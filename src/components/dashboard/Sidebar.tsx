@@ -77,7 +77,17 @@ export function DashboardSidebar() {
                         <p className="truncate text-sm font-medium text-white">Nhan</p>
                         <p className="truncate text-xs text-gray-500">Owner</p>
                     </div>
-                    <button className="rounded-lg p-1.5 text-gray-500 hover:bg-white/5 hover:text-white transition-colors">
+                    <button
+                        onClick={async () => {
+                            await fetch('/api/users/logout', {
+                                method: 'POST',
+                                credentials: 'include',
+                            })
+                            window.location.href = '/login'
+                        }}
+                        className="rounded-lg p-1.5 text-gray-500 hover:bg-white/5 hover:text-white transition-colors"
+                        title="Logout"
+                    >
                         <LogOut className="h-4 w-4" />
                     </button>
                 </div>
@@ -85,3 +95,4 @@ export function DashboardSidebar() {
         </aside>
     )
 }
+

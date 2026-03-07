@@ -66,6 +66,26 @@ export function middleware(req: NextRequest) {
         return response
     }
 
+    // ── Auth Guard — Protected routes ─────────────────────────────────────────
+    const protectedPaths = ['/dashboard', '/builder', '/editor', '/onboarding']
+    const authPaths = ['/login', '/register']
+    const isProtectedRoute = protectedPaths.some((p) => pathname.startsWith(p))
+    const isAuthRoute = authPaths.some((p) => pathname.startsWith(p))
+    const hasToken = req.cookies.has('payload-token')
+
+    // Not logged in → trying to access protected route → redirect to login
+    if (isProtectedRoute && !hasToken) {
+        url.pathname = '/login'
+        url.searchParams.set('redirect', pathname)
+        return NextResponse.redirect(url)
+    }
+
+    // Already logged in → trying to access auth page → redirect to dashboard
+    if (isAuthRoute && hasToken) {
+        url.pathname = '/dashboard'
+        return NextResponse.redirect(url)
+    }
+
     // ── Main platform (primeweb.app) — Dashboard & marketing ─────────────────
     return NextResponse.next()
 }
