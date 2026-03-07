@@ -36,7 +36,7 @@ export const Templates: CollectionConfig = {
             name: 'thumbnail',
             type: 'upload',
             relationTo: 'media',
-            required: true,
+            required: false,
         },
         {
             name: 'previewUrl',

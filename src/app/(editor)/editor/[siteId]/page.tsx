@@ -180,14 +180,22 @@ function AIChatPanel({
 }
 
 // ─── Settings Panel (Right) ─────────────────────────────────────────────
+const FONT_OPTIONS = ['Outfit', 'Inter', 'DM Sans', 'Playfair Display', 'Roboto', 'Poppins', 'Plus Jakarta Sans']
+
 function SettingsPanel({
     block,
     blockIndex,
     theme,
+    onThemeChange,
+    onDeleteBlock,
+    onDuplicateBlock,
 }: {
     block: BlockData | null
     blockIndex: number
     theme: any
+    onThemeChange: (key: string, value: string) => void
+    onDeleteBlock: (idx: number) => void
+    onDuplicateBlock: (idx: number) => void
 }) {
     if (!block) {
         return (
@@ -236,18 +244,6 @@ function SettingsPanel({
                     </div>
                 )}
 
-                {block.subtext && (
-                    <div>
-                        <label className="text-xs font-medium text-gray-400">Description</label>
-                        <textarea
-                            defaultValue={block.subtext}
-                            rows={2}
-                            className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50 resize-none"
-                            readOnly
-                        />
-                    </div>
-                )}
-
                 {block.logoText && (
                     <div>
                         <label className="text-xs font-medium text-gray-400">Logo Text</label>
@@ -259,59 +255,86 @@ function SettingsPanel({
                     </div>
                 )}
 
-                {block.variant && (
-                    <div>
-                        <label className="text-xs font-medium text-gray-400">Variant</label>
-                        <input
-                            defaultValue={block.variant}
-                            className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
-                            readOnly
-                        />
-                    </div>
-                )}
-
                 {/* Block actions */}
                 <div className="border-t border-white/10 pt-4">
                     <label className="text-xs font-medium uppercase text-gray-500">Block Actions</label>
                     <div className="mt-2 flex gap-2">
-                        <button className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
+                        <button
+                            onClick={() => onDuplicateBlock(blockIndex)}
+                            className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                        >
                             <Copy className="h-3 w-3" /> Duplicate
                         </button>
-                        <button className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors">
+                        <button
+                            onClick={() => onDeleteBlock(blockIndex)}
+                            className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors"
+                        >
                             <Trash2 className="h-3 w-3" /> Delete
                         </button>
                     </div>
                 </div>
 
-                {/* Theme */}
+                {/* Theme — live editing */}
                 {theme && (
                     <div className="border-t border-white/10 pt-4">
                         <label className="text-xs font-medium uppercase text-gray-500">🎨 Global Theme</label>
                         <div className="mt-3">
                             <label className="text-xs text-gray-400">Primary Color</label>
                             <div className="mt-1 flex items-center gap-2">
-                                <div className="h-6 w-6 rounded border border-white/10" style={{ backgroundColor: theme.primaryColor }} />
                                 <input
-                                    defaultValue={theme.primaryColor}
-                                    className="flex-1 rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none"
-                                    readOnly
+                                    type="color"
+                                    value={theme.primaryColor || '#0ea5e9'}
+                                    onChange={(e) => onThemeChange('primaryColor', e.target.value)}
+                                    className="h-7 w-7 rounded border-0 cursor-pointer bg-transparent"
+                                />
+                                <input
+                                    value={theme.primaryColor || '#0ea5e9'}
+                                    onChange={(e) => onThemeChange('primaryColor', e.target.value)}
+                                    className="flex-1 rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500/50"
                                 />
                             </div>
                         </div>
                         <div className="mt-3">
                             <label className="text-xs text-gray-400">Heading Font</label>
-                            <input
-                                defaultValue={theme.fontHeading}
-                                className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none"
-                                readOnly
-                            />
+                            <select
+                                value={theme.fontHeading || 'Outfit'}
+                                onChange={(e) => onThemeChange('fontHeading', e.target.value)}
+                                className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500/50"
+                            >
+                                {FONT_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}
+                            </select>
+                        </div>
+                        <div className="mt-3">
+                            <label className="text-xs text-gray-400">Body Font</label>
+                            <select
+                                value={theme.fontBody || 'Inter'}
+                                onChange={(e) => onThemeChange('fontBody', e.target.value)}
+                                className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500/50"
+                            >
+                                {FONT_OPTIONS.map((f) => <option key={f} value={f}>{f}</option>)}
+                            </select>
+                        </div>
+                        <div className="mt-3">
+                            <label className="text-xs text-gray-400">Color Mode</label>
+                            <div className="mt-1 flex gap-2">
+                                {['dark', 'light'].map((mode) => (
+                                    <button
+                                        key={mode}
+                                        onClick={() => onThemeChange('colorMode', mode)}
+                                        className={cn(
+                                            'flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors',
+                                            theme.colorMode === mode
+                                                ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                                                : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10'
+                                        )}
+                                    >
+                                        {mode === 'dark' ? '🌙 Dark' : '☀️ Light'}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 )}
-
-                <p className="text-[10px] text-gray-600 text-center pt-2">
-                    ✏️ Inline editing coming in Phase 2
-                </p>
             </div>
         </div>
     )
@@ -330,6 +353,10 @@ export default function EditorPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [isPublishing, setIsPublishing] = useState(false)
     const [publishSuccess, setPublishSuccess] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [saveSuccess, setSaveSuccess] = useState(false)
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+    const [iframeKey, setIframeKey] = useState(0)
 
     // Fetch site and page data
     useEffect(() => {
@@ -337,20 +364,11 @@ export default function EditorPage() {
 
         async function loadData() {
             try {
-                // Fetch site
-                const siteRes = await fetch(`/api/sites/${siteId}`)
-                if (siteRes.ok) {
-                    const siteData = await siteRes.json()
-                    setSite(siteData)
-                }
-
-                // Fetch pages for this site
-                const pagesRes = await fetch(`/api/pages?where[site][equals]=${siteId}&where[isHomepage][equals]=true&limit=1`)
-                if (pagesRes.ok) {
-                    const pagesData = await pagesRes.json()
-                    if (pagesData.docs?.length > 0) {
-                        setPage(pagesData.docs[0])
-                    }
+                const res = await fetch(`/api/sites/${siteId}/editor-data`)
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.site) setSite(data.site)
+                    if (data.page) setPage(data.page)
                 }
             } catch (err) {
                 console.error('Failed to load site data', err)
@@ -389,6 +407,61 @@ export default function EditorPage() {
     const currentBlock = blocks[selectedBlock] || null
     const isPublished = site?.status === 'published'
 
+    // ─── Save handler ───────────────────────────
+    const handleSave = async () => {
+        if (!siteId || !page) return
+        setIsSaving(true)
+        try {
+            await fetch(`/api/sites/${siteId}/save`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    blocks: page.layout,
+                    theme: site?.theme,
+                }),
+            })
+            setSaveSuccess(true)
+            setHasUnsavedChanges(false)
+            setIframeKey((k) => k + 1) // reload preview
+            setTimeout(() => setSaveSuccess(false), 2000)
+        } catch (err) {
+            console.error('Save failed', err)
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    // ─── Theme change handler ───────────────────
+    const handleThemeChange = (key: string, value: string) => {
+        if (!site) return
+        setSite({
+            ...site,
+            theme: { ...site.theme, [key]: value },
+        })
+        setHasUnsavedChanges(true)
+    }
+
+    // ─── Block delete handler ───────────────────
+    const handleDeleteBlock = (idx: number) => {
+        if (!page) return
+        const newLayout = page.layout.filter((_, i) => i !== idx)
+        setPage({ ...page, layout: newLayout })
+        setSelectedBlock(Math.max(0, idx - 1))
+        setHasUnsavedChanges(true)
+    }
+
+    // ─── Block duplicate handler ────────────────
+    const handleDuplicateBlock = (idx: number) => {
+        if (!page) return
+        const blockCopy = JSON.parse(JSON.stringify(page.layout[idx]))
+        const newLayout = [...page.layout]
+        newLayout.splice(idx + 1, 0, blockCopy)
+        setPage({ ...page, layout: newLayout })
+        setSelectedBlock(idx + 1)
+        setHasUnsavedChanges(true)
+    }
+
     return (
         <div className="flex h-screen flex-col bg-[#0B1120]">
             {/* ─── Top Toolbar ──────────────────────────────────────── */}
@@ -408,6 +481,29 @@ export default function EditorPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {hasUnsavedChanges && (
+                        <span className="text-[10px] text-yellow-400 animate-pulse">● Unsaved</span>
+                    )}
+                    <button
+                        onClick={handleSave}
+                        disabled={isSaving || saveSuccess || !hasUnsavedChanges}
+                        className={cn(
+                            'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                            saveSuccess
+                                ? 'bg-green-600/20 text-green-400'
+                                : hasUnsavedChanges
+                                    ? 'bg-white/10 text-white hover:bg-white/15'
+                                    : 'bg-white/5 text-gray-500 cursor-default'
+                        )}
+                    >
+                        {isSaving ? (
+                            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...</>
+                        ) : saveSuccess ? (
+                            <><Check className="h-3.5 w-3.5" /> Saved!</>
+                        ) : (
+                            <><Save className="h-3.5 w-3.5" /> Save</>
+                        )}
+                    </button>
                     <a
                         href={`/api/preview/${siteId}`}
                         target="_blank"
@@ -464,6 +560,7 @@ export default function EditorPage() {
                     ) : (
                         <div className="flex-1 bg-white">
                             <iframe
+                                key={iframeKey}
                                 src={`/api/preview/${siteId}`}
                                 className="h-full w-full border-0"
                                 title="Site Preview"
@@ -477,6 +574,9 @@ export default function EditorPage() {
                     block={currentBlock}
                     blockIndex={selectedBlock}
                     theme={site?.theme}
+                    onThemeChange={handleThemeChange}
+                    onDeleteBlock={handleDeleteBlock}
+                    onDuplicateBlock={handleDuplicateBlock}
                 />
             </div>
 
