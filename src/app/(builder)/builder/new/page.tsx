@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Sparkles, Send, ArrowLeft, Loader2 } from 'lucide-react'
+import { Sparkles, Send, ArrowLeft, Loader2, Check, ExternalLink } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 type Message = {
@@ -21,7 +23,6 @@ function ChatBubble({ message }: { message: Message }) {
 
     return (
         <div className={cn('flex gap-3', isUser ? 'flex-row-reverse' : 'flex-row')}>
-            {/* Avatar */}
             <div
                 className={cn(
                     'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
@@ -30,10 +31,8 @@ function ChatBubble({ message }: { message: Message }) {
                         : 'bg-gradient-to-br from-purple-500 to-blue-500 text-white'
                 )}
             >
-                {isUser ? 'N' : '✨'}
+                {isUser ? '👤' : '✨'}
             </div>
-
-            {/* Bubble */}
             <div
                 className={cn(
                     'max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
@@ -48,25 +47,45 @@ function ChatBubble({ message }: { message: Message }) {
     )
 }
 
-// ─── Progress Indicator ─────────────────────────────────────────────────
-function GeneratingProgress({ step }: { step: string }) {
+// ─── Progress Steps ─────────────────────────────────────────────────────
+const GENERATION_STEPS = [
+    'Phân tích yêu cầu...',
+    'Tạo Navigation & Hero...',
+    'Tạo About & Features...',
+    'Tạo Testimonials & Contact...',
+    'Tạo Footer & SEO...',
+    'Lưu vào database...',
+]
+
+function GeneratingProgress({ currentStep }: { currentStep: number }) {
     return (
-        <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4">
-            <div className="flex items-center gap-3">
-                <Loader2 className="h-5 w-5 animate-spin text-purple-400" />
-                <div>
-                    <p className="text-sm font-medium text-purple-300">{step}</p>
-                    <div className="mt-2 h-1.5 w-48 rounded-full bg-gray-800">
-                        <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-1000" />
-                    </div>
+        <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4 space-y-3">
+            {GENERATION_STEPS.map((stepText, i) => (
+                <div key={i} className="flex items-center gap-3">
+                    {i < currentStep ? (
+                        <Check className="h-4 w-4 text-green-400" />
+                    ) : i === currentStep ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                    ) : (
+                        <div className="h-4 w-4 rounded-full border border-gray-600" />
+                    )}
+                    <span className={cn(
+                        'text-xs',
+                        i < currentStep ? 'text-green-400' :
+                            i === currentStep ? 'text-purple-300 font-medium' :
+                                'text-gray-600'
+                    )}>
+                        {stepText}
+                    </span>
                 </div>
-            </div>
+            ))}
         </div>
     )
 }
 
 // ─── Main Page ──────────────────────────────────────────────────────────
 export default function AIBuilderPage() {
+    const router = useRouter()
     const [messages, setMessages] = useState<Message[]>([
         {
             id: '1',
@@ -79,18 +98,35 @@ export default function AIBuilderPage() {
     const [input, setInput] = useState('')
     const [step, setStep] = useState<BuilderStep>('chat')
     const [isLoading, setIsLoading] = useState(false)
+    const [genStep, setGenStep] = useState(0)
+    const [generatedSiteId, setGeneratedSiteId] = useState<string | null>(null)
+    const [generatedSiteName, setGeneratedSiteName] = useState('')
+    const [userPrompt, setUserPrompt] = useState('')
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 
-    // Auto-scroll to latest message
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, [messages])
+    }, [messages, genStep])
 
-    // Focus input on mount
     useEffect(() => {
         inputRef.current?.focus()
     }, [])
+
+    // Simulate progress animation during generation
+    useEffect(() => {
+        if (step !== 'generating') return
+        const interval = setInterval(() => {
+            setGenStep(prev => {
+                if (prev >= GENERATION_STEPS.length - 1) {
+                    clearInterval(interval)
+                    return prev
+                }
+                return prev + 1
+            })
+        }, 600)
+        return () => clearInterval(interval)
+    }, [step])
 
     const handleSend = async () => {
         if (!input.trim() || isLoading) return
@@ -102,28 +138,82 @@ export default function AIBuilderPage() {
             timestamp: new Date(),
         }
 
-        setMessages((prev) => [...prev, userMessage])
+        setMessages(prev => [...prev, userMessage])
+        const currentInput = input.trim()
         setInput('')
         setIsLoading(true)
 
-        // TODO: Replace with real AI API call (Vercel AI SDK useChat)
-        // For now, simulate AI response
-        setTimeout(() => {
-            const aiResponse: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content:
-                    'Tuyệt vời! Tôi sẽ tạo website cho bạn với:\n\n' +
-                    '🎨 **Phong cách:** Modern & Clean\n' +
-                    '📄 **Trang:** Home, About, Contact\n' +
-                    '🧩 **Sections:** Hero banner, About, Gallery, Contact form, Footer\n\n' +
-                    'Bạn có muốn tôi bắt đầu tạo ngay không? (Gõ "Tạo ngay" để bắt đầu)',
-                timestamp: new Date(),
-            }
-            setMessages((prev) => [...prev, aiResponse])
-            setStep('confirming')
+        if (step === 'chat') {
+            // First message → AI confirms the plan
+            setUserPrompt(currentInput)
+
+            setTimeout(() => {
+                const confirmMessage: Message = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content:
+                        'Tuyệt vời! Tôi sẽ tạo website cho bạn với:\n\n' +
+                        '📄 **Trang chính:** Homepage đầy đủ\n' +
+                        '🧩 **7 Sections:** Navigation, Hero, About, Features, Testimonials, Contact, Footer\n' +
+                        '🎨 **Theme:** Tự động theo ngành nghề\n' +
+                        '📱 **Responsive:** Tối ưu mọi thiết bị\n\n' +
+                        'Gõ **"Tạo ngay"** hoặc bất kỳ message nào để tôi bắt đầu! 🚀',
+                    timestamp: new Date(),
+                }
+                setMessages(prev => [...prev, confirmMessage])
+                setStep('confirming')
+                setIsLoading(false)
+            }, 800)
+        } else if (step === 'confirming') {
+            // Second message → Start generation
+            setStep('generating')
+            setGenStep(0)
             setIsLoading(false)
-        }, 1500)
+
+            try {
+                const res = await fetch('/api/ai/generate-site', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: userPrompt }),
+                    credentials: 'include',
+                })
+
+                const data = await res.json()
+
+                if (!res.ok) {
+                    throw new Error(data.error || 'Generation failed')
+                }
+
+                // Wait for progress animation to finish
+                await new Promise(resolve => setTimeout(resolve, GENERATION_STEPS.length * 600 + 500))
+
+                setGeneratedSiteId(data.siteId)
+                setGeneratedSiteName(data.siteName)
+                setStep('done')
+
+                const doneMessage: Message = {
+                    id: (Date.now() + 2).toString(),
+                    role: 'assistant',
+                    content:
+                        `✅ Website **"${data.siteName}"** đã được tạo thành công!\n\n` +
+                        `📊 **${data.blockCount} sections** đã được generate\n` +
+                        `🎨 **Theme:** ${data.theme?.colorMode === 'dark' ? 'Dark' : 'Light'} mode\n\n` +
+                        `Bạn có thể vào Dashboard để quản lý website hoặc mở Editor để chỉnh sửa.`,
+                    timestamp: new Date(),
+                }
+                setMessages(prev => [...prev, doneMessage])
+
+            } catch (error: any) {
+                setStep('confirming')
+                const errorMessage: Message = {
+                    id: (Date.now() + 3).toString(),
+                    role: 'assistant',
+                    content: `❌ Đã xảy ra lỗi: ${error.message}\n\nVui lòng thử lại!`,
+                    timestamp: new Date(),
+                }
+                setMessages(prev => [...prev, errorMessage])
+            }
+        }
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -158,7 +248,7 @@ export default function AIBuilderPage() {
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {messages.map((msg) => (
+                    {messages.map(msg => (
                         <ChatBubble key={msg.id} message={msg} />
                     ))}
 
@@ -178,7 +268,27 @@ export default function AIBuilderPage() {
                     )}
 
                     {step === 'generating' && (
-                        <GeneratingProgress step="Đang tạo Hero section..." />
+                        <GeneratingProgress currentStep={genStep} />
+                    )}
+
+                    {/* Done state — action buttons */}
+                    {step === 'done' && generatedSiteId && (
+                        <div className="flex flex-col gap-2 pt-2">
+                            <Button
+                                onClick={() => router.push('/dashboard')}
+                                className="w-full"
+                            >
+                                🏠 Về Dashboard
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => router.push(`/editor/${generatedSiteId}`)}
+                                className="w-full"
+                            >
+                                <ExternalLink className="h-4 w-4" />
+                                Mở Editor
+                            </Button>
+                        </div>
                     )}
 
                     <div ref={messagesEndRef} />
@@ -190,15 +300,21 @@ export default function AIBuilderPage() {
                         <input
                             ref={inputRef}
                             value={input}
-                            onChange={(e) => setInput(e.target.value)}
+                            onChange={e => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="Mô tả business của bạn..."
+                            placeholder={
+                                step === 'chat'
+                                    ? 'Mô tả business của bạn...'
+                                    : step === 'confirming'
+                                        ? 'Gõ "Tạo ngay" để bắt đầu...'
+                                        : 'Website đang được tạo...'
+                            }
                             className="flex-1 bg-transparent px-4 py-3 text-sm text-white placeholder-gray-500 outline-none"
-                            disabled={isLoading || step === 'generating'}
+                            disabled={isLoading || step === 'generating' || step === 'done'}
                         />
                         <button
                             onClick={handleSend}
-                            disabled={!input.trim() || isLoading}
+                            disabled={!input.trim() || isLoading || step === 'generating' || step === 'done'}
                             className="rounded-lg bg-blue-600 p-2 text-white transition-colors hover:bg-blue-500 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                             <Send className="h-4 w-4" />
@@ -218,11 +334,50 @@ export default function AIBuilderPage() {
                             Generating...
                         </span>
                     )}
+                    {step === 'done' && generatedSiteName && (
+                        <span className="flex items-center gap-2 text-xs text-green-400">
+                            <Check className="h-3 w-3" />
+                            {generatedSiteName}
+                        </span>
+                    )}
                 </div>
 
                 {/* Preview content */}
                 <div className="flex-1 flex items-center justify-center bg-[#0F172A]">
-                    {step === 'chat' || step === 'confirming' ? (
+                    {step === 'done' && generatedSiteId ? (
+                        // Show success state with site summary
+                        <div className="text-center space-y-6">
+                            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-green-500/10 border-2 border-green-500/30">
+                                <Check className="h-12 w-12 text-green-400" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-white">{generatedSiteName}</h2>
+                                <p className="mt-2 text-sm text-gray-400">
+                                    Website đã được tạo thành công với 7 sections
+                                </p>
+                            </div>
+                            <div className="flex flex-col gap-3 mx-auto max-w-xs">
+                                <Button
+                                    size="lg"
+                                    onClick={() => router.push('/dashboard')}
+                                >
+                                    Về Dashboard xem kết quả
+                                </Button>
+                            </div>
+                        </div>
+                    ) : step === 'generating' ? (
+                        <div className="text-center space-y-4">
+                            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-purple-500/10 animate-pulse">
+                                <Sparkles className="h-10 w-10 text-purple-400" />
+                            </div>
+                            <p className="text-sm text-purple-300">
+                                Đang tạo website...
+                            </p>
+                            <p className="text-xs text-gray-600">
+                                AI đang generate {GENERATION_STEPS.length} sections cho bạn
+                            </p>
+                        </div>
+                    ) : (
                         <div className="text-center">
                             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-white/5">
                                 <Sparkles className="h-10 w-10 text-gray-700" />
@@ -231,15 +386,8 @@ export default function AIBuilderPage() {
                                 Website preview sẽ xuất hiện ở đây
                             </p>
                             <p className="mt-1 text-xs text-gray-700">
-                                Mô tả business → AI generate → Preview realtime
+                                Mô tả business → AI generate → Preview
                             </p>
-                        </div>
-                    ) : (
-                        // TODO: iframe preview sẽ render website thật ở đây
-                        <div className="h-full w-full bg-white">
-                            <div className="p-8 text-center text-gray-400">
-                                Website preview loading...
-                            </div>
                         </div>
                     )}
                 </div>
