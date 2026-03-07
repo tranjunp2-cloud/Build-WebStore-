@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { User, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export default function RegisterPage() {
     const router = useRouter()
@@ -112,50 +115,44 @@ export default function RegisterPage() {
 
                 {/* First Name */}
                 <div>
-                    <label htmlFor="firstName" className="mb-1.5 block text-sm font-medium text-gray-300">
-                        Your Name
-                    </label>
-                    <div className="relative">
+                    <Label htmlFor="firstName">Your Name</Label>
+                    <div className="relative mt-1.5">
                         <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                        <input
+                        <Input
                             id="firstName"
                             type="text"
                             value={firstName}
                             onChange={(e) => setFirstName(e.target.value)}
                             required
                             placeholder="e.g. Nhan"
-                            className="w-full rounded-lg border border-white/10 bg-[#0F172A] py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-gray-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                            className="pl-10"
                         />
                     </div>
                 </div>
 
                 {/* Email */}
                 <div>
-                    <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-gray-300">
-                        Email
-                    </label>
-                    <div className="relative">
+                    <Label htmlFor="email">Email</Label>
+                    <div className="relative mt-1.5">
                         <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                        <input
+                        <Input
                             id="email"
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
                             placeholder="you@example.com"
-                            className="w-full rounded-lg border border-white/10 bg-[#0F172A] py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-gray-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                            className="pl-10"
                         />
                     </div>
                 </div>
 
                 {/* Password */}
                 <div>
-                    <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-gray-300">
-                        Password
-                    </label>
-                    <div className="relative">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative mt-1.5">
                         <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                        <input
+                        <Input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
                             value={password}
@@ -163,7 +160,7 @@ export default function RegisterPage() {
                             required
                             minLength={6}
                             placeholder="Min 6 characters"
-                            className="w-full rounded-lg border border-white/10 bg-[#0F172A] py-2.5 pl-10 pr-10 text-sm text-white placeholder:text-gray-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+                            className="pl-10 pr-10"
                         />
                         <button
                             type="button"
@@ -199,20 +196,16 @@ export default function RegisterPage() {
                 </div>
 
                 {/* Submit */}
-                <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                >
+                <Button type="submit" disabled={isLoading} className="w-full">
                     {isLoading ? (
-                        <span className="flex items-center justify-center gap-2">
+                        <>
                             <Loader2 className="h-4 w-4 animate-spin" />
                             Creating account...
-                        </span>
+                        </>
                     ) : (
                         'Create Account'
                     )}
-                </button>
+                </Button>
             </form>
 
             <p className="mt-6 text-center text-sm text-gray-400">
