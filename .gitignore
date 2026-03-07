@@ -1,0 +1,39 @@
+# PrimeWeb
+
+## Dependencies
+node_modules/
+
+## Next.js
+.next/
+out/
+
+## Build
+dist/
+build/
+
+## Environment
+.env
+.env.local
+.env.production
+.env.staging
+
+## IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Media uploads
+public/media/*
+!public/media/.gitkeep
+
+## Payload generated
+src/payload-types.ts
+
+## Logs
+*.log
+npm-debug.log*

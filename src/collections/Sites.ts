@@ -1,0 +1,186 @@
+import type { CollectionConfig } from 'payload'
+
+export const Sites: CollectionConfig = {
+    slug: 'sites',
+    admin: {
+        useAsTitle: 'name',
+        description: 'Each tenant can have one or more websites.',
+    },
+    fields: [
+        {
+            name: 'name',
+            type: 'text',
+            required: true,
+            admin: { description: 'Internal name for this website' },
+        },
+        {
+            name: 'domain',
+            type: 'text',
+            admin: { description: 'Auto-populated from tenant settings or custom domain' },
+        },
+        {
+            name: 'status',
+            type: 'select',
+            required: true,
+            defaultValue: 'draft',
+            options: [
+                { label: 'Draft', value: 'draft' },
+                { label: 'Published', value: 'published' },
+                { label: 'Archived', value: 'archived' },
+            ],
+        },
+        {
+            name: 'siteType',
+            type: 'select',
+            required: true,
+            defaultValue: 'business',
+            options: [
+                { label: 'Business / Landing Page', value: 'business' },
+                { label: 'Online Store (E-commerce)', value: 'ecommerce' },
+                { label: 'Blog', value: 'blog' },
+                { label: 'Portfolio', value: 'portfolio' },
+                { label: 'Restaurant', value: 'restaurant' },
+            ],
+        },
+        {
+            name: 'theme',
+            type: 'group',
+            label: 'Site Theme & Branding',
+            fields: [
+                {
+                    name: 'primaryColor',
+                    type: 'text',
+                    defaultValue: '#0ea5e9',
+                    admin: { description: 'Primary brand color (hex)' },
+                },
+                {
+                    name: 'secondaryColor',
+                    type: 'text',
+                    defaultValue: '#d946ef',
+                },
+                {
+                    name: 'backgroundColor',
+                    type: 'text',
+                    defaultValue: '#ffffff',
+                },
+                {
+                    name: 'fontHeading',
+                    type: 'select',
+                    defaultValue: 'Outfit',
+                    options: [
+                        { label: 'Outfit', value: 'Outfit' },
+                        { label: 'Inter', value: 'Inter' },
+                        { label: 'Playfair Display', value: 'Playfair Display' },
+                        { label: 'DM Sans', value: 'DM Sans' },
+                        { label: 'Poppins', value: 'Poppins' },
+                        { label: 'Raleway', value: 'Raleway' },
+                    ],
+                },
+                {
+                    name: 'fontBody',
+                    type: 'select',
+                    defaultValue: 'Inter',
+                    options: [
+                        { label: 'Inter', value: 'Inter' },
+                        { label: 'DM Sans', value: 'DM Sans' },
+                        { label: 'Lato', value: 'Lato' },
+                        { label: 'Open Sans', value: 'Open Sans' },
+                        { label: 'Nunito', value: 'Nunito' },
+                    ],
+                },
+                {
+                    name: 'borderRadius',
+                    type: 'select',
+                    defaultValue: 'rounded',
+                    options: [
+                        { label: 'Sharp (0px)', value: 'sharp' },
+                        { label: 'Subtle (4px)', value: 'subtle' },
+                        { label: 'Rounded (8px)', value: 'rounded' },
+                        { label: 'Soft (16px)', value: 'soft' },
+                        { label: 'Pill (9999px)', value: 'pill' },
+                    ],
+                },
+                {
+                    name: 'colorMode',
+                    type: 'select',
+                    defaultValue: 'light',
+                    options: [
+                        { label: 'Light', value: 'light' },
+                        { label: 'Dark', value: 'dark' },
+                    ],
+                },
+            ],
+        },
+        {
+            name: 'seo',
+            type: 'group',
+            label: 'SEO Settings',
+            fields: [
+                {
+                    name: 'metaTitle',
+                    type: 'text',
+                    admin: { description: 'Default meta title for the site' },
+                },
+                {
+                    name: 'metaDescription',
+                    type: 'textarea',
+                    admin: { description: 'Default meta description' },
+                },
+                {
+                    name: 'ogImage',
+                    type: 'upload',
+                    relationTo: 'media',
+                },
+                {
+                    name: 'googleAnalyticsId',
+                    type: 'text',
+                },
+                {
+                    name: 'googleVerificationToken',
+                    type: 'text',
+                },
+            ],
+        },
+        {
+            name: 'socialLinks',
+            type: 'group',
+            fields: [
+                { name: 'facebook', type: 'text' },
+                { name: 'instagram', type: 'text' },
+                { name: 'twitter', type: 'text' },
+                { name: 'linkedin', type: 'text' },
+                { name: 'youtube', type: 'text' },
+                { name: 'tiktok', type: 'text' },
+            ],
+        },
+        {
+            name: 'aiGenerationMetadata',
+            type: 'group',
+            label: 'AI Generation Info',
+            admin: { description: 'Metadata stored from AI generation session' },
+            fields: [
+                {
+                    name: 'generatedAt',
+                    type: 'date',
+                    admin: { readOnly: true },
+                },
+                {
+                    name: 'originalPrompt',
+                    type: 'textarea',
+                    admin: { readOnly: true, description: 'The prompt used to generate this site' },
+                },
+                {
+                    name: 'businessType',
+                    type: 'text',
+                    admin: { readOnly: true },
+                },
+            ],
+        },
+        {
+            name: 'publishedAt',
+            type: 'date',
+            admin: { readOnly: true },
+        },
+    ],
+    timestamps: true,
+}

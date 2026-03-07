@@ -1,0 +1,81 @@
+---
+description: AI feature rules — generation, rate limiting, prompts
+globs: src/**/ai/**/*
+alwaysApply: false
+---
+
+# AI Features Rules (PrimeWeb)
+
+## Rate Limits (KHÔNG được bỏ qua)
+- Site generation: 3x/day per tenant (Free), 5x (Starter), 20x (Pro), Unlimited (Business)
+- Content rewrite: 20x/day per tenant
+- Image generation: 10x/hour per tenant
+- AI chat: 100x/day per tenant
+
+## OpenAI API Call Pattern
+```typescript
+import OpenAI from 'openai'
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+// Content generation
+const response = await openai.chat.completions.create({
+  model: 'gpt-4',
+  temperature: 0.7,
+  response_format: { type: 'json_object' },
+  messages: [
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: userPrompt },
+  ],
+})
+
+// Image generation
+const image = await openai.images.generate({
+  model: 'dall-e-3',
+  prompt: imagePrompt,
+  size: '1792x1024',
+  quality: 'standard',
+  n: 1,
+})
+```
+
+## Prompt Engineering Rules
+- Luôn có system prompt định nghĩa context (website builder, SEO expert)
+- Luôn inject business context (industry, target_audience, language)
+- Response format: luôn yêu cầu JSON có cấu trúc rõ ràng khi cần parse
+- Language: hỗ trợ Tiếng Việt + English
+- Fallback: nếu AI fail → toast lỗi + retry button, KHÔNG hiện raw error
+
+## AI Site Generation Flow
+```
+1. User nhập: business name, industry, description
+2. Server Action → validate input (Zod)
+3. Check rate limit (tenant plan)
+4. GPT-4: Generate site structure JSON (pages + blocks + content)
+5. DALL-E 3: Generate hero image + relevant images
+6. Payload API: Create Site + Pages + Blocks from JSON
+7. Return siteId → redirect to /editor/:siteId
+```
+
+## AI Response Type
+```typescript
+interface AIGeneratedSite {
+  siteName: string
+  theme: {
+    primaryColor: string
+    secondaryColor: string
+    fontHeading: string
+    fontBody: string
+    colorMode: 'light' | 'dark'
+  }
+  pages: Array<{
+    title: string
+    slug: string
+    blocks: Array<{
+      blockType: string
+      variant: string
+      content: Record<string, unknown>
+    }>
+  }>
+}
+```

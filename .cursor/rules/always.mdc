@@ -1,0 +1,100 @@
+---
+description: Core rules for PrimeWeb SaaS — always apply
+globs: **/*
+alwaysApply: true
+---
+
+# PrimeWeb — Core Rules
+
+## Source of Truth
+- SPEC.md ở root là nguồn sự thật duy nhất cho product requirements
+- Trước khi code feature mới → đọc section liên quan trong SPEC.md
+- Nếu SPEC.md chưa có section đó → hỏi lại, đừng tự assume
+
+## Architecture Overview
+- **Monolith hiện đại**: Next.js 15 App Router + Payload CMS 3 chạy chung 1 app
+- **Database**: PostgreSQL (shared DB, tenant isolation via `tenant` field)
+- **CMS**: Payload CMS 3.14+ tự động sinh REST API + Admin UI
+- **Styling**: Tailwind CSS + shadcn/ui components
+- **AI**: OpenAI GPT-4 (content) + DALL-E 3 (images)
+- **Payments**: Stripe (subscriptions)
+- **Storage**: MinIO / S3 (media uploads)
+- **Deploy**: Docker + Cloudflare
+
+## 9-Point Done Checklist (MANDATORY mỗi screen/page)
+Trước khi hoàn thành, check đủ 9 điểm:
+1. **Loading State** — Skeleton (không spinner đơn lẻ)
+2. **Empty State** — Icon + title + CTA (không blank screen)
+3. **Error State** — Toast đỏ + nút Thử lại
+4. **Form Validation** — Zod schema, lỗi ngay dưới field
+5. **Button States** — disabled + spinner khi loading
+6. **Toast Feedback** — mọi mutation action đều có toast (success/error)
+7. **Auth Redirect** — 401 → /login
+8. **Mobile 375px** — layout không vỡ (responsive)
+9. **TypeScript Clean** — zero `any`, tsc --noEmit pass
+
+## Core Rules
+- Register success → auto-login → /onboarding (KHÔNG redirect /login)
+- Onboarding complete → /editor/:siteId (KHÔNG /dashboard)
+- Soft delete EVERYWHERE: `{ deletedAt: new Date() }` — KHÔNG hard delete
+- Multi-tenant: MỌI Payload query phải scope theo `tenant` field
+- Rate limit trước mọi AI endpoint
+- TypeScript strict — KHÔNG dùng `any`, KHÔNG dùng `as unknown`
+
+## Anti-patterns Cấm Tuyệt Đối
+- ❌ fetch() trực tiếp → ✅ useQuery / useMutation (TanStack Query) hoặc Payload Local API
+- ❌ Hard delete → ✅ Soft delete `{ deletedAt: new Date() }`
+- ❌ `any` type → ✅ Payload generated types hoặc Zod infer types
+- ❌ Missing loading state → ✅ Skeleton component
+- ❌ CSS inline style → ✅ Tailwind classes
+- ❌ Image without next/image → ✅ `<Image>` với width/height
+- ❌ Missing error boundary → ✅ React Error Boundary per route
+- ❌ Business logic trong component → ✅ Custom hooks hoặc server actions
+- ❌ Import Payload config ở client components → ✅ Chỉ dùng ở Server Components/Actions
+
+## File Naming Convention
+- Components: `PascalCase.tsx` (ví dụ: `SiteEditor.tsx`)
+- Hooks: `use-kebab-case.ts` (ví dụ: `use-site-theme.ts`)
+- Utils: `kebab-case.ts` (ví dụ: `generate-slug.ts`)
+- Types: `kebab-case.types.ts` (ví dụ: `site-editor.types.ts`)
+- Server Actions: `kebab-case.action.ts` (ví dụ: `update-site.action.ts`)
+
+## BMAD Workflow (MANDATORY cho mọi feature mới)
+
+### Quy trình
+```
+DISCOVERY → PLANNING → BUILD → MEASURE
+                ↓
+         Readiness Gate (4/4 PASS trước khi code)
+```
+
+### Khi nào dùng
+| Loại | Flow |
+|------|------|
+| Feature mới (AI Builder, Editor, Checkout) | **Full BMAD** — Story → Gate → Sprint |
+| Feature nhỏ (thêm field, CRUD) | **Quick** — Story ngắn → Gate 5 phút → Sprint |
+| Bug fix | **Direct** — Describe → Fix → Test |
+
+### Readiness Gate — 4 tiêu chí PHẢI PASS
+```
+☐ 1. User Stories rõ ràng? (Gherkin AC: GIVEN/WHEN/THEN)
+☐ 2. UI mockup/wireframe anh duyệt?
+☐ 3. API contracts documented? (trong SPEC.md)
+☐ 4. Dependencies resolved? (API keys, DB schema, Docker)
+→ < 4/4 PASS = HOLD. KHÔNG được code.
+```
+
+### User Story Format
+```markdown
+US-[ID]: [Tên]
+Story: As a [user] I want [action] So that [benefit]
+AC: GIVEN [...] WHEN [...] THEN [...] AND [...]
+```
+
+## Deploy Rule (TUYỆT ĐỐI)
+- **LUÔN dùng Docker** — KHÔNG bao giờ hướng dẫn `npm install` / `npm run dev` trực tiếp
+- Chạy: `docker compose up -d`
+- Rebuild: `docker compose build --no-cache && docker compose up -d`
+- Xem log: `docker compose logs -f web`
+- Tắt: `docker compose down`
+
