@@ -1,7 +1,11 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { Plus, Sparkles } from 'lucide-react'
+import { getPayload } from 'payload'
+import config from '@payload-config'
 
+import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
+import { formatRelativeTime, formatStorage } from '@/lib/utils'
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
 import { DashboardSiteGrid } from '@/components/dashboard/DashboardSiteGrid'
@@ -9,29 +13,57 @@ import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { DashboardBanner } from '@/components/dashboard/DashboardBanner'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 
-// ─── Mock Data (will be replaced with Payload Local API in Wave 3) ──────
-// TODO: Replace with getPayload() → payload.find({ collection: 'sites', where: { tenant, deletedAt: { exists: false } } })
-const MOCK_SITES = [
-    { id: 'site-1', name: 'Bakery Delights', slug: 'bakery-delights', isPublished: true, updatedAt: '2 giờ trước' },
-    { id: 'site-2', name: 'Aurora Wellness', slug: 'aurora-wellness', isPublished: false, updatedAt: 'Hôm qua' },
-    { id: 'site-3', name: 'Portfolio Pro', slug: 'portfolio-pro', isPublished: false, updatedAt: '19/10/2026' },
-]
+// ─── Dashboard Page (Server Component — Real Data) ─────────────────────
+export default async function DashboardPage() {
+    const user = await getCurrentUser()
+    const tenantId = await getCurrentTenantId()
+    const payload = await getPayload({ config })
 
-const MOCK_STATS = {
-    totalSites: 3,
-    totalViews: '12.4K',
-    storageUsed: 1.2,
-    storageLimit: 10,
-    aiCredits: 15,
-    aiCreditsLimit: 20,
-}
+    // Get real user name
+    const userName = (user as any)?.firstName || (user as any)?.email?.split('@')[0] || 'User'
 
-// ─── Dashboard Page (Server Component) ─────────────────────────────────
-export default function DashboardPage() {
-    // TODO: Replace mock with Payload Local API server-side fetch
-    const sites = MOCK_SITES
-    const stats = MOCK_STATS
-    const userName = 'Nhan' // TODO: From Payload auth session
+    // Fetch real sites from DB
+    let sites: Array<{ id: string; name: string; slug: string; isPublished: boolean; updatedAt: string }> = []
+    let totalSites = 0
+
+    if (tenantId) {
+        const sitesResult = await payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: tenantId } },
+            sort: '-updatedAt',
+            limit: 20,
+        })
+        totalSites = sitesResult.totalDocs
+        sites = sitesResult.docs.map((doc: any) => ({
+            id: doc.id,
+            name: doc.name || 'Untitled Site',
+            slug: doc.domain || doc.id,
+            isPublished: doc.status === 'published',
+            updatedAt: doc.updatedAt ? formatRelativeTime(doc.updatedAt) : 'Just created',
+        }))
+    }
+
+    // Fetch real tenant data for stats
+    let storageUsed = 0
+    let storageLimit = 500 // MB default
+    if (tenantId) {
+        try {
+            const tenant = await payload.findByID({ collection: 'tenants', id: tenantId })
+            storageUsed = (tenant as any)?.settings?.storageUsed || 0
+            storageLimit = ((tenant as any)?.settings?.storageLimitBytes || 524288000) / (1024 * 1024) // bytes → MB
+        } catch {
+            // tenant not found — use defaults
+        }
+    }
+
+    const stats = {
+        totalSites,
+        totalViews: '0', // TODO: Analytics integration (Wave 5)
+        storageUsed: Math.round((storageUsed / (1024 * 1024)) * 10) / 10, // bytes → MB
+        storageLimit: Math.round(storageLimit),
+        aiCredits: 20,      // TODO: Credits system (Wave 5)
+        aiCreditsLimit: 20,
+    }
 
     const hasSites = sites.length > 0
     const unpublishedSite = sites.find((s) => !s.isPublished)
@@ -52,7 +84,7 @@ export default function DashboardPage() {
                     </Link>
                 </div>
 
-                {/* Unpublished Banner (US-006C) */}
+                {/* Unpublished Banner */}
                 {unpublishedSite && (
                     <DashboardBanner
                         siteId={unpublishedSite.id}
@@ -62,14 +94,14 @@ export default function DashboardPage() {
 
                 {hasSites ? (
                     <>
-                        {/* Stats Cards (US-006A) */}
+                        {/* Stats Cards */}
                         <DashboardStats {...stats} />
 
-                        {/* Site Grid (US-006A) */}
+                        {/* Site Grid */}
                         <DashboardSiteGrid sites={sites} />
                     </>
                 ) : (
-                    /* Empty State (US-006B) */
+                    /* Empty State */
                     <DashboardEmptyState />
                 )}
 

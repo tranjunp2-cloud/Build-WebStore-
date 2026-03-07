@@ -27,7 +27,12 @@ const navItems = [
     { label: 'Billing', href: '/dashboard/billing', icon: CreditCard, phase: 5 },
 ]
 
-export function DashboardSidebar() {
+type SidebarProps = {
+    userName: string
+    userInitial: string
+}
+
+export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
     const pathname = usePathname()
 
     return (
@@ -71,10 +76,10 @@ export function DashboardSidebar() {
             <div className="border-t border-white/10 p-4">
                 <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-xs font-bold text-white">
-                        N
+                        {userInitial}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="truncate text-sm font-medium text-white">Nhan</p>
+                        <p className="truncate text-sm font-medium text-white">{userName}</p>
                         <p className="truncate text-xs text-gray-500">Owner</p>
                     </div>
                     <button

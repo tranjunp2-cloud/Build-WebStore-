@@ -6,7 +6,46 @@ export const Sites: CollectionConfig = {
         useAsTitle: 'name',
         description: 'Each tenant can have one or more websites.',
     },
+    access: {
+        // Authenticated users can create sites
+        create: ({ req }) => Boolean(req.user),
+        // Users can only read their own tenant's sites
+        read: ({ req }) => {
+            if (!req.user) return false
+            if (req.user.roles?.includes('super-admin')) return true
+            const tenantIds = req.user.tenants?.map((t: any) =>
+                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+            ) ?? []
+            return { tenant: { in: tenantIds } }
+        },
+        // Users can update their own tenant's sites
+        update: ({ req }) => {
+            if (!req.user) return false
+            if (req.user.roles?.includes('super-admin')) return true
+            const tenantIds = req.user.tenants?.map((t: any) =>
+                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+            ) ?? []
+            return { tenant: { in: tenantIds } }
+        },
+        // Users can delete their own tenant's sites
+        delete: ({ req }) => {
+            if (!req.user) return false
+            if (req.user.roles?.includes('super-admin')) return true
+            const tenantIds = req.user.tenants?.map((t: any) =>
+                typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+            ) ?? []
+            return { tenant: { in: tenantIds } }
+        },
+    },
     fields: [
+        {
+            name: 'tenant',
+            type: 'relationship',
+            relationTo: 'tenants',
+            required: true,
+            index: true,
+            admin: { description: 'The tenant/store this site belongs to' },
+        },
         {
             name: 'name',
             type: 'text',

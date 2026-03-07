@@ -1,13 +1,18 @@
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
+import { getCurrentUser } from '@/lib/auth'
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
+    const user = await getCurrentUser()
+    const userName = (user as any)?.firstName || (user as any)?.email?.split('@')[0] || 'User'
+    const userInitial = userName.charAt(0).toUpperCase()
+
     return (
         <div className="min-h-screen bg-[#0F172A]">
-            <DashboardSidebar />
+            <DashboardSidebar userName={userName} userInitial={userInitial} />
             <main className="pl-[240px]">
                 <div className="p-8">
                     {children}

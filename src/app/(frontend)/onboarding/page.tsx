@@ -77,6 +77,12 @@ export default function OnboardingPage() {
                 <p className="mt-8 text-xs text-gray-600">
                     Bạn có thể tạo thêm website sau tại Dashboard
                 </p>
+                <Link
+                    href="/dashboard"
+                    className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300"
+                >
+                    Bỏ qua → Đến Dashboard
+                </Link>
             </div>
         </div>
     )
