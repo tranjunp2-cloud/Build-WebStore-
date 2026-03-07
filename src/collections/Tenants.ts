@@ -17,9 +17,19 @@ export const Tenants: CollectionConfig = {
                 },
             }
         },
-        create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
-        update: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
-        delete: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+        // Any authenticated user can create their own tenant (registration flow)
+        create: ({ req }) => Boolean(req.user),
+        update: ({ req }) => {
+            if (req.user?.roles?.includes('super-admin')) return true
+            // Tenant owners can update their own tenant
+            return {
+                id: {
+                    in: req.user?.tenants?.map((t: any) =>
+                        typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                    ) ?? [],
+                },
+            }
+        },
     },
     fields: [
         {

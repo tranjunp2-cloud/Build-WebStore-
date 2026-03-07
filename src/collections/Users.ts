@@ -7,6 +7,24 @@ export const Users: CollectionConfig = {
         useAsTitle: 'email',
         description: 'Platform users — can be super-admins or tenant members.',
     },
+    access: {
+        // Allow anyone to register (public create)
+        create: () => true,
+        // Users can read their own data, super-admin can read all
+        read: ({ req }) => {
+            if (!req.user) return false
+            if (req.user.roles?.includes('super-admin')) return true
+            return { id: { equals: req.user.id } }
+        },
+        // Users can update their own data
+        update: ({ req }) => {
+            if (!req.user) return false
+            if (req.user.roles?.includes('super-admin')) return true
+            return { id: { equals: req.user.id } }
+        },
+        // Only super-admin can delete
+        delete: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
+    },
     fields: [
         {
             name: 'firstName',
@@ -16,7 +34,6 @@ export const Users: CollectionConfig = {
         {
             name: 'lastName',
             type: 'text',
-            required: true,
         },
         {
             name: 'roles',
