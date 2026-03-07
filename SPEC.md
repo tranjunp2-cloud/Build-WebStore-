@@ -564,50 +564,73 @@ Must test: AI prompt builders, Zod schemas, utility functions
 
 ## 17. BUILD TRACKING
 
+> **Thứ tự build theo user journey:** Register → Onboarding → AI Builder → AI Editor → Dashboard → Commerce → Launch
+
 ### Wave 1 — Foundation ✅ DONE
 ```
 ✅ Next.js 15 + Payload CMS setup
 ✅ 7 Collections (DB schemas)
 ✅ Multi-tenant middleware
 ✅ SSR render engine + 8 blocks
-✅ Docker environment
-✅ Cursor rules + SPEC.md
+✅ Docker environment (optimized)
+✅ Cursor rules + SPEC.md v3.0
+✅ BMAD AI-Factory Lite (.ai/ + docs/)
+✅ Git + GitHub (clean structure)
 ```
 
-### Wave 2 — BMAD Planning 🔄 CURRENT
+### Wave 2 — Auth + Onboarding 🔄 CURRENT
 ```
-☐ User Stories P0 (Gherkin AC) — US-001 → US-010
-☐ UI Mockups per screen (v0.app → owner approve)
-☐ Readiness Gate 4/4 PASS
-☐ Design System tokens finalized
+☐ 2.1 AUTH FLOW (← NEXT)
+  ☐ Login page (/login)
+  ☐ Register page (/register)
+  ☐ Payload auth session (built-in JWT)
+  ☐ Auth guard middleware (protect /dashboard, /builder, /editor)
+  ☐ 401 → redirect /login
+  ☐ Logout action
+
+☐ 2.2 ONBOARDING
+  ☐ Welcome page (/onboarding) — post-register
+  ☐ Store setup (/onboarding/setup) — slug, defaults
+  ☐ → redirect to AI Builder
+
+✅ 2.3 DASHBOARD (BMAD PASS)
+  ✅ Dashboard PRD + Architecture + QA
+  ✅ 6 components (Greeting, Stats, SiteGrid, EmptyState, Banner, Skeleton)
 ```
 
-### Wave 3 — AI Core + Editor UI
+### Wave 3 — AI Core + Editor
 ```
-☐ AI generate-site endpoint (SSE streaming)
-☐ AI Chat Builder UI (/builder/new)
-☐ AI Editor UI (/editor/:siteId — 3 panels)
-☐ Block components render in preview
-☐ Undo/Redo + Auto-save
-☐ Publish flow
-☐ 8 new blocks (Pricing → Logo Cloud)
+☐ 3.1 AI CHAT BUILDER
+  ☐ POST /ai/generate-store (SSE streaming)
+  ☐ Full-screen Chat + Live Preview
+  ☐ AI clarifying (max 2 questions)
+  ☐ 12 category prompt templates
+
+☐ 3.2 AI EDITOR
+  ☐ Split screen: Chat (380px) + Live Preview
+  ☐ Inline AI edit (hover → popup)
+  ☐ Undo/Redo + Auto-save (30s)
+  ☐ Publish flow (1-click)
+  ☐ 8 new blocks (Pricing → Logo Cloud)
 ```
 
-### Wave 4 — Commerce + SEO
+### Wave 4 — Commerce + SEO + Storefront
 ```
 ☐ Products CRUD + AI description
-☐ Cart + Checkout + Stripe
+☐ Orders management
+☐ Payment (FPX, GrabPay, card — ipay88)
+☐ Delivery (J&T, Pos Laju)
 ☐ SEO Dashboard + AI SEO
-☐ Public storefront SSR
+☐ Public storefront SSR + JSON-LD
 ```
 
 ### Wave 5 — Polish & Launch
 ```
-☐ E2E tests (Playwright)
-☐ Performance optimization
+☐ Playwright E2E tests
+☐ Core Web Vitals > 90
 ☐ Custom domain (Cloudflare API)
-☐ Analytics (Sentry)
-☐ Beta launch
+☐ Sentry + PostHog analytics
+☐ UAT + Beta launch
 ```
 
 ---

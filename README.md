@@ -94,12 +94,16 @@ DISCOVERY → PLANNING → BUILD → MEASURE
 
 ## 📋 Build Progress
 
+> Build theo **user journey**: Register → Onboarding → Builder → Editor → Dashboard → Commerce
+
 | Wave | Nội dung | Status |
 |------|---------|--------|
-| **Wave 1** | Foundation — Next.js + Payload + Docker + 8 Blocks | ✅ Done |
-| **Wave 2** | BMAD Planning — User Stories + UI Mockups + Gate | 🔄 Current |
-| **Wave 3** | AI Core — Chat Builder + Editor + Preview | ⏳ Next |
-| **Wave 4** | Commerce — Products + Cart + Checkout + SEO | ⏳ |
+| **Wave 1** | Foundation — Next.js + Payload + Docker + 8 Blocks + BMAD | ✅ Done |
+| **Wave 2.1** | **Auth** — Login/Register + Auth Guard | 🔄 **Next** |
+| **Wave 2.2** | Onboarding — Welcome + Store Setup | ⏳ |
+| **Wave 2.3** | Dashboard — Stats + Sites Grid | ✅ Done |
+| **Wave 3** | AI Core — Chat Builder + Editor + Streaming | ⏳ |
+| **Wave 4** | Commerce + SEO — Products + Checkout + Storefront | ⏳ |
 | **Wave 5** | Polish — Tests + Performance + Launch | ⏳ |
 
 ---
