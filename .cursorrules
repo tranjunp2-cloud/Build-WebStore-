@@ -114,18 +114,27 @@ docs/tracking/                      — Product plan, feature registry
 
 ## 🎨 DESIGN WORKFLOW
 
-### For new features:
-1. Generate AI mockup → save to `docs/design/F{XX}-{name}-*.jpg`
-2. Reference Design Tokens from `SPEC.md §4`
-3. Build components following mockup + tokens
-4. Tailwind CSS classes for dashboard (no inline styles)
-5. Storefront pages: inline styles OK (iframe compatibility)
+### Primary: Figma MCP (Agent reads Figma directly)
+- Figma MCP configured at `.cursor/mcp.json`
+- Copy Figma frame link → paste in chat → agent reads design
+- No manual export needed — agent extracts layout, colors, spacing
+
+### Fallback: Exported mockups
+- Export from Figma → `docs/design/F{XX}-{name}-*.jpg`
+- Used when Figma MCP unavailable or for BMAD gate docs
 
 ### Design Tokens (Source of Truth: SPEC.md §4):
 - Primary: teal-600 | Background: white (light) / gray-950 (dark)
 - Font: Inter | Radius: rounded-lg (8px)
 - Mobile: min-width 375px | Tap target: 44px
 - Currency: MYR → format `RM XX.XX`
+
+### Build order:
+1. Read design from Figma MCP (or exported mockup)
+2. Reference Design Tokens from SPEC.md §4
+3. Build components with Tailwind CSS
+4. Dashboard: Tailwind classes only (no inline styles)
+5. Storefront: inline styles OK (iframe compatibility)
 
 ## 🧪 TESTING REQUIREMENTS
 

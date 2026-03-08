@@ -68,9 +68,12 @@ docs/stories/                       — User stories
 
 ## 🎨 Design Workflow
 
-1. Generate AI mockup → `docs/design/F{XX}-{name}-*.jpg`
-2. Reference Design Tokens (`SPEC.md §4`)
-3. Build with Tailwind CSS following mockup + tokens
+### Primary: Figma MCP
+- Agents read Figma files directly via MCP (`.cursor/mcp.json`)
+- Copy frame link → paste in chat → agent builds from design
+
+### Fallback: Exported mockups
+- Export from Figma → `docs/design/F{XX}-{name}-*.jpg`
 
 ### Design Tokens:
 - Primary: teal-600 | Background: white/gray-950
