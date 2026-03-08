@@ -8,9 +8,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
+function getOpenAI(): OpenAI | null {
+    const key = process.env.OPENAI_API_KEY
+    if (!key) return null
+    return new OpenAI({ apiKey: key })
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -80,8 +82,8 @@ For rewriting text content:
 5. blockType in new blocks MUST be one of the available types
 6. If the user asks to add a section, use add_block with appropriate content`
 
-        // No API key → simple rule-based response
-        if (!process.env.OPENAI_API_KEY) {
+        const openai = getOpenAI()
+        if (!openai) {
             return NextResponse.json({
                 action: 'update_block',
                 blockIndex: blockIndex ?? 0,

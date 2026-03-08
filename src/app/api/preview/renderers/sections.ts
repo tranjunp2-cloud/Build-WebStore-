@@ -1,10 +1,16 @@
 /**
- * Section renderers — industry-aware content blocks.
- * Each block type has a distinct visual treatment.
+ * Section renderers — industry-aware content blocks with REAL images.
+ * Each block type has a distinct visual treatment with premium quality.
  */
 import { TemplateTheme } from './styles'
+import { getGalleryImages, getAboutImage, getTeamAvatar } from './images'
 
-export function renderSections(block: any, t: TemplateTheme): string {
+// Category for image selection
+let _category = 'business'
+export function setSectionCategory(cat: string) { _category = cat }
+
+export function renderSections(block: any, t: TemplateTheme, category?: string): string {
+  if (category) _category = category
   switch (block.blockType) {
     case 'features': return renderFeatures(block, t)
     case 'about': return renderAbout(block, t)
@@ -23,8 +29,7 @@ export function renderSections(block: any, t: TemplateTheme): string {
 
 function renderFeatures(b: any, t: TemplateTheme) {
   const items = b.features || []
-  const isDark = t.bg.startsWith('#0') || t.bg.startsWith('#1') || t.bg === '#FFFFFF'
-  const cardBg = isDark ? `${t.text}05` : `${t.text}03`
+  const cardBg = `${t.text}05`
   const cardBorder = `${t.text}08`
   return `<section class="section">
     <div class="container">
@@ -33,11 +38,11 @@ function renderFeatures(b: any, t: TemplateTheme) {
         <h2 class="section-title fade-up fade-up-d1">${b.headline || ''}</h2>
         <p class="section-subtitle fade-up fade-up-d2" style="margin:0 auto;">${b.subheadline || ''}</p>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;">
         ${items.map((f: any, i: number) => `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 4)}" style="padding:36px 28px;background:${cardBg};border:1px solid ${cardBorder};border-radius:16px;transition:all .3s;position:relative;overflow:hidden;">
+          <div class="fade-up fade-up-d${Math.min(i + 1, 4)} card-hover" style="padding:36px 28px;background:${cardBg};border:1px solid ${cardBorder};border-radius:16px;position:relative;overflow:hidden;">
             <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,${t.primary},${t.secondary});opacity:0;transition:opacity .3s;"></div>
-            <div style="width:48px;height:48px;border-radius:12px;background:${t.primary}12;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:20px;">${f.icon || '✦'}</div>
+            <div style="width:52px;height:52px;border-radius:14px;background:${t.primary}15;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:20px;">${f.icon || '✦'}</div>
             <h3 style="font-size:18px;font-weight:700;margin-bottom:10px;">${f.title}</h3>
             <p style="font-size:14px;color:${t.muted};line-height:1.7;">${f.description || ''}</p>
           </div>
@@ -48,6 +53,7 @@ function renderFeatures(b: any, t: TemplateTheme) {
 }
 
 function renderAbout(b: any, t: TemplateTheme) {
+  const aboutImg = getAboutImage(_category)
   return `<section class="section" style="background:${t.primary}06;">
     <div class="container" style="display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;">
       <div>
@@ -55,8 +61,8 @@ function renderAbout(b: any, t: TemplateTheme) {
         <h2 class="section-title fade-up fade-up-d1">${b.headline || ''}</h2>
         <p class="fade-up fade-up-d2" style="font-size:16px;color:${t.muted};line-height:1.8;">${b.body || ''}</p>
       </div>
-      <div style="aspect-ratio:4/3;border-radius:20px;background:linear-gradient(135deg,${t.primary}15,${t.secondary}20);display:flex;align-items:center;justify-content:center;" class="hide-mobile">
-        <div style="font-size:64px;opacity:.4;">🏢</div>
+      <div style="aspect-ratio:4/3;border-radius:20px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,.1);" class="hide-mobile">
+        <img src="${aboutImg}" alt="About Us" loading="lazy" style="width:100%;height:100%;object-fit:cover;transition:transform .5s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" />
       </div>
     </div>
   </section>`
@@ -70,19 +76,21 @@ function renderTestimonials(b: any, t: TemplateTheme) {
         <h2 class="section-title fade-up">${b.headline || ''}</h2>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;">
-        ${items.map((t2: any, i: number) => `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 3)}" style="padding:32px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:16px;">
+        ${items.map((t2: any, i: number) => {
+    const avatar = getTeamAvatar(_category, i)
+    return `
+          <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="padding:32px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:16px;">
             <div style="display:flex;gap:4px;margin-bottom:16px;">${'⭐'.repeat(t2.rating || 5)}</div>
             <p style="font-size:15px;color:${t.muted};line-height:1.7;margin-bottom:20px;font-style:italic;">"${t2.quote}"</p>
             <div style="display:flex;align-items:center;gap:12px;">
-              <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,${t.primary},${t.secondary});display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;">${(t2.name || '?').charAt(0)}</div>
+              <img src="${avatar}" alt="${t2.name}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid ${t.primary}30;" />
               <div>
                 <div style="font-size:14px;font-weight:700;">${t2.name}</div>
                 <div style="font-size:12px;color:${t.muted};">${t2.title || ''}</div>
               </div>
             </div>
-          </div>
-        `).join('')}
+          </div>`
+  }).join('')}
       </div>
     </div>
   </section>`
@@ -115,7 +123,7 @@ function renderPricing(b: any, t: TemplateTheme) {
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;max-width:900px;margin:0 auto;">
         ${plans.map((p: any, i: number) => `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 3)}" style="padding:36px 28px;border-radius:20px;border:${p.isPopular ? `2px solid ${t.primary}` : `1px solid ${t.text}10`};background:${p.isPopular ? `${t.primary}08` : `${t.text}03`};position:relative;${p.isPopular ? `box-shadow:0 20px 40px ${t.primary}15;transform:scale(1.03);` : ''}">
+          <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="padding:36px 28px;border-radius:20px;border:${p.isPopular ? `2px solid ${t.primary}` : `1px solid ${t.text}10`};background:${p.isPopular ? `${t.primary}08` : `${t.text}03`};position:relative;${p.isPopular ? `box-shadow:0 20px 40px ${t.primary}15;transform:scale(1.03);` : ''}">
             ${p.isPopular ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 16px;background:${t.primary};color:#fff;border-radius:100px;font-size:11px;font-weight:700;">POPULAR</div>` : ''}
             <h3 style="font-size:18px;font-weight:700;margin-bottom:4px;">${p.name}</h3>
             <p style="font-size:13px;color:${t.muted};margin-bottom:16px;">${p.description || ''}</p>
@@ -147,14 +155,15 @@ function renderFaq(b: any, t: TemplateTheme) {
 }
 
 function renderGallery(b: any, t: TemplateTheme) {
-  const count = Math.min((b.images || []).length || 6, 8)
+  const galleryImages = getGalleryImages(_category, 6)
   return `<section class="section">
     <div class="container">
       <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
-        ${Array.from({ length: count }, (_, i) => `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 4)}" style="aspect-ratio:${i % 3 === 0 ? '4/3' : '1/1'};border-radius:12px;background:linear-gradient(${135 + i * 20}deg,${t.primary}${12 + i * 3},${t.secondary}${15 + i * 3});overflow:hidden;display:flex;align-items:center;justify-content:center;">
-            <span style="font-size:32px;opacity:.3;">📷</span>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        ${galleryImages.map((imgUrl: string, i: number) => `
+          <div class="fade-up fade-up-d${Math.min(i + 1, 4)}" style="aspect-ratio:${i % 3 === 0 ? '4/3' : '1/1'};border-radius:12px;overflow:hidden;position:relative;cursor:pointer;">
+            <img src="${imgUrl}" alt="Gallery ${i + 1}" loading="lazy" style="width:100%;height:100%;object-fit:cover;transition:transform .5s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'" />
+            <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.3));opacity:0;transition:opacity .3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'"></div>
           </div>
         `).join('')}
       </div>
@@ -168,27 +177,30 @@ function renderTeam(b: any, t: TemplateTheme) {
     <div class="container">
       <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px;max-width:800px;margin:0 auto;">
-        ${members.map((m: any, i: number) => `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 3)}" style="text-align:center;padding:32px 20px;background:${t.text}04;border-radius:16px;">
-            <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,${t.primary},${t.secondary});margin:0 auto 16px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;font-weight:700;">${(m.name || '?').charAt(0)}</div>
+        ${members.map((m: any, i: number) => {
+    const avatar = getTeamAvatar(_category, i)
+    return `
+          <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="text-align:center;padding:32px 20px;background:${t.text}04;border-radius:16px;border:1px solid ${t.text}06;">
+            <img src="${avatar}" alt="${m.name}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin:0 auto 16px;border:3px solid ${t.primary}25;" />
             <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">${m.name}</h3>
             <p style="font-size:13px;color:${t.muted};">${m.role || ''}</p>
-          </div>
-        `).join('')}
+          </div>`
+  }).join('')}
       </div>
     </div>
   </section>`
 }
 
 function renderCta(b: any, t: TemplateTheme) {
+  const img = getAboutImage(_category)
   return `<section style="padding:80px 0;">
     <div class="container">
-      <div class="fade-up" style="text-align:center;padding:64px 40px;border-radius:24px;background:linear-gradient(135deg,${t.primary},${t.secondary});position:relative;overflow:hidden;">
-        <div style="position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.1);"></div>
-        <div style="position:absolute;bottom:-60px;left:-30px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.08);"></div>
+      <div class="fade-up" style="text-align:center;padding:64px 40px;border-radius:24px;position:relative;overflow:hidden;">
+        <img src="${img}" alt="CTA Background" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
+        <div style="position:absolute;inset:0;background:linear-gradient(135deg,${t.primary}e6,${t.secondary}cc);"></div>
         <h2 style="font-size:clamp(24px,3vw,36px);font-weight:800;color:#fff;margin-bottom:12px;position:relative;z-index:1;">${b.headline || ''}</h2>
         <p style="font-size:16px;color:rgba(255,255,255,.85);margin-bottom:32px;position:relative;z-index:1;">${b.subheadline || ''}</p>
-        <a href="${b.ctaUrl || '#'}" style="display:inline-flex;padding:14px 36px;background:#fff;color:${t.primary};border-radius:12px;font-weight:700;font-size:15px;position:relative;z-index:1;transition:all .2s;">${b.ctaLabel || 'Get Started'}</a>
+        <a href="${b.ctaUrl || '#'}" style="display:inline-flex;padding:14px 36px;background:#fff;color:${t.primary};border-radius:12px;font-weight:700;font-size:15px;position:relative;z-index:1;transition:all .2s;box-shadow:0 8px 24px rgba(0,0,0,.2);">${b.ctaLabel || 'Get Started'}</a>
       </div>
     </div>
   </section>`
@@ -206,7 +218,7 @@ function renderContact(b: any, t: TemplateTheme) {
       { icon: '📞', label: 'Phone', value: b.phone },
       { icon: '📍', label: 'Address', value: b.address },
     ].filter(c => c.value).map((c, i) => `
-            <div class="fade-up fade-up-d${i + 2}" style="display:flex;align-items:center;gap:16px;padding:16px;background:${t.text}04;border-radius:12px;">
+            <div class="fade-up fade-up-d${i + 2} card-hover" style="display:flex;align-items:center;gap:16px;padding:16px;background:${t.text}04;border-radius:12px;border:1px solid ${t.text}06;">
               <div style="width:44px;height:44px;border-radius:10px;background:${t.primary}12;display:flex;align-items:center;justify-content:center;font-size:20px;">${c.icon}</div>
               <div><div style="font-size:12px;color:${t.muted};margin-bottom:2px;">${c.label}</div><div style="font-size:14px;font-weight:600;">${c.value}</div></div>
             </div>

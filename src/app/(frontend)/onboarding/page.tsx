@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Zap, Sparkles, LayoutTemplate, FileText, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { Zap, Sparkles, LayoutTemplate, FileText, ArrowRight, CheckCircle2, MousePointerClick } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export default function OnboardingPage() {
