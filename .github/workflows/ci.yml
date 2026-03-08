@@ -56,15 +56,25 @@ jobs:
           BRANCH="${GITHUB_REF_NAME}"
           SHORT_SHA="${GITHUB_SHA:0:7}"
           AUTHOR="${GITHUB_ACTOR}"
+          TIME=$(date -u +"%H:%M UTC")
           curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
             "timestamp": "'"$TIMESTAMP"'",
             "sign": "'"$SIGN"'",
             "msg_type": "interactive",
             "card": {
-              "header": {"title": {"tag": "plain_text", "content": "✅ CI Passed — PrimeWeb"}, "template": "green"},
+              "header": {"title": {"tag": "plain_text", "content": "✅ CI Passed"}, "template": "green"},
               "elements": [
-                {"tag": "div", "text": {"tag": "lark_md", "content": "**Branch:** '"$BRANCH"'\n**Commit:** '"$SHORT_SHA"'\n**Author:** '"$AUTHOR"'"}},
-                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "View Run →"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "primary"}]}
+                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🌿 Branch**\n'"$BRANCH"'"}}]}
+                ]},
+                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$AUTHOR"'"}}]}
+                ]},
+                {"tag": "hr"},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "🕐 '"$TIME"'  ·  Lint ✅  TypeCheck ✅  Test ✅  Build ✅"}},
+                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "📋 View CI Run"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "primary"}]}
               ]
             }
           }' || true
@@ -80,6 +90,7 @@ jobs:
           BRANCH="${GITHUB_REF_NAME}"
           SHORT_SHA="${GITHUB_SHA:0:7}"
           AUTHOR="${GITHUB_ACTOR}"
+          TIME=$(date -u +"%H:%M UTC")
           EVENT_TYPE="${GITHUB_EVENT_NAME}"
           if [ "$EVENT_TYPE" = "pull_request" ]; then
             TITLE="❌ CI Failed — PR #${{ github.event.pull_request.number }}"
@@ -95,8 +106,18 @@ jobs:
             "card": {
               "header": {"title": {"tag": "plain_text", "content": "'"$TITLE"'"}, "template": "red"},
               "elements": [
-                {"tag": "div", "text": {"tag": "lark_md", "content": "**Branch:** '"$BRANCH"'\n**Commit:** '"$SHORT_SHA"'\n**Author:** '"$AUTHOR"'"}},
-                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "View Logs →"}, "url": "'"$URL"'", "type": "danger"}]}
+                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🌿 Branch**\n'"$BRANCH"'"}}]}
+                ]},
+                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$AUTHOR"'"}}]}
+                ]},
+                {"tag": "hr"},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "⚠️ **CI pipeline failed!** Please check the logs and fix the issues."}},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "🕐 '"$TIME"'"}},
+                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔍 View Logs"}, "url": "'"$URL"'", "type": "danger"}]}
               ]
             }
           }' || true
