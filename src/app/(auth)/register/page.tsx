@@ -40,8 +40,8 @@ export default function RegisterPage() {
 
             if (!userRes.ok) {
                 const data = await userRes.json()
-                const msg = data?.errors?.[0]?.message || 'Đăng ký thất bại'
-                setError(msg.includes('duplicate') ? 'Email đã được sử dụng' : msg)
+                const msg = data?.errors?.[0]?.message || 'Registration failed'
+                setError(msg.includes('duplicate') ? 'Email is already in use' : msg)
                 return
             }
 
@@ -54,7 +54,7 @@ export default function RegisterPage() {
             })
 
             if (!loginRes.ok) {
-                setError('Tạo tài khoản thành công nhưng đăng nhập thất bại. Vui lòng login thủ công.')
+                setError('Account created successfully but auto-login failed. Please log in manually.')
                 router.push('/login')
                 return
             }
@@ -93,7 +93,7 @@ export default function RegisterPage() {
             router.push('/onboarding')
             router.refresh()
         } catch {
-            setError('Đã xảy ra lỗi. Vui lòng thử lại.')
+            setError('An error occurred. Please try again.')
         } finally {
             setIsLoading(false)
         }
@@ -103,7 +103,7 @@ export default function RegisterPage() {
         <>
             <div className="mb-6 text-center">
                 <h1 className="text-2xl font-bold text-white">Create your account</h1>
-                <p className="mt-1 text-sm text-gray-400">Get started with PrimeWeb — free</p>
+                <p className="mt-1 text-sm text-gray-400">Get started with Web Store — free</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -178,12 +178,12 @@ export default function RegisterPage() {
                                     <div
                                         key={level}
                                         className={`h-1 flex-1 rounded-full transition-colors ${passwordStrength >= level
-                                                ? level === 1
-                                                    ? 'bg-red-500'
-                                                    : level === 2
-                                                        ? 'bg-yellow-500'
-                                                        : 'bg-green-500'
-                                                : 'bg-gray-700'
+                                            ? level === 1
+                                                ? 'bg-red-500'
+                                                : level === 2
+                                                    ? 'bg-yellow-500'
+                                                    : 'bg-green-500'
+                                            : 'bg-gray-700'
                                             }`}
                                     />
                                 ))}

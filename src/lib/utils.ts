@@ -10,7 +10,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Format relative time (e.g., "2 phút trước")
+ * Format relative time (e.g., "2 minutes ago")
  */
 export function formatRelativeTime(date: Date | string): string {
     const now = new Date()
@@ -20,11 +20,11 @@ export function formatRelativeTime(date: Date | string): string {
     const diffHour = Math.floor(diffMs / 3600000)
     const diffDay = Math.floor(diffMs / 86400000)
 
-    if (diffMin < 1) return 'Vừa xong'
-    if (diffMin < 60) return `${diffMin} phút trước`
-    if (diffHour < 24) return `${diffHour} giờ trước`
-    if (diffDay < 7) return `${diffDay} ngày trước`
-    return target.toLocaleDateString('vi-VN')
+    if (diffMin < 1) return 'Just now'
+    if (diffMin < 60) return `${diffMin} min ago`
+    if (diffHour < 24) return `${diffHour} hours ago`
+    if (diffDay < 7) return `${diffDay} days ago`
+    return target.toLocaleDateString('en-MY')
 }
 
 /**

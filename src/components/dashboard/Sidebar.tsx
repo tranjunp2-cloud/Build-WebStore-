@@ -7,12 +7,9 @@ import {
     Globe,
     LayoutTemplate,
     Image,
-    Search,
-    BarChart3,
     Settings,
-    CreditCard,
     LogOut,
-    Sparkles,
+    MousePointerClick,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -21,10 +18,7 @@ const navItems = [
     { label: 'My Sites', href: '/dashboard/sites', icon: Globe },
     { label: 'Templates', href: '/templates', icon: LayoutTemplate },
     { label: 'Media', href: '/dashboard/media', icon: Image },
-    { label: 'SEO', href: '/dashboard/seo', icon: Search, phase: 5 },
-    { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3, phase: 5 },
     { label: 'Settings', href: '/dashboard/settings', icon: Settings },
-    { label: 'Billing', href: '/dashboard/billing', icon: CreditCard, phase: 5 },
 ]
 
 type SidebarProps = {
@@ -39,8 +33,8 @@ export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
         <aside className="fixed left-0 top-0 z-40 flex h-screen w-[240px] flex-col border-r border-white/10 bg-[#0B1120]">
             {/* Logo */}
             <div className="flex h-16 items-center gap-2 px-6">
-                <Sparkles className="h-6 w-6 text-blue-400" />
-                <span className="text-lg font-bold text-white">PrimeWeb</span>
+                <MousePointerClick className="h-6 w-6 text-cyan-400" />
+                <span className="text-lg font-bold text-white">Web Store</span>
             </div>
 
             {/* Nav items */}
@@ -62,11 +56,6 @@ export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
                         >
                             <Icon className="h-4 w-4" />
                             <span>{item.label}</span>
-                            {item.phase && item.phase > 2 && (
-                                <span className="ml-auto rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-500">
-                                    Soon
-                                </span>
-                            )}
                         </Link>
                     )
                 })}
@@ -91,7 +80,7 @@ export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
                             window.location.href = '/login'
                         }}
                         className="rounded-lg p-1.5 text-gray-500 hover:bg-white/5 hover:text-white transition-colors"
-                        title="Logout"
+                        title="Log Out"
                     >
                         <LogOut className="h-4 w-4" />
                     </button>
@@ -100,4 +89,3 @@ export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
         </aside>
     )
 }
-

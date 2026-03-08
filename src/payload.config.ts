@@ -20,7 +20,7 @@ export default buildConfig({
   admin: {
     user: Users.slug,
     meta: {
-      titleSuffix: '— PrimeWeb Admin',
+      titleSuffix: '— Web Store Admin',
       favicon: '/favicon.ico',
     },
     importMap: {

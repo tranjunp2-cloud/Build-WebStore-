@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import {
   Sparkles,
@@ -5,7 +7,6 @@ import {
   LayoutTemplate,
   ShoppingBag,
   Search,
-  Zap,
   Check,
   LayoutGrid,
   Type,
@@ -23,6 +24,8 @@ import {
   Palette,
   Package,
 } from 'lucide-react'
+import { useI18n } from '@/i18n'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { SolutionTabs } from '@/components/frontend/SolutionTabs'
 
 /** Header chung cho mọi section (LadiPage light theme) */
@@ -58,11 +61,22 @@ function SectionHeader({
 }
 
 export default function HomePage() {
+  const { t } = useI18n()
+  const featureItems = [
+    { icon: '🤖', ...t.features.items.aiGeneration },
+    { icon: '🧩', ...t.features.items.dragDrop },
+    { icon: '🔍', ...t.features.items.seo },
+    { icon: '🎨', ...t.features.items.templates },
+    { icon: '🌐', ...t.features.items.domains },
+    { icon: '📦', ...t.features.items.ecommerce },
+    { icon: '📊', ...t.features.items.analytics },
+    { icon: '🔗', ...t.features.items.integration },
+    { icon: '⚡', ...t.features.items.performance },
+  ]
+
   return (
     <div className="min-h-screen bg-white text-zinc-900">
-      {/* ═══════════════════════════════════════════════════════════════════
-          NAVIGATION (LadiPage: nền trắng, chữ đen, nút xanh)
-      ═══════════════════════════════════════════════════════════════════ */}
+      {/* Navigation: main structure (i18n + LanguageSwitcher) + LadiPage light style + PrimeWeb */}
       <nav
         className="fixed top-0 w-full z-50 border-b border-zinc-200 bg-white/95 backdrop-blur-md"
         aria-label="Menu chính"
@@ -77,34 +91,22 @@ export default function HomePage() {
             </span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#nen-tang" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
-              Nền tảng
-            </a>
-            <a href="#san-pham" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
-              Sản phẩm
-            </a>
-            <a href="#giai-phap" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
-              Giải pháp
-            </a>
-            <a href="#tai-sao" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
-              Tại sao chọn
-            </a>
-            <a href="#tinh-nang" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
-              Tính năng
-            </a>
+            <a href="#nen-tang" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">Nền tảng</a>
+            <a href="#san-pham" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">Sản phẩm</a>
+            <a href="#giai-phap" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">Giải pháp</a>
+            <a href="#tai-sao" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">Tại sao chọn</a>
+            <a href="#tinh-nang" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">Tính năng</a>
+            <a href="#features" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">{t.nav.features}</a>
+            <a href="#pricing" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">{t.nav.pricing}</a>
+            <a href="#templates" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">{t.nav.templates}</a>
           </div>
           <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors px-4 py-2"
-            >
-              Đăng nhập
+            <LanguageSwitcher variant="pill" />
+            <Link href="/login" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors px-4 py-2">
+              {t.common.signIn}
             </Link>
-            <Link
-              href="/register"
-              className="rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm px-5 py-2.5 transition-colors"
-            >
-              Bắt đầu miễn phí
+            <Link href="/signup" className="rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm px-5 py-2.5 transition-colors">
+              {t.common.getStartedFree}
             </Link>
           </div>
         </div>
@@ -120,51 +122,45 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <div className="text-center lg:text-left order-2 lg:order-1">
-              <p className="text-zinc-500 text-sm md:text-base mb-4">
-                Hàng nghìn doanh nghiệp nhỏ tin dùng PrimeWeb
-              </p>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-sky-500/20 bg-sky-500/5 text-sky-600 text-sm font-medium mb-6">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
+                </span>
+                {t.hero.badge}
+              </div>
               <h1
                 id="hero-heading"
                 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold leading-tight mb-5 text-zinc-900"
               >
-                Nền tảng toàn diện cho{' '}
-                <span className="text-sky-600">Website & Marketing</span>
+                {t.hero.title1}
+                <br />
+                <span className="text-sky-600">{t.hero.title2}</span> {t.hero.title3}
               </h1>
               <p className="text-base md:text-lg text-zinc-600 mb-8 max-w-xl mx-auto lg:mx-0">
-                Thúc đẩy tăng trưởng khách hàng, doanh thu và tối ưu vận hành
-                cho nhà kinh doanh.
+                {t.hero.subtitle}
               </p>
-              <Link
-                href="/register"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold px-8 py-4 text-lg shadow-lg shadow-sky-500/20 transition-all"
-              >
-                Bắt đầu miễn phí ngay
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <Link
+                  href="/signup"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold px-8 py-4 text-lg shadow-lg shadow-sky-500/20 transition-all"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M13 7l5 5m0 0l-5 5m5-5H6"
-                  />
-                </svg>
-              </Link>
+                  {t.common.startBuilding}
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </Link>
+                <a href="#demo" className="inline-flex items-center justify-center rounded-xl border-2 border-zinc-300 text-zinc-700 font-semibold px-8 py-4 text-lg hover:bg-zinc-50 transition-colors">
+                  {t.common.watchDemo}
+                </a>
+              </div>
               <div className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4 text-sm text-zinc-600">
-                <span className="flex items-center gap-1.5">
-                  <Check className="w-4 h-4 text-green-600 shrink-0" /> Không cần
-                  thẻ tín dụng
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Check className="w-4 h-4 text-green-600 shrink-0" /> Chuẩn SEO
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Check className="w-4 h-4 text-green-600 shrink-0" /> Tên miền
-                  riêng
-                </span>
+                {[t.hero.noCreditCard, t.hero.seoOptimized, t.hero.customDomain].map((text, i) => (
+                  <span key={i} className="flex items-center gap-1.5">
+                    <Check className="w-4 h-4 text-green-600 shrink-0" />
+                    {text}
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -393,10 +389,10 @@ export default function HomePage() {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  <Link href="/register" className="rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold px-6 py-3 text-sm transition-colors">
+                  <Link href="/signup" className="rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold px-6 py-3 text-sm transition-colors">
                     Xem chi tiết
                   </Link>
-                  <Link href="/register" className="text-sky-600 font-medium text-sm hover:text-sky-700 inline-flex items-center gap-1">
+                  <Link href="/signup" className="text-sky-600 font-medium text-sm hover:text-sky-700 inline-flex items-center gap-1">
                     Dùng thử miễn phí →
                   </Link>
                 </div>
@@ -585,6 +581,28 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Features Section (main i18n: t.features + featureItems) — light theme */}
+      <section id="features" className="py-24 border-t border-zinc-200 bg-zinc-50/50">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <p className="text-sm font-semibold uppercase tracking-widest text-sky-600 mb-4">{t.features.label}</p>
+            <h2 className="text-4xl md:text-5xl font-heading font-bold text-zinc-900 mb-6">
+              {t.features.title} <span className="text-sky-600">{t.features.titleHighlight}</span>
+            </h2>
+            <p className="text-zinc-600 text-lg">{t.features.subtitle}</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {featureItems.map((feature, i) => (
+              <div key={i} className="group p-8 rounded-2xl border border-zinc-200 bg-white shadow-sm hover:shadow-md hover:border-sky-200 transition-all">
+                <div className="text-3xl mb-4">{feature.icon}</div>
+                <h3 className="text-lg font-heading font-bold text-zinc-900 mb-2 group-hover:text-sky-600 transition-colors">{feature.title}</h3>
+                <p className="text-zinc-600 text-sm leading-relaxed">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ═══════════════════════════════════════════════════════════════════
           SECTION 6: TÍNH NĂNG (6 cards — icon màu, hover nổi, stagger)
       ═══════════════════════════════════════════════════════════════════ */}
@@ -653,16 +671,16 @@ export default function HomePage() {
                 id="cta-heading"
                 className="text-3xl md:text-4xl font-heading font-bold text-white mb-6"
               >
-                Tăng trưởng khách hàng và doanh thu bền vững cùng PrimeWeb
+                {t.cta.title} <span className="text-sky-100">{t.cta.titleHighlight}</span>?
               </h2>
               <p className="text-sky-100 text-lg mb-10">
-                Hợp nhất các tính năng, tiện ích và tài nguyên cần thiết cho hoạt động Website — Bán hàng và Vận hành tinh gọn!
+                {t.cta.subtitle}
               </p>
               <Link
-                href="/register"
+                href="/signup"
                 className="inline-flex items-center gap-2 rounded-xl bg-white text-sky-600 font-semibold px-8 py-4 border-2 border-white hover:bg-sky-50 hover:border-sky-50 transition-colors"
               >
-                Bắt đầu với tài khoản miễn phí
+                {t.cta.button}
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
@@ -739,7 +757,7 @@ export default function HomePage() {
                 Đăng nhập
               </Link>
               <Link
-                href="/register"
+                href="/signup"
                 className="text-sky-600 hover:text-sky-700 font-medium transition-colors"
               >
                 Đăng ký
@@ -747,7 +765,7 @@ export default function HomePage() {
             </div>
           </div>
           <p className="mt-6 text-sm text-zinc-500 text-center md:text-left">
-            © 2026 PrimeWeb. All rights reserved.
+            {t.common.copyright}
           </p>
         </div>
       </footer>

@@ -56,13 +56,13 @@ export default async function DashboardPage() {
         }
     }
 
+    const publishedCount = sites.filter((s) => s.isPublished).length
+
     const stats = {
         totalSites,
-        totalViews: '0', // TODO: Analytics integration (Wave 5)
         storageUsed: Math.round((storageUsed / (1024 * 1024)) * 10) / 10, // bytes → MB
         storageLimit: Math.round(storageLimit),
-        aiCredits: 20,      // TODO: Credits system (Wave 5)
-        aiCreditsLimit: 20,
+        publishedCount,
     }
 
     const hasSites = sites.length > 0
