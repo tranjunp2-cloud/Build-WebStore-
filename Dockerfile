@@ -3,6 +3,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 ENV HUSKY=0
 COPY package.json package-lock.json* ./
+COPY scripts ./scripts
 RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
 
 # ── Stage 2: Builder ────────────────────────────────────────────────────
@@ -10,6 +11,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 ENV HUSKY=0
 COPY package.json package-lock.json* ./
+COPY scripts ./scripts
 RUN npm ci 2>/dev/null || npm install
 
 COPY . .
