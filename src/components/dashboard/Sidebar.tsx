@@ -81,10 +81,16 @@ export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
                     </div>
                     <button
                         onClick={async () => {
-                            await fetch('/api/users/logout', {
-                                method: 'POST',
-                                credentials: 'include',
-                            })
+                            try {
+                                await fetch('/api/users/logout', {
+                                    method: 'POST',
+                                    credentials: 'include',
+                                })
+                            } catch (e) {
+                                // Ignore server errors
+                            }
+                            // Always clear cookie client-side as fallback
+                            document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
                             window.location.href = '/login'
                         }}
                         className="rounded-lg p-1.5 text-gray-500 hover:bg-white/5 hover:text-white transition-colors"
