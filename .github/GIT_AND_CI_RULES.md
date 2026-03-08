@@ -1,6 +1,6 @@
 # Git & CI/CD Rules — Chuẩn cho team SaaS
 
-> **Single source of truth** cho quy tắc Git, CI/CD và hướng dẫn setup. Team tuân thủ để review, release và pipeline chạy đúng.
+> **Nguồn sự thật duy nhất** cho quy tắc Git, CI/CD và setup. Mọi môi trường (Cursor, Antigravity, CI, dev local) **bắt buộc dùng chung** file này và [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ---
 
@@ -100,32 +100,14 @@ Repo dùng **Commitlint + Husky** để chặn commit không đúng format (ch�
 #### 4.1 Yêu cầu trước khi merge
 
 - **Title:** Theo Conventional Commits (type(scope): description).  
-- **Description:** Điền đủ template (Story, Changes, Checklist, Test steps).  
+- **Description:** Điền đủ [template](.github/PULL_REQUEST_TEMPLATE.md) (Story, Changes, Checklist, Test steps).  
 - **Review:** ≥ 1 approval.  
 - **CI:** Toàn bộ status check pass (lint, typecheck, test, build).  
 - **Branch:** Cập nhật với base (rebase hoặc merge base vào branch).
 
-#### 4.2 PR template (tóm tắt)
+#### 4.2 PR template
 
-```markdown
-## Story
-- Closes #[issue]
-- Story: US-xxx — [tên]
-
-## Changes
-- [Mô tả thay đổi]
-
-## Checklist
-- [ ] 9-Point Done (xem CLAUDE.md)
-- [ ] TypeScript / lint pass
-- [ ] Test steps đã ghi
-
-## Test Steps
-1. ...
-2. ...
-```
-
-(Chi tiết đầy đủ: `CLAUDE.md` § PR Description Format.)
+Template nằm tại [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md). Mỗi PR phải điền đủ Story, Changes, Checklist, Test Steps.
 
 ---
 
@@ -182,9 +164,9 @@ Repo dùng **Commitlint + Husky** để chặn commit không đúng format (ch�
 
 **Lưu ý:** "Require status checks" bật sau khi đã có GitHub Actions (chọn tên job: lint, build, …).
 
-#### 8.2 PR template (nên dùng)
+#### 8.2 PR template
 
-Tạo **`.github/PULL_REQUEST_TEMPLATE.md`** với nội dung mẫu §4.2 — mỗi lần tạo PR, description tự điền sẵn.
+Đã có sẵn tại [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md). Mỗi lần tạo PR, description tự điền theo template.
 
 ---
 
@@ -270,10 +252,10 @@ Trên GitHub: Compare & pull request → điền template → assign reviewer.
 
 ```bash
 git checkout main && git pull origin main
-git checkout feature/PROJ-123-user-onboarding
+git checkout feature/PROJ-123-landing-page
 git rebase main
 # hoặc git merge main
-git push origin feature/PROJ-123-user-onboarding
+git push origin feature/PROJ-123-landing-page
 ```
 
 **Bước 6 — Sau khi merge PR**
@@ -296,7 +278,18 @@ Xóa branch (trên GitHub hoặc `git branch -d ...` và `git push origin --dele
 
 ---
 
-## Phần D — Xử lý lỗi
+## Phần D — Giải quyết conflict (merge / rebase)
+
+**Nguyên tắc:** Ưu tiên **cấu trúc trên base (main)**; nội dung từ branch feature **tích hợp vào** cấu trúc đó, không xóa code mới trên main để giữ bản branch.
+
+- Khi conflict: đọc kỹ cả hai bên; nếu main có refactor/cấu trúc mới (vd. i18n, component mới), **giữ cấu trúc main** và port thay đổi của branch vào.
+- Không dùng “giữ toàn bộ bên mình” khi main đã có thay đổi quan trọng (kiến trúc, routing, i18n, …).
+
+**Quy trình gợi ý:** Merge/rebase main vào branch → mở file conflict → giữ phần base (main), chèn/chỉnh phần feature cho khớp → test → commit resolve.
+
+---
+
+## Phần E — Xử lý lỗi
 
 | Lỗi | Cách xử lý |
 |-----|------------|
@@ -315,4 +308,4 @@ Xóa branch (trên GitHub hoặc `git branch -d ...` và `git push origin --dele
 - [semantic-release](https://github.com/semantic-release/semantic-release)
 - [Commitlint](https://commitlint.js.org/)
 - [Husky](https://typicode.github.io/husky/)
-- Nội bộ: `CLAUDE.md` (9-Point, PR format), `SPEC.md` (AC, API, schema).
+- Nội bộ: [CONTRIBUTING.md](.github/CONTRIBUTING.md), [SPEC.md](../SPEC.md) (9-Point, API, schema).

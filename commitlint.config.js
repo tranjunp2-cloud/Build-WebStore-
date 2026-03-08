@@ -1,5 +1,5 @@
 /**
- * Commitlint — enforce Conventional Commits (docs/GIT_AND_CI_RULES.md)
+ * Commitlint — enforce Conventional Commits (.github/GIT_AND_CI_RULES.md)
  * Chạy qua Husky hook commit-msg.
  */
 module.exports = {
