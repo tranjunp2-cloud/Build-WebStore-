@@ -337,6 +337,48 @@ Sau khi tạo App từ GitHub (bước 1), App Platform đã “biết” repo +
 
 Sau khi sửa, commit + push lên branch `staging` (hoặc bấm **Redeploy** trên DO) để build lại.
 
+#### Runtime: lỗi "self-signed certificate in certificate chain" (SELF_SIGNED_CERT_IN_CHAIN)
+
+Khi deploy **Live** nhưng Runtime Logs báo `Error: cannot connect to Postgres. Details: self-signed certificate in certificate chain`: app không kết nối được DB vì Node.js không tin chứng chỉ SSL của managed Postgres (DigitalOcean, v.v.). Trong repo đã cấu hình `payload.config.ts`: khi `DATABASE_URI` trỏ tới host **không phải localhost**, pool Postgres dùng `ssl: { rejectUnauthorized: false }` để chấp nhận cert. Sau khi pull code mới và redeploy, lỗi sẽ hết. Nếu vẫn lỗi: kiểm tra `DATABASE_URI` đúng connection string (có `sslmode=require` nếu DO yêu cầu); production lâu dài nên dùng CA cert đúng thay vì tắt verify.
+
+#### Tối ưu thời gian build (build > 5 phút)
+
+Build staging trên DO App Platform thường **~4–5 phút** (pull image, `npm ci`, `npm run build` Next.js). Đã áp dụng:
+
+| Việc | Mục đích |
+|------|----------|
+| **Bỏ stage `deps` trong Dockerfile** | Stage này không được dùng (runner chỉ copy từ `builder`); bỏ để DO/Kaniko không build stage thừa, giảm ~30s–1 phút. |
+| **`.dockerignore` gọn** | Loại `e2e`, `playwright`, `vitest`, `src/__tests__`, `.husky`, `*.log`, … → context gửi lên DO nhỏ hơn, `COPY . .` nhanh hơn. |
+
+Nếu vẫn muốn rút ngắn thêm:
+
+- **Bật build cache trên DO:** Trong App → **Settings** → **App Spec** / build config, bật cache (nếu DO hỗ trợ) để layer `npm ci` được cache khi `package.json`/lock không đổi.
+- **Build trên GitHub, deploy image:** Build Docker image trong `deploy-staging.yml` (GHA), push lên **Docker Hub** (hoặc DO Container Registry), cấu hình App Platform dùng **image** thay vì build từ source → DO chỉ pull image và deploy (**~1–2 phút** thay vì ~5 phút). Chi tiết: [§5.0.3 Deploy staging qua Docker Hub](#503-deploy-staging-qua-docker-hub).
+
+#### 5.0.3 Deploy staging qua Docker Hub (giảm thời gian deploy)
+
+Khi anh đã có **Docker Hub**, có thể chuyển staging sang: **build image trên GitHub Actions** → push lên Docker Hub → DigitalOcean App Platform **chỉ pull image** và chạy (không build trên DO) → thời gian deploy **~1–2 phút** thay vì ~5 phút.
+
+**Luồng:**
+
+1. Push lên nhánh `staging` → chạy `deploy-staging.yml`.
+2. Workflow **build Docker image** (trên GHA), **push** lên Docker Hub với tag `staging` (vd. `username/ech-prime-web-v2:staging`).
+3. Workflow gọi **Deploy to DigitalOcean App Platform** → DO pull image `username/ech-prime-web-v2:staging` và deploy.
+
+**Bật chế độ Docker Hub:**
+
+| Bước | Việc |
+|------|------|
+| 1. GitHub | **Settings** → **Secrets and variables** → **Actions**: thêm **Secret** `DOCKERHUB_TOKEN` (Docker Hub Access Token). **Variables**: thêm `DOCKERHUB_USERNAME` = username Docker Hub; (tùy chọn) `DOCKERHUB_REPO` = tên repo image (mặc định `ech-prime-web-v2`). |
+| 2. DigitalOcean | Vào App staging → **Settings** → component Web Service → **Source**: đổi từ **GitHub** sang **Container image** → chọn **Docker Hub** → **Registry**: `DOCKERHUB_USERNAME`, **Repository**: `DOCKERHUB_REPO` (vd. `ech-prime-web-v2`), **Tag**: `staging`. Lưu. |
+| 3. Chạy deploy | Push lên `staging` (hoặc re-run workflow). Workflow sẽ build image, push lên Docker Hub, rồi trigger deploy trên DO; DO pull image mới và deploy. |
+
+**Lưu ý:**
+
+- App Platform **không auto-redeploy** khi có image mới push lên Docker Hub; cần **trigger deploy** từ workflow (bước "Deploy to DigitalOcean App Platform" đã làm việc này mỗi lần push `staging`).
+- Image build trên GHA dùng **AMD64**. Nếu dùng chip ARM (M1/M2) local, vẫn build đúng trên GHA (ubuntu-latest).
+- Nếu không set `DOCKERHUB_USERNAME`, workflow giữ hành vi cũ: chỉ verify build (Node), DO tiếp tục build từ source.
+
 #### Bước 3 — Workflow đã cấu hình
 
 File `.github/workflows/deploy-staging.yml` đã được cấu hình để:
@@ -406,9 +448,12 @@ Hiện tại bước **Deploy to Production** vẫn chỉ placeholder. Để dep
 
 **Staging (DigitalOcean App Platform):**
 
-| Secret | Mô tả |
-|--------|--------|
+| Secret / Variable | Mô tả |
+|-------------------|--------|
 | `DIGITALOCEAN_ACCESS_TOKEN` | API token DO (Read + Write App Platform). Dùng trong `deploy-staging.yml` bước Deploy to DigitalOcean App Platform. |
+| `DOCKERHUB_TOKEN` (secret) | Chỉ khi deploy qua Docker Hub: Docker Hub Access Token (Settings → Security trên Docker Hub). |
+| `DOCKERHUB_USERNAME` (variable) | Chỉ khi deploy qua Docker Hub: username Docker Hub. Khi set → workflow build image và push lên Docker Hub rồi trigger DO deploy. |
+| `DOCKERHUB_REPO` (variable, tùy chọn) | Tên repo image (mặc định `ech-prime-web-v2`). Image đầy đủ: `DOCKERHUB_USERNAME/DOCKERHUB_REPO:staging`. |
 
 **Khác (khi dùng thêm):** `REGISTRY_PASSWORD`, `VERCEL_TOKEN`, `SSH_PRIVATE_KEY`, `STAGING_HOST`, `PROD_HOST`, …
 

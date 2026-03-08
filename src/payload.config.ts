@@ -52,6 +52,11 @@ export default buildConfig({
   db: postgresAdapter({
     pool: {
       connectionString: process.env.DATABASE_URI || 'postgresql://localhost/primeweb',
+      // DigitalOcean (và một số managed Postgres) dùng cert có thể khiến Node báo SELF_SIGNED_CERT_IN_CHAIN.
+      // Chấp nhận cert để kết nối được; production nên dùng CA đúng nếu có.
+      ...(process.env.DATABASE_URI && !process.env.DATABASE_URI.includes('localhost')
+        ? { ssl: { rejectUnauthorized: false } }
+        : {}),
     },
   }),
   sharp,
