@@ -349,6 +349,27 @@ Sau khi pull code mới và **Redeploy** (hoặc push lên `staging`) lỗi sẽ
 1. **Xác nhận bản deploy mới:** DO → App → Activity → deployment gần nhất đã chạy xong và đang Live.
 2. **Thử biến môi trường (chỉ để test):** Trên DO, App → Settings → App-level environment variables → thêm **`NODE_TLS_REJECT_UNAUTHORIZED`** = **`0`** → Save → Redeploy. Nếu app chạy được thì đúng là lỗi SSL; báo lại để kiểm tra lại pool config (hoặc giữ env này tạm cho staging, production nên dùng CA đúng).
 
+#### Runtime: relation "tenants" (hoặc bảng khác) does not exist (42P01)
+
+Nếu kết nối DB đã ổn nhưng Runtime Logs báo **`relation "tenants" does not exist`** (hoặc bảng khác): database **chưa có schema** (bảng chưa được tạo). Trên production Payload **không tự push schema**, cần chạy **một lần** để tạo bảng.
+
+**Cách 1 — Chạy script push schema từ máy local (khuyến nghị):**
+
+1. Clone repo, cài dependency: `npm ci`.
+2. Build: `npm run build`.
+3. Chạy với **connection string của staging** và để Payload push schema:
+   ```bash
+   DATABASE_URI="postgresql://user:pass@host:5432/dbname?sslmode=require" npm run db:push
+   ```
+   (Thay `DATABASE_URI` bằng connection string đầy đủ của Dev Database trên DO; lấy trong DO → component Database → Connection parameters / Connection string.)
+4. Script sẽ start app tạm (NODE_ENV=development), đợi app lên → kết nối DB → Payload push bảng → thoát. Sau đó deploy lại bình thường (staging đã có bảng).
+
+**Cách 2 — Trên DigitalOcean (one-off Job):**
+
+Tạo **Job** one-off trong cùng App, env giống Web Service (DATABASE_URI, PAYLOAD_SECRET), **Build Command** giống app, **Run Command:** `npm run build && DATABASE_URI="$DATABASE_URI" npm run db:push` (hoặc chạy sau khi build sẵn). Chạy Job một lần; khi xong, các bảng đã có, Web Service sẽ chạy bình thường.
+
+Sau khi đã có bảng, không cần chạy lại `db:push`. Các lần deploy sau chỉ cần build + start.
+
 #### Tối ưu thời gian build (build > 5 phút)
 
 Build staging trên DO App Platform thường **~4–5 phút** (pull image, `npm ci`, `npm run build` Next.js). Đã áp dụng:
