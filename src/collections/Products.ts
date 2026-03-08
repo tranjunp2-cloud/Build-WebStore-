@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Where } from 'payload'
 
 export const Products: CollectionConfig = {
     slug: 'products',
@@ -9,7 +9,14 @@ export const Products: CollectionConfig = {
     access: {
         create: ({ req }) => Boolean(req.user),
         read: ({ req }) => {
-            if (!req.user) return false
+            // Public read for storefront — only active, non-deleted products
+            if (!req.user) {
+                return {
+                    status: { equals: 'active' },
+                    deletedAt: { exists: false },
+                } as Where
+            }
+            // Authenticated: tenant-scoped read (dashboard)
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: any) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
