@@ -10,6 +10,9 @@ import {
     Settings,
     LogOut,
     MousePointerClick,
+    Search,
+    ShoppingBag,
+    ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +20,9 @@ const navItems = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { label: 'My Sites', href: '/dashboard/sites', icon: Globe },
     { label: 'Templates', href: '/templates', icon: LayoutTemplate },
+    { label: 'SEO', href: '/dashboard/seo', icon: Search },
+    { label: 'Products', href: '/dashboard/products', icon: ShoppingBag },
+    { label: 'Orders', href: '/dashboard/orders', icon: ClipboardList },
     { label: 'Media', href: '/dashboard/media', icon: Image },
     { label: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]

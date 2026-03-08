@@ -12,6 +12,8 @@ import { Pages } from './collections/Pages'
 import { Media } from './collections/Media'
 import { Templates } from './collections/Templates'
 import { Subscriptions } from './collections/Subscriptions'
+import { Products } from './collections/Products'
+import { Orders } from './collections/Orders'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -38,6 +40,8 @@ export default buildConfig({
     Media,
     Templates,
     Subscriptions,
+    Products,
+    Orders,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

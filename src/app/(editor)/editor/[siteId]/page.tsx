@@ -500,18 +500,22 @@ export default function EditorPage() {
         setIframeKey(k => k + 1)
     }
 
-    // Publish handler
+    // Publish / Unpublish handler
     const handlePublish = async () => {
         if (!siteId || isPublishing) return
         setIsPublishing(true)
+        const currentlyPublished = site?.status === 'published'
         try {
-            const res = await fetch(`/api/sites/${siteId}/publish`, { method: 'PATCH', credentials: 'include' })
+            const res = await fetch(`/api/sites/${siteId}/publish`, {
+                method: currentlyPublished ? 'DELETE' : 'PATCH',
+                credentials: 'include',
+            })
             if (res.ok) {
                 setPublishSuccess(true)
-                if (site) setSite({ ...site, status: 'published' })
+                if (site) setSite({ ...site, status: currentlyPublished ? 'draft' : 'published' })
                 setTimeout(() => setPublishSuccess(false), 3000)
             }
-        } catch (err) { console.error('Publish failed', err) }
+        } catch (err) { console.error('Publish/unpublish failed', err) }
         finally { setIsPublishing(false) }
     }
 
