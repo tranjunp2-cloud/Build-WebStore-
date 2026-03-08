@@ -8,21 +8,24 @@
 
 ### 1. Git workflow (branch strategy)
 
-Áp dụng **GitHub Flow** (phù hợp SaaS, deploy liên tục):
+Áp dụng **GitHub Flow** với **staging bắt buộc** (team chỉ vào staging trước; main chỉ qua hotfix hoặc release):
 
 ```
-main          ← production (protected)
-staging       ← pre-production (optional, auto-deploy)
-feature/*     ← tính năng mới (tạo từ main)
-fix/*         ← sửa bug (từ main)
-hotfix/*      ← sửa gấp production (từ main → merge main)
+main          ← production (protected). Chỉ nhận PR từ staging (release) hoặc hotfix/*
+staging       ← pre-production. Nhận PR từ feature/*, fix/*. Deploy staging khi push.
+feature/*     ← tính năng mới (tạo từ main hoặc staging). PR vào staging only.
+fix/*         ← sửa bug. PR vào staging only.
+hotfix/*      ← sửa gấp production. Tạo từ main → PR vào main. Sau đó merge main → staging.
 chore/*       ← deps, config, refactor (không đổi logic)
 docs/*        ← chỉ tài liệu
 ```
 
-- **main**: luôn deployable; merge qua PR + approval + CI pass.
-- **staging** (nếu có): deploy tự động khi push; dùng cho QA/demo.
-- **feature/fix/hotfix**: branch ngắn hạn, merge xong có thể xóa.
+- **main**: chỉ cập nhật qua (1) PR **staging → main** (khi release) hoặc (2) PR **hotfix/* → main**. Không merge feature/fix trực tiếp vào main.
+- **staging**: nhánh team merge hàng ngày. Feature/fix → PR vào **staging** → QA/demo → khi ổn định mới tạo PR staging → main.
+- **feature/fix**: luôn tạo PR với **base = staging** (không PR vào main).
+- **hotfix**: ngoại lệ — PR vào main, merge xong nên merge main vào staging để đồng bộ.
+
+Chi tiết luồng deploy: [.github/DEPLOY.md](.github/DEPLOY.md).
 
 **Không dùng:** GitFlow (develop/release) trừ khi cần hỗ trợ nhiều phiên bản production.
 
@@ -130,11 +133,12 @@ Template nằm tại [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEM
 
 | Event / Branch   | Chạy gì |
 |------------------|---------|
-| Push / PR vào `feature/*`, `fix/*`, … | Lint, typecheck, test, build |
-| Push `main`      | Cùng bộ check → deploy production |
-| Push `staging`   | Build → deploy staging (nếu có) |
+| PR vào `staging` (từ feature/*, fix/*) | Lint, typecheck, test, build |
+| Push `staging`   | Build → deploy staging |
+| PR vào `main` (từ staging hoặc hotfix/*) | Lint, typecheck, test, build |
+| Push `main`      | Build → deploy production |
 
-Chi tiết luồng deploy (staging vs production, cấu hình bước deploy thật): [.github/DEPLOY.md](.github/DEPLOY.md).
+**Quy ước:** Feature/fix chỉ merge vào **staging**. Main chỉ nhận merge từ **staging** (release) hoặc **hotfix/***. Chi tiết: [.github/DEPLOY.md](.github/DEPLOY.md).
 
 **Version (semantic-release):** Chạy trên `main`; đọc commit → `feat` = MINOR, `fix` = PATCH, `BREAKING CHANGE` = MAJOR → tag, changelog, GitHub Release.
 

@@ -20,7 +20,7 @@ Cập nhật rule → chỉ sửa trong `.github` (và SPEC.md cho product). Cá
 
 ## 2. Ai phải theo
 
-- **Dev** (local, bất kỳ editor nào): branch, commit, PR theo [GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) và [PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
+- **Dev** (local, bất kỳ editor nào): branch, commit, PR theo [GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) và [PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md). **Feature/fix:** tạo PR với **base = staging** (không PR vào main). Main chỉ cập nhật qua release (staging → main) hoặc hotfix.
 - **Cursor / Antigravity / AI assistant**: đọc rule từ `.github` và SPEC.md; không tạo thêm file “guide” hoặc “standardization” riêng cho từng môi trường.
 - **CI/CD**: pipeline chạy theo branch/commit/PR đã định nghĩa trong [GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md).
 

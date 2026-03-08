@@ -4,7 +4,16 @@
 
 ---
 
-## 1. Tổng quan
+## 1. Rule bắt buộc: Staging trước, main chỉ hotfix hoặc release
+
+- **Team chỉ được merge vào `staging` trước.** Mọi tính năng / fix (feature/*, fix/*) → PR vào **staging** → QA/demo trên staging.
+- **`main` không nhận PR từ feature/fix.** Cập nhật `main` chỉ qua:
+  1. **Luồng hotfix:** `hotfix/*` → PR vào `main` (sửa gấp production).
+  2. **Luồng release:** Khi staging đã ổn định → PR **staging → main** → deploy production.
+
+---
+
+## 2. Tổng quan môi trường
 
 | Môi trường   | Nhánh Git | Workflow              | Mục đích                    |
 |-------------|-----------|------------------------|-----------------------------|
@@ -17,31 +26,40 @@
 
 ---
 
-## 2. Luồng làm việc (flow)
+## 3. Luồng làm việc (flow)
 
 ```
-feature/* → PR → main (sau khi review + CI pass)
-                ↓
-           Deploy Production chạy
-                ↓
-           Production được cập nhật
+┌─────────────────────────────────────────────────────────────────┐
+│  Luồng thường (feature / fix)                                   │
+├─────────────────────────────────────────────────────────────────┤
+│  feature/* hoặc fix/*  →  PR vào staging  →  Merge staging       │
+│                                    ↓                             │
+│                          Deploy Staging chạy                      │
+│                                    ↓                             │
+│                          QA/demo trên staging                    │
+│                                    ↓                             │
+│  Khi sẵn sàng release:  PR staging → main  →  Merge main         │
+│                                    ↓                             │
+│                          Deploy Production chạy                  │
+└─────────────────────────────────────────────────────────────────┘
 
-staging ← merge từ main (hoặc push trực tiếp khi cần test nhanh)
-    ↓
-Deploy Staging chạy
-    ↓
-Staging được cập nhật (QA/demo)
+┌─────────────────────────────────────────────────────────────────┐
+│  Luồng hotfix (sửa gấp production)                              │
+├─────────────────────────────────────────────────────────────────┤
+│  hotfix/*  →  PR vào main  →  Merge main  →  Deploy Production   │
+│  (Sau đó nên merge main vào staging để đồng bộ.)                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Khuyến nghị:**
+**Tóm tắt:**
 
-1. Feature dev trên `feature/*` → PR vào `main`.
-2. Sau khi merge `main`, production tự deploy (nếu đã cấu hình bước deploy).
-3. Cần môi trường staging: tạo nhánh `staging`, merge `main` vào `staging` (hoặc push `staging`), deploy staging chạy.
+1. **Feature / fix:** PR vào **staging** only. Không tạo PR feature → main.
+2. **Release:** Khi staging đã test xong → tạo PR **staging → main** → merge → production deploy.
+3. **Hotfix:** Tạo nhánh `hotfix/xxx` từ main → PR vào **main** → merge → deploy production; sau đó merge main vào staging.
 
 ---
 
-## 3. GitHub Actions đang dùng
+## 4. GitHub Actions đang dùng
 
 | File | Trigger | Nội dung |
 |------|---------|----------|
@@ -51,36 +69,49 @@ Staging được cập nhật (QA/demo)
 
 ---
 
-## 4. Cấu hình deploy thực tế
+## 5. Cấu hình deploy thực tế
 
 Hiện tại bước **Deploy to Staging** / **Deploy to Production** chỉ in thông báo. Để deploy thật, tùy hạ tầng:
 
-### 4.1 Docker + server (BytePlus ECS, VPS, …)
+### 5.1 Docker + server (BytePlus ECS, VPS, …)
 
 - Build image trong workflow, push lên registry.
 - Trên server: pull image, chạy container (docker run / docker-compose).
 - Có thể dùng SSH (key trong GitHub Secrets) hoặc Docker Registry.
 
-### 4.2 Vercel
+### 5.2 Vercel
 
 - Dùng `vercel deploy --prebuilt` sau bước build.
 - Cấu hình token và project trong repo Secrets; tạo environment `staging` / `production` trên Vercel.
 
-### 4.3 SSH + rsync / script
+### 5.3 SSH + rsync / script
 
 - Lưu host, user, key trong GitHub Secrets.
 - Bước deploy: rsync `.next` và assets lên server, chạy script restart (pm2 / systemd / docker).
 
 ---
 
-## 5. GitHub Environments & Secrets
+## 6. GitHub Environments & Secrets
 
 - **Settings → Environments**: tạo `staging` và `production` (optional: protection rules, reviewers).
 - **Settings → Secrets and variables → Actions**: thêm secrets (ví dụ `REGISTRY_PASSWORD`, `VERCEL_TOKEN`, `SSH_PRIVATE_KEY`, `STAGING_HOST`, `PROD_HOST`) và dùng trong workflow.
 
 ---
 
-## 6. Checklist trước khi bật deploy thật
+## 7. Branch protection (khuyến nghị)
+
+Để đảm bảo **chỉ staging trước, main chỉ hotfix/release**:
+
+| Nhánh    | Protection rule gợi ý |
+|----------|------------------------|
+| **main** | Require PR (không push trực tiếp). Chỉ cho phép merge từ nhánh `staging` hoặc `hotfix/*`. Có thể dùng rule "Restrict who can push" hoặc quy ước team: không merge feature/fix vào main. |
+| **staging** | Require PR (optional). Cho phép merge từ `feature/*`, `fix/*`. Sau khi CI pass, merge → deploy staging chạy. |
+
+Trong **Settings → Branches** tạo rule cho `main`: Require pull request, Require status checks (CI), 1 approval. Base branch cho feature/fix khi tạo PR: chọn **staging** (không chọn main).
+
+---
+
+## 8. Checklist trước khi bật deploy thật
 
 - [ ] Đã tạo nhánh `staging` (nếu dùng staging).
 - [ ] Đã cấu hình GitHub Environments `staging` / `production` (nếu dùng).
