@@ -23,7 +23,7 @@ Full details: [`SPEC.md §2`](./SPEC.md)
 ```
 ☐ 1. PRD exists?           → docs/prd/F{XX}-{name}.md
 ☐ 2. Architecture exists?  → docs/architecture/F{XX}-{name}.md
-☐ 3. UI Mockups exist?     → docs/design/F{XX}-{name}-*.png
+☐ 3. UI Mockups exist?     → docs/design/F{XX}-{name}-*.jpg
 ☐ 4. API contracts ready?  → In PRD or SPEC.md §8
 ☐ 5. Dependencies resolved?
 ```
@@ -34,7 +34,7 @@ Full details: [`SPEC.md §2`](./SPEC.md)
 
 ## 📂 Naming Convention
 
-All docs: `F{XX}-{feature-name}.md` or `.png`
+All docs: `F{XX}-{feature-name}.md` or `.jpg`
 
 | ID | Feature | Wave |
 |----|---------|------|
@@ -53,8 +53,9 @@ All docs: `F{XX}-{feature-name}.md` or `.png`
 ```
 docs/prd/F{XX}-{name}.md           — PRD
 docs/architecture/F{XX}-{name}.md  — Architecture
-docs/design/F{XX}-{name}-*.png     — UI Mockups
+docs/design/F{XX}-{name}-*.jpg     — UI Mockups
 docs/qa/F{XX}-{name}.md            — QA Report
+docs/stories/                       — User stories
 ```
 
 ---
@@ -65,7 +66,33 @@ docs/qa/F{XX}-{name}.md            — QA Report
 2. **🔍 SEO** — Meta tags, JSON-LD, semantic HTML
 3. **🌏 Bilingual EN/MY** — All user-facing text
 
-## ✅ 9-Point PR Merge Gate
+## 🎨 Design Workflow
+
+1. Generate AI mockup → `docs/design/F{XX}-{name}-*.jpg`
+2. Reference Design Tokens (`SPEC.md §4`)
+3. Build with Tailwind CSS following mockup + tokens
+
+### Design Tokens:
+- Primary: teal-600 | Background: white/gray-950
+- Font: Inter | Radius: rounded-lg (8px) | Tap: 44px
+- Currency: MYR → `RM XX.XX`
+
+## 🧪 Testing
+
+| Layer | Tool | Location |
+|-------|------|----------|
+| Unit | Vitest | `src/__tests__/unit/` |
+| Integration | Vitest | `src/__tests__/integration/` |
+| E2E | Playwright | `e2e/` |
+
+```bash
+npm test              # Unit + Integration
+npm run test:e2e      # E2E
+npm run test:all      # All tests
+npm run typecheck     # TypeScript check
+```
+
+## ✅ 10-Point PR Merge Gate
 
 - [ ] Loading states
 - [ ] Empty states
@@ -76,6 +103,7 @@ docs/qa/F{XX}-{name}.md            — QA Report
 - [ ] Auth redirect (401)
 - [ ] Mobile responsive (375px)
 - [ ] TypeScript clean (`tsc --noEmit`)
+- [ ] Tests pass (`npm test`)
 
 ## Agent Routing (AI development)
 
@@ -93,13 +121,14 @@ docs/qa/F{XX}-{name}.md            — QA Report
 - **CMS**: Payload CMS 3
 - **Database**: PostgreSQL
 - **Styling**: Tailwind CSS
+- **Testing**: Vitest + Playwright
 - **Market**: Malaysia (MYR)
 
 ## Getting Started
 
 ```bash
-pnpm install
+npm install
 cp .env.example .env.local
 docker compose up -d
-pnpm dev
+npm run dev
 ```

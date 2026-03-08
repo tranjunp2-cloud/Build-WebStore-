@@ -28,7 +28,7 @@
 | 10 | [UX Rules](#10-ux-rules) | Navigation flow, states |
 | 11 | [Security & Auth](#11-security--auth) | JWT, RBAC, rate limit |
 | 12 | [SEO Implementation](#12-seo-implementation) | Meta, JSON-LD, sitemap |
-| 13 | [9-Point Done Checklist](#13-9-point-done-checklist) | Gate trước khi merge |
+| 13 | [10-Point Done Checklist](#13-10-point-done-checklist) | Gate trước khi merge |
 | 14 | [API Response Format](#14-api-response-format) | Standard envelope |
 | 15 | [6-Layer Architecture](#15-6-layer-architecture-checklist) | Per-feature checklist |
 | 16 | [Test Requirements](#16-test-requirements) | Unit, E2E |
@@ -149,7 +149,7 @@ project-planner → worker agents  → quality-inspector → orchestrator
 
 | # | Document | Path | Created By | Approved By | Content |
 |---|----------|------|-----------|-------------|---------|
-| 1 | **PRD** | `docs/prd/F{XX}-{name}.md` | `project-planner` | Product Owner | User Story, Gherkin AC, Technical Requirements, 9-Point Checklist |
+| 1 | **PRD** | `docs/prd/F{XX}-{name}.md` | `project-planner` | Product Owner | User Story, Gherkin AC, Technical Requirements, 10-Point Checklist |
 | 2 | **Architecture** | `docs/architecture/F{XX}-{name}.md` | `backend/frontend-specialist` | Tech Lead | System flow, Component tree, State design, Error matrix |
 | 3 | **UI Mockups** | `docs/design/F{XX}-{name}-*.png` | `frontend-specialist` | Product Owner | Desktop + Mobile mockups for all key screens |
 | 4 | **API Contract** | Trong PRD §8 hoặc `AI_BUILDER_SPEC.md §14` | `backend-specialist` | — | Endpoint, Request, Response, Error codes |
@@ -209,7 +209,7 @@ AND [additional check]
 - [ ] Dependencies confirmed
 
 ## Definition of Done
-- [ ] 9-Point Checklist pass (§13)
+- [ ] 10-Point Checklist pass (§13)
 - [ ] TypeScript clean (tsc --noEmit)
 ```
 
@@ -567,20 +567,21 @@ Per product: JSON-LD Product schema
 
 ---
 
-## 13. 9-POINT DONE CHECKLIST
+## 13. 10-POINT DONE CHECKLIST
 
 > **Bắt buộc** mọi screen/feature trước PR.
 
 ```
-☐ 1. LOADING STATE     — Skeleton (không spinner đơn lẻ)
-☐ 2. EMPTY STATE       — Icon + title + CTA (không blank)
-☐ 3. ERROR STATE       — Toast đỏ + nút Thử lại
-☐ 4. FORM VALIDATION   — Zod inline, lỗi dưới field
-☐ 5. BUTTON STATES     — disabled + spinner khi loading
-☐ 6. TOAST FEEDBACK    — Mọi mutation có toast
-☐ 7. AUTH REDIRECT     — 401 → /login
-☐ 8. MOBILE 375px      — Layout không vỡ
-☐ 9. TYPESCRIPT CLEAN  — Zero any, tsc --noEmit pass
+☐ 1.  LOADING STATE     — Skeleton (không spinner đơn lẻ)
+☐ 2.  EMPTY STATE       — Icon + title + CTA (không blank)
+☐ 3.  ERROR STATE       — Toast đỏ + nút Thử lại
+☐ 4.  FORM VALIDATION   — Zod inline, lỗi dưới field
+☐ 5.  BUTTON STATES     — disabled + spinner khi loading
+☐ 6.  TOAST FEEDBACK    — Mọi mutation có toast
+☐ 7.  AUTH REDIRECT     — 401 → /login
+☐ 8.  MOBILE 375px      — Layout không vỡ
+☐ 9.  TYPESCRIPT CLEAN  — Zero any, tsc --noEmit pass
+☐ 10. TESTS PASS        — npm test (Vitest unit + integration)
 ```
 
 ---
@@ -736,7 +737,7 @@ CLOUDFLARE_ZONE_ID=...
 
 ```
 web-store/
-├── .cursor/rules/           ← Cursor AI rules (BMAD + 9-Point + Deploy)
+├── .cursor/rules/           ← Cursor AI rules (BMAD + 10-Point + Deploy)
 ├── docs/                    ← 📂 BMAD Documents (governed by §2)
 │   ├── README.md            ← Doc hub overview
 │   ├── AI_BUILDER_SPEC.md   ← AI features deep spec (referenced by §7)
@@ -813,9 +814,10 @@ web-store/
 🔴 Trước khi bắt đầu code Feature X:
    1. Check bảng Feature Registry ở trên
    2. PRD column = ✅?  → Nếu ⬜ → STOP, tạo PRD trước
-   3. Architecture column = ✅ hoặc —?  → Nếu ⬜ → STOP, tạo architecture trước  
-   4. Chạy BMAD Gate Checklist (§2.5)
-   5. 4/4 PASS → bắt đầu code
+   3. Architecture column = ✅ hoặc —?  → Nếu ⬜ → STOP, tạo architecture trước
+   4. UI Mockups = ✅?  → Nếu ⬜ → STOP, tạo mockups trước
+   5. Chạy BMAD Gate Checklist (§2.5)
+   6. 5/5 PASS → bắt đầu code
 ```
 
 ---
@@ -823,6 +825,6 @@ web-store/
 > **Cursor reminder:**  
 > 1. Luôn `@SPEC.md` khi bắt đầu feature — §20 (Feature Registry) để check docs status  
 > 2. §2 (BMAD Gate) bắt buộc trước khi code  
-> 3. §13 (9-Point Checklist) bắt buộc trước khi merge PR  
+> 3. §13 (10-Point Checklist) bắt buộc trước khi merge PR  
 > 4. §7 → link tới `AI_BUILDER_SPEC.md` cho chi tiết AI features  
 > 5. §17 → link tới `PLAN-ai-webbuilder.md` cho build plan

@@ -87,10 +87,11 @@ All docs use format: `F{XX}-{feature-name}.md`
 
 ### Doc paths:
 ```
-docs/prd/F{XX}-{name}.md           — PRD (Gherkin AC, 9-point checklist)
+docs/prd/F{XX}-{name}.md           — PRD (Gherkin AC, 10-point checklist)
 docs/architecture/F{XX}-{name}.md  — Architecture (component tree, data flow)
-docs/design/F{XX}-{name}-*.png     — UI Mockups (desktop + mobile)
+docs/design/F{XX}-{name}-*.jpg     — UI Mockups (desktop + mobile)
 docs/qa/F{XX}-{name}.md            — QA Report (after build)
+docs/stories/                       — User stories with Gherkin AC
 docs/tracking/                      — Product plan, feature registry
 ```
 
@@ -100,6 +101,7 @@ docs/tracking/                      — Product plan, feature registry
 
 - **Product**: PrimeWeb — AI-first SaaS website builder for SMEs
 - **Stack**: Next.js 15 + Payload CMS 3 + PostgreSQL + Tailwind CSS
+- **Testing**: Vitest (unit/integration) + Playwright (E2E)
 - **Market**: Malaysia (EN + Bahasa Melayu)
 - **Currency**: MYR (Malaysian Ringgit)
 - **Key docs**: `SPEC.md` (constitution), `docs/tracking/product_plan.md` (roadmap)
@@ -110,7 +112,39 @@ docs/tracking/                      — Product plan, feature registry
 2. **🔍 SEO OPTIMIZED** — Meta tags, JSON-LD, semantic HTML, image alt text.
 3. **🌏 BILINGUAL EN/MY** — All user-facing text in English + Bahasa Melayu.
 
-## ✅ 9-POINT PR MERGE GATE (SPEC.md §13)
+## 🎨 DESIGN WORKFLOW
+
+### For new features:
+1. Generate AI mockup → save to `docs/design/F{XX}-{name}-*.jpg`
+2. Reference Design Tokens from `SPEC.md §4`
+3. Build components following mockup + tokens
+4. Tailwind CSS classes for dashboard (no inline styles)
+5. Storefront pages: inline styles OK (iframe compatibility)
+
+### Design Tokens (Source of Truth: SPEC.md §4):
+- Primary: teal-600 | Background: white (light) / gray-950 (dark)
+- Font: Inter | Radius: rounded-lg (8px)
+- Mobile: min-width 375px | Tap target: 44px
+- Currency: MYR → format `RM XX.XX`
+
+## 🧪 TESTING REQUIREMENTS
+
+### Test every feature:
+| Layer | Tool | What | Location |
+|-------|------|------|----------|
+| **Unit** | Vitest | Utils, stores, schemas | `src/__tests__/unit/` |
+| **Integration** | Vitest | API routes, collections | `src/__tests__/integration/` |
+| **E2E** | Playwright | Critical user flows | `e2e/` |
+
+### Commands:
+```bash
+npm test              # Unit + Integration (Vitest)
+npm run test:e2e      # E2E (Playwright)
+npm run test:all      # All tests
+npm run typecheck     # TypeScript check
+```
+
+## ✅ 10-POINT PR MERGE GATE (SPEC.md §13)
 
 - [ ] Loading states
 - [ ] Empty states
@@ -121,3 +155,4 @@ docs/tracking/                      — Product plan, feature registry
 - [ ] Auth redirect (401 → /login)
 - [ ] Mobile responsive (375px)
 - [ ] TypeScript clean (`tsc --noEmit`)
+- [ ] Tests pass (`npm test`)
