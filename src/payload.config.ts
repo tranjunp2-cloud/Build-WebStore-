@@ -69,6 +69,10 @@ export default buildConfig({
       // Truyền rõ ở đây vì parse(connectionString) có thể ghi đè nếu URL còn sslmode.
       ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: false } } : {}),
     },
+    // Auto-push schema on startup. Required for DO App Platform Dev Database
+    // where we can't run migrations from outside (Trusted Sources restriction).
+    // TODO: Switch to migration-based workflow for production.
+    push: true,
   }),
   sharp,
   plugins: [
