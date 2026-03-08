@@ -1,47 +1,102 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { User, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { toast } from 'sonner'
+import { User, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+const registerSchema = z
+    .object({
+        firstName: z.string().min(2, 'First name must be at least 2 characters'),
+        lastName: z.string().min(2, 'Last name must be at least 2 characters'),
+        email: z.string().min(1, 'Email is required').email('Please enter a valid email'),
+        password: z.string().min(8, 'Password must be at least 8 characters'),
+        confirmPassword: z.string(),
+    })
+    .refine((d) => d.password === d.confirmPassword, {
+        message: 'Passwords don\'t match',
+        path: ['confirmPassword'],
+    })
+
+type RegisterForm = z.infer<typeof registerSchema>
+
+function getPasswordStrength(password: string): { score: number; label: string; color: string } {
+    let score = 0
+    if (password.length >= 8) score++
+    if (/[A-Z]/.test(password)) score++
+    if (/[0-9]/.test(password)) score++
+    if (/[^A-Za-z0-9]/.test(password)) score++
+
+    const levels: { label: string; color: string }[] = [
+        { label: 'Too weak', color: 'bg-red-500' },
+        { label: 'Weak', color: 'bg-orange-500' },
+        { label: 'Fair', color: 'bg-yellow-500' },
+        { label: 'Good', color: 'bg-emerald-400' },
+        { label: 'Strong', color: 'bg-emerald-500' },
+    ]
+    return { score, ...levels[score] }
+}
+
+function generateSlug(name: string): string {
+    return name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .substring(0, 30)
+}
+
 export default function RegisterPage() {
     const router = useRouter()
-
-    const [firstName, setFirstName] = useState('')
-    const [email, setEmail] = useState('')
-    const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState('')
+    const [showConfirm, setShowConfirm] = useState(false)
 
-    const passwordStrength = getPasswordStrength(password)
+    const {
+        register,
+        handleSubmit,
+        watch,
+        formState: { errors, isSubmitting },
+        setError: setFormError,
+    } = useForm<RegisterForm>({
+        resolver: zodResolver(registerSchema),
+        defaultValues: { firstName: '', lastName: '', email: '', password: '', confirmPassword: '' },
+    })
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        setError('')
-        setIsLoading(true)
+    const watchPassword = watch('password', '')
+    const strength = useMemo(() => getPasswordStrength(watchPassword), [watchPassword])
 
+    const onSubmit = async (data: RegisterForm) => {
         try {
-            // Step 1: Create user
-            const userRes = await fetch('/api/users', {
+            // Step 1: Register user
+            const registerRes = await fetch('/api/users', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email,
-                    password,
-                    firstName,
-                    lastName: '',
+                    email: data.email,
+                    password: data.password,
+                    firstName: data.firstName,
+                    lastName: data.lastName,
                 }),
             })
 
-            if (!userRes.ok) {
-                const data = await userRes.json()
-                const msg = data?.errors?.[0]?.message || 'Registration failed'
-                setError(msg.includes('duplicate') ? 'Email is already in use' : msg)
+            if (!registerRes.ok) {
+                const errorData = await registerRes.json().catch(() => null)
+                const message = errorData?.errors?.[0]?.message || 'Registration failed'
+
+                if (message.toLowerCase().includes('unique') || message.toLowerCase().includes('exist')) {
+                    setFormError('email', { message: 'This email is already registered' })
+                    toast.error('This email is already registered')
+                } else {
+                    setFormError('root', { message })
+                    toast.error(message)
+                }
                 return
             }
 
@@ -49,188 +104,247 @@ export default function RegisterPage() {
             const loginRes = await fetch('/api/users/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email: data.email, password: data.password }),
                 credentials: 'include',
             })
 
             if (!loginRes.ok) {
-                setError('Account created successfully but auto-login failed. Please log in manually.')
+                toast.success('Account created! Please sign in.')
                 router.push('/login')
                 return
             }
 
-            const loginData = await loginRes.json()
-            const userId = loginData.user?.id
-
             // Step 3: Create tenant
-            const tenantRes = await fetch('/api/tenants', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: `${firstName}'s Store`,
-                    slug: generateSlug(firstName),
-                }),
-                credentials: 'include',
-            })
-
-            if (tenantRes.ok) {
-                const tenantData = await tenantRes.json()
-                const tenantId = tenantData.doc?.id
-
-                // Step 4: Link user to tenant
-                if (userId && tenantId) {
-                    await fetch(`/api/users/${userId}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            tenants: [{ tenant: tenantId, role: 'owner' }],
-                        }),
-                        credentials: 'include',
-                    })
-                }
+            const storeName = `${data.firstName}'s Store`
+            try {
+                await fetch('/api/tenants', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: storeName,
+                        slug: generateSlug(storeName),
+                    }),
+                    credentials: 'include',
+                })
+            } catch {
+                // Non-blocking — tenant can be created later
             }
+
+            toast.success('Account created! 🎉', {
+                description: "Let's build your first website!",
+            })
 
             router.push('/onboarding')
             router.refresh()
         } catch {
-            setError('An error occurred. Please try again.')
-        } finally {
-            setIsLoading(false)
+            setFormError('root', { message: 'Connection error. Please try again.' })
+            toast.error('Connection error. Please try again.')
         }
     }
 
+    const inputClasses = (hasError: boolean) =>
+        `pl-10 bg-white/[0.06] border-white/[0.08] text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors ${hasError ? 'border-red-500/50' : ''}`
+
     return (
-        <>
+        <div className="animate-in fade-in duration-500">
+            {/* Header */}
             <div className="mb-6 text-center">
                 <h1 className="text-2xl font-bold text-white">Create your account</h1>
-                <p className="mt-1 text-sm text-gray-400">Get started with Web Store — free</p>
+                <p className="mt-1.5 text-sm text-gray-400">Start building your website in minutes</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-                {error && (
-                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                        {error}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                {/* Root error */}
+                {errors.root && (
+                    <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                        <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                        </svg>
+                        {errors.root.message}
                     </div>
                 )}
 
-                {/* First Name */}
-                <div>
-                    <Label htmlFor="firstName">Your Name</Label>
-                    <div className="relative mt-1.5">
-                        <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                        <Input
-                            id="firstName"
-                            type="text"
-                            value={firstName}
-                            onChange={(e) => setFirstName(e.target.value)}
-                            required
-                            placeholder="e.g. Nhan"
-                            className="pl-10"
-                        />
+                {/* Name row */}
+                <div className="grid grid-cols-2 gap-3">
+                    <div>
+                        <Label htmlFor="firstName" className="text-gray-300">First name</Label>
+                        <div className="relative mt-1.5">
+                            <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                            <Input
+                                id="firstName"
+                                placeholder="John"
+                                className={inputClasses(!!errors.firstName)}
+                                {...register('firstName')}
+                            />
+                        </div>
+                        {errors.firstName && (
+                            <p className="mt-1 text-xs text-red-400">{errors.firstName.message}</p>
+                        )}
+                    </div>
+                    <div>
+                        <Label htmlFor="lastName" className="text-gray-300">Last name</Label>
+                        <div className="relative mt-1.5">
+                            <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                            <Input
+                                id="lastName"
+                                placeholder="Doe"
+                                className={inputClasses(!!errors.lastName)}
+                                {...register('lastName')}
+                            />
+                        </div>
+                        {errors.lastName && (
+                            <p className="mt-1 text-xs text-red-400">{errors.lastName.message}</p>
+                        )}
                     </div>
                 </div>
 
                 {/* Email */}
                 <div>
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email" className="text-gray-300">Email</Label>
                     <div className="relative mt-1.5">
                         <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                         <Input
                             id="email"
                             type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
                             placeholder="you@example.com"
-                            className="pl-10"
+                            className={inputClasses(!!errors.email)}
+                            {...register('email')}
                         />
                     </div>
+                    {errors.email && (
+                        <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>
+                    )}
                 </div>
 
                 {/* Password */}
                 <div>
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password" className="text-gray-300">Password</Label>
                     <div className="relative mt-1.5">
                         <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                         <Input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            minLength={6}
-                            placeholder="Min 6 characters"
-                            className="pl-10 pr-10"
+                            placeholder="Min. 8 characters"
+                            className={`${inputClasses(!!errors.password)} pr-10`}
+                            {...register('password')}
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                            tabIndex={-1}
                         >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                     </div>
-                    {/* Password Strength */}
-                    {password.length > 0 && (
-                        <div className="mt-2 flex items-center gap-2">
-                            <div className="flex flex-1 gap-1">
-                                {[1, 2, 3].map((level) => (
+                    {errors.password && (
+                        <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>
+                    )}
+
+                    {/* Password strength bar */}
+                    {watchPassword && (
+                        <div className="mt-2">
+                            <div className="flex gap-1">
+                                {[0, 1, 2, 3].map((i) => (
                                     <div
-                                        key={level}
-                                        className={`h-1 flex-1 rounded-full transition-colors ${passwordStrength >= level
-                                            ? level === 1
-                                                ? 'bg-red-500'
-                                                : level === 2
-                                                    ? 'bg-yellow-500'
-                                                    : 'bg-green-500'
-                                            : 'bg-gray-700'
+                                        key={i}
+                                        className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= strength.score - 1 ? strength.color : 'bg-white/10'
                                             }`}
                                     />
                                 ))}
                             </div>
-                            <span className="text-[10px] text-gray-500">
-                                {passwordStrength === 1 ? 'Weak' : passwordStrength === 2 ? 'Medium' : 'Strong'}
-                            </span>
+                            <p className="mt-1 text-xs text-gray-500">{strength.label}</p>
                         </div>
                     )}
                 </div>
 
+                {/* Confirm password */}
+                <div>
+                    <Label htmlFor="confirmPassword" className="text-gray-300">Confirm password</Label>
+                    <div className="relative mt-1.5">
+                        <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                        <Input
+                            id="confirmPassword"
+                            type={showConfirm ? 'text' : 'password'}
+                            placeholder="••••••••"
+                            className={`${inputClasses(!!errors.confirmPassword)} pr-10`}
+                            {...register('confirmPassword')}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowConfirm(!showConfirm)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                            tabIndex={-1}
+                        >
+                            {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                    </div>
+                    {errors.confirmPassword && (
+                        <p className="mt-1 text-xs text-red-400">{errors.confirmPassword.message}</p>
+                    )}
+                </div>
+
+                {/* Password requirements */}
+                <div className="space-y-1">
+                    {[
+                        { test: watchPassword.length >= 8, label: 'At least 8 characters' },
+                        { test: /[A-Z]/.test(watchPassword), label: 'One uppercase letter' },
+                        { test: /[0-9]/.test(watchPassword), label: 'One number' },
+                    ].map(({ test, label }) => (
+                        <div key={label} className="flex items-center gap-2 text-xs">
+                            <Check className={`h-3 w-3 transition-colors ${test ? 'text-emerald-400' : 'text-gray-600'}`} />
+                            <span className={test ? 'text-gray-300' : 'text-gray-500'}>{label}</span>
+                        </div>
+                    ))}
+                </div>
+
                 {/* Submit */}
-                <Button type="submit" disabled={isLoading} className="w-full">
-                    {isLoading ? (
+                <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-medium h-11 shadow-lg shadow-blue-500/25 transition-all hover:shadow-blue-500/40 disabled:opacity-50"
+                >
+                    {isSubmitting ? (
                         <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Creating account...
                         </>
                     ) : (
-                        'Create Account'
+                        <>
+                            Create account
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
                     )}
                 </Button>
+
+                <p className="text-xs text-center text-gray-500">
+                    By signing up, you agree to our{' '}
+                    <Link href="/terms" className="text-gray-400 underline hover:text-gray-300">Terms</Link>{' '}
+                    and{' '}
+                    <Link href="/privacy" className="text-gray-400 underline hover:text-gray-300">Privacy Policy</Link>
+                </p>
             </form>
 
-            <p className="mt-6 text-center text-sm text-gray-400">
+            {/* Divider */}
+            <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-white/[0.06]" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                    <span className="bg-transparent px-3 text-gray-500">or</span>
+                </div>
+            </div>
+
+            {/* Login link */}
+            <p className="text-center text-sm text-gray-400">
                 Already have an account?{' '}
-                <Link href="/login" className="font-medium text-blue-400 hover:text-blue-300">
-                    Sign in
+                <Link
+                    href="/login"
+                    className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                    Sign in →
                 </Link>
             </p>
-        </>
+        </div>
     )
-}
-
-function getPasswordStrength(password: string): number {
-    if (password.length === 0) return 0
-    let score = 0
-    if (password.length >= 6) score++
-    if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++
-    if (/[0-9]/.test(password) || /[^A-Za-z0-9]/.test(password)) score++
-    return score
-}
-
-function generateSlug(name: string): string {
-    return name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '')
-        + '-' + Math.random().toString(36).slice(2, 6)
 }
