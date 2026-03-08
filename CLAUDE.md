@@ -248,6 +248,16 @@ Layer 6 — Business: Subscription check · Audit log · ECH ecosystem sync
 
 ---
 
+## 📋 Git & CI/CD (chuẩn team + pipeline + setup)
+
+Một doc duy nhất: **`docs/GIT_AND_CI_RULES.md`** (rule + setup GitHub/máy + quy trình hàng ngày).
+
+- **Rule:** Branch `feature/*`, `fix/*`, …; commit **Conventional Commits**; PR title + template, 1 approval, CI pass.
+- **Setup:** Branch protection, PR template, Git config, `npm install` (Commitlint + Husky).
+- **Quy trình:** Pull main → tạo branch → commit → push → PR → merge.
+
+---
+
 ## 📋 PR Description Format
 
 ```markdown

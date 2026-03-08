@@ -148,6 +148,7 @@ docker compose down -v && docker compose up -d
 | File | Mô tả |
 |------|-------|
 | `SPEC.md` | **Source of Truth** — 19 sections, BMAD-enhanced |
+| `docs/GIT_AND_CI_RULES.md` | **Git & CI/CD** — rule (branch, commit, PR), setup (GitHub + máy), quy trình hàng ngày |
 | `.cursor/rules/always.mdc` | Core rules: BMAD + 9-Point + Docker |
 | `.cursor/rules/frontend.mdc` | Frontend patterns: Server/Client, TanStack Query |
 | `.cursor/rules/ai-features.mdc` | AI rules: Rate limits, prompt engineering |
