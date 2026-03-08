@@ -9,6 +9,7 @@
 | Nội dung | File / vị trí |
 |----------|----------------|
 | **Git, PR, CI/CD, conflict** | [.github/GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) |
+| **Luồng deploy (staging vs prod)** | [.github/DEPLOY.md](.github/DEPLOY.md) |
 | **Mô tả PR (template)** | [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) — khi tạo/sửa PR **bắt buộc** dùng đúng template này |
 | **Product, BMAD, 9-Point, API, data model** | [SPEC.md](../SPEC.md) (root) |
 | **Cursor:** tuân theo .github + dùng template khi tạo PR | [.cursor/rules/github.mdc](../.cursor/rules/github.mdc) |

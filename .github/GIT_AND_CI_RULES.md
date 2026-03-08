@@ -134,6 +134,8 @@ Template nằm tại [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEM
 | Push `main`      | Cùng bộ check → deploy production |
 | Push `staging`   | Build → deploy staging (nếu có) |
 
+Chi tiết luồng deploy (staging vs production, cấu hình bước deploy thật): [.github/DEPLOY.md](.github/DEPLOY.md).
+
 **Version (semantic-release):** Chạy trên `main`; đọc commit → `feat` = MINOR, `fix` = PATCH, `BREAKING CHANGE` = MAJOR → tag, changelog, GitHub Release.
 
 ---
