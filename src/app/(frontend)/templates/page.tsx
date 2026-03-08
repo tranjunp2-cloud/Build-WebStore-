@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -12,6 +12,9 @@ import {
     Search,
     LayoutTemplate,
     Eye,
+    X,
+    Monitor,
+    Smartphone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -22,95 +25,189 @@ type Template = {
     description: string
     category: string[]
     thumbnail?: { url: string }
-    previewUrl?: string
     isPremium: boolean
     isFeatured: boolean
     defaultTheme: {
         primaryColor: string
+        secondaryColor?: string
         colorMode: string
     }
 }
 
 const CATEGORIES = [
     { value: 'all', label: 'Tất cả' },
-    { value: 'business', label: 'Business' },
-    { value: 'ecommerce', label: 'Online Store' },
-    { value: 'restaurant', label: 'Restaurant' },
-    { value: 'portfolio', label: 'Portfolio' },
-    { value: 'blog', label: 'Blog' },
-    { value: 'service', label: 'Agency' },
+    { value: 'restaurant', label: '🍽️ Nhà hàng' },
+    { value: 'ecommerce', label: '🛍️ Cửa hàng' },
+    { value: 'beauty', label: '💄 Beauty' },
+    { value: 'tech', label: '💻 Tech' },
+    { value: 'health', label: '🏥 Y tế' },
+    { value: 'education', label: '📚 Giáo dục' },
+    { value: 'realestate', label: '🏠 BĐS' },
+    { value: 'fitness', label: '💪 Fitness' },
+    { value: 'creative', label: '🎨 Portfolio' },
+    { value: 'business', label: '🏢 Business' },
 ]
 
-// ─── Template Card ──────────────────────────────────────────────────────
-function TemplateCard({
+// ─── Preview Modal ─────────────────────────────────────────────────────
+function PreviewModal({
     template,
+    onClose,
     onUse,
     isApplying,
 }: {
     template: Template
+    onClose: () => void
+    onUse: (id: string) => void
+    isApplying: boolean
+}) {
+    const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop')
+
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+        document.addEventListener('keydown', handler)
+        return () => document.removeEventListener('keydown', handler)
+    }, [onClose])
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+
+            {/* Modal */}
+            <div
+                className="relative w-[95vw] h-[92vh] rounded-2xl border border-white/10 bg-[#0B1120] overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Top bar */}
+                <div className="flex items-center justify-between px-6 py-3 border-b border-white/10 bg-[#0B1120]/95 backdrop-blur-md shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div
+                            className="h-4 w-4 rounded-full border border-white/10"
+                            style={{ backgroundColor: template.defaultTheme?.primaryColor || '#3B82F6' }}
+                        />
+                        <div>
+                            <h3 className="text-sm font-semibold text-white">{template.name}</h3>
+                            <p className="text-[10px] text-gray-500">{template.description}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {/* View mode toggle */}
+                        <div className="flex items-center gap-1 rounded-lg bg-white/5 p-0.5">
+                            <button
+                                onClick={() => setViewMode('desktop')}
+                                className={cn(
+                                    'rounded-md p-1.5 transition-colors',
+                                    viewMode === 'desktop' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'
+                                )}
+                            >
+                                <Monitor className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('mobile')}
+                                className={cn(
+                                    'rounded-md p-1.5 transition-colors',
+                                    viewMode === 'mobile' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'
+                                )}
+                            >
+                                <Smartphone className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => onUse(template.id)}
+                            disabled={isApplying}
+                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                        >
+                            {isApplying ? (
+                                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Đang tạo...</>
+                            ) : (
+                                <><Sparkles className="h-3.5 w-3.5" /> Sử dụng template này</>
+                            )}
+                        </button>
+
+                        <button
+                            onClick={onClose}
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Preview iframe */}
+                <div className="flex-1 flex items-center justify-center bg-[#09090b] overflow-hidden p-4">
+                    <div
+                        className={cn(
+                            'h-full rounded-xl overflow-hidden border border-white/5 transition-all duration-500 bg-[#09090b]',
+                            viewMode === 'desktop' ? 'w-full' : 'w-[390px]'
+                        )}
+                    >
+                        <iframe
+                            src={`/api/templates/preview?id=${template.id}`}
+                            className="w-full h-full border-0"
+                            title={`Preview: ${template.name}`}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Template Card ──────────────────────────────────────────────────────
+function TemplateCard({
+    template,
+    onPreview,
+    onUse,
+    isApplying,
+}: {
+    template: Template
+    onPreview: (t: Template) => void
     onUse: (id: string) => void
     isApplying: string | null
 }) {
-    const primaryColor = template.defaultTheme?.primaryColor || '#0ea5e9'
-    const isDark = template.defaultTheme?.colorMode === 'dark'
+    const primaryColor = template.defaultTheme?.primaryColor || '#3B82F6'
+    const secondaryColor = template.defaultTheme?.secondaryColor || '#8B5CF6'
     const isThisApplying = isApplying === template.id
 
     return (
         <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#1E293B] transition-all duration-300 hover:border-white/20 hover:shadow-xl hover:shadow-blue-500/5 hover:-translate-y-1">
-            {/* Thumbnail / Preview */}
-            <div
-                className="relative h-52 overflow-hidden"
-                style={{
-                    background: isDark
-                        ? `linear-gradient(135deg, #09090b 0%, ${primaryColor}15 50%, #09090b 100%)`
-                        : `linear-gradient(135deg, #ffffff 0%, ${primaryColor}15 50%, #f8fafc 100%)`,
-                }}
-            >
-                {/* Mock preview content */}
-                <div className="absolute inset-4">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: primaryColor }} />
-                        <div className="h-2 w-16 rounded bg-current opacity-20" />
-                        <div className="ml-auto flex gap-2">
-                            <div className="h-2 w-8 rounded bg-current opacity-10" />
-                            <div className="h-2 w-8 rounded bg-current opacity-10" />
-                        </div>
-                    </div>
-                    <div className="mt-6 text-center">
-                        <div className="mx-auto h-3 w-40 rounded bg-current opacity-20 mb-2" />
-                        <div className="mx-auto h-2 w-28 rounded bg-current opacity-10 mb-4" />
-                        <div
-                            className="mx-auto h-6 w-20 rounded-lg"
-                            style={{ backgroundColor: primaryColor, opacity: 0.8 }}
-                        />
-                    </div>
-                    <div className="mt-6 grid grid-cols-3 gap-2">
-                        <div className="h-10 rounded-lg bg-current opacity-5" />
-                        <div className="h-10 rounded-lg bg-current opacity-5" />
-                        <div className="h-10 rounded-lg bg-current opacity-5" />
-                    </div>
-                </div>
+            {/* Live preview thumbnail via iframe */}
+            <div className="relative h-56 overflow-hidden bg-[#09090b]">
+                <iframe
+                    src={`/api/templates/preview?id=${template.id}`}
+                    className="w-[1200px] h-[800px] border-0 pointer-events-none origin-top-left"
+                    style={{ transform: 'scale(0.3)', transformOrigin: 'top left' }}
+                    title={template.name}
+                    loading="lazy"
+                />
 
                 {/* Badges */}
-                <div className="absolute top-3 right-3 flex gap-1.5">
+                <div className="absolute top-3 right-3 flex gap-1.5 z-10">
                     {template.isFeatured && (
-                        <span className="flex items-center gap-1 rounded-full bg-yellow-500/20 px-2 py-0.5 text-[10px] font-semibold text-yellow-400">
+                        <span className="flex items-center gap-1 rounded-full bg-yellow-500/20 px-2 py-0.5 text-[10px] font-semibold text-yellow-400 backdrop-blur-sm">
                             <Star className="h-2.5 w-2.5" /> Featured
                         </span>
                     )}
                     {template.isPremium && (
-                        <span className="flex items-center gap-1 rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-semibold text-purple-400">
+                        <span className="flex items-center gap-1 rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-semibold text-purple-400 backdrop-blur-sm">
                             <Crown className="h-2.5 w-2.5" /> Pro
                         </span>
                     )}
                 </div>
 
                 {/* Hover overlay */}
-                <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <button
+                        onClick={() => onPreview(template)}
+                        className="flex items-center gap-1.5 rounded-xl bg-white/15 backdrop-blur-sm px-4 py-2 text-sm font-semibold text-white hover:bg-white/25 transition-colors"
+                    >
+                        <Eye className="h-3.5 w-3.5" /> Xem trước
+                    </button>
                     <button
                         onClick={() => onUse(template.id)}
                         disabled={isThisApplying}
-                        className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                     >
                         {isThisApplying ? (
                             <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Đang tạo...</>
@@ -118,16 +215,6 @@ function TemplateCard({
                             <><Sparkles className="h-3.5 w-3.5" /> Sử dụng</>
                         )}
                     </button>
-                    {template.previewUrl && (
-                        <a
-                            href={template.previewUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20 transition-colors"
-                        >
-                            <Eye className="h-3.5 w-3.5" /> Preview
-                        </a>
-                    )}
                 </div>
             </div>
 
@@ -138,10 +225,16 @@ function TemplateCard({
                         <h3 className="font-semibold text-white">{template.name}</h3>
                         <p className="mt-1 text-xs text-gray-400 line-clamp-2">{template.description}</p>
                     </div>
-                    <div
-                        className="h-5 w-5 rounded-full shrink-0 ml-3 border border-white/10"
-                        style={{ backgroundColor: primaryColor }}
-                    />
+                    <div className="flex shrink-0 ml-3 gap-1">
+                        <div
+                            className="h-4 w-4 rounded-full border border-white/10"
+                            style={{ backgroundColor: primaryColor }}
+                        />
+                        <div
+                            className="h-4 w-4 rounded-full border border-white/10"
+                            style={{ backgroundColor: secondaryColor }}
+                        />
+                    </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                     {template.category?.map((cat) => (
@@ -166,11 +259,12 @@ export default function TemplatesPage() {
     const [activeCategory, setActiveCategory] = useState('all')
     const [search, setSearch] = useState('')
     const [isApplying, setIsApplying] = useState<string | null>(null)
+    const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null)
 
     useEffect(() => {
         async function fetchTemplates() {
             try {
-                const res = await fetch('/api/templates?limit=50&sort=sortOrder')
+                const res = await fetch('/api/templates/list?limit=50&sort=sortOrder')
                 if (res.ok) {
                     const data = await res.json()
                     setTemplates(data.docs || [])
@@ -204,6 +298,8 @@ export default function TemplatesPage() {
         }
     }
 
+    const handleClosePreview = useCallback(() => setPreviewTemplate(null), [])
+
     const filtered = templates.filter((t) => {
         const matchCat = activeCategory === 'all' || t.category?.includes(activeCategory)
         const matchSearch = !search || t.name.toLowerCase().includes(search.toLowerCase())
@@ -227,7 +323,7 @@ export default function TemplatesPage() {
                                 <LayoutTemplate className="h-5 w-5 text-blue-400" />
                                 Template Gallery
                             </h1>
-                            <p className="text-xs text-gray-500">Chọn mẫu website phù hợp với ngành của bạn</p>
+                            <p className="text-xs text-gray-500">Chọn mẫu website phù hợp với ngành của bạn — xem trước trước khi chọn</p>
                         </div>
                     </div>
                     <Link
@@ -300,6 +396,7 @@ export default function TemplatesPage() {
                             <TemplateCard
                                 key={t.id}
                                 template={t}
+                                onPreview={setPreviewTemplate}
                                 onUse={handleUseTemplate}
                                 isApplying={isApplying}
                             />
@@ -307,6 +404,16 @@ export default function TemplatesPage() {
                     </div>
                 )}
             </div>
+
+            {/* Preview Modal */}
+            {previewTemplate && (
+                <PreviewModal
+                    template={previewTemplate}
+                    onClose={handleClosePreview}
+                    onUse={handleUseTemplate}
+                    isApplying={isApplying === previewTemplate.id}
+                />
+            )}
         </div>
     )
 }

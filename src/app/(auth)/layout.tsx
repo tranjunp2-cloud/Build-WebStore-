@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react'
+import { MousePointerClick } from 'lucide-react'
 import Link from 'next/link'
 
 export default function AuthLayout({
@@ -17,9 +17,9 @@ export default function AuthLayout({
             <div className="relative w-full max-w-md">
                 {/* Logo */}
                 <div className="mb-8 flex items-center justify-center gap-2">
-                    <Sparkles className="h-7 w-7 text-blue-400" />
+                    <MousePointerClick className="h-7 w-7 text-cyan-400" />
                     <Link href="/" className="text-2xl font-bold text-white">
-                        PrimeWeb
+                        Web Store
                     </Link>
                 </div>
 
@@ -30,7 +30,7 @@ export default function AuthLayout({
 
                 {/* Footer */}
                 <p className="mt-6 text-center text-xs text-gray-500">
-                    © 2026 PrimeWeb by ECH. All rights reserved.
+                    © 2026 Web Store by ECH. All rights reserved.
                 </p>
             </div>
         </div>

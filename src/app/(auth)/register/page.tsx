@@ -103,7 +103,7 @@ export default function RegisterPage() {
         <>
             <div className="mb-6 text-center">
                 <h1 className="text-2xl font-bold text-white">Create your account</h1>
-                <p className="mt-1 text-sm text-gray-400">Get started with PrimeWeb — free</p>
+                <p className="mt-1 text-sm text-gray-400">Get started with Web Store — free</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -178,12 +178,12 @@ export default function RegisterPage() {
                                     <div
                                         key={level}
                                         className={`h-1 flex-1 rounded-full transition-colors ${passwordStrength >= level
-                                                ? level === 1
-                                                    ? 'bg-red-500'
-                                                    : level === 2
-                                                        ? 'bg-yellow-500'
-                                                        : 'bg-green-500'
-                                                : 'bg-gray-700'
+                                            ? level === 1
+                                                ? 'bg-red-500'
+                                                : level === 2
+                                                    ? 'bg-yellow-500'
+                                                    : 'bg-green-500'
+                                            : 'bg-gray-700'
                                             }`}
                                     />
                                 ))}

@@ -8,7 +8,7 @@ export default function HomePage() {
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-purple-600" />
-                        <span className="font-heading font-bold text-xl">PrimeWeb</span>
+                        <span className="font-heading font-bold text-xl">Web Store</span>
                     </div>
                     <div className="hidden md:flex items-center gap-8">
                         <a href="#features" className="text-sm text-zinc-400 hover:text-white transition-colors">Features</a>
@@ -137,7 +137,7 @@ export default function HomePage() {
                         Ready to Build Your <span className="gradient-text-brand">Dream Website</span>?
                     </h2>
                     <p className="text-zinc-400 text-lg mb-10">
-                        Join thousands of SMEs who trust PrimeWeb to power their online presence.
+                        Join thousands of SMEs who trust Web Store to power their online presence.
                     </p>
                     <Link href="/signup" className="btn-primary px-12 py-5 text-lg">
                         Get Started — It&apos;s Free
@@ -150,9 +150,9 @@ export default function HomePage() {
                 <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <div className="w-6 h-6 rounded-md bg-gradient-to-br from-sky-500 to-purple-600" />
-                        <span className="font-heading font-semibold">PrimeWeb</span>
+                        <span className="font-heading font-semibold">Web Store</span>
                     </div>
-                    <p className="text-sm text-zinc-600">© 2026 PrimeWeb. All rights reserved.</p>
+                    <p className="text-sm text-zinc-600">© 2026 Web Store. All rights reserved.</p>
                 </div>
             </footer>
         </div>

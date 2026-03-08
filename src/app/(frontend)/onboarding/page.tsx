@@ -1,17 +1,17 @@
 import Link from 'next/link'
-import { Sparkles, LayoutTemplate, FileText } from 'lucide-react'
+import { MousePointerClick, LayoutTemplate, FileText } from 'lucide-react'
 
 export default function OnboardingPage() {
     return (
         <div className="flex min-h-screen items-center justify-center bg-[#0F172A] px-4">
             <div className="w-full max-w-lg text-center">
                 {/* Logo */}
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/25">
-                    <Sparkles className="h-7 w-7 text-white" />
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 shadow-lg shadow-cyan-500/25">
+                    <MousePointerClick className="h-7 w-7 text-white" />
                 </div>
 
                 <h1 className="mt-6 text-3xl font-bold text-white">
-                    Chào mừng đến PrimeWeb!
+                    Chào mừng đến Web Store!
                 </h1>
                 <p className="mt-2 text-gray-400">
                     Hãy bắt đầu tạo website đầu tiên của bạn
