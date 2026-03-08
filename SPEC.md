@@ -56,11 +56,15 @@ Web Store là **AI-first website builder cho SME** — chủ shop không cần k
 - SME (chủ tiệm nhỏ, freelancer, cá nhân kinh doanh)
 - Không rành tech, không có designer
 - Muốn có website nhanh, chuyên nghiệp
+- **3 Personas:** SME Owner (Local Seller), Dropshipper/Social Seller, Malay Consumer
+- **Full market research:** [`docs/malaysia-market-context.md`](docs/malaysia-market-context.md)
 
 ### Target Market
 - **Primary:** Malaysia (MY)
 - **Languages:** English (EN) + Bahasa Melayu (MY) — **BOTH required on all UI**
 - **Default lang:** EN, user can toggle to MY
+- **Payment:** Stripe (cards), FPX (P1), E-wallets (P1)
+- **Cultural:** Halal cert support (P2), Seasonal commerce (Hari Raya, CNY, Deepavali)
 
 ### 🚨 3 MANDATORY BUILD RULES (Must follow for ALL templates & features)
 
@@ -774,46 +778,51 @@ web-store/
 
 ---
 
-## 20. FEATURE REGISTRY
+## 20. FEATURE REGISTRY (UNIFIED)
 
 > **Master index** — Trạng thái docs và build cho mỗi feature.
 > Cập nhật bảng này khi tạo PRD, Architecture, hoặc hoàn thành sprint.
+> **Ref:** [`docs/malaysia-market-context.md`](docs/malaysia-market-context.md) cho MY market priorities.
 
 ### Legend
 | Icon | Meaning |
 |------|---------|
 | ⬜ | Not started |
-| 📝 | Draft (chưa approved) |
+| 📝 | Draft (created, pending approval) |
 | ✅ | Approved / Done |
 | 🚀 | Shipped (live) |
-| — | Not required |
+| — | Not required for this feature |
 
 ### Feature Status
 
-| ID | Feature | Priority | PRD | Architecture | Sprint | QA | Status |
-|----|---------|----------|-----|-------------|--------|-----|--------|
-| F-01 | AI Chat Builder | P0 🌟 | ✅ `docs/prd/ai-chat-builder.md` | ✅ `docs/architecture/ai-chat-builder.md` | Wave 3 | ✅ | ✅ Sprint 2 |
-| F-02 | AI Editor (Split Screen) | P0 🌟 | ✅ | ✅ | Wave 3 | ✅ | ✅ Sprint 3 |
-| F-03 | Inline AI Edit | P0 | ✅ | — (in ai-editor) | Wave 3 | ✅ | ✅ Sprint 4 |
-| F-04 | AI SEO Engine | P0 🌟 | ⬜ `docs/prd/ai-seo-engine.md` | ⬜ `docs/architecture/ai-seo-engine.md` | Wave 4 | ⬜ | Spec Done |
-| F-05 | Block Renderer | P0 | ✅ `docs/prd/block-renderer.md` | — | Wave 3 | ✅ | ✅ Sprint 1 |
-| F-06 | Undo/Redo System | P0 | — (in ai-editor PRD) | — | Wave 3 | ✅ | ✅ Sprint 3 |
-| F-07 | Auto-Save & Draft | P0 | — (in ai-editor PRD) | — | Wave 3 | ✅ | ✅ Sprint 3 |
-| F-08 | Publish Flow | P0 | ✅ | — | Wave 3 | ✅ | ✅ Sprint 4 |
-| F-09 | AI Image Generation | P1 | — (in ai-chat-builder PRD) | — | Wave 4 | ⬜ | Spec Done |
-| F-10 | Template Gallery | P1 | ✅ | — | Wave 3 | ✅ | 🚀 Shipped |
-| F-11 | i18n EN/MY (Bilingual) | P0 | — | — | Wave 3.5 | ✅ | 🚀 Shipped |
-| F-12 | Vietnamese → English (380+ strings) | P0 | — | — | Wave 3.5 | ✅ | 🚀 Shipped |
-| — | Auth Flow | P0 | ✅ `docs/prd/auth.md` | — | Wave 2 | ⬜ | ✅ Done |
-| — | Dashboard | P0 | ✅ `docs/prd/dashboard.md` | — | Wave 2 | ✅ | 🚀 Shipped |
-| — | Onboarding | P0 | ⬜ | — | Wave 2 | ⬜ | ✅ Done |
+| ID | Feature | Wave | Priority | PRD | Stories | Code | Status |
+|----|---------|------|----------|-----|---------|------|--------|
+| **F01** | AI Chat Builder | 3 | P0 🌟 | ✅ `F01-ai-chat-builder.md` | ✅ | ✅ Built | ⚠️ Needs UI polish |
+| **F02** | Auth (Login/Register/Forgot/Reset) | 1 | P0 | ✅ `F02-auth.md` v2.0 | ✅ | ✅ Rebuilt | ✅ SaaS Bible compliant |
+| **F03** | Dashboard Overview | 1 | P0 | ✅ `F03-dashboard.md` | ✅ | ✅ Built | ⚠️ Needs UI polish |
+| **F04** | Block Renderer Engine | 3 | P0 | ✅ `F04-block-renderer.md` | — | ⚠️ Monolith | 🔴 Needs refactor |
+| **F05** | AI Editor (Split Screen) | 3 | P0 🌟 | 📝 `F05-ai-editor.md` | ✅ | ✅ Basic | ⚠️ Needs rebuild |
+| **F06** | Onboarding Flow | 1 | P0 | 📝 `F06-onboarding.md` | — | ✅ Basic | ⚠️ Needs rebuild |
+| **F07** | Template Gallery | 3.5 | P1 | 📝 `F07-template-gallery.md` | — | ⚠️ Static | ⚠️ Needs rebuild |
+| **F08** | Publish Flow | 3 | P0 | 📝 `F08-publish-flow.md` | ✅ | ❌ Not built | 🔴 Needs build |
+| **F09** | Products CRUD | 4 | P0 | 📝 `F09-products-crud.md` | ✅ | ✅ Basic | ⚠️ Needs polish |
+| **F10** | Storefront Commerce | 5 | P0 🌟 | ✅ `F10-storefront-commerce.md` | ✅ | ✅ Built | ⚠️ Needs UI polish |
+| **F11** | Orders Management | 4 | P0 | 📝 `F11-orders-management.md` | — | ✅ Basic | ⚠️ Needs polish |
+| **F12** | SEO Dashboard | 4 | P0 🌟 | 📝 `F12-seo-dashboard.md` | ✅ | ✅ Basic | ⚠️ Needs rebuild |
+| **F13** | Analytics Dashboard | 5 | P1 | 📝 `F13-analytics-dashboard.md` | — | ✅ Basic | ⚠️ Needs polish |
+| **F14** | Undo/Redo System | 3 | P0 | 📝 `F14-undo-redo.md` | — | ❌ Not built | 🔴 Needs build |
+| **F15** | Auto-Save & Draft | 3 | P0 | 📝 `F15-auto-save-draft.md` | — | ❌ Not built | 🔴 Needs build |
+| — | i18n EN/MY (Bilingual) | 3.5 | P0 | — | — | ⚠️ Partial | In progress |
+| — | Payment Gateway (FPX) | 6 | P0 🌟 | ⬜ | — | ❌ | Future wave |
+| — | WhatsApp Integration | 6+ | P1 | ⬜ | — | ❌ | Future wave |
+| — | Halal Trust Badge | 6+ | P2 | ⬜ | — | ❌ | Future wave |
 
 ### BMAD Gate Quick Check
 
 ```
 🔴 Trước khi bắt đầu code Feature X:
    1. Check bảng Feature Registry ở trên
-   2. PRD column = ✅?  → Nếu ⬜ → STOP, tạo PRD trước
+   2. PRD column = ✅ or 📝?  → Nếu ⬜ → STOP, tạo PRD trước
    3. Architecture column = ✅ hoặc —?  → Nếu ⬜ → STOP, tạo architecture trước
    4. UI Mockups = ✅?  → Nếu ⬜ → STOP, tạo mockups trước
    5. Chạy BMAD Gate Checklist (§2.5)
@@ -827,4 +836,5 @@ web-store/
 > 2. §2 (BMAD Gate) bắt buộc trước khi code  
 > 3. §13 (10-Point Checklist) bắt buộc trước khi merge PR  
 > 4. §7 → link tới `AI_BUILDER_SPEC.md` cho chi tiết AI features  
-> 5. §17 → link tới `PLAN-ai-webbuilder.md` cho build plan
+> 5. §17 → link tới `PLAN-ai-webbuilder.md` cho build plan  
+> 6. [`docs/malaysia-market-context.md`](docs/malaysia-market-context.md) cho MY market insights
