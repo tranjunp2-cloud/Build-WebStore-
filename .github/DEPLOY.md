@@ -330,7 +330,8 @@ Sau khi tạo App từ GitHub (bước 1), App Platform đã “biết” repo +
 #### Build failed trên App Platform — kiểm tra gì
 
 - **Xem log:** Trong DO App → **Activity** hoặc **Runtime Logs** → mở bản deploy fail → **View details** để xem log build (lỗi cụ thể).
-- **Husky trong Docker:** Dockerfile đã set `ENV HUSKY=0` để tránh lỗi khi `npm ci` (môi trường không có git). Nếu repo clone cũ, pull code mới có Dockerfile đã sửa rồi redeploy.
+- **Husky trong Docker / build từ source:** Dockerfile đã set `ENV HUSKY=0`. Nếu DO build **từ source** (không Dockerfile), thêm **Build-time env** trên DO: `HUSKY=0` để tránh lỗi khi `npm install` chạy script `prepare`.
+- **Postinstall:** Script `scripts/postinstall.js` đã sửa: dùng đúng path `../node_modules/undici/...`, bọc try/catch, luôn `process.exit(0)` để không làm fail build.
 - **Polyfill:** Dockerfile builder stage đã set `NODE_OPTIONS="--require ./node-polyfill.js"` cho `npm run build`. Thiếu có thể gây lỗi khi collect page data.
 - **Build args (tùy chọn):** Nếu build cần DB/secret lúc build time, cấu hình **Build-time environment variables** trong DO App (DATABASE_URI, PAYLOAD_SECRET). Thường Next.js build không cần DB; runtime mới cần.
 
