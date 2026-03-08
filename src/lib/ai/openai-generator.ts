@@ -9,9 +9,11 @@ import { blockRegistry } from '@/blocks/registry'
 import { buildSystemPrompt, buildUserPrompt, type BusinessInfoInput } from './system-prompt'
 import { generateBlocks, type GenerationResult } from './generate-blocks'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
+function getOpenAI(): OpenAI | null {
+    const key = process.env.OPENAI_API_KEY
+    if (!key) return null
+    return new OpenAI({ apiKey: key })
+}
 
 export type SSEEvent = {
     event: 'step' | 'theme_set' | 'block_complete' | 'seo_generated' | 'error' | 'done'
@@ -30,8 +32,8 @@ export async function generateSiteWithAI(
     const events: SSEEvent[] = []
     const promptText = `${businessInfo.businessName} - ${businessInfo.industry}`
 
-    // Fallback if no API key
-    if (!process.env.OPENAI_API_KEY) {
+    const openai = getOpenAI()
+    if (!openai) {
         console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
         return generateWithFallback(promptText, events)
     }

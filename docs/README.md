@@ -1,24 +1,36 @@
 # PrimeWeb — Documentation Hub
 
-> Feature documentation organized by BMAD workflow.
-> **Product:** PrimeWeb (AI-first SaaS website builder for SMEs)
-> **Authority:** `SPEC.md` §2 is the master rule — read it before coding.
+> Feature documentation organized by BMAD workflow.  
+> **Product:** PrimeWeb (AI-first SaaS website builder for SMEs — Malaysia market)  
+> **Authority:** `SPEC.md` §2 is the master rule — read it before coding.  
+> **Market Ref:** [`malaysia-market-context.md`](./malaysia-market-context.md)
 
 ## 📂 Structure
 
 ```
 docs/
 ├── README.md                      ← This file
+├── malaysia-market-context.md     ← 🆕 MY market personas, JTBD, payments
 ├── prd/                           ← Product Requirement Documents
-│   ├── _TEMPLATE.md               ← PRD template
+│   ├── _TEMPLATE.md
 │   ├── F01-ai-chat-builder.md
 │   ├── F02-auth.md
 │   ├── F03-dashboard.md
 │   ├── F04-block-renderer.md
-│   └── F10-storefront-commerce.md
+│   ├── F05-ai-editor.md           ← 🆕
+│   ├── F06-onboarding.md          ← 🆕
+│   ├── F07-template-gallery.md    ← 🆕
+│   ├── F08-publish-flow.md        ← 🆕
+│   ├── F09-products-crud.md       ← 🆕
+│   ├── F10-storefront-commerce.md
+│   ├── F11-orders-management.md   ← 🆕
+│   ├── F12-seo-dashboard.md       ← 🆕
+│   ├── F13-analytics-dashboard.md ← 🆕
+│   ├── F14-undo-redo.md           ← 🆕
+│   └── F15-auto-save-draft.md     ← 🆕
 ├── architecture/                  ← System design & architecture
-│   ├── _TEMPLATE.md               ← Architecture template
-│   ├── AI_BUILDER_SPEC.md         ← AI features deep technical spec
+│   ├── _TEMPLATE.md
+│   ├── AI_BUILDER_SPEC.md
 │   ├── F01-ai-chat-builder.md
 │   ├── F02-auth.md
 │   ├── F03-dashboard.md
@@ -30,35 +42,46 @@ docs/
 │   ├── F10-storefront-checkout.jpg
 │   └── F10-storefront-cart.jpg
 ├── stories/                       ← User Stories with Gherkin AC
-│   └── user-stories-p0.md         ← P0 stories (US-001 → US-010)
+│   ├── user-stories-p0.md         ← Index file (links to per-feature)
+│   ├── F01-ai-chat-builder-stories.md  ← 🆕
+│   ├── F02-auth-stories.md             ← 🆕
+│   ├── F03-dashboard-stories.md        ← 🆕
+│   ├── F05-ai-editor-stories.md        ← 🆕
+│   ├── F08-publish-stories.md          ← 🆕
+│   ├── F09-products-crud-stories.md    ← 🆕
+│   ├── F10-storefront-stories.md       ← 🆕
+│   └── F12-seo-dashboard-stories.md    ← 🆕
 ├── qa/                            ← QA Reports (after build)
 │   ├── F02-auth.md
 │   └── F03-dashboard.md
 ├── decisions/                     ← Architecture Decision Records
-├── tracking/                      ← Build progress & plans
-│   ├── product_plan.md            ← Full product roadmap
-│   ├── PLAN-ai-webbuilder.md      ← BMAD master build plan
-│   ├── implementation_plan.md
-│   ├── task.md
-│   └── walkthrough.md
+└── tracking/                      ← Build progress & plans
+    ├── product_plan.md
+    ├── PLAN-ai-webbuilder.md
+    ├── implementation_plan.md
+    ├── task.md
+    └── walkthrough.md
 ```
 
-## 📑 Naming Convention
+## 📑 Feature Registry (Unified F01-F15)
 
-All feature docs: **`F{XX}-{feature-name}.md`**
-
-| ID | Feature | Wave | PRD | Architecture | Design | QA |
-|----|---------|------|-----|-------------|--------|-----|
-| F01 | AI Chat Builder | 3 | ✅ | ✅ | ⬜ | ⬜ |
-| F02 | Auth | 1 | ✅ | ✅ | ⬜ | ✅ |
-| F03 | Dashboard | 2 | ✅ | ✅ | ✅ | ✅ |
-| F04 | Block Renderer | 3 | ✅ | ⬜ | ⬜ | ⬜ |
-| F05 | SEO Dashboard | 4 | ⬜ | ⬜ | ⬜ | ⬜ |
-| F06 | Products CRUD | 4 | ⬜ | ⬜ | ⬜ | ⬜ |
-| F07 | Orders | 4 | ⬜ | ⬜ | ⬜ | ⬜ |
-| F08 | Publish Flow | 4 | ⬜ | ⬜ | ⬜ | ⬜ |
-| F09 | Templates + i18n | 3.5 | ⬜ | ⬜ | ⬜ | ⬜ |
-| F10 | Storefront Commerce | 5 | ✅ | ✅ | ✅ | ⬜ |
+| ID | Feature | Wave | Priority | PRD | Stories | Code |
+|----|---------|------|----------|-----|---------|------|
+| F01 | AI Chat Builder | 3 | P0 🌟 | ✅ | ✅ | ✅ Built |
+| F02 | Auth | 1 | P0 | ✅ | ✅ | ✅ Built |
+| F03 | Dashboard | 1 | P0 | ✅ | ✅ | ✅ Built |
+| F04 | Block Renderer | 3 | P0 | ✅ | — | ⚠️ Monolith |
+| F05 | AI Editor | 3 | P0 🌟 | 📝 | ✅ | ⚠️ Basic |
+| F06 | Onboarding | 1 | P0 | 📝 | — | ⚠️ Basic |
+| F07 | Templates | 3.5 | P1 | 📝 | — | ⚠️ Static |
+| F08 | Publish Flow | 3 | P0 | 📝 | ✅ | ❌ |
+| F09 | Products CRUD | 4 | P0 | 📝 | ✅ | ⚠️ Basic |
+| F10 | Storefront | 5 | P0 🌟 | ✅ | ✅ | ✅ Built |
+| F11 | Orders | 4 | P0 | 📝 | — | ⚠️ Basic |
+| F12 | SEO Dashboard | 4 | P0 🌟 | 📝 | ✅ | ⚠️ Basic |
+| F13 | Analytics | 5 | P1 | 📝 | — | ⚠️ Basic |
+| F14 | Undo/Redo | 3 | P0 | 📝 | — | ❌ |
+| F15 | Auto-Save | 3 | P0 | 📝 | — | ❌ |
 
 ## 🛑 BMAD Gate (5/5 Required)
 
@@ -76,6 +99,7 @@ Before coding any feature, verify:
 | Document | Purpose |
 |----------|---------|
 | [`SPEC.md`](../SPEC.md) | Constitution — master rules |
+| [`malaysia-market-context.md`](./malaysia-market-context.md) | MY market personas, payments, UX |
 | [`AI_BUILDER_SPEC.md`](./architecture/AI_BUILDER_SPEC.md) | AI features deep spec |
 | [`product_plan.md`](./tracking/product_plan.md) | Full product roadmap |
 | [`PLAN-ai-webbuilder.md`](./tracking/PLAN-ai-webbuilder.md) | BMAD build plan |

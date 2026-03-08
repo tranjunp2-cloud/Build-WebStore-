@@ -1,30 +1,31 @@
-/* THIS FILE WAS GENERATED AUTOMATICALLY BY PAYLOAD. */
-/* DO NOT MODIFY IT BECAUSE IT COULD BE REWRITTEN AT ANY TIME. */
-import type { Metadata } from 'next'
 import { RootPage, generatePageMetadata } from '@payloadcms/next/views'
 import config from '@payload-config'
 import { importMap } from '../importMap.js'
 
-type Args = {
-    params: Promise<{ segments: string[] }>
-    searchParams: Promise<{ [key: string]: string | string[] }>
+type PageProps = {
+    params: Promise<{ segments?: string[] }>
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-export const generateMetadata = ({
-    params,
-    searchParams,
-}: {
-    params: Promise<{ segments: string[] }>
-    searchParams: Promise<{ [key: string]: string | string[] }>
-}): Promise<Metadata> =>
-    generatePageMetadata({ config, params, searchParams })
+const paramsPromise = (params: Promise<{ segments?: string[] }>) =>
+    params.then((p) => ({ segments: p.segments ?? [] }))
 
-const Page = ({ params, searchParams }: Args) => (
+const searchParamsPromise = (searchParams: Promise<{ [key: string]: string | string[] | undefined }>) =>
+    searchParams.then((s) => s as { [key: string]: string | string[] })
+
+export const generateMetadata = ({ params, searchParams }: PageProps) =>
+    generatePageMetadata({
+        config,
+        params: paramsPromise(params),
+        searchParams: searchParamsPromise(searchParams),
+    })
+
+const Page = async ({ params, searchParams }: PageProps) => (
     <RootPage
         config={config}
         importMap={importMap}
-        params={params}
-        searchParams={searchParams}
+        params={paramsPromise(params)}
+        searchParams={searchParamsPromise(searchParams)}
     />
 )
 

@@ -9,9 +9,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
+function getOpenAI(): OpenAI | null {
+    const key = process.env.OPENAI_API_KEY
+    if (!key) return null
+    return new OpenAI({ apiKey: key })
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -21,8 +23,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Text and instruction are required' }, { status: 400 })
         }
 
-        if (!process.env.OPENAI_API_KEY) {
-            // Simple rule-based fallback
+        const openai = getOpenAI()
+        if (!openai) {
             return NextResponse.json({
                 rewritten: text,
                 message: 'AI rewriting requires OPENAI_API_KEY',

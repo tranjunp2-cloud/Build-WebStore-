@@ -8,7 +8,11 @@
 
 | Nội dung | File / vị trí |
 |----------|----------------|
+| **Overview — code rules & project rules (điểm vào)** | [.github/OVERVIEW.md](.github/OVERVIEW.md) — một trang tổng quan, bản đồ + cách check |
 | **Git, PR, CI/CD, conflict** | [.github/GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) |
+| **Luồng deploy (staging vs prod)** | [.github/DEPLOY.md](.github/DEPLOY.md) |
+| **Code rules, CI fix, Copilot** | [.github/CODE_AND_RULES.md](.github/CODE_AND_RULES.md) |
+| **Đánh giá triển khai CI/CD** | [.github/CICD_IMPLEMENTATION_ASSESSMENT.md](.github/CICD_IMPLEMENTATION_ASSESSMENT.md) — so với workflow + analysis, lộ trình gợi ý |
 | **Mô tả PR (template)** | [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) — khi tạo/sửa PR **bắt buộc** dùng đúng template này |
 | **Product, BMAD, 9-Point, API, data model** | [SPEC.md](../SPEC.md) (root) |
 | **Cursor:** tuân theo .github + dùng template khi tạo PR | [.cursor/rules/github.mdc](../.cursor/rules/github.mdc) |
@@ -19,7 +23,7 @@ Cập nhật rule → chỉ sửa trong `.github` (và SPEC.md cho product). Cá
 
 ## 2. Ai phải theo
 
-- **Dev** (local, bất kỳ editor nào): branch, commit, PR theo [GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) và [PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
+- **Dev** (local, bất kỳ editor nào): branch, commit, PR theo [GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) và [PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md). **Feature/fix:** tạo PR với **base = staging** (không PR vào main). Main chỉ cập nhật qua release (staging → main) hoặc hotfix.
 - **Cursor / Antigravity / AI assistant**: đọc rule từ `.github` và SPEC.md; không tạo thêm file “guide” hoặc “standardization” riêng cho từng môi trường.
 - **CI/CD**: pipeline chạy theo branch/commit/PR đã định nghĩa trong [GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md).
 

@@ -1,20 +1,24 @@
 # ── Stage 1: Dependencies ────────────────────────────────────────────────
 FROM node:20-alpine AS deps
 WORKDIR /app
-
+ENV HUSKY=0
 COPY package.json package-lock.json* ./
+COPY scripts ./scripts
 RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
 
 # ── Stage 2: Builder ────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 WORKDIR /app
-
+ENV HUSKY=0
 COPY package.json package-lock.json* ./
+COPY scripts ./scripts
 RUN npm ci 2>/dev/null || npm install
 
 COPY . .
+# Ensure public exists (empty dirs may be omitted from build context)
+RUN mkdir -p public
 
-# Build args for env at build time
+# Build args for env at build time (optional; app can use runtime env)
 ARG DATABASE_URI
 ARG PAYLOAD_SECRET
 ARG NEXT_PUBLIC_SERVER_URL
@@ -25,6 +29,8 @@ ENV PAYLOAD_SECRET=${PAYLOAD_SECRET}
 ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
 ENV NEXT_PUBLIC_PLATFORM_DOMAIN=${NEXT_PUBLIC_PLATFORM_DOMAIN}
 ENV NEXT_TELEMETRY_DISABLED=1
+# Polyfill for Next.js build (File/Blob); package.json build script also sets NODE_OPTIONS
+ENV NODE_OPTIONS="--require ./node-polyfill.js"
 
 RUN npm run build
 

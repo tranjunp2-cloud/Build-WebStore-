@@ -1,22 +1,22 @@
-/* THIS FILE WAS GENERATED AUTOMATICALLY BY PAYLOAD. */
-/* DO NOT MODIFY IT BECAUSE IT COULD BE REWRITTEN AT ANY TIME. */
+import type { ServerFunctionClient } from 'payload'
 import { RootLayout, handleServerFunctions } from '@payloadcms/next/layouts'
 import config from '@payload-config'
-import { importMap } from '../importMap.js'
 import React from 'react'
-import type { ServerFunctionClient } from 'payload'
+import { importMap } from '../importMap.js'
 
-type Args = {
-    children: React.ReactNode
-}
+export { metadata } from '@payloadcms/next/layouts'
 
-const serverFunction: ServerFunctionClient = async function serverFunction(args) {
+const serverFunction: ServerFunctionClient = async (args) => {
     'use server'
     return handleServerFunctions({
         ...args,
         config,
         importMap,
     })
+}
+
+type Args = {
+    children: React.ReactNode
 }
 
 const Layout = ({ children }: Args) => (

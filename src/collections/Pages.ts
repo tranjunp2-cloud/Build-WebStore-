@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { Block, CollectionConfig } from 'payload'
 
 // Block definitions — each block is a section of a page
 const HeroBlock = {
@@ -39,7 +39,7 @@ const HeroBlock = {
         },
         { name: 'image', type: 'upload', relationTo: 'media' },
         { name: 'backgroundImage', type: 'upload', relationTo: 'media' },
-        { name: 'videoUrl', type: 'text', admin: { condition: (_, s) => s?.variant === 'video' } },
+        { name: 'videoUrl', type: 'text', admin: { condition: (_: unknown, s: Record<string, unknown>) => s?.variant === 'video' } },
         {
             name: 'badge',
             type: 'group',
@@ -112,7 +112,7 @@ const AboutBlock = {
             name: 'stats',
             type: 'array',
             maxRows: 4,
-            admin: { condition: (_, s) => s?.layout === 'cards' },
+            admin: { condition: (_: unknown, s: Record<string, unknown>) => s?.layout === 'cards' },
             fields: [
                 { name: 'value', type: 'text', required: true },
                 { name: 'label', type: 'text', required: true },
@@ -334,7 +334,7 @@ export const Pages: CollectionConfig = {
                 ContactBlock,
                 GalleryBlock,
                 FooterBlock,
-            ],
+            ] as Block[],
         },
         {
             name: 'seo',
