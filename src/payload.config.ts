@@ -24,7 +24,6 @@ export default buildConfig({
     user: Users.slug,
     meta: {
       titleSuffix: '— Web Store Admin',
-      favicon: '/favicon.ico',
     },
     importMap: {
       baseDir: path.resolve(dirname),
