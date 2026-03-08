@@ -28,6 +28,59 @@
 
 ## 3. Luồng làm việc (flow)
 
+### 3.1 Sơ đồ tổng quan
+
+```mermaid
+flowchart TB
+    subgraph daily["Luồng hàng ngày (feature / fix)"]
+        A[Dev: tạo branch feature/xxx hoặc fix/xxx] --> B[PR vào staging]
+        B --> C{Merge vào staging}
+        C --> D[GitHub Actions: CI chạy]
+        D --> E[Push staging → Deploy Staging chạy]
+        E --> F[QA / demo trên môi trường staging]
+        F --> G{Staging ổn, sẵn sàng release?}
+        G -->|Có| H[PR: staging → main]
+        H --> I[Merge main]
+        I --> J[Deploy Production chạy]
+        G -->|Chưa| F
+    end
+
+    subgraph hotfix["Luồng hotfix (khẩn cấp)"]
+        K[Sự cố production] --> L[Dev: tạo hotfix/xxx từ main]
+        L --> M[PR vào main]
+        M --> N[Merge main → Deploy Production]
+        N --> O[Merge main vào staging để đồng bộ]
+    end
+```
+
+### 3.2 Luồng chi tiết (theo bước)
+
+**Luồng thường — Feature / Fix (team chỉ vào staging trước):**
+
+| Bước | Ai làm | Việc |
+|------|--------|------|
+| 1 | Dev | `git checkout staging` → `git pull` → `git checkout -b feature/PROJ-123-mô-tả` |
+| 2 | Dev | Code, commit (Conventional Commits), push branch |
+| 3 | Dev | Tạo **PR: base = staging** (không chọn main) |
+| 4 | CI | GitHub Actions chạy: Lint → Typecheck → Test → Build |
+| 5 | Reviewer | Review, approve |
+| 6 | Dev / Maintainer | Merge PR vào **staging** |
+| 7 | CI/CD | Push lên staging → workflow **Deploy Staging** chạy → app staging cập nhật |
+| 8 | QA / PM | Test, demo trên staging |
+| 9 | Khi ổn | Tạo **PR: staging → main** → merge → **Deploy Production** chạy |
+
+**Luồng hotfix — Sửa gấp production:**
+
+| Bước | Ai làm | Việc |
+|------|--------|------|
+| 1 | Dev | `git checkout main` → `git pull` → `git checkout -b hotfix/PROJ-789-mô-tả` |
+| 2 | Dev | Sửa, commit, push, tạo **PR vào main** |
+| 3 | CI + Review | CI pass, approve → merge vào **main** |
+| 4 | CI/CD | Deploy Production chạy |
+| 5 | Dev | Merge **main** vào **staging** để staging không lệch với prod |
+
+### 3.3 Tóm tắt (text)
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Luồng thường (feature / fix)                                   │
