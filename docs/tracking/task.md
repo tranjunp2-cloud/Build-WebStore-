@@ -31,7 +31,15 @@
 - [x] Dashboard BMAD Run (PRD → Arch → Dev → QA ✅ PASS)
 - [x] 6 components (Greeting, Stats, SiteGrid, EmptyState, Banner, Skeleton)
 
-## Wave 3: AI Core — Builder + Editor (⏳ After Auth)
+## Wave 2.5: UX Quick Wins (Done)
+- [x] Sidebar: remove "Soon" items (SEO, Analytics, Billing)
+- [x] Site cards: gradient thumbnails + initials (no more globe icons)
+- [x] Stats: only real data (total sites, published count, storage)
+- [x] Empty state: two-path cards (AI Builder + Template Gallery)
+- [x] Editor: block fields editable (headline, subheadline, ctaText, description)
+- [x] UX Audit report created and copied to docs/tracking/
+
+## Wave 3: AI Core (Done)
 
 ### 3.1 AI Chat Builder
 - [x] Rule-based block generator (5 business types × 7 blocks)

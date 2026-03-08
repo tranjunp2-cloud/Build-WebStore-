@@ -106,27 +106,27 @@ export function checkRateLimit(
  * Keep them short and reusable across requests
  */
 export const SYSTEM_PROMPTS = {
-    'site-generation': `Bạn là AI chuyên tạo website cho SME. Output JSON format cho block system.
+    'site-generation': `You are an AI specialised in creating websites for SMEs. Output JSON format for the block system.
 Blocks: hero, navigation, about, features, testimonials, contact, gallery, footer, pricing, faq, cta, stats, team, blog-list, video, logo-cloud.
-Mỗi block có: blockType, variant, và content fields.
-Theme có: primaryColor (hex), secondaryColor (hex), fontHeading, fontBody, colorMode (light/dark).
-KHÔNG sinh HTML/CSS. CHỈ sinh JSON config cho blocks.`,
+Each block has: blockType, variant, and content fields.
+Theme has: primaryColor (hex), secondaryColor (hex), fontHeading, fontBody, colorMode (light/dark).
+DO NOT generate HTML/CSS. ONLY generate JSON config for blocks.`,
 
-    'chat-edit': `Bạn là AI editor cho website builder. User yêu cầu thay đổi website.
-Trả về JSON: { "changes": [{ "type": "UPDATE_BLOCK"|"ADD_BLOCK"|"REMOVE_BLOCK"|"UPDATE_THEME", "blockId"?: string, "data": {} }], "message": "Mô tả ngắn thay đổi" }
-KHÔNG sinh HTML. CHỈ sinh JSON changes cho block system.`,
+    'chat-edit': `You are an AI editor for a website builder. Users request changes to their website.
+Return JSON: { "changes": [{ "type": "UPDATE_BLOCK"|"ADD_BLOCK"|"REMOVE_BLOCK"|"UPDATE_THEME", "blockId"?: string, "data": {} }], "message": "Short change description" }
+DO NOT generate HTML. ONLY generate JSON changes for the block system.`,
 
-    'inline-edit': `Bạn edit 1 text element duy nhất. Giữ nguyên tone và style.
-Input: text hiện tại + chỉ dẫn sửa. Output: text mới (plain text, KHÔNG JSON).`,
+    'inline-edit': `You edit a single text element. Preserve the original tone and style.
+Input: current text + editing instructions. Output: new text (plain text, NOT JSON).`,
 
-    'seo-generation': `Bạn là SEO expert. Generate metadata cho website.
+    'seo-generation': `You are an SEO expert. Generate metadata for a website.
 Output JSON: { "metaTitle": "<60 chars", "metaDescription": "150-160 chars", "keywords": ["..."], "ogTitle": "...", "ogDescription": "..." }`,
 
-    'content-rewrite': `Viết lại content theo yêu cầu. Giữ nguyên ý nghĩa, thay đổi cách diễn đạt.
-Output: text mới (plain text).`,
+    'content-rewrite': `Rewrite content as requested. Preserve meaning, change phrasing.
+Output: new text (plain text).`,
 
-    'product-description': `Viết mô tả sản phẩm hấp dẫn, SEO-friendly. 2-3 câu ngắn gọn, highlight tính năng và lợi ích.
-Output: mô tả sản phẩm (plain text).`,
+    'product-description': `Write compelling, SEO-friendly product descriptions. 2-3 concise sentences, highlighting features and benefits.
+Output: product description (plain text).`,
 } as const
 
 // ─── Cost Estimation ────────────────────────────────────────────────────

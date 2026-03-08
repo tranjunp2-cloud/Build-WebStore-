@@ -33,7 +33,7 @@ export default function LoginPage() {
             })
 
             if (!res.ok) {
-                setError('Email hoặc mật khẩu không đúng')
+                setError('Incorrect email or password')
                 setPassword('')
                 return
             }
@@ -41,7 +41,7 @@ export default function LoginPage() {
             router.push(redirectUrl)
             router.refresh()
         } catch {
-            setError('Đã xảy ra lỗi. Vui lòng thử lại.')
+            setError('An error occurred. Please try again.')
         } finally {
             setIsLoading(false)
         }

@@ -1,20 +1,20 @@
 import Link from 'next/link'
-import { Sparkles, LayoutTemplate, FileText } from 'lucide-react'
+import { MousePointerClick, LayoutTemplate, FileText } from 'lucide-react'
 
 export default function OnboardingPage() {
     return (
         <div className="flex min-h-screen items-center justify-center bg-[#0F172A] px-4">
             <div className="w-full max-w-lg text-center">
                 {/* Logo */}
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/25">
-                    <Sparkles className="h-7 w-7 text-white" />
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-600 shadow-lg shadow-cyan-500/25">
+                    <MousePointerClick className="h-7 w-7 text-white" />
                 </div>
 
                 <h1 className="mt-6 text-3xl font-bold text-white">
-                    Chào mừng đến PrimeWeb!
+                    Welcome to Web Store!
                 </h1>
                 <p className="mt-2 text-gray-400">
-                    Hãy bắt đầu tạo website đầu tiên của bạn
+                    Start creating your first website
                 </p>
 
                 {/* Options */}
@@ -29,13 +29,13 @@ export default function OnboardingPage() {
                         </div>
                         <div>
                             <h3 className="font-semibold text-white group-hover:text-blue-300">
-                                Tạo bằng AI
+                                Build with AI
                                 <span className="ml-2 rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] uppercase text-blue-400">
                                     Recommend
                                 </span>
                             </h3>
                             <p className="mt-0.5 text-sm text-gray-400">
-                                Chat với AI để tạo website chuyên nghiệp trong 5 phút
+                                Chat with AI to create a professional website in 5 minutes
                             </p>
                         </div>
                     </Link>
@@ -49,9 +49,9 @@ export default function OnboardingPage() {
                             <LayoutTemplate className="h-6 w-6 text-gray-400 group-hover:text-white" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-white">Chọn Template</h3>
+                            <h3 className="font-semibold text-white">Choose Template</h3>
                             <p className="mt-0.5 text-sm text-gray-400">
-                                Duyệt và chỉnh sửa từ các mẫu website có sẵn
+                                Browse and customise from ready-made templates
                             </p>
                         </div>
                     </Link>
@@ -65,9 +65,9 @@ export default function OnboardingPage() {
                             <FileText className="h-6 w-6 text-gray-400 group-hover:text-white" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-white">Tạo từ trang trắng</h3>
+                            <h3 className="font-semibold text-white">Start from Scratch</h3>
                             <p className="mt-0.5 text-sm text-gray-400">
-                                Bắt đầu với canvas trống, tự thêm blocks
+                                Start with a blank canvas, add blocks yourself
                             </p>
                         </div>
                     </Link>
@@ -75,13 +75,13 @@ export default function OnboardingPage() {
 
                 {/* Skip */}
                 <p className="mt-8 text-xs text-gray-600">
-                    Bạn có thể tạo thêm website sau tại Dashboard
+                    You can create more websites later from the Dashboard
                 </p>
                 <Link
                     href="/dashboard"
                     className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300"
                 >
-                    Bỏ qua → Đến Dashboard
+                    Skip → Go to Dashboard
                 </Link>
             </div>
         </div>

@@ -1,4 +1,4 @@
-import { Globe, Eye, HardDrive, Sparkles } from 'lucide-react'
+import { Globe, HardDrive } from 'lucide-react'
 
 type StatCardProps = {
     icon: React.ElementType
@@ -37,50 +37,41 @@ function StatCard({ icon: Icon, label, value, sub, progress, iconColor = 'text-g
 
 type DashboardStatsProps = {
     totalSites: number
-    totalViews: string
     storageUsed: number
     storageLimit: number
-    aiCredits: number
-    aiCreditsLimit: number
+    publishedCount: number
 }
 
 export function DashboardStats({
     totalSites,
-    totalViews,
     storageUsed,
     storageLimit,
-    aiCredits,
-    aiCreditsLimit,
+    publishedCount,
 }: DashboardStatsProps) {
+    const draftCount = totalSites - publishedCount
+
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard
                 icon={Globe}
-                label="Total Sites"
+                label="Total Websites"
                 value={String(totalSites)}
-                sub={`${totalSites} active`}
+                sub={`${publishedCount} published · ${draftCount} draft`}
                 iconColor="text-blue-400"
             />
             <StatCard
-                icon={Eye}
-                label="Total Views"
-                value={totalViews}
-                sub="+8% this month"
+                icon={Globe}
+                label="Published"
+                value={String(publishedCount)}
+                sub={publishedCount > 0 ? 'Sites are live' : 'No live sites yet'}
                 iconColor="text-green-400"
             />
             <StatCard
                 icon={HardDrive}
                 label="Storage"
-                value={`${storageUsed}GB / ${storageLimit}GB`}
-                progress={(storageUsed / storageLimit) * 100}
+                value={storageUsed > 0 ? `${storageUsed}MB / ${storageLimit}MB` : 'Not used'}
+                progress={storageUsed > 0 ? (storageUsed / storageLimit) * 100 : 0}
                 iconColor="text-amber-400"
-            />
-            <StatCard
-                icon={Sparkles}
-                label="AI Credits"
-                value={`${aiCredits} / ${aiCreditsLimit}`}
-                progress={(aiCredits / aiCreditsLimit) * 100}
-                iconColor="text-purple-400"
             />
         </div>
     )

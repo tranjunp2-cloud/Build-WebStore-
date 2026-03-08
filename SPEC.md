@@ -1,6 +1,14 @@
-# SPEC.md — PrimeWeb SaaS Website Builder
-> **Version:** 3.0 (BMAD-enhanced) | **Updated:** 2026-03-07 | **Owner:** Ben (Antigravity)  
-> **Cursor:** `@SPEC.md` mỗi khi bắt đầu feature mới — đây là nguồn sự thật duy nhất
+# SPEC.md — Web Store (AI Website Builder)
+> **Version:** 4.0 (Master Document) | **Updated:** 2026-03-08 | **Owner:** Ben (Antigravity)  
+> **Rule:** `@SPEC.md` trước BẤT KỲ feature nào — đây là **HIẾN PHÁP** duy nhất của dự án
+
+> [!IMPORTANT]
+> **Document Hierarchy:**  
+> `SPEC.md` (this file) = Master skeleton + Rules + References  
+> `docs/AI_BUILDER_SPEC.md` = AI features deep technical spec (referenced by §7)  
+> `docs/PLAN-ai-webbuilder.md` = Build plan with sprint order (referenced by §17)  
+> `docs/prd/{feature}.md` = PRD cho từng feature (bắt buộc trước khi code)  
+> `docs/architecture/{feature}.md` = Architecture note (bắt buộc trước khi code)
 
 ---
 
@@ -27,13 +35,14 @@
 | 17 | [Build Tracking](#17-build-tracking) | Wave 1-5 progress |
 | 18 | [Measure & Iterate](#18-measure--iterate) | Analytics, KPIs |
 | 19 | [Env Variables](#19-environment-variables-template) | .env template |
+| **20** | **[Feature Registry](#20-feature-registry)** | **Master index — docs & build status per feature** |
 
 ---
 
 ## 1. PRODUCT OVERVIEW
 
 ### Vision
-PrimeWeb là **AI-first website builder cho SME** — chủ shop không cần kỹ thuật có thể tạo website đẹp, chuyên nghiệp chỉ bằng **chat với AI trong 5 phút**.
+Web Store là **AI-first website builder cho SME** — chủ shop không cần kỹ thuật có thể tạo website đẹp, chuyên nghiệp chỉ bằng **chat với AI trong 5 phút**.
 
 ### USP (Unique Selling Points)
 1. **AI Chat Builder** — chat tạo và sửa website như Lovable/Cursor
@@ -48,6 +57,51 @@ PrimeWeb là **AI-first website builder cho SME** — chủ shop không cần k�
 - Không rành tech, không có designer
 - Muốn có website nhanh, chuyên nghiệp
 
+### Target Market
+- **Primary:** Malaysia (MY)
+- **Languages:** English (EN) + Bahasa Melayu (MY) — **BOTH required on all UI**
+- **Default lang:** EN, user can toggle to MY
+
+### 🚨 3 MANDATORY BUILD RULES (Must follow for ALL templates & features)
+
+> [!CAUTION]
+> Bất kỳ PR/feature nào **KHÔNG** tuân thủ 3 rules dưới đây sẽ bị reject.
+
+#### Rule 1: MOBILE-FIRST RESPONSIVE ✅
+- **All templates, blocks, sections MUST be mobile-responsive**
+- Breakpoints: `768px` (tablet), `480px` (mobile)
+- Grid layouts → stack vertically on mobile
+- Hero split-screen → single column on mobile
+- Font sizes: use `clamp()` for fluid typography
+- Touch-friendly: buttons ≥ 44px tap target, no hover-only interactions
+- Test: every template MUST render correctly on 375px (iPhone SE) and 390px (iPhone 14)
+
+#### Rule 2: SEO OPTIMIZED ✅
+- Every generated website page MUST include:
+  - `<title>` tag with business name + keyword
+  - `<meta name="description">` (max 160 chars)
+  - `<meta name="viewport">` for mobile
+  - Open Graph tags (`og:title`, `og:description`, `og:image`)
+  - `<html lang="en">` (or `ms` for Malay)
+  - Semantic HTML: `<header>`, `<main>`, `<section>`, `<footer>`, `<nav>`
+  - Heading hierarchy: single `<h1>`, proper `<h2>`/`<h3>` nesting
+  - `alt` text on all images
+  - JSON-LD structured data (LocalBusiness, Organization)
+- Performance: all templates load < 3s on 3G
+- Image optimization: lazy loading, WebP format
+
+#### Rule 3: BILINGUAL EN/MY (English + Bahasa Melayu) ✅
+- **ALL user-facing UI** must support both languages
+- Implementation:
+  - Platform UI (dashboard, editor, gallery): i18n via locale files
+  - Template content: AI generates in user's selected language
+  - Template preview: seed data in EN (default) with MY translations available
+  - Language toggle: visible in navbar/header of all pages
+- Locale files: `src/i18n/locales/en.json`, `src/i18n/locales/ms.json`
+- Default locale: `en`
+- URL strategy: `/en/...` and `/ms/...` (prefix-based routing)
+- Date/currency: EN uses `MYR 299.00`, MY uses `RM299.00`
+
 ---
 
 ## 2. BMAD WORKFLOW
@@ -56,46 +110,76 @@ PrimeWeb là **AI-first website builder cho SME** — chủ shop không cần k�
 
 ### 2.1 Tổng quan flow
 ```
-DISCOVERY          PLANNING           BUILD              MEASURE
-─────────          ────────           ─────              ───────
-Product Brief  →   User Stories   →   Dev Sprint    →   Analytics
-(SPEC.md §1)       (SPEC.md §6)       (Wave 1-5)        (SPEC.md §18)
-                   ↓
-                   Readiness Gate
-                   (PASS/FAIL trước khi code)
+PLAN               BUILD              CHECK             ACT
+────               ─────              ─────             ───
+project-planner → worker agents  → quality-inspector → orchestrator
+(PRD + Stories)   (code + tests)   (audit + verify)   (review + ship)
+     ↓                                    ↓
+  Readiness Gate                      QA Report
+  (PASS/FAIL)                     docs/qa/{feature}.md
 ```
 
 ### 2.2 Khi nào dùng BMAD flow
 | Situation | Flow |
 |---|---|
-| Feature mới có UX phức tạp (AI Builder, Checkout) | **Full BMAD** — Discovery → Stories → Gate → Sprint |
+| Feature mới có UX phức tạp (AI Builder, Checkout) | **Full BMAD** — PRD → Architecture → Gate → Sprint → QA |
 | Feature nhỏ đã rõ yêu cầu (thêm field, CRUD) | **Quick Flow** — Story ngắn → Gate 5 phút → Sprint |
 | Bug fix | **Direct** — Describe bug → Fix → Test → PR |
 | Infra / DevOps | **Direct** — Task → Implement → Done |
 
-### 2.3 Pre-Sprint Readiness Gate (BMAD Gate)
-> Rule: **< 4/4 PASS → HOLD**, fix trước khi dev bắt đầu code.
+### 2.3 Agent Routing (BMAD Phase → Agent)
+
+| Phase | Agent | Skill(s) | Output |
+|-------|-------|----------|--------|
+| **PLAN** | `project-planner` | `brainstorming`, `plan-writing` | `docs/prd/{feature}.md` |
+| **BUILD (FE)** | `frontend-specialist` | `modern-web-architect` | Components, UI |
+| **BUILD (BE)** | `backend-specialist` | `ai-engineer`, `api-patterns` | Server Actions, API |
+| **CHECK** | `quality-inspector` | `testing-patterns` | `docs/qa/{feature}.md` |
+| **ACT** | `orchestrator` | — | Review + Ship |
+
+> 🔴 **Routing Rule:** WEB project → `frontend-specialist` + `backend-specialist`.  
+> MOBILE → `mobile-developer` only. KHÔNG bao giờ dùng sai agent.
+
+### 2.4 BMAD Doc Gate — Required Documents
+
+> 🔴 **RULE: Trước khi code BẤT KỲ feature nào, các file dưới đây PHẢI tồn tại và được approved.**  
+> **< 4/4 PASS → HOLD. Không code khi chưa đủ docs.**
+
+| # | Document | Path | Created By | Approved By | Content |
+|---|----------|------|-----------|-------------|--------|
+| 1 | **PRD** | `docs/prd/{feature}.md` | `project-planner` | Product Owner | User Story, Gherkin AC, Technical Requirements, 9-Point Checklist |
+| 2 | **Architecture** | `docs/architecture/{feature}.md` | `backend/frontend-specialist` | Tech Lead | System flow, Component tree, State design, Error matrix |
+| 3 | **API Contract** | Trong PRD hoặc `AI_BUILDER_SPEC.md §14` | `backend-specialist` | — | Endpoint, Request, Response, Error codes |
+| 4 | **Dependencies** | Verified by agent | — | — | API keys, Collections ready, Docker OK |
+
+**After build:**
+
+| # | Document | Path | Created By |
+|---|----------|------|------------|
+| 5 | **QA Report** | `docs/qa/{feature}.md` | `quality-inspector` |
+
+### 2.5 BMAD Gate Checklist Template
 
 ```
-☐ 1. Stories rõ ràng?
-      → Mọi story có AC đầy đủ (Gherkin GIVEN/WHEN/THEN)
-      PASS ☐  /  FAIL ☐
+──────────────────────────────────────────────────
+BMAD GATE — Feature: [Feature Name]
+──────────────────────────────────────────────────
+☐ 1. PRD exists?          → docs/prd/{feature}.md
+      Gherkin AC đầy đủ?   PASS ☐  /  FAIL ☐
 
-☐ 2. UI mockup/wireframe ready?
-      → Owner đã approve design (v0.app hoặc mockup)
-      → Mobile layout đã check (375px)
-      PASS ☐  /  FAIL ☐
+☐ 2. Architecture exists?  → docs/architecture/{feature}.md
+      Component tree rõ?    PASS ☐  /  FAIL ☐
 
-☐ 3. API contracts documented?
-      → Endpoint, request, response có trong SPEC.md §8
-      → Error codes defined
-      PASS ☐  /  FAIL ☐
+☐ 3. API contracts ready?  → SPEC.md §8 hoặc AI_BUILDER_SPEC.md §14
+      Error codes defined?  PASS ☐  /  FAIL ☐
 
 ☐ 4. Dependencies resolved?
-      → API keys configured (OpenAI, Stripe...)
-      → Payload CMS collections ready
-      → Docker environment working
-      PASS ☐  /  FAIL ☐
+      API keys configured?  PASS ☐  /  FAIL ☐
+      Collections ready?    PASS ☐  /  FAIL ☐
+      Docker working?       PASS ☐  /  FAIL ☐
+
+Result: ___/4 PASS → [PROCEED / HOLD]
+──────────────────────────────────────────────────
 ```
 
 ### 2.4 User Story Convention
@@ -278,53 +362,38 @@ export const typography = {
 
 ## 7. AI FEATURES SPEC
 
-### 7.1 AI Chat Builder — System Prompt
-```
-Bạn là AI chuyên tạo website cho SME.
-Khi user mô tả shop, extract: businessName, category, products, tone.
-Generate JSON block config (KHÔNG raw HTML):
-{ "blocks": [...], "theme": {...}, "seo": {...} }
-```
+> 📖 **Full technical spec:** [`docs/AI_BUILDER_SPEC.md`](docs/AI_BUILDER_SPEC.md) (700 dòng, 16 sections)
+>
+> File này chỉ chứa **summary**. Chi tiết system prompts, block schemas, SSE protocol,
+> error handling, và API contracts nằm trong file trên.
 
-### 7.2 AI Editor — Capabilities
-```
-CONTENT:  Đổi/viết lại text, thêm/xóa block, thêm trang
-DESIGN:   Đổi màu, font, layout, spacing
-SEO:      Optimize meta, generate keywords
-PRODUCTS: Thêm sản phẩm, viết description
-```
+### 7.1 AI Features Index
 
-### 7.3 AI Response Format
-```typescript
-type AIEditorResponse = {
-  message: string           // Giải thích cho user
-  changes: SiteChange[]     // Changes để apply
-  suggestions?: string[]    // Follow-up suggestions (max 3)
-}
+| Feature | Spec Section | PRD | Architecture | Priority |
+|---------|-------------|-----|-------------|----------|
+| AI Chat Builder | [SPEC §2](docs/AI_BUILDER_SPEC.md#2-ai-chat-builder) | `docs/prd/ai-chat-builder.md` | `docs/architecture/ai-chat-builder.md` | P0 🌟 |
+| AI Editor | [SPEC §3](docs/AI_BUILDER_SPEC.md#3-ai-editor) | `docs/prd/ai-editor.md` | `docs/architecture/ai-editor.md` | P0 🌟 |
+| Inline AI Edit | [SPEC §4](docs/AI_BUILDER_SPEC.md#4-inline-ai-edit) | `docs/prd/inline-edit.md` | — (trong ai-editor) | P0 |
+| AI SEO Engine | [SPEC §5](docs/AI_BUILDER_SPEC.md#5-ai-seo-engine) | `docs/prd/ai-seo-engine.md` | `docs/architecture/ai-seo-engine.md` | P0 🌟 |
+| AI Image Generation | [SPEC §6](docs/AI_BUILDER_SPEC.md#6-ai-image-generation) | — (trong ai-chat-builder) | — | P1 |
+| Block Renderer | [SPEC §7](docs/AI_BUILDER_SPEC.md#7-block-output-schema) | `docs/prd/block-renderer.md` | — | P0 |
 
-type SiteChange = {
-  type: 'UPDATE_BLOCK' | 'ADD_BLOCK' | 'REMOVE_BLOCK' |
-        'UPDATE_THEME' | 'UPDATE_SEO' | 'ADD_PAGE'
-  target: string
-  data: Record<string, unknown>
-}
-```
-
-### 7.4 AI Cost Optimization (7 Strategies)
+### 7.2 AI Cost Optimization (7 Strategies)
 1. **Model routing:** GPT-4o (generation) vs GPT-4o-mini (edits) — 15x cheaper
 2. **Block JSON output:** ~200 tokens vs ~2000 tokens HTML — 10x cheaper
 3. **Response caching:** Same industry = cache template — 90% savings
 4. **Template-first:** Load template → AI customize only — 8x cheaper
 5. **Minimal context:** Send only active block JSON, not full page — 10x cheaper
-6. **Rate limits per tier:** See §7.5
+6. **Rate limits per tier:** See §7.3
 7. **Lazy AI:** 70% operations don't need AI (drag, reorder, color pick)
 
-### 7.5 AI Rate Limits
+### 7.3 AI Rate Limits
 | Action | Free | Starter ($9) | Pro ($29) | Business ($79) |
 |--------|------|-------------|-----------|----------------|
 | Site generation | 1x total | 5/month | 20/month | Unlimited |
 | Chat edits | 20/day | 100/day | 500/day | Unlimited |
 | Image generation | 3/day | 10/day | 50/day | Unlimited |
+| SEO analysis | 3/day | 10/day | 30/day | Unlimited |
 
 ---
 
@@ -564,74 +633,30 @@ Must test: AI prompt builders, Zod schemas, utility functions
 
 ## 17. BUILD TRACKING
 
-> **Thứ tự build theo user journey:** Register → Onboarding → AI Builder → AI Editor → Dashboard → Commerce → Launch
+> 📖 **Full build plan:** [`docs/PLAN-ai-webbuilder.md`](docs/PLAN-ai-webbuilder.md)  
+> Bao gồm: 10 features, agent assignments, sprint order, dependency graph, verification plan.
 
-### Wave 1 — Foundation ✅ DONE
+### Quick Summary
+
+| Wave | Focus | Status |
+|------|-------|--------|
+| **Wave 1** | Foundation (Next.js, Payload, Docker, SPEC) | ✅ DONE |
+| **Wave 2** | Auth + Onboarding + Dashboard | ✅ DONE |
+| **Wave 3** | AI Core (Builder + Editor + Blocks) | 🔄 CURRENT |
+| **Wave 3.5** | Premium Templates + i18n EN/MY | ✅ DONE |
+| **Wave 4** | Commerce + SEO + Storefront | ⬜ NEXT |
+| **Wave 5** | Polish + Testing + Launch | ⬜ |
+
+### Sprint Order (Wave 3+)
 ```
-✅ Next.js 15 + Payload CMS setup
-✅ 7 Collections (DB schemas)
-✅ Multi-tenant middleware
-✅ SSR render engine + 8 blocks
-✅ Docker environment (optimized)
-✅ Cursor rules + SPEC.md v3.0
-✅ BMAD AI-Factory Lite (.ai/ + docs/)
-✅ Git + GitHub (clean structure)
-```
-
-### Wave 2 — Auth + Onboarding 🔄 CURRENT
-```
-☐ 2.1 AUTH FLOW (← NEXT)
-  ☐ Login page (/login)
-  ☐ Register page (/register)
-  ☐ Payload auth session (built-in JWT)
-  ☐ Auth guard middleware (protect /dashboard, /builder, /editor)
-  ☐ 401 → redirect /login
-  ☐ Logout action
-
-☐ 2.2 ONBOARDING
-  ☐ Welcome page (/onboarding) — post-register
-  ☐ Store setup (/onboarding/setup) — slug, defaults
-  ☐ → redirect to AI Builder
-
-✅ 2.3 DASHBOARD (BMAD PASS)
-  ✅ Dashboard PRD + Architecture + QA
-  ✅ 6 components (Greeting, Stats, SiteGrid, EmptyState, Banner, Skeleton)
+Sprint 1: F-05 Block Renderer      ← Foundation cho mọi thứ
+Sprint 2: F-01 AI Chat Builder      ← Core USP
+Sprint 3: F-02 AI Editor + F-06 Undo + F-07 Auto-Save
+Sprint 4: F-03 Inline Edit + F-08 Publish
+Sprint 5: F-04 SEO Engine + F-09 Images + F-10 Templates
 ```
 
-### Wave 3 — AI Core + Editor
-```
-☐ 3.1 AI CHAT BUILDER
-  ☐ POST /ai/generate-store (SSE streaming)
-  ☐ Full-screen Chat + Live Preview
-  ☐ AI clarifying (max 2 questions)
-  ☐ 12 category prompt templates
-
-☐ 3.2 AI EDITOR
-  ☐ Split screen: Chat (380px) + Live Preview
-  ☐ Inline AI edit (hover → popup)
-  ☐ Undo/Redo + Auto-save (30s)
-  ☐ Publish flow (1-click)
-  ☐ 8 new blocks (Pricing → Logo Cloud)
-```
-
-### Wave 4 — Commerce + SEO + Storefront
-```
-☐ Products CRUD + AI description
-☐ Orders management
-☐ Payment (FPX, GrabPay, card — ipay88)
-☐ Delivery (J&T, Pos Laju)
-☐ SEO Dashboard + AI SEO
-☐ Public storefront SSR + JSON-LD
-```
-
-### Wave 5 — Polish & Launch
-```
-☐ Playwright E2E tests
-☐ Core Web Vitals > 90
-☐ Custom domain (Cloudflare API)
-☐ Sentry + PostHog analytics
-☐ UAT + Beta launch
-```
+> Chi tiết agent assignments, dependencies, và acceptance criteria xem [PLAN](docs/PLAN-ai-webbuilder.md).
 
 ---
 
@@ -675,7 +700,7 @@ NODE_ENV=development
 NEXT_PUBLIC_SITE_URL=http://localhost:3005
 
 # ─── Database ──────────────────────────────────
-DATABASE_URI=postgresql://primeweb:primeweb@postgres:5432/primeweb
+DATABASE_URI=postgresql://webstore:webstore@postgres:5432/webstore
 PAYLOAD_SECRET=your-payload-secret-min-32-chars
 
 # ─── AI Services ───────────────────────────────
@@ -683,9 +708,9 @@ OPENAI_API_KEY=sk-...
 
 # ─── Storage (MinIO / S3) ─────────────────────
 S3_ENDPOINT=http://minio:9000
-S3_ACCESS_KEY=primeweb
-S3_SECRET_KEY=primeweb123
-S3_BUCKET=primeweb-media
+S3_ACCESS_KEY=webstore
+S3_SECRET_KEY=webstore123
+S3_BUCKET=webstore-media
 
 # ─── Payments ──────────────────────────────────
 STRIPE_SECRET_KEY=sk_test_...
@@ -705,8 +730,18 @@ CLOUDFLARE_ZONE_ID=...
 ## PROJECT STRUCTURE
 
 ```
-prime-web/
+web-store/
 ├── .cursor/rules/           ← Cursor AI rules (BMAD + 9-Point + Deploy)
+├── docs/                    ← 📂 BMAD Documents (governed by §2)
+│   ├── README.md            ← Doc hub overview
+│   ├── AI_BUILDER_SPEC.md   ← AI features deep spec (referenced by §7)
+│   ├── PLAN-ai-webbuilder.md← Build plan (referenced by §17)
+│   ├── prd/                 ← PRDs per feature (BMAD Gate §2.4)
+│   ├── architecture/        ← Architecture notes (BMAD Gate §2.4)
+│   ├── stories/             ← User stories (Gherkin AC)
+│   ├── qa/                  ← QA reports (after build)
+│   ├── decisions/           ← Architecture Decision Records
+│   └── tracking/            ← Walkthroughs, screenshots
 ├── src/
 │   ├── app/
 │   │   ├── (frontend)/      ← Marketing + Onboarding
@@ -726,11 +761,63 @@ prime-web/
 │   ├── lib/                 ← Utilities (ai, stripe, s3)
 │   │   └── ai/config.ts     ← AI cost optimization (7 strategies)
 │   └── payload.config.ts
-├── SPEC.md                  ← THIS FILE (Source of Truth)
+├── SPEC.md                  ← THIS FILE (HIẾN PHÁP — Source of Truth)
 ├── docker-compose.yml
 └── package.json
 ```
 
 ---
 
-> **Cursor reminder:** Luôn `@SPEC.md` khi bắt đầu feature. §6 (Stories) và §13 (9-Point) là 2 sections quan trọng nhất khi implement.
+## 20. FEATURE REGISTRY
+
+> **Master index** — Trạng thái docs và build cho mỗi feature.
+> Cập nhật bảng này khi tạo PRD, Architecture, hoặc hoàn thành sprint.
+
+### Legend
+| Icon | Meaning |
+|------|---------|
+| ⬜ | Not started |
+| 📝 | Draft (chưa approved) |
+| ✅ | Approved / Done |
+| 🚀 | Shipped (live) |
+| — | Not required |
+
+### Feature Status
+
+| ID | Feature | Priority | PRD | Architecture | Sprint | QA | Status |
+|----|---------|----------|-----|-------------|--------|-----|--------|
+| F-01 | AI Chat Builder | P0 🌟 | ✅ `docs/prd/ai-chat-builder.md` | ✅ `docs/architecture/ai-chat-builder.md` | Wave 3 | ✅ | ✅ Sprint 2 |
+| F-02 | AI Editor (Split Screen) | P0 🌟 | ✅ | ✅ | Wave 3 | ✅ | ✅ Sprint 3 |
+| F-03 | Inline AI Edit | P0 | ✅ | — (in ai-editor) | Wave 3 | ✅ | ✅ Sprint 4 |
+| F-04 | AI SEO Engine | P0 🌟 | ⬜ `docs/prd/ai-seo-engine.md` | ⬜ `docs/architecture/ai-seo-engine.md` | Wave 4 | ⬜ | Spec Done |
+| F-05 | Block Renderer | P0 | ✅ `docs/prd/block-renderer.md` | — | Wave 3 | ✅ | ✅ Sprint 1 |
+| F-06 | Undo/Redo System | P0 | — (in ai-editor PRD) | — | Wave 3 | ✅ | ✅ Sprint 3 |
+| F-07 | Auto-Save & Draft | P0 | — (in ai-editor PRD) | — | Wave 3 | ✅ | ✅ Sprint 3 |
+| F-08 | Publish Flow | P0 | ✅ | — | Wave 3 | ✅ | ✅ Sprint 4 |
+| F-09 | AI Image Generation | P1 | — (in ai-chat-builder PRD) | — | Wave 4 | ⬜ | Spec Done |
+| F-10 | Template Gallery | P1 | ✅ | — | Wave 3 | ✅ | 🚀 Shipped |
+| F-11 | i18n EN/MY (Bilingual) | P0 | — | — | Wave 3.5 | ✅ | 🚀 Shipped |
+| F-12 | Vietnamese → English (380+ strings) | P0 | — | — | Wave 3.5 | ✅ | 🚀 Shipped |
+| — | Auth Flow | P0 | ✅ `docs/prd/auth.md` | — | Wave 2 | ⬜ | ✅ Done |
+| — | Dashboard | P0 | ✅ `docs/prd/dashboard.md` | — | Wave 2 | ✅ | 🚀 Shipped |
+| — | Onboarding | P0 | ⬜ | — | Wave 2 | ⬜ | ✅ Done |
+
+### BMAD Gate Quick Check
+
+```
+🔴 Trước khi bắt đầu code Feature X:
+   1. Check bảng Feature Registry ở trên
+   2. PRD column = ✅?  → Nếu ⬜ → STOP, tạo PRD trước
+   3. Architecture column = ✅ hoặc —?  → Nếu ⬜ → STOP, tạo architecture trước  
+   4. Chạy BMAD Gate Checklist (§2.5)
+   5. 4/4 PASS → bắt đầu code
+```
+
+---
+
+> **Cursor reminder:**  
+> 1. Luôn `@SPEC.md` khi bắt đầu feature — §20 (Feature Registry) để check docs status  
+> 2. §2 (BMAD Gate) bắt buộc trước khi code  
+> 3. §13 (9-Point Checklist) bắt buộc trước khi merge PR  
+> 4. §7 → link tới `AI_BUILDER_SPEC.md` cho chi tiết AI features  
+> 5. §17 → link tới `PLAN-ai-webbuilder.md` cho build plan

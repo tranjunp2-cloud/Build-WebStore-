@@ -1,0 +1,118 @@
+{
+    "common": {
+        "signIn": "Log Masuk",
+        "signUp": "Daftar",
+        "getStartedFree": "Mula Percuma",
+        "startBuilding": "Mula Bina — Percuma",
+        "watchDemo": "Tonton Demo",
+        "learnMore": "Ketahui Lagi",
+        "copyright": "© 2026 Web Store. Hak cipta terpelihara.",
+        "language": "Bahasa",
+        "search": "Cari..."
+    },
+    "nav": {
+        "features": "Ciri-ciri",
+        "pricing": "Harga",
+        "templates": "Templat"
+    },
+    "hero": {
+        "badge": "Pembina Laman Web Berkuasa AI",
+        "title1": "Bina Laman Web",
+        "title2": "Menakjubkan",
+        "title3": "dalam Beberapa Minit",
+        "subtitle": "Huraikan perniagaan anda dan biarkan AI mencipta laman web yang cantik dan dioptimumkan SEO untuk anda. Sesuaikan dengan seret & lepas. Terbitkan serta-merta.",
+        "noCreditCard": "Tiada kad kredit diperlukan",
+        "seoOptimized": "Dioptimumkan SEO dari hari pertama",
+        "customDomain": "Sokongan domain tersuai"
+    },
+    "features": {
+        "label": "Ciri-ciri",
+        "title": "Semua Yang Anda Perlukan untuk",
+        "titleHighlight": "Bina & Kembangkan",
+        "subtitle": "Dari penjanaan AI hingga penyuntingan seret & lepas — semua dalam satu platform.",
+        "items": {
+            "aiGeneration": {
+                "title": "Penjanaan Laman Web AI",
+                "desc": "Huraikan perniagaan anda dalam teks biasa dan dapatkan laman web lengkap dalam beberapa saat."
+            },
+            "dragDrop": {
+                "title": "Editor Seret & Lepas",
+                "desc": "Sesuaikan mana-mana bahagian dengan menyeret blok — Hero, Ciri-ciri, Testimoni, Hubungi dan banyak lagi."
+            },
+            "seo": {
+                "title": "Seni Bina SEO-First",
+                "desc": "Halaman dirender pelayan. Google mengindeks setiap halaman. Data berstruktur secara automatik."
+            },
+            "templates": {
+                "title": "Templat Cantik",
+                "desc": "Berpuluh templat premium untuk setiap industri — restoran, e-dagang, portfolio, blog."
+            },
+            "domains": {
+                "title": "Domain Tersuai",
+                "desc": "Sambungkan domain anda sendiri dalam beberapa minit. Sijil SSL percuma disertakan secara automatik."
+            },
+            "ecommerce": {
+                "title": "Sedia E-dagang",
+                "desc": "Pengurusan produk, troli, daftar keluar, dan pemprosesan pembayaran — semua terbina dalam."
+            },
+            "analytics": {
+                "title": "Papan Pemuka Analitik",
+                "desc": "Jejaki pelawat, paparan halaman, penukaran dan sumber dalam papan pemuka yang cantik."
+            },
+            "integration": {
+                "title": "Integrasi ECH",
+                "desc": "Segerakkan dengan Pengedaran Berpusat untuk inventori masa nyata dan pengurusan pesanan."
+            },
+            "performance": {
+                "title": "Sepantas Kilat",
+                "desc": "CDN global, pengoptimuman imej, dan caching pintar memastikan laman anda pantas."
+            }
+        }
+    },
+    "cta": {
+        "title": "Bersedia Membina",
+        "titleHighlight": "Laman Web Impian",
+        "subtitle": "Sertai ribuan SME yang mempercayai Web Store untuk memperkasakan kehadiran dalam talian mereka.",
+        "button": "Mula Sekarang — Percuma"
+    },
+    "gallery": {
+        "title": "Galeri Templat",
+        "subtitle": "Pilih templat yang sesuai dengan industri anda — pratonton sebelum memilih",
+        "searchPlaceholder": "Cari templat...",
+        "noTemplates": "Tiada templat tersedia",
+        "createWithAI": "Cipta dengan AI",
+        "preview": "Pratonton",
+        "useTemplate": "Guna templat ini",
+        "usingTemplate": "Sedang memuat...",
+        "desktop": "Desktop",
+        "mobile": "Mudah alih",
+        "featured": "Pilihan",
+        "premium": "Premium",
+        "categories": {
+            "all": "Semua",
+            "restaurant": "🍽️ Restoran",
+            "ecommerce": "🛍️ Kedai",
+            "beauty": "💄 Kecantikan",
+            "tech": "💻 Teknologi",
+            "health": "🏥 Kesihatan",
+            "education": "📚 Pendidikan",
+            "realestate": "🏠 Hartanah",
+            "fitness": "💪 Kecergasan",
+            "creative": "🎨 Portfolio",
+            "business": "🏢 Perniagaan"
+        }
+    },
+    "onboarding": {
+        "stepLabel": "Langkah",
+        "of": "daripada",
+        "next": "Seterusnya",
+        "back": "Kembali",
+        "finish": "Cipta Laman Web Saya",
+        "step1Title": "Apakah perniagaan anda?",
+        "step1Subtitle": "Beritahu kami tentang perniagaan anda supaya kami boleh mencipta laman web yang sempurna.",
+        "step2Title": "Pilih templat",
+        "step2Subtitle": "Pilih titik permulaan — anda boleh menyesuaikan semua nanti.",
+        "step3Title": "Sesuaikan laman anda",
+        "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda."
+    }
+}
