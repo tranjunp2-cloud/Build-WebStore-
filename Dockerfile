@@ -15,6 +15,8 @@ COPY scripts ./scripts
 RUN npm ci 2>/dev/null || npm install
 
 COPY . .
+# Ensure public exists (empty dirs may be omitted from build context)
+RUN mkdir -p public
 
 # Build args for env at build time (optional; app can use runtime env)
 ARG DATABASE_URI
