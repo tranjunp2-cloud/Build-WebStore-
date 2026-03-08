@@ -52,7 +52,7 @@ jobs:
           LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
         run: |
           TIMESTAMP=$(date +%s)
-          SIGN=$(echo -ne "${TIMESTAMP}\n${LARK_SIGN_KEY}" | openssl dgst -sha256 -hmac "" -binary | base64 2>/dev/null || echo "")
+          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
           BRANCH="${GITHUB_REF_NAME}"
           SHORT_SHA="${GITHUB_SHA:0:7}"
           AUTHOR="${GITHUB_ACTOR}"
@@ -76,7 +76,7 @@ jobs:
           LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
         run: |
           TIMESTAMP=$(date +%s)
-          SIGN=$(echo -ne "${TIMESTAMP}\n${LARK_SIGN_KEY}" | openssl dgst -sha256 -hmac "" -binary | base64 2>/dev/null || echo "")
+          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
           BRANCH="${GITHUB_REF_NAME}"
           SHORT_SHA="${GITHUB_SHA:0:7}"
           AUTHOR="${GITHUB_ACTOR}"
