@@ -57,6 +57,51 @@ Web Store là **AI-first website builder cho SME** — chủ shop không cần k
 - Không rành tech, không có designer
 - Muốn có website nhanh, chuyên nghiệp
 
+### Target Market
+- **Primary:** Malaysia (MY)
+- **Languages:** English (EN) + Bahasa Melayu (MY) — **BOTH required on all UI**
+- **Default lang:** EN, user can toggle to MY
+
+### 🚨 3 MANDATORY BUILD RULES (Must follow for ALL templates & features)
+
+> [!CAUTION]
+> Bất kỳ PR/feature nào **KHÔNG** tuân thủ 3 rules dưới đây sẽ bị reject.
+
+#### Rule 1: MOBILE-FIRST RESPONSIVE ✅
+- **All templates, blocks, sections MUST be mobile-responsive**
+- Breakpoints: `768px` (tablet), `480px` (mobile)
+- Grid layouts → stack vertically on mobile
+- Hero split-screen → single column on mobile
+- Font sizes: use `clamp()` for fluid typography
+- Touch-friendly: buttons ≥ 44px tap target, no hover-only interactions
+- Test: every template MUST render correctly on 375px (iPhone SE) and 390px (iPhone 14)
+
+#### Rule 2: SEO OPTIMIZED ✅
+- Every generated website page MUST include:
+  - `<title>` tag with business name + keyword
+  - `<meta name="description">` (max 160 chars)
+  - `<meta name="viewport">` for mobile
+  - Open Graph tags (`og:title`, `og:description`, `og:image`)
+  - `<html lang="en">` (or `ms` for Malay)
+  - Semantic HTML: `<header>`, `<main>`, `<section>`, `<footer>`, `<nav>`
+  - Heading hierarchy: single `<h1>`, proper `<h2>`/`<h3>` nesting
+  - `alt` text on all images
+  - JSON-LD structured data (LocalBusiness, Organization)
+- Performance: all templates load < 3s on 3G
+- Image optimization: lazy loading, WebP format
+
+#### Rule 3: BILINGUAL EN/MY (English + Bahasa Melayu) ✅
+- **ALL user-facing UI** must support both languages
+- Implementation:
+  - Platform UI (dashboard, editor, gallery): i18n via locale files
+  - Template content: AI generates in user's selected language
+  - Template preview: seed data in EN (default) with MY translations available
+  - Language toggle: visible in navbar/header of all pages
+- Locale files: `src/locales/en.json`, `src/locales/ms.json`
+- Default locale: `en`
+- URL strategy: `/en/...` and `/ms/...` (prefix-based routing)
+- Date/currency: EN uses `MYR 299.00`, MY uses `RM299.00`
+
 ---
 
 ## 2. BMAD WORKFLOW

@@ -95,7 +95,31 @@ export function baseCSS(t: TemplateTheme): string {
     .fade-up-d4 { animation-delay: .4s; }
     @media (max-width: 768px) {
       .section { padding: 60px 0; }
+      .container { padding: 0 16px; }
       .hide-mobile { display: none !important; }
+      .section-title { font-size: 28px; }
+      h1 { font-size: 32px !important; }
+      section[style*="grid-template-columns: 1fr 1fr"],
+      section[style*="grid-template-columns:1fr 1fr"] { display: block !important; }
+      section[style*="min-height:100vh"] { min-height: auto !important; padding: 80px 0 60px !important; }
+      section[style*="min-height:90vh"] { min-height: auto !important; padding: 80px 0 60px !important; }
+      section[style*="min-height:85vh"] { min-height: auto !important; padding: 80px 0 60px !important; }
+      div[style*="grid-template-columns: 1fr 1fr"],
+      div[style*="grid-template-columns:1fr 1fr"],
+      div[style*="grid-template-columns:1.1fr"] { grid-template-columns: 1fr !important; }
+      div[style*="padding:80px 60px"] { padding: 40px 20px !important; }
+      div[style*="padding:80px 60px 80px 80px"] { padding: 40px 20px !important; }
+      .btn-primary, .btn-outline { width: 100%; justify-content: center; padding: 16px 24px; min-height: 48px; }
+      footer div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; gap: 24px !important; }
+      nav .container { flex-wrap: wrap; }
+    }
+    @media (max-width: 480px) {
+      .section { padding: 40px 0; }
+      .container { padding: 0 12px; }
+      h1 { font-size: 26px !important; }
+      .section-title { font-size: 24px; }
+      .section-subtitle { font-size: 15px; }
+      .btn-primary, .btn-outline { font-size: 14px; padding: 14px 20px; }
     }
   `
 }

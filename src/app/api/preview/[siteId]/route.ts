@@ -21,26 +21,56 @@ function detectCategory(blocks: any[], siteName: string): string {
   return 'business'
 }
 
-export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: string): string {
+export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string }): string {
   const cat = category || 'business'
   const t = theme || THEMES[cat] || THEMES.business
 
-  const bodyParts = blocks.map(block => {
-    if (block.blockType === 'navigation') return renderNav(block, t)
-    if (block.blockType === 'hero') return renderHero(block, t)
-    return renderSections(block, t)
-  }).join('\n')
+  // Extract site info from blocks for SEO
+  const heroBlock = blocks.find(b => b.blockType === 'hero')
+  const navBlock = blocks.find(b => b.blockType === 'navigation')
+  const siteName = meta?.name || navBlock?.logoText || 'Website'
+  const siteDesc = meta?.description || heroBlock?.subheadline || `${siteName} — Professional website`
+  const lang = meta?.lang || 'en'
+
+  // Separate nav/hero from other sections for semantic HTML
+  const navHtml = blocks.filter(b => b.blockType === 'navigation').map(b => renderNav(b, t)).join('\n')
+  const heroHtml = blocks.filter(b => b.blockType === 'hero').map(b => renderHero(b, t)).join('\n')
+  const footerHtml = blocks.filter(b => b.blockType === 'footer').map(b => renderSections(b, t)).join('\n')
+  const mainHtml = blocks
+    .filter(b => !['navigation', 'hero', 'footer'].includes(b.blockType))
+    .map(b => renderSections(b, t)).join('\n')
 
   return `<!DOCTYPE html>
-<html lang="vi">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${siteName}</title>
+  <meta name="description" content="${siteDesc.substring(0, 160)}">
+  <meta property="og:title" content="${siteName}">
+  <meta property="og:description" content="${siteDesc.substring(0, 160)}">
+  <meta property="og:type" content="website">
+  <meta name="robots" content="index, follow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="${getGoogleFontsLink(t)}" rel="stylesheet">
   <style>${baseCSS(t)}</style>
+  <script type="application/ld+json">
+  ${JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": siteName,
+    "description": siteDesc.substring(0, 160),
+  })}
+  </script>
 </head>
-<body>${bodyParts}</body>
+<body>
+  <header role="banner">${navHtml}</header>
+  <main role="main">
+    ${heroHtml}
+    ${mainHtml}
+  </main>
+  ${footerHtml}
+</body>
 </html>`
 }
 
