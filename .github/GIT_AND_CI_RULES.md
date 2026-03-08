@@ -25,7 +25,7 @@ docs/*        ← chỉ tài liệu
 - **feature/fix**: luôn tạo PR với **base = staging** (không PR vào main).
 - **hotfix**: ngoại lệ — PR vào main, merge xong nên merge main vào staging để đồng bộ.
 
-Chi tiết luồng deploy: [.github/DEPLOY.md](.github/DEPLOY.md).
+Chi tiết luồng deploy: [.github/DEPLOY.md](.github/DEPLOY.md). Đánh giá triển khai CI/CD (so workflow + analysis): [.github/CICD_IMPLEMENTATION_ASSESSMENT.md](.github/CICD_IMPLEMENTATION_ASSESSMENT.md).
 
 **Không dùng:** GitFlow (develop/release) trừ khi cần hỗ trợ nhiều phiên bản production.
 

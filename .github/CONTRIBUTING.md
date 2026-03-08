@@ -10,7 +10,8 @@
 |----------|----------------|
 | **Git, PR, CI/CD, conflict** | [.github/GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) |
 | **Luồng deploy (staging vs prod)** | [.github/DEPLOY.md](.github/DEPLOY.md) |
-| **Code rules, CI fix, Copilot** | [.github/CODE_AND_RULES.md](.github/CODE_AND_RULES.md) — lỗi Git ai fix, rule check thế nào, Copilot bật sao |
+| **Code rules, CI fix, Copilot** | [.github/CODE_AND_RULES.md](.github/CODE_AND_RULES.md) |
+| **Đánh giá triển khai CI/CD** | [.github/CICD_IMPLEMENTATION_ASSESSMENT.md](.github/CICD_IMPLEMENTATION_ASSESSMENT.md) — so với workflow + analysis, lộ trình gợi ý |
 | **Mô tả PR (template)** | [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) — khi tạo/sửa PR **bắt buộc** dùng đúng template này |
 | **Product, BMAD, 9-Point, API, data model** | [SPEC.md](../SPEC.md) (root) |
 | **Cursor:** tuân theo .github + dùng template khi tạo PR | [.cursor/rules/github.mdc](../.cursor/rules/github.mdc) |
