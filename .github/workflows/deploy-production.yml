@@ -1,0 +1,43 @@
+# Deploy Production — chạy khi push lên nhánh main
+# Chỉ chạy sau khi PR đã merge (main protected, CI pass)
+name: Deploy Production
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Production
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          NODE_OPTIONS: '--require ./node-polyfill.js'
+          NEXT_PUBLIC_APP_ENV: production
+        run: npm run build
+
+      # Bước deploy: tùy hạ tầng (Docker, Vercel, SSH, …) cấu hình thêm
+      - name: Deploy to Production
+        run: |
+          echo "Production build OK. Configure deploy step (Docker push / SSH / Vercel) via repo secrets."
+          # Ví dụ Docker: docker build -t $REGISTRY/app:latest . && docker push ...
+          # Ví dụ Vercel: npx vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
+          # Ví dụ SSH: rsync -avz .next/ $PROD_HOST:~/app/.next/ && ssh $PROD_HOST 'cd ~/app && npm run start'

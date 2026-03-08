@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { MousePointerClick, LayoutTemplate, FileText } from 'lucide-react'
+import { MousePointerClick, LayoutTemplate, FileText, Sparkles } from 'lucide-react'
 
 export default function OnboardingPage() {
     return (

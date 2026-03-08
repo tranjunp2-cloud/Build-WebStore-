@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -19,7 +19,7 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>
 
-export default function LoginPage() {
+function LoginFormContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const redirectUrl = searchParams.get('redirect') || '/dashboard'
@@ -179,5 +179,13 @@ export default function LoginPage() {
                 </Link>
             </p>
         </div>
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center text-gray-400">Loading...</div>}>
+            <LoginFormContent />
+        </Suspense>
     )
 }

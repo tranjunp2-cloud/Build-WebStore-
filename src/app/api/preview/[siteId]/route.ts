@@ -1,11 +1,18 @@
 /**
  * Site Preview API — Renders a site's blocks into premium HTML.
+ * Loads blocks from the pages collection (layout field), NOT from sites.
  * Uses industry-aware renderers for true visual diversity.
  */
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { renderNav, renderHero, renderSections, THEMES, baseCSS, getGoogleFontsLink, TemplateTheme } from '../renderers'
+import { setHeroCategory } from '../renderers/hero'
+import { setSectionCategory } from '../renderers/sections'
+
+// Force dynamic rendering — never cache this route
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 function detectCategory(blocks: any[], siteName: string): string {
   const text = JSON.stringify(blocks).toLowerCase() + siteName.toLowerCase()
@@ -32,13 +39,17 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
   const siteDesc = meta?.description || heroBlock?.subheadline || `${siteName} — Professional website`
   const lang = meta?.lang || 'en'
 
+  // Set category for image selection in renderers
+  setHeroCategory(cat)
+  setSectionCategory(cat)
+
   // Separate nav/hero from other sections for semantic HTML
   const navHtml = blocks.filter(b => b.blockType === 'navigation').map(b => renderNav(b, t)).join('\n')
-  const heroHtml = blocks.filter(b => b.blockType === 'hero').map(b => renderHero(b, t)).join('\n')
-  const footerHtml = blocks.filter(b => b.blockType === 'footer').map(b => renderSections(b, t)).join('\n')
+  const heroHtml = blocks.filter(b => b.blockType === 'hero').map(b => renderHero(b, t, cat)).join('\n')
+  const footerHtml = blocks.filter(b => b.blockType === 'footer').map(b => renderSections(b, t, cat)).join('\n')
   const mainHtml = blocks
     .filter(b => !['navigation', 'hero', 'footer'].includes(b.blockType))
-    .map(b => renderSections(b, t)).join('\n')
+    .map(b => renderSections(b, t, cat)).join('\n')
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -78,16 +89,50 @@ export async function GET(_req: Request, { params }: { params: Promise<{ siteId:
   try {
     const { siteId } = await params
     const payload = await getPayload({ config })
-    const site = await payload.findByID({ collection: 'sites', id: Number(siteId) })
+    const numericSiteId = Number(siteId)
+
+    // Fetch site info
+    const site: any = await payload.findByID({ collection: 'sites', id: numericSiteId })
     if (!site) return new NextResponse('Not found', { status: 404 })
 
-    const blocks = (site as any).blocks || []
-    const cat = detectCategory(blocks, (site as any).name || '')
-    const t = THEMES[cat] || THEMES.business
-    const html = buildFullHTML(blocks, t, cat)
+    // Fetch blocks from pages collection (homepage or first page)
+    let pagesResult = await payload.find({
+      collection: 'pages',
+      where: {
+        site: { equals: numericSiteId },
+        isHomepage: { equals: true },
+      },
+      limit: 1,
+    })
 
-    return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+    // Fallback: get first page for this site
+    if (pagesResult.docs.length === 0) {
+      pagesResult = await payload.find({
+        collection: 'pages',
+        where: { site: { equals: numericSiteId } },
+        limit: 1,
+      })
+    }
+
+    const page: any = pagesResult.docs[0]
+    const blocks = page?.layout || []
+
+    const cat = detectCategory(blocks, site.name || '')
+    const t = THEMES[cat] || THEMES.business
+    const html = buildFullHTML(blocks, t, cat, {
+      name: site.name,
+      description: site.description,
+    })
+
+    return new NextResponse(html, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+      },
+    })
   } catch (e: any) {
+    console.error('[Preview Error]', e.message)
     return new NextResponse(`Error: ${e.message}`, { status: 500 })
   }
 }
