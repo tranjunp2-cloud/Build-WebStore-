@@ -54,22 +54,22 @@ export function DashboardStats({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <StatCard
                 icon={Globe}
-                label="Tổng Website"
+                label="Total Websites"
                 value={String(totalSites)}
                 sub={`${publishedCount} published · ${draftCount} draft`}
                 iconColor="text-blue-400"
             />
             <StatCard
                 icon={Globe}
-                label="Đã Publish"
+                label="Published"
                 value={String(publishedCount)}
-                sub={publishedCount > 0 ? 'Website đang live' : 'Chưa có site nào live'}
+                sub={publishedCount > 0 ? 'Sites are live' : 'No live sites yet'}
                 iconColor="text-green-400"
             />
             <StatCard
                 icon={HardDrive}
-                label="Dung lượng"
-                value={storageUsed > 0 ? `${storageUsed}MB / ${storageLimit}MB` : 'Chưa sử dụng'}
+                label="Storage"
+                value={storageUsed > 0 ? `${storageUsed}MB / ${storageLimit}MB` : 'Not used'}
                 progress={storageUsed > 0 ? (storageUsed / storageLimit) * 100 : 0}
                 iconColor="text-amber-400"
             />

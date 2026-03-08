@@ -178,7 +178,7 @@ export function InlineEdit({
                         value={aiInstruction}
                         onChange={e => setAIInstruction(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') handleAIRewrite(); if (e.key === 'Escape') setShowAIInput(false) }}
-                        placeholder="e.g. Viết ngắn hơn, thêm emoji..."
+                        placeholder="e.g. Make it shorter, add emoji..."
                         className="flex-1 bg-transparent text-xs text-white placeholder-gray-500 outline-none"
                         disabled={isRewriting}
                     />

@@ -37,12 +37,12 @@ export async function generateSiteWithAI(
     }
 
     try {
-        events.push({ event: 'step', data: { step: 'analyzing', label: 'Phân tích yêu cầu...', progress: 10 } })
+        events.push({ event: 'step', data: { step: 'analyzing', label: 'Analysing requirements...', progress: 10 } })
 
         const systemPrompt = buildSystemPrompt(language)
         const userPromptText = buildUserPrompt(businessInfo, extraInstructions, language)
 
-        events.push({ event: 'step', data: { step: 'generating', label: 'AI đang tạo nội dung...', progress: 20 } })
+        events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
 
         const completion = await openai.chat.completions.create({
             model: 'gpt-4o',
@@ -60,7 +60,7 @@ export async function generateSiteWithAI(
             throw new Error('Empty AI response')
         }
 
-        events.push({ event: 'step', data: { step: 'parsing', label: 'Xử lý kết quả AI...', progress: 60 } })
+        events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
 
         const parsed = JSON.parse(content)
 
@@ -89,7 +89,7 @@ export async function generateSiteWithAI(
             const block = rawBlocks[i]
             const progress = 60 + Math.round((i / rawBlocks.length) * 30)
 
-            events.push({ event: 'step', data: { step: `block_${i}`, label: `Tạo ${block.blockType || 'section'}...`, progress } })
+            events.push({ event: 'step', data: { step: `block_${i}`, label: `Creating ${block.blockType || 'section'}...`, progress } })
 
             // Sanitize block data FIRST (before validation)
             const sanitized = sanitizeBlockData(block)
@@ -120,7 +120,7 @@ export async function generateSiteWithAI(
         }
 
         events.push({ event: 'seo_generated', data: seo })
-        events.push({ event: 'step', data: { step: 'saving', label: 'Lưu vào database...', progress: 95 } })
+        events.push({ event: 'step', data: { step: 'saving', label: 'Saving to database...', progress: 95 } })
 
         const result: GenerationResult = {
             siteName: parsed.siteName || 'My Website',
@@ -141,7 +141,7 @@ export async function generateSiteWithAI(
 }
 
 function generateWithFallback(prompt: string, events: SSEEvent[]): { result: GenerationResult; events: SSEEvent[] } {
-    events.push({ event: 'step', data: { step: 'fallback', label: 'Tạo từ template thông minh...', progress: 50 } })
+    events.push({ event: 'step', data: { step: 'fallback', label: 'Creating from smart templates...', progress: 50 } })
 
     const result = generateBlocks(prompt)
 
@@ -268,8 +268,8 @@ function sanitizeBlockData(block: any): any {
                 const name = field.toLowerCase()
                 let fieldType = 'text'
                 if (name.includes('email')) fieldType = 'email'
-                else if (name.includes('phone') || name.includes('điện thoại') || name.includes('tel')) fieldType = 'phone'
-                else if (name.includes('message') || name.includes('nội dung') || name.includes('ghi chú')) fieldType = 'textarea'
+                else if (name.includes('phone') || name.includes('tel') || name.includes('telefon')) fieldType = 'phone'
+                else if (name.includes('message') || name.includes('content') || name.includes('notes') || name.includes('mesej')) fieldType = 'textarea'
                 return { fieldName: field, label: field, fieldType, required: true }
             }
             // Normalize fieldType — map common aliases

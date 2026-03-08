@@ -85,14 +85,14 @@ function SiteCard({ site }: { site: SiteCardData }) {
                         href={`/editor/${site.id}`}
                         className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 transition-colors"
                     >
-                        <Pencil className="h-3 w-3" /> Chỉnh sửa
+                        <Pencil className="h-3 w-3" /> Edit
                     </Link>
                     <Link
                         href={`/api/preview/${site.id}`}
                         target="_blank"
                         className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 transition-colors"
                     >
-                        <ExternalLink className="h-3 w-3" /> Xem trước
+                        <ExternalLink className="h-3 w-3" /> Preview
                     </Link>
                 </div>
             </div>
@@ -104,10 +104,10 @@ export function DashboardSiteGrid({ sites }: { sites: SiteCardData[] }) {
     return (
         <div>
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">Website của tôi</h2>
+                <h2 className="text-lg font-semibold text-white">My Websites</h2>
                 {sites.length > 6 && (
                     <Link href="/dashboard/sites" className="text-sm text-blue-400 hover:text-blue-300">
-                        Xem tất cả →
+                        View All →
                     </Link>
                 )}
             </div>

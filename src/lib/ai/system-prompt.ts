@@ -7,11 +7,11 @@
 import { blockRegistry } from '@/blocks/registry'
 
 const CATEGORY_HINTS: Record<string, string> = {
-  restaurant: 'F&B, quán ăn, cafe, nhà hàng',
-  ecommerce: 'shop, cửa hàng, thời trang, mỹ phẩm',
+  restaurant: 'F&B, eatery, cafe, restaurant',
+  ecommerce: 'shop, store, fashion, cosmetics',
   portfolio: 'portfolio, freelancer, designer, photographer',
-  blog: 'blog, tin tức, nội dung',
-  business: 'dịch vụ, công ty, agency, startup',
+  blog: 'blog, news, content',
+  business: 'services, company, agency, startup',
 }
 
 export function buildSystemPrompt(language: 'vi' | 'en' = 'vi'): string {
@@ -67,7 +67,7 @@ ${blockList}
 13. Features/Services section must list ACTUAL products/services, not generic ones
 14. Testimonials must sound realistic for the SPECIFIC industry
 15. Contact section should include realistic placeholder content matching the industry
-16. CTA text should be action-oriented and relevant (e.g., "Đặt Bàn Ngay" for restaurants)
+16. CTA text should be action-oriented and relevant (e.g., "Book a Table" for restaurants)
 
 ## CATEGORY PALETTES (suggestions)
 - Restaurant/F&B: warm tones (amber, orange), Playfair Display

@@ -80,7 +80,7 @@ export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
                             window.location.href = '/login'
                         }}
                         className="rounded-lg p-1.5 text-gray-500 hover:bg-white/5 hover:text-white transition-colors"
-                        title="Đăng xuất"
+                        title="Log Out"
                     >
                         <LogOut className="h-4 w-4" />
                     </button>

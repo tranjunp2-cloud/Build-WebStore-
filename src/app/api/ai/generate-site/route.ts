@@ -229,12 +229,12 @@ function sanitizeBlocksForPayload(blocks: any[]): any[] {
         if (sanitized.formFields && Array.isArray(sanitized.formFields)) {
             sanitized.formFields = sanitized.formFields.map((field: any) => {
                 if (typeof field === 'string') {
-                    // Convert string → object: "Tên" → { fieldName: "Tên", fieldType: "text" }
+                    // Convert string → object: "Name" → { fieldName: "Name", fieldType: "text" }
                     const name = field.toLowerCase()
                     let fieldType = 'text'
                     if (name.includes('email')) fieldType = 'email'
-                    else if (name.includes('phone') || name.includes('điện thoại') || name.includes('sdt')) fieldType = 'tel'
-                    else if (name.includes('message') || name.includes('tin nhắn') || name.includes('nội dung') || name.includes('ghi chú')) fieldType = 'textarea'
+                    else if (name.includes('phone') || name.includes('telefon')) fieldType = 'tel'
+                    else if (name.includes('message') || name.includes('content') || name.includes('notes') || name.includes('mesej')) fieldType = 'textarea'
                     return { fieldName: field, fieldType, required: true }
                 }
                 // Already an object — ensure required fields exist

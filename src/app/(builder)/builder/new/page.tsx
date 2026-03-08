@@ -39,7 +39,7 @@ function GeneratingProgress({ progress }: { progress: { step: string; label: str
         <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4 space-y-3">
             <div className="flex items-center gap-3">
                 <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
-                <span className="text-xs text-purple-300 font-medium">{progress.label || 'Đang xử lý...'}</span>
+                <span className="text-xs text-purple-300 font-medium">{progress.label || 'Processing...'}</span>
             </div>
             <div className="w-full bg-purple-500/10 rounded-full h-1.5">
                 <div
@@ -105,7 +105,7 @@ export default function AIBuilderPage() {
     // SSE Stream consumer
     const startSSEGeneration = useCallback(async (extraInstructions?: string) => {
         setStatus('streaming')
-        addMessage({ role: 'assistant', content: '🚀 Bắt đầu tạo website...' })
+        addMessage({ role: 'assistant', content: '🚀 Starting website creation...' })
 
         try {
             const res = await fetch('/api/ai/generate-site?stream=true', {
@@ -158,7 +158,7 @@ export default function AIBuilderPage() {
             }
         } catch (err: any) {
             setError({ code: 'generation_failed', message: err.message, retryable: true })
-            addMessage({ role: 'assistant', content: `❌ Đã xảy ra lỗi: ${err.message}\n\nVui lòng thử lại!` })
+            addMessage({ role: 'assistant', content: `❌ An error occurred: ${err.message}\n\nPlease try again!` })
         }
     }, [businessInfo, setStatus, addMessage, setError])
 
@@ -186,10 +186,10 @@ export default function AIBuilderPage() {
                 addMessage({
                     role: 'assistant',
                     content:
-                        `✅ Website **"${data.siteName}"** đã được tạo thành công!\n\n` +
-                        `📊 **${data.totalBlocks} sections** đã được generate\n` +
-                        `⏱️ **${Math.round(data.timeMs / 1000)}s** thời gian tạo\n\n` +
-                        `Bạn có thể xem Preview bên phải, vào Editor để chỉnh sửa, hoặc Publish ngay!`,
+                        `✅ Website **"${data.siteName}"** has been created successfully!\n\n` +
+                        `📊 **${data.totalBlocks} sections** generated\n` +
+                        `⏱️ **${Math.round(data.timeMs / 1000)}s** generation time\n\n` +
+                        `You can view the Preview on the right, open the Editor to make changes, or Publish now!`,
                 })
                 break
         }
@@ -278,10 +278,10 @@ export default function AIBuilderPage() {
                     {isDone && siteId && (
                         <div className="flex flex-col gap-2 pt-2">
                             <Button onClick={() => router.push('/dashboard')} className="w-full">
-                                🏠 Về Dashboard
+                                🏠 Dashboard
                             </Button>
                             <Button variant="outline" onClick={() => router.push(`/editor/${siteId}`)} className="w-full">
-                                <ExternalLink className="h-4 w-4" /> Mở Editor
+                                <ExternalLink className="h-4 w-4" /> Open Editor
                             </Button>
                         </div>
                     )}
@@ -298,9 +298,9 @@ export default function AIBuilderPage() {
                             onChange={e => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
                             placeholder={
-                                isGenerating ? 'Đang tạo website...'
-                                    : isDone ? 'Website đã được tạo!'
-                                        : 'Gõ "Tạo ngay" hoặc yêu cầu đặc biệt...'
+                                isGenerating ? 'Creating website...'
+                                    : isDone ? 'Website created successfully!'
+                                        : 'Type "Create now" or describe special requirements...'
                             }
                             className="flex-1 bg-transparent px-4 py-3 text-sm text-white placeholder-gray-500 outline-none"
                             disabled={isLoading || isGenerating || isDone}
@@ -354,7 +354,7 @@ export default function AIBuilderPage() {
                                 </div>
                                 <div>
                                     <h2 className="text-2xl font-bold text-white">{siteName}</h2>
-                                    <p className="mt-2 text-sm text-gray-400">Website đã được tạo thành công</p>
+                                    <p className="mt-2 text-sm text-gray-400">Website created successfully</p>
                                 </div>
                             </div>
                         </div>
@@ -364,8 +364,8 @@ export default function AIBuilderPage() {
                                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-purple-500/10 animate-pulse">
                                     <Sparkles className="h-10 w-10 text-purple-400" />
                                 </div>
-                                <p className="text-sm text-purple-300">Đang tạo website...</p>
-                                <p className="text-xs text-gray-600">Preview sẽ xuất hiện khi blocks được generate</p>
+                                <p className="text-sm text-purple-300">Creating website...</p>
+                                <p className="text-xs text-gray-600">Preview will appear when blocks are generated</p>
                             </div>
                         </div>
                     ) : (
@@ -374,8 +374,8 @@ export default function AIBuilderPage() {
                                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-white/5">
                                     <Sparkles className="h-10 w-10 text-gray-700" />
                                 </div>
-                                <p className="mt-4 text-sm text-gray-600">Website preview sẽ xuất hiện ở đây</p>
-                                <p className="mt-1 text-xs text-gray-700">Mô tả business → AI generate → Preview</p>
+                                <p className="mt-4 text-sm text-gray-600">Website preview will appear here</p>
+                                <p className="mt-1 text-xs text-gray-700">Describe business → AI generates → Preview</p>
                             </div>
                         </div>
                     )}

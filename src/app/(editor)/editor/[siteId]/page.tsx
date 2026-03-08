@@ -37,7 +37,7 @@ function AIChatPanel({
     const [input, setInput] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
     const [messages, setMessages] = useState<ChatMessage[]>([
-        { id: 'welcome', role: 'assistant', content: 'Tôi có thể giúp bạn chỉnh sửa website. Ví dụ:\n• "Đổi màu chủ đạo thành xanh lá"\n• "Viết lại phần About ngắn hơn"\n• "Thêm section FAQ"\n• "Đổi heading font thành Playfair Display"' },
+        { id: 'welcome', role: 'assistant', content: 'I can help you edit your website. For example:\n• "Change primary colour to green"\n• "Rewrite the About section shorter"\n• "Add a FAQ section"\n• "Change heading font to Playfair Display"' },
     ])
     const [showAddBlock, setShowAddBlock] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -79,10 +79,10 @@ function AIChatPanel({
             // Apply the AI action
             onAIAction(data)
 
-            const actionDesc = data.action === 'update_block' ? '✅ Đã cập nhật block'
-                : data.action === 'update_theme' ? '🎨 Đã cập nhật theme'
-                    : data.action === 'add_block' ? '➕ Đã thêm block mới'
-                        : data.action === 'delete_block' ? '🗑️ Đã xóa block'
+            const actionDesc = data.action === 'update_block' ? '✅ Block updated'
+                : data.action === 'update_theme' ? '🎨 Theme updated'
+                    : data.action === 'add_block' ? '➕ New block added'
+                        : data.action === 'delete_block' ? '🗑️ Block deleted'
                             : '✅ Done'
 
             setMessages(prev => [...prev, {
@@ -90,7 +90,7 @@ function AIChatPanel({
                 content: `${actionDesc}\n${data.message || ''}`,
             }])
         } catch (err: any) {
-            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `❌ Lỗi: ${err.message}` }])
+            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `❌ Error: ${err.message}` }])
         } finally {
             setIsProcessing(false)
         }
@@ -205,7 +205,7 @@ function AIChatPanel({
                             <input value={input}
                                 onChange={e => setInput(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat() } }}
-                                placeholder="Yêu cầu AI chỉnh sửa..."
+                                placeholder="Ask AI to make changes..."
                                 className="flex-1 bg-transparent px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none"
                                 disabled={isProcessing}
                             />

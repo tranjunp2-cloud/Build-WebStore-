@@ -14,7 +14,7 @@ export function DashboardBanner({ siteId, siteName }: { siteId: string; siteName
             <div className="flex items-center gap-3">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
                 <p className="text-sm text-yellow-200">
-                    <strong>{siteName}</strong> chưa live.{' '}
+                    <strong>{siteName}</strong> is not live yet.{' '}
                     <Link
                         href={`/editor/${siteId}`}
                         className="font-medium text-yellow-400 underline underline-offset-2 hover:text-yellow-300"

@@ -11,11 +11,11 @@ export function DashboardEmptyState() {
                 </div>
 
                 <h2 className="mt-6 text-2xl font-bold text-white">
-                    Tạo website đầu tiên của bạn
+                    Create your first website
                 </h2>
                 <p className="mt-3 text-gray-400 leading-relaxed">
-                    Chỉ cần mô tả doanh nghiệp, AI sẽ tạo website chuyên nghiệp<br />
-                    với đầy đủ nội dung trong vài phút.
+                    Just describe your business, AI will create a professional website<br />
+                    with complete content in minutes.
                 </p>
 
                 {/* Two paths */}
@@ -28,8 +28,8 @@ export function DashboardEmptyState() {
                             <Wand2 className="h-6 w-6 text-blue-400" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-white">Tạo bằng AI</h3>
-                            <p className="mt-1 text-xs text-gray-400">Mô tả → AI tạo website</p>
+                            <h3 className="font-semibold text-white">Build with AI</h3>
+                            <p className="mt-1 text-xs text-gray-400">Describe → AI builds website</p>
                         </div>
                     </Link>
 
@@ -41,8 +41,8 @@ export function DashboardEmptyState() {
                             <LayoutTemplate className="h-6 w-6 text-gray-300" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-white">Chọn Template</h3>
-                            <p className="mt-1 text-xs text-gray-400">6 mẫu sẵn, tùy chỉnh dễ</p>
+                            <h3 className="font-semibold text-white">Choose Template</h3>
+                            <p className="mt-1 text-xs text-gray-400">Ready-made templates, easy to customise</p>
                         </div>
                     </Link>
                 </div>

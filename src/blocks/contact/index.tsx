@@ -17,8 +17,8 @@ export function ContactBlock({ block, theme }: BlockProps<ContactConfig>) {
             <div className="container mx-auto px-6 relative z-10">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
-                    <SectionLabel color={pc}>Liên hệ</SectionLabel>
-                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'Liên Hệ Với Chúng Tôi'}</h2>
+                    <SectionLabel color={pc}>Contact</SectionLabel>
+                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'Contact Us'}</h2>
                     {subtext && <p className="text-lg opacity-50 leading-relaxed">{subtext}</p>}
                 </div>
 
@@ -47,7 +47,7 @@ export function ContactBlock({ block, theme }: BlockProps<ContactConfig>) {
                                         📞
                                     </div>
                                     <div>
-                                        <p className="text-xs opacity-40 mb-0.5">Điện thoại</p>
+                                        <p className="text-xs opacity-40 mb-0.5">Phone</p>
                                         <p className="text-sm font-medium">{phone}</p>
                                     </div>
                                 </div>
@@ -61,7 +61,7 @@ export function ContactBlock({ block, theme }: BlockProps<ContactConfig>) {
                                         📍
                                     </div>
                                     <div>
-                                        <p className="text-xs opacity-40 mb-0.5">Địa chỉ</p>
+                                        <p className="text-xs opacity-40 mb-0.5">Address</p>
                                         <p className="text-sm font-medium">{address}</p>
                                     </div>
                                 </div>
@@ -131,7 +131,7 @@ export function ContactBlock({ block, theme }: BlockProps<ContactConfig>) {
                                         boxShadow: `0 6px 25px ${pc}30`,
                                     }}
                                 >
-                                    Gửi Tin Nhắn →
+                                    Send Message →
                                 </motion.button>
                             </form>
                         </GlassCard>

@@ -16,9 +16,9 @@ export function TestimonialsBlock({ block, theme }: BlockProps<TestimonialsConfi
             <div className="container mx-auto px-6 relative z-10">
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">
-                        {headline || 'Khách Hàng Nói Gì'}
+                        {headline || 'What Our Clients Say'}
                     </h2>
-                    <p className="text-lg opacity-40">Những đánh giá chân thực từ khách hàng</p>
+                    <p className="text-lg opacity-40">Genuine reviews from our customers</p>
                 </div>
 
                 <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

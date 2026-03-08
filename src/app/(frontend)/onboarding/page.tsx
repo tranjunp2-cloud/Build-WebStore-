@@ -11,10 +11,10 @@ export default function OnboardingPage() {
                 </div>
 
                 <h1 className="mt-6 text-3xl font-bold text-white">
-                    Chào mừng đến Web Store!
+                    Welcome to Web Store!
                 </h1>
                 <p className="mt-2 text-gray-400">
-                    Hãy bắt đầu tạo website đầu tiên của bạn
+                    Start creating your first website
                 </p>
 
                 {/* Options */}
@@ -29,13 +29,13 @@ export default function OnboardingPage() {
                         </div>
                         <div>
                             <h3 className="font-semibold text-white group-hover:text-blue-300">
-                                Tạo bằng AI
+                                Build with AI
                                 <span className="ml-2 rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] uppercase text-blue-400">
                                     Recommend
                                 </span>
                             </h3>
                             <p className="mt-0.5 text-sm text-gray-400">
-                                Chat với AI để tạo website chuyên nghiệp trong 5 phút
+                                Chat with AI to create a professional website in 5 minutes
                             </p>
                         </div>
                     </Link>
@@ -49,9 +49,9 @@ export default function OnboardingPage() {
                             <LayoutTemplate className="h-6 w-6 text-gray-400 group-hover:text-white" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-white">Chọn Template</h3>
+                            <h3 className="font-semibold text-white">Choose Template</h3>
                             <p className="mt-0.5 text-sm text-gray-400">
-                                Duyệt và chỉnh sửa từ các mẫu website có sẵn
+                                Browse and customise from ready-made templates
                             </p>
                         </div>
                     </Link>
@@ -65,9 +65,9 @@ export default function OnboardingPage() {
                             <FileText className="h-6 w-6 text-gray-400 group-hover:text-white" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-white">Tạo từ trang trắng</h3>
+                            <h3 className="font-semibold text-white">Start from Scratch</h3>
                             <p className="mt-0.5 text-sm text-gray-400">
-                                Bắt đầu với canvas trống, tự thêm blocks
+                                Start with a blank canvas, add blocks yourself
                             </p>
                         </div>
                     </Link>
@@ -75,13 +75,13 @@ export default function OnboardingPage() {
 
                 {/* Skip */}
                 <p className="mt-8 text-xs text-gray-600">
-                    Bạn có thể tạo thêm website sau tại Dashboard
+                    You can create more websites later from the Dashboard
                 </p>
                 <Link
                     href="/dashboard"
                     className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300"
                 >
-                    Bỏ qua → Đến Dashboard
+                    Skip → Go to Dashboard
                 </Link>
             </div>
         </div>

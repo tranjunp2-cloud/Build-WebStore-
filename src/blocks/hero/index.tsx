@@ -94,7 +94,7 @@ export function HeroBlock({ block, theme }: BlockProps<HeroConfig>) {
                                             style={{ background: `${pc}15`, border: `1px solid ${pc}25` }}>
                                             <span className="text-3xl">✨</span>
                                         </div>
-                                        <p className="text-sm opacity-40">Hình ảnh doanh nghiệp</p>
+                                        <p className="text-sm opacity-40">Business image</p>
                                     </div>
                                 </div>
                             )}

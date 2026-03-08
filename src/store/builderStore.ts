@@ -99,13 +99,13 @@ export const useBuilderStore = create<BuilderState & BuilderActions>((set) => ({
                     id: 'welcome',
                     role: 'assistant',
                     content:
-                        `Tuyệt vời! Tôi đã nhận thông tin về **${info.businessName}** (${info.industry}).` +
-                        `\n\nDựa trên thông tin bạn cung cấp, tôi sẽ tạo website với:` +
-                        `\n📄 **Homepage** đầy đủ sections` +
+                        `Great! I have received the info for **${info.businessName}** (${info.industry}).` +
+                        `\n\nBased on your information, I will create a website with:` +
+                        `\n📄 **Homepage** with complete sections` +
                         `\n🧩 **8-14 Sections:** Navigation, Hero, About, Features, Testimonials, Contact, Footer...` +
-                        `\n🎨 **Theme:** Tự động theo ngành nghề bằng AI` +
-                        `\n📱 **Responsive:** Tối ưu mọi thiết bị` +
-                        `\n\nGõ **"Tạo ngay"** hoặc mô tả thêm yêu cầu đặc biệt nếu có! 🚀`,
+                        `\n🎨 **Theme:** Auto-selected by AI based on your industry` +
+                        `\n📱 **Responsive:** Optimised for all devices` +
+                        `\n\nType **"Create now"** or describe any special requirements! 🚀`,
                     timestamp: new Date(),
                 },
             ],

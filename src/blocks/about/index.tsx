@@ -46,7 +46,7 @@ export function AboutBlock({ block, theme }: BlockProps<AboutConfig>) {
                                             style={{ background: `${pc}15` }}>
                                             <span className="text-2xl">🏢</span>
                                         </div>
-                                        <p className="text-xs opacity-30">Hình ảnh doanh nghiệp</p>
+                                        <p className="text-xs opacity-30">Business image</p>
                                     </div>
                                 </div>
                             )}
@@ -64,7 +64,7 @@ export function AboutBlock({ block, theme }: BlockProps<AboutConfig>) {
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-6 leading-tight">{headline}</h2>
                         {block.body && (
                             <div className="opacity-60 leading-relaxed text-lg space-y-4">
-                                <p>{typeof block.body === 'string' ? block.body : 'Về chúng tôi'}</p>
+                                <p>{typeof block.body === 'string' ? block.body : 'About Us'}</p>
                             </div>
                         )}
                     </motion.div>
@@ -93,7 +93,7 @@ export function AboutBlock({ block, theme }: BlockProps<AboutConfig>) {
                                             style={{ background: `${pc}15` }}>
                                             <span className="text-2xl">📸</span>
                                         </div>
-                                        <p className="text-xs opacity-30">Hình ảnh doanh nghiệp</p>
+                                        <p className="text-xs opacity-30">Business image</p>
                                     </div>
                                 </div>
                             )}
