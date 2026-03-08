@@ -13,6 +13,7 @@ import {
     Search,
     ShoppingBag,
     ClipboardList,
+    BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -23,6 +24,7 @@ const navItems = [
     { label: 'SEO', href: '/dashboard/seo', icon: Search },
     { label: 'Products', href: '/dashboard/products', icon: ShoppingBag },
     { label: 'Orders', href: '/dashboard/orders', icon: ClipboardList },
+    { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
     { label: 'Media', href: '/dashboard/media', icon: Image },
     { label: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]

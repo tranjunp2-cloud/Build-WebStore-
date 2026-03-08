@@ -14,6 +14,7 @@ import { Templates } from './collections/Templates'
 import { Subscriptions } from './collections/Subscriptions'
 import { Products } from './collections/Products'
 import { Orders } from './collections/Orders'
+import { Analytics } from './collections/Analytics'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -42,6 +43,7 @@ export default buildConfig({
     Subscriptions,
     Products,
     Orders,
+    Analytics,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',
