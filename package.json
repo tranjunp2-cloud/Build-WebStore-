@@ -8,7 +8,7 @@
     "build": "NODE_OPTIONS='--require ./node-polyfill.js' next build",
     "start": "next start",
     "lint": "next lint",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "generate:types": "payload generate:types",
     "payload": "cross-env PAYLOAD_CONFIG_PATH=src/payload.config.ts payload",
     "test": "vitest run",
