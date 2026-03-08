@@ -19,6 +19,15 @@ import { Analytics } from './collections/Analytics'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
+/** Connection string cho Postgres. Với DB từ xa ép sslmode=no-verify để tránh SELF_SIGNED_CERT_IN_CHAIN (DO managed DB). */
+function getDatabaseConnectionString(): string {
+  const raw = process.env.DATABASE_URI || 'postgresql://localhost/primeweb'
+  if (raw.includes('localhost')) return raw
+  const withoutSslmode = raw.replace(/[?&]sslmode=[^&]+/g, '').replace(/\?&/, '?')
+  const join = withoutSslmode.includes('?') ? '&' : '?'
+  return `${withoutSslmode}${join}sslmode=no-verify`
+}
+
 export default buildConfig({
   admin: {
     user: Users.slug,
@@ -51,12 +60,7 @@ export default buildConfig({
   },
   db: postgresAdapter({
     pool: {
-      connectionString: process.env.DATABASE_URI || 'postgresql://localhost/primeweb',
-      // DigitalOcean (và một số managed Postgres) dùng cert có thể khiến Node báo SELF_SIGNED_CERT_IN_CHAIN.
-      // Chấp nhận cert để kết nối được; production nên dùng CA đúng nếu có.
-      ...(process.env.DATABASE_URI && !process.env.DATABASE_URI.includes('localhost')
-        ? { ssl: { rejectUnauthorized: false } }
-        : {}),
+      connectionString: getDatabaseConnectionString(),
     },
   }),
   sharp,

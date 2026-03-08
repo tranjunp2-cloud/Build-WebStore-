@@ -339,7 +339,7 @@ Sau khi sửa, commit + push lên branch `staging` (hoặc bấm **Redeploy** tr
 
 #### Runtime: lỗi "self-signed certificate in certificate chain" (SELF_SIGNED_CERT_IN_CHAIN)
 
-Khi deploy **Live** nhưng Runtime Logs báo `Error: cannot connect to Postgres. Details: self-signed certificate in certificate chain`: app không kết nối được DB vì Node.js không tin chứng chỉ SSL của managed Postgres (DigitalOcean, v.v.). Trong repo đã cấu hình `payload.config.ts`: khi `DATABASE_URI` trỏ tới host **không phải localhost**, pool Postgres dùng `ssl: { rejectUnauthorized: false }` để chấp nhận cert. Sau khi pull code mới và redeploy, lỗi sẽ hết. Nếu vẫn lỗi: kiểm tra `DATABASE_URI` đúng connection string (có `sslmode=require` nếu DO yêu cầu); production lâu dài nên dùng CA cert đúng thay vì tắt verify.
+Khi deploy **Live** nhưng Runtime Logs báo `Error: cannot connect to Postgres. Details: self-signed certificate in certificate chain`: app không kết nối được DB vì Node.js không tin chứng chỉ SSL của managed Postgres (DigitalOcean). Trong repo đã xử lý trong `payload.config.ts`: với `DATABASE_URI` trỏ tới host **không phải localhost**, connection string được chuẩn hóa thêm **`sslmode=no-verify`** (thay thế hoặc thêm vào query string) để driver `pg` chấp nhận cert. Sau khi pull code mới và **Redeploy** (hoặc push lên `staging`) lỗi sẽ hết. Nếu vẫn lỗi: kiểm tra DO đã dùng bản deploy mới (Activity → deployment gần nhất); production lâu dài nên dùng CA cert đúng nếu có.
 
 #### Tối ưu thời gian build (build > 5 phút)
 
