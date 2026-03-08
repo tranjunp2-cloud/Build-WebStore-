@@ -1,5 +1,6 @@
 # CI — Lint, typecheck, test, build
 # Chạy trên: PR vào main/staging, push lên main/staging
+# Thông báo Lark khi fail
 name: CI
 
 on:
@@ -42,3 +43,60 @@ jobs:
         env:
           NODE_OPTIONS: '--require ./node-polyfill.js'
         run: npm run build
+
+      # --- Lark Notifications ---
+      - name: Notify Lark (Success)
+        if: success() && github.event_name == 'push'
+        env:
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
+          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+        run: |
+          TIMESTAMP=$(date +%s)
+          SIGN=$(echo -ne "${TIMESTAMP}\n${LARK_SIGN_KEY}" | openssl dgst -sha256 -hmac "" -binary | base64 2>/dev/null || echo "")
+          BRANCH="${GITHUB_REF_NAME}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          AUTHOR="${GITHUB_ACTOR}"
+          curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
+            "timestamp": "'"$TIMESTAMP"'",
+            "sign": "'"$SIGN"'",
+            "msg_type": "interactive",
+            "card": {
+              "header": {"title": {"tag": "plain_text", "content": "✅ CI Passed — PrimeWeb"}, "template": "green"},
+              "elements": [
+                {"tag": "div", "text": {"tag": "lark_md", "content": "**Branch:** '"$BRANCH"'\n**Commit:** '"$SHORT_SHA"'\n**Author:** '"$AUTHOR"'"}},
+                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "View Run →"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "primary"}]}
+              ]
+            }
+          }' || true
+
+      - name: Notify Lark (Failure)
+        if: failure()
+        env:
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
+          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+        run: |
+          TIMESTAMP=$(date +%s)
+          SIGN=$(echo -ne "${TIMESTAMP}\n${LARK_SIGN_KEY}" | openssl dgst -sha256 -hmac "" -binary | base64 2>/dev/null || echo "")
+          BRANCH="${GITHUB_REF_NAME}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          AUTHOR="${GITHUB_ACTOR}"
+          EVENT_TYPE="${GITHUB_EVENT_NAME}"
+          if [ "$EVENT_TYPE" = "pull_request" ]; then
+            TITLE="❌ CI Failed — PR #${{ github.event.pull_request.number }}"
+            URL="${{ github.event.pull_request.html_url }}"
+          else
+            TITLE="❌ CI Failed — $BRANCH"
+            URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi
+          curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
+            "timestamp": "'"$TIMESTAMP"'",
+            "sign": "'"$SIGN"'",
+            "msg_type": "interactive",
+            "card": {
+              "header": {"title": {"tag": "plain_text", "content": "'"$TITLE"'"}, "template": "red"},
+              "elements": [
+                {"tag": "div", "text": {"tag": "lark_md", "content": "**Branch:** '"$BRANCH"'\n**Commit:** '"$SHORT_SHA"'\n**Author:** '"$AUTHOR"'"}},
+                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "View Logs →"}, "url": "'"$URL"'", "type": "danger"}]}
+              ]
+            }
+          }' || true
