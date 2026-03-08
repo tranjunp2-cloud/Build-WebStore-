@@ -248,6 +248,16 @@ Layer 6 — Business: Subscription check · Audit log · ECH ecosystem sync
 
 ---
 
+## 📋 Git & CI/CD (chuẩn team + pipeline + setup)
+
+**Nguồn sự thật duy nhất:** `.github/` — mọi môi trường (Cursor, Antigravity, CI, dev) bắt buộc dùng chung, không tạo rule riêng.
+
+- **Rule & setup:** [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) (entry point), [.github/GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) (branch, commit, PR, conflict, setup GitHub/máy, quy trình).
+- **PR template:** [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md).
+- **Tóm tắt:** Branch `feature/*`, `fix/*`, …; Conventional Commits; PR title + description đủ template; 1 approval, CI pass; branch protection, Commitlint + Husky.
+
+---
+
 ## 📋 PR Description Format
 
 ```markdown

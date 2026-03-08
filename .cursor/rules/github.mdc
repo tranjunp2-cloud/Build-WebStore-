@@ -1,0 +1,41 @@
+---
+description: Git, PR, CI — bắt buộc dùng rule trong .github; khi tạo PR phải lấy template .github/PULL_REQUEST_TEMPLATE.md
+globs: **/*
+alwaysApply: true
+---
+
+# Git & PR — Rule từ .github (bắt buộc)
+
+## Nguồn sự thật
+
+- **Git, PR, CI/CD, conflict:** đọc và tuân theo [.github/GIT_AND_CI_RULES.md](../../.github/GIT_AND_CI_RULES.md).
+- **Quy định chung (Cursor / Antigravity / CI):** [.github/CONTRIBUTING.md](../../.github/CONTRIBUTING.md).
+- **Template mô tả PR:** [.github/PULL_REQUEST_TEMPLATE.md](../../.github/PULL_REQUEST_TEMPLATE.md).
+
+Không tạo rule riêng hay file mô tả PR one-off (vd. `docs/PR_DESCRIPTION_xxx.md`). Mọi PR dùng đúng template trong `.github`.
+
+---
+
+## Khi user yêu cầu "tạo PR", "tạo PR dùm a", "create PR", "update PR description"
+
+1. **Đọc nội dung** [.github/PULL_REQUEST_TEMPLATE.md](../../.github/PULL_REQUEST_TEMPLATE.md).
+2. **Dùng đúng cấu trúc** của template đó (các mục: Story, Changes, Checklist, Test Steps, v.v.).
+3. **Điền nội dung** dựa trên:
+   - branch hiện tại / commits trên branch;
+   - file thay đổi (diff);
+   - context user đã cung cấp (tên feature, ticket, v.v.).
+4. **Output:** trả về bản mô tả PR hoàn chỉnh theo template để user paste vào GitHub, hoặc dùng GitHub CLI/API nếu có (vẫn dùng nội dung đã điền theo template).
+
+Nếu user chỉ nói "tạo PR" mà chưa có issue/ticket: vẫn lấy template, điền Story/Changes/Checklist/Test Steps dựa trên diff và tên branch; có thể để "Closes #" trống hoặc gợi ý điền sau.
+
+---
+
+## Commit message
+
+Theo **Conventional Commits** (xem .github/GIT_AND_CI_RULES.md):
+
+- Format: `type(scope): description`
+- Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore
+- Có ticket: `feat(auth): add OAuth (PROJ-123)`
+
+Commitlint + Husky sẽ chặn commit sai format.

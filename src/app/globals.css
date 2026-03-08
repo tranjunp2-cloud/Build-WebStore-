@@ -165,4 +165,72 @@
   .animation-delay-200 { animation-delay: 200ms; }
   .animation-delay-300 { animation-delay: 300ms; }
   .animation-delay-500 { animation-delay: 500ms; }
+
+  /* LadiPage-style: floating components */
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  .animate-float-slow {
+    animation: float 8s ease-in-out infinite;
+  }
+  .animate-float-delay {
+    animation: float 6s ease-in-out infinite;
+    animation-delay: 1.5s;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .hero-laptop-shadow {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255,255,255,0.05);
+  }
+
+  /* Section entrance (LadiPage-style) */
+  .animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+  }
+  .animate-fade-in-up-1 { animation-delay: 0.1s; opacity: 0; }
+  .animate-fade-in-up-2 { animation-delay: 0.2s; opacity: 0; }
+  .animate-fade-in-up-3 { animation-delay: 0.3s; opacity: 0; }
+  .animate-fade-in-up-4 { animation-delay: 0.4s; opacity: 0; }
+  .animate-fade-in-up-5 { animation-delay: 0.5s; opacity: 0; }
+  .animate-fade-in-up-6 { animation-delay: 0.6s; opacity: 0; }
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Slide content when switching tabs */
+  .animate-slide-in-right {
+    animation: slideInRight 0.4s ease-out forwards;
+  }
+  .animate-slide-in-left {
+    animation: slideInLeft 0.4s ease-out forwards;
+  }
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
 }
