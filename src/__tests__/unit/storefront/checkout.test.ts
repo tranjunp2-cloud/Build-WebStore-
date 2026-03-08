@@ -1,31 +1,15 @@
 import { describe, it, expect } from 'vitest'
+import { formatPrice } from '@/lib/utils'
+import {
+    validateCheckoutForm,
+    calculateOrderTotals,
+    generateOrderNumber,
+    MY_STATES,
+} from '@/lib/storefront'
 
-// ─── Checkout Form Validation ─────────────────────────────────────────────────
-
-interface CheckoutForm {
-    name: string
-    email: string
-    phone: string
-    line1: string
-    line2: string
-    city: string
-    state: string
-    postcode: string
-}
-
-function validateCheckout(form: CheckoutForm): { valid: boolean; errors: string[] } {
-    const errors: string[] = []
-    if (!form.name.trim()) errors.push('Name is required')
-    if (!form.email.trim()) errors.push('Email is required')
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-        errors.push('Invalid email format')
-    }
-    return { valid: errors.length === 0, errors }
-}
-
-describe('Checkout Validation', () => {
+describe('Checkout Validation (lib/storefront)', () => {
     it('should pass with valid name + email', () => {
-        const result = validateCheckout({
+        const result = validateCheckoutForm({
             name: 'Ahmad bin Ali',
             email: 'ahmad@example.com',
             phone: '012-3456789',
@@ -40,7 +24,7 @@ describe('Checkout Validation', () => {
     })
 
     it('should fail when name is empty', () => {
-        const result = validateCheckout({
+        const result = validateCheckoutForm({
             name: '',
             email: 'ahmad@example.com',
             phone: '',
@@ -51,7 +35,7 @@ describe('Checkout Validation', () => {
     })
 
     it('should fail when email is empty', () => {
-        const result = validateCheckout({
+        const result = validateCheckoutForm({
             name: 'Ahmad',
             email: '',
             phone: '',
@@ -62,7 +46,7 @@ describe('Checkout Validation', () => {
     })
 
     it('should fail with invalid email format', () => {
-        const result = validateCheckout({
+        const result = validateCheckoutForm({
             name: 'Ahmad',
             email: 'not-an-email',
             phone: '',
@@ -73,7 +57,7 @@ describe('Checkout Validation', () => {
     })
 
     it('should fail when both name and email are empty', () => {
-        const result = validateCheckout({
+        const result = validateCheckoutForm({
             name: '',
             email: '',
             phone: '',
@@ -84,20 +68,7 @@ describe('Checkout Validation', () => {
     })
 })
 
-// ─── Order Calculation Logic ──────────────────────────────────────────────────
-
-function calculateOrderTotals(items: Array<{ price: number; quantity: number }>) {
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
-    const tax = Math.round(subtotal * 0.06 * 100) / 100 // SST 6%
-    const total = subtotal + tax
-    return { subtotal, tax, total }
-}
-
-function generateOrderNumber(): string {
-    return `ORD-${Date.now().toString(36).toUpperCase()}`
-}
-
-describe('Order Calculations', () => {
+describe('Order Calculations (lib/storefront)', () => {
     it('should calculate SST at 6%', () => {
         const { subtotal, tax, total } = calculateOrderTotals([
             { price: 100, quantity: 1 },
@@ -128,15 +99,13 @@ describe('Order Calculations', () => {
         const { tax } = calculateOrderTotals([
             { price: 33.33, quantity: 1 },
         ])
-        // 33.33 * 0.06 = 1.9998 → round to 2.00
         expect(tax).toBe(2)
     })
 })
 
-describe('Order Number Generation', () => {
+describe('Order Number Generation (lib/storefront)', () => {
     it('should start with ORD-', () => {
-        const orderNum = generateOrderNumber()
-        expect(orderNum).toMatch(/^ORD-/)
+        expect(generateOrderNumber()).toMatch(/^ORD-/)
     })
 
     it('should be uppercase', () => {
@@ -149,20 +118,11 @@ describe('Order Number Generation', () => {
         for (let i = 0; i < 10; i++) {
             nums.add(generateOrderNumber())
         }
-        // At least 2 unique (timestamps may collide in tight loop, but mostly unique)
         expect(nums.size).toBeGreaterThanOrEqual(1)
     })
 })
 
-// ─── formatPrice ──────────────────────────────────────────────────────────────
-
-function formatPrice(price: number, currency: string): string {
-    if (currency === 'MYR') return `RM ${price.toFixed(2)}`
-    if (currency === 'SGD') return `S$${price.toFixed(2)}`
-    return `$${price.toFixed(2)}`
-}
-
-describe('formatPrice', () => {
+describe('formatPrice (lib/utils)', () => {
     it('should format MYR correctly', () => {
         expect(formatPrice(29.90, 'MYR')).toBe('RM 29.90')
         expect(formatPrice(0, 'MYR')).toBe('RM 0.00')
@@ -178,20 +138,12 @@ describe('formatPrice', () => {
     })
 })
 
-// ─── Malaysian States ─────────────────────────────────────────────────────────
-
-const MY_STATES = [
-    'Johor', 'Kedah', 'Kelantan', 'Kuala Lumpur', 'Labuan', 'Melaka',
-    'Negeri Sembilan', 'Pahang', 'Penang', 'Perak', 'Perlis',
-    'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu',
-]
-
-describe('Malaysian States', () => {
+describe('Malaysian States (lib/storefront)', () => {
     it('should have 16 states', () => {
         expect(MY_STATES).toHaveLength(16)
     })
 
-    it('should include all major states', () => {
+    it('should include major states', () => {
         expect(MY_STATES).toContain('Kuala Lumpur')
         expect(MY_STATES).toContain('Selangor')
         expect(MY_STATES).toContain('Johor')
