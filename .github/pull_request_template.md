@@ -1,50 +1,46 @@
-## Description
+## Story
 
-[Brief description of what this PR does and why]
-
-## BMAD Gate Checklist
-
-> **Required for all feature PRs.** Skip for bug fixes and infra changes.
-
-- [ ] **PRD exists**: `docs/prd/{feature}.md` — Gherkin AC complete
-- [ ] **Architecture exists**: `docs/architecture/{feature}.md` — Component tree clear
-- [ ] **API contracts defined**: In PRD or SPEC.md §8
-- [ ] **Dependencies resolved**: API keys, collections, Docker working
-
-### Result: ___/4 PASS
+- **Closes:** #
+- **Ticket / Story ID (nếu có):** e.g. PROJ-123, US-456
+- **Mô tả ngắn:** [1–2 câu: feature/fix này làm gì, cho ai]
 
 ---
 
-## 3 Build Rules Verified
+## Changes
 
-- [ ] 📱 **Mobile-First** — Tested on 375px
-- [ ] 🔍 **SEO** — Meta tags, JSON-LD, semantic HTML
-- [ ] 🌏 **Bilingual EN/MY** — All user-facing text in both languages
+- [ ] Thay đổi 1: [mô tả ngắn]
+- [ ] Thay đổi 2: [mô tả ngắn]
+- [ ] (Thêm/xóa dòng theo thực tế; liệt kê file/area chính: API, UI, schema, config, …)
 
-## 9-Point Done Checklist (SPEC.md §13)
+**API / Contract thay đổi (nếu có):**
 
-- [ ] Loading states
-- [ ] Empty states
-- [ ] Error states
-- [ ] Form validation
-- [ ] Button states (disabled/loading)
-- [ ] Toast feedback
-- [ ] Auth redirect (401 → /login)
-- [ ] Mobile responsive (375px)
-- [ ] TypeScript clean (`tsc --noEmit`)
+- [ ] Endpoint / schema mới hoặc sửa: [tên hoặc path]
+- [ ] Breaking change: [Có / Không — nếu có thì ghi rõ]
 
-## Type of Change
+---
 
-- [ ] 🆕 New feature (Full BMAD)
-- [ ] 🔧 Bug fix
-- [ ] 🔄 Refactor
-- [ ] 🏗️ Infra / DevOps
-- [ ] 📄 Documentation only
+## Checklist
 
-## Screenshots / Recordings
+- [ ] **9-Point Done** (SPEC §13): Loading (skeleton), Empty, Error, Form validation, Button states, Toast, Auth redirect, Mobile 375px, TypeScript clean
+- [ ] **TypeScript / lint:** `tsc --noEmit` và `eslint` pass (hoặc tương đương)
+- [ ] **Test:** Đã thêm/sửa test liên quan (nếu có); test steps bên dưới đã điền
+- [ ] **Security:** Không commit secret/credential; input đã validate/sanitize
+- [ ] **Branch:** Đã cập nhật với base (merge/rebase `main`); không conflict
 
-[Add screenshots or recordings of the feature if applicable]
+---
 
-## Testing Done
+## Test Steps
 
-[Describe what testing was performed]
+1. [Bước kiểm tra 1 — mô tả cụ thể]
+2. [Bước kiểm tra 2]
+3. [Bước kiểm tra 3 — happy path + edge case nếu cần]
+
+*(Điền theo feature/fix; reviewer có thể chạy theo để verify.)*
+
+---
+
+## Ghi chú (tùy chọn)
+
+- **Screenshot / recording (nếu có):** [link hoặc mô tả]
+- **Deploy / env:** [yêu cầu env biến mới, migration, … nếu có]
+- **Tài liệu:** [Đã cập nhật README / SPEC / doc nào]

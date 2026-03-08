@@ -143,42 +143,47 @@ project-planner → worker agents  → quality-inspector → orchestrator
 ### 2.4 BMAD Doc Gate — Required Documents
 
 > 🔴 **RULE: Trước khi code BẤT KỲ feature nào, các file dưới đây PHẢI tồn tại và được approved.**  
-> **< 4/4 PASS → HOLD. Không code khi chưa đủ docs.**
+> **< 5/5 PASS → HOLD. Không code khi chưa đủ docs.**
+>
+> **Naming convention**: Tất cả docs dùng format `F{XX}-{feature-name}` (ví dụ: `F10-storefront-commerce.md`)
 
 | # | Document | Path | Created By | Approved By | Content |
-|---|----------|------|-----------|-------------|--------|
-| 1 | **PRD** | `docs/prd/{feature}.md` | `project-planner` | Product Owner | User Story, Gherkin AC, Technical Requirements, 9-Point Checklist |
-| 2 | **Architecture** | `docs/architecture/{feature}.md` | `backend/frontend-specialist` | Tech Lead | System flow, Component tree, State design, Error matrix |
-| 3 | **API Contract** | Trong PRD hoặc `AI_BUILDER_SPEC.md §14` | `backend-specialist` | — | Endpoint, Request, Response, Error codes |
-| 4 | **Dependencies** | Verified by agent | — | — | API keys, Collections ready, Docker OK |
+|---|----------|------|-----------|-------------|---------|
+| 1 | **PRD** | `docs/prd/F{XX}-{name}.md` | `project-planner` | Product Owner | User Story, Gherkin AC, Technical Requirements, 9-Point Checklist |
+| 2 | **Architecture** | `docs/architecture/F{XX}-{name}.md` | `backend/frontend-specialist` | Tech Lead | System flow, Component tree, State design, Error matrix |
+| 3 | **UI Mockups** | `docs/design/F{XX}-{name}-*.png` | `frontend-specialist` | Product Owner | Desktop + Mobile mockups for all key screens |
+| 4 | **API Contract** | Trong PRD §8 hoặc `AI_BUILDER_SPEC.md §14` | `backend-specialist` | — | Endpoint, Request, Response, Error codes |
+| 5 | **Dependencies** | Verified by agent | — | — | API keys, Collections ready, Docker OK |
 
 **After build:**
 
 | # | Document | Path | Created By |
 |---|----------|------|------------|
-| 5 | **QA Report** | `docs/qa/{feature}.md` | `quality-inspector` |
+| 6 | **QA Report** | `docs/qa/F{XX}-{name}.md` | `quality-inspector` |
 
 ### 2.5 BMAD Gate Checklist Template
 
 ```
 ──────────────────────────────────────────────────
-BMAD GATE — Feature: [Feature Name]
+BMAD GATE — Feature: [F{XX}-feature-name]
 ──────────────────────────────────────────────────
-☐ 1. PRD exists?          → docs/prd/{feature}.md
-      Gherkin AC đầy đủ?   PASS ☐  /  FAIL ☐
+☐ 1. PRD exists?           → docs/prd/F{XX}-{name}.md
+      Gherkin AC complete?   PASS ☐  /  FAIL ☐
 
-☐ 2. Architecture exists?  → docs/architecture/{feature}.md
-      Component tree rõ?    PASS ☐  /  FAIL ☐
+☐ 2. Architecture exists?  → docs/architecture/F{XX}-{name}.md
+      Component tree clear?  PASS ☐  /  FAIL ☐
 
-☐ 3. API contracts ready?  → SPEC.md §8 hoặc AI_BUILDER_SPEC.md §14
-      Error codes defined?  PASS ☐  /  FAIL ☐
+☐ 3. UI Mockups exist?     → docs/design/F{XX}-{name}-*.png
+      Mobile + Desktop?      PASS ☐  /  FAIL ☐
 
-☐ 4. Dependencies resolved?
-      API keys configured?  PASS ☐  /  FAIL ☐
-      Collections ready?    PASS ☐  /  FAIL ☐
-      Docker working?       PASS ☐  /  FAIL ☐
+☐ 4. API contracts ready?  → In PRD §8 or SPEC.md §8
+      Error codes defined?   PASS ☐  /  FAIL ☐
 
-Result: ___/4 PASS → [PROCEED / HOLD]
+☐ 5. Dependencies resolved?
+      API keys configured?   PASS ☐  /  FAIL ☐
+      Collections ready?     PASS ☐  /  FAIL ☐
+
+Result: ___/5 PASS → [PROCEED / HOLD]
 ──────────────────────────────────────────────────
 ```
 
