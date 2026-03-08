@@ -93,6 +93,11 @@ export function baseCSS(t: TemplateTheme): string {
     .fade-up-d2 { animation-delay: .2s; }
     .fade-up-d3 { animation-delay: .3s; }
     .fade-up-d4 { animation-delay: .4s; }
+    .card-hover { transition: transform .3s ease, box-shadow .3s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,.1); }
+    .card-hover:hover div[style*="height:3px"] { opacity: 1 !important; }
+    img { max-width: 100%; display: block; }
+    img[loading="lazy"] { animation: fadeUp .5s ease both; }
     @media (max-width: 768px) {
       .section { padding: 60px 0; }
       .container { padding: 0 16px; }
