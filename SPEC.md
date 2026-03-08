@@ -97,7 +97,7 @@ Web Store là **AI-first website builder cho SME** — chủ shop không cần k
   - Template content: AI generates in user's selected language
   - Template preview: seed data in EN (default) with MY translations available
   - Language toggle: visible in navbar/header of all pages
-- Locale files: `src/locales/en.json`, `src/locales/ms.json`
+- Locale files: `src/i18n/locales/en.json`, `src/i18n/locales/ms.json`
 - Default locale: `en`
 - URL strategy: `/en/...` and `/ms/...` (prefix-based routing)
 - Date/currency: EN uses `MYR 299.00`, MY uses `RM299.00`
@@ -641,9 +641,10 @@ Must test: AI prompt builders, Zod schemas, utility functions
 | Wave | Focus | Status |
 |------|-------|--------|
 | **Wave 1** | Foundation (Next.js, Payload, Docker, SPEC) | ✅ DONE |
-| **Wave 2** | Auth + Onboarding + Dashboard | 🔄 CURRENT |
-| **Wave 3** | AI Core (Builder + Editor + Blocks) | ⬜ NEXT |
-| **Wave 4** | Commerce + SEO + Storefront | ⬜ |
+| **Wave 2** | Auth + Onboarding + Dashboard | ✅ DONE |
+| **Wave 3** | AI Core (Builder + Editor + Blocks) | 🔄 CURRENT |
+| **Wave 3.5** | Premium Templates + i18n EN/MY | ✅ DONE |
+| **Wave 4** | Commerce + SEO + Storefront | ⬜ NEXT |
 | **Wave 5** | Polish + Testing + Launch | ⬜ |
 
 ### Sprint Order (Wave 3+)
@@ -794,10 +795,12 @@ web-store/
 | F-07 | Auto-Save & Draft | P0 | — (in ai-editor PRD) | — | Wave 3 | ✅ | ✅ Sprint 3 |
 | F-08 | Publish Flow | P0 | ✅ | — | Wave 3 | ✅ | ✅ Sprint 4 |
 | F-09 | AI Image Generation | P1 | — (in ai-chat-builder PRD) | — | Wave 4 | ⬜ | Spec Done |
-| F-10 | Template Gallery | P1 | ⬜ `docs/prd/template-gallery.md` | — | Wave 3 | ⬜ | Concept |
-| — | Auth Flow | P0 | ✅ `docs/prd/auth.md` | — | Wave 2 | ⬜ | 🔄 Building |
+| F-10 | Template Gallery | P1 | ✅ | — | Wave 3 | ✅ | 🚀 Shipped |
+| F-11 | i18n EN/MY (Bilingual) | P0 | — | — | Wave 3.5 | ✅ | 🚀 Shipped |
+| F-12 | Vietnamese → English (380+ strings) | P0 | — | — | Wave 3.5 | ✅ | 🚀 Shipped |
+| — | Auth Flow | P0 | ✅ `docs/prd/auth.md` | — | Wave 2 | ⬜ | ✅ Done |
 | — | Dashboard | P0 | ✅ `docs/prd/dashboard.md` | — | Wave 2 | ✅ | 🚀 Shipped |
-| — | Onboarding | P0 | ⬜ | — | Wave 2 | ⬜ | 🔄 Building |
+| — | Onboarding | P0 | ⬜ | — | Wave 2 | ⬜ | ✅ Done |
 
 ### BMAD Gate Quick Check
 
