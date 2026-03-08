@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { cn, formatRelativeTime, formatStorage } from '@/lib/utils'
+import { cn, formatRelativeTime, formatStorage, formatPrice } from '@/lib/utils'
 
 describe('cn (className merge)', () => {
     it('should merge simple strings', () => {
@@ -82,21 +82,19 @@ describe('formatStorage', () => {
     })
 })
 
-describe('formatMYR (currency helper)', () => {
-    // If project has a formatMYR util, test it here
-    // For now, test the pattern that should be used
-    it('should format to RM XX.XX pattern', () => {
-        const formatMYR = (amount: number) => `RM ${amount.toFixed(2)}`
-        expect(formatMYR(29.9)).toBe('RM 29.90')
-        expect(formatMYR(0)).toBe('RM 0.00')
-        expect(formatMYR(1250.5)).toBe('RM 1250.50')
+describe('formatPrice', () => {
+    it('should format MYR as RM XX.XX', () => {
+        expect(formatPrice(29.9, 'MYR')).toBe('RM 29.90')
+        expect(formatPrice(0, 'MYR')).toBe('RM 0.00')
+        expect(formatPrice(1250.5, 'MYR')).toBe('RM 1250.50')
     })
 
-    it('should handle SST (6%) calculation', () => {
-        const subtotal = 100
-        const sst = subtotal * 0.06
-        const total = subtotal + sst
-        expect(sst).toBeCloseTo(6.0)
-        expect(total).toBeCloseTo(106.0)
+    it('should format SGD as S$XX.XX', () => {
+        expect(formatPrice(29.9, 'SGD')).toBe('S$29.90')
+    })
+
+    it('should default to USD $ for other currencies', () => {
+        expect(formatPrice(29.9, 'USD')).toBe('$29.90')
+        expect(formatPrice(10, 'VND')).toBe('$10.00')
     })
 })

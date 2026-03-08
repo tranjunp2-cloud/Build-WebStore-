@@ -14,6 +14,7 @@
 | **Code rules, CI fix, Copilot** | [.github/CODE_AND_RULES.md](.github/CODE_AND_RULES.md) |
 | **Đánh giá triển khai CI/CD** | [.github/CICD_IMPLEMENTATION_ASSESSMENT.md](.github/CICD_IMPLEMENTATION_ASSESSMENT.md) — so với workflow + analysis, lộ trình gợi ý |
 | **Mô tả PR (template)** | [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md) — khi tạo/sửa PR **bắt buộc** dùng đúng template này |
+| **Unit test — đủ và đúng, phạm vi từng nhóm** | [.github/TEST_PLAN.md](.github/TEST_PLAN.md) |
 | **Product, BMAD, 9-Point, API, data model** | [SPEC.md](../SPEC.md) (root) |
 | **Cursor:** tuân theo .github + dùng template khi tạo PR | [.cursor/rules/github.mdc](../.cursor/rules/github.mdc) |
 
