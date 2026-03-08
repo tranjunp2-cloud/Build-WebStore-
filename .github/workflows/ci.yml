@@ -1,6 +1,6 @@
-# CI — Lint, typecheck, test, build
-# Chạy trên: PR vào main/staging, push lên main/staging
-# Thông báo Lark khi fail
+# CI Pipeline — Lint, typecheck, test, build
+# Nếu là PR: CI → Deploy Preview (sequential)
+# Thông báo Lark cho CI pass/fail
 name: CI
 
 on:
@@ -14,8 +14,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ──────────────────────────────────────
+  # Job 1: CI — Lint, Typecheck, Test, Build
+  # ──────────────────────────────────────
   ci:
-    name: Lint, typecheck, test, build
+    name: "CI: Lint → Typecheck → Test → Build"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,8 +47,8 @@ jobs:
           NODE_OPTIONS: '--require ./node-polyfill.js'
         run: npm run build
 
-      # --- Lark Notifications ---
-      - name: Notify Lark (Success)
+      # --- Lark: CI Passed ---
+      - name: Notify Lark (CI Passed)
         if: success() && github.event_name == 'push'
         env:
           LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
@@ -55,7 +58,6 @@ jobs:
           SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
           BRANCH="${GITHUB_REF_NAME}"
           SHORT_SHA="${GITHUB_SHA:0:7}"
-          AUTHOR="${GITHUB_ACTOR}"
           TIME=$(date -u +"%H:%M UTC")
           curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
             "timestamp": "'"$TIMESTAMP"'",
@@ -70,16 +72,17 @@ jobs:
                 ]},
                 {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
                   {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$AUTHOR"'"}}]}
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
                 ]},
                 {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "🕐 '"$TIME"'  ·  Lint ✅  TypeCheck ✅  Test ✅  Build ✅"}},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "**Pipeline [1/2]** CI\n🕐 '"$TIME"'  ·  Lint ✅  TypeCheck ✅  Test ✅  Build ✅"}},
                 {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "📋 View CI Run"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "primary"}]}
               ]
             }
           }' || true
 
-      - name: Notify Lark (Failure)
+      # --- Lark: CI Failed ---
+      - name: Notify Lark (CI Failed)
         if: failure()
         env:
           LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
@@ -89,15 +92,17 @@ jobs:
           SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
           BRANCH="${GITHUB_REF_NAME}"
           SHORT_SHA="${GITHUB_SHA:0:7}"
-          AUTHOR="${GITHUB_ACTOR}"
           TIME=$(date -u +"%H:%M UTC")
           EVENT_TYPE="${GITHUB_EVENT_NAME}"
           if [ "$EVENT_TYPE" = "pull_request" ]; then
+            PR_TITLE="${{ github.event.pull_request.title }}"
             TITLE="❌ CI Failed — PR #${{ github.event.pull_request.number }}"
             URL="${{ github.event.pull_request.html_url }}"
+            EXTRA="📝 $PR_TITLE"
           else
             TITLE="❌ CI Failed — $BRANCH"
             URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            EXTRA=""
           fi
           curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
             "timestamp": "'"$TIMESTAMP"'",
@@ -112,12 +117,130 @@ jobs:
                 ]},
                 {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
                   {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$AUTHOR"'"}}]}
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
                 ]},
                 {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "⚠️ **CI pipeline failed!** Please check the logs and fix the issues."}},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "🕐 '"$TIME"'"}},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "'"$EXTRA"'\n⚠️ **CI pipeline failed!** Pipeline stopped.\n🕐 '"$TIME"'"}},
                 {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔍 View Logs"}, "url": "'"$URL"'", "type": "danger"}]}
+              ]
+            }
+          }' || true
+
+  # ──────────────────────────────────────
+  # Job 2: Deploy Preview (PR only, after CI passes)
+  # ──────────────────────────────────────
+  deploy-preview:
+    name: "Preview: Deploy PR"
+    needs: ci
+    if: github.event_name == 'pull_request' && github.base_ref == 'staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy preview app
+        id: deploy
+        uses: digitalocean/app_action/deploy@v2
+        with:
+          deploy_pr_preview: "true"
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Comment preview URL on PR
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const app = ${{ steps.deploy.outputs.app }};
+            const liveUrl = app.live_url;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Preview deployed!**\n\n🔗 **URL:** ${liveUrl}\n\n---\n_Deployed from commit ${context.sha.substring(0, 7)}_`
+            });
+
+      # --- Lark: Preview Deployed ---
+      - name: Notify Lark (Preview Deployed)
+        if: success()
+        env:
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
+          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+        run: |
+          TIMESTAMP=$(date +%s)
+          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
+          PR_NUM="${{ github.event.pull_request.number }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          TIME=$(date -u +"%H:%M UTC")
+          curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
+            "timestamp": "'"$TIMESTAMP"'",
+            "sign": "'"$SIGN"'",
+            "msg_type": "interactive",
+            "card": {
+              "header": {"title": {"tag": "plain_text", "content": "🔍 Preview Deployed — PR #'"$PR_NUM"'"}, "template": "blue"},
+              "elements": [
+                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
+                ]},
+                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🌿 PR**\n#'"$PR_NUM"'"}}]}
+                ]},
+                {"tag": "hr"},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "📝 '"$PR_TITLE"'\n**Pipeline [2/2]** Preview Deploy\n🕐 '"$TIME"'  ·  CI ✅  Preview ✅"}},
+                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔗 View PR"}, "url": "'"${{ github.event.pull_request.html_url }}"'", "type": "primary"}]}
+              ]
+            }
+          }' || true
+
+      - name: Comment failure on PR
+        if: failure()
+        uses: actions/github-script@v7
+        env:
+          BUILD_LOGS: ${{ steps.deploy.outputs.build_logs }}
+          DEPLOY_LOGS: ${{ steps.deploy.outputs.deploy_logs }}
+        with:
+          script: |
+            const { BUILD_LOGS, DEPLOY_LOGS } = process.env;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `❌ **Preview deploy failed.**\n\n[View logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n<details>\n<summary>Build logs</summary>\n\n\`\`\`\n${BUILD_LOGS}\n\`\`\`\n</details>\n\n<details>\n<summary>Deploy logs</summary>\n\n\`\`\`\n${DEPLOY_LOGS}\n\`\`\`\n</details>`
+            });
+
+      # --- Lark: Preview Failed ---
+      - name: Notify Lark (Preview Failed)
+        if: failure()
+        env:
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
+          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+        run: |
+          TIMESTAMP=$(date +%s)
+          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
+          PR_NUM="${{ github.event.pull_request.number }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          TIME=$(date -u +"%H:%M UTC")
+          curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
+            "timestamp": "'"$TIMESTAMP"'",
+            "sign": "'"$SIGN"'",
+            "msg_type": "interactive",
+            "card": {
+              "header": {"title": {"tag": "plain_text", "content": "❌ Preview Failed — PR #'"$PR_NUM"'"}, "template": "red"},
+              "elements": [
+                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
+                ]},
+                {"tag": "hr"},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "📝 '"$PR_TITLE"'\n⚠️ **Preview deploy failed!** Pipeline stopped at step [2/2].\n🕐 '"$TIME"'"}},
+                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔍 View Logs"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "danger"}]}
               ]
             }
           }' || true

@@ -1,9 +1,11 @@
-# Deploy Staging — chạy khi push lên nhánh staging
-# Deploy lên DigitalOcean App Platform + thông báo Lark
+# Deploy Staging — chạy SAU KHI CI pass trên nhánh staging
+# Pipeline: CI [1/2] → Deploy Staging [2/2]
 name: Deploy Staging
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [staging]
 
 concurrency:
@@ -15,12 +17,15 @@ permissions:
 
 jobs:
   build-and-deploy:
-    name: Build & Deploy Staging
+    name: "Deploy: Staging [2/2]"
     runs-on: ubuntu-latest
     environment: staging
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -42,8 +47,8 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      # --- Lark Notifications ---
-      - name: Notify Lark (Deploy Success)
+      # --- Lark: Staging Deployed ---
+      - name: Notify Lark (Staging Deployed)
         if: success()
         env:
           LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
@@ -51,7 +56,9 @@ jobs:
         run: |
           TIMESTAMP=$(date +%s)
           SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
-          SHORT_SHA="${GITHUB_SHA:0:7}"
+          SHORT_SHA="${{ github.event.workflow_run.head_sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          AUTHOR="${{ github.event.workflow_run.actor.login }}"
           TIME=$(date -u +"%H:%M UTC")
           curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
             "timestamp": "'"$TIMESTAMP"'",
@@ -66,16 +73,17 @@ jobs:
                 ]},
                 {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
                   {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$AUTHOR"'"}}]}
                 ]},
                 {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "🕐 '"$TIME"'  ·  Build ✅  Deploy ✅"}},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "**Pipeline [2/2]** Staging Deploy\n🕐 '"$TIME"'  ·  CI ✅  Deploy ✅"}},
                 {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "📋 View Deploy"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "primary"}]}
               ]
             }
           }' || true
 
-      - name: Notify Lark (Deploy Failed)
+      # --- Lark: Staging Deploy Failed ---
+      - name: Notify Lark (Staging Deploy Failed)
         if: failure()
         env:
           LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
@@ -83,7 +91,9 @@ jobs:
         run: |
           TIMESTAMP=$(date +%s)
           SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
-          SHORT_SHA="${GITHUB_SHA:0:7}"
+          SHORT_SHA="${{ github.event.workflow_run.head_sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          AUTHOR="${{ github.event.workflow_run.actor.login }}"
           TIME=$(date -u +"%H:%M UTC")
           curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
             "timestamp": "'"$TIMESTAMP"'",
@@ -98,11 +108,10 @@ jobs:
                 ]},
                 {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
                   {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
+                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$AUTHOR"'"}}]}
                 ]},
                 {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "⚠️ **Deploy failed!** Check logs immediately."}},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "🕐 '"$TIME"'"}},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "⚠️ **Staging deploy failed!** Pipeline failed at step [2/2].\n🕐 '"$TIME"'"}},
                 {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔍 View Logs"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "danger"}]}
               ]
             }
