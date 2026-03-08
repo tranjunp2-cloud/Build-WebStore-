@@ -1,5 +1,5 @@
 # Deploy Staging — chạy khi push lên nhánh staging
-# Mục đích: QA, demo, test trước khi lên production
+# Deploy lên DigitalOcean App Platform (xem .github/DEPLOY.md §5.0)
 name: Deploy Staging
 
 on:
@@ -9,6 +9,9 @@ on:
 concurrency:
   group: deploy-staging
   cancel-in-progress: false
+
+permissions:
+  contents: read
 
 jobs:
   build-and-deploy:
@@ -34,10 +37,7 @@ jobs:
           NEXT_PUBLIC_APP_ENV: staging
         run: npm run build
 
-      # Bước deploy: tùy hạ tầng (Docker, Vercel, SSH, …) cấu hình thêm
-      - name: Deploy to Staging
-        run: |
-          echo "Staging build OK. Configure deploy step (Docker push / SSH / Vercel) via repo secrets."
-          # Ví dụ Docker: docker build -t $REGISTRY/app:staging . && docker push ...
-          # Ví dụ Vercel: npx vercel deploy --prebuilt --token=$VERCEL_TOKEN --env=staging
-          # Ví dụ SSH: rsync -avz .next/ $STAGING_HOST:~/app/.next/
+      - name: Deploy to DigitalOcean App Platform
+        uses: digitalocean/app_action/deploy@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}

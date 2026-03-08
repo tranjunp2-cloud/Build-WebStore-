@@ -8,6 +8,7 @@
 
 | Nội dung | File / vị trí |
 |----------|----------------|
+| **Overview — code rules & project rules (điểm vào)** | [.github/OVERVIEW.md](.github/OVERVIEW.md) — một trang tổng quan, bản đồ + cách check |
 | **Git, PR, CI/CD, conflict** | [.github/GIT_AND_CI_RULES.md](.github/GIT_AND_CI_RULES.md) |
 | **Luồng deploy (staging vs prod)** | [.github/DEPLOY.md](.github/DEPLOY.md) |
 | **Code rules, CI fix, Copilot** | [.github/CODE_AND_RULES.md](.github/CODE_AND_RULES.md) |

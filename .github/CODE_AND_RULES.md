@@ -1,6 +1,7 @@
 # Code rules & cách check — Project rules + Copilot
 
-> Tài liệu này trả lời: (1) Lỗi nhiều nơi trên Git thì xử lý thế nào? (2) Rule code / project setup ra sao? (3) GitHub Copilot bật nhưng không thấy chạy — cấu hình thế nào?
+> **Một trang tổng quan** toàn bộ code/project rules: [.github/OVERVIEW.md](.github/OVERVIEW.md).  
+> File này trả lời chi tiết: (1) Lỗi nhiều nơi trên Git thì xử lý thế nào? (2) Rule code / project setup ra sao? (3) GitHub Copilot bật nhưng không thấy chạy — cấu hình thế nào?
 
 ---
 

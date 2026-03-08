@@ -1,6 +1,6 @@
 # Git & CI/CD Rules — Chuẩn cho team SaaS
 
-> **Nguồn sự thật duy nhất** cho quy tắc Git, CI/CD và setup. Mọi môi trường (Cursor, Antigravity, CI, dev local) **bắt buộc dùng chung** file này và [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+> **Nguồn sự thật duy nhất** cho quy tắc Git, CI/CD và setup. Mọi môi trường (Cursor, Antigravity, CI, dev local) **bắt buộc dùng chung** file này và [CONTRIBUTING.md](.github/CONTRIBUTING.md). **Tổng quan code/project rules:** [.github/OVERVIEW.md](.github/OVERVIEW.md).
 
 ---
 
@@ -126,6 +126,19 @@ Template nằm tại [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEM
 - Optional: Require linear history (squash hoặc rebase).
 
 **CI status checks cần có:** `lint`, `typecheck`, `test`, `build`.
+
+#### 5.1 CI flow — thứ tự bước và giữ CI xanh
+
+Workflow file: [.github/workflows/ci.yml](.github/workflows/ci.yml). Chạy trên mọi **push** và **pull_request** vào nhánh `main`, `staging`.
+
+| Bước | Lệnh | Ghi chú |
+|------|------|--------|
+| 1 | `npm run lint` | ESLint (next lint) — chỉ **errors** fail; warnings in ra nhưng không fail. |
+| 2 | `npm run typecheck` | `tsc --noEmit` — kiểm tra type toàn bộ `src/`. |
+| 3 | `npm run test` | `vitest run` — unit test. |
+| 4 | `npm run build` | Next.js build (script đã gắn `NODE_OPTIONS='--require ./node-polyfill.js'` để tránh lỗi khi collect page data). |
+
+**Giữ CI xanh:** Trước khi push hoặc tạo PR, chạy local lần lượt: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`. Chỉ push khi cả 4 bước pass. Nếu CI fail, sửa trên branch (fix lint/type/test/build) rồi push lại.
 
 ---
 

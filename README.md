@@ -147,6 +147,7 @@ docker compose down -v && docker compose up -d
 
 | File | Mô tả |
 |------|-------|
+| `.github/OVERVIEW.md` | **Overview** — một trang: code rules & project rules ở đâu, check thế nào, bản đồ + link |
 | `SPEC.md` | **Source of Truth** — 19 sections, BMAD-enhanced |
 | `.github/CONTRIBUTING.md` | **Rule chung** — mọi môi trường (Cursor, Antigravity, CI) dùng chung; không tạo rule riêng |
 | `.github/GIT_AND_CI_RULES.md` | **Git & CI/CD** — branch, commit, PR, conflict, setup (GitHub + máy), quy trình hàng ngày |
