@@ -1,6 +1,23 @@
+'use client'
+
 import Link from 'next/link'
+import { useI18n } from '@/i18n'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 export default function HomePage() {
+    const { t } = useI18n()
+    const featureItems = [
+        { icon: '🤖', ...t.features.items.aiGeneration },
+        { icon: '🧩', ...t.features.items.dragDrop },
+        { icon: '🔍', ...t.features.items.seo },
+        { icon: '🎨', ...t.features.items.templates },
+        { icon: '🌐', ...t.features.items.domains },
+        { icon: '📦', ...t.features.items.ecommerce },
+        { icon: '📊', ...t.features.items.analytics },
+        { icon: '🔗', ...t.features.items.integration },
+        { icon: '⚡', ...t.features.items.performance },
+    ]
+
     return (
         <div className="min-h-screen">
             {/* Navigation */}
@@ -11,16 +28,17 @@ export default function HomePage() {
                         <span className="font-heading font-bold text-xl">Web Store</span>
                     </div>
                     <div className="hidden md:flex items-center gap-8">
-                        <a href="#features" className="text-sm text-zinc-400 hover:text-white transition-colors">Features</a>
-                        <a href="#pricing" className="text-sm text-zinc-400 hover:text-white transition-colors">Pricing</a>
-                        <a href="#templates" className="text-sm text-zinc-400 hover:text-white transition-colors">Templates</a>
+                        <a href="#features" className="text-sm text-zinc-400 hover:text-white transition-colors">{t.nav.features}</a>
+                        <a href="#pricing" className="text-sm text-zinc-400 hover:text-white transition-colors">{t.nav.pricing}</a>
+                        <a href="#templates" className="text-sm text-zinc-400 hover:text-white transition-colors">{t.nav.templates}</a>
                     </div>
                     <div className="flex items-center gap-3">
+                        <LanguageSwitcher variant="pill" />
                         <Link href="/login" className="text-sm text-zinc-400 hover:text-white transition-colors px-4 py-2">
-                            Sign In
+                            {t.common.signIn}
                         </Link>
                         <Link href="/signup" className="btn-primary text-sm !px-5 !py-2.5">
-                            Get Started Free
+                            {t.common.getStartedFree}
                         </Link>
                     </div>
                 </div>
@@ -28,7 +46,6 @@ export default function HomePage() {
 
             {/* Hero Section */}
             <section className="pt-32 pb-20 relative overflow-hidden">
-                {/* Background effects */}
                 <div className="absolute inset-0">
                     <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
                     <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
@@ -40,53 +57,40 @@ export default function HomePage() {
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
                         </span>
-                        AI-Powered Website Builder
+                        {t.hero.badge}
                     </div>
 
                     <h1 className="text-5xl md:text-7xl lg:text-8xl font-heading font-bold leading-[0.95] mb-8 animate-slide-up">
-                        Build Stunning
+                        {t.hero.title1}
                         <br />
-                        <span className="gradient-text-brand">Websites</span> in
-                        <br />
-                        Minutes
+                        <span className="gradient-text-brand">{t.hero.title2}</span> {t.hero.title3}
                     </h1>
 
                     <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mx-auto mb-12 animate-slide-up animation-delay-100">
-                        Describe your business and let AI create a beautiful, SEO-optimized website for you.
-                        Customize with drag & drop. Publish instantly.
+                        {t.hero.subtitle}
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up animation-delay-200">
                         <Link href="/signup" className="btn-primary px-10 py-4 text-lg">
-                            Start Building — Free
+                            {t.common.startBuilding}
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                             </svg>
                         </Link>
                         <a href="#demo" className="btn-secondary px-10 py-4 text-lg">
-                            Watch Demo
+                            {t.common.watchDemo}
                         </a>
                     </div>
 
                     <div className="mt-10 flex items-center justify-center gap-6 text-sm text-zinc-500 animate-slide-up animation-delay-300">
-                        <span className="flex items-center gap-1.5">
-                            <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            No credit card required
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                            <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            SEO-optimized from day one
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                            <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            Custom domain support
-                        </span>
+                        {[t.hero.noCreditCard, t.hero.seoOptimized, t.hero.customDomain].map((text, i) => (
+                            <span key={i} className="flex items-center gap-1.5">
+                                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                                {text}
+                            </span>
+                        ))}
                     </div>
                 </div>
             </section>
@@ -95,29 +99,16 @@ export default function HomePage() {
             <section id="features" className="py-24 border-t border-white/5">
                 <div className="max-w-7xl mx-auto px-6">
                     <div className="text-center max-w-2xl mx-auto mb-16">
-                        <p className="text-sm font-semibold uppercase tracking-widest text-sky-400 mb-4">Features</p>
+                        <p className="text-sm font-semibold uppercase tracking-widest text-sky-400 mb-4">{t.features.label}</p>
                         <h2 className="text-4xl md:text-5xl font-heading font-bold mb-6">
-                            Everything You Need to <span className="gradient-text">Build & Scale</span>
+                            {t.features.title} <span className="gradient-text">{t.features.titleHighlight}</span>
                         </h2>
-                        <p className="text-zinc-400 text-lg">From AI generation to drag & drop editing — all in one platform.</p>
+                        <p className="text-zinc-400 text-lg">{t.features.subtitle}</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[
-                            { icon: '🤖', title: 'AI Website Generation', desc: 'Describe your business in plain text and get a complete website generated in seconds.' },
-                            { icon: '🧩', title: 'Drag & Drop Editor', desc: 'Customize any section by dragging blocks — Hero, Features, Testimonials, Contact and more.' },
-                            { icon: '🔍', title: 'SEO-First Architecture', desc: 'Server-side rendered pages. Google indexes every page. Structured data out of the box.' },
-                            { icon: '🎨', title: 'Beautiful Templates', desc: 'Dozens of premium templates for every industry — restaurants, e-commerce, portfolios, blogs.' },
-                            { icon: '🌐', title: 'Custom Domains', desc: 'Connect your own domain in minutes. Free SSL certificate included automatically.' },
-                            { icon: '📦', title: 'E-commerce Ready', desc: 'Product management, cart, checkout, and payment processing — all built in.' },
-                            { icon: '📊', title: 'Analytics Dashboard', desc: 'Track visitors, page views, conversions and sources in a beautiful dashboard.' },
-                            { icon: '🔗', title: 'ECH Integration', desc: 'Sync with Centralised Distribution for real-time inventory and order management.' },
-                            { icon: '⚡', title: 'Lightning Fast', desc: 'Global CDN, image optimization, and smart caching keep your site blazing fast.' },
-                        ].map((feature, i) => (
-                            <div
-                                key={i}
-                                className="group card card-hover p-8"
-                            >
+                        {featureItems.map((feature, i) => (
+                            <div key={i} className="group card card-hover p-8">
                                 <div className="text-3xl mb-4">{feature.icon}</div>
                                 <h3 className="text-lg font-heading font-bold mb-2 group-hover:text-sky-400 transition-colors">{feature.title}</h3>
                                 <p className="text-zinc-500 text-sm leading-relaxed">{feature.desc}</p>
@@ -134,13 +125,13 @@ export default function HomePage() {
                 </div>
                 <div className="relative max-w-3xl mx-auto px-6 text-center">
                     <h2 className="text-4xl md:text-5xl font-heading font-bold mb-6">
-                        Ready to Build Your <span className="gradient-text-brand">Dream Website</span>?
+                        {t.cta.title} <span className="gradient-text-brand">{t.cta.titleHighlight}</span>?
                     </h2>
                     <p className="text-zinc-400 text-lg mb-10">
-                        Join thousands of SMEs who trust Web Store to power their online presence.
+                        {t.cta.subtitle}
                     </p>
                     <Link href="/signup" className="btn-primary px-12 py-5 text-lg">
-                        Get Started — It&apos;s Free
+                        {t.cta.button}
                     </Link>
                 </div>
             </section>
@@ -152,7 +143,7 @@ export default function HomePage() {
                         <div className="w-6 h-6 rounded-md bg-gradient-to-br from-sky-500 to-purple-600" />
                         <span className="font-heading font-semibold">Web Store</span>
                     </div>
-                    <p className="text-sm text-zinc-600">© 2026 Web Store. All rights reserved.</p>
+                    <p className="text-sm text-zinc-600">{t.common.copyright}</p>
                 </div>
             </footer>
         </div>

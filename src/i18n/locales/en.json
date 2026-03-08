@@ -1,0 +1,118 @@
+{
+    "common": {
+        "signIn": "Sign In",
+        "signUp": "Sign Up",
+        "getStartedFree": "Get Started Free",
+        "startBuilding": "Start Building — Free",
+        "watchDemo": "Watch Demo",
+        "learnMore": "Learn More",
+        "copyright": "© 2026 Web Store. All rights reserved.",
+        "language": "Language",
+        "search": "Search..."
+    },
+    "nav": {
+        "features": "Features",
+        "pricing": "Pricing",
+        "templates": "Templates"
+    },
+    "hero": {
+        "badge": "AI-Powered Website Builder",
+        "title1": "Build Stunning",
+        "title2": "Websites",
+        "title3": "in Minutes",
+        "subtitle": "Describe your business and let AI create a beautiful, SEO-optimized website for you. Customize with drag & drop. Publish instantly.",
+        "noCreditCard": "No credit card required",
+        "seoOptimized": "SEO-optimized from day one",
+        "customDomain": "Custom domain support"
+    },
+    "features": {
+        "label": "Features",
+        "title": "Everything You Need to",
+        "titleHighlight": "Build & Scale",
+        "subtitle": "From AI generation to drag & drop editing — all in one platform.",
+        "items": {
+            "aiGeneration": {
+                "title": "AI Website Generation",
+                "desc": "Describe your business in plain text and get a complete website generated in seconds."
+            },
+            "dragDrop": {
+                "title": "Drag & Drop Editor",
+                "desc": "Customize any section by dragging blocks — Hero, Features, Testimonials, Contact and more."
+            },
+            "seo": {
+                "title": "SEO-First Architecture",
+                "desc": "Server-side rendered pages. Google indexes every page. Structured data out of the box."
+            },
+            "templates": {
+                "title": "Beautiful Templates",
+                "desc": "Dozens of premium templates for every industry — restaurants, e-commerce, portfolios, blogs."
+            },
+            "domains": {
+                "title": "Custom Domains",
+                "desc": "Connect your own domain in minutes. Free SSL certificate included automatically."
+            },
+            "ecommerce": {
+                "title": "E-commerce Ready",
+                "desc": "Product management, cart, checkout, and payment processing — all built in."
+            },
+            "analytics": {
+                "title": "Analytics Dashboard",
+                "desc": "Track visitors, page views, conversions and sources in a beautiful dashboard."
+            },
+            "integration": {
+                "title": "ECH Integration",
+                "desc": "Sync with Centralised Distribution for real-time inventory and order management."
+            },
+            "performance": {
+                "title": "Lightning Fast",
+                "desc": "Global CDN, image optimization, and smart caching keep your site blazing fast."
+            }
+        }
+    },
+    "cta": {
+        "title": "Ready to Build Your",
+        "titleHighlight": "Dream Website",
+        "subtitle": "Join thousands of SMEs who trust Web Store to power their online presence.",
+        "button": "Get Started — It's Free"
+    },
+    "gallery": {
+        "title": "Template Gallery",
+        "subtitle": "Choose a template that fits your industry — preview before you select",
+        "searchPlaceholder": "Search templates...",
+        "noTemplates": "No templates available",
+        "createWithAI": "Create with AI",
+        "preview": "Preview",
+        "useTemplate": "Use this template",
+        "usingTemplate": "Applying...",
+        "desktop": "Desktop",
+        "mobile": "Mobile",
+        "featured": "Featured",
+        "premium": "Premium",
+        "categories": {
+            "all": "All",
+            "restaurant": "🍽️ Restaurant",
+            "ecommerce": "🛍️ Shop",
+            "beauty": "💄 Beauty",
+            "tech": "💻 Tech",
+            "health": "🏥 Health",
+            "education": "📚 Education",
+            "realestate": "🏠 Property",
+            "fitness": "💪 Fitness",
+            "creative": "🎨 Portfolio",
+            "business": "🏢 Business"
+        }
+    },
+    "onboarding": {
+        "stepLabel": "Step",
+        "of": "of",
+        "next": "Next",
+        "back": "Back",
+        "finish": "Create My Website",
+        "step1Title": "What's your business about?",
+        "step1Subtitle": "Tell us about your business so we can create the perfect website.",
+        "step2Title": "Choose a template",
+        "step2Subtitle": "Pick a starting point — you can customize everything later.",
+        "step3Title": "Customize your site",
+        "step3Subtitle": "Add your brand details to make it yours."
+    }
+}

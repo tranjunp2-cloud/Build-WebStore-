@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useI18n } from '@/i18n'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 import {
     ArrowLeft,
     Sparkles,
@@ -34,19 +36,10 @@ type Template = {
     }
 }
 
-const CATEGORIES = [
-    { value: 'all', label: 'Tất cả' },
-    { value: 'restaurant', label: '🍽️ Nhà hàng' },
-    { value: 'ecommerce', label: '🛍️ Cửa hàng' },
-    { value: 'beauty', label: '💄 Beauty' },
-    { value: 'tech', label: '💻 Tech' },
-    { value: 'health', label: '🏥 Y tế' },
-    { value: 'education', label: '📚 Giáo dục' },
-    { value: 'realestate', label: '🏠 BĐS' },
-    { value: 'fitness', label: '💪 Fitness' },
-    { value: 'creative', label: '🎨 Portfolio' },
-    { value: 'business', label: '🏢 Business' },
-]
+const CATEGORY_KEYS = [
+    'all', 'restaurant', 'ecommerce', 'beauty', 'tech',
+    'health', 'education', 'realestate', 'fitness', 'creative', 'business',
+] as const
 
 // ─── Preview Modal ─────────────────────────────────────────────────────
 function PreviewModal({
@@ -60,6 +53,7 @@ function PreviewModal({
     onUse: (id: string) => void
     isApplying: boolean
 }) {
+    const { t } = useI18n()
     const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop')
 
     useEffect(() => {
@@ -119,9 +113,9 @@ function PreviewModal({
                             className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
                             {isApplying ? (
-                                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Đang tạo...</>
+                                <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {t.gallery.usingTemplate}</>
                             ) : (
-                                <><Sparkles className="h-3.5 w-3.5" /> Sử dụng template này</>
+                                <><Sparkles className="h-3.5 w-3.5" /> {t.gallery.useTemplate}</>
                             )}
                         </button>
 
@@ -166,6 +160,7 @@ function TemplateCard({
     onUse: (id: string) => void
     isApplying: string | null
 }) {
+    const { t } = useI18n()
     const primaryColor = template.defaultTheme?.primaryColor || '#3B82F6'
     const secondaryColor = template.defaultTheme?.secondaryColor || '#8B5CF6'
     const isThisApplying = isApplying === template.id
@@ -202,7 +197,7 @@ function TemplateCard({
                         onClick={() => onPreview(template)}
                         className="flex items-center gap-1.5 rounded-xl bg-white/15 backdrop-blur-sm px-4 py-2 text-sm font-semibold text-white hover:bg-white/25 transition-colors"
                     >
-                        <Eye className="h-3.5 w-3.5" /> Xem trước
+                        <Eye className="h-3.5 w-3.5" /> {t.gallery.preview}
                     </button>
                     <button
                         onClick={() => onUse(template.id)}
@@ -210,9 +205,9 @@ function TemplateCard({
                         className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                     >
                         {isThisApplying ? (
-                            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Đang tạo...</>
+                            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {t.gallery.usingTemplate}</>
                         ) : (
-                            <><Sparkles className="h-3.5 w-3.5" /> Sử dụng</>
+                            <><Sparkles className="h-3.5 w-3.5" /> {t.gallery.useTemplate}</>
                         )}
                     </button>
                 </div>
@@ -254,6 +249,7 @@ function TemplateCard({
 // ─── Main Page ──────────────────────────────────────────────────────────
 export default function TemplatesPage() {
     const router = useRouter()
+    const { t } = useI18n()
     const [templates, setTemplates] = useState<Template[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [activeCategory, setActiveCategory] = useState('all')
@@ -321,17 +317,20 @@ export default function TemplatesPage() {
                         <div>
                             <h1 className="text-lg font-bold text-white flex items-center gap-2">
                                 <LayoutTemplate className="h-5 w-5 text-blue-400" />
-                                Template Gallery
+                                {t.gallery.title}
                             </h1>
-                            <p className="text-xs text-gray-500">Chọn mẫu website phù hợp với ngành của bạn — xem trước trước khi chọn</p>
+                            <p className="text-xs text-gray-500">{t.gallery.subtitle}</p>
                         </div>
                     </div>
-                    <Link
-                        href="/builder/new"
-                        className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
-                    >
-                        <Sparkles className="h-3.5 w-3.5" /> Tạo bằng AI
-                    </Link>
+                    <div className="flex items-center gap-3">
+                        <LanguageSwitcher variant="pill" />
+                        <Link
+                            href="/builder/new"
+                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+                        >
+                            <Sparkles className="h-3.5 w-3.5" /> {t.gallery.createWithAI}
+                        </Link>
+                    </div>
                 </div>
             </div>
 
@@ -343,23 +342,23 @@ export default function TemplatesPage() {
                         <input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Tìm template..."
+                            placeholder={t.gallery.searchPlaceholder}
                             className="w-full rounded-xl border border-white/10 bg-[#1E293B] py-2.5 pl-10 pr-4 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50 transition-colors"
                         />
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                        {CATEGORIES.map((cat) => (
+                        {CATEGORY_KEYS.map((key) => (
                             <button
-                                key={cat.value}
-                                onClick={() => setActiveCategory(cat.value)}
+                                key={key}
+                                onClick={() => setActiveCategory(key)}
                                 className={cn(
                                     'rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
-                                    activeCategory === cat.value
+                                    activeCategory === key
                                         ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
                                         : 'text-gray-500 hover:bg-white/5 hover:text-gray-300 border border-transparent'
                                 )}
                             >
-                                {cat.label}
+                                {t.gallery.categories[key as keyof typeof t.gallery.categories] || key}
                             </button>
                         ))}
                     </div>
@@ -376,15 +375,15 @@ export default function TemplatesPage() {
                 {!isLoading && filtered.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-32 text-center">
                         <LayoutTemplate className="h-12 w-12 text-gray-600 mb-4" />
-                        <h3 className="text-lg font-semibold text-white mb-1">Chưa có template</h3>
+                        <h3 className="text-lg font-semibold text-white mb-1">{t.gallery.noTemplates}</h3>
                         <p className="text-sm text-gray-500 mb-6">
-                            Thử tạo website bằng AI thay thế
+                            {t.gallery.createWithAI}
                         </p>
                         <Link
                             href="/builder/new"
                             className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 transition-colors"
                         >
-                            <Sparkles className="h-4 w-4" /> Tạo bằng AI
+                            <Sparkles className="h-4 w-4" /> {t.gallery.createWithAI}
                         </Link>
                     </div>
                 )}
