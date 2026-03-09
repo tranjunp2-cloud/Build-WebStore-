@@ -72,9 +72,6 @@ export default buildConfig({
     // Use custom schema 'app' instead of 'public'.
     // DO App Platform Dev Database (PG17) denies CREATE on 'public' schema.
     schemaName: 'app',
-    // Auto-push schema on startup (development convenience).
-    // TODO: Switch to migration-based workflow for production.
-    push: true,
   }),
   sharp,
   plugins: [

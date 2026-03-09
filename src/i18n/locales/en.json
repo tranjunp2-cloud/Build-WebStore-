@@ -11,9 +11,10 @@
         "search": "Search..."
     },
     "nav": {
+        "platform": "Platform",
+        "solutions": "Solutions",
         "features": "Features",
-        "pricing": "Pricing",
-        "templates": "Templates"
+        "pricing": "Pricing"
     },
     "hero": {
         "badge": "AI-Powered Website Builder",
