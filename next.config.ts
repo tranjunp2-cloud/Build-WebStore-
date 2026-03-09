@@ -10,7 +10,7 @@ if (typeof globalThis.File === 'undefined') {
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['undici'],
+  serverExternalPackages: ['undici', 'pg'],
   experimental: {
     reactCompiler: false,
   },

@@ -25,9 +25,11 @@ export async function register() {
     const connStr = process.env.DATABASE_URI || process.env.DATABASE_URL
     if (connStr && !connStr.includes('localhost') && !connStr.includes('127.0.0.1')) {
         try {
-            const { Pool } = await import('pg')
+            // Dynamic require to bypass webpack static analysis (pg uses fs/path)
+            // eslint-disable-next-line no-eval
+            const pg = eval('require')('pg') as typeof import('pg')
             const cleanStr = connStr.replace(/[?&]sslmode=[^&]+/g, '').replace(/\?&/, '?').replace(/\?$/, '')
-            const pool = new Pool({
+            const pool = new pg.Pool({
                 connectionString: cleanStr,
                 ssl: { rejectUnauthorized: false },
             })
