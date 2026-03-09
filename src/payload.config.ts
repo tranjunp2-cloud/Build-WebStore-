@@ -69,8 +69,10 @@ export default buildConfig({
       // Truyền rõ ở đây vì parse(connectionString) có thể ghi đè nếu URL còn sslmode.
       ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: false } } : {}),
     },
-    // Auto-push schema on startup. Required for DO App Platform Dev Database
-    // where we can't run migrations from outside (Trusted Sources restriction).
+    // Use custom schema 'app' instead of 'public'.
+    // DO App Platform Dev Database (PG17) denies CREATE on 'public' schema.
+    schemaName: 'app',
+    // Auto-push schema on startup (development convenience).
     // TODO: Switch to migration-based workflow for production.
     push: true,
   }),
