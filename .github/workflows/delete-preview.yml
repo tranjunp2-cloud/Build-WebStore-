@@ -1,16 +1,16 @@
-# Delete Preview — xóa preview app khi PR close/merge
-# Tiết kiệm chi phí DigitalOcean
+# Delete Preview — cleanup khi PR được merge hoặc close
+# Xóa preview app trên DO App Platform
 name: Delete Preview
 
 on:
   pull_request:
     types: [closed]
-    branches: [staging]
 
 jobs:
-  delete:
-    name: Delete Preview App
+  delete-preview:
+    name: "Cleanup: Delete Preview App"
     runs-on: ubuntu-latest
+    environment: staging
     steps:
       - name: Delete preview app
         uses: digitalocean/app_action/delete@v2

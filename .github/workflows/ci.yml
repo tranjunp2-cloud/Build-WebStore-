@@ -1,6 +1,6 @@
 # CI Pipeline — Lint, typecheck, test, build
-# Nếu là PR: CI → Deploy Preview (sequential)
-# Thông báo Lark cho CI pass/fail
+# PR → CI → Deploy Preview (sequential)
+# Push → CI → Lark notify
 name: CI
 
 on:
@@ -34,15 +34,19 @@ jobs:
         run: npm ci
 
       - name: Lint
+        id: lint
         run: npm run lint
 
       - name: Typecheck
+        id: typecheck
         run: npm run typecheck
 
       - name: Test
+        id: test
         run: npm run test
 
       - name: Build
+        id: build
         env:
           NODE_OPTIONS: '--require ./node-polyfill.js'
         run: npm run build
@@ -59,12 +63,13 @@ jobs:
           BRANCH="${GITHUB_REF_NAME}"
           SHORT_SHA="${GITHUB_SHA:0:7}"
           TIME=$(date -u +"%H:%M UTC")
+          COMMIT_MSG=$(git log --format='%s' -n 1 | head -c 80)
           curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
             "timestamp": "'"$TIMESTAMP"'",
             "sign": "'"$SIGN"'",
             "msg_type": "interactive",
             "card": {
-              "header": {"title": {"tag": "plain_text", "content": "✅ CI Passed"}, "template": "green"},
+              "header": {"title": {"tag": "plain_text", "content": "✅ CI Passed — '"$BRANCH"'"}, "template": "green"},
               "elements": [
                 {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
                   {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
@@ -75,35 +80,55 @@ jobs:
                   {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
                 ]},
                 {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "**Pipeline [1/2]** CI\n🕐 '"$TIME"'  ·  Lint ✅  TypeCheck ✅  Test ✅  Build ✅"}},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "📝 '"$COMMIT_MSG"'\n**Pipeline [1/2]** CI\n🕐 '"$TIME"'  ·  Lint ✅  TypeCheck ✅  Test ✅  Build ✅"}},
                 {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "📋 View CI Run"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "primary"}]}
               ]
             }
           }' || true
 
-      # --- Lark: CI Failed ---
+      # --- Lark: CI Failed (with error details) ---
       - name: Notify Lark (CI Failed)
         if: failure()
         env:
           LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
           LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+          LINT_OUTCOME: ${{ steps.lint.outcome }}
+          TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
         run: |
           TIMESTAMP=$(date +%s)
           SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
           BRANCH="${GITHUB_REF_NAME}"
           SHORT_SHA="${GITHUB_SHA:0:7}"
           TIME=$(date -u +"%H:%M UTC")
+          COMMIT_MSG=$(git log --format='%s' -n 1 | head -c 80)
+
+          # Determine which step failed
+          LINT_ICON="✅"; TYPECHECK_ICON="✅"; TEST_ICON="✅"; BUILD_ICON="⬜"
+          FAILED_STEP=""
+          if [ "$LINT_OUTCOME" = "failure" ]; then LINT_ICON="❌"; FAILED_STEP="Lint"; fi
+          if [ "$TYPECHECK_OUTCOME" = "failure" ]; then TYPECHECK_ICON="❌"; FAILED_STEP="TypeCheck"; fi
+          if [ "$TEST_OUTCOME" = "failure" ]; then TEST_ICON="❌"; FAILED_STEP="Test"; fi
+          if [ "$BUILD_OUTCOME" = "failure" ]; then BUILD_ICON="❌"; FAILED_STEP="Build"; fi
+          # Mark skipped steps
+          if [ "$TYPECHECK_OUTCOME" = "" ] || [ "$TYPECHECK_OUTCOME" = "skipped" ]; then TYPECHECK_ICON="⬜"; fi
+          if [ "$TEST_OUTCOME" = "" ] || [ "$TEST_OUTCOME" = "skipped" ]; then TEST_ICON="⬜"; fi
+          if [ "$BUILD_OUTCOME" = "" ] || [ "$BUILD_OUTCOME" = "skipped" ]; then BUILD_ICON="⬜"; fi
+
+          # Build title with context
           EVENT_TYPE="${GITHUB_EVENT_NAME}"
           if [ "$EVENT_TYPE" = "pull_request" ]; then
             PR_TITLE="${{ github.event.pull_request.title }}"
             TITLE="❌ CI Failed — PR #${{ github.event.pull_request.number }}"
             URL="${{ github.event.pull_request.html_url }}"
-            EXTRA="📝 $PR_TITLE"
+            CONTEXT="📝 $PR_TITLE"
           else
             TITLE="❌ CI Failed — $BRANCH"
             URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            EXTRA=""
+            CONTEXT="📝 $COMMIT_MSG"
           fi
+
           curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
             "timestamp": "'"$TIMESTAMP"'",
             "sign": "'"$SIGN"'",
@@ -120,7 +145,7 @@ jobs:
                   {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
                 ]},
                 {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "'"$EXTRA"'\n⚠️ **CI pipeline failed!** Pipeline stopped.\n🕐 '"$TIME"'"}},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "'"$CONTEXT"'\n\n⚠️ **Failed at: '"$FAILED_STEP"'**\nLint '"$LINT_ICON"'  TypeCheck '"$TYPECHECK_ICON"'  Test '"$TEST_ICON"'  Build '"$BUILD_ICON"'\n🕐 '"$TIME"'"}},
                 {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔍 View Logs"}, "url": "'"$URL"'", "type": "danger"}]}
               ]
             }
@@ -239,7 +264,7 @@ jobs:
                   {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
                 ]},
                 {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "📝 '"$PR_TITLE"'\n⚠️ **Preview deploy failed!** Pipeline stopped at step [2/2].\n🕐 '"$TIME"'"}},
+                {"tag": "div", "text": {"tag": "lark_md", "content": "📝 '"$PR_TITLE"'\n⚠️ **Preview deploy failed at step [2/2].**\n🕐 '"$TIME"'"}},
                 {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔍 View Logs"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "danger"}]}
               ]
             }
