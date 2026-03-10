@@ -49,6 +49,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# DB setup script: checks permissions, creates schema/tables, then starts server
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/db-setup.js ./db-setup.js
 
 # Media upload directory
 RUN mkdir -p /app/public/media && chown -R nextjs:nodejs /app/public/media
@@ -59,4 +61,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["node", "db-setup.js"]
