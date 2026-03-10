@@ -72,6 +72,10 @@ export default buildConfig({
     // Use custom schema 'app' instead of 'public'.
     // DO App Platform Dev Database (PG17) denies CREATE on 'public' schema.
     schemaName: 'app',
+    // Auto-push schema to DB. Required for staging where tables may not exist.
+    // Payload only honors push when NODE_ENV !== 'production',
+    // so we also handle table creation via instrumentation.ts as fallback.
+    push: true,
   }),
   sharp,
   plugins: [
