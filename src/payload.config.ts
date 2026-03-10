@@ -69,12 +69,8 @@ export default buildConfig({
       // Truyền rõ ở đây vì parse(connectionString) có thể ghi đè nếu URL còn sslmode.
       ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: false } } : {}),
     },
-    // Use custom schema 'app' instead of 'public'.
-    // DO App Platform Dev Database (PG17) denies CREATE on 'public' schema.
-    schemaName: 'app',
-    // Auto-push schema to DB. Required for staging where tables may not exist.
-    // Payload only honors push when NODE_ENV !== 'production',
-    // so we also handle table creation via instrumentation.ts as fallback.
+    // push: true auto-creates tables when NODE_ENV !== 'production'.
+    // For staging (NODE_ENV=development via DO env var), this creates tables on first run.
     push: true,
   }),
   sharp,
