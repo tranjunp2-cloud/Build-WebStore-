@@ -18,17 +18,11 @@ COPY . .
 # Ensure public exists (empty dirs may be omitted from build context)
 RUN mkdir -p public
 
-# Build args — DO App Platform doesn't pass env vars as Docker build args,
-# so we set staging defaults here. Override with --build-arg if needed.
-ARG DATABASE_URI
-ARG PAYLOAD_SECRET=primeweb-staging-secret-2026-03
-ARG NEXT_PUBLIC_SERVER_URL=https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
-ARG NEXT_PUBLIC_PLATFORM_DOMAIN=ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
-
-ENV DATABASE_URI=${DATABASE_URI}
-ENV PAYLOAD_SECRET=${PAYLOAD_SECRET}
-ENV NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
-ENV NEXT_PUBLIC_PLATFORM_DOMAIN=${NEXT_PUBLIC_PLATFORM_DOMAIN}
+# Build-time env vars — set directly since DO App Platform may pass empty build args
+# which would override ARG defaults. These are baked by webpack at build time.
+ENV NEXT_PUBLIC_SERVER_URL=https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
+ENV NEXT_PUBLIC_PLATFORM_DOMAIN=ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
+ENV PAYLOAD_SECRET=primeweb-staging-secret-2026-03
 ENV NEXT_TELEMETRY_DISABLED=1
 # Polyfill for Next.js build (File/Blob); package.json build script also sets NODE_OPTIONS
 ENV NODE_OPTIONS="--require ./node-polyfill.js"
