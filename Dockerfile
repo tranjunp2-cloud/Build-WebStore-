@@ -18,11 +18,12 @@ COPY . .
 # Ensure public exists (empty dirs may be omitted from build context)
 RUN mkdir -p public
 
-# Build args for env at build time (optional; app can use runtime env)
+# Build args — DO App Platform doesn't pass env vars as Docker build args,
+# so we set staging defaults here. Override with --build-arg if needed.
 ARG DATABASE_URI
-ARG PAYLOAD_SECRET
-ARG NEXT_PUBLIC_SERVER_URL
-ARG NEXT_PUBLIC_PLATFORM_DOMAIN
+ARG PAYLOAD_SECRET=primeweb-staging-secret-2026-03
+ARG NEXT_PUBLIC_SERVER_URL=https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
+ARG NEXT_PUBLIC_PLATFORM_DOMAIN=ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
 
 ENV DATABASE_URI=${DATABASE_URI}
 ENV PAYLOAD_SECRET=${PAYLOAD_SECRET}
