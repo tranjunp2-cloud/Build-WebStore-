@@ -35,6 +35,10 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+# Runtime env — needed for Payload serverURL and admin theme
+ENV NEXT_PUBLIC_SERVER_URL=https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
+ENV NEXT_PUBLIC_PLATFORM_DOMAIN=ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
+ENV PAYLOAD_SECRET=primeweb-staging-secret-2026-03
 
 # Security: non-root user
 RUN addgroup --system --gid 1001 nodejs && \
