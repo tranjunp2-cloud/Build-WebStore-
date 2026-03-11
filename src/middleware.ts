@@ -32,7 +32,15 @@ export function middleware(req: NextRequest) {
         return NextResponse.rewrite(url)
     }
 
-    // ── API routes: pass through ─────────────────────────────────────────────
+    // ── Admin panel: redirect root /admin to /admin/login ────────────────────
+    // Payload's internal RSC redirect from /admin → /admin/login fails
+    // client-side in production builds. Do a proper HTTP redirect instead.
+    if (pathname === '/admin' || pathname === '/admin/') {
+        url.pathname = '/admin/login'
+        return NextResponse.redirect(url, 307)
+    }
+
+    // ── API and admin sub-routes: pass through ───────────────────────────────
     if (pathname.startsWith('/api/') || pathname.startsWith('/admin')) {
         return NextResponse.next()
     }
