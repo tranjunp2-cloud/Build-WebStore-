@@ -3,7 +3,14 @@ module.exports = {
     content: [
         './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
         './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-        './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+        // Exclude (payload) admin to avoid @layer conflicts with Payload CSS
+        './src/app/(auth)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(builder)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(dashboard)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(editor)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(frontend)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/sites/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/templates/**/*.{js,ts,jsx,tsx,mdx}',
     ],
     theme: {
         extend: {
