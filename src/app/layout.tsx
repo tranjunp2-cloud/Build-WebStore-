@@ -21,21 +21,21 @@ export const metadata: Metadata = {
 }
 
 /**
- * Root layout — kept minimal so Payload admin CSS is not affected.
- * DO NOT import globals.css here — it must go in route-group layouts
- * that need it (e.g. (frontend), (auth), (dashboard), etc).
+ * Root layout — returns ONLY children, no <html> or <body>.
  *
- * Payload admin at (payload)/admin uses its own RootLayout which
- * renders its own full-page HTML with proper Payload CSS theme.
+ * Why: Payload admin's RootLayout renders its own <html data-theme="..."><body>.
+ * If we wrap it in another <html><body>, it creates invalid nested HTML which
+ * breaks Payload's CSS targeting (data-theme attribute, :root styles, etc).
+ *
+ * Each route group provides its own html/body wrapper:
+ * - (payload): uses @payloadcms/next RootLayout which renders html+body
+ * - (frontend), (auth), (dashboard): use AppShell which wraps in html+body
  */
 export default function RootLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
-    return (
-        <html lang="en" suppressHydrationWarning>
-            <body>{children}</body>
-        </html>
-    )
+    // eslint-disable-next-line react/jsx-no-useless-fragment
+    return <>{children}</>
 }
