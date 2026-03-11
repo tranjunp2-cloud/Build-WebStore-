@@ -83,6 +83,11 @@ module.exports = {
             },
         },
     },
+    // Disable Preflight — its CSS reset overrides Payload admin styles
+    // (globals.css has custom resets in @layer base instead)
+    corePlugins: {
+        preflight: false,
+    },
     plugins: [
         require('@tailwindcss/typography'),
     ],

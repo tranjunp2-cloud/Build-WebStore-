@@ -1,4 +1,17 @@
 import type { Metadata } from 'next'
+import { Inter, Outfit } from 'next/font/google'
+
+const inter = Inter({
+    subsets: ['latin'],
+    variable: '--font-inter',
+    display: 'swap',
+})
+
+const outfit = Outfit({
+    subsets: ['latin'],
+    variable: '--font-outfit',
+    display: 'swap',
+})
 
 export const metadata: Metadata = {
     title: {
@@ -21,21 +34,21 @@ export const metadata: Metadata = {
 }
 
 /**
- * Root layout — returns ONLY children, no <html> or <body>.
+ * Root layout — provides html/body tags (required by Next.js).
  *
- * Why: Payload admin's RootLayout renders its own <html data-theme="..."><body>.
- * If we wrap it in another <html><body>, it creates invalid nested HTML which
- * breaks Payload's CSS targeting (data-theme attribute, :root styles, etc).
- *
- * Each route group provides its own html/body wrapper:
- * - (payload): uses @payloadcms/next RootLayout which renders html+body
- * - (frontend), (auth), (dashboard): use AppShell which wraps in html+body
+ * IMPORTANT: Do NOT import globals.css here!
+ * Tailwind's @tailwind base (Preflight) resets all browser styles globally
+ * and overrides Payload admin panel CSS. globals.css must only be imported
+ * in non-admin route group layouts via AppShell.
  */
 export default function RootLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
-    // eslint-disable-next-line react/jsx-no-useless-fragment
-    return <>{children}</>
+    return (
+        <html lang="en" className={`${inter.variable} ${outfit.variable}`} suppressHydrationWarning>
+            <body>{children}</body>
+        </html>
+    )
 }

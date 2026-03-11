@@ -1,29 +1,10 @@
 /**
- * AppShell — wrapper for non-Payload routes that provides html/body tags.
- * Root layout.tsx returns only children (no html/body) to avoid nested HTML
- * with Payload admin's own html/body.
+ * AppShell — wrapper for non-Payload routes.
+ * Imports globals.css (Tailwind) here so it ONLY applies to non-admin routes.
+ * Root layout provides <html> and <body> — this is just a style boundary.
  */
-import { Inter, Outfit } from 'next/font/google'
 import '../app/globals.css'
 
-const inter = Inter({
-    subsets: ['latin'],
-    variable: '--font-inter',
-    display: 'swap',
-})
-
-const outfit = Outfit({
-    subsets: ['latin'],
-    variable: '--font-outfit',
-    display: 'swap',
-})
-
 export function AppShell({ children }: { children: React.ReactNode }) {
-    return (
-        <html lang="en" className={`${inter.variable} ${outfit.variable}`}>
-            <body className="font-sans bg-gray-950 text-white antialiased">
-                {children}
-            </body>
-        </html>
-    )
+    return <>{children}</>
 }
