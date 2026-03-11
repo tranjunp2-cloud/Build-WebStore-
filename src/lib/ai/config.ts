@@ -27,6 +27,7 @@ export function selectModel(task: AITask): AIModel {
         case 'seo-generation':
         case 'content-rewrite':
         case 'product-description':
+        case 'assistant-chat':
             return 'gpt-4o-mini'
         default:
             return 'gpt-4o-mini'
@@ -40,6 +41,7 @@ export type AITask =
     | 'seo-generation'
     | 'content-rewrite'
     | 'product-description'
+    | 'assistant-chat'
 
 // ─── Rate Limiting ──────────────────────────────────────────────────────
 export type SubscriptionPlan = 'free' | 'starter' | 'pro' | 'business'
@@ -55,6 +57,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 3,         // per day
         'content-rewrite': 5,        // per day
         'product-description': 5,    // per day
+        'assistant-chat': 30,        // per day
     },
     starter: {
         'site-generation': 5,        // per month
@@ -63,6 +66,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 10,        // per day
         'content-rewrite': 20,       // per day
         'product-description': 20,   // per day
+        'assistant-chat': 100,       // per day
     },
     pro: {
         'site-generation': 20,       // per month
@@ -71,6 +75,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 50,        // per day
         'content-rewrite': 100,      // per day
         'product-description': 100,  // per day
+        'assistant-chat': 500,       // per day
     },
     business: {
         'site-generation': 999999,   // unlimited
@@ -79,6 +84,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 999999,
         'content-rewrite': 999999,
         'product-description': 999999,
+        'assistant-chat': 999999,
     },
 }
 
@@ -127,6 +133,25 @@ Output: new text (plain text).`,
 
     'product-description': `Write compelling, SEO-friendly product descriptions. 2-3 concise sentences, highlighting features and benefits.
 Output: product description (plain text).`,
+
+    'assistant-chat': `You are PrimeBot, the internal assistant for the PrimeWeb development team.
+Project: PrimeWeb — AI-powered SaaS website builder for SMEs (targeting Malaysia market).
+Tech Stack: Next.js 15, Payload CMS 3, PostgreSQL, Tailwind CSS, Radix UI, Vercel AI SDK, OpenAI, Zustand, Framer Motion, Docker.
+Architecture: Multi-tenant SaaS with middleware-based routing. Monorepo — Payload CMS admin + Next.js frontend in one app.
+Key features: AI site generation, block-based page builder, visual editor, storefront/e-commerce, SEO dashboard, analytics.
+Deployment: Docker containers on DigitalOcean, CI/CD via GitHub Actions.
+Branching: main (production), staging (testing), feat/* (features).
+Coding conventions: TypeScript strict, ESLint, Commitlint (conventional commits), Husky pre-commit hooks.
+Team language: Vietnamese (answer in Vietnamese by default, switch to English if asked).
+
+You help the team with:
+- Project architecture and code questions
+- Deployment and DevOps guidance
+- Debugging tips and best practices
+- Sprint planning and feature scoping
+- Onboarding new team members
+
+Be concise, helpful, and friendly. Use code examples when relevant. If unsure, say so honestly.`,
 } as const
 
 // ─── Cost Estimation ────────────────────────────────────────────────────
@@ -142,4 +167,5 @@ export const ESTIMATED_COSTS: Record<AITask, number> = {
     'seo-generation': 0.0004,     // GPT-4o-mini, ~800 in + 400 out
     'content-rewrite': 0.0003,    // GPT-4o-mini, ~600 in + 300 out
     'product-description': 0.0003,
+    'assistant-chat': 0.0004,     // GPT-4o-mini, ~1K in + 500 out
 }

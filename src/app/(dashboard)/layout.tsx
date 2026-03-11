@@ -1,5 +1,7 @@
 import { AppShell } from '@/components/AppShell'
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
+import { AssistantButton } from '@/components/assistant/AssistantButton'
+import { AssistantPanel } from '@/components/assistant/AssistantPanel'
 import { getCurrentUser } from '@/lib/auth'
 
 export default async function DashboardLayout({
@@ -20,7 +22,10 @@ export default async function DashboardLayout({
                         {children}
                     </div>
                 </main>
+                <AssistantButton />
+                <AssistantPanel />
             </div>
         </AppShell>
     )
 }
+
