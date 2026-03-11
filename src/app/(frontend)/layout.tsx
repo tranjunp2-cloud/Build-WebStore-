@@ -1,5 +1,3 @@
-'use client'
-
 import { AppShell } from '@/components/AppShell'
 import { I18nProvider } from '@/i18n'
 
