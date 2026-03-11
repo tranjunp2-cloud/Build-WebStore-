@@ -1,5 +1,8 @@
 import type { ServerFunctionClient } from 'payload'
 import { RootLayout, handleServerFunctions } from '@payloadcms/next/layouts'
+/* Import full Payload CSS with theme variable definitions.
+ * Without this, --theme-elevation-*, --color-base-* are undefined. */
+import '@payloadcms/next/css'
 import config from '@payload-config'
 import React from 'react'
 import { importMap } from '../importMap.js'
