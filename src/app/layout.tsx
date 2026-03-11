@@ -21,22 +21,26 @@ export const metadata: Metadata = {
 }
 
 /**
- * Root layout — pass-through only.
+ * Root layout — minimal html/body wrapper (required by Next.js).
  *
- * IMPORTANT: Do NOT add <html>/<body> tags here!
- * Payload CMS admin provides its own <html data-theme> and <body>.
- * Adding them here creates nested <html> tags = invalid HTML
- * = hydration failure = client-side 404.
+ * IMPORTANT: Keep this minimal! Do NOT add:
+ * - Google Fonts (next/font/google) — these go in AppShell
+ * - globals.css import — goes in AppShell
+ * - Font class names on <html>
  *
- * Each route group provides its own html/body wrapper:
- * - (payload) → Payload's RootLayout handles it
- * - (frontend)/(dashboard)/(auth)/(builder)/(editor) → AppShell handles it
+ * Payload CMS admin has its own RootLayout that adds data-theme
+ * and other attributes. suppressHydrationWarning prevents conflicts.
  */
 export default function RootLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
-    return children
+    return (
+        <html lang="en" suppressHydrationWarning>
+            <body>{children}</body>
+        </html>
+    )
 }
+
 
