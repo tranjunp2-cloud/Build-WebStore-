@@ -57,7 +57,8 @@ export function middleware(req: NextRequest) {
         hostname !== PLATFORM_DOMAIN &&
         hostname !== `www.${PLATFORM_DOMAIN}` &&
         !hostname.includes('localhost') &&
-        !hostname.includes('vercel.app')
+        !hostname.includes('vercel.app') &&
+        !hostname.includes('ondigitalocean.app')
     ) {
         url.pathname = `/sites/custom${pathname}`
         const response = NextResponse.rewrite(url)
