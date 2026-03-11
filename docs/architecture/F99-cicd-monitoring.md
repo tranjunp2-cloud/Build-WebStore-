@@ -14,7 +14,7 @@ Trigger: `pull_request` to `main`
   - Run `npm run typecheck` (TypeScript)
   - Run `npm run lint` (ESLint/Prettier)
 - **Step 3: Security Checks (DevSecOps)**
-  - **SAST:** Run CodeQL or SonarQube for static analysis.
+  - **SAST:** Run SonarQube for static analysis (connected to `https://sonarqube.primecommerce.asia`).
   - **Dependency Scan:** Run `npm audit` or Dependabot/Snyk to find vulnerable packages.
   - **Secret Scan:** Run TruffleHog or Gitleaks to prevent hardcoded secrets.
 - **Step 4: Unit & Integration Tests**
