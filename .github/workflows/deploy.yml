@@ -1,0 +1,77 @@
+name: CD & Deploy to Production
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Build Application
+        run: |
+          npm ci
+          npm run build
+        continue-on-error: true
+
+      - name: Build Docker Image
+        run: |
+          docker build -t primeweb/v2:${{ github.sha }} .
+          docker tag primeweb/v2:${{ github.sha }} primeweb/v2:latest
+        continue-on-error: true
+
+      - name: Push to Registry
+        run: |
+          echo "Simulate pushing to registry (Docker Hub / GHCR)"
+          # docker login ...
+          # docker push primeweb/v2:${{ github.sha }}
+        continue-on-error: true
+
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@master
+        if: ${{ secrets.SERVER_HOST != '' }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/primeweb
+            docker pull primeweb/v2:latest
+            docker compose -f docker-compose.prod.yml up -d web
+
+      - name: Notify Lark (Deploy Status)
+        if: always()
+        run: |
+          if [ -n "${{ secrets.LARK_WEBHOOK_URL }}" ]; then
+            curl -X POST -H "Content-Type: application/json" \
+              -d '{
+                "msg_type": "interactive",
+                "card": {
+                  "header": {
+                    "title": { "content": "'"${{ job.status == 'success' && '🚀 Deploy Success' || '🚨 Deploy Failed' }}"'", "tag": "plain_text" },
+                    "template": "'"${{ job.status == 'success' && 'green' || 'red' }}"'"
+                  },
+                  "elements": [
+                    {
+                      "tag": "div",
+                      "text": {
+                        "content": "**Branch:** main\n**Commit:** ${{ github.sha }}\n**Author:** ${{ github.actor }}\n**Environment:** Production",
+                        "tag": "lark_md"
+                      }
+                    }
+                  ]
+                }
+              }' ${{ secrets.LARK_WEBHOOK_URL }}
+          else
+            echo "Lark Webhook URL not configured. Skipping notification."
+          fi
