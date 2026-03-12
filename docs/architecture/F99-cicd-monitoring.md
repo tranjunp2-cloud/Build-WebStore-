@@ -29,11 +29,11 @@ Trigger: `pull_request` to `main`
 Trigger: `push` to `main` (after PR merge)
 - **Step 1: Build Docker Images**
   - Build `web` (Next.js + Payload) image.
-- **Step 2: Push to Registry**
-  - Push images to Docker Hub / GitHub Container Registry / AWS ECR.
-- **Step 3: Deploy to Production**
-  - SSH into production server and run `docker compose pull && docker compose up -d`.
-  - Alternatively, trigger ArgoCD if using Kubernetes.
+- **Step 2: Push to Docker Hub**
+  - Push images to Docker Hub (`${{ secrets.DOCKERHUB_USERNAME }}/primeweb-v2`).
+- **Step 3: Deploy to AWS EC2 via Systems Manager (SSM)**
+  - Use `aws-actions/aws-ssm-send-command` to deploy to multiple EC2 instances securely without opening port 22.
+  - Login to Docker Hub, run `./dockerctl update` (or `docker compose up`) to pull the latest image and restart containers across all specified instances.
 - **Step 4: Notify Lark (CD Status)**
   - Send deployment success/failure message with commit details and author.
 
