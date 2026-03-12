@@ -32,7 +32,7 @@ export function middleware(req: NextRequest) {
         return NextResponse.rewrite(url)
     }
 
-    // ── API routes: pass through ─────────────────────────────────────────────
+    // ── API and admin routes: pass through ─────────────────────────────────
     if (pathname.startsWith('/api/') || pathname.startsWith('/admin')) {
         return NextResponse.next()
     }
@@ -57,7 +57,8 @@ export function middleware(req: NextRequest) {
         hostname !== PLATFORM_DOMAIN &&
         hostname !== `www.${PLATFORM_DOMAIN}` &&
         !hostname.includes('localhost') &&
-        !hostname.includes('vercel.app')
+        !hostname.includes('vercel.app') &&
+        !hostname.includes('ondigitalocean.app')
     ) {
         url.pathname = `/sites/custom${pathname}`
         const response = NextResponse.rewrite(url)

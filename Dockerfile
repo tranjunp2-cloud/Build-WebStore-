@@ -50,6 +50,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # DB setup script: checks permissions, creates schema/tables, then starts server
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/db-setup.js ./db-setup.js
+# Runtime polyfill for File/Blob (required by Payload/undici for RSC rendering)
+COPY --from=builder --chown=nextjs:nodejs /app/node-polyfill.js ./node-polyfill.js
 
 # Media upload directory
 RUN mkdir -p /app/public/media && chown -R nextjs:nodejs /app/public/media
@@ -59,5 +61,7 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+# Polyfill File/Blob at runtime (required by Payload for RSC rendering)
+ENV NODE_OPTIONS="--require ./node-polyfill.js"
 
 CMD ["node", "db-setup.js"]

@@ -1,8 +1,7 @@
 import type { ServerFunctionClient } from 'payload'
 import { RootLayout, handleServerFunctions } from '@payloadcms/next/layouts'
-/* Import the FULL Payload CSS (includes theme variable definitions).
- * Without this, only component CSS loads but --theme-elevation-*, --color-base-*
- * variables are never defined, causing completely unstyled admin UI. */
+/* Import full Payload CSS with theme variable definitions.
+ * Without this, --theme-elevation-*, --color-base-* are undefined. */
 import '@payloadcms/next/css'
 import config from '@payload-config'
 import React from 'react'

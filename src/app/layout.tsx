@@ -1,17 +1,4 @@
 import type { Metadata } from 'next'
-import { Inter, Outfit } from 'next/font/google'
-
-const inter = Inter({
-    subsets: ['latin'],
-    variable: '--font-inter',
-    display: 'swap',
-})
-
-const outfit = Outfit({
-    subsets: ['latin'],
-    variable: '--font-outfit',
-    display: 'swap',
-})
 
 export const metadata: Metadata = {
     title: {
@@ -34,12 +21,15 @@ export const metadata: Metadata = {
 }
 
 /**
- * Root layout — provides html/body tags (required by Next.js).
+ * Root layout — minimal html/body wrapper (required by Next.js).
  *
- * IMPORTANT: Do NOT import globals.css here!
- * Tailwind's @tailwind base (Preflight) resets all browser styles globally
- * and overrides Payload admin panel CSS. globals.css must only be imported
- * in non-admin route group layouts via AppShell.
+ * IMPORTANT: Keep this minimal! Do NOT add:
+ * - Google Fonts (next/font/google) — these go in AppShell
+ * - globals.css import — goes in AppShell
+ * - Font class names on <html>
+ *
+ * Payload CMS admin has its own RootLayout that adds data-theme
+ * and other attributes. suppressHydrationWarning prevents conflicts.
  */
 export default function RootLayout({
     children,
@@ -47,8 +37,10 @@ export default function RootLayout({
     children: React.ReactNode
 }) {
     return (
-        <html lang="en" className={`${inter.variable} ${outfit.variable}`} suppressHydrationWarning>
+        <html lang="en" suppressHydrationWarning>
             <body>{children}</body>
         </html>
     )
 }
+
+
