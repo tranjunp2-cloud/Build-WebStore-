@@ -1,6 +1,6 @@
-# CI Pipeline — Lint, typecheck, test, build
-# PR → CI → Deploy Preview (sequential)
-# Push → CI → Lark notify
+# CI Pipeline — Lint, typecheck, test, build, quality metrics
+# PR → CI (+ quality comment) → Deploy Preview
+# Push → CI → Deploy Staging/Production → Lark notify
 name: CI
 
 on:
@@ -15,11 +15,14 @@ concurrency:
 
 jobs:
   # ──────────────────────────────────────
-  # Job 1: CI — Lint, Typecheck, Test, Build
+  # Job 1: CI — Lint, Typecheck, Test, Build + Quality Metrics (PR)
   # ──────────────────────────────────────
   ci:
     name: "CI: Lint → Typecheck → Test → Build"
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,7 +60,97 @@ jobs:
         id: build
         env:
           NODE_OPTIONS: '--require ./node-polyfill.js'
-        run: npm run build
+        run: npm run build 2>&1 | tee build-output.txt
+
+      # --- Quality Metrics: Coverage + Bundle Size (PR only) ---
+      - name: Parse coverage report
+        if: success() && github.event_name == 'pull_request'
+        id: coverage
+        run: |
+          if [ -f "coverage/coverage-summary.json" ]; then
+            LINES=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.lines.pct)")
+            BRANCHES=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.branches.pct)")
+            FUNCTIONS=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.functions.pct)")
+            STATEMENTS=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.statements.pct)")
+          else
+            LINES="N/A"; BRANCHES="N/A"; FUNCTIONS="N/A"; STATEMENTS="N/A"
+          fi
+          echo "lines=$LINES" >> "$GITHUB_OUTPUT"
+          echo "branches=$BRANCHES" >> "$GITHUB_OUTPUT"
+          echo "functions=$FUNCTIONS" >> "$GITHUB_OUTPUT"
+          echo "statements=$STATEMENTS" >> "$GITHUB_OUTPUT"
+
+      - name: Measure bundle size
+        if: success() && github.event_name == 'pull_request'
+        id: bundle
+        run: |
+          if [ -d ".next" ]; then
+            TOTAL_SIZE=$(du -sh .next/ 2>/dev/null | cut -f1 || echo "N/A")
+            FIRST_LOAD=$(grep -oP 'First Load JS shared by all\s+\K[\d.]+ [kKmM]?B' build-output.txt 2>/dev/null || echo "N/A")
+            [ -z "$FIRST_LOAD" ] && FIRST_LOAD="N/A"
+          else
+            TOTAL_SIZE="N/A"; FIRST_LOAD="N/A"
+          fi
+          echo "total_size=$TOTAL_SIZE" >> "$GITHUB_OUTPUT"
+          echo "first_load=$FIRST_LOAD" >> "$GITHUB_OUTPUT"
+
+      - name: Comment quality metrics on PR
+        if: success() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const coverage = {
+              lines: '${{ steps.coverage.outputs.lines }}',
+              branches: '${{ steps.coverage.outputs.branches }}',
+              functions: '${{ steps.coverage.outputs.functions }}',
+              statements: '${{ steps.coverage.outputs.statements }}',
+            };
+            const bundle = {
+              totalSize: '${{ steps.bundle.outputs.total_size }}',
+              firstLoad: '${{ steps.bundle.outputs.first_load }}',
+            };
+
+            const marker = '<!-- quality-metrics -->';
+            const body = [
+              marker,
+              '## 📊 Quality Metrics',
+              '',
+              '### Test Coverage',
+              '| Metric | Value |',
+              '|--------|-------|',
+              `| Lines | ${coverage.lines}% |`,
+              `| Branches | ${coverage.branches}% |`,
+              `| Functions | ${coverage.functions}% |`,
+              `| Statements | ${coverage.statements}% |`,
+              '',
+              '### Bundle Size',
+              '| Asset | Size |',
+              '|-------|------|',
+              `| Total (.next/) | ${bundle.totalSize} |`,
+              `| First Load JS | ${bundle.firstLoad} |`,
+              '',
+              '---',
+              `_Updated: ${new Date().toISOString()} | [View CI Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number, body,
+              });
+            }
 
       # --- Lark: CI Passed ---
       - name: Prepare CI status

@@ -1,112 +1,93 @@
 #!/usr/bin/env node
 /**
- * DB Setup Script — runs BEFORE server.js on DO App Platform
+ * DB Setup Script — runs as Docker CMD on DO App Platform
  *
- * Problem: Next.js standalone build bakes process.env.NODE_ENV as 'production'
- * via webpack DefinePlugin. Payload's push:true checks this at runtime
- * but finds the hardcoded 'production' string, so it never creates tables.
+ * Problem: Payload CMS's `push: true` only creates tables when
+ * `process.env.NODE_ENV !== 'production'` (checked at runtime in
+ * node_modules/@payloadcms/db-postgres/dist/connect.js line 109).
  *
- * Solution: This script patches the bundled server code to replace the
- * hardcoded NODE_ENV check, then starts the server.
+ * Solution: When the database is empty (no tables), spawn server.js
+ * with NODE_ENV=development so Payload creates tables on first request.
+ * On subsequent deploys, tables already exist so NODE_ENV stays production.
  */
-const { spawn, execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { spawn } = require('child_process');
 
 async function checkDB() {
   const connStr = process.env.DATABASE_URI || process.env.DATABASE_URL;
   if (!connStr) {
-    console.log('[db-setup] No DATABASE_URL found');
-    return { needsPush: false };
+    console.log('[db-setup] No DATABASE_URI found, skipping DB check');
+    return { needsPush: false, tableCount: -1 };
   }
-
-  console.log('[db-setup] NODE_ENV:', process.env.NODE_ENV);
 
   try {
     const pg = require('pg');
-    const cleanStr = connStr.replace(/[?&]sslmode=[^&]+/g, '').replace(/\?&/, '?').replace(/\?$/, '');
+    // Strip sslmode from URL to avoid pg driver parse conflicts
+    const cleanStr = connStr
+      .replace(/[?&]sslmode=[^&]+/g, '')
+      .replace(/\?&/, '?')
+      .replace(/\?$/, '');
+
     const pool = new pg.Pool({
       connectionString: cleanStr,
       ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 10000,
     });
 
-    const result = await pool.query('SELECT current_database(), current_user, current_schema()');
-    const row = result.rows[0];
+    const info = await pool.query('SELECT current_database(), current_user');
+    const row = info.rows[0];
     console.log(`[db-setup] Connected: db=${row.current_database}, user=${row.current_user}`);
 
-    // Check if tables exist
+    // Count tables in public schema
     const tables = await pool.query(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+      "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
     );
-    console.log(`[db-setup] Tables in public: ${tables.rowCount}`);
+    const tableCount = parseInt(tables.rows[0].count, 10);
+    console.log(`[db-setup] Tables in public schema: ${tableCount}`);
 
-    const canCreate = await pool.query(
+    // Check if user can create tables
+    const perm = await pool.query(
       "SELECT has_schema_privilege(current_user, 'public', 'CREATE') as can_create"
     );
-    console.log(`[db-setup] Can CREATE: ${canCreate.rows[0].can_create}`);
+    const canCreate = perm.rows[0].can_create;
+    console.log(`[db-setup] CREATE privilege: ${canCreate}`);
 
     await pool.end();
 
     return {
-      needsPush: tables.rowCount === 0 && canCreate.rows[0].can_create,
-      tableCount: tables.rowCount,
+      needsPush: tableCount === 0 && canCreate,
+      tableCount,
     };
   } catch (e) {
-    console.log('[db-setup] DB check error:', e.message);
-    return { needsPush: false };
+    console.error('[db-setup] DB check failed:', e.message);
+    return { needsPush: false, tableCount: -1 };
   }
-}
-
-function patchServerForPush() {
-  // Find the connect.js chunk in the standalone build that contains the push check
-  const chunksDir = path.join(__dirname, '.next', 'server', 'chunks');
-  if (!fs.existsSync(chunksDir)) {
-    console.log('[db-setup] No chunks dir found, skipping patch');
-    return false;
-  }
-
-  const files = fs.readdirSync(chunksDir).filter(f => f.endsWith('.js'));
-  let patched = false;
-
-  for (const file of files) {
-    const filePath = path.join(chunksDir, file);
-    let content = fs.readFileSync(filePath, 'utf8');
-
-    // Webpack replaces process.env.NODE_ENV with "production" literal
-    // The Payload push check becomes: if("production"!=="production" && ...
-    // We need to make this evaluate to true
-    // Pattern: "production"!=="production" or "production" !== "production"
-    if (content.includes('"production"!=="production"') || content.includes("'production'!=='production'")) {
-      console.log(`[db-setup] Patching ${file} — enabling push:true`);
-      content = content.replace(/"production"!=="production"/g, '"development"!=="production"');
-      content = content.replace(/'production'!=='production'/g, "'development'!=='production'");
-      fs.writeFileSync(filePath, content);
-      patched = true;
-    }
-  }
-
-  return patched;
 }
 
 async function main() {
+  console.log('[db-setup] NODE_ENV:', process.env.NODE_ENV);
+
   const { needsPush, tableCount } = await checkDB();
 
+  // Determine the NODE_ENV for the server process
+  let serverEnv = { ...process.env };
+
   if (needsPush) {
-    console.log('[db-setup] No tables found — patching server to enable push:true...');
-    const patched = patchServerForPush();
-    if (patched) {
-      console.log('[db-setup] ✅ Patched! push:true will create tables on first request');
-    } else {
-      console.log('[db-setup] ⚠️ Could not find push check to patch');
-    }
+    // Database is empty — Payload needs NODE_ENV !== 'production' to run pushDevSchema().
+    // This is safe because the Next.js build is already production-optimized.
+    // After tables are created, subsequent deploys will skip this (tableCount > 0).
+    console.log('[db-setup] ⚡ Empty database detected — enabling schema push');
+    console.log('[db-setup] Setting NODE_ENV=development for Payload push:true');
+    serverEnv.NODE_ENV = 'development';
   } else if (tableCount > 0) {
-    console.log(`[db-setup] ✅ ${tableCount} tables already exist, no push needed`);
+    console.log(`[db-setup] ✅ ${tableCount} tables exist — no push needed`);
+  } else {
+    console.log('[db-setup] ⚠️ Could not check tables — starting server as-is');
   }
 
-  console.log('[db-setup] Starting server...');
+  console.log(`[db-setup] Starting server (NODE_ENV=${serverEnv.NODE_ENV})...`);
   const server = spawn('node', ['server.js'], {
     stdio: 'inherit',
-    env: { ...process.env },
+    env: serverEnv,
   });
 
   server.on('exit', (code) => {
