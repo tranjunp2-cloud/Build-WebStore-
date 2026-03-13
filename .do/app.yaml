@@ -21,7 +21,9 @@ services:
       deploy_on_push: false
 
     health_check:
-      http_path: /
+      http_path: /api/health
+      initial_delay_seconds: 10
+      timeout_seconds: 5
 
     envs:
       - key: NODE_ENV
