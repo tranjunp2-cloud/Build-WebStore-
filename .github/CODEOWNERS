@@ -1,45 +1,59 @@
 # ECH Prime Web v2 — CODEOWNERS
 # ================================
 # Auto-assign reviewers based on changed files.
-# Replace @placeholder-* with actual GitHub usernames.
+# GitHub auto-requests review from code owners when PR touches matching paths.
+#
+# Team:
+#   @tinnt-prime      — SA / Tech Lead
+#   @haynoikonike     — PM
+#   @dangduy310       — BA (Assistant PM)
+#   @thuuya           — BA
+#   @levietducprime   — FE Dev (Lead)
+#   @hptruong         — FE Dev
+#   @Duylinh03        — FE Dev
+#   @Mr-LeeB          — BE Dev (Lead)
+#   @tgiangk1         — BE Dev
+#   @nntanh585        — BE Dev
+#   @aryhibye         — QA
+#   @tranjunp2-cloud  — UI/UX Designer
 #
 # Format: <path-pattern> @github-username [@github-username ...]
 # Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # ── Default (catch-all) ──────────────────────────────
-*                               @placeholder-tech-lead
+*                               @tinnt-prime
 
 # ── Frontend (App Router, Components, Blocks) ────────
-/src/app/                       @placeholder-fe-dev-1 @placeholder-fe-dev-2
-/src/components/                @placeholder-fe-dev-1 @placeholder-fe-dev-2
-/src/blocks/                    @placeholder-fe-dev-1
-/src/store/                     @placeholder-fe-dev-1
-/tailwind.config.js             @placeholder-fe-dev-1
+/src/app/                       @levietducprime @hptruong @Duylinh03
+/src/components/                @levietducprime @hptruong @Duylinh03
+/src/blocks/                    @levietducprime @hptruong
+/src/store/                     @levietducprime
+/tailwind.config.js             @levietducprime
 
 # ── Backend (Collections, API, Lib) ──────────────────
-/src/collections/               @placeholder-be-dev
-/src/lib/                       @placeholder-be-dev @placeholder-fe-dev-1
-/src/app/api/                   @placeholder-be-dev
-/src/payload.config.ts          @placeholder-be-dev
+/src/collections/               @Mr-LeeB @tgiangk1 @nntanh585
+/src/lib/                       @Mr-LeeB @levietducprime
+/src/app/api/                   @Mr-LeeB @tgiangk1
+/src/payload.config.ts          @Mr-LeeB @tinnt-prime
 
 # ── Infrastructure & CI/CD ───────────────────────────
-/.github/workflows/             @placeholder-devops
-/.github/actions/               @placeholder-devops
-/.github/scripts/               @placeholder-devops
-/Dockerfile*                    @placeholder-devops
-/docker-compose*.yml            @placeholder-devops
-/scripts/                       @placeholder-devops
+/.github/workflows/             @tinnt-prime @haynoikonike
+/.github/actions/               @tinnt-prime @haynoikonike
+/.github/scripts/               @tinnt-prime
+/Dockerfile*                    @tinnt-prime
+/docker-compose*.yml            @tinnt-prime
+/scripts/                       @tinnt-prime
 
 # ── Documentation & Specs ────────────────────────────
-/SPEC.md                        @placeholder-pm @placeholder-tech-lead
-/CLAUDE.md                      @placeholder-tech-lead
-/docs/prd/                      @placeholder-pm
-/docs/stories/                  @placeholder-pm @placeholder-qa
-/docs/design/                   @placeholder-pm
-/docs/qa/                       @placeholder-qa
-/docs/architecture/             @placeholder-tech-lead
+/SPEC.md                        @haynoikonike @tinnt-prime
+/CLAUDE.md                      @tinnt-prime
+/docs/prd/                      @haynoikonike @dangduy310 @thuuya
+/docs/stories/                  @haynoikonike @dangduy310 @aryhibye
+/docs/design/                   @tranjunp2-cloud @haynoikonike
+/docs/qa/                       @aryhibye
+/docs/architecture/             @tinnt-prime
 
 # ── Config & Dependencies ────────────────────────────
-/package.json                   @placeholder-tech-lead @placeholder-devops
-/tsconfig.json                  @placeholder-tech-lead
-/.env.example                   @placeholder-devops
+/package.json                   @tinnt-prime
+/tsconfig.json                  @tinnt-prime
+/.env.example                   @tinnt-prime

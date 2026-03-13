@@ -1,8 +1,17 @@
 {
-  "_comment": "GitHub username → Lark display name mapping. Update with real Lark names/IDs.",
+  "_comment": "GitHub username → Lark display name + role mapping.",
   "users": {
-    "haynoikonike": "Nhan",
-    "ben-pm": "Ben (PM)",
-    "designer": "Designer"
+    "haynoikonike": { "name": "Nhân", "role": "PM" },
+    "tinnt-prime": { "name": "Tín", "role": "SA" },
+    "Mr-LeeB": { "name": "Lee", "role": "BE Lead" },
+    "dangduy310": { "name": "Duy", "role": "BA" },
+    "levietducprime": { "name": "Đức", "role": "FE Lead" },
+    "tgiangk1": { "name": "Giang", "role": "BE" },
+    "hptruong": { "name": "Trường", "role": "FE" },
+    "Duylinh03": { "name": "Linh", "role": "FE" },
+    "nntanh585": { "name": "Tánh", "role": "BE" },
+    "aryhibye": { "name": "Ary", "role": "QA" },
+    "tranjunp2-cloud": { "name": "Jun", "role": "UI/UX" },
+    "thuuya": { "name": "Thuý", "role": "BA" }
   }
 }

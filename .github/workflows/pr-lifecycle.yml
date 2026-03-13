@@ -25,15 +25,27 @@ jobs:
       - name: Checkout (for composite action)
         uses: actions/checkout@v4
 
-      - name: Auto-label PR size
+      - name: Auto-assign author + label + detect type
         uses: actions/github-script@v7
         id: size
         with:
           script: |
+            const pr = context.payload.pull_request;
+            const prNumber = pr.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // ── 1. Auto-assign PR author ──
+            await github.rest.issues.addAssignees({
+              owner, repo,
+              issue_number: prNumber,
+              assignees: [pr.user.login],
+            });
+
+            // ── 2. Get changed files + compute size ──
             const { data: files } = await github.rest.pulls.listFiles({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number,
+              owner, repo,
+              pull_number: prNumber,
             });
 
             const changes = files.reduce((sum, f) => sum + f.additions + f.deletions, 0);
@@ -42,16 +54,40 @@ jobs:
             else if (changes > 200) sizeLabel = 'size:L';
             else if (changes > 50) sizeLabel = 'size:M';
 
+            // ── 3. Auto-detect type labels from branch name ──
+            const branch = pr.head.ref;
+            const labels = [sizeLabel];
+
+            if (branch.startsWith('feature/')) labels.push('type:feature');
+            else if (branch.startsWith('fix/')) labels.push('type:fix');
+            else if (branch.startsWith('hotfix/')) labels.push('type:hotfix');
+            else if (branch.startsWith('chore/')) labels.push('type:chore');
+            else if (branch.startsWith('docs/')) labels.push('type:docs');
+            else if (branch.startsWith('refactor/')) labels.push('type:refactor');
+
+            // ── 4. Auto-detect area labels from changed files ──
+            const paths = files.map(f => f.filename);
+            const areas = new Set();
+
+            for (const p of paths) {
+              if (p.startsWith('src/app/') || p.startsWith('src/components/') || p.startsWith('src/blocks/') || p.startsWith('src/store/')) areas.add('area:frontend');
+              if (p.startsWith('src/collections/') || p.startsWith('src/app/api/') || p === 'src/payload.config.ts') areas.add('area:backend');
+              if (p.startsWith('.github/') || p.startsWith('Dockerfile') || p.startsWith('docker-compose') || p.startsWith('scripts/')) areas.add('area:infra');
+              if (p.startsWith('docs/') || p === 'SPEC.md' || p === 'CLAUDE.md') areas.add('area:docs');
+            }
+
+            for (const area of areas) labels.push(area);
+
             await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              labels: [sizeLabel],
+              owner, repo,
+              issue_number: prNumber,
+              labels,
             });
 
             core.setOutput('size_label', sizeLabel);
             core.setOutput('changes', changes);
             core.setOutput('file_count', files.length);
+            core.setOutput('labels', labels.join(', '));
 
       - name: Notify Lark (PR Opened)
         uses: ./.github/actions/lark-notify
