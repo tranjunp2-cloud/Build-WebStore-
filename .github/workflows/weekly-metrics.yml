@@ -1,0 +1,70 @@
+# Weekly Metrics — Collect team stats and send report to Lark
+name: Weekly Metrics
+
+on:
+  schedule:
+    # Monday 2 AM UTC (10 AM MYT)
+    - cron: '0 2 * * 1'
+  workflow_dispatch: # Manual trigger for testing
+
+jobs:
+  collect-and-report:
+    name: 'Metrics: Weekly Report'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: read
+      contents: read
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Collect metrics
+        id: metrics
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node .github/scripts/collect-metrics.js \
+            --repo "${{ github.repository }}" \
+            --period 7 > metrics.json
+
+          # Extract summary for outputs
+          LARK_CONTENT=$(node -e "const d=require('./metrics.json'); console.log(d.larkContent)")
+          TOTAL_COMMITS=$(node -e "const d=require('./metrics.json'); console.log(d.summary.totalCommits)")
+          PRS_MERGED=$(node -e "const d=require('./metrics.json'); console.log(d.summary.totalPRsMerged)")
+          COMPLETION=$(node -e "const d=require('./metrics.json'); console.log(d.summary.completionRate)")
+
+          # Use heredoc for multiline output
+          {
+            echo "lark_content<<EOF"
+            echo "$LARK_CONTENT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "total_commits=$TOTAL_COMMITS" >> "$GITHUB_OUTPUT"
+          echo "prs_merged=$PRS_MERGED" >> "$GITHUB_OUTPUT"
+          echo "completion=$COMPLETION" >> "$GITHUB_OUTPUT"
+
+      - name: Upload metrics artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-metrics-${{ github.run_number }}
+          path: metrics.json
+          retention-days: 90
+
+      - name: Send weekly report to Lark
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || secrets.LARK_SIGN_KEY }}
+          title: "Weekly Report — Week ${{ github.run_number }}"
+          template: 'purple'
+          content: ${{ steps.metrics.outputs.lark_content }}
+          button-text: "View Details"
+          button-url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
