@@ -163,7 +163,158 @@ jobs:
           buttons: '[{"text":"🔍 View Logs","url":"${{ github.event.pull_request.html_url }}","type":"danger"}]'
 
   # ──────────────────────────────────────
-  # Job 2: Deploy Preview (PR only, after CI passes)
+  # Job 2: Deploy Staging (push to staging, after CI passes)
+  # ──────────────────────────────────────
+  deploy-staging:
+    name: "Deploy: Staging [2/2]"
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to DigitalOcean App Platform
+        id: deploy
+        uses: digitalocean/app_action/deploy@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          app_name: ech-prime-web-v2-staging
+          print_build_logs: "true"
+          print_deploy_logs: "true"
+
+      - name: Prepare deploy info
+        if: always()
+        id: info
+        run: |
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Lark (Staging Deployed)
+        if: success()
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          title: "🚀 Staging Deployed"
+          template: 'green'
+          meta-left-label: "📦 Project"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🌍 Environment"
+          meta-right-value: "Staging"
+          meta2-left-label: "🔖 Commit"
+          meta2-left-value: "${{ steps.info.outputs.short_sha }}"
+          meta2-right-label: "👤 Author"
+          meta2-right-value: "${{ github.actor }}"
+          content: |
+            📝 ${{ steps.info.outputs.commit_msg }}
+            **Pipeline [2/2]** Staging Deploy
+            CI ✅  Deploy ✅
+          buttons: '[{"text":"📋 View Deploy","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"primary"},{"text":"🌐 Open Staging","url":"https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app","type":"default"}]'
+
+      - name: Notify Lark (Staging Deploy Failed)
+        if: failure()
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          title: "❌ Staging Deploy Failed"
+          template: 'red'
+          meta-left-label: "📦 Project"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🌍 Environment"
+          meta-right-value: "Staging"
+          meta2-left-label: "🔖 Commit"
+          meta2-left-value: "${{ steps.info.outputs.short_sha }}"
+          meta2-right-label: "👤 Author"
+          meta2-right-value: "${{ github.actor }}"
+          content: |
+            📝 ${{ steps.info.outputs.commit_msg }}
+            ⚠️ **Staging deploy failed!** Check DO build logs.
+          buttons: '[{"text":"🔍 View Logs","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"danger"}]'
+
+  # ──────────────────────────────────────
+  # Job 3: Deploy Production (push to main, after CI passes)
+  # ──────────────────────────────────────
+  deploy-production:
+    name: "Deploy: Production [2/2]"
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to DigitalOcean App Platform
+        id: deploy
+        uses: digitalocean/app_action/deploy@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          app_name: ech-prime-web-v2
+          print_build_logs: "true"
+          print_deploy_logs: "true"
+
+      - name: Prepare deploy info
+        if: always()
+        id: info
+        run: |
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Lark (Production Deployed)
+        if: success()
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          title: "🚀 Production Deployed"
+          template: 'green'
+          meta-left-label: "📦 Project"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🌍 Environment"
+          meta-right-value: "🔴 Production"
+          meta2-left-label: "🔖 Commit"
+          meta2-left-value: "${{ steps.info.outputs.short_sha }}"
+          meta2-right-label: "👤 Author"
+          meta2-right-value: "${{ github.actor }}"
+          content: |
+            📝 ${{ steps.info.outputs.commit_msg }}
+            ⚡ **Production is now live!**
+            CI ✅  Deploy ✅
+          buttons: '[{"text":"📋 View Deploy","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"primary"},{"text":"🌐 Open Production","url":"https://echprime.com","type":"default"}]'
+
+      - name: Notify Lark (Production Deploy FAILED)
+        if: failure()
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          title: "🚨 Production Deploy FAILED"
+          template: 'red'
+          meta-left-label: "📦 Project"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🌍 Environment"
+          meta-right-value: "🔴 Production"
+          meta2-left-label: "🔖 Commit"
+          meta2-left-value: "${{ steps.info.outputs.short_sha }}"
+          meta2-right-label: "👤 Author"
+          meta2-right-value: "${{ github.actor }}"
+          content: |
+            📝 ${{ steps.info.outputs.commit_msg }}
+            🚨 **CRITICAL: Production deploy failed!**
+            ⚠️ Action required immediately!
+          buttons: '[{"text":"🔍 View Logs","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"danger"}]'
+
+  # ──────────────────────────────────────
+  # Job 4: Deploy Preview (PR only, after CI passes)
   # ──────────────────────────────────────
   deploy-preview:
     name: "Preview: Deploy PR"
