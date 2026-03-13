@@ -1,0 +1,45 @@
+# ECH Prime Web v2 — CODEOWNERS
+# ================================
+# Auto-assign reviewers based on changed files.
+# Replace @placeholder-* with actual GitHub usernames.
+#
+# Format: <path-pattern> @github-username [@github-username ...]
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# ── Default (catch-all) ──────────────────────────────
+*                               @placeholder-tech-lead
+
+# ── Frontend (App Router, Components, Blocks) ────────
+/src/app/                       @placeholder-fe-dev-1 @placeholder-fe-dev-2
+/src/components/                @placeholder-fe-dev-1 @placeholder-fe-dev-2
+/src/blocks/                    @placeholder-fe-dev-1
+/src/store/                     @placeholder-fe-dev-1
+/tailwind.config.js             @placeholder-fe-dev-1
+
+# ── Backend (Collections, API, Lib) ──────────────────
+/src/collections/               @placeholder-be-dev
+/src/lib/                       @placeholder-be-dev @placeholder-fe-dev-1
+/src/app/api/                   @placeholder-be-dev
+/src/payload.config.ts          @placeholder-be-dev
+
+# ── Infrastructure & CI/CD ───────────────────────────
+/.github/workflows/             @placeholder-devops
+/.github/actions/               @placeholder-devops
+/.github/scripts/               @placeholder-devops
+/Dockerfile*                    @placeholder-devops
+/docker-compose*.yml            @placeholder-devops
+/scripts/                       @placeholder-devops
+
+# ── Documentation & Specs ────────────────────────────
+/SPEC.md                        @placeholder-pm @placeholder-tech-lead
+/CLAUDE.md                      @placeholder-tech-lead
+/docs/prd/                      @placeholder-pm
+/docs/stories/                  @placeholder-pm @placeholder-qa
+/docs/design/                   @placeholder-pm
+/docs/qa/                       @placeholder-qa
+/docs/architecture/             @placeholder-tech-lead
+
+# ── Config & Dependencies ────────────────────────────
+/package.json                   @placeholder-tech-lead @placeholder-devops
+/tsconfig.json                  @placeholder-tech-lead
+/.env.example                   @placeholder-devops
