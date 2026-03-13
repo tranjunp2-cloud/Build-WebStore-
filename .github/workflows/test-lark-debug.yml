@@ -1,0 +1,76 @@
+# Debug Lark webhooks — shows API response
+# DELETE after debugging
+
+name: "🔍 Debug Lark Webhooks"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Debug CI Group (LARK_WEBHOOK_URL fallback)"
+        env:
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+        run: |
+          echo "=== CI GROUP ==="
+          echo "Webhook URL set: $([ -n "$LARK_WEBHOOK" ] && echo 'YES' || echo 'NO')"
+          echo "Sign Key set: $([ -n "$LARK_SIGN_KEY" ] && echo 'YES' || echo 'NO')"
+          TIMESTAMP=$(date +%s)
+          SIGN_STR=$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")
+          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$SIGN_STR" -binary | base64 2>/dev/null || echo "")
+          echo "Timestamp: $TIMESTAMP"
+          echo "Sign generated: $([ -n "$SIGN" ] && echo 'YES' || echo 'NO')"
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "$LARK_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "timestamp": "'"$TIMESTAMP"'",
+              "sign": "'"$SIGN"'",
+              "msg_type": "text",
+              "content": {"text": "🧪 Debug test — CI Group"}
+            }')
+          echo "Response: $RESPONSE"
+
+      - name: "Debug Task Group (LARK_WEBHOOK_TASK)"
+        env:
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_TASK }}
+          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+        run: |
+          echo "=== TASK GROUP ==="
+          echo "Webhook URL set: $([ -n "$LARK_WEBHOOK" ] && echo 'YES' || echo 'NO')"
+          echo "Sign Key set: $([ -n "$LARK_SIGN_KEY" ] && echo 'YES' || echo 'NO')"
+          TIMESTAMP=$(date +%s)
+          SIGN_STR=$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")
+          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$SIGN_STR" -binary | base64 2>/dev/null || echo "")
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "$LARK_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "timestamp": "'"$TIMESTAMP"'",
+              "sign": "'"$SIGN"'",
+              "msg_type": "text",
+              "content": {"text": "🧪 Debug test — Task Group"}
+            }')
+          echo "Response: $RESPONSE"
+
+      - name: "Debug Report Group (LARK_WEBHOOK_REPORT)"
+        env:
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_REPORT }}
+          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+        run: |
+          echo "=== REPORT GROUP ==="
+          echo "Webhook URL set: $([ -n "$LARK_WEBHOOK" ] && echo 'YES' || echo 'NO')"
+          echo "Sign Key set: $([ -n "$LARK_SIGN_KEY" ] && echo 'YES' || echo 'NO')"
+          TIMESTAMP=$(date +%s)
+          SIGN_STR=$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")
+          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$SIGN_STR" -binary | base64 2>/dev/null || echo "")
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "$LARK_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "timestamp": "'"$TIMESTAMP"'",
+              "sign": "'"$SIGN"'",
+              "msg_type": "text",
+              "content": {"text": "🧪 Debug test — Report Group"}
+            }')
+          echo "Response: $RESPONSE"
