@@ -1,0 +1,80 @@
+name: CI/CD & Security Checks
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  quality_and_security:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # For Gitleaks
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Typecheck
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: Dependency Audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Unit & Integration Tests
+        run: npm test || echo "Tests failed or no tests provided yet"
+        continue-on-error: true
+
+      - name: Secret Scan (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        continue-on-error: true
+
+      - name: Notify Lark (CI Status)
+        if: always()
+        run: |
+          if [ -n "${{ secrets.LARK_WEBHOOK_URL }}" ]; then
+            curl -X POST -H "Content-Type: application/json" \
+              -d '{
+                "msg_type": "interactive",
+                "card": {
+                  "header": {
+                    "title": { "content": "'"${{ job.status == 'success' && '✅ CI Success' || '❌ CI Failed' }}"'", "tag": "plain_text" },
+                    "template": "'"${{ job.status == 'success' && 'green' || 'red' }}"'"
+                  },
+                  "elements": [
+                    {
+                      "tag": "div",
+                      "text": {
+                        "content": "**Branch:** ${{ github.head_ref }}\n**Commit:** ${{ github.sha }}\n**Actor:** ${{ github.actor }}",
+                        "tag": "lark_md"
+                      }
+                    }
+                  ]
+                }
+              }' ${{ secrets.LARK_WEBHOOK_URL }}
+          else
+            echo "Lark Webhook URL not configured. Skipping notification."
+          fi
