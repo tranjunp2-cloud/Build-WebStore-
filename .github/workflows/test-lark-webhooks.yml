@@ -1,0 +1,97 @@
+# Temporary workflow to test all 3 Lark webhook groups
+# DELETE THIS FILE after testing is complete
+
+name: "🧪 Test Lark Webhooks"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-webhooks:
+    name: "Send test to all 3 Lark groups"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Test CI Group"
+        env:
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+        run: |
+          TIMESTAMP=$(date +%s)
+          SIGN_STR=$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")
+          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$SIGN_STR" -binary | base64 2>/dev/null || echo "")
+          curl -s -X POST "$LARK_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "timestamp": "'"$TIMESTAMP"'",
+              "sign": "'"$SIGN"'",
+              "msg_type": "interactive",
+              "card": {
+                "header": {"title": {"tag": "plain_text", "content": "🧪 Test — CI Group"}, "template": "green"},
+                "elements": [
+                  {"tag": "div", "text": {"tag": "lark_md", "content": "✅ **CI Group webhook đang hoạt động!**\n\nGroup này sẽ nhận:\n• CI pass/fail notifications\n• Preview deploy status\n\n🕐 '"$(date -u '+%Y-%m-%d %H:%M UTC')"'"}}
+                ]
+              }
+            }'
+          echo ""
+          echo "✅ CI Group message sent"
+
+      - name: "Test Task Group"
+        env:
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_TASK }}
+          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+        run: |
+          TIMESTAMP=$(date +%s)
+          SIGN_STR=$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")
+          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$SIGN_STR" -binary | base64 2>/dev/null || echo "")
+          curl -s -X POST "$LARK_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "timestamp": "'"$TIMESTAMP"'",
+              "sign": "'"$SIGN"'",
+              "msg_type": "interactive",
+              "card": {
+                "header": {"title": {"tag": "plain_text", "content": "🧪 Test — Task Group"}, "template": "blue"},
+                "elements": [
+                  {"tag": "div", "text": {"tag": "lark_md", "content": "✅ **Task Group webhook đang hoạt động!**\n\nGroup này sẽ nhận:\n• PR opened/merged/review notifications\n• Story → Issue sync alerts\n• Doc change notifications\n• Stale PR/Issue warnings\n\n🕐 '"$(date -u '+%Y-%m-%d %H:%M UTC')"'"}}
+                ]
+              }
+            }'
+          echo ""
+          echo "✅ Task Group message sent"
+
+      - name: "Test Report Group"
+        env:
+          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_REPORT }}
+          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+        run: |
+          TIMESTAMP=$(date +%s)
+          SIGN_STR=$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")
+          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$SIGN_STR" -binary | base64 2>/dev/null || echo "")
+          curl -s -X POST "$LARK_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "timestamp": "'"$TIMESTAMP"'",
+              "sign": "'"$SIGN"'",
+              "msg_type": "interactive",
+              "card": {
+                "header": {"title": {"tag": "plain_text", "content": "🧪 Test — Report Group"}, "template": "purple"},
+                "elements": [
+                  {"tag": "div", "text": {"tag": "lark_md", "content": "✅ **Report Group webhook đang hoạt động!**\n\nGroup này sẽ nhận:\n• Weekly team metrics (Mon 10AM)\n• Sprint start/standup/review reminders\n• Security alerts (Dependabot + secret scan)\n• Release changelog\n\n🕐 '"$(date -u '+%Y-%m-%d %H:%M UTC')"'"}}
+                ]
+              }
+            }'
+          echo ""
+          echo "✅ Report Group message sent"
+
+      - name: "Summary"
+        run: |
+          echo "============================================"
+          echo "🎉 All 3 Lark webhook groups tested!"
+          echo ""
+          echo "Check your Lark groups for messages:"
+          echo "  🟢 CI Group      — Green card"
+          echo "  🔵 Task Group    — Blue card"
+          echo "  🟣 Report Group  — Purple card"
+          echo ""
+          echo "⚠️  Remember to delete this test workflow!"
+          echo "============================================"
