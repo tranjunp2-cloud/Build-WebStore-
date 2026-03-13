@@ -1,8 +1,8 @@
 # PRD: Products CRUD (F09)
-> **Version:** 1.0 | **Created:** 2026-03-08 | **Agent:** `project-planner`  
+> **Version:** 2.0 | **Updated:** 2026-03-13 | **Agent:** `project-planner`  
 > **Priority:** P0 | **Wave:** 4 | **Size:** L  
 > **Depends on:** Dashboard ✅, Payload CMS Products collection ✅  
-> **Ref:** [malaysia-market-context.md](../malaysia-market-context.md)
+> **MY Ref:** [malaysia-market-context.md](../malaysia-market-context.md) — §6 Halal, §4 Payment
 
 ---
 
@@ -60,6 +60,8 @@ THEN  fields: name*, price* (RM), compareAtPrice, category*, description, images
 AND   price field auto-formats as RM XX.XX
 AND   image upload: drag & drop, max 5MB per image, auto-resize
 AND   "✨ AI Write Description" button below description field
+AND   Halal section: toggle "Halal Certified" + upload cert image (JAKIM)
+AND   weight field (grams) for shipping calculation
 ```
 
 ### AC-3: AI Description
@@ -95,6 +97,16 @@ AND   Undo restores product.status to previous value
 GIVEN product stock = 0
 THEN  red warning badge "Out of Stock" in list
 AND   product still visible on storefront but "Add to Cart" disabled
+```
+
+### AC-7: Halal Certification (MY Market)
+```gherkin
+GIVEN product category is F&B or Beauty
+WHEN  user toggles "Halal Certified" ON
+THEN  upload field for Halal cert image appears (JAKIM certificate)
+AND   uploaded cert shows ✅ Halal badge on product card in storefront
+AND   if Halal toggled OFF → no badge shown
+AND   badge text: "Halal Certified (JAKIM)"
 ```
 
 ## 5. Edge Cases

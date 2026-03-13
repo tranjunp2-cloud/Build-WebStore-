@@ -19,6 +19,12 @@
 | Onboarding page tồn tại | Không có Redis |
 | Email lib cơ bản (Resend) | Resend chưa có templates |
 | Multi-tenant middleware | Không có preview deploy |
+| Currency MYR, SST 6% in checkout layout | ❌ Products không có Halal cert field |
+| | ❌ Storefront không có WhatsApp button |
+| | ❌ Không có shipping config/rates |
+| | ❌ Onboarding không có language selection |
+| | ❌ Storefront không có language switcher |
+| | ❌ Tenant không có SSM/WhatsApp fields |
 
 ---
 
@@ -463,14 +469,122 @@ Thêm env: `SENTRY_DSN=https://xxx@sentry.io/yyy`
 
 ---
 
-## 📊 Tóm tắt thay đổi vs bản cũ
+## 🇲🇾 MY Market Tasks (Sprint 0 — chuẩn bị cho Sprint 2)
 
-| Bản cũ | Bản mới |
+> Tasks này chuẩn bị collection fields và components cho MY market features.
+> Không cần design — chỉ backend/collection changes.
+
+### D8 — Thêm Halal Cert field vào Products collection (VIẾT CODE)
+
+| | |
+|---|---|
+| **Thực trạng** | Products collection không có field Halal. Ref: F09 AC-7 |
+| **Việc làm** | Thêm fields vào `src/collections/Products.ts` |
+| **Thời gian** | 0.5 ngày |
+
+**Thêm vào Products collection:**
+```typescript
+// Trong fields array:
+{
+  name: 'halalCertified',
+  type: 'checkbox',
+  defaultValue: false,
+  admin: { description: 'Toggle to mark product as Halal Certified (JAKIM)' },
+},
+{
+  name: 'halalCertImage',
+  type: 'upload',
+  relationTo: 'media',
+  admin: {
+    condition: (data) => data.halalCertified,
+    description: 'Upload JAKIM Halal certificate image',
+  },
+},
+{
+  name: 'weight',
+  type: 'number',
+  min: 0,
+  admin: { description: 'Product weight in grams (for shipping calculation)' },
+},
+```
+
+**DoD:** `npm run db:push` → Products form in Payload admin shows Halal toggle + upload + weight field
+
+---
+
+### D9 — Thêm WhatsApp + SSM fields vào Tenants collection (VIẾT CODE)
+
+| | |
+|---|---|
+| **Thực trạng** | Tenants collection không có WhatsApp/SSM fields. Ref: F10 AC-11, AC-12 |
+| **Việc làm** | Thêm fields vào `src/collections/Tenants.ts` |
+| **Thời gian** | 0.5 ngày |
+
+**Thêm vào Tenants collection:**
+```typescript
+{
+  name: 'whatsappNumber',
+  type: 'text',
+  admin: { description: 'WhatsApp number with country code, e.g. 60123456789' },
+},
+{
+  name: 'ssmNumber',
+  type: 'text',
+  admin: { description: 'SSM Registration Number (Suruhanjaya Syarikat Malaysia)' },
+},
+{
+  name: 'businessAddress',
+  type: 'textarea',
+  admin: { description: 'Physical business address for trust signals' },
+},
+```
+
+**DoD:** Tenants form in Payload admin → fill WhatsApp + SSM → save → query returns fields
+
+---
+
+### D10 — Thêm Shipping Config + Locale vào Sites collection (VIẾT CODE)
+
+| | |
+|---|---|
+| **Thực trạng** | Sites collection không có shipping config hay locale. Ref: F17 §8, F06 AC-1 |
+| **Việc làm** | Thêm shippingConfig group + locale vào `src/collections/Sites.ts` |
+| **Thời gian** | 0.5 ngày |
+
+**Thêm vào Sites collection:**
+```typescript
+{
+  name: 'locale',
+  type: 'select',
+  options: [
+    { label: 'Bahasa Melayu', value: 'bm' },
+    { label: 'English', value: 'en' },
+  ],
+  defaultValue: 'bm',
+},
+{
+  name: 'shippingConfig',
+  type: 'group',
+  fields: [
+    { name: 'westRate', type: 'number', defaultValue: 800, admin: { description: 'Semenanjung rate in sen (800 = RM 8)' } },
+    { name: 'eastRate', type: 'number', defaultValue: 1500, admin: { description: 'Sabah/Sarawak rate in sen (1500 = RM 15)' } },
+    { name: 'freeAbove', type: 'number', admin: { description: 'Free shipping above X sen (null = no free shipping)' } },
+  ],
+},
+```
+
+**DoD:** Sites form in Payload admin → locale dropdown (BM/EN) + shipping rates → save → query returns fields
+
+---
+
+## 📊 Tóm tắt
+
+| Bản cũ | Bản mới (13/3/2026) |
 |--------|---------|
-| 37 tasks (nhiều task giả) | **14 tasks (tất cả viết code thật)** |
+| 37 tasks (nhiều task giả) | **17 tasks (tất cả viết code thật)** |
+| Không có MY market tasks | +3 tasks: Halal field, WhatsApp/SSM fields, Shipping config |
 | D1 "Fix TS errors" (đã pass) | ❌ Xóa |
 | D3 "API audit" (mơ hồ) | → D1 Auth Check + D2 Zod (cụ thể từng file) |
 | D8,D9,D10,D11 "hoàn thiện" (đã có code) | ❌ Xóa — code đã có, cần test thôi → Q1 |
-| D14,D15 "publish, auto-save" (đã có) | ❌ Xóa — code đã có |
 | Tasks Q1-Q10 chung chung | → 3 tasks cụ thể: API tests, E2E, Test plans |
 | Tasks O1-O10 nhiều giả | → 4 tasks thật: CI fix, Sentry, Preview, Docker |

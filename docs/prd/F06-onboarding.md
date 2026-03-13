@@ -1,7 +1,8 @@
 # PRD: Onboarding Flow (F06)
-> **Version:** 1.0 | **Created:** 2026-03-08 | **Agent:** `project-planner`  
+> **Version:** 2.0 | **Updated:** 2026-03-13 | **Agent:** `project-planner`  
 > **Priority:** P0 | **Wave:** 1 | **Size:** M  
-> **Depends on:** F02 Auth ✅ | **Blocks:** F01 AI Builder, F07 Templates
+> **Depends on:** F02 Auth ✅ | **Blocks:** F01 AI Builder, F07 Templates  
+> **MY Ref:** [malaysia-market-context.md](../malaysia-market-context.md) — Persona A
 
 ---
 
@@ -33,10 +34,31 @@ SO THAT I don't get lost and start building immediately
 
 ## 5. Screen Layout
 
+### Step 1: Store Setup (NEW — MY market)
 ```
 ┌─ /onboarding ──────────────────────────────────┐
 │                                                  │
 │     👋 Welcome to PrimeWeb, [Name]!             │
+│                                                  │
+│     Tell us about your business:                 │
+│                                                  │
+│     Store Name*:  [________________]             │
+│                                                  │
+│     Business Type*:                              │
+│     [Fashion ▼] [F&B ▼] [Beauty ▼] [Other]      │
+│                                                  │
+│     Store Language*:                             │
+│     ┌─────────┐  ┌─────────┐                    │
+│     │ 🇲🇾 BM   │  │ 🇬🇧 EN   │                    │
+│     └─────────┘  └─────────┘                    │
+│                                                  │
+│     [Continue →]                                 │
+└──────────────────────────────────────────────────┘
+```
+
+### Step 2: Choose Method
+```
+┌─ /onboarding/method ───────────────────────────┐
 │                                                  │
 │     How would you like to create your website?   │
 │                                                  │
@@ -58,12 +80,21 @@ SO THAT I don't get lost and start building immediately
 
 ## 6. Acceptance Criteria
 
-### AC-1: Welcome Screen
+### AC-1: Store Setup (NEW)
 ```gherkin
 GIVEN user just registered (no sites yet)
 WHEN  redirected to /onboarding
 THEN  greeting shows "Welcome to PrimeWeb, [firstName]!"
-AND   2 option cards: "AI Builder" and "Templates"
+AND   form: Store Name, Business Type (Fashion/F&B/Beauty/Other), Store Language (BM/EN)
+AND   language saves to site.locale → used by AI for content generation
+AND   business type saves to site.category → used by AI/SEO for MY keywords
+```
+
+### AC-1b: Choose Method
+```gherkin
+GIVEN user filled store setup and clicks "Continue"
+WHEN  step 2 loads
+THEN  2 option cards: "AI Builder" and "Templates"
 AND   each card has icon, description, time estimate, CTA button
 ```
 

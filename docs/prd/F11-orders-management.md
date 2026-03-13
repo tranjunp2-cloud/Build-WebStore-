@@ -1,7 +1,8 @@
 # PRD: Orders Management (F11)
-> **Version:** 1.0 | **Created:** 2026-03-08 | **Agent:** `project-planner`  
+> **Version:** 2.0 | **Updated:** 2026-03-13 | **Agent:** `project-planner`  
 > **Priority:** P0 | **Wave:** 4 | **Size:** M  
-> **Depends on:** F10 Storefront Commerce ✅, Payload CMS Orders collection ✅
+> **Depends on:** F10 Storefront Commerce ✅, Payload CMS Orders collection ✅  
+> **MY Ref:** [malaysia-market-context.md](../malaysia-market-context.md) — §6 WhatsApp
 
 ---
 
@@ -68,7 +69,26 @@ GIVEN user changes status from Pending → Confirmed
 WHEN  saved
 THEN  order.status updated in DB
 AND   toast "Order ORD-XXXXX updated to Confirmed"
-AND   (future P1: WhatsApp notification to customer)
+```
+
+### AC-3b: WhatsApp Notification (MY Market)
+```gherkin
+GIVEN order status changes to Confirmed or Shipped
+WHEN  customer phone number is available
+THEN  WhatsApp message sent via wa.me link (P0) or WhatsApp Business API (P1)
+AND   message template:
+       Confirmed: "Pesanan ORD-XXXXX telah disahkan! Kami sedang menyediakan barang anda."
+       Shipped: "Pesanan ORD-XXXXX telah dihantar! Tracking: [link]"
+AND   seller dashboard shows "WhatsApp sent ✅" status
+```
+
+### AC-3c: Order Confirmation Page (Customer-facing)
+```gherkin
+GIVEN customer successfully places an order
+WHEN  order created
+THEN  confirmation page shows: order #, items, total, estimated delivery
+AND   "Share via WhatsApp" button (shares order summary to customer's WhatsApp)
+AND   "Continue Shopping" link back to storefront
 ```
 
 ### AC-4: Cancel Order

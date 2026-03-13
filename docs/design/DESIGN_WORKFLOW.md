@@ -1,68 +1,74 @@
-# 🎨 Design Workflow & Rules — PrimeWeb
+# 🎨 Design Guide — PrimeWeb (Malaysia Market)
 
-> **Dành cho:** Designer UI/UX
-> **Đọc trước khi bắt đầu:** [PROJECT_ALIGNMENT.md](PROJECT_ALIGNMENT.md) (timeline, priority)
+> **Dành cho:** UI/UX Designer
+> **1 file duy nhất** — tất cả rules, screens, tokens, Figma links ở đây.
+> **Đọc kèm:** [malaysia-market-context.md](../malaysia-market-context.md) (personas, payment, shipping, cultural UX)
 
 ---
 
-## 1. Quy trình Design
+## 1. Bối cảnh
+
+PrimeWeb = **AI Website Builder cho SME Malaysia** — chủ tiệm nhỏ tạo website bán hàng trong 5 phút.
+
+**Redesign nhắm vào:**
+- Mobile-first (97.4% users MY mua trên điện thoại)
+- Bilingual (BM + EN)
+- Trust signals MY (Halal badge, SSM number, WhatsApp, J&T/Pos Laju)
+
+**Cultural UX cần thể hiện:**
+
+| Yếu tố | Làm sao trong UI |
+|---------|-----------------|
+| 🕌 Halal | Badge JAKIM trên product card + detail |
+| 📱 WhatsApp | Floating button xanh lá ở storefront |
+| 💰 Giá RM | Format: `RM 189.00` |
+| 🏢 SSM | Footer: "SSM: 123456-X" |
+| 📦 J&T / Pos Laju | Logo carriers khi chọn shipping |
+| 🔤 BM + EN | Language switcher (toggle BM/EN) |
+
+> Chi tiết personas, JTBD, payment landscape → [malaysia-market-context.md](../malaysia-market-context.md)
+
+---
+
+## 2. Quy trình Design
 
 ```
 Step 1                Step 2              Step 3              Step 4
 Nhận brief       →    Wireframe      →    UI Design      →    Handoff
-(Architecture doc)     (Low-fi, 1 ngày)   (Hi-fi, 2-3 ngày)  (Figma link vào repo)
+(Đọc PRD + §4)       (Low-fi, 1 ngày)   (Hi-fi, 2-3 ngày)  (Figma link vào §7)
        ↓                    ↓                   ↓                    ↓
   Đọc PRD + Stories    Review với TL       Review với TL       Dev dùng Dev Mode
 ```
 
-### Chi tiết mỗi step
-
-| Step | Input | Output | Ai review | Thời gian |
-|------|-------|--------|-----------|:---------:|
-| **1. Nhận brief** | PRD + Stories + Architecture doc | Hiểu rõ yêu cầu | — | 2-3 giờ |
-| **2. Wireframe** | Hiểu biết từ step 1 | Low-fi frames (Desktop + Mobile) | Tech Lead | 1 ngày |
-| **3. UI Design** | Wireframe approved | Hi-fi design với Design System | Tech Lead + 1 Dev | 2-3 ngày |
-| **4. Handoff** | UI approved | Figma link vào `docs/design/README.md` | — | 15 phút |
-
----
-
-## 2. Mỗi Feature cần có
-
-### Bắt buộc
-- [ ] **Desktop** (1440px)
-- [ ] **Mobile** (375px) — BMAD bắt buộc
-- [ ] **4 States**: Empty, Loading, Error, Success
-- [ ] **Interactive elements**: hover, focus, disabled, active
-
-### Nên có
-- [ ] Tablet breakpoint (768px)
-- [ ] Dark mode (nếu áp dụng)
-- [ ] Micro-animations (transition notes)
-- [ ] User flow (arrows giữa screens)
+| Step | Input | Output | Review | Thời gian |
+|------|-------|--------|--------|:---------:|
+| **1. Brief** | PRD + Stories | Hiểu yêu cầu | — | 2-3 giờ |
+| **2. Wireframe** | Brief | Low-fi (Desktop + Mobile) | Tech Lead | 1 ngày |
+| **3. UI Design** | Wireframe approved | Hi-fi với Design System | Tech Lead + Dev | 2-3 ngày |
+| **4. Handoff** | UI approved | Figma link vào §7 | — | 15 phút |
 
 ---
 
 ## 3. Design System — shadcn/ui
 
-> **QUAN TRỌNG:** Project dùng **shadcn/ui** (React components). Designer phải design **matching** với shadcn components.
+> Project dùng **shadcn/ui** (React). Designer phải design **matching** với shadcn components.
 
-### Figma Resources
-- **shadcn/ui Figma Kit**: [Tìm trên Figma Community](https://www.figma.com/community/search?resource_type=mixed&sort_by=relevancy&query=shadcn)
-- Import kit vào project Figma → dùng components từ đó
+### Figma Kit
+Import từ [Figma Community — shadcn/ui](https://www.figma.com/community/search?resource_type=mixed&sort_by=relevancy&query=shadcn)
 
-### Components chính (phải dùng từ kit)
+### Components chính
 
 | Component | Dùng cho |
 |-----------|---------|
-| **Button** | CTA, actions — Primary, Secondary, Outline, Ghost |
+| **Button** | CTA — Primary, Secondary, Outline, Ghost |
 | **Input** | Forms — Text, Email, Password, Search |
-| **Select** | Dropdowns — Filter, sort |
-| **Dialog** | Modal — Confirm, alert |
-| **Sheet** | Slide-over panel — Detail views |
-| **Card** | Product card, stat card, info card |
+| **Select** | Dropdowns — Filter, sort, MY states |
+| **Dialog** | Modals — Confirm, alert |
+| **Sheet** | Slide-over — Detail views, cart drawer |
+| **Card** | Product card, stat card |
 | **Table** | Products list, Orders list |
-| **Badge** | Status tags — Published, Draft, Active |
-| **Toast** | Notifications — Success, Error, Warning |
+| **Badge** | Status — Published, Draft, Halal ✅ |
+| **Toast** | Notifications — Success, Error |
 | **Tabs** | Navigation trong page |
 | **Skeleton** | Loading states — KHÔNG dùng spinner |
 
@@ -76,12 +82,12 @@ Foreground:  hsl(222, 47%, 11%)     ← Text chính
 Muted:       hsl(210, 40%, 96%)     ← Text phụ bg
 Border:      hsl(214, 32%, 91%)     ← Borders
 Destructive: hsl(0, 84%, 60%)       ← Errors, delete
-Success:     hsl(142, 71%, 45%)     ← Success states
-Warning:     hsl(38, 92%, 50%)      ← Warnings
+Success:     hsl(142, 71%, 45%)     ← Success, Halal badge
+Warning:     hsl(38, 92%, 50%)      ← Warnings, stock low
+WhatsApp:    hsl(142, 70%, 49%)     ← WhatsApp button (#25D366)
 ```
 
 ### Typography
-
 ```
 Font:     Inter (Google Fonts)
 H1:       30px / 700 (1 per page)
@@ -99,7 +105,169 @@ Mono:     JetBrains Mono (code blocks)
 
 ---
 
-## 4. Design Rules
+## 4. Tất cả screens cần design (28 screens)
+
+### 🔐 A. Auth (4 screens)
+
+| # | Screen | Priority | Notes |
+|---|--------|:--------:|-------|
+| A1 | **Login** | 🔴 | Email + password. Social login (Google)? |
+| A2 | **Register** | 🔴 | Name, email, password → onboarding |
+| A3 | **Forgot Password** | 🟡 | Nhập email → link reset |
+| A4 | **Reset Password** | 🟡 | New password + confirm |
+
+- 1 cột giữa, brand logo + tagline "Tạo website bán hàng trong 5 phút"
+- Mobile: full-width input, buttons ≥ 48px height
+
+---
+
+### 🚀 B. Onboarding (3 screens)
+
+| # | Screen | Priority | Notes |
+|---|--------|:--------:|-------|
+| B1 | **Store Setup** | 🔴 | Tên store, loại (Fashion/F&B/Beauty), **ngôn ngữ BM/EN** |
+| B2 | **AI Generation** | 🔴 | Loading animation + fun facts |
+| B3 | **Result Preview** | 🔴 | Preview → "Edit" hoặc "Publish" |
+
+- Wizard 3 steps (progress bar). B1 < 30 giây hoàn thành
+- B2: skeleton animation ("Đang chọn màu sắc...", "Đang viết nội dung...")
+
+---
+
+### 📊 C. Dashboard (6 screens)
+
+| # | Screen | Priority | Notes |
+|---|--------|:--------:|-------|
+| C1 | **Dashboard Home** | 🔴 | Stats: orders, revenue, visitors + Quick Actions |
+| C2 | **Products List** | 🔴 | Table: name, price, stock, **Halal badge**, status |
+| C3 | **Product Detail/Edit** | 🔴 | Form: name, price, images, AI desc btn, **Halal cert toggle+upload**, weight |
+| C4 | **Orders List** | 🟡 | Table: order #, customer, total, status badge |
+| C5 | **SEO Dashboard** | 🟡 | Score circle, issues list, "AI Fix All" |
+| C6 | **Analytics** | ⚪ | Charts: visitors, revenue, top products |
+
+- Sidebar nav (desktop) → bottom nav (mobile)
+- Tables: desktop = full table, mobile = card list
+
+---
+
+### ✏️ D. AI Editor (2 screens)
+
+| # | Screen | Priority | Notes |
+|---|--------|:--------:|-------|
+| D1 | **Editor Main** | 🔴 | Chat (30%) + Preview (70%). Device switcher |
+| D2 | **Settings Panel** | 🟡 | Site name, favicon, SEO, colors |
+
+- **D1 = screen quan trọng nhất** — user dùng nhiều nhất
+- Toolbar: Undo/Redo, Publish, Settings gear
+
+---
+
+### 🎨 E. Templates (2 screens)
+
+| # | Screen | Priority | Notes |
+|---|--------|:--------:|-------|
+| E1 | **Gallery Grid** | 🟡 | Cards + filter by: Fashion, F&B, Beauty, Raya Special |
+| E2 | **Template Preview** | 🟡 | Full preview + "Use Template" CTA |
+
+---
+
+### 🌐 F. Storefront (5 screens) — PHẦN QUAN TRỌNG NHẤT
+
+| # | Screen | Priority | Notes |
+|---|--------|:--------:|-------|
+| F1 | **Homepage** | 🔴 | Hero, products grid, about, trust footer |
+| F2 | **Products Catalog** | 🔴 | Grid 2 cột (mobile), filter drawer |
+| F3 | **Product Detail** | 🔴 | Gallery swipe, variant selector, **Halal badge**, WhatsApp btn |
+| F4 | **Checkout** | 🔴 | Cart → Info → Shipping → Payment (SST 6%) |
+| F5 | **Order Confirmation** | 🟡 | Order # + **"Share via WhatsApp"** button |
+
+- **Mobile-first bắt buộc** — 97.4% users MY
+- Trust signals footer mỗi storefront:
+```
+✅ Halal Certified (JAKIM)  🏢 SSM: 123456-X
+📍 Jalan ABC, KL           📱 WhatsApp: +60 12-345 6789
+💳 Visa, MC, FPX           📦 J&T, Pos Laju
+```
+
+---
+
+### 🏠 G. Landing Page (1 screen)
+
+| # | Screen | Priority | Notes |
+|---|--------|:--------:|-------|
+| G1 | **PrimeWeb Homepage** | 🟡 | Marketing — attract signups |
+
+---
+
+### 💳 H. Payment (2 screens — F16)
+
+| # | Screen | Priority | Notes |
+|---|--------|:--------:|-------|
+| H1 | **Payment Method Selection** | 🟡 | Radio: FPX (bank dropdown), Card, E-wallet icon |
+| H2 | **Payment Failed** | 🟡 | "Pembayaran gagal" + Retry + cart preserved |
+
+- FPX: Malaysian bank logos (Maybank, CIMB, RHB) in dropdown
+- Order summary: subtotal + shipping + SST 6% = total
+
+---
+
+### 📦 I. Shipping & Settings (3 screens — F17)
+
+| # | Screen | Priority | Notes |
+|---|--------|:--------:|-------|
+| I1 | **Shipping Address** | 🟡 | Address form + **16 MY states dropdown** |
+| I2 | **Shipping Settings** | 🟡 | Seller: West rate, East rate, free threshold |
+| I3 | **Store Settings** | 🟡 | WhatsApp number, SSM, address, language |
+
+---
+
+### Tổng screens
+
+| Nhóm | Screens |
+|------|:-------:|
+| A. Auth | 4 |
+| B. Onboarding | 3 |
+| C. Dashboard | 6 |
+| D. AI Editor | 2 |
+| E. Templates | 2 |
+| F. Storefront | 5 |
+| G. Landing | 1 |
+| H. Payment | 2 |
+| I. Shipping/Settings | 3 |
+| **Total** | **28** |
+
+---
+
+## 5. Thứ tự ưu tiên design
+
+### Wave 1 (Design trước — 1 tuần)
+| # | Screen | Lý do |
+|---|--------|-------|
+| D1 | AI Editor | User dùng nhiều nhất |
+| B1-B3 | Onboarding 3 steps | First impression |
+| F1 | Storefront Homepage | Brand impression |
+| F3 | Product Detail | Buyer quyết định mua |
+| F4 | Checkout | Revenue — mất ở đây = mất tiền |
+
+### Wave 2 (Tuần 2)
+| # | Screen | Lý do |
+|---|--------|-------|
+| A1-A2 | Login/Register | Gate entry |
+| C1-C3 | Dashboard + Products | Seller daily use |
+| F2 | Product Catalog | Browse experience |
+
+### Wave 3 (Tuần 3)
+| # | Screen | Lý do |
+|---|--------|-------|
+| C4-C6 | Orders, SEO, Analytics | Secondary |
+| E1-E2 | Templates | Fallback |
+| F5, G1 | Order confirm, Landing | Polish |
+| H1-H2 | Payment | FPX cho MY market |
+| I1-I3 | Shipping, Settings | MY-specific settings |
+
+---
+
+## 6. Design Rules
 
 ### Mobile First
 ```
@@ -111,196 +279,99 @@ Mono:     JetBrains Mono (code blocks)
 ```
 ❌ Tự tạo component/style mới
 ✅ Dùng shadcn components từ Figma Kit
-   Nếu cần component mới → trao đổi với Tech Lead trước
+   Cần mới → trao đổi với Tech Lead trước
 ```
 
 ### ⚠️ Rule: 4 States — BẮT BUỘC mỗi screen
 
-> **Tại sao?** Nếu designer chỉ vẽ state "có data" → dev không biết trang trống, đang load, hay bị lỗi thì hiện gì → tự design bừa → UI không nhất quán. 4 states đảm bảo **user không bao giờ thấy trang trắng trơn**.
-
-Ví dụ: Trang **Products List** (`/dashboard/products`)
-
-#### ✅ State 1: Success (có data — bình thường)
-```
-┌─ Products ──────────────────────────────┐
-│  Products (12)           [+ Add Product] │
-│                                          │
-│  📷 Baju Kurung Pink     RM 189    Active│
-│  📷 Tudung Bawal Basic   RM 35     Active│
-│  📷 Telekung Premium     RM 250    Draft │
-└──────────────────────────────────────────┘
-```
-Ai cũng design state này. **Nhưng 3 state dưới mới quan trọng.**
-
-#### 📭 State 2: Empty (chưa có data)
-```
-┌─ Products ──────────────────────────────┐
-│  Products (0)                            │
-│                                          │
-│              📦                          │
-│      Chưa có sản phẩm nào               │
-│    Thêm sản phẩm đầu tiên để            │
-│    bắt đầu bán hàng                      │
-│                                          │
-│        [+ Thêm Sản Phẩm]  ← CTA        │
-└──────────────────────────────────────────┘
-```
-User mới, chưa có data → trang **KHÔNG được trống trơn**:
-- **Icon** (📦) → nhìn không hoang mang
-- **Text giải thích** → hiểu tại sao trống
-- **CTA button** → biết phải làm gì tiếp
-
-```
-❌ Sai:  Bảng trống, không có gì
-✅ Đúng: Icon + text mô tả + nút hành động
-```
-
-#### ⏳ State 3: Loading (đang tải data)
-```
-┌─ Products ──────────────────────────────┐
-│  Products                [+ Add Product] │
-│                                          │
-│  ██████████████████       ████    ██████ │
-│  ██████████████████       ████    ██████ │
-│  ██████████████████       ████    ██████ │
-│  ██████████████████       ████    ██████ │
-└──────────────────────────────────────────┘
-           ↑ Skeleton (xám nhấp nháy, hình giống nội dung thật)
-```
-API đang load → hiện khung xám nhấp nháy **giống hình dáng nội dung thật**. User thấy layout đang hình thành → cảm giác nhanh.
-
-```
-❌ Sai:  Spinner tròn quay giữa trang trống → không biết chờ bao lâu
-✅ Đúng: Skeleton giống layout thật → user thấy data sắp xuất hiện
-```
-
-#### 🔴 State 4: Error (API lỗi, mất mạng)
-```
-┌─ Products ──────────────────────────────┐
-│  Products                                │
-│                                          │
-│  ┌─ Toast (góc trên phải) ──────────┐   │
-│  │ ❌ Không thể tải sản phẩm.       │   │
-│  │    [Thử lại]                      │   │
-│  └───────────────────────────────────┘   │
-└──────────────────────────────────────────┘
-```
-API lỗi → **KHÔNG để trang trắng không nói gì**:
-- **Toast đỏ** → user biết có lỗi
-- **"Thử lại" button** → user tự fix được, không cần refresh trang
-
-```
-❌ Sai:  Trang trắng, hoặc hiện "Error" không có nút gì
-✅ Đúng: Thông báo rõ lỗi + nút retry
-```
-
-#### Tóm tắt rule
+> Nếu designer chỉ vẽ state "có data" → dev tự design trang trống/loading/lỗi → UI không nhất quán.
 
 | State | Khi nào | User thấy gì | Mục đích |
 |-------|---------|--------------|----------|
 | **Success** | Có data | Nội dung thật | Bình thường |
 | **Empty** | Chưa có data | Icon + text + CTA | Không hoang mang |
-| **Loading** | Đang tải | Skeleton (khung xám) | Trang không trống |
-| **Error** | API lỗi | Toast + "Thử lại" | Tự khắc phục |
+| **Loading** | Đang tải | Skeleton (khung xám nhấp nháy) | Trang không trống |
+| **Error** | API lỗi | Toast đỏ + "Thử lại" button | Tự khắc phục |
+
+**Ví dụ Products List:**
+```
+✅ Success:  Bảng product với data
+📭 Empty:    📦 "Chưa có sản phẩm" + [+ Thêm Sản Phẩm]
+⏳ Loading:  Skeleton giống layout thật (KHÔNG spinner)
+🔴 Error:    Toast "Không thể tải" + [Thử lại]
+```
 
 ### Naming trong Figma
 ```
 Page:   F{XX} — {Feature Name}
 Frame:  F{XX}/{Screen}/Desktop hoặc Mobile
-Layer:  Dùng tên có nghĩa, KHÔNG "Frame 123"
-```
-
-Ví dụ:
-```
-📄 F05 — AI Editor
-├── F05/Editor/Desktop
-├── F05/Editor/Mobile
-├── F05/Editor/Empty-State
-├── F05/Editor/Loading-State
-└── F05/Editor/Error-State
+Layer:  Tên có nghĩa, KHÔNG "Frame 123"
 ```
 
 ---
 
-## 5. Figma Links — Tracking
+## 7. Figma Links — Tracking
 
 > Designer vẽ xong → **paste link vào bảng dưới**. Dev dùng Figma Dev Mode.
 
 | Feature | PRD | Figma Link | Desktop | Mobile | Status |
 |---------|-----|------------|:---:|:---:|:---:|
-| **F01** AI Chat Builder | [PRD](../prd/F01-ai-chat-builder.md) | `<!-- PASTE FIGMA LINK -->` | ⬜ | ⬜ | ⬜ Chưa có |
-| **F02** Auth | [PRD](../prd/F02-auth.md) | `<!-- PASTE FIGMA LINK -->` | ⬜ | ⬜ | ⬜ Chưa có |
+| **F01** AI Chat Builder | [PRD](../prd/F01-ai-chat-builder.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F02** Auth | [PRD](../prd/F02-auth.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
 | **F03** Dashboard | [PRD](../prd/F03-dashboard.md) | ✅ Có PNG cũ | ✅ | ⬜ | ⚠️ Cần mobile |
-| **F05** AI Editor | [PRD](../prd/F05-ai-editor.md) | `<!-- PASTE FIGMA LINK -->` | ⬜ | ⬜ | ⬜ Chưa có |
-| **F06** Onboarding | [PRD](../prd/F06-onboarding.md) | `<!-- PASTE FIGMA LINK -->` | ⬜ | ⬜ | ⬜ Chưa có |
-| **F07** Templates | [PRD](../prd/F07-template-gallery.md) | `<!-- PASTE FIGMA LINK -->` | ⬜ | ⬜ | ⬜ Chưa có |
-| **F08** Publish Flow | [PRD](../prd/F08-publish-flow.md) | `<!-- PASTE FIGMA LINK -->` | ⬜ | ⬜ | ⬜ Chưa có |
-| **F09** Products CRUD | [PRD](../prd/F09-products-crud.md) | `<!-- PASTE FIGMA LINK -->` | ⬜ | ⬜ | ⬜ Chưa có |
-| **F10** Storefront | [PRD](../prd/F10-storefront-commerce.md) | ✅ Có JPG cũ | ✅ | ⬜ | ⚠️ Cần mobile |
-| **F11** Orders | [PRD](../prd/F11-orders-management.md) | `<!-- PASTE FIGMA LINK -->` | ⬜ | ⬜ | ⬜ Chưa có |
-| **F12** SEO Dashboard | [PRD](../prd/F12-seo-dashboard.md) | `<!-- PASTE FIGMA LINK -->` | ⬜ | ⬜ | ⬜ Chưa có |
-| **F13** Analytics | [PRD](../prd/F13-analytics-dashboard.md) | `<!-- PASTE FIGMA LINK -->` | ⬜ | ⬜ | ⬜ Chưa có |
-| **F14** Undo/Redo | [PRD](../prd/F14-undo-redo.md) | — | — | — | Trong F05 Editor |
-| **F15** Auto-save | [PRD](../prd/F15-auto-save-draft.md) | — | — | — | Trong F05 Editor |
-
-Figma link format: `https://www.figma.com/design/XXXXX/PrimeWeb-F{XX}?node-id=...`
+| **F05** AI Editor | [PRD](../prd/F05-ai-editor.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F06** Onboarding | [PRD](../prd/F06-onboarding.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F07** Templates | [PRD](../prd/F07-template-gallery.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F08** Publish Flow | [PRD](../prd/F08-publish-flow.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F09** Products + Halal | [PRD](../prd/F09-products-crud.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F10** Storefront + Trust | [PRD](../prd/F10-storefront-commerce.md) | ✅ Có JPG cũ | ✅ | ⬜ | ⚠️ Cần mobile |
+| **F11** Orders + WhatsApp | [PRD](../prd/F11-orders-management.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F12** SEO Dashboard | [PRD](../prd/F12-seo-dashboard.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F13** Analytics | [PRD](../prd/F13-analytics-dashboard.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F14** Undo/Redo | [PRD](../prd/F14-undo-redo.md) | — | — | — | Trong F05 |
+| **F15** Auto-save | [PRD](../prd/F15-auto-save-draft.md) | — | — | — | Trong F05 |
+| **F16** Payment 🇲🇾 | [PRD](../prd/F16-payment-gateway.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F17** Shipping 🇲🇾 | [PRD](../prd/F17-shipping.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
 
 ---
 
-## 6. Handoff Checklist
+## 8. Handoff Checklist
 
-Trước khi ghi Figma link vào bảng trên, check:
+Trước khi paste Figma link vào §7:
 
-- [ ] Desktop frame (1440px) — done
-- [ ] Mobile frame (375px) — done
+- [ ] Desktop frame (1440px)
+- [ ] Mobile frame (375px)
 - [ ] 4 states (Empty, Loading, Error, Success)
-- [ ] Dùng shadcn components (không custom)
-- [ ] Color tokens đúng (không hardcode hex)
-- [ ] Typography đúng (Inter, đúng sizes)
-- [ ] Spacing đúng (multiples of 4px)
+- [ ] Dùng shadcn components
+- [ ] Color tokens đúng (§3)
+- [ ] Typography Inter, đúng sizes
+- [ ] Spacing multiples of 4px
+- [ ] MY elements: RM format, Halal badge, WhatsApp button
 - [ ] Layer names có nghĩa
 - [ ] Tech Lead approved
 
-→ Paste link vào bảng **§5 Figma Links** ở trên
+---
+
+## 9. Tham khảo Design
+
+| Loại | Xem | Học gì |
+|------|-----|--------|
+| **Shopee Seller Center** | seller.shopee.com.my | Dashboard, product management |
+| **Shopify Admin** | admin.shopify.com | Clean dashboard, product form |
+| **Wix/Squarespace Editor** | wix.com/editor | AI editor split view |
+| **v0.dev** | v0.dev | AI chat → UI generation |
+| **Shopee App** | Play Store | Mobile product page, checkout |
+| **GrabFood** | Play Store | Bottom nav, order tracking |
 
 ---
 
-## 7. Skills cần thiết
-
-### Bắt buộc
-| Skill | Mức | Lý do |
-|-------|-----|-------|
-| **Figma** | Thành thạo | Tool chính. Component system, auto-layout, variants |
-| **Responsive Design** | Thành thạo | Mobile-first là bắt buộc |
-| **Design System** | Hiểu rõ | Phải biết dùng tokens, components nhất quán |
-| **UI States** | Hiểu rõ | Empty/Loading/Error/Success cho mọi screen |
-
-### Nên có
-| Skill | Mức | Lý do |
-|-------|-----|-------|
-| **Tailwind CSS** | Cơ bản | Hiểu spacing/color naming → design sát code |
-| **shadcn/ui** | Cơ bản | Biết components nào có sẵn → design khả thi |
-| **Prototyping** | Cơ bản | Demo user flows cho review |
-| **Accessibility** | Cơ bản | Contrast ratio, touch target size (44px min) |
-| **E-commerce UX** | Portfolio | Hiểu checkout flow, product page, cart |
-| **SaaS Dashboard UX** | Portfolio | Biết layout admin panel, data tables, charts |
-
-### Tham khảo Design
-| Loại | Xem |
-|------|-----|
-| **SaaS Builder** | Framer, Webflow, Shopify admin |
-| **E-commerce** | Shopee seller center, Lazada seller |
-| **Dashboard** | Linear, Notion, Vercel dashboard |
-| **AI Chat** | ChatGPT, Claude, v0.dev |
-
----
-
-## 8. Tìm ở đâu
+## 10. Tìm ở đâu
 
 | Câu hỏi | File |
 |---------|------|
-| Feature cần design gì? | [docs/prd/](../prd/) — đọc PRD |
-| User flows, acceptance criteria? | [docs/stories/](../stories/) — Gherkin AC |
-| Component tree, layout gợi ý? | [docs/architecture/](../architecture/) |
-| Figma links tracking? | Bảng §5 trong file này |
-| Quyết định đã chốt? | [docs/decisions/](../decisions/) |
+| MY market research (personas, payment, cultural) | [malaysia-market-context.md](../malaysia-market-context.md) |
+| Feature PRD | [docs/prd/](../prd/) |
+| User stories + Gherkin AC | [docs/stories/](../stories/) |
+| Architecture / Component tree | [docs/architecture/](../architecture/) |
+| Product decisions log | [docs/decisions/](../decisions/) |
+| Sprint 0 tasks | [SPRINT0_DETAIL.md](../SPRINT0_DETAIL.md) |
