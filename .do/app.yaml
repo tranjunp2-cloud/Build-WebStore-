@@ -27,7 +27,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URI
-        type: SECRET
+        value: ${db.DATABASE_URL}
       - key: PAYLOAD_SECRET
         type: SECRET
       - key: NEXT_PUBLIC_SERVER_URL
