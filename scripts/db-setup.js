@@ -6,45 +6,61 @@
  * `process.env.NODE_ENV !== 'production'` (checked at runtime in
  * node_modules/@payloadcms/db-postgres/dist/connect.js line 109).
  *
- * Solution: When the database is empty (no tables), spawn server.js
- * with NODE_ENV=development so Payload creates tables on first request.
- * On subsequent deploys, tables already exist so NODE_ENV stays production.
+ * Solution:
+ * 1. Check if database has tables
+ * 2. If empty → start server.js with NODE_ENV=development (triggers pushDevSchema)
+ * 3. Poll DB until tables are created (pushDevSchema done)
+ * 4. Kill the dev server, restart with NODE_ENV=production
+ * 5. If tables exist → start server.js normally (NODE_ENV=production)
+ *
+ * Health check: Uses /api/health (no DB query) so DO doesn't kill
+ * the container during schema push.
  */
 const { spawn } = require('child_process');
 
-async function checkDB() {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createPool() {
   const connStr = process.env.DATABASE_URI || process.env.DATABASE_URL;
-  if (!connStr) {
+  if (!connStr) return null;
+
+  const pg = require('pg');
+  const cleanStr = connStr
+    .replace(/[?&]sslmode=[^&]+/g, '')
+    .replace(/\?&/, '?')
+    .replace(/\?$/, '');
+
+  return new pg.Pool({
+    connectionString: cleanStr,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 10000,
+  });
+}
+
+async function getTableCount(pool) {
+  const result = await pool.query(
+    "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+  );
+  return parseInt(result.rows[0].count, 10);
+}
+
+async function checkDB() {
+  const pool = createPool();
+  if (!pool) {
     console.log('[db-setup] No DATABASE_URI found, skipping DB check');
     return { needsPush: false, tableCount: -1 };
   }
 
   try {
-    const pg = require('pg');
-    // Strip sslmode from URL to avoid pg driver parse conflicts
-    const cleanStr = connStr
-      .replace(/[?&]sslmode=[^&]+/g, '')
-      .replace(/\?&/, '?')
-      .replace(/\?$/, '');
-
-    const pool = new pg.Pool({
-      connectionString: cleanStr,
-      ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 10000,
-    });
-
     const info = await pool.query('SELECT current_database(), current_user');
     const row = info.rows[0];
     console.log(`[db-setup] Connected: db=${row.current_database}, user=${row.current_user}`);
 
-    // Count tables in public schema
-    const tables = await pool.query(
-      "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
-    );
-    const tableCount = parseInt(tables.rows[0].count, 10);
+    const tableCount = await getTableCount(pool);
     console.log(`[db-setup] Tables in public schema: ${tableCount}`);
 
-    // Check if user can create tables
     const perm = await pool.query(
       "SELECT has_schema_privilege(current_user, 'public', 'CREATE') as can_create"
     );
@@ -59,8 +75,46 @@ async function checkDB() {
     };
   } catch (e) {
     console.error('[db-setup] DB check failed:', e.message);
+    await pool.end().catch(() => {});
     return { needsPush: false, tableCount: -1 };
   }
+}
+
+/**
+ * Wait for Payload's pushDevSchema to finish by polling the DB.
+ * Returns true when tables are detected, false on timeout.
+ */
+async function waitForTables(maxWaitSec = 120) {
+  const pool = createPool();
+  if (!pool) return false;
+
+  const startTime = Date.now();
+  const deadline = startTime + maxWaitSec * 1000;
+
+  console.log(`[db-setup] Waiting for schema push (timeout: ${maxWaitSec}s)...`);
+
+  while (Date.now() < deadline) {
+    try {
+      const count = await getTableCount(pool);
+      if (count > 0) {
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`[db-setup] ✅ Schema push complete — ${count} tables created in ${elapsed}s`);
+        await pool.end();
+        return true;
+      }
+    } catch {
+      // DB might be busy during schema push — retry
+    }
+    await sleep(3000);
+  }
+
+  console.error(`[db-setup] ⏰ Schema push timed out after ${maxWaitSec}s`);
+  await pool.end().catch(() => {});
+  return false;
+}
+
+function spawnServer(env) {
+  return spawn('node', ['server.js'], { stdio: 'inherit', env });
 }
 
 async function main() {
@@ -68,31 +122,55 @@ async function main() {
 
   const { needsPush, tableCount } = await checkDB();
 
-  // Determine the NODE_ENV for the server process
-  let serverEnv = { ...process.env };
-
   if (needsPush) {
-    // Database is empty — Payload needs NODE_ENV !== 'production' to run pushDevSchema().
-    // This is safe because the Next.js build is already production-optimized.
-    // After tables are created, subsequent deploys will skip this (tableCount > 0).
-    console.log('[db-setup] ⚡ Empty database detected — enabling schema push');
-    console.log('[db-setup] Setting NODE_ENV=development for Payload push:true');
-    serverEnv.NODE_ENV = 'development';
-  } else if (tableCount > 0) {
-    console.log(`[db-setup] ✅ ${tableCount} tables exist — no push needed`);
+    // ── Phase 1: Start with NODE_ENV=development to trigger pushDevSchema ──
+    console.log('[db-setup] ⚡ Empty database detected — starting schema push');
+    console.log('[db-setup] Phase 1: Starting server with NODE_ENV=development...');
+
+    const devEnv = { ...process.env, NODE_ENV: 'development' };
+    const devServer = spawnServer(devEnv);
+
+    // Wait for tables to appear (pushDevSchema triggered by first request)
+    // Also make a request to trigger Payload initialization
+    await sleep(5000); // Give server time to start listening
+    try {
+      // Trigger Payload init by hitting the health endpoint
+      const http = require('http');
+      http.get('http://localhost:3000/api/health', () => {});
+    } catch {
+      // Ignore — Payload init might be triggered by other means
+    }
+
+    const tablesCreated = await waitForTables(120);
+
+    if (tablesCreated) {
+      // ── Phase 2: Restart with NODE_ENV=production ──
+      console.log('[db-setup] Phase 2: Restarting server with NODE_ENV=production...');
+      devServer.kill('SIGTERM');
+
+      // Give the dev server time to shut down
+      await sleep(2000);
+
+      const prodEnv = { ...process.env }; // Original env (NODE_ENV=production from Dockerfile)
+      const prodServer = spawnServer(prodEnv);
+      prodServer.on('exit', (code) => process.exit(code || 0));
+    } else {
+      // Schema push timed out — keep dev server running and hope for the best
+      console.error('[db-setup] ⚠️ Schema push timed out — keeping dev server running');
+      devServer.on('exit', (code) => process.exit(code || 0));
+    }
   } else {
-    console.log('[db-setup] ⚠️ Could not check tables — starting server as-is');
+    // ── Normal start: tables already exist ──
+    if (tableCount > 0) {
+      console.log(`[db-setup] ✅ ${tableCount} tables exist — no push needed`);
+    } else {
+      console.log('[db-setup] ⚠️ Could not check tables — starting server as-is');
+    }
+
+    console.log(`[db-setup] Starting server (NODE_ENV=${process.env.NODE_ENV})...`);
+    const server = spawnServer({ ...process.env });
+    server.on('exit', (code) => process.exit(code || 0));
   }
-
-  console.log(`[db-setup] Starting server (NODE_ENV=${serverEnv.NODE_ENV})...`);
-  const server = spawn('node', ['server.js'], {
-    stdio: 'inherit',
-    env: serverEnv,
-  });
-
-  server.on('exit', (code) => {
-    process.exit(code || 0);
-  });
 }
 
 main().catch((e) => {
