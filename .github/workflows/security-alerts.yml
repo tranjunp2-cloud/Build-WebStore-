@@ -1,0 +1,91 @@
+# Security Alerts — Check Dependabot + secret scanning, notify Lark
+name: Security Alerts
+
+on:
+  schedule:
+    # Monday 3 AM UTC (11 AM MYT)
+    - cron: '0 3 * * 1'
+  workflow_dispatch: # Manual trigger for testing
+
+jobs:
+  check-security:
+    name: 'Security: Weekly Check'
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: read
+      contents: read
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Check Dependabot alerts
+        uses: actions/github-script@v7
+        id: alerts
+        with:
+          script: |
+            let content = '';
+            let alertCount = 0;
+
+            // Check Dependabot alerts
+            try {
+              const { data: alerts } = await github.rest.dependabot.listAlertsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                severity: 'high,critical',
+                per_page: 10,
+              });
+
+              if (alerts.length > 0) {
+                alertCount += alerts.length;
+                content += `**Dependabot Alerts (High/Critical):** ${alerts.length}\n`;
+                for (const a of alerts.slice(0, 5)) {
+                  const pkg = a.dependency?.package?.name || 'unknown';
+                  const severity = a.security_advisory?.severity || 'unknown';
+                  content += `- ${pkg}: ${severity} — ${a.security_advisory?.summary?.substring(0, 80) || 'N/A'}\n`;
+                }
+                if (alerts.length > 5) {
+                  content += `- ...and ${alerts.length - 5} more\n`;
+                }
+                content += '\n';
+              }
+            } catch (e) {
+              console.log(`Dependabot API not available: ${e.message}`);
+              content += '**Dependabot:** API not available (enable in repo Settings)\n\n';
+            }
+
+            // Check secret scanning alerts
+            try {
+              const { data: secrets } = await github.rest.secretScanning.listAlertsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 10,
+              });
+
+              if (secrets.length > 0) {
+                alertCount += secrets.length;
+                content += `**Secret Scanning Alerts:** ${secrets.length}\n`;
+                for (const s of secrets.slice(0, 3)) {
+                  content += `- ${s.secret_type_display_name || s.secret_type}: found in ${s.locations_url ? 'repo' : 'unknown'}\n`;
+                }
+              }
+            } catch (e) {
+              console.log(`Secret scanning API not available: ${e.message}`);
+            }
+
+            core.setOutput('has_alerts', alertCount > 0 ? 'true' : 'false');
+            core.setOutput('alert_count', alertCount);
+            core.setOutput('content', content || 'No security alerts found.');
+
+      - name: Notify Lark (Security Alerts)
+        if: steps.alerts.outputs.has_alerts == 'true'
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || secrets.LARK_SIGN_KEY }}
+          title: "Security Alert — ${{ steps.alerts.outputs.alert_count }} issues"
+          template: 'red'
+          content: ${{ steps.alerts.outputs.content }}
+          button-text: "View Security Tab"
+          button-url: "${{ github.server_url }}/${{ github.repository }}/security"
