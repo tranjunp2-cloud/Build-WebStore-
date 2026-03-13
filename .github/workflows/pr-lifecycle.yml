@@ -1,0 +1,220 @@
+# PR Lifecycle — Full PR automation (notify, assign, remind, stale check)
+name: PR Lifecycle
+
+on:
+  pull_request:
+    types: [opened, closed, review_requested]
+  pull_request_review:
+    types: [submitted]
+  schedule:
+    # Every 4 hours, weekdays only (UTC) — stale/reminder checks
+    - cron: '0 */4 * * 1-5'
+
+jobs:
+  # ──────────────────────────────────────
+  # PR Opened — Notify team + auto-label size
+  # ──────────────────────────────────────
+  pr-opened:
+    name: 'PR Opened'
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Auto-label PR size
+        uses: actions/github-script@v7
+        id: size
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+
+            const changes = files.reduce((sum, f) => sum + f.additions + f.deletions, 0);
+            let sizeLabel = 'size:S';
+            if (changes > 500) sizeLabel = 'size:XL';
+            else if (changes > 200) sizeLabel = 'size:L';
+            else if (changes > 50) sizeLabel = 'size:M';
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: [sizeLabel],
+            });
+
+            core.setOutput('size_label', sizeLabel);
+            core.setOutput('changes', changes);
+            core.setOutput('file_count', files.length);
+
+      - name: Notify Lark (PR Opened)
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
+          title: "New PR #${{ github.event.pull_request.number }}"
+          template: 'blue'
+          content: |
+            **Title:** ${{ github.event.pull_request.title }}
+            **Author:** ${{ github.event.pull_request.user.login }}
+            **Branch:** ${{ github.event.pull_request.head.ref }} → ${{ github.event.pull_request.base.ref }}
+            **Size:** ${{ steps.size.outputs.size_label }} (${{ steps.size.outputs.changes }} lines, ${{ steps.size.outputs.file_count }} files)
+          button-text: "Review PR"
+          button-url: "${{ github.event.pull_request.html_url }}"
+
+  # ──────────────────────────────────────
+  # PR Review Submitted — Notify on approve or changes requested
+  # ──────────────────────────────────────
+  pr-review:
+    name: 'PR Review'
+    if: github.event_name == 'pull_request_review'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Notify Lark (Approved)
+        if: github.event.review.state == 'approved'
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
+          title: "PR #${{ github.event.pull_request.number }} Approved"
+          template: 'green'
+          content: |
+            **Title:** ${{ github.event.pull_request.title }}
+            **Reviewer:** ${{ github.event.review.user.login }}
+            **Author:** ${{ github.event.pull_request.user.login }}
+            Ready to merge!
+          button-text: "View PR"
+          button-url: "${{ github.event.pull_request.html_url }}"
+
+      - name: Notify Lark (Changes Requested)
+        if: github.event.review.state == 'changes_requested'
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
+          title: "PR #${{ github.event.pull_request.number }} — Changes Requested"
+          template: 'yellow'
+          content: |
+            **Title:** ${{ github.event.pull_request.title }}
+            **Reviewer:** ${{ github.event.review.user.login }}
+            **Author:** ${{ github.event.pull_request.user.login }}
+            Please address review feedback.
+          button-text: "View Review"
+          button-url: "${{ github.event.review.html_url }}"
+
+  # ──────────────────────────────────────
+  # PR Merged — Notify team
+  # ──────────────────────────────────────
+  pr-merged:
+    name: 'PR Merged'
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Notify Lark (Merged)
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
+          title: "PR #${{ github.event.pull_request.number }} Merged"
+          template: 'green'
+          content: |
+            **Title:** ${{ github.event.pull_request.title }}
+            **Author:** ${{ github.event.pull_request.user.login }}
+            **Target:** ${{ github.event.pull_request.base.ref }}
+            **Merge commit:** ${{ github.event.pull_request.merge_commit_sha }}
+          button-text: "View PR"
+          button-url: "${{ github.event.pull_request.html_url }}"
+
+  # ──────────────────────────────────────
+  # Stale PR Check — Remind reviewers and authors
+  # ──────────────────────────────────────
+  stale-pr-check:
+    name: 'Stale PR Check'
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      contents: read
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Check for stale PRs
+        uses: actions/github-script@v7
+        id: stale
+        with:
+          script: |
+            const now = new Date();
+            const FOUR_HOURS = 4 * 60 * 60 * 1000;
+            const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
+            const MAX_NOTIFICATIONS = 5;
+
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              sort: 'updated',
+              direction: 'asc',
+              per_page: 30,
+            });
+
+            const needsReview = [];
+            const stale = [];
+
+            for (const pr of prs) {
+              if (pr.draft) continue;
+
+              const updatedAt = new Date(pr.updated_at);
+              const timeSinceUpdate = now - updatedAt;
+
+              // Check review requests pending > 4 hours
+              if (pr.requested_reviewers.length > 0 && timeSinceUpdate > FOUR_HOURS) {
+                const reviewers = pr.requested_reviewers.map(r => r.login).join(', ');
+                needsReview.push(`#${pr.number} "${pr.title}" — waiting for: ${reviewers}`);
+              }
+
+              // Check stale > 5 days
+              if (timeSinceUpdate > FIVE_DAYS) {
+                stale.push(`#${pr.number} "${pr.title}" by ${pr.user.login} — no activity ${Math.floor(timeSinceUpdate / (24*60*60*1000))} days`);
+              }
+            }
+
+            let content = '';
+
+            if (needsReview.length > 0) {
+              const items = needsReview.slice(0, MAX_NOTIFICATIONS).join('\n');
+              content += `**Pending Review (>4h):**\n${items}\n\n`;
+            }
+
+            if (stale.length > 0) {
+              const items = stale.slice(0, MAX_NOTIFICATIONS).join('\n');
+              content += `**Stale PRs (>5 days):**\n${items}`;
+            }
+
+            core.setOutput('has_issues', content.length > 0 ? 'true' : 'false');
+            core.setOutput('content', content);
+            core.setOutput('count', needsReview.length + stale.length);
+
+      - name: Notify Lark (Stale PRs)
+        if: steps.stale.outputs.has_issues == 'true'
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
+          title: "PR Reminder — ${{ steps.stale.outputs.count }} items"
+          template: 'yellow'
+          content: ${{ steps.stale.outputs.content }}
+          button-text: "View Open PRs"
+          button-url: "${{ github.server_url }}/${{ github.repository }}/pulls"

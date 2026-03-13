@@ -1,0 +1,132 @@
+# Doc Change Notify — Alert team when docs/specs are updated
+# Tracks: SPEC.md, PRD, Stories, Design, Architecture docs
+name: Doc Change Notify
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - 'SPEC.md'
+      - 'CLAUDE.md'
+      - 'docs/prd/**'
+      - 'docs/stories/**'
+      - 'docs/design/**'
+      - 'docs/architecture/**'
+      - 'docs/qa/**'
+
+jobs:
+  notify:
+    name: 'Notify: Doc Changes'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect and classify changes
+        id: detect
+        run: |
+          # Get changed files
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- \
+            SPEC.md CLAUDE.md \
+            docs/prd/ docs/stories/ docs/design/ docs/architecture/ docs/qa/ \
+            2>/dev/null || echo "")
+
+          if [ -z "$CHANGED" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+          # Classify changes into categories
+          CATEGORIES=""
+          DETAILS=""
+          ROLES=""
+
+          if echo "$CHANGED" | grep -q "^SPEC.md"; then
+            CATEGORIES="${CATEGORIES}SPEC  "
+            ROLES="${ROLES}All team  "
+          fi
+
+          if echo "$CHANGED" | grep -q "^CLAUDE.md"; then
+            CATEGORIES="${CATEGORIES}Agent Rules  "
+            ROLES="${ROLES}Dev  "
+          fi
+
+          if echo "$CHANGED" | grep -q "^docs/prd/"; then
+            PRD_FILES=$(echo "$CHANGED" | grep "^docs/prd/" | sed 's|docs/prd/||' | tr '\n' ', ' | sed 's/,$//')
+            CATEGORIES="${CATEGORIES}PRD  "
+            DETAILS="${DETAILS}PRD: ${PRD_FILES}\n"
+            ROLES="${ROLES}Dev QC  "
+          fi
+
+          if echo "$CHANGED" | grep -q "^docs/stories/"; then
+            STORY_FILES=$(echo "$CHANGED" | grep "^docs/stories/" | sed 's|docs/stories/||' | tr '\n' ', ' | sed 's/,$//')
+            CATEGORIES="${CATEGORIES}Stories  "
+            DETAILS="${DETAILS}Stories: ${STORY_FILES}\n"
+            ROLES="${ROLES}Dev QC  "
+          fi
+
+          if echo "$CHANGED" | grep -q "^docs/design/"; then
+            CATEGORIES="${CATEGORIES}Design  "
+            ROLES="${ROLES}FE Dev  "
+          fi
+
+          if echo "$CHANGED" | grep -q "^docs/architecture/"; then
+            CATEGORIES="${CATEGORIES}Architecture  "
+            ROLES="${ROLES}Tech Lead  "
+          fi
+
+          if echo "$CHANGED" | grep -q "^docs/qa/"; then
+            CATEGORIES="${CATEGORIES}QA  "
+            ROLES="${ROLES}QC  "
+          fi
+
+          # Get diff stats (truncate to 500 chars)
+          DIFF_STAT=$(git diff --stat HEAD~1 HEAD -- \
+            SPEC.md CLAUDE.md docs/prd/ docs/stories/ docs/design/ docs/architecture/ docs/qa/ \
+            2>/dev/null | tail -1 || echo "")
+
+          # Count changed files
+          FILE_COUNT=$(echo "$CHANGED" | wc -l | tr -d ' ')
+
+          # Deduplicate roles
+          UNIQUE_ROLES=$(echo "$ROLES" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/ $//')
+
+          # Store outputs
+          echo "categories=${CATEGORIES}" >> "$GITHUB_OUTPUT"
+          echo "file_count=${FILE_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "diff_stat=${DIFF_STAT}" >> "$GITHUB_OUTPUT"
+          echo "unique_roles=${UNIQUE_ROLES}" >> "$GITHUB_OUTPUT"
+
+          # Store multiline details
+          {
+            echo "details<<EOF"
+            echo -e "$DETAILS"
+            echo "$CHANGED"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Notify Lark
+        if: steps.detect.outputs.skip != 'true'
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
+          title: "Doc Updated — ${{ steps.detect.outputs.categories }}"
+          template: 'purple'
+          content: |
+            **Author:** ${{ github.actor }}
+            **Branch:** ${{ github.ref_name }}
+            **Files changed:** ${{ steps.detect.outputs.file_count }}
+            **Stats:** ${{ steps.detect.outputs.diff_stat }}
+
+            ${{ steps.detect.outputs.details }}
+
+            **CC:** ${{ steps.detect.outputs.unique_roles }}
+          button-text: "View Commit"
+          button-url: "${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
