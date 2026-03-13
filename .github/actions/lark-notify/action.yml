@@ -1,0 +1,260 @@
+# Reusable Lark Webhook Notification — Composite Action v2
+# Supports: 2-column metadata rows, multi-button, VN time footer, optional signing
+# Backward-compatible with v1 inputs (content, button-text, button-url)
+name: 'Lark Notify'
+description: 'Send interactive card notification to Lark webhook with rich layout'
+
+inputs:
+  webhook-url:
+    description: 'Lark webhook URL'
+    required: true
+  sign-key:
+    description: 'HMAC-SHA256 signing key (leave empty to skip signing)'
+    required: false
+    default: ''
+  title:
+    description: 'Card header title'
+    required: true
+  template:
+    description: 'Card color: green, red, blue, yellow, purple, turquoise, indigo, wathet, orange, carmine, violet'
+    required: true
+    default: 'blue'
+
+  # ── Row 1: 2-column metadata ──
+  meta-left-label:
+    description: 'Row 1 left column label (e.g. "Project")'
+    required: false
+    default: ''
+  meta-left-value:
+    description: 'Row 1 left column value'
+    required: false
+    default: ''
+  meta-right-label:
+    description: 'Row 1 right column label (e.g. "Branch")'
+    required: false
+    default: ''
+  meta-right-value:
+    description: 'Row 1 right column value'
+    required: false
+    default: ''
+
+  # ── Row 2: 2-column metadata ──
+  meta2-left-label:
+    description: 'Row 2 left column label'
+    required: false
+    default: ''
+  meta2-left-value:
+    description: 'Row 2 left column value'
+    required: false
+    default: ''
+  meta2-right-label:
+    description: 'Row 2 right column label'
+    required: false
+    default: ''
+  meta2-right-value:
+    description: 'Row 2 right column value'
+    required: false
+    default: ''
+
+  # ── Body content ──
+  content:
+    description: 'Card body in lark_md format'
+    required: true
+
+  # ── Footer (auto VN time if empty) ──
+  footer:
+    description: 'Footer text (auto-adds VN time if empty)'
+    required: false
+    default: ''
+
+  # ── Buttons — JSON array or legacy single button ──
+  buttons:
+    description: 'JSON array of buttons: [{"text":"Label","url":"https://...","type":"primary"}]'
+    required: false
+    default: ''
+  button-text:
+    description: '(Legacy) Single button label'
+    required: false
+    default: ''
+  button-url:
+    description: '(Legacy) Single button URL'
+    required: false
+    default: ''
+  button-type:
+    description: '(Legacy) Single button style: primary or danger'
+    required: false
+    default: 'primary'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Send Lark notification
+      shell: bash
+      env:
+        LARK_WEBHOOK: ${{ inputs.webhook-url }}
+        LARK_SIGN_KEY: ${{ inputs.sign-key }}
+        CARD_TITLE: ${{ inputs.title }}
+        CARD_TEMPLATE: ${{ inputs.template }}
+        CARD_CONTENT: ${{ inputs.content }}
+        CARD_FOOTER: ${{ inputs.footer }}
+        META_L1_LABEL: ${{ inputs.meta-left-label }}
+        META_L1_VALUE: ${{ inputs.meta-left-value }}
+        META_R1_LABEL: ${{ inputs.meta-right-label }}
+        META_R1_VALUE: ${{ inputs.meta-right-value }}
+        META_L2_LABEL: ${{ inputs.meta2-left-label }}
+        META_L2_VALUE: ${{ inputs.meta2-left-value }}
+        META_R2_LABEL: ${{ inputs.meta2-right-label }}
+        META_R2_VALUE: ${{ inputs.meta2-right-value }}
+        BTN_JSON: ${{ inputs.buttons }}
+        BTN_TEXT: ${{ inputs.button-text }}
+        BTN_URL: ${{ inputs.button-url }}
+        BTN_TYPE: ${{ inputs.button-type }}
+      run: |
+        # Skip if webhook URL is empty
+        if [ -z "$LARK_WEBHOOK" ]; then
+          echo "::warning::Lark webhook URL not configured, skipping notification"
+          exit 0
+        fi
+
+        # ── Generate VN timestamp for footer ──
+        VN_TIME=$(TZ='Asia/Ho_Chi_Minh' date '+%H:%M %d/%m')
+
+        if [ -n "$CARD_FOOTER" ]; then
+          FOOTER_TEXT="$CARD_FOOTER"
+        else
+          FOOTER_TEXT="$VN_TIME (VN)"
+        fi
+
+        # ── Build elements array using jq ──
+        ELEMENTS="[]"
+
+        # Row 1: 2-column metadata
+        if [ -n "$META_L1_LABEL" ] && [ -n "$META_R1_LABEL" ]; then
+          ROW1=$(jq -n \
+            --arg ll "$META_L1_LABEL" --arg lv "$META_L1_VALUE" \
+            --arg rl "$META_R1_LABEL" --arg rv "$META_R1_VALUE" \
+            '{
+              "tag": "column_set",
+              "flex_mode": "none",
+              "background_style": "default",
+              "columns": [
+                {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top",
+                  "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": ("**" + $ll + "**\n" + $lv)}}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top",
+                  "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": ("**" + $rl + "**\n" + $rv)}}]}
+              ]
+            }')
+          ELEMENTS=$(echo "$ELEMENTS" | jq --argjson row "$ROW1" '. + [$row]')
+        fi
+
+        # Row 2: 2-column metadata
+        if [ -n "$META_L2_LABEL" ] && [ -n "$META_R2_LABEL" ]; then
+          ROW2=$(jq -n \
+            --arg ll "$META_L2_LABEL" --arg lv "$META_L2_VALUE" \
+            --arg rl "$META_R2_LABEL" --arg rv "$META_R2_VALUE" \
+            '{
+              "tag": "column_set",
+              "flex_mode": "none",
+              "background_style": "default",
+              "columns": [
+                {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top",
+                  "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": ("**" + $ll + "**\n" + $lv)}}]},
+                {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top",
+                  "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": ("**" + $rl + "**\n" + $rv)}}]}
+              ]
+            }')
+          ELEMENTS=$(echo "$ELEMENTS" | jq --argjson row "$ROW2" '. + [$row]')
+        fi
+
+        # Horizontal rule (only if we have metadata rows)
+        if [ -n "$META_L1_LABEL" ] || [ -n "$META_L2_LABEL" ]; then
+          ELEMENTS=$(echo "$ELEMENTS" | jq '. + [{"tag": "hr"}]')
+        fi
+
+        # Content body + footer
+        CLOCK_EMOJI=$'\xF0\x9F\x95\x90'
+        BODY_WITH_FOOTER=$(printf '%s\n\n%s %s' "$CARD_CONTENT" "$CLOCK_EMOJI" "$FOOTER_TEXT")
+
+        CONTENT_ELEMENT=$(jq -n --arg content "$BODY_WITH_FOOTER" \
+          '{"tag": "div", "text": {"tag": "lark_md", "content": $content}}')
+        ELEMENTS=$(echo "$ELEMENTS" | jq --argjson el "$CONTENT_ELEMENT" '. + [$el]')
+
+        # ── Build buttons ──
+        BUTTONS_ARRAY="[]"
+
+        if [ -n "$BTN_JSON" ]; then
+          # New format: JSON array of buttons
+          BUTTONS_ARRAY=$(echo "$BTN_JSON" | jq '[.[] | {
+            "tag": "button",
+            "text": {"tag": "plain_text", "content": .text},
+            "url": .url,
+            "type": (.type // "primary")
+          }]')
+        elif [ -n "$BTN_TEXT" ] && [ -n "$BTN_URL" ]; then
+          # Legacy single button
+          BUTTONS_ARRAY=$(jq -n \
+            --arg text "$BTN_TEXT" --arg url "$BTN_URL" --arg type "$BTN_TYPE" \
+            '[{"tag": "button", "text": {"tag": "plain_text", "content": $text}, "url": $url, "type": $type}]')
+        fi
+
+        # Add action element if we have buttons
+        BTN_COUNT=$(echo "$BUTTONS_ARRAY" | jq 'length')
+        if [ "$BTN_COUNT" -gt 0 ]; then
+          ACTION_ELEMENT=$(echo "$BUTTONS_ARRAY" | jq '{"tag": "action", "actions": .}')
+          ELEMENTS=$(echo "$ELEMENTS" | jq --argjson el "$ACTION_ELEMENT" '. + [$el]')
+        fi
+
+        # ── Build full card payload ──
+        if [ -n "$LARK_SIGN_KEY" ]; then
+          # Signed request
+          TIMESTAMP=$(date +%s)
+          STRING_TO_SIGN=$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")
+          SIGN=$(printf '' | openssl dgst -sha256 -hmac "$STRING_TO_SIGN" -binary | base64 2>/dev/null || echo "")
+
+          PAYLOAD=$(jq -n \
+            --arg ts "$TIMESTAMP" \
+            --arg sign "$SIGN" \
+            --arg title "$CARD_TITLE" \
+            --arg template "$CARD_TEMPLATE" \
+            --argjson elements "$ELEMENTS" \
+            '{
+              "timestamp": $ts,
+              "sign": $sign,
+              "msg_type": "interactive",
+              "card": {
+                "header": {
+                  "title": {"tag": "plain_text", "content": $title},
+                  "template": $template
+                },
+                "elements": $elements
+              }
+            }')
+        else
+          # Unsigned request (sign verification disabled on bot)
+          PAYLOAD=$(jq -n \
+            --arg title "$CARD_TITLE" \
+            --arg template "$CARD_TEMPLATE" \
+            --argjson elements "$ELEMENTS" \
+            '{
+              "msg_type": "interactive",
+              "card": {
+                "header": {
+                  "title": {"tag": "plain_text", "content": $title},
+                  "template": $template
+                },
+                "elements": $elements
+              }
+            }')
+        fi
+
+        # ── Send request ──
+        RESPONSE=$(curl -s -X POST "$LARK_WEBHOOK" \
+          -H 'Content-Type: application/json' \
+          -d "$PAYLOAD" || echo '{"code":-1,"msg":"curl failed"}')
+
+        CODE=$(echo "$RESPONSE" | jq -r '.code // -1')
+        if [ "$CODE" = "0" ]; then
+          echo "✅ Lark notification sent: $CARD_TITLE"
+        else
+          echo "::warning::Lark notification failed: $RESPONSE"
+        fi
