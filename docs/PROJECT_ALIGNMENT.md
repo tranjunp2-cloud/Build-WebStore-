@@ -27,14 +27,16 @@ Tuần 1-2 (Mar 12-25)    Sprint 0: Foundation
 Tuần 3-4 (Mar 26-Apr 8)  Sprint 1: Core Features
                          ├── F01 AI Chat Builder (polish)
                          ├── F05 AI Editor (rebuild)
-                         ├── F06 Onboarding (build)
+                         ├── F06 Onboarding + Language (build)
                          └── F08 Publish Flow (build)
 
-Tuần 5-6 (Apr 9-22)      Sprint 2: Commerce
-                         ├── F09 Products CRUD (polish)
-                         ├── F11 Orders Management
-                         ├── F10 Storefront (polish)
-                         └── F12 SEO Dashboard
+Tuần 5-6 (Apr 9-22)      Sprint 2: Commerce + MY Market
+                         ├── F09 Products + Halal cert (polish)
+                         ├── F11 Orders + WhatsApp (build)
+                         ├── F10 Storefront + Trust signals (polish)
+                         ├── F12 SEO Dashboard
+                         ├── F16 Payment Gateway (FPX)
+                         └── F17 Shipping (flat rate by state)
 
 Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
                          ├── Bug fixes
@@ -45,20 +47,22 @@ Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
 
 ---
 
-## Feature Priority (không đổi)
+## Feature Priority (updated 13/3/2026)
 
 | Priority | Feature | Lý do |
 |:---:|---------|-------|
 | 🔴 1 | **F01 AI Chat Builder** | USP #1 — core giá trị product |
 | 🔴 2 | **F05 AI Editor** | User dùng sau khi generate |
-| 🔴 3 | **F06 Onboarding** | First impression, conversion |
+| 🔴 3 | **F06 Onboarding** + Language | First impression + BM/EN selection |
 | 🔴 4 | **F08 Publish Flow** | Không có thì site không live dc |
-| 🟡 5 | **F09 Products CRUD** | Commerce cần products |
-| 🟡 6 | **F10 Storefront** | Public-facing, SEO |
-| 🟡 7 | **F11 Orders** | Revenue flow |
-| 🟡 8 | **F12 SEO Dashboard** | Growth, discoverability |
-| ⚪ 9 | **F07 Templates** | Fallback nếu AI không ok |
-| ⚪ 10 | **F13-F15** | Nice-to-have for launch |
+| 🟡 5 | **F09 Products** + Halal | Commerce + trust signal MY |
+| 🟡 6 | **F10 Storefront** + Trust signals | WhatsApp, SSM footer, language switcher |
+| 🟡 7 | **F11 Orders** + WhatsApp notify | Revenue flow + MY communication |
+| 🟡 8 | **F12 SEO Dashboard** | Growth, MY keywords |
+| 🟡 9 | **F16 Payment Gateway** 🇲🇾 | FPX (Wave 6) — most trusted in MY |
+| 🟡 10 | **F17 Shipping** 🇲🇾 | Flat rate by state (Wave 6) |
+| ⚪ 11 | **F07 Templates** | Fallback nếu AI không ok |
+| ⚪ 12 | **F13-F15** | Nice-to-have for launch |
 
 ---
 
@@ -70,7 +74,7 @@ Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
 ☐ PRD approved? (docs/prd/F{XX}.md)
 ☐ Stories có Gherkin AC? (docs/stories/F{XX}-stories.md)
 ☐ Architecture doc? (docs/architecture/F{XX}.md)
-☐ Figma link? (docs/design/README.md)
+☐ Figma link? (docs/design/DESIGN_WORKFLOW.md)
 → 5/5 = GO. < 5/5 = STOP, hoàn thiện docs trước.
 ```
 
@@ -120,7 +124,7 @@ Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
 > Đã **audit code thật 13/3/2026** — chỉ liệt kê task PHẢI VIẾT CODE.
 > 📋 **Chi tiết (files, steps, code mẫu):** [SPRINT0_DETAIL.md](SPRINT0_DETAIL.md)
 
-### 🔧 Dev (7 tasks)
+### 🔧 Dev (10 tasks)
 
 | # | Task | Việc làm thật | DoD | Ngày |
 |---|------|--------------|-----|:----:|
@@ -131,6 +135,9 @@ Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
 | D5 | Rate Limit | Viết middleware rate limit cho `/api/ai/*` | Gọi lần 11 → 429 | 1 |
 | D6 | Sitemap | Viết `/sites/[slug]/sitemap.xml` route | `curl sitemap.xml` → valid XML | 0.5 |
 | D7 | Email Templates | Viết 3 HTML templates (welcome, order, status) | Email delivered in Resend | 1.5 |
+| D8 | 🇲🇾 Halal Cert Field | Thêm halalCertified + halalCertImage + weight vào Products | Payload admin hiển toggle + upload | 0.5 |
+| D9 | 🇲🇾 WhatsApp/SSM Fields | Thêm whatsappNumber + ssmNumber + address vào Tenants | Payload admin hiển fields | 0.5 |
+| D10 | 🇲🇾 Shipping + Locale | Thêm shippingConfig group + locale vào Sites | Payload admin hiển config | 0.5 |
 
 ### 🧪 QC (3 tasks)
 
@@ -157,7 +164,7 @@ Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
 |----|-------|----------|
 | Dev 1 | D1, D2 | Tất cả API routes có auth + validation |
 | Dev 2 | D3 | Stripe webhook hoạt động |
-| Dev 3 | D4, D5 | Seed data + Rate limit |
+| Dev 3 | D4, D5, D8-D10 | Seed data + Rate limit + MY collection fields |
 | QC | Q1 | API route tests |
 | DevOps | O1, O2 | CI green + Sentry monitoring |
 

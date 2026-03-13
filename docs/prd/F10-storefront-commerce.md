@@ -1,7 +1,8 @@
 # PRD: Storefront Commerce (F-10)
-> **Version:** 1.0 | **Created:** 2026-03-08 | **Agent:** `project-planner`  
+> **Version:** 2.0 | **Updated:** 2026-03-13 | **Agent:** `project-planner`  
 > **Priority:** P0 🌟 | **Sprint:** Wave 5 | **Size:** XL  
-> **Depends on:** F-08 Products CRUD ✅, F-09 Orders ✅ | **Blocks:** F-11 Payment Gateway (Wave 6)
+> **Depends on:** F-08 Products CRUD ✅, F-09 Orders ✅ | **Blocks:** F16 Payment Gateway, F17 Shipping  
+> **MY Ref:** [malaysia-market-context.md](../malaysia-market-context.md) — §6 Trust Signals, §4 Payment
 
 ---
 
@@ -211,12 +212,49 @@ AND checkout stacks summary above form
 AND all buttons are min 44px tap target
 ```
 
+### AC-11: WhatsApp Floating Button (MY Market)
+```gherkin
+GIVEN a published storefront
+WHEN  site owner has set WhatsApp number in settings
+THEN  floating WhatsApp button (green, bottom-right) appears on all pages
+AND   click opens https://wa.me/60XXXXXXXXX with pre-filled message
+AND   message: "Hi, saya berminat dengan produk di [StoreName]"
+```
+
+### AC-12: Trust Signals Footer (MY Market)
+```gherkin
+GIVEN a published storefront
+WHEN  footer renders
+THEN  shows: Halal badge (if any products halal), SSM number (from tenant settings),
+       business address, WhatsApp contact, accepted payment icons, shipping carriers
+AND   SSM format: "SSM: 123456-X"
+```
+
+### AC-13: Language Switcher (MY Market)
+```gherkin
+GIVEN a storefront with locale setting
+WHEN  user clicks language toggle (BM/EN)
+THEN  UI labels switch language (Product names stay as-is)
+AND   default language = site.locale set during onboarding
+AND   toggle saved in localStorage
+```
+
+### AC-14: Shipping by State (MY Market)
+```gherkin
+GIVEN buyer at checkout selects state
+WHEN  state is in Semenanjung (West MY)
+THEN  shipping = flat rate RM 8
+WHEN  state is Sabah or Sarawak
+THEN  shipping = flat rate RM 15
+AND   shipping fee shows in order summary before Place Order
+```
+
 ## 7. Edge Cases & Recommendations
 
 | Case | Decision |
 |------|----------|
 | SST Tax | Fixed 6% (Malaysian SST) applied at checkout |
-| Shipping fee | Not included in Wave 5 (flat rate planned for Wave 6) |
+| Shipping fee | West MY: RM 8 flat, East MY: RM 15 flat. See AC-14 |
 | Guest checkout | ✅ Yes — no login required for buyers |
 | Max quantity per product | Limited by inventory stock |
 | Currency | MYR (Malaysian Ringgit) — format: `RM XX.XX` |

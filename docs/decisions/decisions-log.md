@@ -146,3 +146,52 @@
 | **Chosen** | **DigitalOcean App Platform** with Docker container |
 | **Rationale** | Cost-effective. Docker ensures environment parity. GitHub Actions CI/CD already configured. Lark webhook notifications. |
 | **Status** | ✅ Decided — Implemented in `.github/workflows/ci.yml` |
+
+---
+
+## PD-013 — Halal Trust Signal
+
+| | |
+|---|---|
+| **Decision** | Products collection supports Halal certification upload + badge |
+| **Options** | No Halal feature, Text-only Halal claim, Cert upload + verified badge |
+| **Chosen** | **Cert upload + badge** — toggle per product, JAKIM cert image |
+| **Rationale** | F&B and Beauty are top categories for MY SMEs. Halal cert is critical trust signal — consumers check before buying. Badge on storefront + cert viewable = highest trust. |
+| **Status** | ✅ Decided — Added to F09 v2.0 |
+
+---
+
+## PD-014 — WhatsApp Integration
+
+| | |
+|---|---|
+| **Decision** | WhatsApp as primary customer communication channel |
+| **Options** | Email only, Live chat widget, WhatsApp button, All channels |
+| **Chosen** | **WhatsApp floating button** (storefront) + **wa.me notification** (orders) |
+| **Rationale** | 90%+ Malaysian users use WhatsApp daily. Lower friction than email for SMEs. P0: wa.me links (no API). P1: WhatsApp Business API for automated messages. |
+| **Status** | ✅ Decided — Added to F10 AC-11, F11 AC-3b |
+
+---
+
+## PD-015 — Shipping Model
+
+| | |
+|---|---|
+| **Decision** | Flat rate by region (West vs East Malaysia), carrier API later |
+| **Options** | Free shipping all, Variable by weight, Flat rate by region, Carrier API |
+| **Chosen** | **Flat rate by region** — Semenanjung RM 8, Sabah/Sarawak RM 15 |
+| **Rationale** | Simple for MVP. 85% orders are Semenanjung. Seller can customize rates. Free shipping threshold (configurable). Carrier API (J&T, Pos Laju) in Wave 7 via EasyParcel. |
+| **Status** | ✅ Decided — F17 PRD created |
+
+---
+
+## PD-016 — Store Language Selection
+
+| | |
+|---|---|
+| **Decision** | Language selected at onboarding, used by AI and storefront UI |
+| **Options** | EN only, BM only, Auto-detect, User selects at onboarding |
+| **Chosen** | **User selects BM or EN at onboarding** — saved to `site.locale` |
+| **Rationale** | Drives AI content language (product descriptions, SEO keywords). Storefront UI labels switch via locale. Product names are user-entered (stay as-is). Bilingual = competitive advantage. |
+| **Status** | ✅ Decided — Added to F06 v2.0 |
+

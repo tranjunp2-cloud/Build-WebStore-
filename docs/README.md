@@ -9,7 +9,7 @@
 | Bạn là | Đọc file này |
 |--------|-------------|
 | **Dev mới** | [README.md](../README.md) (setup) → [CONTRIBUTING.md](../.github/CONTRIBUTING.md) (rules) |
-| **Designer** | [Design Workflow](design/DESIGN_WORKFLOW.md) (rules + Figma links) |
+| **Designer** | [Design Guide](design/DESIGN_WORKFLOW.md) (rules + screens + tokens + Figma links) |
 | **QC** | [Features](#features) bên dưới → xem stories |
 | **DevOps** | [DEPLOY.md](../.github/DEPLOY.md) → [GIT_AND_CI_RULES.md](../.github/GIT_AND_CI_RULES.md) |
 | **Tất cả** | [PROJECT_ALIGNMENT.md](PROJECT_ALIGNMENT.md) (timeline, priority) |
@@ -27,7 +27,7 @@ docs/
 ├── prd/                         ← PRD mỗi feature (yêu cầu)
 ├── stories/                     ← User Stories + Gherkin AC
 ├── architecture/                ← Technical design
-├── design/DESIGN_WORKFLOW.md     ← Rules + Figma links (1 file duy nhất)
+├── design/DESIGN_WORKFLOW.md     ← Design Guide: rules + 28 screens + tokens + Figma (1 file)
 ├── decisions/decisions-log.md   ← Product decisions đã chốt
 └── malaysia-market-context.md   ← Ngữ cảnh thị trường MY
 
@@ -63,3 +63,5 @@ Root:
 | **F13** Analytics | [📄](prd/F13-analytics-dashboard.md) | ❌ | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
 | **F14** Undo/Redo | [📄](prd/F14-undo-redo.md) | [📝](stories/F14-undo-redo-stories.md) | ❌ | — |
 | **F15** Auto-save | [📄](prd/F15-auto-save-draft.md) | ❌ | ❌ | — |
+| **F16** Payment Gateway 🇲🇾 | [📄](prd/F16-payment-gateway.md) | ❌ | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F17** Shipping 🇲🇾 | [📄](prd/F17-shipping.md) | ❌ | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
