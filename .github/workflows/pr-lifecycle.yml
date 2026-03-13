@@ -57,16 +57,21 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
-          title: "New PR #${{ github.event.pull_request.number }}"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "🆕 New PR #${{ github.event.pull_request.number }}"
           template: 'blue'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.event.pull_request.head.ref }} → ${{ github.event.pull_request.base.ref }}"
+          meta2-left-label: "📊 Size"
+          meta2-left-value: "${{ steps.size.outputs.size_label }} (${{ steps.size.outputs.changes }} lines)"
+          meta2-right-label: "👤 Author"
+          meta2-right-value: "${{ github.event.pull_request.user.login }}"
           content: |
-            **Title:** ${{ github.event.pull_request.title }}
-            **Author:** ${{ github.event.pull_request.user.login }}
-            **Branch:** ${{ github.event.pull_request.head.ref }} → ${{ github.event.pull_request.base.ref }}
-            **Size:** ${{ steps.size.outputs.size_label }} (${{ steps.size.outputs.changes }} lines, ${{ steps.size.outputs.file_count }} files)
-          button-text: "Review PR"
-          button-url: "${{ github.event.pull_request.html_url }}"
+            📝 ${{ github.event.pull_request.title }}
+            📁 ${{ steps.size.outputs.file_count }} files changed
+          buttons: '[{"text":"🔍 Review PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"},{"text":"📄 View Files","url":"${{ github.event.pull_request.html_url }}/files","type":"default"}]'
 
   # ──────────────────────────────────────
   # PR Review Submitted — Notify on approve or changes requested
@@ -84,32 +89,36 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
-          title: "PR #${{ github.event.pull_request.number }} Approved"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "✅ PR Approved #${{ github.event.pull_request.number }}"
           template: 'green'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "✅ Reviewer"
+          meta-right-value: "${{ github.event.review.user.login }}"
           content: |
-            **Title:** ${{ github.event.pull_request.title }}
-            **Reviewer:** ${{ github.event.review.user.login }}
-            **Author:** ${{ github.event.pull_request.user.login }}
-            Ready to merge!
-          button-text: "View PR"
-          button-url: "${{ github.event.pull_request.html_url }}"
+            📝 ${{ github.event.pull_request.title }}
+            👤 Author: ${{ github.event.pull_request.user.login }}
+            🎉 **Ready to merge!**
+          buttons: '[{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'
 
       - name: Notify Lark (Changes Requested)
         if: github.event.review.state == 'changes_requested'
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
-          title: "PR #${{ github.event.pull_request.number }} — Changes Requested"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "⚠️ Changes Requested #${{ github.event.pull_request.number }}"
           template: 'yellow'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "👀 Reviewer"
+          meta-right-value: "${{ github.event.review.user.login }}"
           content: |
-            **Title:** ${{ github.event.pull_request.title }}
-            **Reviewer:** ${{ github.event.review.user.login }}
-            **Author:** ${{ github.event.pull_request.user.login }}
-            Please address review feedback.
-          button-text: "View Review"
-          button-url: "${{ github.event.review.html_url }}"
+            📝 ${{ github.event.pull_request.title }}
+            👤 Author: ${{ github.event.pull_request.user.login }}
+            ⚠️ Please address review feedback.
+          buttons: '[{"text":"📝 View Review","url":"${{ github.event.review.html_url }}","type":"primary"}]'
 
   # ──────────────────────────────────────
   # PR Merged — Notify team
@@ -126,16 +135,20 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
-          title: "PR #${{ github.event.pull_request.number }} Merged"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "🎉 PR Merged #${{ github.event.pull_request.number }}"
           template: 'green'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🎯 Target"
+          meta-right-value: "${{ github.event.pull_request.base.ref }}"
+          meta2-left-label: "🔖 Merge"
+          meta2-left-value: "${{ github.event.pull_request.merge_commit_sha }}"
+          meta2-right-label: "👤 Author"
+          meta2-right-value: "${{ github.event.pull_request.user.login }}"
           content: |
-            **Title:** ${{ github.event.pull_request.title }}
-            **Author:** ${{ github.event.pull_request.user.login }}
-            **Target:** ${{ github.event.pull_request.base.ref }}
-            **Merge commit:** ${{ github.event.pull_request.merge_commit_sha }}
-          button-text: "View PR"
-          button-url: "${{ github.event.pull_request.html_url }}"
+            📝 ${{ github.event.pull_request.title }}
+          buttons: '[{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'
 
   # ──────────────────────────────────────
   # Stale PR Check — Remind reviewers and authors
@@ -179,15 +192,13 @@ jobs:
               const updatedAt = new Date(pr.updated_at);
               const timeSinceUpdate = now - updatedAt;
 
-              // Check review requests pending > 4 hours
               if (pr.requested_reviewers.length > 0 && timeSinceUpdate > FOUR_HOURS) {
                 const reviewers = pr.requested_reviewers.map(r => r.login).join(', ');
-                needsReview.push(`#${pr.number} "${pr.title}" — waiting for: ${reviewers}`);
+                needsReview.push(`#${pr.number} "${pr.title}" — waiting: ${reviewers}`);
               }
 
-              // Check stale > 5 days
               if (timeSinceUpdate > FIVE_DAYS) {
-                stale.push(`#${pr.number} "${pr.title}" by ${pr.user.login} — no activity ${Math.floor(timeSinceUpdate / (24*60*60*1000))} days`);
+                stale.push(`#${pr.number} "${pr.title}" by ${pr.user.login} — ${Math.floor(timeSinceUpdate / (24*60*60*1000))}d inactive`);
               }
             }
 
@@ -195,12 +206,12 @@ jobs:
 
             if (needsReview.length > 0) {
               const items = needsReview.slice(0, MAX_NOTIFICATIONS).join('\n');
-              content += `**Pending Review (>4h):**\n${items}\n\n`;
+              content += `**⏳ Pending Review (>4h):**\n${items}\n\n`;
             }
 
             if (stale.length > 0) {
               const items = stale.slice(0, MAX_NOTIFICATIONS).join('\n');
-              content += `**Stale PRs (>5 days):**\n${items}`;
+              content += `**🕸️ Stale PRs (>5 days):**\n${items}`;
             }
 
             core.setOutput('has_issues', content.length > 0 ? 'true' : 'false');
@@ -212,9 +223,12 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
-          title: "PR Reminder — ${{ steps.stale.outputs.count }} items"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "⏰ Stale PR Alert — ${{ steps.stale.outputs.count }} items"
           template: 'yellow'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "📊 Total"
+          meta-right-value: "${{ steps.stale.outputs.count }} items"
           content: ${{ steps.stale.outputs.content }}
-          button-text: "View Open PRs"
-          button-url: "${{ github.server_url }}/${{ github.repository }}/pulls"
+          buttons: '[{"text":"📋 View Open PRs","url":"${{ github.server_url }}/${{ github.repository }}/pulls","type":"primary"}]'

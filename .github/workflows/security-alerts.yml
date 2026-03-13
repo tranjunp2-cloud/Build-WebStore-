@@ -83,9 +83,12 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || secrets.LARK_SIGN_KEY }}
-          title: "Security Alert — ${{ steps.alerts.outputs.alert_count }} issues"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || '' }}
+          title: "🔒 Security Alert — ${{ steps.alerts.outputs.alert_count }} issues"
           template: 'red'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🚨 Alerts"
+          meta-right-value: "${{ steps.alerts.outputs.alert_count }} issues"
           content: ${{ steps.alerts.outputs.content }}
-          button-text: "View Security Tab"
-          button-url: "${{ github.server_url }}/${{ github.repository }}/security"
+          buttons: '[{"text":"🔒 View Security","url":"${{ github.server_url }}/${{ github.repository }}/security","type":"danger"}]'

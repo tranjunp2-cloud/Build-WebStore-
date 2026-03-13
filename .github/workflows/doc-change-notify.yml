@@ -1,5 +1,8 @@
 # Doc Change Notify — Alert team when docs/specs are updated
-# Tracks: SPEC.md, PRD, Stories, Design, Architecture docs
+# Priority flows:
+#   1. BA changes PRD/Stories → notify Dev + QC (Task group)
+#   2. UI/UX changes Design → notify FE Dev (Task group)
+#   3. Other docs (SPEC, CLAUDE, Architecture, QA) → general notify
 name: Doc Change Notify
 
 on:
@@ -42,91 +45,267 @@ jobs:
 
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
-          # Classify changes into categories
+          # ── Classify by type ──
+          HAS_PRD=false; HAS_STORIES=false; HAS_DESIGN=false
+          HAS_ARCH=false; HAS_QA=false; HAS_SPEC=false; HAS_CLAUDE=false
+          PRD_FILES=""; STORY_FILES=""; DESIGN_FILES=""
+          ARCH_FILES=""; QA_FILES=""
           CATEGORIES=""
-          DETAILS=""
-          ROLES=""
-
-          if echo "$CHANGED" | grep -q "^SPEC.md"; then
-            CATEGORIES="${CATEGORIES}SPEC  "
-            ROLES="${ROLES}All team  "
-          fi
-
-          if echo "$CHANGED" | grep -q "^CLAUDE.md"; then
-            CATEGORIES="${CATEGORIES}Agent Rules  "
-            ROLES="${ROLES}Dev  "
-          fi
 
           if echo "$CHANGED" | grep -q "^docs/prd/"; then
-            PRD_FILES=$(echo "$CHANGED" | grep "^docs/prd/" | sed 's|docs/prd/||' | tr '\n' ', ' | sed 's/,$//')
-            CATEGORIES="${CATEGORIES}PRD  "
-            DETAILS="${DETAILS}PRD: ${PRD_FILES}\n"
-            ROLES="${ROLES}Dev QC  "
+            HAS_PRD=true
+            PRD_FILES=$(echo "$CHANGED" | grep "^docs/prd/" | sed 's|docs/prd/||')
+            CATEGORIES="${CATEGORIES}PRD "
           fi
 
           if echo "$CHANGED" | grep -q "^docs/stories/"; then
-            STORY_FILES=$(echo "$CHANGED" | grep "^docs/stories/" | sed 's|docs/stories/||' | tr '\n' ', ' | sed 's/,$//')
-            CATEGORIES="${CATEGORIES}Stories  "
-            DETAILS="${DETAILS}Stories: ${STORY_FILES}\n"
-            ROLES="${ROLES}Dev QC  "
+            HAS_STORIES=true
+            STORY_FILES=$(echo "$CHANGED" | grep "^docs/stories/" | sed 's|docs/stories/||')
+            CATEGORIES="${CATEGORIES}Stories "
           fi
 
           if echo "$CHANGED" | grep -q "^docs/design/"; then
-            CATEGORIES="${CATEGORIES}Design  "
-            ROLES="${ROLES}FE Dev  "
+            HAS_DESIGN=true
+            DESIGN_FILES=$(echo "$CHANGED" | grep "^docs/design/" | sed 's|docs/design/||')
+            CATEGORIES="${CATEGORIES}Design "
           fi
 
           if echo "$CHANGED" | grep -q "^docs/architecture/"; then
-            CATEGORIES="${CATEGORIES}Architecture  "
-            ROLES="${ROLES}Tech Lead  "
+            HAS_ARCH=true
+            ARCH_FILES=$(echo "$CHANGED" | grep "^docs/architecture/" | sed 's|docs/architecture/||')
+            CATEGORIES="${CATEGORIES}Architecture "
           fi
 
           if echo "$CHANGED" | grep -q "^docs/qa/"; then
-            CATEGORIES="${CATEGORIES}QA  "
-            ROLES="${ROLES}QC  "
+            HAS_QA=true
+            QA_FILES=$(echo "$CHANGED" | grep "^docs/qa/" | sed 's|docs/qa/||')
+            CATEGORIES="${CATEGORIES}QA "
           fi
 
-          # Get diff stats (truncate to 500 chars)
+          if echo "$CHANGED" | grep -q "^SPEC.md"; then
+            HAS_SPEC=true
+            CATEGORIES="${CATEGORIES}SPEC "
+          fi
+
+          if echo "$CHANGED" | grep -q "^CLAUDE.md"; then
+            HAS_CLAUDE=true
+            CATEGORIES="${CATEGORIES}Agent-Rules "
+          fi
+
+          # Count files and get diff stats
+          FILE_COUNT=$(echo "$CHANGED" | wc -l | tr -d ' ')
           DIFF_STAT=$(git diff --stat HEAD~1 HEAD -- \
             SPEC.md CLAUDE.md docs/prd/ docs/stories/ docs/design/ docs/architecture/ docs/qa/ \
-            2>/dev/null | tail -1 || echo "")
+            2>/dev/null | tail -1 | sed 's/^ *//' || echo "")
 
-          # Count changed files
-          FILE_COUNT=$(echo "$CHANGED" | wc -l | tr -d ' ')
+          # Extract +/- from stat line (e.g. "3 files changed, 45 insertions(+), 12 deletions(-)")
+          INSERTIONS=$(echo "$DIFF_STAT" | grep -oP '\d+ insertion' | grep -oP '\d+' || echo "0")
+          DELETIONS=$(echo "$DIFF_STAT" | grep -oP '\d+ deletion' | grep -oP '\d+' || echo "0")
+          CHANGES_TEXT="+${INSERTIONS} / -${DELETIONS} lines"
 
-          # Deduplicate roles
+          # Try to extract feature ID from filenames (e.g. F02-auth.md → F02 Auth)
+          FEATURE_CONTEXT=""
+          ALL_DOC_FILES=$(echo "$CHANGED" | grep "^docs/" || echo "")
+          FEATURE_ID=$(echo "$ALL_DOC_FILES" | head -1 | grep -oP 'F\d+' || echo "")
+          if [ -n "$FEATURE_ID" ]; then
+            FEATURE_NAME=$(echo "$ALL_DOC_FILES" | head -1 | sed 's|.*/||' | sed 's/\.md$//' | sed "s/^${FEATURE_ID}-//" | sed 's/-stories$//' | sed 's/-/ /g')
+            FEATURE_CONTEXT="${FEATURE_ID} ${FEATURE_NAME}"
+          fi
+
+          # ── Build detailed file list for card body ──
+          FILE_DETAILS=""
+
+          if [ "$HAS_PRD" = "true" ]; then
+            FILE_DETAILS="${FILE_DETAILS}📋 **PRD:**\n"
+            while IFS= read -r f; do
+              FILE_DETAILS="${FILE_DETAILS}  • ${f}\n"
+            done <<< "$PRD_FILES"
+          fi
+
+          if [ "$HAS_STORIES" = "true" ]; then
+            FILE_DETAILS="${FILE_DETAILS}📝 **Stories:**\n"
+            while IFS= read -r f; do
+              FILE_DETAILS="${FILE_DETAILS}  • ${f}\n"
+            done <<< "$STORY_FILES"
+          fi
+
+          if [ "$HAS_DESIGN" = "true" ]; then
+            FILE_DETAILS="${FILE_DETAILS}🎨 **Design:**\n"
+            while IFS= read -r f; do
+              FILE_DETAILS="${FILE_DETAILS}  • ${f}\n"
+            done <<< "$DESIGN_FILES"
+          fi
+
+          if [ "$HAS_ARCH" = "true" ]; then
+            FILE_DETAILS="${FILE_DETAILS}🏗️ **Architecture:**\n"
+            while IFS= read -r f; do
+              FILE_DETAILS="${FILE_DETAILS}  • ${f}\n"
+            done <<< "$ARCH_FILES"
+          fi
+
+          if [ "$HAS_QA" = "true" ]; then
+            FILE_DETAILS="${FILE_DETAILS}🧪 **QA:**\n"
+            while IFS= read -r f; do
+              FILE_DETAILS="${FILE_DETAILS}  • ${f}\n"
+            done <<< "$QA_FILES"
+          fi
+
+          if [ "$HAS_SPEC" = "true" ]; then
+            FILE_DETAILS="${FILE_DETAILS}📖 **SPEC.md** updated\n"
+          fi
+
+          if [ "$HAS_CLAUDE" = "true" ]; then
+            FILE_DETAILS="${FILE_DETAILS}🤖 **CLAUDE.md** updated\n"
+          fi
+
+          # ── Determine notification type ──
+          # Priority: PRD/Stories → Design → Mixed
+          ONLY_PRD_STORIES=false
+          ONLY_DESIGN=false
+
+          if { [ "$HAS_PRD" = "true" ] || [ "$HAS_STORIES" = "true" ]; } && \
+             [ "$HAS_DESIGN" = "false" ] && [ "$HAS_ARCH" = "false" ] && \
+             [ "$HAS_QA" = "false" ] && [ "$HAS_SPEC" = "false" ] && [ "$HAS_CLAUDE" = "false" ]; then
+            ONLY_PRD_STORIES=true
+          fi
+
+          if [ "$HAS_DESIGN" = "true" ] && \
+             [ "$HAS_PRD" = "false" ] && [ "$HAS_STORIES" = "false" ] && \
+             [ "$HAS_ARCH" = "false" ] && [ "$HAS_QA" = "false" ] && \
+             [ "$HAS_SPEC" = "false" ] && [ "$HAS_CLAUDE" = "false" ]; then
+            ONLY_DESIGN=true
+          fi
+
+          # ── Build action items per role ──
+          ACTION_ITEMS=""
+          ROLES=""
+
+          if [ "$HAS_PRD" = "true" ] || [ "$HAS_STORIES" = "true" ]; then
+            ACTION_ITEMS="${ACTION_ITEMS}⚠️ **Team cần review:**\n"
+            ACTION_ITEMS="${ACTION_ITEMS}• Dev: Check PRD changes ảnh hưởng code\n"
+            ACTION_ITEMS="${ACTION_ITEMS}• QC: Update test cases theo AC mới\n"
+            ROLES="${ROLES}Dev QC "
+          fi
+
+          if [ "$HAS_DESIGN" = "true" ]; then
+            if [ -n "$ACTION_ITEMS" ]; then
+              ACTION_ITEMS="${ACTION_ITEMS}• FE Dev: Check lại UI implementation\n"
+            else
+              ACTION_ITEMS="⚠️ **FE Dev cần aware:**\nDesign specs hoặc Figma links có thay đổi → check lại UI implementation\n"
+            fi
+            ROLES="${ROLES}FE-Dev "
+          fi
+
+          if [ "$HAS_ARCH" = "true" ]; then
+            ROLES="${ROLES}Tech-Lead "
+          fi
+
+          if [ "$HAS_QA" = "true" ]; then
+            ROLES="${ROLES}QC "
+          fi
+
+          if [ "$HAS_SPEC" = "true" ]; then
+            ROLES="${ROLES}All-team "
+          fi
+
           UNIQUE_ROLES=$(echo "$ROLES" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/ $//')
 
-          # Store outputs
-          echo "categories=${CATEGORIES}" >> "$GITHUB_OUTPUT"
-          echo "file_count=${FILE_COUNT}" >> "$GITHUB_OUTPUT"
-          echo "diff_stat=${DIFF_STAT}" >> "$GITHUB_OUTPUT"
-          echo "unique_roles=${UNIQUE_ROLES}" >> "$GITHUB_OUTPUT"
+          # ── Store outputs ──
+          echo "has_prd=$HAS_PRD" >> "$GITHUB_OUTPUT"
+          echo "has_stories=$HAS_STORIES" >> "$GITHUB_OUTPUT"
+          echo "has_design=$HAS_DESIGN" >> "$GITHUB_OUTPUT"
+          echo "only_prd_stories=$ONLY_PRD_STORIES" >> "$GITHUB_OUTPUT"
+          echo "only_design=$ONLY_DESIGN" >> "$GITHUB_OUTPUT"
+          echo "file_count=$FILE_COUNT" >> "$GITHUB_OUTPUT"
+          echo "changes_text=$CHANGES_TEXT" >> "$GITHUB_OUTPUT"
+          echo "categories=$CATEGORIES" >> "$GITHUB_OUTPUT"
+          echo "feature_context=$FEATURE_CONTEXT" >> "$GITHUB_OUTPUT"
+          echo "unique_roles=$UNIQUE_ROLES" >> "$GITHUB_OUTPUT"
 
-          # Store multiline details
+          # Multiline outputs
           {
-            echo "details<<EOF"
-            echo -e "$DETAILS"
-            echo "$CHANGED"
+            echo "file_details<<EOF"
+            echo -e "$FILE_DETAILS"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Notify Lark
-        if: steps.detect.outputs.skip != 'true'
+          {
+            echo "action_items<<EOF"
+            echo -e "$ACTION_ITEMS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # ──────────────────────────────────────
+      # Card Type 1: PRD / Stories only
+      # ──────────────────────────────────────
+      - name: "Notify Lark — PRD/Stories Updated"
+        if: steps.detect.outputs.skip != 'true' && steps.detect.outputs.only_prd_stories == 'true'
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
-          title: "Doc Updated — ${{ steps.detect.outputs.categories }}"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "📋 PRD/Stories Updated — ${{ steps.detect.outputs.feature_context || steps.detect.outputs.categories }}"
           template: 'purple'
+          meta-left-label: "👤 Author"
+          meta-left-value: "${{ github.actor }}"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.ref_name }}"
+          meta2-left-label: "📁 Files"
+          meta2-left-value: "${{ steps.detect.outputs.file_count }} files"
+          meta2-right-label: "📊 Changes"
+          meta2-right-value: "${{ steps.detect.outputs.changes_text }}"
           content: |
-            **Author:** ${{ github.actor }}
-            **Branch:** ${{ github.ref_name }}
-            **Files changed:** ${{ steps.detect.outputs.file_count }}
-            **Stats:** ${{ steps.detect.outputs.diff_stat }}
-
-            ${{ steps.detect.outputs.details }}
-
+            ${{ steps.detect.outputs.file_details }}
+            ${{ steps.detect.outputs.action_items }}
             **CC:** ${{ steps.detect.outputs.unique_roles }}
-          button-text: "View Commit"
-          button-url: "${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+          buttons: '[{"text":"📄 View Changes","url":"${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}","type":"primary"},{"text":"📋 View Commit","url":"${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}","type":"default"}]'
+
+      # ──────────────────────────────────────
+      # Card Type 2: Design only
+      # ──────────────────────────────────────
+      - name: "Notify Lark — Design Updated"
+        if: steps.detect.outputs.skip != 'true' && steps.detect.outputs.only_design == 'true'
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "🎨 Design Updated"
+          template: 'blue'
+          meta-left-label: "👤 Author"
+          meta-left-value: "${{ github.actor }}"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.ref_name }}"
+          meta2-left-label: "📁 Files"
+          meta2-left-value: "${{ steps.detect.outputs.file_count }} files"
+          meta2-right-label: "📊 Changes"
+          meta2-right-value: "${{ steps.detect.outputs.changes_text }}"
+          content: |
+            ${{ steps.detect.outputs.file_details }}
+            ${{ steps.detect.outputs.action_items }}
+            **CC:** ${{ steps.detect.outputs.unique_roles }}
+          buttons: '[{"text":"🎨 View Design","url":"${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}","type":"primary"},{"text":"📋 View Commit","url":"${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}","type":"default"}]'
+
+      # ──────────────────────────────────────
+      # Card Type 3: Mixed / other doc types
+      # ──────────────────────────────────────
+      - name: "Notify Lark — Docs Updated (mixed)"
+        if: steps.detect.outputs.skip != 'true' && steps.detect.outputs.only_prd_stories != 'true' && steps.detect.outputs.only_design != 'true'
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "📚 Docs Updated — ${{ steps.detect.outputs.categories }}"
+          template: 'purple'
+          meta-left-label: "👤 Author"
+          meta-left-value: "${{ github.actor }}"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.ref_name }}"
+          meta2-left-label: "📁 Files"
+          meta2-left-value: "${{ steps.detect.outputs.file_count }} files"
+          meta2-right-label: "📊 Changes"
+          meta2-right-value: "${{ steps.detect.outputs.changes_text }}"
+          content: |
+            ${{ steps.detect.outputs.file_details }}
+            ${{ steps.detect.outputs.action_items }}
+            **CC:** ${{ steps.detect.outputs.unique_roles }}
+          buttons: '[{"text":"📄 View All Changes","url":"${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}","type":"primary"},{"text":"📋 Commit","url":"${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}","type":"default"}]'

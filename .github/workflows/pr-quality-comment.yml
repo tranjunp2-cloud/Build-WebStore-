@@ -146,11 +146,13 @@ jobs:
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
           sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          title: "Quality Report — PR #${{ github.event.pull_request.number }}"
+          title: "📊 Quality Report — PR #${{ github.event.pull_request.number }}"
           template: 'blue'
+          meta-left-label: "🧪 Coverage"
+          meta-left-value: "Lines ${{ steps.coverage.outputs.lines }}%"
+          meta-right-label: "📦 Bundle"
+          meta-right-value: "${{ steps.bundle.outputs.total_size }}"
           content: |
-            **PR:** ${{ github.event.pull_request.title }}
-            **Coverage:** Lines ${{ steps.coverage.outputs.lines }}% | Branches ${{ steps.coverage.outputs.branches }}%
-            **Bundle:** ${{ steps.bundle.outputs.total_size }} | First Load ${{ steps.bundle.outputs.first_load }}
-          button-text: "View PR"
-          button-url: "${{ github.event.pull_request.html_url }}"
+            📝 ${{ github.event.pull_request.title }}
+            Branches ${{ steps.coverage.outputs.branches }}% | First Load ${{ steps.bundle.outputs.first_load }}
+          buttons: '[{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'

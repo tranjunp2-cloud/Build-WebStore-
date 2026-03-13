@@ -76,12 +76,18 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || secrets.LARK_SIGN_KEY }}
-          title: "Sprint Start — Monday"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || '' }}
+          title: "🏁 Sprint Start — Monday"
           template: 'blue'
-          content: ${{ steps.overview.outputs.content }}
-          button-text: "View Board"
-          button-url: "${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Auser-story"
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "📅 Sprint"
+          meta-right-value: "Week start"
+          content: |
+            <at id=all></at>
+
+            ${{ steps.overview.outputs.content }}
+          buttons: '[{"text":"📋 View Board","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Auser-story","type":"primary"}]'
 
   # ──────────────────────────────────────
   # Tue-Fri — Daily Standup Reminder
@@ -98,10 +104,12 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || secrets.LARK_SIGN_KEY }}
-          title: "Daily Standup"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || '' }}
+          title: "☀️ Daily Standup"
           template: 'blue'
           content: |
+            <at id=all></at>
+
             Time for standup! Update your progress:
 
             **Yesterday:** What did you complete?
@@ -192,9 +200,12 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || secrets.LARK_SIGN_KEY }}
-          title: "Sprint Review — Friday"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || '' }}
+          title: "📋 Sprint Review — Friday"
           template: 'purple'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "📅 Sprint"
+          meta-right-value: "Week review"
           content: ${{ steps.summary.outputs.content }}
-          button-text: "View This Week"
-          button-url: "${{ github.server_url }}/${{ github.repository }}/pulse"
+          buttons: '[{"text":"📈 View This Week","url":"${{ github.server_url }}/${{ github.repository }}/pulse","type":"primary"}]'

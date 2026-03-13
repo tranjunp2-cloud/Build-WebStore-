@@ -47,74 +47,56 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
+      # --- Prepare info for Lark ---
+      - name: Prepare deploy info
+        if: always()
+        id: info
+        run: |
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "short_sha=${SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
+
       # --- Lark: Staging Deployed ---
       - name: Notify Lark (Staging Deployed)
         if: success()
-        env:
-          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
-          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
-        run: |
-          TIMESTAMP=$(date +%s)
-          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
-          SHORT_SHA="${{ github.event.workflow_run.head_sha }}"
-          SHORT_SHA="${SHORT_SHA:0:7}"
-          AUTHOR="${{ github.event.workflow_run.actor.login }}"
-          TIME=$(date -u +"%H:%M UTC")
-          COMMIT_MSG=$(git log --format='%s' -n 1 | head -c 80)
-          curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
-            "timestamp": "'"$TIMESTAMP"'",
-            "sign": "'"$SIGN"'",
-            "msg_type": "interactive",
-            "card": {
-              "header": {"title": {"tag": "plain_text", "content": "🚀 Staging Deployed"}, "template": "blue"},
-              "elements": [
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🌍 Environment**\nStaging"}}]}
-                ]},
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$AUTHOR"'"}}]}
-                ]},
-                {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "📝 '"$COMMIT_MSG"'\n**Pipeline [2/2]** Staging Deploy\n🕐 '"$TIME"'  ·  CI ✅  Deploy ✅"}},
-                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "📋 View Deploy"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "primary"}]}
-              ]
-            }
-          }' || true
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          title: "🚀 Staging Deployed"
+          template: 'green'
+          meta-left-label: "📦 Project"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🌍 Environment"
+          meta-right-value: "Staging"
+          meta2-left-label: "🔖 Commit"
+          meta2-left-value: "${{ steps.info.outputs.short_sha }}"
+          meta2-right-label: "👤 Author"
+          meta2-right-value: "${{ github.event.workflow_run.actor.login }}"
+          content: |
+            📝 ${{ steps.info.outputs.commit_msg }}
+            **Pipeline [2/2]** Staging Deploy
+            CI ✅  Deploy ✅
+          buttons: '[{"text":"📋 View Deploy","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"primary"},{"text":"🌐 Open Staging","url":"https://staging.echprime.com","type":"default"}]'
 
       # --- Lark: Staging Deploy Failed ---
       - name: Notify Lark (Staging Deploy Failed)
         if: failure()
-        env:
-          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
-          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
-        run: |
-          TIMESTAMP=$(date +%s)
-          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
-          SHORT_SHA="${{ github.event.workflow_run.head_sha }}"
-          SHORT_SHA="${SHORT_SHA:0:7}"
-          AUTHOR="${{ github.event.workflow_run.actor.login }}"
-          TIME=$(date -u +"%H:%M UTC")
-          COMMIT_MSG=$(git log --format='%s' -n 1 | head -c 80)
-          curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
-            "timestamp": "'"$TIMESTAMP"'",
-            "sign": "'"$SIGN"'",
-            "msg_type": "interactive",
-            "card": {
-              "header": {"title": {"tag": "plain_text", "content": "❌ Staging Deploy Failed"}, "template": "red"},
-              "elements": [
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🌍 Environment**\nStaging"}}]}
-                ]},
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$AUTHOR"'"}}]}
-                ]},
-                {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "📝 '"$COMMIT_MSG"'\n⚠️ **Staging deploy failed!** Pipeline failed at step [2/2].\n🕐 '"$TIME"'"}},
-                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔍 View Logs"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "danger"}]}
-              ]
-            }
-          }' || true
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          title: "❌ Staging Deploy Failed"
+          template: 'red'
+          meta-left-label: "📦 Project"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🌍 Environment"
+          meta-right-value: "Staging"
+          meta2-left-label: "🔖 Commit"
+          meta2-left-value: "${{ steps.info.outputs.short_sha }}"
+          meta2-right-label: "👤 Author"
+          meta2-right-value: "${{ github.event.workflow_run.actor.login }}"
+          content: |
+            📝 ${{ steps.info.outputs.commit_msg }}
+            ⚠️ **Staging deploy failed!** Pipeline failed at step [2/2].
+          buttons: '[{"text":"🔍 View Logs","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"danger"}]'

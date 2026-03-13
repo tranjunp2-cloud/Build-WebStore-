@@ -209,12 +209,15 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
-          title: "Stories Synced — ${{ steps.parse.outputs.count }} stories"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "📝 Stories Synced — ${{ steps.parse.outputs.count }} stories"
           template: 'blue'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.ref_name }}"
           content: |
             **Created:** ${{ steps.sync.outputs.created }} | **Updated:** ${{ steps.sync.outputs.updated }}
 
             ${{ steps.sync.outputs.summary }}
-          button-text: "View Issues"
-          button-url: "${{ github.server_url }}/${{ github.repository }}/issues?q=label%3Auser-story"
+          buttons: '[{"text":"📋 View Issues","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=label%3Auser-story","type":"primary"}]'

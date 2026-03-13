@@ -62,9 +62,16 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || secrets.LARK_SIGN_KEY }}
-          title: "Weekly Report — Week ${{ github.run_number }}"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || '' }}
+          title: "📊 Weekly Report — W${{ github.run_number }}"
           template: 'purple'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "📈 Commits"
+          meta-right-value: "${{ steps.metrics.outputs.total_commits }}"
+          meta2-left-label: "🔀 PRs Merged"
+          meta2-left-value: "${{ steps.metrics.outputs.prs_merged }}"
+          meta2-right-label: "✅ Completion"
+          meta2-right-value: "${{ steps.metrics.outputs.completion }}"
           content: ${{ steps.metrics.outputs.lark_content }}
-          button-text: "View Details"
-          button-url: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          buttons: '[{"text":"📊 View Details","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"primary"},{"text":"📈 View Pulse","url":"${{ github.server_url }}/${{ github.repository }}/pulse","type":"default"}]'

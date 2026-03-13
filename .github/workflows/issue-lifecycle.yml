@@ -247,9 +247,12 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || secrets.LARK_SIGN_KEY }}
-          title: "Issue Reminder — ${{ steps.stale.outputs.count }} items"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "⏰ Stale Issue Alert — ${{ steps.stale.outputs.count }} items"
           template: 'yellow'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "📊 Total"
+          meta-right-value: "${{ steps.stale.outputs.count }} items"
           content: ${{ steps.stale.outputs.content }}
-          button-text: "View Issues"
-          button-url: "${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Auser-story"
+          buttons: '[{"text":"📋 View Issues","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Auser-story","type":"primary"}]'

@@ -80,14 +80,15 @@ jobs:
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || secrets.LARK_SIGN_KEY }}
-          title: "Release v${{ steps.changelog.outputs.new_version }}"
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || '' }}
+          title: "🏷️ Release v${{ steps.changelog.outputs.new_version }}"
           template: 'green'
+          meta-left-label: "📦 Version"
+          meta-left-value: "v${{ steps.changelog.outputs.new_version }}"
+          meta-right-label: "👤 Author"
+          meta-right-value: "${{ github.event.pull_request.user.login }}"
           content: |
-            **Version:** v${{ steps.changelog.outputs.new_version }}
             **PR:** #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}
-            **Author:** ${{ github.event.pull_request.user.login }}
 
             ${{ steps.changelog.outputs.summary }}
-          button-text: "View Release"
-          button-url: "${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.changelog.outputs.new_version }}"
+          buttons: '[{"text":"🏷️ View Release","url":"${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.changelog.outputs.new_version }}","type":"primary"}]'

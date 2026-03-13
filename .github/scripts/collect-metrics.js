@@ -178,18 +178,18 @@ async function main() {
   memberMetrics.sort((a, b) => b.commits - a.commits);
 
   // ── Build Lark report content ──
-  let larkContent = `**Period:** Last ${period} days\n\n`;
+  let larkContent = `**📅 Period:** Last ${period} days\n\n`;
 
-  // Team summary
-  larkContent += `**Team Summary**\n`;
-  larkContent += `Commits: ${commits.length} | PRs Merged: ${mergedPRs.length} | PRs Open: ${openPRs.length}\n`;
-  larkContent += `Avg Review Time: ${avgReviewHours}h | CI Pass Rate: ${ciPassRate}\n`;
-  larkContent += `Stories Done: ${closedStories.length} | Stories Open: ${openStories.length} | Completion: ${completionRate}%\n\n`;
+  // Team summary with visual indicators
+  larkContent += `**📊 Team Summary**\n`;
+  larkContent += `📝 Commits: **${commits.length}** | 🔀 PRs Merged: **${mergedPRs.length}** | 📬 PRs Open: **${openPRs.length}**\n`;
+  larkContent += `⏱️ Avg Review: **${avgReviewHours}h** | 🏗️ CI Pass Rate: **${ciPassRate}**\n`;
+  larkContent += `✅ Stories Done: **${closedStories.length}** | 📋 Open: **${openStories.length}** | 🎯 Completion: **${completionRate}%**\n\n`;
 
   // Per member
-  larkContent += `**Per Member**\n`;
+  larkContent += `**👥 Per Member**\n`;
   for (const m of memberMetrics) {
-    larkContent += `@${m.member}: ${m.commits} commits, ${m.prsMerged} PRs merged\n`;
+    larkContent += `• **${m.member}**: ${m.commits} commits, ${m.prsMerged} PRs merged\n`;
   }
 
   // ── Output ──
