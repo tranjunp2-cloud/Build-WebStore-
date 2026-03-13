@@ -83,3 +83,62 @@ AND   toast "Đã xóa. Hoàn tác?" 5s
 ### Definition of Done
 - [ ] 9-Point Checklist pass
 - [ ] Soft delete works (page not on published site)
+
+---
+
+## US-006: Inline Click-to-Edit Element
+
+**Wave 3** | **P0** | **L** | Status: Draft
+
+### Story
+```
+As a   store owner
+I want to click directly on any element in the preview and tell AI what to change
+So that I can make precise edits to specific parts of my page
+```
+
+### Acceptance Criteria
+```gherkin
+GIVEN I hover over a text element in the preview pane
+WHEN  my cursor rests on the element for 200ms
+THEN  a blue "✨ Edit with AI" button appears overlaid on the element
+  AND positioned at top-right of the element, not obscuring text
+
+GIVEN I click "Edit with AI" on the hero headline element
+WHEN  the popup appears
+THEN  an input popup shows the current text pre-filled
+  AND an instruction field: "How would you like to change this?"
+  AND I can type my instruction and press Enter to apply
+```
+
+### Additional Criteria
+- [ ] Inline edit popup closes on Escape key or clicking outside
+- [ ] Applied change reflected in preview within 300ms
+- [ ] If AI edits inline, chat panel shows same action in history — full transparency
+
+---
+
+## US-007: Add New Section via AI
+
+**Wave 3** | **P0** | **L** | Status: Draft
+
+### Story
+```
+As a   store owner
+I want to add new content sections to my page via chat
+So that I can expand my website without manual block building
+```
+
+### Acceptance Criteria
+```gherkin
+GIVEN I type "Add a testimonials section with 3 customer reviews" in AI chat
+WHEN  AI processes the request
+THEN  a Testimonials section with 3 placeholder reviews is added
+  AND I can drag it to reposition it
+```
+
+### Additional Criteria
+- [ ] AI-added sections match existing store's colour scheme and fonts
+- [ ] Section added at bottom by default — drag handle to reposition
+- [ ] Supported types: Testimonials, FAQ, Gallery, Features, Team, Newsletter, Banner, CTA
+- [ ] Adding a section is a single undoable action
