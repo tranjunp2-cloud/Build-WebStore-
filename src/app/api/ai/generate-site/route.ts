@@ -26,16 +26,40 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { user } = await payload.auth({ headers: req.headers })
+        // Build headers with JWT token for payload.auth()
+        // Next.js App Router may not forward cookies in req.headers properly
+        const authHeaders = new Headers(req.headers)
+        authHeaders.set('Authorization', `JWT ${token}`)
+
+        const { user } = await payload.auth({ headers: authHeaders })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // Get tenant ID
-        const tenantId = (user as any).tenants?.[0]?.tenant
-        const resolvedTenantId = typeof tenantId === 'object' ? tenantId.id : tenantId
+        // Get tenant ID — auto-create if missing (legacy accounts)
+        let tenantId = (user as any).tenants?.[0]?.tenant
+        let resolvedTenantId = typeof tenantId === 'object' ? tenantId.id : tenantId
+
         if (!resolvedTenantId) {
-            return NextResponse.json({ error: 'No tenant found' }, { status: 400 })
+            // Auto-create tenant for legacy users without one
+            const firstName = (user as any).firstName || (user as any).name || 'My'
+            const newTenant = await payload.create({
+                collection: 'tenants',
+                data: {
+                    name: `${firstName}'s Store`,
+                    slug: `store-${user.id}`,
+                },
+            })
+            // Assign tenant to user
+            await payload.update({
+                collection: 'users',
+                id: user.id,
+                data: {
+                    tenants: [{ tenant: newTenant.id, role: 'owner' }],
+                } as any,
+            })
+            resolvedTenantId = newTenant.id
+            console.log(`[AI Generate] Auto-created tenant ${newTenant.id} for user ${user.id}`)
         }
 
         // Parse request body — structured business info
@@ -216,79 +240,164 @@ export async function POST(req: NextRequest) {
 
 /**
  * Sanitize AI-generated blocks for Payload CMS compatibility.
- * AI models often return data in slightly wrong formats:
- * - formFields as strings instead of objects
- * - footer columns without proper link structure
- * - Extra/missing fields
+ * 
+ * KEY ISSUE: AI models return field names that don't match Payload schema.
+ * Example: AI returns { text: "Home" } but Payload requires { label: "Home" }
+ * 
+ * This function normalizes ALL block types to match the Pages collection schema.
  */
 function sanitizeBlocksForPayload(blocks: any[]): any[] {
     return blocks.map(block => {
         const sanitized = { ...block }
 
-        // ── Contact/Form blocks: normalize formFields ──
+        // Helper: normalize a link object → { label, url }
+        const normalizeLink = (link: any): { label: string; url: string; openInNewTab?: boolean } => {
+            if (typeof link === 'string') {
+                return { label: link, url: '#' }
+            }
+            return {
+                label: String(link.label || link.text || link.title || link.name || 'Link'),
+                url: String(link.url || link.href || link.link || '#'),
+                ...(link.openInNewTab !== undefined ? { openInNewTab: link.openInNewTab } : {}),
+            }
+        }
+
+        // ── Navigation: links[] requires { label (required), url (required) } ──
+        if (sanitized.blockType === 'navigation') {
+            // AI may use "navLinks" or "links" — normalize to "links"
+            const rawLinks = sanitized.links || sanitized.navLinks || []
+            sanitized.links = Array.isArray(rawLinks)
+                ? rawLinks.map(normalizeLink).filter((l: any) => l.label && l.label !== 'Link')
+                : []
+            // Clean up wrong field name
+            delete sanitized.navLinks
+
+            // CTA button normalization
+            if (sanitized.ctaButton) {
+                sanitized.ctaButton = {
+                    show: sanitized.ctaButton.show !== false,
+                    label: String(sanitized.ctaButton.label || sanitized.ctaButton.text || 'Get Started'),
+                    url: String(sanitized.ctaButton.url || sanitized.ctaButton.href || '#'),
+                }
+            }
+
+            // Ensure logoText exists
+            if (!sanitized.logoText && sanitized.logo && typeof sanitized.logo === 'string') {
+                sanitized.logoText = sanitized.logo
+                delete sanitized.logo // logo field is upload type, can't be string
+            }
+        }
+
+        // ── Hero: ctaButtons[] requires { label (required), url (required) } ──
+        if (sanitized.blockType === 'hero') {
+            if (Array.isArray(sanitized.ctaButtons)) {
+                sanitized.ctaButtons = sanitized.ctaButtons.map((btn: any) => {
+                    if (typeof btn === 'string') {
+                        return { label: btn, url: '#', style: 'primary' }
+                    }
+                    return {
+                        label: String(btn.label || btn.text || btn.title || 'Button'),
+                        url: String(btn.url || btn.href || btn.link || '#'),
+                        style: btn.style || 'primary',
+                    }
+                })
+            }
+            // Ensure headline exists
+            if (!sanitized.headline) {
+                sanitized.headline = sanitized.title || sanitized.heading || 'Welcome'
+            }
+        }
+
+        // ── Contact/Form: formFields[] requires { fieldName, label, fieldType } ──
         if (sanitized.formFields && Array.isArray(sanitized.formFields)) {
             sanitized.formFields = sanitized.formFields.map((field: any) => {
                 if (typeof field === 'string') {
-                    // Convert string → object: "Name" → { fieldName: "Name", fieldType: "text" }
                     const name = field.toLowerCase()
                     let fieldType = 'text'
                     if (name.includes('email')) fieldType = 'email'
-                    else if (name.includes('phone') || name.includes('telefon')) fieldType = 'tel'
-                    else if (name.includes('message') || name.includes('content') || name.includes('notes') || name.includes('mesej')) fieldType = 'textarea'
-                    return { fieldName: field, fieldType, required: true }
+                    else if (name.includes('phone') || name.includes('telefon')) fieldType = 'phone'
+                    else if (name.includes('message') || name.includes('content') || name.includes('mesej')) fieldType = 'textarea'
+                    return { fieldName: field, label: field, fieldType, required: true }
                 }
-                // Already an object — ensure required fields exist
                 return {
-                    fieldName: field.fieldName || field.name || field.label || 'Field',
+                    fieldName: String(field.fieldName || field.name || field.id || 'field'),
+                    label: String(field.label || field.fieldName || field.name || 'Field'),
                     fieldType: field.fieldType || field.type || 'text',
                     required: field.required !== undefined ? field.required : true,
-                    ...field,
+                    placeholder: field.placeholder || '',
                 }
             })
         }
 
-        // ── Footer: normalize columns with links ──
+        // ── Footer: columns[].links[] requires { label, url } ──
         if (sanitized.blockType === 'footer' && Array.isArray(sanitized.columns)) {
             sanitized.columns = sanitized.columns.map((col: any) => {
                 if (typeof col === 'string') {
                     return { title: col, links: [] }
                 }
-                const normalizedCol = {
-                    title: col.title || col.heading || 'Column',
-                    links: Array.isArray(col.links) ? col.links.map((link: any) => {
-                        if (typeof link === 'string') {
-                            return { label: link, url: '#' }
-                        }
-                        return {
-                            label: link.label || link.text || link.title || 'Link',
-                            url: link.url || link.href || '#',
-                            ...link,
-                        }
-                    }) : [],
-                }
-                return normalizedCol
-            })
-        }
-
-        // ── Navigation: normalize navLinks ──
-        if (sanitized.blockType === 'navigation' && Array.isArray(sanitized.navLinks)) {
-            sanitized.navLinks = sanitized.navLinks.map((link: any) => {
-                if (typeof link === 'string') {
-                    return { label: link, url: '#' }
-                }
                 return {
-                    label: link.label || link.text || 'Link',
-                    url: link.url || link.href || '#',
-                    ...link,
+                    title: String(col.title || col.heading || 'Column'),
+                    links: Array.isArray(col.links) ? col.links.map(normalizeLink) : [],
                 }
             })
         }
 
-        // ── Pricing: normalize plans/tiers ──
+        // ── Features: features[] requires { title (required), description (required) } ──
+        if (sanitized.blockType === 'features') {
+            // AI may use "items" instead of "features"
+            const rawFeatures = sanitized.features || sanitized.items || []
+            sanitized.features = Array.isArray(rawFeatures)
+                ? rawFeatures.map((item: any) => {
+                    if (typeof item === 'string') {
+                        return { title: item, description: '', icon: '✨' }
+                    }
+                    return {
+                        icon: item.icon || '✨',
+                        title: String(item.title || item.name || item.heading || 'Feature'),
+                        description: String(item.description || item.desc || item.text || ''),
+                    }
+                })
+                : []
+            delete sanitized.items
+            // Ensure headline
+            if (!sanitized.headline) {
+                sanitized.headline = sanitized.title || 'Our Features'
+            }
+        }
+
+        // ── Testimonials: testimonials[] requires { quote (required), name (required) } ──
+        if (sanitized.blockType === 'testimonials') {
+            // AI may use "items" instead of "testimonials"
+            const rawTestimonials = sanitized.testimonials || sanitized.items || []
+            sanitized.testimonials = Array.isArray(rawTestimonials)
+                ? rawTestimonials.map((item: any) => {
+                    if (typeof item === 'string') {
+                        return { quote: item, name: 'Customer', rating: 5 }
+                    }
+                    return {
+                        quote: String(item.quote || item.text || item.content || item.review || 'Great service!'),
+                        name: String(item.name || item.author || item.customer || 'Customer'),
+                        title: item.title || item.role || item.position || '',
+                        company: item.company || item.organization || '',
+                        rating: item.rating || 5,
+                    }
+                })
+                : []
+            delete sanitized.items
+        }
+
+        // ── About: ensure headline ──
+        if (sanitized.blockType === 'about') {
+            if (!sanitized.headline) {
+                sanitized.headline = sanitized.title || 'About Us'
+            }
+        }
+
+        // ── Pricing: plans[] normalization ──
         if (sanitized.blockType === 'pricing' && Array.isArray(sanitized.plans)) {
             sanitized.plans = sanitized.plans.map((plan: any) => {
                 if (typeof plan === 'string') {
-                    return { name: plan, price: '$0', features: [] }
+                    return { name: plan, price: 'RM 0', features: [] }
                 }
                 if (Array.isArray(plan.features)) {
                     plan.features = plan.features.map((f: any) =>
@@ -299,25 +408,10 @@ function sanitizeBlocksForPayload(blocks: any[]): any[] {
             })
         }
 
-        // ── Features: normalize items ──
-        if (sanitized.blockType === 'features' && Array.isArray(sanitized.items)) {
-            sanitized.items = sanitized.items.map((item: any) => {
-                if (typeof item === 'string') {
-                    return { title: item, description: '' }
-                }
-                return item
-            })
-        }
-
-        // ── Testimonials: normalize items ──
-        if (sanitized.blockType === 'testimonials' && Array.isArray(sanitized.items)) {
-            sanitized.items = sanitized.items.map((item: any) => {
-                if (typeof item === 'string') {
-                    return { quote: item, author: 'Anonymous' }
-                }
-                return item
-            })
-        }
+        // ── Remove non-schema fields that AI might add ──
+        delete sanitized.id
+        delete sanitized.order
+        delete sanitized.section
 
         return sanitized
     })

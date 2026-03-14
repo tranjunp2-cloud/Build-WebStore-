@@ -1,6 +1,6 @@
 # Git & CI/CD Rules — Chuẩn cho team SaaS
 
-> **Nguồn sự thật duy nhất** cho quy tắc Git, CI/CD và setup. Mọi môi trường (Cursor, Antigravity, CI, dev local) **bắt buộc dùng chung** file này và [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+> **Nguồn sự thật duy nhất** cho quy tắc Git, CI/CD và setup. Mọi môi trường (Cursor, Antigravity, CI, dev local) **bắt buộc dùng chung** file này và [CONTRIBUTING.md](.github/CONTRIBUTING.md). **Tổng quan code/project rules:** [.github/OVERVIEW.md](.github/OVERVIEW.md).
 
 ---
 
@@ -8,21 +8,24 @@
 
 ### 1. Git workflow (branch strategy)
 
-Áp dụng **GitHub Flow** (phù hợp SaaS, deploy liên tục):
+Áp dụng **GitHub Flow** với **staging bắt buộc** (team chỉ vào staging trước; main chỉ qua hotfix hoặc release):
 
 ```
-main          ← production (protected)
-staging       ← pre-production (optional, auto-deploy)
-feature/*     ← tính năng mới (tạo từ main)
-fix/*         ← sửa bug (từ main)
-hotfix/*      ← sửa gấp production (từ main → merge main)
+main          ← production (protected). Chỉ nhận PR từ staging (release) hoặc hotfix/*
+staging       ← pre-production. Nhận PR từ feature/*, fix/*. Deploy staging khi push.
+feature/*     ← tính năng mới (tạo từ main hoặc staging). PR vào staging only.
+fix/*         ← sửa bug. PR vào staging only.
+hotfix/*      ← sửa gấp production. Tạo từ main → PR vào main. Sau đó merge main → staging.
 chore/*       ← deps, config, refactor (không đổi logic)
 docs/*        ← chỉ tài liệu
 ```
 
-- **main**: luôn deployable; merge qua PR + approval + CI pass.
-- **staging** (nếu có): deploy tự động khi push; dùng cho QA/demo.
-- **feature/fix/hotfix**: branch ngắn hạn, merge xong có thể xóa.
+- **main**: chỉ cập nhật qua (1) PR **staging → main** (khi release) hoặc (2) PR **hotfix/* → main**. Không merge feature/fix trực tiếp vào main.
+- **staging**: nhánh team merge hàng ngày. Feature/fix → PR vào **staging** → QA/demo → khi ổn định mới tạo PR staging → main.
+- **feature/fix**: luôn tạo PR với **base = staging** (không PR vào main).
+- **hotfix**: ngoại lệ — PR vào main, merge xong nên merge main vào staging để đồng bộ.
+
+Chi tiết luồng deploy: [.github/DEPLOY.md](.github/DEPLOY.md). Đánh giá triển khai CI/CD (so workflow + analysis): [.github/CICD_IMPLEMENTATION_ASSESSMENT.md](.github/CICD_IMPLEMENTATION_ASSESSMENT.md).
 
 **Không dùng:** GitFlow (develop/release) trừ khi cần hỗ trợ nhiều phiên bản production.
 
@@ -124,15 +127,31 @@ Template nằm tại [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEM
 
 **CI status checks cần có:** `lint`, `typecheck`, `test`, `build`.
 
+#### 5.1 CI flow — thứ tự bước và giữ CI xanh
+
+Workflow file: [.github/workflows/ci.yml](.github/workflows/ci.yml). Chạy trên mọi **push** và **pull_request** vào nhánh `main`, `staging`.
+
+| Bước | Lệnh | Ghi chú |
+|------|------|--------|
+| 1 | `npm run lint` | ESLint (next lint) — chỉ **errors** fail; warnings in ra nhưng không fail. |
+| 2 | `npm run typecheck` | `tsc --noEmit` — kiểm tra type toàn bộ `src/`. |
+| 3 | `npm run test` | `vitest run` — unit test. |
+| 4 | `npm run build` | Next.js build (script đã gắn `NODE_OPTIONS='--require ./node-polyfill.js'` để tránh lỗi khi collect page data). |
+
+**Giữ CI xanh:** Trước khi push hoặc tạo PR, chạy local lần lượt: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`. Chỉ push khi cả 4 bước pass. Nếu CI fail, sửa trên branch (fix lint/type/test/build) rồi push lại.
+
 ---
 
 ### 6. CI/CD pipeline (gợi ý)
 
 | Event / Branch   | Chạy gì |
 |------------------|---------|
-| Push / PR vào `feature/*`, `fix/*`, … | Lint, typecheck, test, build |
-| Push `main`      | Cùng bộ check → deploy production |
-| Push `staging`   | Build → deploy staging (nếu có) |
+| PR vào `staging` (từ feature/*, fix/*) | Lint, typecheck, test, build |
+| Push `staging`   | Build → deploy staging |
+| PR vào `main` (từ staging hoặc hotfix/*) | Lint, typecheck, test, build |
+| Push `main`      | Build → deploy production |
+
+**Quy ước:** Feature/fix chỉ merge vào **staging**. Main chỉ nhận merge từ **staging** (release) hoặc **hotfix/***. Chi tiết: [.github/DEPLOY.md](.github/DEPLOY.md).
 
 **Version (semantic-release):** Chạy trên `main`; đọc commit → `feat` = MINOR, `fix` = PATCH, `BREAKING CHANGE` = MAJOR → tag, changelog, GitHub Release.
 

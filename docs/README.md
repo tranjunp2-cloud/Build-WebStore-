@@ -1,81 +1,67 @@
-# PrimeWeb — Documentation Hub
+# 📚 PrimeWeb — Team Hub
 
-> Feature documentation organized by BMAD workflow.
-> **Product:** PrimeWeb (AI-first SaaS website builder for SMEs)
-> **Authority:** `SPEC.md` §2 is the master rule — read it before coding.
+> **Đọc file này trước. Tất cả docs có link ở đây.**
 
-## 📂 Structure
+---
+
+## 🚀 Bắt đầu
+
+| Bạn là | Đọc file này |
+|--------|-------------|
+| **Dev mới** | [README.md](../README.md) (setup) → [CONTRIBUTING.md](../.github/CONTRIBUTING.md) (rules) |
+| **Designer** | [Design Guide](design/DESIGN_WORKFLOW.md) (rules + screens + tokens + Figma links) |
+| **QC** | [Features](#features) bên dưới → xem stories |
+| **DevOps** | [DEPLOY.md](../.github/DEPLOY.md) → [GIT_AND_CI_RULES.md](../.github/GIT_AND_CI_RULES.md) |
+| **Tất cả** | [PROJECT_ALIGNMENT.md](PROJECT_ALIGNMENT.md) (timeline, priority) |
+
+---
+
+## 📂 Cấu trúc docs
 
 ```
 docs/
-├── README.md                      ← This file
-├── prd/                           ← Product Requirement Documents
-│   ├── _TEMPLATE.md               ← PRD template
-│   ├── F01-ai-chat-builder.md
-│   ├── F02-auth.md
-│   ├── F03-dashboard.md
-│   ├── F04-block-renderer.md
-│   └── F10-storefront-commerce.md
-├── architecture/                  ← System design & architecture
-│   ├── _TEMPLATE.md               ← Architecture template
-│   ├── AI_BUILDER_SPEC.md         ← AI features deep technical spec
-│   ├── F01-ai-chat-builder.md
-│   ├── F02-auth.md
-│   ├── F03-dashboard.md
-│   └── F10-storefront-commerce.md
-├── design/                        ← UI Mockups (required by BMAD gate)
-│   ├── F03-dashboard-mockup.png
-│   ├── F10-storefront-products.jpg
-│   ├── F10-storefront-detail.jpg
-│   ├── F10-storefront-checkout.jpg
-│   └── F10-storefront-cart.jpg
-├── stories/                       ← User Stories with Gherkin AC
-│   └── user-stories-p0.md         ← P0 stories (US-001 → US-010)
-├── qa/                            ← QA Reports (after build)
-│   ├── F02-auth.md
-│   └── F03-dashboard.md
-├── decisions/                     ← Architecture Decision Records
-├── tracking/                      ← Build progress & plans
-│   ├── product_plan.md            ← Full product roadmap
-│   ├── PLAN-ai-webbuilder.md      ← BMAD master build plan
-│   ├── implementation_plan.md
-│   ├── task.md
-│   └── walkthrough.md
+├── README.md                    ← Bạn đang đây (Team Hub)
+├── PROJECT_ALIGNMENT.md         ← Timeline, priority, team rules, task tóm tắt
+├── SPRINT0_DETAIL.md            ← Chi tiết từng task (files, steps, DoD)
+│
+├── prd/                         ← PRD mỗi feature (yêu cầu)
+├── stories/                     ← User Stories + Gherkin AC
+├── architecture/                ← Technical design
+├── design/DESIGN_WORKFLOW.md     ← Design Guide: rules + 28 screens + tokens + Figma (1 file)
+├── decisions/decisions-log.md   ← Product decisions đã chốt
+└── malaysia-market-context.md   ← Ngữ cảnh thị trường MY
+
+.github/
+├── CONTRIBUTING.md              ← Git rules, PR rules, code rules
+├── GIT_AND_CI_RULES.md          ← Chi tiết Git workflow
+├── DEPLOY.md                    ← Deploy staging vs production
+├── TEST_PLAN.md                 ← Phạm vi test
+└── pull_request_template.md     ← Template PR
+
+Root:
+├── README.md                    ← Setup & run project
+└── SPEC.md                      ← Product spec gốc (reference)
 ```
 
-## 📑 Naming Convention
+---
 
-All feature docs: **`F{XX}-{feature-name}.md`**
+## Features
 
-| ID | Feature | Wave | PRD | Architecture | Design | QA |
-|----|---------|------|-----|-------------|--------|-----|
-| F01 | AI Chat Builder | 3 | ✅ | ✅ | ⬜ | ⬜ |
-| F02 | Auth | 1 | ✅ | ✅ | ⬜ | ✅ |
-| F03 | Dashboard | 2 | ✅ | ✅ | ✅ | ✅ |
-| F04 | Block Renderer | 3 | ✅ | ⬜ | ⬜ | ⬜ |
-| F05 | SEO Dashboard | 4 | ⬜ | ⬜ | ⬜ | ⬜ |
-| F06 | Products CRUD | 4 | ⬜ | ⬜ | ⬜ | ⬜ |
-| F07 | Orders | 4 | ⬜ | ⬜ | ⬜ | ⬜ |
-| F08 | Publish Flow | 4 | ⬜ | ⬜ | ⬜ | ⬜ |
-| F09 | Templates + i18n | 3.5 | ⬜ | ⬜ | ⬜ | ⬜ |
-| F10 | Storefront Commerce | 5 | ✅ | ✅ | ✅ | ⬜ |
-
-## 🛑 BMAD Gate (5/5 Required)
-
-Before coding any feature, verify:
-1. ☐ PRD exists (`docs/prd/F{XX}-{name}.md`)
-2. ☐ Architecture exists (`docs/architecture/F{XX}-{name}.md`)
-3. ☐ UI Mockups exist (`docs/design/F{XX}-{name}-*.jpg`)
-4. ☐ API contracts defined (in PRD §8)
-5. ☐ Dependencies resolved
-
-> **< 5/5 PASS → HOLD. Create docs FIRST.**
-
-## 🔗 Key References
-
-| Document | Purpose |
-|----------|---------|
-| [`SPEC.md`](../SPEC.md) | Constitution — master rules |
-| [`AI_BUILDER_SPEC.md`](./architecture/AI_BUILDER_SPEC.md) | AI features deep spec |
-| [`product_plan.md`](./tracking/product_plan.md) | Full product roadmap |
-| [`PLAN-ai-webbuilder.md`](./tracking/PLAN-ai-webbuilder.md) | BMAD build plan |
+| Feature | PRD | Stories | Architecture | Design |
+|---------|:---:|:-------:|:------------:|:------:|
+| **F01** AI Chat Builder | [📄](prd/F01-ai-chat-builder.md) | [📝](stories/F01-ai-chat-builder-stories.md) | [🏗️](architecture/F01-ai-chat-builder.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F02** Auth | [📄](prd/F02-auth.md) | [📝](stories/F02-auth-stories.md) | [🏗️](architecture/F02-auth.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F03** Dashboard | [📄](prd/F03-dashboard.md) | [📝](stories/F03-dashboard-stories.md) | [🏗️](architecture/F03-dashboard.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F05** AI Editor | [📄](prd/F05-ai-editor.md) | [📝](stories/F05-ai-editor-stories.md) | [🏗️](architecture/F05-ai-editor.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F06** Onboarding | [📄](prd/F06-onboarding.md) | [📝](stories/F06-onboarding-stories.md) | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F07** Templates | [📄](prd/F07-template-gallery.md) | [📝](stories/F07-template-gallery-stories.md) | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F08** Publish | [📄](prd/F08-publish-flow.md) | [📝](stories/F08-publish-stories.md) | [🏗️](architecture/F08-publish-flow.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F09** Products | [📄](prd/F09-products-crud.md) | [📝](stories/F09-products-crud-stories.md) | [🏗️](architecture/F09-products-crud.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F10** Storefront | [📄](prd/F10-storefront-commerce.md) | [📝](stories/F10-storefront-stories.md) | [🏗️](architecture/F10-storefront-commerce.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F11** Orders | [📄](prd/F11-orders-management.md) | [📝](stories/F11-orders-stories.md) | [🏗️](architecture/F11-orders-management.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F12** SEO | [📄](prd/F12-seo-dashboard.md) | [📝](stories/F12-seo-dashboard-stories.md) | [🏗️](architecture/F12-seo-dashboard.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F13** Analytics | [📄](prd/F13-analytics-dashboard.md) | ❌ | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F14** Undo/Redo | [📄](prd/F14-undo-redo.md) | [📝](stories/F14-undo-redo-stories.md) | ❌ | — |
+| **F15** Auto-save | [📄](prd/F15-auto-save-draft.md) | ❌ | ❌ | — |
+| **F16** Payment Gateway 🇲🇾 | [📄](prd/F16-payment-gateway.md) | ❌ | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F17** Shipping 🇲🇾 | [📄](prd/F17-shipping.md) | ❌ | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |

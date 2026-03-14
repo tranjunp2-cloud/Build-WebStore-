@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI/CD Analysis — Ưu Nhược Điểm & Chi Phí</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Cabinet+Grotesk:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f0e8;
+    --bg2: #ede8df;
+    --ink: #1a1410;
+    --ink2: #3d3530;
+    --muted: #8b7d72;
+    --green: #1a5c3a;
+    --green-bg: #e8f5ee;
+    --red: #8b1a1a;
+    --red-bg: #f5e8e8;
+    --blue: #1a2d5c;
+    --blue-bg: #e8ecf5;
+    --orange: #8b4a1a;
+    --orange-bg: #f5ece8;
+    --purple: #3d1a5c;
+    --purple-bg: #ede8f5;
+    --yellow: #5c4a1a;
+    --yellow-bg: #f5f0e8;
+    --border: #d4c8bc;
+    --cursor: #5b4cf5;
+    --lark: #1456f5;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Cabinet Grotesk', sans-serif;
+    line-height: 1.6;
+  }
+
+  /* Grain texture */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.4;
+  }
+
+  .page { max-width: 1300px; margin: 0 auto; padding: 50px 40px; }
+
+  /* Header */
+  .masthead {
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 24px;
+    margin-bottom: 40px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .masthead-left {}
+
+  .kicker {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-size: 48px;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--ink);
+  }
+
+  h1 span { color: var(--cursor); }
+
+  .masthead-meta {
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  /* Section headers */
+  h2 {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--ink);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  h2::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    background: var(--ink);
+  }
+
+  h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  section { margin-bottom: 52px; }
+
+  /* Verdict card */
+  .verdict {
+    background: var(--ink);
+    color: var(--bg);
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin-bottom: 48px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+  }
+
+  .verdict-item {}
+  .verdict-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(245,240,232,0.5);
+    margin-bottom: 6px;
+  }
+  .verdict-value {
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--bg);
+  }
+  .verdict-sub {
+    font-size: 12px;
+    color: rgba(245,240,232,0.6);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-top: 4px;
+  }
+
+  /* Pro/Con grid */
+  .procon-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .procon-box {
+    border-radius: 12px;
+    padding: 24px;
+    border: 1.5px solid;
+  }
+
+  .pro-box {
+    background: var(--green-bg);
+    border-color: var(--green);
+  }
+
+  .con-box {
+    background: var(--red-bg);
+    border-color: var(--red);
+  }
+
+  .box-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .box-icon { font-size: 20px; }
+
+  .box-title {
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .pro-box .box-title { color: var(--green); }
+  .con-box .box-title { color: var(--red); }
+
+  .procon-list { list-style: none; }
+
+  .procon-list li {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .pro-box .procon-list li { border-color: rgba(26,92,58,0.15); }
+  .con-box .procon-list li { border-color: rgba(139,26,26,0.15); }
+
+  .procon-list li:last-child { border-bottom: none; }
+
+  .procon-list li::before {
+    flex-shrink: 0;
+    font-size: 14px;
+    margin-top: 1px;
+  }
+
+  .pro-box li::before { content: '✓'; color: var(--green); font-weight: 700; }
+  .con-box li::before { content: '✗'; color: var(--red); font-weight: 700; }
+
+  .li-label {
+    font-weight: 700;
+    display: block;
+    margin-bottom: 2px;
+    color: var(--ink);
+  }
+
+  .li-detail {
+    color: var(--ink2);
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Cost table */
+  .cost-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .cost-table th {
+    background: var(--ink);
+    color: var(--bg);
+    padding: 12px 16px;
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .cost-table th:first-child { border-radius: 8px 0 0 0; }
+  .cost-table th:last-child { border-radius: 0 8px 0 0; }
+
+  .cost-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .cost-table tr:nth-child(even) td { background: var(--bg2); }
+
+  .cost-table tr:last-child td:first-child { border-radius: 0 0 0 8px; }
+  .cost-table tr:last-child td:last-child { border-radius: 0 0 8px 0; }
+
+  .cost-free { color: var(--green); font-weight: 700; }
+  .cost-low { color: var(--blue); font-weight: 700; }
+  .cost-mid { color: var(--orange); font-weight: 700; }
+  .cost-high { color: var(--red); font-weight: 700; }
+
+  .total-row td {
+    background: #1a1410 !important;
+    color: var(--bg);
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  /* Comparison table */
+  .compare-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12px;
+  }
+
+  .compare-table th {
+    padding: 14px 16px;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .compare-table th.highlight {
+    background: var(--cursor);
+    color: white;
+    border-radius: 10px 10px 0 0;
+  }
+
+  .compare-table th:first-child { text-align: left; }
+
+  .compare-table td {
+    padding: 11px 16px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    color: var(--ink2);
+  }
+
+  .compare-table td:first-child {
+    text-align: left;
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 13px;
+  }
+
+  .compare-table td.highlight {
+    background: rgba(91,76,245,0.06);
+    font-weight: 700;
+    color: var(--cursor);
+  }
+
+  .compare-table tr:last-child td.highlight {
+    border-radius: 0 0 10px 10px;
+  }
+
+  .score-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--border);
+    width: 60px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+  }
+
+  /* CD Detail section */
+  .cd-timeline {
+    position: relative;
+    padding-left: 40px;
+  }
+
+  .cd-timeline::before {
+    content: '';
+    position: absolute;
+    left: 16px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--ink) 0, var(--ink) 6px,
+      transparent 6px, transparent 12px
+    );
+  }
+
+  .cd-step {
+    position: relative;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .cd-step::before {
+    content: attr(data-num);
+    position: absolute;
+    left: -40px;
+    top: 12px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--bg);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cd-card {
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+    background: white;
+    transition: box-shadow 0.2s;
+  }
+
+  .cd-card:hover { box-shadow: 4px 4px 0 var(--ink); }
+
+  .cd-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .cd-card-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+
+  .cd-card-env {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .env-chip {
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 9px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1.5px solid;
+  }
+
+  .env-staging { background: var(--yellow-bg); border-color: var(--yellow); color: var(--yellow); }
+  .env-prod { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+  .env-auto { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); }
+  .env-manual { background: var(--orange-bg); border-color: var(--orange); color: var(--orange); }
+  .env-cursor { background: var(--purple-bg); border-color: var(--purple); color: var(--purple); }
+
+  .cd-card-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--ink2);
+  }
+
+  .cd-detail-label {
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .cd-detail-value { color: var(--ink); font-size: 12px; line-height: 1.6; }
+
+  .cd-steps-list {
+    list-style: none;
+  }
+
+  .cd-steps-list li {
+    display: flex;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--ink2);
+  }
+
+  .cd-steps-list li::before {
+    content: '→';
+    color: var(--cursor);
+    flex-shrink: 0;
+  }
+
+  /* Canary diagram */
+  .canary-visual {
+    background: var(--bg2);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 16px;
+  }
+
+  .canary-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .canary-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .canary-label {
+    width: 80px;
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .canary-bar-wrap {
+    flex: 1;
+    height: 24px;
+    background: var(--bg);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    display: flex;
+  }
+
+  .canary-old {
+    background: #d4c8bc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--ink2);
+    font-weight: 600;
+    transition: width 1s ease;
+  }
+
+  .canary-new {
+    background: var(--cursor);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: white;
+    font-weight: 600;
+    transition: width 1s ease;
+  }
+
+  .canary-status {
+    width: 80px;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 10px;
+  }
+
+  .status-ok { color: var(--green); }
+  .status-watch { color: var(--orange); }
+  .status-go { color: var(--cursor); font-weight: 700; }
+
+  /* Rollback box */
+  .rollback-box {
+    background: var(--red-bg);
+    border: 1.5px solid var(--red);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-top: 12px;
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .rollback-title {
+    color: var(--red);
+    font-weight: 700;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+
+  .rollback-triggers {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .trigger-tag {
+    padding: 3px 10px;
+    border-radius: 4px;
+    background: rgba(139,26,26,0.1);
+    border: 1px solid rgba(139,26,26,0.3);
+    color: var(--red);
+    font-size: 9px;
+    letter-spacing: 0.05em;
+  }
+
+  /* Recommendation box */
+  .rec-box {
+    background: var(--ink);
+    color: var(--bg);
+    border-radius: 16px;
+    padding: 32px;
+    margin-top: 40px;
+  }
+
+  .rec-title {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  .rec-subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: rgba(245,240,232,0.5);
+    margin-bottom: 24px;
+  }
+
+  .rec-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .rec-card {
+    background: rgba(245,240,232,0.06);
+    border: 1px solid rgba(245,240,232,0.1);
+    border-radius: 10px;
+    padding: 18px;
+  }
+
+  .rec-phase {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(245,240,232,0.4);
+    margin-bottom: 6px;
+  }
+
+  .rec-action {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--bg);
+    margin-bottom: 8px;
+  }
+
+  .rec-detail {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: rgba(245,240,232,0.5);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 768px) {
+    .procon-grid, .rec-grid { grid-template-columns: 1fr; }
+    .cd-card-body { grid-template-columns: 1fr; }
+    h1 { font-size: 32px; }
+    .verdict { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Masthead -->
+  <div class="masthead">
+    <div class="masthead-left">
+      <div class="kicker">Analysis Report · CI/CD với Cursor Automations + Lark</div>
+      <h1>Ưu Nhược Điểm,<br>Chi Phí & <span>So Sánh</span></h1>
+    </div>
+    <div class="masthead-meta">
+      Cursor Automations + GitHub Actions<br>
+      + Lark MCP · March 2026<br>
+      <br>
+      Team size: 3–20 developers<br>
+      Stack: Web / Mobile / API
+    </div>
+  </div>
+
+  <!-- Verdict summary -->
+  <div class="verdict">
+    <div class="verdict-item">
+      <div class="verdict-label">Tổng chi phí / tháng</div>
+      <div class="verdict-value">~$120</div>
+      <div class="verdict-sub">team 5 người · ước tính</div>
+    </div>
+    <div class="verdict-item">
+      <div class="verdict-label">Thời gian setup</div>
+      <div class="verdict-value">3–5 ngày</div>
+      <div class="verdict-sub">từ zero → fully automated</div>
+    </div>
+    <div class="verdict-item">
+      <div class="verdict-label">ROI kỳ vọng</div>
+      <div class="verdict-value">10–15h/tuần</div>
+      <div class="verdict-sub">thời gian tiết kiệm per dev</div>
+    </div>
+  </div>
+
+  <!-- Ưu nhược điểm -->
+  <section>
+    <h2>Ưu &amp; Nhược Điểm</h2>
+    <div class="procon-grid">
+      <div class="procon-box pro-box">
+        <div class="box-header">
+          <span class="box-icon">✅</span>
+          <span class="box-title">Ưu điểm</span>
+        </div>
+        <ul class="procon-list">
+          <li>
+            <span>
+              <span class="li-label">Giảm 80% manual code review</span>
+              <span class="li-detail">Cursor BugBot + Security Review tự động catch bug trước khi human xem → dev chỉ review những gì thực sự cần</span>
+            </span>
+          </li>
+          <li>
+            <span>
+              <span class="li-label">Deploy nhanh và an toàn hơn</span>
+              <span class="li-detail">Canary deploy + auto rollback → deploy nhiều lần/ngày mà không sợ sập production</span>
+            </span>
+          </li>
+          <li>
+            <span>
+              <span class="li-label">Visibility 100% qua Lark</span>
+              <span class="li-detail">Toàn team biết status realtime mà không cần hỏi nhau → ít họp hơn, ít Slack loạn hơn</span>
+            </span>
+          </li>
+          <li>
+            <span>
+              <span class="li-label">Incident response tự động</span>
+              <span class="li-detail">Bug production → Cursor điều tra logs → đề xuất fix → tạo PR trong vài phút thay vì hàng giờ</span>
+            </span>
+          </li>
+          <li>
+            <span>
+              <span class="li-label">Scale không đau</span>
+              <span class="li-detail">Team từ 5 → 20 người không cần thêm DevOps engineer riêng vì pipeline tự lo hầu hết</span>
+            </span>
+          </li>
+          <li>
+            <span>
+              <span class="li-label">Tích hợp Lark — toàn cty dùng chung</span>
+              <span class="li-detail">PM, CTO, QA đều nhận được đúng thông tin cần mà không cần access GitHub hay Cursor</span>
+            </span>
+          </li>
+        </ul>
+      </div>
+      <div class="procon-box con-box">
+        <div class="box-header">
+          <span class="box-icon">⚠️</span>
+          <span class="box-title">Nhược điểm &amp; Rủi ro</span>
+        </div>
+        <ul class="procon-list">
+          <li>
+            <span>
+              <span class="li-label">Vendor lock-in Cursor</span>
+              <span class="li-detail">Nếu Cursor tăng giá hoặc outage → toàn bộ Automations bị ảnh hưởng. Cần có backup plan (GitHub Actions thuần)</span>
+            </span>
+          </li>
+          <li>
+            <span>
+              <span class="li-label">Cursor Automations còn rất mới (5/3/2026)</span>
+              <span class="li-detail">Feature mới ra, chưa battle-tested ở quy mô lớn. Có thể có bugs, thay đổi pricing, thay đổi API</span>
+            </span>
+          </li>
+          <li>
+            <span>
+              <span class="li-label">Chi phí khó predict</span>
+              <span class="li-detail">Cursor Automations billing theo token/run, nếu code nhiều đột biến thì cost tăng không lường trước được</span>
+            </span>
+          </li>
+          <li>
+            <span>
+              <span class="li-label">AI có thể review sai</span>
+              <span class="li-detail">BugBot/Security Review không phải 100% chính xác, có false positive. Team cần hiểu là AI assist, không phải AI replace</span>
+            </span>
+          </li>
+          <li>
+            <span>
+              <span class="li-label">Setup ban đầu tốn công</span>
+              <span class="li-detail">Cần cấu hình GitHub, Lark MCP, viết prompt cho từng automation, test từng luồng → tốn 3–5 ngày đầu</span>
+            </span>
+          </li>
+          <li>
+            <span>
+              <span class="li-label">Cần team hiểu công cụ</span>
+              <span class="li-detail">Dev cần biết cách đọc Cursor review, hiểu canary deploy, biết khi nào rollback → cần onboarding session</span>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Chi phí -->
+  <section>
+    <h2>Chi Phí Chi Tiết (team 5 người)</h2>
+    <table class="cost-table">
+      <thead>
+        <tr>
+          <th>Công cụ</th>
+          <th>Plan đề xuất</th>
+          <th>Chi phí/tháng</th>
+          <th>Dùng để làm gì</th>
+          <th>Có thể thay thế bằng</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Cursor</strong></td>
+          <td>Business ($40/user)</td>
+          <td class="cost-high">$200 (5 devs)</td>
+          <td>IDE + Automations + BugBot + Cloud Agents</td>
+          <td>GitHub Copilot ($19/user)</td>
+        </tr>
+        <tr>
+          <td><strong>GitHub</strong></td>
+          <td>Team ($4/user)</td>
+          <td class="cost-low">$20</td>
+          <td>Source control + GitHub Actions CI + PR management</td>
+          <td>GitLab (free tier)</td>
+        </tr>
+        <tr>
+          <td><strong>Lark</strong></td>
+          <td>Pro (đã có)</td>
+          <td class="cost-free">$0 (đã trả)</td>
+          <td>Notifications + team communication</td>
+          <td>Slack ($7.25/user)</td>
+        </tr>
+        <tr>
+          <td><strong>Cloud Deploy</strong></td>
+          <td>Tùy stack</td>
+          <td class="cost-mid">$50–200</td>
+          <td>Staging + Production environments</td>
+          <td>Vercel / Railway / AWS</td>
+        </tr>
+        <tr>
+          <td><strong>GitHub Actions</strong></td>
+          <td>Included in Team</td>
+          <td class="cost-free">$0</td>
+          <td>CI pipeline, lint, test, build</td>
+          <td>CircleCI, Jenkins</td>
+        </tr>
+        <tr>
+          <td><strong>Docker Registry</strong></td>
+          <td>GitHub Packages / free</td>
+          <td class="cost-free">$0</td>
+          <td>Store Docker images</td>
+          <td>DockerHub, ECR</td>
+        </tr>
+        <tr class="total-row">
+          <td>TỔNG ƯỚC TÍNH</td>
+          <td>—</td>
+          <td>~$270–$420/tháng</td>
+          <td colspan="2">→ ~$54–84/dev/tháng · Tiết kiệm ~10–15h dev time/tuần/người</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:12px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted)">
+      * Nếu dùng GitLab + self-host runners thay GitHub Actions → giảm ~$20/tháng. Nếu dùng Vercel Pro thay EC2 → dễ hơn nhưng đắt hơn ~$50/tháng.
+    </p>
+  </section>
+
+  <!-- So sánh -->
+  <section>
+    <h2>So Sánh Với Các Phương Án Khác</h2>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Tiêu chí</th>
+          <th class="highlight">Cursor + GitHub Actions + Lark ✦</th>
+          <th>GitHub Actions thuần</th>
+          <th>GitLab CI/CD</th>
+          <th>Jenkins (self-host)</th>
+          <th>Vercel / Netlify</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Độ khó setup</td>
+          <td class="highlight">
+            <div class="score-bar"><div class="bar"><div class="bar-fill" style="width:65%;background:#5b4cf5"></div></div> Trung bình</div>
+          </td>
+          <td><div class="score-bar"><div class="bar"><div class="bar-fill" style="width:50%;background:#94a3b8"></div></div> Dễ</div></td>
+          <td><div class="score-bar"><div class="bar"><div class="bar-fill" style="width:50%;background:#94a3b8"></div></div> Dễ</div></td>
+          <td><div class="score-bar"><div class="bar"><div class="bar-fill" style="width:90%;background:#ef4444"></div></div> Khó</div></td>
+          <td><div class="score-bar"><div class="bar"><div class="bar-fill" style="width:20%;background:#10b981"></div></div> Rất dễ</div></td>
+        </tr>
+        <tr>
+          <td>AI code review</td>
+          <td class="highlight">✅ Tự động, sâu, security audit</td>
+          <td>❌ Không có</td>
+          <td>⚠️ Cần plugin thêm</td>
+          <td>❌ Không có</td>
+          <td>❌ Không có</td>
+        </tr>
+        <tr>
+          <td>Auto incident response</td>
+          <td class="highlight">✅ Cursor agent điều tra + tạo fix PR</td>
+          <td>❌ Manual</td>
+          <td>❌ Manual</td>
+          <td>❌ Manual</td>
+          <td>❌ Manual</td>
+        </tr>
+        <tr>
+          <td>Thông báo team</td>
+          <td class="highlight">✅ Lark realtime, có context đầy đủ</td>
+          <td>⚠️ Slack/Email cơ bản</td>
+          <td>⚠️ Slack/Email cơ bản</td>
+          <td>⚠️ Email cơ bản</td>
+          <td>⚠️ Email/Slack</td>
+        </tr>
+        <tr>
+          <td>Canary / Blue-Green deploy</td>
+          <td class="highlight">✅ Setup được với Kubernetes/ECS</td>
+          <td>✅ Setup được</td>
+          <td>✅ Built-in environments</td>
+          <td>✅ Plugin có sẵn</td>
+          <td>❌ Không hỗ trợ</td>
+        </tr>
+        <tr>
+          <td>Auto rollback</td>
+          <td class="highlight">✅ Dựa trên metrics + error rate</td>
+          <td>⚠️ Manual trigger</td>
+          <td>✅ Built-in rollback</td>
+          <td>⚠️ Manual</td>
+          <td>✅ Instant rollback</td>
+        </tr>
+        <tr>
+          <td>Self-hosted option</td>
+          <td class="highlight">⚠️ Cursor cloud-only</td>
+          <td>✅ Self-hosted runners</td>
+          <td>✅ Full self-host</td>
+          <td>✅ 100% self-host</td>
+          <td>❌ Cloud only</td>
+        </tr>
+        <tr>
+          <td>Chi phí (5 devs)</td>
+          <td class="highlight">~$270–420/tháng</td>
+          <td>~$20–50/tháng</td>
+          <td>~$0–50/tháng</td>
+          <td>~$0 + server cost</td>
+          <td>~$20–100/tháng</td>
+        </tr>
+        <tr>
+          <td>Phù hợp khi</td>
+          <td class="highlight">Team đang dùng Cursor, muốn AI-first, focus vào product</td>
+          <td>Budget thấp, team quen GitHub</td>
+          <td>Muốn all-in-one, self-host</td>
+          <td>Enterprise, on-premise</td>
+          <td>Frontend-only, simple deploy</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- CD Detail -->
+  <section>
+    <h2>Chi Tiết Phần CD — Continuous Deployment</h2>
+    <p style="color:var(--ink2); font-size:13px; margin-bottom:24px; font-family:'IBM Plex Mono',monospace;">
+      // Đây là phần nhiều team bỏ qua hoặc làm sai nhất. Giải thích từng bước cụ thể:
+    </p>
+
+    <div class="cd-timeline">
+
+      <div class="cd-step" data-num="1">
+        <div class="cd-card">
+          <div class="cd-card-header">
+            <div class="cd-card-title">Merge vào main → Trigger CD Pipeline</div>
+            <div class="cd-card-env">
+              <span class="env-chip env-auto">tự động</span>
+              <span class="env-chip env-staging">staging</span>
+            </div>
+          </div>
+          <div class="cd-card-body">
+            <div>
+              <div class="cd-detail-label">Điều gì xảy ra</div>
+              <ul class="cd-steps-list">
+                <li>GitHub Actions nhận event "push to main"</li>
+                <li>Build Docker image mới với version tag</li>
+                <li>Push image lên Container Registry</li>
+                <li>Chạy integration tests trên staging</li>
+              </ul>
+            </div>
+            <div>
+              <div class="cd-detail-label">Tools cụ thể</div>
+              <div class="cd-detail-value">
+                GitHub Actions workflow<br>
+                Docker build + push<br>
+                GitHub Container Registry (free)<br>
+                Playwright E2E tests
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cd-step" data-num="2">
+        <div class="cd-card">
+          <div class="cd-card-header">
+            <div class="cd-card-title">Deploy lên Staging Environment</div>
+            <div class="cd-card-env">
+              <span class="env-chip env-auto">tự động</span>
+              <span class="env-chip env-staging">staging.app.com</span>
+            </div>
+          </div>
+          <div class="cd-card-body">
+            <div>
+              <div class="cd-detail-label">Điều gì xảy ra</div>
+              <ul class="cd-steps-list">
+                <li>Deploy image mới lên server staging</li>
+                <li>Run smoke tests tự động (5–10 test cases)</li>
+                <li>Kiểm tra API endpoints health check</li>
+                <li>Chạy performance benchmark cơ bản</li>
+                <li>Lark nhận thông báo "Staging deployed"</li>
+              </ul>
+            </div>
+            <div>
+              <div class="cd-detail-label">Nếu staging fail</div>
+              <div class="cd-detail-value">
+                → Pipeline dừng ngay<br>
+                → Lark alert về team<br>
+                → Không bao giờ lên production<br>
+                → Dev nhận link log để debug
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cd-step" data-num="3">
+        <div class="cd-card">
+          <div class="cd-card-header">
+            <div class="cd-card-title">Manual Approval Gate (tùy chọn)</div>
+            <div class="cd-card-env">
+              <span class="env-chip env-manual">human decision</span>
+            </div>
+          </div>
+          <div class="cd-card-body">
+            <div>
+              <div class="cd-detail-label">Khi nào cần gate này</div>
+              <ul class="cd-steps-list">
+                <li>Major feature release</li>
+                <li>Database migration kèm theo</li>
+                <li>Thay đổi ảnh hưởng toàn user base</li>
+                <li>Release vào giờ cao điểm</li>
+              </ul>
+            </div>
+            <div>
+              <div class="cd-detail-label">Cơ chế hoạt động</div>
+              <div class="cd-detail-value">
+                Lark bot gửi message:<br>
+                "🚀 Ready to deploy v2.4.1<br>
+                Changes: [summary]<br>
+                [✅ Approve] [❌ Reject]"<br><br>
+                Anh click button → trigger deploy
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cd-step" data-num="4">
+        <div class="cd-card">
+          <div class="cd-card-header">
+            <div class="cd-card-title">Canary Deploy lên Production</div>
+            <div class="cd-card-env">
+              <span class="env-chip env-auto">tự động</span>
+              <span class="env-chip env-prod">production</span>
+              <span class="env-chip env-cursor">cursor monitor</span>
+            </div>
+          </div>
+          <div class="cd-card-body" style="grid-template-columns:1fr;">
+            <div>
+              <div class="cd-detail-label">Canary Deploy là gì? — Triển khai từng bước, không deploy tất cả 1 lần</div>
+            </div>
+          </div>
+
+          <!-- Canary Visual -->
+          <div class="canary-visual">
+            <div class="canary-title">// Tiến trình canary deploy theo thời gian thực</div>
+            <div class="canary-row">
+              <div class="canary-label">T+0 min</div>
+              <div class="canary-bar-wrap">
+                <div class="canary-old" style="width:95%">v2.3 · 95%</div>
+                <div class="canary-new" style="width:5%">5%</div>
+              </div>
+              <div class="canary-status status-watch">monitoring...</div>
+            </div>
+            <div class="canary-row">
+              <div class="canary-label">T+5 min</div>
+              <div class="canary-bar-wrap">
+                <div class="canary-old" style="width:75%">v2.3 · 75%</div>
+                <div class="canary-new" style="width:25%">v2.4 · 25%</div>
+              </div>
+              <div class="canary-status status-ok">✓ error rate: 0.01%</div>
+            </div>
+            <div class="canary-row">
+              <div class="canary-label">T+10 min</div>
+              <div class="canary-bar-wrap">
+                <div class="canary-old" style="width:50%">v2.3 · 50%</div>
+                <div class="canary-new" style="width:50%">v2.4 · 50%</div>
+              </div>
+              <div class="canary-status status-ok">✓ p99: 120ms</div>
+            </div>
+            <div class="canary-row">
+              <div class="canary-label">T+15 min</div>
+              <div class="canary-bar-wrap">
+                <div class="canary-new" style="width:100%">v2.4 · 100% — fully deployed ✓</div>
+              </div>
+              <div class="canary-status status-go">✅ done</div>
+            </div>
+          </div>
+
+          <!-- Rollback -->
+          <div class="rollback-box">
+            <div class="rollback-title">🔄 Auto Rollback — kích hoạt tự động khi:</div>
+            <div class="rollback-triggers">
+              <span class="trigger-tag">Error rate > 1%</span>
+              <span class="trigger-tag">API latency > 2s</span>
+              <span class="trigger-tag">Health check fail</span>
+              <span class="trigger-tag">5xx errors spike</span>
+              <span class="trigger-tag">Memory leak detected</span>
+            </div>
+            <p style="margin-top:10px; font-size:11px; color:var(--red);">
+              → Rollback về v2.3 trong &lt;60 giây · Lark alert ngay lập tức · Cursor agent bắt đầu điều tra
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="cd-step" data-num="5">
+        <div class="cd-card">
+          <div class="cd-card-header">
+            <div class="cd-card-title">Post-Deploy Verification</div>
+            <div class="cd-card-env">
+              <span class="env-chip env-auto">tự động</span>
+              <span class="env-chip env-cursor">cursor automation</span>
+            </div>
+          </div>
+          <div class="cd-card-body">
+            <div>
+              <div class="cd-detail-label">Cursor automation chạy sau deploy</div>
+              <ul class="cd-steps-list">
+                <li>Monitor error rate 30 phút đầu tiên</li>
+                <li>So sánh performance với version cũ</li>
+                <li>Check database query performance</li>
+                <li>Verify critical user flows hoạt động</li>
+              </ul>
+            </div>
+            <div>
+              <div class="cd-detail-label">Output về Lark</div>
+              <div class="cd-detail-value">
+                "✅ v2.4.1 stable after 30min<br>
+                Error rate: 0.02% (was 0.03%)<br>
+                P99 latency: 118ms (was 145ms)<br>
+                → Performance improved 19%"
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Recommendation -->
+  <div class="rec-box">
+    <div class="rec-title">💡 Khuyến Nghị cho Team Anh</div>
+    <div class="rec-subtitle">// Không cần làm full luồng ngay — theo thứ tự ưu tiên này:</div>
+    <div class="rec-grid">
+      <div class="rec-card">
+        <div class="rec-phase">Tuần 1 — Quick win</div>
+        <div class="rec-action">Setup GitHub Actions CI cơ bản</div>
+        <div class="rec-detail">
+          Lint + test + build tự động<br>
+          Kết nối Lark webhook<br>
+          Chi phí: $0 thêm<br>
+          Value: team thấy kết quả ngay
+        </div>
+      </div>
+      <div class="rec-card">
+        <div class="rec-phase">Tuần 2–3 — Core automation</div>
+        <div class="rec-action">Bật Cursor BugBot + Security Automation</div>
+        <div class="rec-detail">
+          Setup Lark MCP<br>
+          Viết prompt cho 2 automation đầu<br>
+          Test với 1 repo nhỏ trước<br>
+          Value: giảm ngay 50% review time
+        </div>
+      </div>
+      <div class="rec-card">
+        <div class="rec-phase">Tháng 2 — Production ready</div>
+        <div class="rec-action">Canary deploy + Auto rollback</div>
+        <div class="rec-detail">
+          Setup staging environment<br>
+          Configure canary với K8s hoặc ECS<br>
+          Incident response automation<br>
+          Value: deploy không còn stress
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

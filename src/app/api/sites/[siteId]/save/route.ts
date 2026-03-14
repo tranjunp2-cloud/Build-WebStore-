@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { cookies } from 'next/headers'
 
 /**
  * PATCH /api/sites/[siteId]/save
@@ -13,7 +14,33 @@ export async function PATCH(
 ) {
     try {
         const payload = await getPayload({ config })
-        const { user } = await payload.auth({ headers: req.headers })
+
+        // Try standard Payload auth first
+        let user: any = null
+        try {
+            const authResult = await payload.auth({ headers: req.headers })
+            user = authResult.user
+        } catch (authErr) {
+            console.warn('[Save] Standard auth failed, trying cookie fallback')
+        }
+
+        // Fallback: read payload-token from cookies
+        if (!user) {
+            const cookieStore = await cookies()
+            const token = cookieStore.get('payload-token')?.value
+            if (token) {
+                try {
+                    // Create new headers with Authorization bearer token
+                    const authHeaders = new Headers(req.headers)
+                    authHeaders.set('Authorization', `JWT ${token}`)
+                    const authResult = await payload.auth({ headers: authHeaders })
+                    user = authResult.user
+                } catch (fallbackErr) {
+                    console.warn('[Save] Cookie fallback auth failed too')
+                }
+            }
+        }
+
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

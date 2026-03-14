@@ -1,3 +1,4 @@
+import { AppShell } from '@/components/AppShell'
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { getCurrentUser } from '@/lib/auth'
@@ -14,14 +15,16 @@ export default async function DashboardLayout({
     const userInitial = userName.charAt(0).toUpperCase()
 
     return (
-        <div className="min-h-screen bg-[#0F172A]">
-            <DashboardSidebar userName={userName} userInitial={userInitial} />
-            <main className="pl-[240px]">
-                <div className="p-8">
-                    {children}
-                </div>
-            </main>
-            <Toaster position="bottom-right" />
-        </div>
+        <AppShell>
+            <div className="min-h-screen bg-[#0F172A]">
+                <DashboardSidebar userName={userName} userInitial={userInitial} />
+                <main className="pl-[240px]">
+                    <div className="p-8">
+                        {children}
+                    </div>
+                </main>
+                <Toaster position="bottom-right" />
+            </div>
+        </AppShell>
     )
 }

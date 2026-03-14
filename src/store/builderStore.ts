@@ -113,13 +113,15 @@ export const useBuilderStore = create<BuilderState & BuilderActions>((set) => ({
 
     setStep: (step) => set({ step }),
 
-    addMessage: (msg) =>
+    addMessage: (msg) => {
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
         set((state) => ({
             messages: [
                 ...state.messages,
-                { ...msg, id: Date.now().toString(), timestamp: new Date() },
+                { ...msg, id, timestamp: new Date() },
             ],
-        })),
+        }))
+    },
 
     setStatus: (status) => set({ status }),
 

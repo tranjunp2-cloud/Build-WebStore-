@@ -19,12 +19,25 @@ import { Analytics } from './collections/Analytics'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
+/** Trả về connection string (bỏ sslmode để tránh parse ghi đè pool.ssl). */
+function getDatabaseConnectionString(): string {
+  const raw = process.env.DATABASE_URI || 'postgresql://localhost/primeweb'
+  const withoutSslmode = raw.replace(/[?&]sslmode=[^&]+/g, '').replace(/\?&/, '?').replace(/\?$/, '')
+  return withoutSslmode || raw
+}
+
+/** Có phải DB từ xa (cần SSL, có thể self-signed) không. */
+function isRemoteDatabase(): boolean {
+  const raw = process.env.DATABASE_URI || ''
+  return raw.length > 0 && !raw.includes('localhost') && !raw.includes('127.0.0.1')
+}
+
 export default buildConfig({
+  serverURL: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
   admin: {
     user: Users.slug,
     meta: {
       titleSuffix: '— Web Store Admin',
-      favicon: '/favicon.ico',
     },
     importMap: {
       baseDir: path.resolve(dirname),
@@ -52,8 +65,14 @@ export default buildConfig({
   },
   db: postgresAdapter({
     pool: {
-      connectionString: process.env.DATABASE_URI || 'postgresql://localhost/primeweb',
+      connectionString: getDatabaseConnectionString(),
+      // DB từ xa (DO managed): ép chấp nhận cert để tránh SELF_SIGNED_CERT_IN_CHAIN.
+      // Truyền rõ ở đây vì parse(connectionString) có thể ghi đè nếu URL còn sslmode.
+      ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: false } } : {}),
     },
+    // push: true auto-creates tables when NODE_ENV !== 'production'.
+    // For staging (NODE_ENV=development via DO env var), this creates tables on first run.
+    push: true,
   }),
   sharp,
   plugins: [
