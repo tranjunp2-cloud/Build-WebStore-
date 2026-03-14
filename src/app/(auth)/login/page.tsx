@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 export default function LoginPage() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const redirectUrl = searchParams.get('redirect') || '/dashboard'
+    const redirectUrl = searchParams.get('returnUrl') || '/dashboard'
 
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')

@@ -18,6 +18,7 @@ import {
     Monitor,
     Smartphone,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -265,8 +266,8 @@ export default function TemplatesPage() {
                     const data = await res.json()
                     setTemplates(data.docs || [])
                 }
-            } catch (err) {
-                console.error('Failed to load templates', err)
+            } catch {
+                toast.error('Failed to load templates')
             } finally {
                 setIsLoading(false)
             }
@@ -287,8 +288,8 @@ export default function TemplatesPage() {
                 const data = await res.json()
                 router.push(`/editor/${data.siteId}`)
             }
-        } catch (err) {
-            console.error('Failed to apply template', err)
+        } catch {
+            toast.error('Failed to apply template')
         } finally {
             setIsApplying(null)
         }

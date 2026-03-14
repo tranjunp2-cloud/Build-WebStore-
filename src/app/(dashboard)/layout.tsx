@@ -1,5 +1,7 @@
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
+import { Toaster } from '@/components/ui/sonner'
 import { getCurrentUser } from '@/lib/auth'
+import type { PlatformUser } from '@/types/user'
 
 export default async function DashboardLayout({
     children,
@@ -7,7 +9,8 @@ export default async function DashboardLayout({
     children: React.ReactNode
 }) {
     const user = await getCurrentUser()
-    const userName = (user as any)?.firstName || (user as any)?.email?.split('@')[0] || 'User'
+    const typedUser = user as PlatformUser | null
+    const userName = typedUser?.firstName || typedUser?.email?.split('@')[0] || 'User'
     const userInitial = userName.charAt(0).toUpperCase()
 
     return (
@@ -18,6 +21,7 @@ export default async function DashboardLayout({
                     {children}
                 </div>
             </main>
+            <Toaster position="bottom-right" />
         </div>
     )
 }

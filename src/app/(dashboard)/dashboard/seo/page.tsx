@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Search, AlertTriangle, CheckCircle, Info, Sparkles, Loader2, RefreshCcw, ExternalLink } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 type SEOIssue = {
@@ -75,7 +76,7 @@ export default function SEODashboardPage() {
                 const res = await fetch('/api/sites', { credentials: 'include' })
                 if (res.ok) {
                     const data = await res.json()
-                    const siteList = (data.docs || []).map((s: any) => ({ id: String(s.id), name: s.name }))
+                    const siteList = (data.docs || []).map((s: { id: string | number; name: string }) => ({ id: String(s.id), name: s.name }))
                     setSites(siteList)
                     if (siteList.length > 0) {
                         setSelectedSiteId(siteList[0].id)
@@ -83,8 +84,8 @@ export default function SEODashboardPage() {
                         setIsLoading(false)
                     }
                 }
-            } catch (err) {
-                console.error('Failed to load sites', err)
+            } catch {
+                toast.error('Failed to load sites')
                 setIsLoading(false)
             }
         }
@@ -111,8 +112,10 @@ export default function SEODashboardPage() {
                 const data = await res.json()
                 if (data.success) setSeoData(data.data)
             }
-        } catch (err) {
-            console.error('SEO analysis failed', err)
+        } catch {
+            toast.error('SEO analysis failed', {
+                action: { label: 'Retry', onClick: () => analyseSite(siteId) },
+            })
         } finally {
             setIsLoading(false)
         }
@@ -137,8 +140,9 @@ export default function SEODashboardPage() {
                     setTimeout(() => analyseSite(selectedSiteId), 1000)
                 }
             }
-        } catch (err) {
+        } catch {
             setFixResult('❌ Fix failed — please try again')
+            toast.error('AI fix failed')
         } finally {
             setIsFixing(false)
         }

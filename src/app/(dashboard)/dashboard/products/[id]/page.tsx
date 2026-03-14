@@ -8,6 +8,7 @@ import {
     Plus, Trash2, Upload as UploadIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 type ProductForm = {
     name: string
@@ -82,6 +83,7 @@ export default function ProductEditPage() {
                 }
             } catch (err) {
                 setError('Failed to load product')
+                toast.error('Failed to load product')
             } finally {
                 setIsLoading(false)
             }
@@ -143,15 +145,20 @@ export default function ProductEditPage() {
 
             if (res.ok) {
                 setSuccess(true)
+                toast.success(isNew ? 'Product created!' : 'Product updated!')
                 setTimeout(() => {
                     router.push('/dashboard/products')
                 }, 1000)
             } else {
                 const data = await res.json()
-                setError(data.error?.message || 'Failed to save')
+                const msg = data.error?.message || 'Failed to save'
+                setError(msg)
+                toast.error(msg)
             }
-        } catch (err: any) {
-            setError(err.message || 'Network error')
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Network error'
+            setError(message)
+            toast.error(message)
         } finally {
             setIsSaving(false)
         }
@@ -190,6 +197,7 @@ export default function ProductEditPage() {
             }
         } catch (err) {
             setError('AI generation failed')
+            toast.error('AI generation failed')
         } finally {
             setIsGenerating(false)
         }

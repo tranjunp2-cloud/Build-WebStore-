@@ -76,7 +76,7 @@ export function middleware(req: NextRequest) {
     // Not logged in → trying to access protected route → redirect to login
     if (isProtectedRoute && !hasToken) {
         url.pathname = '/login'
-        url.searchParams.set('redirect', pathname)
+        url.searchParams.set('returnUrl', pathname)
         return NextResponse.redirect(url)
     }
 

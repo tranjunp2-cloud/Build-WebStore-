@@ -9,12 +9,13 @@ import {
     ChevronDown, PanelLeftClose, PanelLeftOpen, Check, Loader2, Plus
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import { blockRegistry } from '@/blocks/registry'
 import { useEditorStore } from '@/store/editorStore'
 
 // ─── Types ──────────────────────────────────────────────────────────────
-type BlockData = { blockType: string;[key: string]: any }
-type SiteData = { id: string; name: string; status: string; theme: any; siteType: string }
+type BlockData = { blockType: string } & Record<string, unknown>
+type SiteData = { id: string; name: string; status: string; theme: Record<string, unknown>; siteType: string }
 type PageData = { id: string; title: string; layout: BlockData[] }
 type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
 
@@ -31,7 +32,7 @@ function AIChatPanel({
 }: {
     isOpen: boolean; onToggle: () => void; blocks: BlockData[]
     onBlockSelect: (idx: number) => void; selectedBlock: number
-    onAIAction: (action: any) => void; siteName: string; theme: any
+    onAIAction: (action: Record<string, unknown>) => void; siteName: string; theme: Record<string, unknown> | undefined
 }) {
     const [tab, setTab] = useState<'chat' | 'blocks'>('blocks')
     const [input, setInput] = useState('')
@@ -89,8 +90,9 @@ function AIChatPanel({
                 id: (Date.now() + 1).toString(), role: 'assistant',
                 content: `${actionDesc}\n${data.message || ''}`,
             }])
-        } catch (err: any) {
-            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `❌ Error: ${err.message}` }])
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error'
+            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `❌ Error: ${message}` }])
         } finally {
             setIsProcessing(false)
         }
@@ -164,7 +166,7 @@ function AIChatPanel({
                                 <GripVertical className="h-3 w-3 text-gray-600" />
                                 <span className="mr-1">{info.icon}</span>
                                 <span className="font-medium">{info.label}</span>
-                                {block.variant && <span className="ml-auto text-[10px] text-gray-600">{block.variant}</span>}
+                                {block.variant ? <span className="ml-auto text-[10px] text-gray-600">{String(block.variant)}</span> : null}
                             </button>
                         )
                     })}
@@ -227,7 +229,7 @@ const FONT_OPTIONS = ['Outfit', 'Inter', 'DM Sans', 'Playfair Display', 'Roboto'
 function SettingsPanel({
     block, blockIndex, theme, onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange,
 }: {
-    block: BlockData | null; blockIndex: number; theme: any
+    block: BlockData | null; blockIndex: number; theme: Record<string, unknown> | undefined
     onThemeChange: (key: string, value: string) => void
     onDeleteBlock: (idx: number) => void; onDuplicateBlock: (idx: number) => void
     onBlockFieldChange: (idx: number, field: string, value: string) => void
@@ -271,8 +273,8 @@ function SettingsPanel({
                 {block.headline !== undefined && (
                     <div>
                         <label className="text-xs font-medium text-gray-400">Headline</label>
-                        <input defaultValue={block.headline}
-                            onBlur={(e: any) => onBlockFieldChange(blockIndex, 'headline', e.target.value)}
+                        <input defaultValue={block.headline as string}
+                            onBlur={(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => onBlockFieldChange(blockIndex, 'headline', e.target.value)}
                             className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50" />
                     </div>
                 )}
@@ -280,8 +282,8 @@ function SettingsPanel({
                 {block.subheadline !== undefined && (
                     <div>
                         <label className="text-xs font-medium text-gray-400">Subheadline</label>
-                        <textarea defaultValue={block.subheadline} rows={2}
-                            onBlur={(e: any) => onBlockFieldChange(blockIndex, 'subheadline', e.target.value)}
+                        <textarea defaultValue={block.subheadline as string} rows={2}
+                            onBlur={(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => onBlockFieldChange(blockIndex, 'subheadline', e.target.value)}
                             className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50 resize-none" />
                     </div>
                 )}
@@ -289,8 +291,8 @@ function SettingsPanel({
                 {block.logoText !== undefined && (
                     <div>
                         <label className="text-xs font-medium text-gray-400">Logo Text</label>
-                        <input defaultValue={block.logoText}
-                            onBlur={(e: any) => onBlockFieldChange(blockIndex, 'logoText', e.target.value)}
+                        <input defaultValue={block.logoText as string}
+                            onBlur={(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => onBlockFieldChange(blockIndex, 'logoText', e.target.value)}
                             className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50" />
                     </div>
                 )}
@@ -298,8 +300,8 @@ function SettingsPanel({
                 {block.copyrightText !== undefined && (
                     <div>
                         <label className="text-xs font-medium text-gray-400">Copyright</label>
-                        <input defaultValue={block.copyrightText}
-                            onBlur={(e: any) => onBlockFieldChange(blockIndex, 'copyrightText', e.target.value)}
+                        <input defaultValue={block.copyrightText as string}
+                            onBlur={(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => onBlockFieldChange(blockIndex, 'copyrightText', e.target.value)}
                             className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50" />
                     </div>
                 )}
@@ -307,8 +309,8 @@ function SettingsPanel({
                 {block.ctaLabel !== undefined && (
                     <div>
                         <label className="text-xs font-medium text-gray-400">CTA Label</label>
-                        <input defaultValue={block.ctaLabel}
-                            onBlur={(e: any) => onBlockFieldChange(blockIndex, 'ctaLabel', e.target.value)}
+                        <input defaultValue={block.ctaLabel as string}
+                            onBlur={(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => onBlockFieldChange(blockIndex, 'ctaLabel', e.target.value)}
                             className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50" />
                     </div>
                 )}
@@ -335,24 +337,24 @@ function SettingsPanel({
                         <div className="mt-3">
                             <label className="text-xs text-gray-400">Primary Color</label>
                             <div className="mt-1 flex items-center gap-2">
-                                <input type="color" value={theme.primaryColor || '#0ea5e9'}
+                                <input type="color" value={(theme.primaryColor as string) || '#0ea5e9'}
                                     onChange={e => onThemeChange('primaryColor', e.target.value)}
                                     className="h-7 w-7 rounded border-0 cursor-pointer bg-transparent" />
-                                <input value={theme.primaryColor || '#0ea5e9'}
+                                <input value={(theme.primaryColor as string) || '#0ea5e9'}
                                     onChange={e => onThemeChange('primaryColor', e.target.value)}
                                     className="flex-1 rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500/50" />
                             </div>
                         </div>
                         <div className="mt-3">
                             <label className="text-xs text-gray-400">Heading Font</label>
-                            <select value={theme.fontHeading || 'Outfit'} onChange={e => onThemeChange('fontHeading', e.target.value)}
+                            <select value={(theme.fontHeading as string) || 'Outfit'} onChange={e => onThemeChange('fontHeading', e.target.value)}
                                 className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
                                 {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
                             </select>
                         </div>
                         <div className="mt-3">
                             <label className="text-xs text-gray-400">Body Font</label>
-                            <select value={theme.fontBody || 'Inter'} onChange={e => onThemeChange('fontBody', e.target.value)}
+                            <select value={(theme.fontBody as string) || 'Inter'} onChange={e => onThemeChange('fontBody', e.target.value)}
                                 className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
                                 {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
                             </select>
@@ -452,42 +454,46 @@ export default function EditorPage() {
                     // Init editor store for undo/redo
                     editorStore.init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '')
                 }
-            } catch (err) { console.error('Failed to load site data', err) }
+            } catch (err) {
+                const message = err instanceof Error ? err.message : 'Failed to load site data'
+                toast.error('Failed to load site', { description: message })
+            }
             finally { setIsLoading(false) }
         }
         loadData()
     }, [siteId])
 
     // AI Action handler — applies structured actions from AI
-    const handleAIAction = (action: any) => {
+    const handleAIAction = (action: Record<string, unknown>) => {
         if (!page) return
+        const changes = action.changes as Record<string, unknown> | undefined
 
         switch (action.action) {
             case 'update_block': {
-                const idx = action.blockIndex ?? selectedBlock
+                const idx = (action.blockIndex as number) ?? selectedBlock
                 const newLayout = [...page.layout]
-                newLayout[idx] = { ...newLayout[idx], ...action.changes }
+                newLayout[idx] = { ...newLayout[idx], ...changes }
                 setPage({ ...page, layout: newLayout })
                 setHasUnsavedChanges(true)
                 break
             }
             case 'update_theme': {
                 if (!site) return
-                setSite({ ...site, theme: { ...site.theme, ...action.changes } })
+                setSite({ ...site, theme: { ...site.theme, ...changes } })
                 setHasUnsavedChanges(true)
                 break
             }
             case 'add_block': {
-                const afterIdx = action.afterIndex ?? page.layout.length - 1
+                const afterIdx = (action.afterIndex as number) ?? page.layout.length - 1
                 const newLayout = [...page.layout]
-                newLayout.splice(afterIdx + 1, 0, action.block)
+                newLayout.splice(afterIdx + 1, 0, action.block as BlockData)
                 setPage({ ...page, layout: newLayout })
                 setSelectedBlock(afterIdx + 1)
                 setHasUnsavedChanges(true)
                 break
             }
             case 'delete_block': {
-                const idx = action.blockIndex ?? selectedBlock
+                const idx = (action.blockIndex as number) ?? selectedBlock
                 const newLayout = page.layout.filter((_, i) => i !== idx)
                 setPage({ ...page, layout: newLayout })
                 setSelectedBlock(Math.max(0, idx - 1))
@@ -513,9 +519,15 @@ export default function EditorPage() {
             if (res.ok) {
                 setPublishSuccess(true)
                 if (site) setSite({ ...site, status: currentlyPublished ? 'draft' : 'published' })
+                toast.success(currentlyPublished ? 'Site unpublished' : 'Site published!')
                 setTimeout(() => setPublishSuccess(false), 3000)
+            } else {
+                toast.error('Publish failed', { description: `Server returned ${res.status}` })
             }
-        } catch (err) { console.error('Publish/unpublish failed', err) }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Publish failed'
+            toast.error('Publish failed', { description: message })
+        }
         finally { setIsPublishing(false) }
     }
 
@@ -528,17 +540,25 @@ export default function EditorPage() {
         if (!siteId || !page) return
         setIsSaving(true)
         try {
-            await fetch(`/api/sites/${siteId}/save`, {
+            const res = await fetch(`/api/sites/${siteId}/save`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ blocks: page.layout, theme: site?.theme }),
             })
+            if (!res.ok) {
+                toast.error('Save failed', { description: `Server returned ${res.status}` })
+                return
+            }
             setSaveSuccess(true)
             setHasUnsavedChanges(false)
             setIframeKey(k => k + 1)
+            toast.success('Changes saved')
             setTimeout(() => setSaveSuccess(false), 2000)
-        } catch (err) { console.error('Save failed', err) }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Save failed'
+            toast.error('Save failed', { description: message })
+        }
         finally { setIsSaving(false) }
     }
 

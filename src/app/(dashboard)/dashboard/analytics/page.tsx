@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { BarChart3, TrendingUp, Eye, MousePointerClick, Users, Loader2, RefreshCcw } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 type AnalyticsSummary = {
@@ -26,12 +27,15 @@ export default function AnalyticsDashboardPage() {
                 const res = await fetch('/api/sites', { credentials: 'include' })
                 if (res.ok) {
                     const d = await res.json()
-                    const list = (d.docs || []).map((s: any) => ({ id: String(s.id), name: s.name }))
+                    const list = (d.docs || []).map((s: { id: string | number; name: string }) => ({ id: String(s.id), name: s.name }))
                     setSites(list)
                     if (list.length > 0) setSelectedSiteId(list[0].id)
                     else setIsLoading(false)
                 }
-            } catch { setIsLoading(false) }
+            } catch {
+                toast.error('Failed to load sites')
+                setIsLoading(false)
+            }
         }
         loadSites()
     }, [])
@@ -57,7 +61,7 @@ export default function AnalyticsDashboardPage() {
                 const docs = d.docs || []
 
                 // Process into summary
-                const uniqueIps = new Set(docs.map((d: any) => d.ip))
+                const uniqueIps = new Set(docs.map((d: { ip?: string }) => d.ip))
                 const pageViews: Record<string, number> = {}
                 const eventCounts: Record<string, number> = {}
                 const dailyCounts: Record<string, number> = {}
@@ -97,7 +101,9 @@ export default function AnalyticsDashboardPage() {
                 })
             }
         } catch (err) {
-            console.error('Analytics load failed', err)
+            toast.error('Failed to load analytics', {
+                action: { label: 'Retry', onClick: () => loadAnalytics(siteId) },
+            })
         } finally {
             setIsLoading(false)
         }
