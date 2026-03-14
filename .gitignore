@@ -17,6 +17,9 @@ build/
 .env.production
 .env.staging
 
+## Bot config (personality controlled by PM/Lead only)
+.bot-config.json
+
 ## IDE
 .idea/
 .vscode/
