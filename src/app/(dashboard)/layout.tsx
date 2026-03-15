@@ -18,8 +18,8 @@ export default async function DashboardLayout({
         <AppShell>
             <div className="min-h-screen bg-[#0F172A]">
                 <DashboardSidebar userName={userName} userInitial={userInitial} />
-                <main className="pl-[240px]">
-                    <div className="p-8">
+                <main className="pt-14 md:pt-0 md:pl-[240px]">
+                    <div className="p-4 sm:p-6 md:p-8">
                         {children}
                     </div>
                 </main>

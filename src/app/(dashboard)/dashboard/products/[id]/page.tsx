@@ -205,8 +205,31 @@ export default function ProductEditPage() {
 
     if (isLoading) {
         return (
-            <div className="flex h-full items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+            <div className="mx-auto max-w-3xl space-y-6 animate-pulse">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-white/5" />
+                        <div className="h-7 w-48 rounded bg-white/5" />
+                    </div>
+                    <div className="h-10 w-32 rounded-lg bg-white/5" />
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
+                    <div className="h-4 w-32 rounded bg-white/5" />
+                    <div className="h-10 w-full rounded-lg bg-white/5" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="h-10 rounded-lg bg-white/5" />
+                        <div className="h-10 rounded-lg bg-white/5" />
+                    </div>
+                    <div className="h-20 w-full rounded-lg bg-white/5" />
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
+                    <div className="h-4 w-36 rounded bg-white/5" />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="h-10 rounded-lg bg-white/5" />
+                        <div className="h-10 rounded-lg bg-white/5" />
+                        <div className="h-10 rounded-lg bg-white/5" />
+                    </div>
+                </div>
             </div>
         )
     }
@@ -217,6 +240,7 @@ export default function ProductEditPage() {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <Link href="/dashboard/products"
+                        aria-label="Back to products"
                         className="rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                         <ArrowLeft className="h-4 w-4" />
                     </Link>
@@ -250,7 +274,7 @@ export default function ProductEditPage() {
                         className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#0B1120] px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-blue-500/50" />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-medium text-gray-400">Slug</label>
                         <input value={form.slug} onChange={e => updateField('slug', e.target.value)}
@@ -281,9 +305,8 @@ export default function ProductEditPage() {
 
                 {generatedDescription && (
                     <div className="rounded-lg bg-purple-500/5 border border-purple-500/20 p-4">
-                        <p className="text-xs font-medium text-purple-400 mb-2">✨ AI Generated Description</p>
-                        <div className="text-sm text-gray-300 prose prose-invert prose-sm max-w-none"
-                            dangerouslySetInnerHTML={{ __html: generatedDescription }} />
+                        <p className="flex items-center gap-1 text-xs font-medium text-purple-400 mb-2"><Sparkles className="h-3 w-3" /> AI Generated Description</p>
+                        <p className="text-sm text-gray-300 whitespace-pre-wrap">{generatedDescription}</p>
                     </div>
                 )}
             </div>
@@ -291,7 +314,7 @@ export default function ProductEditPage() {
             {/* Pricing */}
             <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
                 <h2 className="text-sm font-semibold uppercase text-gray-500">Pricing & Inventory</h2>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label className="text-xs font-medium text-gray-400">Price *</label>
                         <div className="mt-1.5 flex items-center rounded-lg border border-white/10 bg-[#0B1120] overflow-hidden focus-within:border-blue-500/50">
@@ -321,7 +344,7 @@ export default function ProductEditPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-medium text-gray-400">Inventory</label>
                         <input type="number" min="0" value={form.inventory}
