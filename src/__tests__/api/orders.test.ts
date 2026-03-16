@@ -2,11 +2,6 @@ import { describe, it, expect, vi } from 'vitest'
 import { POST } from '@/app/api/orders/create/route'
 import { NextRequest } from 'next/server'
 
-// Mock cấu hình mặc định để không bị lỗi module import route
-vi.mock('@payload-config', () => ({
-    default: {}
-}))
-
 // Mock thư viện PayloadCMS để không gọi DB thật
 vi.mock('payload', () => {
     // Tạo giả lập db Payload CMS

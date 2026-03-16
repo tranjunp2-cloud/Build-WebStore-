@@ -4,9 +4,6 @@ import { GET as PreviewGET } from '@/app/api/templates/preview/route'
 import { POST as SeedPOST } from '@/app/api/templates/seed/route'
 import { NextRequest } from 'next/server'
 
-// Mock cấu hình mặc định (do Payload cần module này)
-vi.mock('@payload-config', () => ({ default: {} }))
-
 // Mock helper function sinh HTML giao diện từ payload CMS layout
 vi.mock('@/app/api/preview/[siteId]/route', () => ({
     buildFullHTML: vi.fn().mockReturnValue('<html><body>Mocked Theme HTML</body></html>')

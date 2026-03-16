@@ -5,9 +5,6 @@ import { GET as EditorDataGET } from '@/app/api/sites/[siteId]/editor-data/route
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 
-// Mock cấu hình mặc định 
-vi.mock('@payload-config', () => ({ default: {} }))
-
 // Mock cookies từ next/headers
 vi.mock('next/headers', () => {
     return {

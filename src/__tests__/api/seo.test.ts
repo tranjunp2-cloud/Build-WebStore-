@@ -3,8 +3,6 @@ import { POST as AnalyzePOST } from '@/app/api/seo/analyze/route'
 import { POST as FixPOST } from '@/app/api/seo/fix/route'
 import { NextRequest } from 'next/server'
 
-vi.mock('@payload-config', () => ({ default: {} }))
-
 // Giả lập OpenAI cho tính năng SEO Fix
 vi.mock('openai', () => {
     const OpenAI = vi.fn()
