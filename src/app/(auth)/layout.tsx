@@ -26,7 +26,7 @@ export default function AuthLayout({
                     }}
                 />
 
-                <div className="relative z-10 w-full max-w-[420px]">
+                <div className="relative z-10 w-full max-w-[90vw] sm:max-w-[420px]">
                     {/* Logo */}
                     <div className="mb-8 text-center">
                         <Link href="/" className="group inline-flex items-center gap-2.5">
@@ -44,7 +44,7 @@ export default function AuthLayout({
                     </div>
 
                     {/* Glassmorphism card */}
-                    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-8 shadow-2xl shadow-black/20 backdrop-blur-xl">
+                    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-5 sm:p-8 shadow-2xl shadow-black/20 backdrop-blur-xl">
                         {children}
                     </div>
 
