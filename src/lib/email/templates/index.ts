@@ -1,7 +1,6 @@
 /**
  * Email templates barrel export.
  */
-export { welcomeEmail } from './welcome'
+export { welcomeEmail, type EmailLocale } from './welcome'
 export { orderConfirmationEmail } from './order-confirmation'
 export { orderStatusEmail } from './order-status'
-export { type EmailLocale } from '../i18n'

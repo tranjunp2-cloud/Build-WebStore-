@@ -3,7 +3,12 @@
  * Supports EN (English) and MS (Bahasa Melayu) locales.
  */
 
-import { type EmailLocale, getEmailT, formatPrice } from '../i18n'
+import en from '@/i18n/locales/en.json'
+import ms from '@/i18n/locales/ms.json'
+
+type EmailLocale = 'en' | 'ms'
+
+const locales = { en: en.email, ms: ms.email } as const
 
 interface OrderItem {
     productName: string
@@ -29,9 +34,22 @@ interface OrderEmailData {
     }
 }
 
+/**
+ * Format price based on locale per SPEC Rule 3.
+ * EN: MYR 299.00 | MS: RM299.00
+ */
+function formatPrice(amount: number, currency: string, locale: EmailLocale = 'en'): string {
+    if (currency === 'MYR') {
+        return locale === 'ms'
+            ? `RM${amount.toFixed(2)}`
+            : `MYR ${amount.toFixed(2)}`
+    }
+    return `${currency} ${amount.toFixed(2)}`
+}
+
 export function orderConfirmationEmail(data: OrderEmailData): { subject: string; html: string } {
     const locale = data.locale || 'en'
-    const t = getEmailT(locale).order
+    const t = (locales[locale] || locales.en).order
 
     const itemsHtml = data.items.map(item => `
         <tr>

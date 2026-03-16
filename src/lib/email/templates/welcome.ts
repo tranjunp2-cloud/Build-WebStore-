@@ -4,7 +4,12 @@
  * Supports EN (English) and MS (Bahasa Melayu) locales.
  */
 
-import { type EmailLocale, getEmailT } from '../i18n'
+import en from '@/i18n/locales/en.json'
+import ms from '@/i18n/locales/ms.json'
+
+export type EmailLocale = 'en' | 'ms'
+
+const locales = { en: en.email, ms: ms.email } as const
 
 interface WelcomeEmailData {
     userName: string
@@ -14,7 +19,7 @@ interface WelcomeEmailData {
 
 export function welcomeEmail(data: WelcomeEmailData): { subject: string; html: string } {
     const { userName, dashboardUrl = 'https://primeweb.app/dashboard', locale = 'en' } = data
-    const t = getEmailT(locale).welcome
+    const t = (locales[locale] || locales.en).welcome
 
     return {
         subject: t.subject,

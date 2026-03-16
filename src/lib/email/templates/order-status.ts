@@ -4,9 +4,13 @@
  * Supports EN (English) and MS (Bahasa Melayu) locales.
  */
 
-import { type EmailLocale, getEmailT } from '../i18n'
+import en from '@/i18n/locales/en.json'
+import ms from '@/i18n/locales/ms.json'
 
+type EmailLocale = 'en' | 'ms'
 type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled'
+
+const locales = { en: en.email, ms: ms.email } as const
 
 interface OrderStatusEmailData {
     customerName: string
@@ -34,7 +38,7 @@ const STATUS_EMOJIS: Record<OrderStatus, string> = {
 
 export function orderStatusEmail(data: OrderStatusEmailData): { subject: string; html: string } {
     const { customerName, orderNumber, status, trackingNumber, trackingUrl, storeName = 'PrimeWeb', locale = 'en' } = data
-    const t = getEmailT(locale).status
+    const t = (locales[locale] || locales.en).status
     const statusT = t[status]
     const emoji = STATUS_EMOJIS[status]
     const color = STATUS_COLORS[status]
