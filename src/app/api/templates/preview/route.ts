@@ -6,9 +6,15 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { buildFullHTML } from '../../preview/[siteId]/route'
 import { THEMES } from '../../preview/renderers'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
     try {
+        const user = await getCurrentUser()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
         if (!id) return NextResponse.json({ error: 'Missing id param' }, { status: 400 })

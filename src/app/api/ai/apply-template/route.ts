@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * POST /api/ai/apply-template
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
         const payload = await getPayload({ config })
 
         // Auth
-        const { user } = await payload.auth({ headers: req.headers })
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

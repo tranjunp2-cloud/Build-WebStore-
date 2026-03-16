@@ -10,6 +10,7 @@ import { renderNav, renderHero, renderSections, THEMES, baseCSS, getGoogleFontsL
 import { setHeroCategory } from '../renderers/hero'
 import { setSectionCategory } from '../renderers/sections'
 import { detectCategory } from '@/lib/preview'
+import { getCurrentUser } from '@/lib/auth'
 
 // Force dynamic rendering — never cache this route
 export const dynamic = 'force-dynamic'
@@ -74,6 +75,14 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
 
 export async function GET(_req: Request, { params }: { params: Promise<{ siteId: string }> }) {
   try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     const { siteId } = await params
     const payload = await getPayload({ config })
     const numericSiteId = Number(siteId)

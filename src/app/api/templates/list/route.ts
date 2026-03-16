@@ -1,6 +1,7 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * GET /api/templates/list
@@ -8,6 +9,11 @@ import { NextResponse } from 'next/server'
  */
 export async function GET(req: Request) {
     try {
+        const user = await getCurrentUser()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const { searchParams } = new URL(req.url)
         const limit = parseInt(searchParams.get('limit') || '50', 10)
         const sort = searchParams.get('sort') || 'sortOrder'

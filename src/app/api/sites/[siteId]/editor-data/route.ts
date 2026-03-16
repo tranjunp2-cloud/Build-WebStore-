@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * GET /api/sites/[siteId]/editor-data
@@ -12,6 +13,11 @@ export async function GET(
     { params }: { params: Promise<{ siteId: string }> }
 ) {
     try {
+        const user = await getCurrentUser()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const payload = await getPayload({ config })
         const { siteId } = await params
         const numericSiteId = Number(siteId)

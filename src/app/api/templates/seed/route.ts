@@ -2,6 +2,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { SEED_TEMPLATES } from '@/lib/ai/seed-templates'
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * POST /api/templates/seed
@@ -10,6 +11,11 @@ import { NextRequest, NextResponse } from 'next/server'
  */
 export async function POST(request: NextRequest) {
     try {
+        const user = await getCurrentUser()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const payload = await getPayload({ config })
         const force = request.nextUrl.searchParams.get('force') === 'true'
 

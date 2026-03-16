@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
+import { getCurrentUser } from '@/lib/auth'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -16,6 +17,11 @@ function getOpenAI(): OpenAI | null {
 
 export async function POST(req: NextRequest) {
     try {
+        const user = await getCurrentUser()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
         const { instruction, block, blockIndex, allBlocks, theme, siteName } = await req.json()
 
         if (!instruction) {
