@@ -1,0 +1,96 @@
+import { describe, it, expect, vi } from 'vitest'
+import { POST } from '@/app/api/orders/create/route'
+import { NextRequest } from 'next/server'
+
+// Mock cấu hình mặc định để không bị lỗi module import route
+vi.mock('@payload-config', () => ({
+    default: {}
+}))
+
+// Mock thư viện PayloadCMS để không gọi DB thật
+vi.mock('payload', () => {
+    // Tạo giả lập db Payload CMS
+    const mockPayload = {
+        findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+            if (collection === 'sites' && id === 'site-123') {
+                return { id: 'site-123', tenant: 'tenant-456' }
+            }
+            if (collection === 'products' && id === 'prod-1') {
+                return { id: 'prod-1', name: 'Mock Product', price: 100, inventory: 10, currency: 'MYR' }
+            }
+            return null
+        }),
+        update: vi.fn().mockResolvedValue({}),
+        create: vi.fn().mockImplementation(async ({ collection, data }) => {
+            if (collection === 'orders') {
+                return { ...data, id: 'order-999' }
+            }
+            return data
+        })
+    }
+    
+    return {
+        getPayload: vi.fn().mockResolvedValue(mockPayload)
+    }
+})
+
+describe('POST /api/orders/create', () => {
+    
+    it('returns 422 validations error when required fields are missing', async () => {
+        // Thiếu customer email và items
+        const req = new NextRequest('http://localhost:3000/api/orders/create', {
+            method: 'POST',
+            body: JSON.stringify({ siteId: 'site-123' })
+        })
+
+        const response = await POST(req)
+        const json = await response.json()
+
+        expect(response.status).toBe(422)
+        expect(json.success).toBe(false)
+        expect(json.error.message).toContain('Missing required fields')
+    })
+    
+    it('returns 404 if siteId does not exist in DB', async () => {
+        const req = new NextRequest('http://localhost:3000/api/orders/create', {
+            method: 'POST',
+            body: JSON.stringify({
+                siteId: 'invalid-site',
+                items: [{ productId: 'prod-1', quantity: 1 }],
+                customer: { name: 'John Doe', email: 'john@example.com' }
+            })
+        })
+
+        const response = await POST(req)
+        const json = await response.json()
+
+        expect(response.status).toBe(404)
+        expect(json.success).toBe(false)
+        expect(json.error.message).toBe('Site not found')
+    })
+
+    it('returns 200 with orderId and total calculated correctly (Happy Path)', async () => {
+        const req = new NextRequest('http://localhost:3000/api/orders/create', {
+            method: 'POST',
+            body: JSON.stringify({
+                siteId: 'site-123',
+                items: [{ productId: 'prod-1', quantity: 2 }],
+                customer: { name: 'John Doe', email: 'john@example.com' }
+            })
+        })
+
+        const response = await POST(req)
+        const json = await response.json()
+
+        // 2 items * 100 price = 200 subtotal
+        // Tax 6% = 12
+        // Total = 212
+        
+        expect(response.status).toBe(200)
+        expect(json.success).toBe(true)
+        expect(json.data.orderId).toBe('order-999')
+        expect(json.data.total).toBe(212)
+        expect(json.data.currency).toBe('MYR')
+        expect(json.data.status).toBe('pending')
+    })
+})
