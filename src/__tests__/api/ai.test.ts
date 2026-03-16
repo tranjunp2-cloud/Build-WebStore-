@@ -4,11 +4,8 @@ import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
 import { POST as RewriteTextPOST } from '@/app/api/ai/rewrite-text/route'
 import { POST as ApplyTemplatePOST } from '@/app/api/ai/apply-template/route'
 import { NextRequest } from 'next/server'
-import { getPayload } from 'payload'
 
-vi.mock('@payload-config', () => ({ default: {} }))
-
-// Mock user auth qua cookies
+// Mock next/headers
 vi.mock('next/headers', () => ({
     cookies: vi.fn().mockResolvedValue({
         get: vi.fn().mockReturnValue({ value: 'valid-token' })
