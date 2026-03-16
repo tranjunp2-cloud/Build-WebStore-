@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import OpenAI from 'openai'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/seo/fix
@@ -11,7 +12,7 @@ import OpenAI from 'openai'
  * Body: { siteId: string }
  */
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
         const { siteId } = await request.json()
         if (!siteId) {
@@ -148,4 +149,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})

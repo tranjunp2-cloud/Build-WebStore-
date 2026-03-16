@@ -1,12 +1,13 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextResponse } from 'next/server'
+import { withAuth } from '@/lib/auth'
 
 /**
  * GET /api/templates/list
  * Custom endpoint to list templates (workaround for Payload REST API undici bug).
  */
-export async function GET(req: Request) {
+export const GET = withAuth(async (_user, req) => {
     try {
         const { searchParams } = new URL(req.url)
         const limit = parseInt(searchParams.get('limit') || '50', 10)
@@ -28,4 +29,4 @@ export async function GET(req: Request) {
             error: error.message,
         }, { status: 500 })
     }
-}
+})

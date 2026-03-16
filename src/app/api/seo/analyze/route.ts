@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/seo/analyze
@@ -96,7 +97,7 @@ function analysePage(page: any, siteSEO: any): PageAnalysis {
     }
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
         const { siteId } = await request.json()
         if (!siteId) {
@@ -156,4 +157,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})
