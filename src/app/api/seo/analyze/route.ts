@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { z } from 'zod'
 
 /**
  * POST /api/seo/analyze
@@ -96,15 +97,23 @@ function analysePage(page: any, siteSEO: any): PageAnalysis {
     }
 }
 
+const seoAnalyzeSchema = z.object({
+    siteId: z.string().min(1)
+})
+
 export async function POST(request: NextRequest) {
     try {
-        const { siteId } = await request.json()
-        if (!siteId) {
+        const body = await request.json()
+        const parsed = seoAnalyzeSchema.safeParse(body)
+        
+        if (!parsed.success) {
             return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'siteId is required' } },
-                { status: 422 }
+                { success: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.flatten() } },
+                { status: 400 } // using 400 for consistency in standard validation
             )
         }
+        
+        const { siteId } = parsed.data
 
         const payload = await getPayload({ config })
 

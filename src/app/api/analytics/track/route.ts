@@ -3,6 +3,17 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { createHash } from 'crypto'
 
+import { z } from 'zod'
+
+const analyticsTrackSchema = z.object({
+    siteId: z.string().min(1),
+    event: z.string().optional(),
+    pageUrl: z.string().min(1),
+    referrer: z.string().optional(),
+    sessionId: z.string().optional(),
+    metadata: z.any().optional(),
+})
+
 /**
  * POST /api/analytics/track
  * Public lightweight endpoint for tracking page views and events.
@@ -12,11 +23,13 @@ import { createHash } from 'crypto'
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json()
-        const { siteId, event = 'pageview', pageUrl, referrer, sessionId, metadata } = body
-
-        if (!siteId || !pageUrl) {
-            return NextResponse.json({ success: false }, { status: 422 })
+        const parsed = analyticsTrackSchema.safeParse(body)
+        
+        if (!parsed.success) {
+            return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 })
         }
+        
+        const { siteId, event = 'pageview', pageUrl, referrer, sessionId, metadata } = parsed.data
 
         const payload = await getPayload({ config })
 

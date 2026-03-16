@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { z } from 'zod'
+
+const applyTemplateSchema = z.object({
+    templateId: z.string().min(1),
+    siteId: z.string().optional(),
+})
 
 /**
  * POST /api/ai/apply-template
@@ -18,11 +24,13 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json()
-        const { templateId } = body
-
-        if (!templateId) {
-            return NextResponse.json({ error: 'templateId required' }, { status: 400 })
+        const parsed = applyTemplateSchema.safeParse(body)
+        
+        if (!parsed.success) {
+            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
         }
+        
+        const { templateId } = parsed.data
 
         // Find template
         const template: any = await payload.findByID({

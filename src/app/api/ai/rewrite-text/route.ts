@@ -8,6 +8,14 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { z } from 'zod'
+
+const rewriteTextSchema = z.object({
+    text: z.string().min(1),
+    instruction: z.string().min(1),
+    context: z.string().optional(),
+    language: z.string().optional(),
+})
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -17,11 +25,14 @@ function getOpenAI(): OpenAI | null {
 
 export async function POST(req: NextRequest) {
     try {
-        const { text, instruction, context, language = 'vi' } = await req.json()
+        const body = await req.json()
+        const parsed = rewriteTextSchema.safeParse(body)
 
-        if (!text || !instruction) {
-            return NextResponse.json({ error: 'Text and instruction are required' }, { status: 400 })
+        if (!parsed.success) {
+            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
         }
+        
+        const { text, instruction, context, language = 'vi' } = parsed.data
 
         const openai = getOpenAI()
         if (!openai) {

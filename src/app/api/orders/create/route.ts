@@ -1,6 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { z } from 'zod'
+
+const orderCreateSchema = z.object({
+    siteId: z.string().min(1),
+    items: z.array(z.object({
+        productId: z.string().min(1),
+        quantity: z.number().min(1),
+    })).min(1),
+    customer: z.object({
+        name: z.string().min(1),
+        email: z.string().email(),
+        phone: z.string().optional(),
+        address: z.object({
+            line1: z.string().optional(),
+            line2: z.string().optional(),
+            city: z.string().optional(),
+            state: z.string().optional(),
+            postcode: z.string().optional(),
+            country: z.string().optional(),
+        }).optional(),
+    }),
+})
 
 /**
  * POST /api/orders/create
@@ -11,14 +33,16 @@ import config from '@payload-config'
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json()
-        const { siteId, items, customer } = body
+        const parsed = orderCreateSchema.safeParse(body)
 
-        if (!siteId || !items?.length || !customer?.name || !customer?.email) {
+        if (!parsed.success) {
             return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Missing required fields' } },
-                { status: 422 }
+                { success: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.flatten() } },
+                { status: 400 }
             )
         }
+        
+        const { siteId, items, customer } = parsed.data
 
         const payload = await getPayload({ config })
 

@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { z } from 'zod'
+
+const generateDescriptionSchema = z.object({
+    name: z.string().min(1),
+    category: z.string().optional(),
+    features: z.string().optional(),
+})
 
 /**
  * POST /api/products/generate-description
@@ -10,14 +17,17 @@ import OpenAI from 'openai'
  */
 export async function POST(request: NextRequest) {
     try {
-        const { name, category, features } = await request.json()
+        const body = await request.json()
+        const parsed = generateDescriptionSchema.safeParse(body)
 
-        if (!name) {
+        if (!parsed.success) {
             return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Product name is required' } },
-                { status: 422 }
+                { success: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.flatten() } },
+                { status: 400 } // using 400 for consistency in our standard validation
             )
         }
+
+        const { name, category, features } = parsed.data
 
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 

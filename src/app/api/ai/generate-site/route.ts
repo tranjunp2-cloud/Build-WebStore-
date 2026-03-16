@@ -3,6 +3,17 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { cookies } from 'next/headers'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
+import { z } from 'zod'
+
+const generateSiteSchema = z.object({
+    businessInfo: z.object({
+        businessName: z.string().min(1),
+        industry: z.string().min(1),
+        products: z.string().min(1),
+    }),
+    extraInstructions: z.string().optional(),
+    language: z.enum(['vi', 'en']).optional(),
+})
 
 /**
  * POST /api/ai/generate-site
@@ -63,15 +74,17 @@ export async function POST(req: NextRequest) {
         }
 
         // Parse request body — structured business info
-        const { businessInfo, extraInstructions, language = 'vi' } = await req.json()
-
-        // Validate required business info
-        if (!businessInfo || !businessInfo.businessName || !businessInfo.industry || !businessInfo.products) {
+        const body = await req.json()
+        const parsed = generateSiteSchema.safeParse(body)
+        
+        if (!parsed.success) {
             return NextResponse.json(
-                { error: 'Missing required fields: businessName, industry, products' },
-                { status: 400 },
+                { error: parsed.error.flatten() },
+                { status: 400 }
             )
         }
+        
+        const { businessInfo, extraInstructions, language = 'vi' } = parsed.data
 
         // Check SSE mode
         const isStreaming = req.nextUrl.searchParams.get('stream') === 'true'
