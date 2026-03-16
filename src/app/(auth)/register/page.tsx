@@ -104,9 +104,19 @@ export default function RegisterPage() {
 
             if (!registerRes.ok) {
                 const errorData = await registerRes.json().catch(() => null)
-                const message = errorData?.errors?.[0]?.message || 'Registration failed'
+                
+                // Extract the most specific error message from Payload's ValidationError structure
+                let message = errorData?.errors?.[0]?.message || 'Registration failed'
+                const subError = errorData?.errors?.[0]?.data?.errors?.[0]
+                if (subError?.message) {
+                    message = subError.message
+                }
 
-                if (message.toLowerCase().includes('unique') || message.toLowerCase().includes('exist')) {
+                const isDuplicate = message.toLowerCase().includes('unique') || 
+                                  message.toLowerCase().includes('exist') || 
+                                  message.toLowerCase().includes('already registered')
+
+                if (isDuplicate) {
                     setFormError('email', { message: 'This email is already registered' })
                     toast.error('This email is already registered')
                 } else {

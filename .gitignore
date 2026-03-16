@@ -37,3 +37,10 @@ src/payload-types.ts
 ## Logs
 *.log
 npm-debug.log*
+
+## Test and AI Agent data
+test-results/
+.agents/
+.agent/
+_agents/
+_agent/
