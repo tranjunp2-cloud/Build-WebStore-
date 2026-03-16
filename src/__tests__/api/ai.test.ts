@@ -4,6 +4,7 @@ import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
 import { POST as RewriteTextPOST } from '@/app/api/ai/rewrite-text/route'
 import { POST as ApplyTemplatePOST } from '@/app/api/ai/apply-template/route'
 import { NextRequest } from 'next/server'
+import { getPayload } from 'payload'
 
 // Mock next/headers
 vi.mock('next/headers', () => ({
@@ -120,8 +121,11 @@ describe('AI Streaming APIs', () => {
              const text = new TextDecoder().decode(value)
              expect(text).toContain('event: theme_generated')
              
-             // Đóng stream để test không bị treo
-             reader!.cancel()
+             // Wait for stream to finish reading to prevent controller close error
+             while (true) {
+                 const { done } = await reader!.read()
+                 if (done) break
+             }
         })
     })
 
