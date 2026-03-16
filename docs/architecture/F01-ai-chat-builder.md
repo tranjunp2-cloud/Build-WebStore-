@@ -1,11 +1,11 @@
-# Architecture: AI Chat Builder (F-01)
-> **Version:** 1.0 | **Created:** 2026-03-08
+# Architecture: AI Chat Builder (F01)
+> **Version:** 1.1 | **Updated:** 2026-03-16
 
 ## Overview
 
-Upgrade existing v1 rule-based builder to Phase 2 with **real OpenAI GPT-4o** integration, **SSE streaming**, and **live preview** using block registry (F-05).
+Upgrade existing v1 rule-based builder to Phase 2 with **real OpenAI GPT-4o** integration, **Conversational Onboarding**, **Multilingual Support (EN/BM/VI)**, **Drag-and-Drop Reorder**, and **SSE streaming** for live preview generation.
 
-## Architecture Diagram
+## 1. Architecture Diagram
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -13,31 +13,38 @@ Upgrade existing v1 rule-based builder to Phase 2 with **real OpenAI GPT-4o** in
 │                                                              │
 │  ┌─────────────────┐         ┌────────────────────────────┐  │
 │  │ BuilderChatPanel │  ───→  │ BuilderPreview (iframe)     │  │
-│  │                  │         │  renders blocks via         │  │
-│  │ useBuilderStore  │         │  blockRegistry.getComponent │  │
+│  │ (Multi-turn conversational│ │ + Drag & Drop Reorder      │  │
+│  │  flow, auto-detect lang)  │ │  renders blocks via         │  │
+│  │                           │ │  blockRegistry.getComponent │  │
+│  │ useBuilderStore  │         │                            │  │
 │  │   (Zustand)      │         │                            │  │
 │  └────────┬─────────┘         └────────────────────────────┘  │
 │           │                                                   │
-│           │ POST /api/ai/generate-site (SSE)                  │
+│           │ POST /api/ai/chat (Conversational Flow)           │
+│           │ POST /api/ai/generate-site (SSE Generation)       │
 └───────────┼───────────────────────────────────────────────────┘
             │
 ┌───────────▼───────────────────────────────────────────────────┐
-│              API Route Handler (Server)                        │
+│              API Route Handlers (Server)                       │
 │                                                                │
-│  1. Auth check (JWT from cookies)                              │
-│  2. Rate limit check (free=1, starter=5, pro=20)               │
-│  3. Parse prompt → extract businessName + category             │
-│  4. Select theme palette by category                           │
-│  5. Build system prompt (block types from registry meta)       │
-│  6. Call OpenAI GPT-4o with streaming                          │
-│  7. Parse JSON blocks from AI stream                           │
-│  8. Validate each block with Zod (blockRegistry.validate)      │
-│  9. Save blocks to Payload CMS (Site + Page)                   │
-│  10. Stream SSE events back to client                          │
+│  A. Chat Endpoint (/api/ai/chat)                               │
+│     1. Detect User Language                                    │
+│     2. Extract Info: Business Name, Category, Tone             │
+│     3. Return Clarifying Questions (Max 4) or Confirm          │
+│                                                                │
+│  B. Generation Endpoint (/api/ai/generate-site - SSE)          │
+│     1. Auth & Rate limit check (free=1, pro=20)                │
+│     2. Build system prompt based on conversational context     │
+│        and target language (BM/VI/EN)                          │
+│     3. Call OpenAI GPT-4o with streaming                       │
+│     4. Parse JSON blocks (4 required: Hero, About, Products, Contact)
+│     5. Validate each block with Zod (blockRegistry.validate)   │
+│     6. Save blocks to Payload CMS (Site + Page)                │
+│     7. Stream SSE events back to client                        │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-## SSE Event Protocol
+## 2. SSE Event Protocol
 
 | Event | Payload | Client Action |
 |-------|---------|---------------|
@@ -46,22 +53,25 @@ Upgrade existing v1 rule-based builder to Phase 2 with **real OpenAI GPT-4o** in
 | `block_complete` | `{block: BlockConfig, index: number}` | Add block to preview |
 | `seo_generated` | `{title: string, description: string}` | Store SEO meta |
 | `error` | `{code: string, message: string, retryable: boolean}` | Show toast |
-| `done` | `{siteId: string, totalBlocks: number, timeMs: number}` | Show success CTAs |
+| `done` | `{siteId: string, slug: string, url: string}` | Show Congratulations Modal |
 
-## Files to Create/Modify
+## 3. Files to Create/Modify
 
-| Action | File | Purpose |
-|--------|------|---------|
-| MODIFY | `app/api/ai/generate-site/route.ts` | Add SSE streaming + OpenAI integration |
-| MODIFY | `lib/ai/generate-blocks.ts` | Keep as fallback, add OpenAI generator |
-| CREATE | `lib/ai/openai-generator.ts` | OpenAI GPT-4o streaming block generation |
-| CREATE | `lib/ai/system-prompt.ts` | AI system prompt builder using registry meta |
-| CREATE | `store/builderStore.ts` | Zustand store for builder state |
-| MODIFY | `app/(builder)/builder/new/page.tsx` | Upgrade with SSE + live preview + store |
+| Action | File / Component | Purpose |
+|--------|------------------|---------|
+| MODIFY | `app/(builder)/builder/new/page.tsx` | Upgrade with conversational UI + SSE + store |
+| CREATE | `app/api/ai/chat/route.ts` | Handles multi-turn conversational onboarding |
+| MODIFY | `app/api/ai/generate-site/route.ts` | Add target language param, enforce 4 required pages |
+| CREATE | `lib/ai/prompts/conversational.ts` | System prompt for NLU and language detection |
+| CREATE | `lib/ai/prompts/builder.ts` | System prompt for full site generation |
+| MODIFY | `store/builderStore.ts` | Zustand store (add chat history, targetLanguage, layout sortOrder) |
+| CREATE | `components/builder/DragDropContext.tsx` | Handle drag and drop action in preview |
+| CREATE | `components/builder/CongratsModal.tsx` | Post-publish: copy link, redirect to `/admin` |
 
-## Key Design Decisions
+## 4. Key Design Decisions
 
-1. **Keep rule-based fallback**: If OpenAI fails, fall back to existing `generate-blocks.ts`
-2. **SSE over WebSocket**: Simpler, works with Next.js API routes, no extra infra
-3. **Block-by-block streaming**: Each complete block is streamed + validated individually
-4. **Zustand over context**: Better performance, simpler persistence for drafts
+1. **Decoupled Conversations & Generation**: Use `/api/ai/chat` for lightweight NLU and language detection (GPT-4o-mini is fine here). Use `/api/ai/generate-site` only when confirming the start of site building (requires GPT-4o).
+2. **Multilingual output strategy**: The system prompt injected into the generator will explicitly instruct OpenAI to generate block content in the detected `targetLanguage`, with a fallback to English.
+3. **Zustand over context**: Better performance, simpler persistence for drafts, and easy to mutate array order for drag-and-drop.
+4. **Drag & Drop Reorder**: Modifies the `sortOrder` array in frontend state. Persists via PATCH to Payload CMS only when user clicks "Publish" or "Tinh chỉnh" to avoid excessive DB writes.
+5. **No CMS Config in F01**: Builder only redirects to `/admin`, leveraging Payload's existing React-based admin panel.
