@@ -1,13 +1,14 @@
 /**
  * Template Preview API — renders a template's defaultBlocks with industry-aware styling.
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { buildFullHTML } from '../../preview/[siteId]/route'
 import { THEMES } from '../../preview/renderers'
+import { withAuth } from '@/lib/auth'
 
-export async function GET(req: NextRequest) {
+export const GET = withAuth(async (_user, req) => {
     try {
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
@@ -27,4 +28,4 @@ export async function GET(req: NextRequest) {
     } catch (e: any) {
         return new NextResponse(`Error: ${e.message}`, { status: 500 })
     }
-}
+})
