@@ -220,6 +220,38 @@ export const Sites: CollectionConfig = {
             type: 'date',
             admin: { readOnly: true },
         },
+        {
+            name: 'locale',
+            type: 'select',
+            options: [
+                { label: 'Bahasa Melayu', value: 'bm' },
+                { label: 'English', value: 'en' },
+            ],
+            defaultValue: 'bm',
+        },
+        {
+            name: 'shippingConfig',
+            type: 'group',
+            fields: [
+                {
+                    name: 'westRate',
+                    type: 'number',
+                    defaultValue: 800,
+                    admin: { description: 'Semenanjung rate in sen (800 = RM 8)' },
+                },
+                {
+                    name: 'eastRate',
+                    type: 'number',
+                    defaultValue: 1500,
+                    admin: { description: 'Sabah/Sarawak rate in sen (1500 = RM 15)' },
+                },
+                {
+                    name: 'freeAbove',
+                    type: 'number',
+                    admin: { description: 'Free shipping above X sen (null = no free shipping)' },
+                },
+            ],
+        },
     ],
     timestamps: true,
 }
