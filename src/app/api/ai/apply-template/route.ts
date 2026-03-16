@@ -4,6 +4,7 @@ import config from '@payload-config'
 import { applyTemplateSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
  * POST /api/ai/apply-template
@@ -12,6 +13,15 @@ import { withAuth } from '@/lib/auth'
  */
 export const POST = withAuth(async (user, req) => {
     try {
+        // Rate Limit: 20 template applications per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
+        }
+
         const payload = await getPayload({ config })
 
         const { data, errorResponse } = await parseRequest(req, applyTemplateSchema)

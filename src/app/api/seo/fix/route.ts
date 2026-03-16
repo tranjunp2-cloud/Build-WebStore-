@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import OpenAI from 'openai'
 import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
  * POST /api/seo/fix
@@ -15,14 +16,23 @@ import { withAuth } from '@/lib/auth'
 import { seoFixSchema } from '@/lib/validations/seo'
 import { parseRequest } from '@/lib/validations/helpers'
 
-export const POST = withAuth(async (_user, request) => {
+export const POST = withAuth(async (user, request) => {
     try {
+        const payload = await getPayload({ config })
+
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
+        }
+
         const { data, errorResponse } = await parseRequest(request, seoFixSchema)
         if (errorResponse) return errorResponse
         
         const { siteId } = data!
-
-        const payload = await getPayload({ config })
 
         // Get site info
         const site = await payload.findByID({ collection: 'sites', id: siteId })

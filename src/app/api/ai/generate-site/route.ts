@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { cookies } from 'next/headers'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
+import { getCurrentUser } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
  * POST /api/ai/generate-site
@@ -19,23 +20,20 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
 
     try {
-        const payload = await getPayload({ config })
-
-        // Authenticate user
-        const cookieStore = await cookies()
-        const token = cookieStore.get('payload-token')?.value
-        if (!token) {
+        const user = await getCurrentUser()
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // Build headers with JWT token for payload.auth()
-        // Next.js App Router may not forward cookies in req.headers properly
-        const authHeaders = new Headers(req.headers)
-        authHeaders.set('Authorization', `JWT ${token}`)
+        const payload = await getPayload({ config })
 
-        const { user } = await payload.auth({ headers: authHeaders })
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
         }
 
         // Get tenant ID — auto-create if missing (legacy accounts)
