@@ -1,4 +1,4 @@
-package com.primeweb.tests;
+﻿package com.primeweb.tests;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -7,9 +7,9 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 public class OrdersManagementTest extends BaseTest {
 
     @Test
-    @DisplayName("TC-11.01: Checkout tạo Order qua cổng Stripe khi thanh toán thành công (Happy Path)")
+    @DisplayName("TC-11.01: Checkout táº¡o Order qua cá»•ng Stripe khi thanh toÃ¡n thÃ nh cÃ´ng (Happy Path)")
     void TC_11_01_CheckoutViaStripeSuccessfully() {
-        page.navigate("http://localhost:3000/checkout");
+        page.navigate(getBaseUrl() + "/checkout");
         page.locator("input[name='email']").fill("khachhang@test.com");
         page.locator("button[data-testid='btn-pay-stripe']").click();
         page.waitForURL(java.util.regex.Pattern.compile(".*/order/.*/confirm"));
@@ -17,19 +17,19 @@ public class OrdersManagementTest extends BaseTest {
     }
 
     @Test
-    @DisplayName("TC-11.02: Thao tác Khách: Hủy Thanh Toán (Cancel) Đầu Cổng Trả Tồn Kho")
+    @DisplayName("TC-11.02: Thao tÃ¡c KhÃ¡ch: Há»§y Thanh ToÃ¡n (Cancel) Äáº§u Cá»•ng Tráº£ Tá»“n Kho")
     void TC_11_02_CancelStripePaymentRestoresStock() {
-        page.navigate("http://localhost:3000/checkout");
+        page.navigate(getBaseUrl() + "/checkout");
         page.locator("button[data-testid='btn-pay-stripe']").click();
-        // Giả lập KH bấm Hủy/Back ở Stripe
+        // Giáº£ láº­p KH báº¥m Há»§y/Back á»Ÿ Stripe
         page.locator("a[data-testid='btn-cancel-payment']").click();
-        assertThat(page).hasURL("http://localhost:3000/cart");
+        assertThat(page).hasURL(getBaseUrl() + "/cart");
     }
 
     @Test
-    @DisplayName("TC-11.03: Khách Cập Nhật Địa Chỉ Shipping Xong CMS Label Update")
+    @DisplayName("TC-11.03: KhÃ¡ch Cáº­p Nháº­t Äá»‹a Chá»‰ Shipping Xong CMS Label Update")
     void TC_11_03_UpdateShippingAddress() {
-        page.navigate("http://localhost:3000/admin/orders/123");
+        page.navigate(getBaseUrl() + "/admin/orders/123");
         page.locator("button[data-testid='btn-edit-shipping']").click();
         page.locator("input[name='address']").fill("New Address 456");
         page.locator("button[data-testid='btn-save-shipping']").click();
@@ -37,9 +37,9 @@ public class OrdersManagementTest extends BaseTest {
     }
 
     @Test
-    @DisplayName("TC-11.04: Admin Hoàn Tiền Thẻ Một Phần Qua Stripe (Partial Refund)")
+    @DisplayName("TC-11.04: Admin HoÃ n Tiá»n Tháº» Má»™t Pháº§n Qua Stripe (Partial Refund)")
     void TC_11_04_PartialRefundAdminAction() {
-        page.navigate("http://localhost:3000/admin/orders/123");
+        page.navigate(getBaseUrl() + "/admin/orders/123");
         page.locator("button[data-testid='btn-issue-refund']").click();
         page.locator("input[name='refund_amount']").fill("30");
         page.locator("button[data-testid='btn-confirm-refund']").click();
@@ -47,19 +47,19 @@ public class OrdersManagementTest extends BaseTest {
     }
 
     @Test
-    @DisplayName("TC-11.05: Tính Toán Giỏ Hàng Sai Lệch JS Client Check [Negative]")
+    @DisplayName("TC-11.05: TÃ­nh ToÃ¡n Giá» HÃ ng Sai Lá»‡ch JS Client Check [Negative]")
     void TC_11_05_ClientSidePriceTampering() {
-        page.navigate("http://localhost:3000/checkout");
-        // Giả lập chèn giá trị giả qua JS
+        page.navigate(getBaseUrl() + "/checkout");
+        // Giáº£ láº­p chÃ¨n giÃ¡ trá»‹ giáº£ qua JS
         page.evaluate("document.querySelector('input[name=\"total_price\"]').value = '0.1'");
         page.locator("button[data-testid='btn-pay-stripe']").click();
         assertThat(page.locator("div.toast-error")).containsText("Bad Logic Error");
     }
 
     @Test
-    @DisplayName("TC-11.06: Dò Nén Chặn CheckForm Thiếu Dữ Liệu Form Missing Address/Email [Negative]")
+    @DisplayName("TC-11.06: DÃ² NÃ©n Cháº·n CheckForm Thiáº¿u Dá»¯ Liá»‡u Form Missing Address/Email [Negative]")
     void TC_11_06_BlockMissingRequiredFields() {
-        page.navigate("http://localhost:3000/checkout");
+        page.navigate(getBaseUrl() + "/checkout");
         page.locator("input[name='email']").fill("   ");
         page.locator("button[data-testid='btn-pay-stripe']").click();
         assertThat(page.locator("input[name='email']")).hasClass(java.util.regex.Pattern.compile(".*border-red.*"));
@@ -67,35 +67,35 @@ public class OrdersManagementTest extends BaseTest {
     }
 
     @Test
-    @DisplayName("TC-11.08: Ngăn Nhập Mã Promocode Giảm Giá Hết Lượt / Hết Hạn [Negative]")
+    @DisplayName("TC-11.08: NgÄƒn Nháº­p MÃ£ Promocode Giáº£m GiÃ¡ Háº¿t LÆ°á»£t / Háº¿t Háº¡n [Negative]")
     void TC_11_08_BlockExpiredPromoCode() {
-        page.navigate("http://localhost:3000/checkout");
+        page.navigate(getBaseUrl() + "/checkout");
         page.locator("input[name='promo_code']").fill("SUMMER2026");
         page.locator("button[data-testid='btn-apply-promo']").click();
-        assertThat(page.locator("div.promo-tooltip-error")).containsText("Mã này đã hết hạn");
+        assertThat(page.locator("div.promo-tooltip-error")).containsText("MÃ£ nÃ y Ä‘Ã£ háº¿t háº¡n");
     }
 
     @Test
-    @DisplayName("TC-11.10: Auto-focus Nhập Thẻ & Label Checkout Friendly [UX Empathy]")
+    @DisplayName("TC-11.10: Auto-focus Nháº­p Tháº» & Label Checkout Friendly [UX Empathy]")
     void TC_11_10_CheckoutUXEmpathy() {
-        page.navigate("http://localhost:3000/checkout");
+        page.navigate(getBaseUrl() + "/checkout");
         assertThat(page.locator("input[name='phone']")).isFocused();
-        assertThat(page.locator("button[data-testid='btn-pay-stripe']")).containsText("Thanh Toán");
+        assertThat(page.locator("button[data-testid='btn-pay-stripe']")).containsText("Thanh ToÃ¡n");
     }
 
     @Test
-    @DisplayName("TC-11.11: Push Real-Time SSE Thông Báo Đơn Tới Mới Trên Admin Desktop")
+    @DisplayName("TC-11.11: Push Real-Time SSE ThÃ´ng BÃ¡o ÄÆ¡n Tá»›i Má»›i TrÃªn Admin Desktop")
     void TC_11_11_RealTimeSseNotification() {
-        page.navigate("http://localhost:3000/admin/dashboard");
-        // Mock SSE Event Tới
+        page.navigate(getBaseUrl() + "/admin/dashboard");
+        // Mock SSE Event Tá»›i
         page.evaluate("window.dispatchEvent(new CustomEvent('new_order_event', {detail: {id: 999}}))");
-        assertThat(page.locator("div.toast-notification")).containsText("Đơn Mới");
+        assertThat(page.locator("div.toast-notification")).containsText("ÄÆ¡n Má»›i");
     }
 
     @Test
-    @DisplayName("TC-11.13: In Hàng Loạt Batch Cục Mass Lệnh Label Bưu Phiếu Shipping Khách Chọn Mảng Chọn")
+    @DisplayName("TC-11.13: In HÃ ng Loáº¡t Batch Cá»¥c Mass Lá»‡nh Label BÆ°u Phiáº¿u Shipping KhÃ¡ch Chá»n Máº£ng Chá»n")
     void TC_11_13_BatchPrintShippingLabels() {
-        page.navigate("http://localhost:3000/admin/orders");
+        page.navigate(getBaseUrl() + "/admin/orders");
         for(int i=0; i<5; i++) {
              page.locator("input.row-checkbox").nth(i).check();
         }
@@ -106,23 +106,24 @@ public class OrdersManagementTest extends BaseTest {
     }
 
     @Test
-    @DisplayName("TC-11.14: Hành Vi Nút Bulk Action Đảo Mode Nhiều Item Quản Lý Tool Batch")
+    @DisplayName("TC-11.14: HÃ nh Vi NÃºt Bulk Action Äáº£o Mode Nhiá»u Item Quáº£n LÃ½ Tool Batch")
     void TC_11_14_BulkUpdateOrderStatus() {
-        page.navigate("http://localhost:3000/admin/orders");
+        page.navigate(getBaseUrl() + "/admin/orders");
         page.locator("input.row-checkbox").nth(0).check();
         page.locator("input.row-checkbox").nth(1).check();
         page.locator("button[data-testid='btn-bulk-actions']").click();
         page.locator("button[data-testid='action-mark-shipped']").click();
-        assertThat(page.locator("div.toast-success")).containsText("Cập nhật 2 đơn hàng thành công");
+        assertThat(page.locator("div.toast-success")).containsText("Cáº­p nháº­t 2 Ä‘Æ¡n hÃ ng thÃ nh cÃ´ng");
     }
 
     @Test
-    @DisplayName("TC-11.15: Modal Lướt Dữ Liệu Ngoại Xem Đơn Không Đổ Trang Context Web [UX Empathy]")
+    @DisplayName("TC-11.15: Modal LÆ°á»›t Dá»¯ Liá»‡u Ngoáº¡i Xem ÄÆ¡n KhÃ´ng Äá»• Trang Context Web [UX Empathy]")
     void TC_11_15_ViewOrderInSideModalUX() {
-        page.navigate("http://localhost:3000/admin/orders?filter=new");
+        page.navigate(getBaseUrl() + "/admin/orders?filter=new");
         page.locator("table.orders-list tr td[data-field='id']").first().click();
         assertThat(page.locator("div.right-side-modal")).isVisible();
         page.locator("button.close-modal").click();
         assertThat(page).hasURL(java.util.regex.Pattern.compile(".*filter=new.*"));
     }
 }
+
