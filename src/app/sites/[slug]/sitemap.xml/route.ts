@@ -2,7 +2,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextRequest } from 'next/server'
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
     try {
         const { slug } = await params
         const payload = await getPayload({ config })
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
             where: { slug: { equals: slug } },
             limit: 1,
         })
-        const tenant = tenantsResult.docs[0]
+        const [tenant] = tenantsResult.docs
         if (!tenant) {
             return new Response('Not found', { status: 404 })
         }
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
             limit: 1,
         })
 
-        const site = siteResults.docs[0]
+        const [site] = siteResults.docs
         if (!site) {
             return new Response('Not found', { status: 404 })
         }
@@ -42,10 +42,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
                     { 'seo.noIndex': { not_equals: true } }
                 ]
             },
-            limit: 1000, 
+            pagination: false,
         })
 
-        const baseUrl = `https://${slug}.primeweb.app`
+        const rootDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+        const baseUrl = `https://${slug}.${rootDomain}`
 
         const xmlLines = pagesResult.docs.map(p => {
             const isHome = p.isHomepage || p.slug === '/' || p.slug === 'home' || !p.slug
