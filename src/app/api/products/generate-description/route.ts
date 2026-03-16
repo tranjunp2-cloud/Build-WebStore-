@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { getCurrentUser } from '@/lib/auth'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/products/generate-description
@@ -9,13 +9,8 @@ import { getCurrentUser } from '@/lib/auth'
  * Body: { name, category?, features? }
  * Response: { description, shortDescription, seoTitle, seoDescription }
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
-        const user = await getCurrentUser()
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         const { name, category, features } = await request.json()
 
         if (!name) {
@@ -67,4 +62,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})

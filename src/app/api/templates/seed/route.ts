@@ -1,23 +1,18 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { SEED_TEMPLATES } from '@/lib/ai/seed-templates'
-import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/templates/seed
  * Seeds the 10 industry-based templates into the database.
  * Pass ?force=true to delete existing templates and re-seed.
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
-        const user = await getCurrentUser()
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         const payload = await getPayload({ config })
-        const force = request.nextUrl.searchParams.get('force') === 'true'
+        const force = new URL(request.url).searchParams.get('force') === 'true'
 
         // Check if templates already exist
         const existing = await payload.find({ collection: 'templates', limit: 100 })
@@ -67,4 +62,4 @@ export async function POST(request: NextRequest) {
             error: { code: 'INTERNAL_ERROR', message: error.message },
         }, { status: 500 })
     }
-}
+})

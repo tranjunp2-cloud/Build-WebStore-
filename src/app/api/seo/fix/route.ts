@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import OpenAI from 'openai'
-import { getCurrentUser } from '@/lib/auth'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/seo/fix
@@ -12,13 +12,8 @@ import { getCurrentUser } from '@/lib/auth'
  * Body: { siteId: string }
  */
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
-        const user = await getCurrentUser()
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         const { siteId } = await request.json()
         if (!siteId) {
             return NextResponse.json(
@@ -154,4 +149,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})

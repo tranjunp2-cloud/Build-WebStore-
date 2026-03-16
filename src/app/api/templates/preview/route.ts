@@ -1,20 +1,15 @@
 /**
  * Template Preview API — renders a template's defaultBlocks with industry-aware styling.
  */
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { buildFullHTML } from '../../preview/[siteId]/route'
 import { THEMES } from '../../preview/renderers'
-import { getCurrentUser } from '@/lib/auth'
+import { withAuth } from '@/lib/auth'
 
-export async function GET(req: NextRequest) {
+export const GET = withAuth(async (_user, req) => {
     try {
-        const user = await getCurrentUser()
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
         if (!id) return NextResponse.json({ error: 'Missing id param' }, { status: 400 })
@@ -33,4 +28,4 @@ export async function GET(req: NextRequest) {
     } catch (e: any) {
         return new NextResponse(`Error: ${e.message}`, { status: 500 })
     }
-}
+})
