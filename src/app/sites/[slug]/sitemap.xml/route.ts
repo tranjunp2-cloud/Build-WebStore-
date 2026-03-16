@@ -36,7 +36,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
         const pagesResult = await payload.find({
             collection: 'pages',
             where: {
-                site: { equals: site.id },
+                and: [
+                    { site: { equals: site.id } },
+                    { _status: { equals: 'published' } },
+                    { 'seo.noIndex': { not_equals: true } }
+                ]
             },
             limit: 1000, 
         })
