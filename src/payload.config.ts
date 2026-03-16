@@ -29,7 +29,12 @@ function getDatabaseConnectionString(): string {
 /** Có phải DB từ xa (cần SSL, có thể self-signed) không. */
 function isRemoteDatabase(): boolean {
   const raw = process.env.DATABASE_URI || ''
-  return raw.length > 0 && !raw.includes('localhost') && !raw.includes('127.0.0.1') && !raw.includes('@postgres:')
+  return (
+    raw.length > 0 &&
+    !raw.includes('localhost') &&
+    !raw.includes('127.0.0.1') &&
+    !raw.includes('@postgres:') // Exclude Docker networking hostname
+  )
 }
 
 export default buildConfig({

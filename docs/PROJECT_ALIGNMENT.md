@@ -68,11 +68,30 @@ Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
 
 ## Quy tắc Alignment
 
+### 0. Stories-First Rule (BẮT BUỘC) 🔴
+
+```
+⚠️ RULE: Stories TRƯỚC, PRD SAU — KHÔNG BAO GIỜ NGƯỢC LẠI.
+
+1. Viết / cập nhật User Story (docs/stories/F{XX}-stories.md) trước
+2. PO approve story → mới tạo / update PRD
+3. PRD chỉ được expand chi tiết kỹ thuật (API, Data Model, Component)
+   → PRD KHÔNG được tự tạo scope mới (FR mới không có story cover)
+4. Mọi FR trong PRD PHẢI có cột Story Ref với ID hợp lệ
+5. Story ID format: US-F{XX}-{NN} (VD: US-F01-01, US-F02-03)
+   KHÔNG dùng: US-001, US-AUTH-02, US-10A
+
+Template stories: docs/stories/STORY_TEMPLATE.md
+Index tổng hợp: docs/stories/user-stories-p0.md
+```
+
 ### 1. Trước khi code bất kỳ feature nào
 ```
 ☐ Feature có trong bảng priority ở trên?
-☐ PRD approved? (docs/prd/F{XX}.md)
-☐ Stories có Gherkin AC? (docs/stories/F{XX}-stories.md)
+☐ User Story tồn tại? (docs/stories/F{XX}-stories.md) — PHẢI CÓ TRƯỚC
+☐ PRD approved? (docs/prd/F{XX}.md) — viết SAU khi story done
+     └── PRD Section 0 (Story Traceability) có đủ story refs?
+     └── PRD Section 7 (FR) có cột Story Ref không trống?
 ☐ Architecture doc? (docs/architecture/F{XX}.md)
 ☐ Figma link? (docs/design/DESIGN_WORKFLOW.md)
 → 5/5 = GO. < 5/5 = STOP, hoàn thiện docs trước.
@@ -89,18 +108,19 @@ Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
 
 ### 3. Khi có thay đổi PRD/Design
 ```
-1. Design/PRD thay đổi → update docs trước
-2. Thông báo team trong standup
-3. Review task nào bị ảnh hưởng
-4. Sprint 0 tasks (backend) → KHÔNG bị ảnh hưởng
-5. Sprint 1+ tasks (UI) → re-estimate nếu cần
+1. Nếu thay đổi scope → update Story trước → sau đó update PRD
+2. Nếu chỉ thay đổi kỹ thuật (API, component) → cập nhật PRD trực tiếp
+3. Thông báo team trong standup
+4. Review task nào bị ảnh hưởng
+5. Sprint 0 tasks (backend) → KHÔNG bị ảnh hưởng
+6. Sprint 1+ tasks (UI) → re-estimate nếu cần
 ```
 
 ### 4. Khi phân task cho member
 ```
 1. Nhìn bảng Priority ở trên → feature nào trước?
-2. Check BMAD Gate → feature đó có đủ docs?
-3. Assign task → ghi rõ DoD (Definition of Done)
+2. Check BMAD Gate → feature đó có đủ docs? (stories → PRD → architecture)
+3. Assign task → ghi rõ DoD (Definition of Done) theo Story ID
 4. Review theo DoD → PASS/FAIL, không subjective
 ```
 
@@ -185,8 +205,13 @@ Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
 |---------|-------------|
 | Product vision, rules | `SPEC.md` |
 | Feature nào cần build? | `SPEC.md §20 Feature Registry` |
+| **User Stories (source of truth cho scope)** | **`docs/stories/user-stories-p0.md`** |
+| Story format chuẩn | `docs/stories/STORY_TEMPLATE.md` |
 | Feature cần gì để build? | `docs/prd/`, `docs/stories/`, `docs/architecture/` |
+| PRD format chuẩn | `docs/prd/PRD_TEMPLATE.md` |
 | Design workflow + Figma links | `docs/design/DESIGN_WORKFLOW.md` |
 | Quyết định đã chốt? | `docs/decisions/decisions-log.md` |
 | Git rules, PR template | `.github/CONTRIBUTING.md` |
 | Sprint 0 tasks | Bảng ở trên ☝️ |
+
+> ⚠️ **Thứ tự ưu tiên khi conflict:** Stories > PRD > Architecture > Code

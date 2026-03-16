@@ -1,7 +1,25 @@
 # PRD: AI Editor — Split Screen (F05)
-> **Version:** 1.0 | **Created:** 2026-03-08 | **Agent:** `project-planner`  
-> **Priority:** P0 🌟 | **Wave:** 3 | **Size:** XL  
+> **Version:** 1.1 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
+> **Priority:** P0 🌟 | **Sprint:** Wave 3 | **Size:** XL
 > **Depends on:** F04 Block Renderer ✅, F01 AI Builder ✅ | **Blocks:** F14 Undo/Redo, F15 Auto-Save
+
+---
+
+> [!IMPORTANT]
+> **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
+> Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
+
+---
+
+## 0. Story Traceability
+
+| Story ID | Title | File | Status |
+|----------|-------|------|--------|
+| US-F05-01 | AI Editor — Split Screen Chat + Preview | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-02 | Page Manager | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-03 | Inline Click-to-Edit Element | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Draft |
+| US-F05-04 | Add New Section via AI | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Draft |
+| US-F05-05 | Drag-and-Drop Block Reorder in Editor | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Draft |
 
 ---
 
@@ -9,175 +27,294 @@
 
 After AI generates a website, users need to refine and customize it. Currently the editor is a basic single-panel view with limited AI integration. Users need a powerful but simple split-screen editor where they can chat with AI to make changes while seeing live preview — similar to Lovable/Bolt.new.
 
+---
+
 ## 2. Target User
 
-- SME owner who just generated a website (Persona A)
-- Wants to tweak colors, text, images without code
-- Comfortable chatting in BM/EN/Manglish
+- SME owner vừa generate website (Persona A)
+- Muốn chỉnh màu, text, images mà không cần code
+- Comfortable chatting trong BM/EN/Manglish
 
-## 3. Success Metrics
+---
 
-| Metric | Target |
-|--------|--------|
-| Chat edit → preview update | < 3 seconds |
-| User satisfaction (editing experience) | > 7/10 |
-| Average edits before publish | 5-15 |
-| Undo/Redo usage | > 30% of sessions |
+## 3. Solution Overview
 
-## 4. User Story
+3-panel split screen editor: AI Chat (380px trái), Live Preview iframe (giữa), Settings panel (320px phải). User chat để AI apply changes realtime lên preview. Hover element để click-to-edit inline. Undo/Redo support cả AI và manual edits. Auto-save mỗi 3 giây.
+
+---
+
+## 4. Scope
+
+### In Scope
+- 3-panel layout: Chat + Preview + Settings (US-F05-01)
+- AI chat → realtime preview update (US-F05-01)
+- Undo/Redo (Ctrl+Z/Y) cho cả AI và manual changes (US-F05-01)
+- Hover element → inline AI edit popup (US-F05-03)
+- Page Manager: CRUD pages + soft delete (US-F05-02)
+- Add new section via AI chat (US-F05-04)
+- Auto-save debounce 3s (US-F05-01)
+- Drag-drop block reordering in iframe (US-F05-05)
+
+### Out of Scope
+- Custom HTML/CSS injection
+- Block Library sidebar (Wave 4+)
+
+---
+
+## 5. Success Metrics
+
+| Metric | Target | Measured By |
+|--------|--------|-------------|
+| Chat edit → preview update | < 3 seconds | Custom timing |
+| User satisfaction (editing exp) | > 7/10 | In-app survey |
+| Undo/Redo usage | > 30% sessions | PostHog |
+
+---
+
+## 6. User Story Summary
 
 ```
-AS A site owner after AI generation
-I WANT TO refine my website through chat or direct click
-SO THAT I can customize everything without knowing code
+AS A   site owner sau khi AI generate
+I WANT chỉnh sửa website qua chat hoặc click trực tiếp
+SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 ```
 
-## 5. Screen Layout
+> Source: [US-F05-01](../stories/F05-ai-editor-stories.md#us-f05-01)
+
+---
+
+## 7. Functional Requirements
+
+| FR-ID | Requirement | Story Ref | Priority | Notes |
+|-------|-------------|-----------|----------|-------|
+| FR-01 | 3-panel layout: Chat (380px) + Preview (iframe) + Settings (320px) | US-F05-01 | P0 | Collapsible panels |
+| FR-02 | Toolbar: Undo, Redo, Save, Preview, Publish | US-F05-01 | P0 | |
+| FR-03 | AI chat → apply changes to preview realtime (SSE) | US-F05-01 | P0 | < 3s |
+| FR-04 | Undo (Ctrl+Z) reverts most recent change — AI or manual | US-F05-01 | P0 | Max 50 states |
+| FR-05 | Auto-save debounce 3s — prevent data loss on tab close | US-F05-01 | P0 | Payload PATCH |
+| FR-06 | Badge: Draft / Published visible in header | US-F05-01 | P0 | |
+| FR-07 | Page Manager: list pages với status, block count, last edited | US-F05-02 | P0 | |
+| FR-08 | Add page: điền tên → slug auto-generated → redirect editor | US-F05-02 | P0 | |
+| FR-09 | Delete page: soft delete + undo toast 5s | US-F05-02 | P0 | |
+| FR-10 | Hover element 200ms → hiện "✨ Edit with AI" button | US-F05-03 | P0 | top-right position |
+| FR-11 | Click ✨ → instruction popup → apply changes trong 300ms | US-F05-03 | P0 | |
+| FR-12 | Add section via chat (Testimonials, FAQ, Gallery, etc.) | US-F05-04 | P0 | 8 section types |
+| FR-13 | Drag handle on hover → drag to reorder blocks in preview | US-F05-05 | P0 | |
+| FR-14 | Drag-drop action pushes to Undo/Redo stack and triggers auto-save | US-F05-05 | P0 | |
+
+---
+
+## 8. Business Rules
+
+- **BR-01:** Mọi query scope theo tenant + siteId — không access cross-tenant
+- **BR-02:** Soft delete page only — không hard delete
+- **BR-03:** AI chat action được ghi vào chat history để user trace được
+- **BR-04:** Inline edit chỉ modify element được click — không affect phần còn lại
+
+---
+
+## 9. User Flow
+
+```
+/editor/:siteId (authenticated)
+  ↓
+Load 3-panel layout + fetch site blocks
+  ↓
+User action:
+  ├── Chat "Đổi màu chủ → xanh mint"
+  │     → AI stream → preview update → chat shows "Done + Undo"
+  ├── Hover element → Click ✨ → mini popup → type instruction → apply
+  ├── Drag handle → block reorder → update Zustand state + auto save
+  ├── Pages tab → add/delete page → soft delete + undo toast
+  └── Ctrl+Z → revert last change (preview updates < 200ms)
+```
+
+---
+
+## 10. Screen Layout
 
 ```
 ┌─ /editor/:siteId ──────────────────────────────────────────┐
-│ ┌─ Toolbar ────────────────────────────────────────────────┐│
-│ │ [☰ Pages ▼] [← Undo] [Redo →] [💾 Save] [👁 Preview] [🚀 Publish] ││
-│ │                                        Draft · Saved 2s ago ││
-│ └──────────────────────────────────────────────────────────┘│
-│ ┌──────────────┐ ┌────────────────────────────────────────┐│
-│ │  CHAT PANEL  │ │             LIVE PREVIEW               ││
-│ │  (380px)     │ │             (iframe)                    ││
-│ │              │ │                                        ││
-│ │  AI: How can │ │  ┌──────────────────────────────────┐  ││
-│ │  I help?     │ │  │  [Navigation Block]              │  ││
-│ │              │ │  │  [Hero Block] ← hover = blue     │  ││
-│ │  User: Change│ │  │     outline + ✨ button           │  ││
-│ │  hero color  │ │  │  [Features Block]                │  ││
-│ │  to mint     │ │  │  [About Block]                   │  ││
-│ │              │ │  │  [Contact Block]                 │  ││
-│ │  AI: Done!   │ │  │  [Footer Block]                  │  ││
-│ │  Changed to  │ │  └──────────────────────────────────┘  ││
-│ │  #A8E6CF ✓   │ │                                        ││
-│ │  [Undo]      │ │                                        ││
-│ │              │ │                                        ││
-│ │  💡 Suggestions:                                        ││
-│ │  • Add testimonials                                     ││
-│ │  • Change font                                          ││
-│ │              │ │                                        ││
-│ │ [Type here.. ]│                                        ││
-│ └──────────────┘ └────────────────────────────────────────┘│
+│ ┌─ Toolbar ──────────────────────────────────────────────┐ │
+│ │ [Pages ▼] [← Undo(3)] [Redo →] [💾] [👁] [🚀 Publish]│ │
+│ │                                     Draft · Saved 2s   │ │
+│ └────────────────────────────────────────────────────────┘ │
+│ ┌──────────────┐ ┌──────────────────────────────────────┐  │
+│ │  CHAT PANEL  │ │           LIVE PREVIEW (iframe)       │  │
+│ │  (380px)     │ │                                       │  │
+│ │  AI: How can │ │  [Nav Block]                          │  │
+│ │  I help?     │ │  [Hero Block] ← hover → blue outline  │  │
+│ │              │ │       ┌─────────────┐                 │  │
+│ │  User: Change│ │       │ ✨ Edit with│                 │  │
+│ │  hero color  │ │       │    AI       │                 │  │
+│ │              │ │       └─────────────┘                 │  │
+│ │  [Type...]   │ │  [Features] [About] [Contact]         │  │
+│ └──────────────┘ └──────────────────────────────────────┘  │
 │                                                              │
-│ Mobile (< 768px): Chat = bottom sheet, Preview = full width  │
+│ Mobile: Preview full width, Chat = bottom sheet             │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## 6. Acceptance Criteria
+---
 
-### AC-1: Split Screen Layout
+## 11. Acceptance Criteria
+
+> AC được copy từ `F05-ai-editor-stories.md`. Không tự thêm AC không có trong story.
+
+### AC-1: Layout 3 Panel
+> 📌 Source: [US-F05-01](../stories/F05-ai-editor-stories.md) — AC-1
+
 ```gherkin
-GIVEN user navigates to /editor/:siteId
-WHEN  page loads
-THEN  chat panel (380px fixed) on left, collapsible
-AND   live preview (iframe, sandboxed) takes remaining width
-AND   toolbar top: Pages dropdown, Undo, Redo, Save, Preview, Publish
-AND   status bar: "Draft · Saved Xs ago" or "Published"
+GIVEN user ở /editor/:siteId
+WHEN  load trang
+THEN  AI chat panel trái (380px, collapsible)
+  AND live preview giữa (iframe, sandboxed)
+  AND settings panel phải (320px, context-sensitive)
+  AND toolbar: [Undo] [Redo] [Save] [Preview] [Publish]
+  AND status bar: autosave ON, draft/published badge
 ```
 
-### AC-2: Chat-to-Edit
+### AC-2: AI Chat Edit
+> 📌 Source: [US-F05-01](../stories/F05-ai-editor-stories.md) — AC-2
+
 ```gherkin
-GIVEN user types "Đổi tiêu đề hero thành Khám Phá Moda"
-WHEN  message sent
-THEN  AI responds within 3 seconds
-AND   preview updates in real-time (no page refresh)
-AND   AI explains: "Đã đổi tiêu đề hero"
-AND   "Undo" button appears in that message
-AND   3 follow-up suggestions shown below response
+GIVEN user nhập lệnh chat (VD: "Đổi màu chủ thành xanh mint")
+WHEN  gửi message
+THEN  AI stream response
+  AND changes apply lên preview realtime
+  AND AI giải thích: "Đã đổi primary color thành #B2DFDB"
+  AND có nút "Hoàn tác" trong chat message
 ```
 
-### AC-3: Inline AI Edit (Hover + Click)
-```gherkin
-GIVEN user hovers a block in preview iframe
-WHEN  hover occurs
-THEN  blue outline (2px solid #2563EB) around block
-AND   floating [✨ AI Edit] button appears top-right
+### AC-3: Undo — Ctrl+Z
+> 📌 Source: [US-F05-01](../stories/F05-ai-editor-stories.md) — AC-3
 
-GIVEN user clicks [✨ AI Edit]
+```gherkin
+GIVEN user đã thực hiện thay đổi (AI hoặc manual)
+WHEN  nhấn Ctrl+Z
+THEN  revert change gần nhất (cả AI changes và manual edits)
+  AND preview cập nhật trong < 200ms
+```
+
+### AC-4: Inline Click-to-Edit
+> 📌 Source: [US-F05-03](../stories/F05-ai-editor-stories.md) — AC-1 & AC-2
+
+```gherkin
+GIVEN I hover over a text element in the preview pane
+WHEN  cursor rests on element for 200ms
+THEN  blue "✨ Edit with AI" button appears at top-right of element
+
+GIVEN I click "✨ Edit with AI"
 WHEN  popup opens
-THEN  text input + quick actions (Viết lại, Đổi style, Xóa)
-AND   popup positioned adjacent to block
-
-GIVEN user types instruction and clicks Apply
-THEN  AI modifies ONLY that block
-AND   other blocks unaffected
-AND   toast "Đã cập nhật [block name]"
+THEN  instruction field shows, I type + press Enter
 ```
 
-### AC-4: Page Manager
+### AC-5: Page Manager — Add & Delete
+> 📌 Source: [US-F05-02](../stories/F05-ai-editor-stories.md) — AC-2 & AC-3
+
 ```gherkin
-GIVEN user clicks Pages dropdown in toolbar
-WHEN  dropdown opens
-THEN  list all pages: name, status (Draft/Published), block count
-AND   option to "Add page" and "Delete page"
-AND   clicking a page loads it in preview
+GIVEN click "Thêm trang mới" và điền tên "Khuyến mãi"
+THEN  tạo page với slug = "khuyen-mai"
+  AND redirect sang editor của page đó
+
+GIVEN click Delete trên 1 page và confirm
+THEN  soft delete (deletedAt set)
+  AND toast "Đã xóa. Hoàn tác?" 5s
 ```
 
-### AC-5: Mobile Responsive
+### AC-6: Mobile Responsive
+> 📌 Source: [US-F05-01](../stories/F05-ai-editor-stories.md) — Additional Criteria
+
 ```gherkin
 GIVEN screen width < 768px
 WHEN  on /editor/:siteId
 THEN  preview takes full width
-AND   chat panel becomes bottom sheet (swipe up to open)
-AND   toggle buttons: [💬 Chat] [👁 Preview]
+  AND chat panel becomes bottom sheet (swipe up to open)
 ```
 
-### AC-6: Theme Controls
-```gherkin
-GIVEN user says "Đổi font chữ thành Poppins"
-WHEN  AI processes
-THEN  entire site font changes in preview
-AND   theme config updated in state
-AND   AI confirms change with before/after preview
-```
+---
 
-## 7. Technical Requirements
+## 12. Non-Functional Requirements
 
-### Components
+| Category | Requirement | Notes |
+|----------|-------------|-------|
+| **Performance** | Chat edit → preview < 3s | SSE streaming |
+| **Security** | Route requires auth, tenant-scoped | |
+| **Device support** | Mobile 375px, Desktop 1280px+ | |
+| **iframe** | Sandboxed — no cross-origin leaks | |
+
+---
+
+## 13. Technical Architecture
+
+### 13.1 Components
+
 | Component | File | Description |
 |-----------|------|-------------|
-| EditorPage | `app/(editor)/editor/[siteId]/page.tsx` | Layout orchestrator |
-| EditorChatPanel | `components/editor/EditorChatPanel.tsx` | AI chat (380px left) |
-| EditorPreview | `components/editor/EditorPreview.tsx` | Sandboxed iframe |
-| EditorToolbar | `components/editor/EditorToolbar.tsx` | Top actions bar |
-| InlineEditPopup | `components/editor/InlineEditPopup.tsx` | Hover → popup over block |
-| PageSelector | `components/editor/PageSelector.tsx` | Pages dropdown |
+| `EditorPage` | `app/(editor)/editor/[siteId]/page.tsx` | Layout orchestrator |
+| `EditorChatPanel` | `components/editor/EditorChatPanel.tsx` | AI chat (380px left) |
+| `EditorPreview` | `components/editor/EditorPreview.tsx` | Sandboxed iframe |
+| `EditorToolbar` | `components/editor/EditorToolbar.tsx` | Top actions bar |
+| `InlineEditPopup` | `components/editor/InlineEditPopup.tsx` | Hover → popup |
+| `PageManager` | `components/editor/PageManager.tsx` | Pages CRUD |
 
-### State (Zustand — `editorStore`)
-```typescript
-type EditorStore = {
-  siteId: string
-  currentPageId: string
-  blocks: BlockConfig[]
-  theme: ThemeConfig
-  messages: Message[]
-  isDirty: boolean
-  lastSaved: Date | null
-  undoStack: UndoAction[] // max 50
-  redoStack: UndoAction[]
-}
+### 13.2 API Endpoints
+
+```
+POST /api/ai/chat-edit        → structured changes (SSE)
+PATCH /api/sites/:id/pages/:pageId → Save block changes
+POST /api/pages               → Add new page
+DELETE /api/pages/:id         → Soft delete page
 ```
 
-### iframe Communication
-- Parent → iframe: `UPDATE_BLOCK`, `HIGHLIGHT_BLOCK`, `SET_THEME`
-- iframe → Parent: `BLOCK_CLICKED`, `BLOCK_HOVERED` (with rect position)
+### 13.3 iframe Communication
 
-### API
-- `POST /api/ai/chat-edit` — Send message, get structured changes
-- `PATCH /api/sites/:id/pages/:pageId` — Save block changes
+```
+Parent → iframe: UPDATE_BLOCK, HIGHLIGHT_BLOCK, SET_THEME
+iframe → Parent: BLOCK_CLICKED, BLOCK_HOVERED (with rect position)
+```
 
-## 8. 9-Point Done Checklist
+---
 
-- [ ] Loading State — Skeleton for preview, typing indicator for chat
-- [ ] Empty State — Welcome message + suggestion prompts
-- [ ] Error State — Toast + retry for AI failures
+## 14. Dependencies
+
+| Dependency | Status | Action Needed |
+|-----------|--------|---------------|
+| F04 Block Renderer | ✅ Done | — |
+| F01 AI Builder | ✅ Done | — |
+| F14 Undo/Redo | ⬜ | Build concurrently |
+| F15 Auto-Save | ⬜ | Build concurrently |
+
+---
+
+## 17. 9-Point Done Checklist
+
+- [ ] Loading State — Skeleton preview, typing indicator chat
+- [ ] Empty State — Welcome + suggestion prompts in chat
+- [ ] Error State — Toast + retry cho AI failures
 - [ ] Form Validation — N/A (chat input)
-- [ ] Button States — Send disabled during streaming, Undo/Redo greyed when empty
-- [ ] Toast Feedback — Success/Error for all actions
+- [ ] Button States — Send disabled during streaming, Undo/Redo greyed khi empty
+- [ ] Toast Feedback — Success/Error cho all actions
 - [ ] Auth Redirect — 401 → /login
 - [ ] Mobile 375px — Bottom sheet chat, full-width preview
-- [ ] TypeScript Clean — tsc --noEmit pass
+- [ ] TypeScript Clean — `tsc --noEmit` pass
+
+---
+
+## 18. Definition of Ready
+
+- [ ] User Stories approved và linked ở Section 0
+- [ ] F04 Block Renderer done ✅
+- [ ] F01 AI Builder done ✅
+- [ ] iframe communication protocol agreed
+
+---
+
+## 19. Definition of Done
+
+- [ ] All FR items implemented
+- [ ] All AC pass
+- [ ] 9-Point Checklist all pass
+- [ ] Chat edit → preview < 3s measured
+- [ ] Undo/Redo works cho cả AI + manual
+- [ ] Mobile 375px tested
