@@ -4,10 +4,10 @@
  * and applies changes to a specific block or the entire site.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
-import { getCurrentUser } from '@/lib/auth'
+import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
 function getOpenAI(): OpenAI | null {
@@ -16,13 +16,8 @@ function getOpenAI(): OpenAI | null {
     return new OpenAI({ apiKey: key })
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (user, req) => {
     try {
-        const user = await getCurrentUser()
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         // Rate Limit: 20 AI tasks per hour
         const rateLimit = checkRateLimit(String(user.id), 20)
         if (!rateLimit.allowed) {
@@ -141,4 +136,4 @@ For rewriting text content:
             { status: 500 },
         )
     }
-}
+})

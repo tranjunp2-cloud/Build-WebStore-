@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { getCurrentUser } from '@/lib/auth'
+import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
@@ -9,13 +9,8 @@ import { checkRateLimit } from '@/lib/rateLimit'
  * Creates a new site from a template's default blocks and theme.
  * Body: { templateId: string }
  */
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (user, req) => {
     try {
-        const user = await getCurrentUser()
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         const payload = await getPayload({ config })
 
         // Rate Limit: 20 AI tasks per hour
@@ -26,7 +21,6 @@ export async function POST(req: NextRequest) {
                 { status: 429 }
             )
         }
-
         const body = await req.json()
         const { templateId } = body
 
@@ -108,4 +102,4 @@ export async function POST(req: NextRequest) {
             { status: 500 },
         )
     }
-}
+})

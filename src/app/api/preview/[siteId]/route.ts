@@ -10,6 +10,7 @@ import { renderNav, renderHero, renderSections, THEMES, baseCSS, getGoogleFontsL
 import { setHeroCategory } from '../renderers/hero'
 import { setSectionCategory } from '../renderers/sections'
 import { detectCategory } from '@/lib/preview'
+import { withAuth } from '@/lib/auth'
 
 // Force dynamic rendering — never cache this route
 export const dynamic = 'force-dynamic'
@@ -72,9 +73,9 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
 </html>`
 }
 
-export async function GET(_req: Request, { params }: { params: Promise<{ siteId: string }> }) {
+export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_user, _req, ctx) => {
   try {
-    const { siteId } = await params
+    const { siteId } = await ctx.params
     const payload = await getPayload({ config })
     const numericSiteId = Number(siteId)
 
@@ -122,4 +123,4 @@ export async function GET(_req: Request, { params }: { params: Promise<{ siteId:
     console.error('[Preview Error]', e.message)
     return new NextResponse(`Error: ${e.message}`, { status: 500 })
   }
-}
+})

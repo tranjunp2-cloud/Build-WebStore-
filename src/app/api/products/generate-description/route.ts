@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { getCurrentUser } from '@/lib/auth'
+import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
@@ -10,13 +10,8 @@ import { checkRateLimit } from '@/lib/rateLimit'
  * Body: { name, category?, features? }
  * Response: { description, shortDescription, seoTitle, seoDescription }
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (user, request) => {
     try {
-        const user = await getCurrentUser()
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         // Rate Limit: 20 AI tasks per hour
         const rateLimit = checkRateLimit(String(user.id), 20)
         if (!rateLimit.allowed) {
@@ -76,4 +71,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})

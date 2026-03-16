@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import OpenAI from 'openai'
-import { getCurrentUser } from '@/lib/auth'
+import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
@@ -13,13 +13,8 @@ import { checkRateLimit } from '@/lib/rateLimit'
  * Body: { siteId: string }
  */
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (user, request) => {
     try {
-        const user = await getCurrentUser()
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
         const payload = await getPayload({ config })
 
         // Rate Limit: 20 AI tasks per hour
@@ -164,4 +159,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})
