@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
  * POST /api/products/generate-description
@@ -9,8 +10,16 @@ import { withAuth } from '@/lib/auth'
  * Body: { name, category?, features? }
  * Response: { description, shortDescription, seoTitle, seoDescription }
  */
-export const POST = withAuth(async (_user, request) => {
+export const POST = withAuth(async (user, request) => {
     try {
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
+        }
         const { name, category, features } = await request.json()
 
         if (!name) {
