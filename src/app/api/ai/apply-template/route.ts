@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
  * POST /api/ai/apply-template
@@ -12,6 +13,14 @@ export const POST = withAuth(async (user, req) => {
     try {
         const payload = await getPayload({ config })
 
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
+        }
         const body = await req.json()
         const { templateId } = body
 
