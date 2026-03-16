@@ -14,7 +14,7 @@ const CATEGORY_HINTS: Record<string, string> = {
   business: 'services, company, agency, startup',
 }
 
-export function buildSystemPrompt(language: 'vi' | 'en' = 'vi'): string {
+export function buildSystemPrompt(language: 'en' | 'ms' = 'en'): string {
   const blockMetas = blockRegistry.getAllMeta()
 
   const blockList = blockMetas.map(m =>
@@ -54,7 +54,7 @@ ${blockList}
 2. Each block MUST have "blockType" and "variant" fields
 3. blockType MUST be one of the listed types — no custom types
 4. variant MUST be one of the listed variants for that block type
-5. All text content should be in ${language === 'vi' ? 'Vietnamese' : 'English'}
+5. All text content should be in ${language === 'ms' ? 'Malay (Bahasa Melayu)' : 'English'}
 6. Choose theme colors that match the business category and feel premium
 7. Generate realistic, professional content — not placeholder text
 8. Include at least one CTA block or CTA in hero
@@ -93,7 +93,7 @@ export type BusinessInfoInput = {
 export function buildUserPrompt(
   info: BusinessInfoInput,
   extraInstructions?: string,
-  language: 'vi' | 'en' = 'vi',
+  language: 'en' | 'ms' = 'en',
 ): string {
   const parts = [
     `Create a complete website for: "${info.businessName}"`,
@@ -111,7 +111,7 @@ export function buildUserPrompt(
     parts.push(`Additional instructions: ${extraInstructions}`)
   }
 
-  parts.push(`\nGenerate in ${language === 'vi' ? 'Vietnamese' : 'English'}. Make it look premium and professional.`)
+  parts.push(`\nGenerate in ${language === 'ms' ? 'Malay (Bahasa Melayu)' : 'English'}. Make it look premium and professional.`)
 
   return parts.join('\n')
 }

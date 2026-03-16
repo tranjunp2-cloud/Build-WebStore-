@@ -8,14 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { z } from 'zod'
-
-const rewriteTextSchema = z.object({
-    text: z.string().min(1),
-    instruction: z.string().min(1),
-    context: z.string().optional(),
-    language: z.string().optional(),
-})
+import { rewriteTextSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -25,14 +19,10 @@ function getOpenAI(): OpenAI | null {
 
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json()
-        const parsed = rewriteTextSchema.safeParse(body)
-
-        if (!parsed.success) {
-            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-        }
+        const { data, errorResponse } = await parseRequest(req, rewriteTextSchema)
+        if (errorResponse) return errorResponse
         
-        const { text, instruction, context, language = 'vi' } = parsed.data
+        const { text, instruction, context, language = 'en' } = data!
 
         const openai = getOpenAI()
         if (!openai) {

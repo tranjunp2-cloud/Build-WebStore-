@@ -3,17 +3,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { cookies } from 'next/headers'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
-import { z } from 'zod'
-
-const generateSiteSchema = z.object({
-    businessInfo: z.object({
-        businessName: z.string().min(1),
-        industry: z.string().min(1),
-        products: z.string().min(1),
-    }),
-    extraInstructions: z.string().optional(),
-    language: z.enum(['vi', 'en']).optional(),
-})
+import { generateSiteSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
 
 /**
  * POST /api/ai/generate-site
@@ -74,17 +65,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Parse request body — structured business info
-        const body = await req.json()
-        const parsed = generateSiteSchema.safeParse(body)
+        const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
+        if (errorResponse) return errorResponse
         
-        if (!parsed.success) {
-            return NextResponse.json(
-                { error: parsed.error.flatten() },
-                { status: 400 }
-            )
-        }
-        
-        const { businessInfo, extraInstructions, language = 'vi' } = parsed.data
+        const { businessInfo, extraInstructions, language = 'en' } = data!
 
         // Check SSE mode
         const isStreaming = req.nextUrl.searchParams.get('stream') === 'true'

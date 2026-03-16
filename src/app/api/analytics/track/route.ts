@@ -3,16 +3,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { createHash } from 'crypto'
 
-import { z } from 'zod'
-
-const analyticsTrackSchema = z.object({
-    siteId: z.string().min(1),
-    event: z.string().optional(),
-    pageUrl: z.string().min(1),
-    referrer: z.string().optional(),
-    sessionId: z.string().optional(),
-    metadata: z.any().optional(),
-})
+import { analyticsTrackSchema } from '@/lib/validations/analytics'
+import { parseRequest } from '@/lib/validations/helpers'
 
 /**
  * POST /api/analytics/track
@@ -22,14 +14,10 @@ const analyticsTrackSchema = z.object({
  */
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json()
-        const parsed = analyticsTrackSchema.safeParse(body)
+        const { data, errorResponse } = await parseRequest(request, analyticsTrackSchema)
+        if (errorResponse) return errorResponse
         
-        if (!parsed.success) {
-            return NextResponse.json({ success: false, error: parsed.error.flatten() }, { status: 400 })
-        }
-        
-        const { siteId, event = 'pageview', pageUrl, referrer, sessionId, metadata } = parsed.data
+        const { siteId, event = 'pageview', pageUrl, referrer, sessionId, metadata } = data!
 
         const payload = await getPayload({ config })
 

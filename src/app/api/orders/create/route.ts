@@ -1,28 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { z } from 'zod'
-
-const orderCreateSchema = z.object({
-    siteId: z.string().min(1),
-    items: z.array(z.object({
-        productId: z.string().min(1),
-        quantity: z.number().min(1),
-    })).min(1),
-    customer: z.object({
-        name: z.string().min(1),
-        email: z.string().email(),
-        phone: z.string().optional(),
-        address: z.object({
-            line1: z.string().optional(),
-            line2: z.string().optional(),
-            city: z.string().optional(),
-            state: z.string().optional(),
-            postcode: z.string().optional(),
-            country: z.string().optional(),
-        }).optional(),
-    }),
-})
+import { orderCreateSchema } from '@/lib/validations/orders'
+import { parseRequest } from '@/lib/validations/helpers'
 
 /**
  * POST /api/orders/create
@@ -32,17 +12,10 @@ const orderCreateSchema = z.object({
  */
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json()
-        const parsed = orderCreateSchema.safeParse(body)
-
-        if (!parsed.success) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.flatten() } },
-                { status: 400 }
-            )
-        }
+        const { data, errorResponse } = await parseRequest(request, orderCreateSchema)
+        if (errorResponse) return errorResponse
         
-        const { siteId, items, customer } = parsed.data
+        const { siteId, items, customer } = data!
 
         const payload = await getPayload({ config })
 

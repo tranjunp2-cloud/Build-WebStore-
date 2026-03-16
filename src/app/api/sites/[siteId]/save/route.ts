@@ -3,12 +3,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { cookies } from 'next/headers'
 
-import { z } from 'zod'
-
-const saveSiteSchema = z.object({
-    blocks: z.array(z.any()).optional(),
-    theme: z.any().optional(),
-})
+import { saveSiteSchema } from '@/lib/validations/sites'
+import { parseRequest } from '@/lib/validations/helpers'
 
 /**
  * PATCH /api/sites/[siteId]/save
@@ -53,14 +49,10 @@ export async function PATCH(
         }
 
         const { siteId } = await params
-        const body = await req.json()
-        const parsed = saveSiteSchema.safeParse(body)
-
-        if (!parsed.success) {
-            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-        }
+        const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
+        if (errorResponse) return errorResponse
         
-        const { blocks, theme } = parsed.data
+        const { blocks, theme } = data!
 
         // Update theme on site if provided
         if (theme) {

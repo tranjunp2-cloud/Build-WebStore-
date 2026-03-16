@@ -7,16 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
-import { z } from 'zod'
-
-const editBlockSchema = z.object({
-    instruction: z.string().min(1),
-    block: z.any().optional(),
-    blockIndex: z.number().optional(),
-    allBlocks: z.array(z.any()).optional(),
-    theme: z.any().optional(),
-    siteName: z.string().optional(),
-})
+import { editBlockSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -26,14 +18,10 @@ function getOpenAI(): OpenAI | null {
 
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json()
-        const parsed = editBlockSchema.safeParse(body)
+        const { data, errorResponse } = await parseRequest(req, editBlockSchema)
+        if (errorResponse) return errorResponse
         
-        if (!parsed.success) {
-            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-        }
-        
-        const { instruction, block, blockIndex = 0, allBlocks, theme, siteName } = parsed.data
+        const { instruction, block, blockIndex = 0, allBlocks, theme, siteName } = data!
 
         // Build context-aware system prompt
         const blockMetas = blockRegistry.getAllMeta()

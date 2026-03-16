@@ -11,25 +11,15 @@ import OpenAI from 'openai'
  * Body: { siteId: string }
  */
 
-import { z } from 'zod'
-
-const seoFixSchema = z.object({
-    siteId: z.string().min(1)
-})
+import { seoFixSchema } from '@/lib/validations/seo'
+import { parseRequest } from '@/lib/validations/helpers'
 
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json()
-        const parsed = seoFixSchema.safeParse(body)
+        const { data, errorResponse } = await parseRequest(request, seoFixSchema)
+        if (errorResponse) return errorResponse
         
-        if (!parsed.success) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.flatten() } },
-                { status: 400 } // using 400 for consistency in standard validation
-            )
-        }
-        
-        const { siteId } = parsed.data
+        const { siteId } = data!
 
         const payload = await getPayload({ config })
 

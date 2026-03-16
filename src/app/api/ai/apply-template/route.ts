@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { z } from 'zod'
-
-const applyTemplateSchema = z.object({
-    templateId: z.string().min(1),
-    siteId: z.string().optional(),
-})
+import { applyTemplateSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
 
 /**
  * POST /api/ai/apply-template
@@ -23,14 +19,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const body = await req.json()
-        const parsed = applyTemplateSchema.safeParse(body)
+        const { data, errorResponse } = await parseRequest(req, applyTemplateSchema)
+        if (errorResponse) return errorResponse
         
-        if (!parsed.success) {
-            return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-        }
-        
-        const { templateId } = parsed.data
+        const { templateId } = data!
 
         // Find template
         const template: any = await payload.findByID({

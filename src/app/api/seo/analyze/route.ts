@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { z } from 'zod'
-
+import { seoAnalyzeSchema } from '@/lib/validations/seo'
+import { parseRequest } from '@/lib/validations/helpers'
 /**
  * POST /api/seo/analyze
  * Analyses all pages of a site and returns an SEO score with issues.
@@ -97,23 +97,14 @@ function analysePage(page: any, siteSEO: any): PageAnalysis {
     }
 }
 
-const seoAnalyzeSchema = z.object({
-    siteId: z.string().min(1)
-})
+
 
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json()
-        const parsed = seoAnalyzeSchema.safeParse(body)
+        const { data, errorResponse } = await parseRequest(request, seoAnalyzeSchema)
+        if (errorResponse) return errorResponse
         
-        if (!parsed.success) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.flatten() } },
-                { status: 400 } // using 400 for consistency in standard validation
-            )
-        }
-        
-        const { siteId } = parsed.data
+        const { siteId } = data!
 
         const payload = await getPayload({ config })
 
