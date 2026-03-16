@@ -5,6 +5,19 @@
  */
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const CLEANUP_INTERVAL = 3600000 // 1 hour
+
+// Run cleanup every hour to prevent memory leaks
+if (typeof setInterval !== 'undefined') {
+    setInterval(() => {
+        const now = Date.now()
+        for (const [userId, entry] of rateLimitMap.entries()) {
+            if (now > entry.resetAt) {
+                rateLimitMap.delete(userId)
+            }
+        }
+    }, CLEANUP_INTERVAL)
+}
 
 export interface RateLimitResult {
     allowed: boolean

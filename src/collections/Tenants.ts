@@ -12,7 +12,7 @@ export const Tenants: CollectionConfig = {
             return {
                 id: {
                     in: req.user?.tenants?.map((t: any) =>
-                        typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                        t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant
                     ).filter(Boolean) ?? [],
                 },
             }
@@ -25,7 +25,7 @@ export const Tenants: CollectionConfig = {
             return {
                 id: {
                     in: req.user?.tenants?.map((t: any) =>
-                        typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                        t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant
                     ) ?? [],
                 },
             }

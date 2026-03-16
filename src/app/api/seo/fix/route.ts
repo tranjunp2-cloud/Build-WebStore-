@@ -16,10 +16,11 @@ import { checkRateLimit } from '@/lib/rateLimit'
 export async function POST(request: NextRequest) {
     try {
         const user = await getCurrentUser()
-        const payload = await getPayload({ config })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
+
+        const payload = await getPayload({ config })
 
         // Rate Limit: 20 AI tasks per hour
         const rateLimit = checkRateLimit(String(user.id), 20)
