@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getPayload } from 'payload'
+import config from '@payload-config'
 import OpenAI from 'openai'
-import { getAuthUser } from '@/lib/auth-check'
+import { getCurrentUser } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
@@ -13,7 +15,8 @@ import { checkRateLimit } from '@/lib/rateLimit'
 
 export async function POST(request: NextRequest) {
     try {
-        const { user, payload } = await getAuthUser(request)
+        const user = await getCurrentUser()
+        const payload = await getPayload({ config })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

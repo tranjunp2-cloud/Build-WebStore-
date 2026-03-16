@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getPayload } from 'payload'
+import config from '@payload-config'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
-import { getAuthUser } from '@/lib/auth-check'
+import { getCurrentUser } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
@@ -16,7 +18,8 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
 
     try {
-        const { user, payload } = await getAuthUser(req)
+        const user = await getCurrentUser()
+        const payload = await getPayload({ config })
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
