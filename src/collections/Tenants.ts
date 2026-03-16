@@ -12,8 +12,8 @@ export const Tenants: CollectionConfig = {
             return {
                 id: {
                     in: req.user?.tenants?.map((t: any) =>
-                        typeof t === 'object' && t !== null ? t.id : t
-                    ) ?? [],
+                        typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                    ).filter(Boolean) ?? [],
                 },
             }
         },
