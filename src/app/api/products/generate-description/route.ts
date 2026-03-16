@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/products/generate-description
@@ -8,7 +9,7 @@ import OpenAI from 'openai'
  * Body: { name, category?, features? }
  * Response: { description, shortDescription, seoTitle, seoDescription }
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
         const { name, category, features } = await request.json()
 
@@ -61,4 +62,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})
