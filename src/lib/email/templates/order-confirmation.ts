@@ -31,7 +31,7 @@ function formatPrice(amount: number, currency: string) {
     return `$${amount.toFixed(2)}`
 }
 
-export function orderConfirmationEmail(data: OrderEmailData): string {
+export function orderConfirmationEmail(data: OrderEmailData): { subject: string; html: string } {
     const itemsHtml = data.items.map(item => `
         <tr>
             <td style="padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px;">
@@ -57,7 +57,9 @@ export function orderConfirmationEmail(data: OrderEmailData): string {
         </div>
     ` : ''
 
-    return `
+    return {
+        subject: `Order Confirmed — ${data.orderNumber}`,
+        html: `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
@@ -120,5 +122,6 @@ export function orderConfirmationEmail(data: OrderEmailData): string {
     </div>
 </body>
 </html>
-    `.trim()
+        `.trim()
+    }
 }
