@@ -192,30 +192,59 @@ Result: ___/5 PASS → [PROCEED / HOLD]
 ```
 
 ### 2.4 User Story Convention
-```markdown
-# US-[ID]: [Tên feature]
-Wave: [N] | Priority: P[0/1/2] | Estimate: [S/M/L/XL]
 
-## Story
-As a [user type]
-I want to [action]
-So that [benefit]
+> 🔴 **STORIES-FIRST RULE:**
+> User Stories được viết **TRƯỚC**, PRD được viết **SAU**.
+> PRD không được tự tạo scope mới — mọi FR PHẢI có Story ID tham chiếu.
+> Quy trình: Viết Story → PO approve → Tạo/Update PRD dựa trên Story.
 
-## Acceptance Criteria
-GIVEN [context]
-WHEN [action]
-THEN [outcome]
-AND [additional check]
-
-## Definition of Ready
-- [ ] UI mockup approved
-- [ ] API contract in SPEC.md §8
-- [ ] Dependencies confirmed
-
-## Definition of Done
-- [ ] 10-Point Checklist pass (§13)
-- [ ] TypeScript clean (tsc --noEmit)
+#### ID Convention
 ```
+Format:  US-F[FeatureNumber]-[SequenceNumber]
+Example: US-F01-01, US-F02-03, US-F10-02
+
+FXX = Feature number (F01 = AI Chat Builder, F02 = Auth, etc.)
+NN  = Story sequence number within the feature (01, 02, 03...)
+
+KHÔNG dùng: US-001, US-AUTH-02, US-TG-001, US-10A
+```
+
+#### Story File Format (ref: `docs/stories/STORY_TEMPLATE.md`)
+```markdown
+# User Stories: [Feature Name] ([Feature ID])
+
+> **Feature:** [FXX] — [Feature Full Name]
+> **Wave:** [N] | **Priority:** P[0/1/2] | **Ref PRD:** [FXX-name.md](../prd/FXX-name.md)
+
+## US-F[XX]-[NN]: [Story Title]
+
+**Wave [N]** | **P[0/1/2]** | **[XS/S/M/L/XL]** | **Status:** [Draft / Ready / Done ✅]
+
+### Story
+```
+As a   [user persona]
+I want [action]
+So that [benefit]
+```
+
+### Acceptance Criteria
+
+#### AC-1: [Happy Path — Tên rõ ràng]
+```gherkin
+GIVEN [context]
+WHEN  [action]
+THEN  [expected outcome]
+  AND [additional check]
+```
+
+### Definition of Done
+- [ ] 9-Point Checklist pass (ref: SPEC.md §13)
+- [ ] [Feature-specific verification item]
+```
+
+#### Story Registry
+> Index đầy đủ tại: `docs/stories/user-stories-p0.md`
+> Template: `docs/stories/STORY_TEMPLATE.md`
 
 ---
 
@@ -351,21 +380,27 @@ export const typography = {
 
 ## 6. USER STORIES (P0)
 
-> Stories linked to separate file: `user_stories_p0.md`  
-> Full stories with Gherkin AC: US-001 → US-010
+> **Full Story Registry:** [`docs/stories/user-stories-p0.md`](docs/stories/user-stories-p0.md)
+> **Story Template:** [`docs/stories/STORY_TEMPLATE.md`](docs/stories/STORY_TEMPLATE.md)
+> **ID Format:** `US-F[XX]-[NN]` (e.g. `US-F01-01`, `US-F02-03`)
 
-| ID | Feature | Wave | Size | Key AC |
-|----|---------|------|------|--------|
-| US-001 | Register & Welcome | 1 | S | Register → auto-login → /onboarding |
-| US-002 ⭐ | AI Chat Builder | 3 | XL | Chat → generate site < 60s → preview |
-| US-003 | Store Setup | 1 | S | AI Chat collects info (no form) |
-| US-004 ⭐ | AI Editor (Split) | 3 | XL | 3-panel: Chat + Preview + Settings |
-| US-005 | Page Manager | 3 | M | CRUD pages + soft delete |
-| US-006 | Dashboard | 1 | M | Stats + site cards + empty state |
-| US-007 | Products CRUD + AI | 4 | L | AI description, soft delete |
-| US-008 ⭐ | Checkout (Stripe) | 4 | XL | Cart → payment → confirm |
-| US-009 ⭐ | SEO Dashboard | 4 | L | Score 0-100, AI fix all |
-| US-010 | Publish Site | 3 | M | Publish → live subdomain |
+> 🔴 **STORIES-FIRST RULE:** User Stories TRƯỚC, PRD SAU.
+> Mọi FR trong PRD phải có Story ID tham chiếu. Chi tiết tại §2.4.
+
+| Story ID | Feature | Wave | Size | Key AC |
+|----------|---------|------|------|--------|
+| US-F02-01 | Register & Welcome | 1 | S | Register → auto-login → /onboarding |
+| US-F01-01 ⭐ | AI Chat Builder | 3 | XL | Chat → generate site < 60s → preview |
+| US-F01-02 | Store Setup — Basic Info | 1 | S | AI Chat collects info (no form) |
+| US-F05-01 ⭐ | AI Editor (Split Screen) | 3 | XL | 3-panel: Chat + Preview + Settings |
+| US-F05-02 | Page Manager | 3 | M | CRUD pages + soft delete |
+| US-F03-01 | Dashboard Overview | 1 | M | Stats + site cards + empty state |
+| US-F09-01 | Products CRUD + AI | 4 | L | AI description, soft delete |
+| US-F10-03 ⭐ | Checkout Flow | 5 | XL | Cart → payment → confirm |
+| US-F12-01 ⭐ | SEO Dashboard | 4 | L | Score 0-100, AI fix all |
+| US-F08-01 | Publish Site | 3 | M | Publish → live subdomain |
+
+> 📖 Xem đầy đủ 33 stories tại [`docs/stories/user-stories-p0.md`](docs/stories/user-stories-p0.md)
 
 ---
 
