@@ -115,5 +115,57 @@
         "step2Subtitle": "Pilih titik permulaan — anda boleh menyesuaikan semua nanti.",
         "step3Title": "Sesuaikan laman anda",
         "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda."
+    },
+    "email": {
+        "welcome": {
+            "subject": "Selamat Datang ke PrimeWeb! 🎉",
+            "heading": "Selamat Datang! 🎉",
+            "subheading": "Selamat datang ke PrimeWeb",
+            "greeting": "Hai",
+            "body": "Anda sudah bersedia untuk mencipta laman web pertama anda dengan PrimeWeb! Hanya huraikan idea anda, dan AI akan membantu anda membina laman web profesional dalam beberapa minit.",
+            "stepsTitle": "Mula dalam 3 langkah",
+            "step1": "Huraikan laman web yang anda mahu cipta",
+            "step2": "Sesuaikan kandungan dan reka bentuk",
+            "step3": "Terbitkan dan kongsi!",
+            "cta": "Mula Sekarang →",
+            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia"
+        },
+        "order": {
+            "subject": "Pesanan Disahkan",
+            "heading": "Pesanan Disahkan ✓",
+            "subheading": "Terima kasih atas pembelian anda!",
+            "greeting": "Hai",
+            "body": "Pesanan anda telah berjaya dibuat.",
+            "orderNumber": "Nombor Pesanan",
+            "item": "Barangan",
+            "qty": "Kuantiti",
+            "amount": "Jumlah",
+            "subtotal": "Jumlah Kecil",
+            "sst": "SST (6%)",
+            "total": "Jumlah Besar",
+            "shippingAddress": "Alamat Penghantaran",
+            "footer": "Dikuasakan oleh PrimeWeb"
+        },
+        "status": {
+            "greeting": "Hai",
+            "orderNumber": "Nombor Pesanan",
+            "tracking": "Penjejakan",
+            "processing": {
+                "title": "Pesanan Sedang Diproses",
+                "description": "Pesanan anda sedang disediakan. Kami akan memaklumkan anda apabila ia telah dihantar."
+            },
+            "shipped": {
+                "title": "Pesanan Telah Dihantar",
+                "description": "Pesanan anda sedang dalam perjalanan. Anda boleh menjejaki penghantaran di bawah."
+            },
+            "delivered": {
+                "title": "Pesanan Telah Dihantar",
+                "description": "Pesanan anda telah dihantar. Terima kasih atas pembelian anda!"
+            },
+            "cancelled": {
+                "title": "Pesanan Dibatalkan",
+                "description": "Pesanan anda telah dibatalkan. Jika ada sebarang pertanyaan, sila hubungi kami."
+            }
+        }
     }
 }

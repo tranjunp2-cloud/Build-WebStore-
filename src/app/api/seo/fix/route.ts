@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import OpenAI from 'openai'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/seo/fix
@@ -14,7 +15,7 @@ import OpenAI from 'openai'
 import { seoFixSchema } from '@/lib/validations/seo'
 import { parseRequest } from '@/lib/validations/helpers'
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
         const { data, errorResponse } = await parseRequest(request, seoFixSchema)
         if (errorResponse) return errorResponse
@@ -148,4 +149,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})

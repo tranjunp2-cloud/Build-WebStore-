@@ -316,6 +316,7 @@ Layer:  Tên có nghĩa, KHÔNG "Frame 123"
 
 | Feature | PRD | Figma Link | Desktop | Mobile | Status |
 |---------|-----|------------|:---:|:---:|:---:|
+| **DS** Design System (shadcn/ui) | [Docs](https://ui.shadcn.com/) | [Figma Kit](https://www.figma.com/design/VVSDY0EEZZEMvkDJ32JNz4/shadcn-ui-components-with-variables---Tailwind-classes---Updated-January-2026--Community-?node-id=72-2719&t=kfZtK78gqmsCLHlG-1) | ✅ | ✅ | ✅ Có sẵn |
 | **F01** AI Chat Builder | [PRD](../prd/F01-ai-chat-builder.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
 | **F02** Auth | [PRD](../prd/F02-auth.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
 | **F03** Dashboard | [PRD](../prd/F03-dashboard.md) | ✅ Có PNG cũ | ✅ | ⬜ | ⚠️ Cần mobile |

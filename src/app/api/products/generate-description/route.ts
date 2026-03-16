@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { generateDescriptionSchema } from '@/lib/validations/products'
 import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/products/generate-description
@@ -10,7 +11,7 @@ import { parseRequest } from '@/lib/validations/helpers'
  * Body: { name, category?, features? }
  * Response: { description, shortDescription, seoTitle, seoDescription }
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
         const { data, errorResponse } = await parseRequest(request, generateDescriptionSchema)
         if (errorResponse) return errorResponse
@@ -59,4 +60,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})

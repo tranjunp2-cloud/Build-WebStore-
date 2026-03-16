@@ -1,23 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { applyTemplateSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/ai/apply-template
  * Creates a new site from a template's default blocks and theme.
  * Body: { templateId: string }
  */
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (user, req) => {
     try {
         const payload = await getPayload({ config })
-
-        // Auth
-        const { user } = await payload.auth({ headers: req.headers })
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
 
         const { data, errorResponse } = await parseRequest(req, applyTemplateSchema)
         if (errorResponse) return errorResponse
@@ -98,4 +93,4 @@ export async function POST(req: NextRequest) {
             { status: 500 },
         )
     }
-}
+})

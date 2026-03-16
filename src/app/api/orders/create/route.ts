@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { orderCreateSchema } from '@/lib/validations/orders'
 import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/orders/create
@@ -10,7 +11,7 @@ import { parseRequest } from '@/lib/validations/helpers'
  *
  * Body: { siteId, items: [{productId, quantity}], customer: {name, email, phone, address} }
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
         const { data, errorResponse } = await parseRequest(request, orderCreateSchema)
         if (errorResponse) return errorResponse
@@ -126,4 +127,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})

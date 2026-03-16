@@ -4,11 +4,12 @@
  * and applies changes to a specific block or the entire site.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
 import { editBlockSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -16,7 +17,7 @@ function getOpenAI(): OpenAI | null {
     return new OpenAI({ apiKey: key })
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (_user, req) => {
     try {
         const { data, errorResponse } = await parseRequest(req, editBlockSchema)
         if (errorResponse) return errorResponse
@@ -127,4 +128,4 @@ For rewriting text content:
             { status: 500 },
         )
     }
-}
+})
