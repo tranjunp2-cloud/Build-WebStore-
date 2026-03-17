@@ -38,9 +38,9 @@ describe('POST /api/products/generate-description', () => {
         const response = await POST(req)
         const json = await response.json()
 
-        expect(response.status).toBe(422)
+        expect(response.status).toBe(400)
         expect(json.success).toBe(false)
-        expect(json.error.message).toContain('Product name is required')
+        expect(json.error.code).toBe('VALIDATION_ERROR')
     })
 
     it('returns 200 with AI generated JSON data for correct inputs', async () => {

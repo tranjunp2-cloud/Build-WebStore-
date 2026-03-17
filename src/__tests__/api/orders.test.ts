@@ -41,9 +41,9 @@ describe('POST /api/orders/create', () => {
         const response = await POST(req)
         const json = await response.json()
 
-        expect(response.status).toBe(422)
+        expect(response.status).toBe(400)
         expect(json.success).toBe(false)
-        expect(json.error.message).toContain('Missing required fields')
+        expect(json.error.code).toBe('VALIDATION_ERROR')
     })
     
     it('returns 404 if siteId does not exist in DB', async () => {

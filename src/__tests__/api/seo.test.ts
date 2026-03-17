@@ -70,8 +70,9 @@ describe('SEO APIs', () => {
                 body: JSON.stringify({})
             })
             const res = await AnalyzePOST(req)
-            expect(res.status).toBe(422)
-            expect((await res.json()).error.message).toContain('siteId is required')
+            const body = await res.json()
+            expect(res.status).toBe(400)
+            expect(body.error.code).toBe('VALIDATION_ERROR')
         })
 
         it('returns 200 with SEO score and issue list for valid siteId', async () => {
