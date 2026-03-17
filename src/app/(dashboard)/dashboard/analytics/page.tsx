@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart3, TrendingUp, Eye, MousePointerClick, Users, Loader2, RefreshCcw } from 'lucide-react'
+import { BarChart3, TrendingUp, Eye, MousePointerClick, Users, RefreshCcw } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 type AnalyticsSummary = {
@@ -26,12 +27,15 @@ export default function AnalyticsDashboardPage() {
                 const res = await fetch('/api/sites', { credentials: 'include' })
                 if (res.ok) {
                     const d = await res.json()
-                    const list = (d.docs || []).map((s: any) => ({ id: String(s.id), name: s.name }))
+                    const list = (d.docs || []).map((s: { id: string | number; name: string }) => ({ id: String(s.id), name: s.name }))
                     setSites(list)
                     if (list.length > 0) setSelectedSiteId(list[0].id)
                     else setIsLoading(false)
                 }
-            } catch { setIsLoading(false) }
+            } catch {
+                toast.error('Failed to load sites')
+                setIsLoading(false)
+            }
         }
         loadSites()
     }, [])
@@ -57,7 +61,7 @@ export default function AnalyticsDashboardPage() {
                 const docs = d.docs || []
 
                 // Process into summary
-                const uniqueIps = new Set(docs.map((d: any) => d.ip))
+                const uniqueIps = new Set(docs.map((d: { ip?: string }) => d.ip))
                 const pageViews: Record<string, number> = {}
                 const eventCounts: Record<string, number> = {}
                 const dailyCounts: Record<string, number> = {}
@@ -97,7 +101,9 @@ export default function AnalyticsDashboardPage() {
                 })
             }
         } catch (err) {
-            console.error('Analytics load failed', err)
+            toast.error('Failed to load analytics', {
+                action: { label: 'Retry', onClick: () => loadAnalytics(siteId) },
+            })
         } finally {
             setIsLoading(false)
         }
@@ -105,11 +111,15 @@ export default function AnalyticsDashboardPage() {
 
     if (!isLoading && sites.length === 0) {
         return (
-            <div className="flex h-full items-center justify-center">
+            <div className="flex h-[60vh] items-center justify-center">
                 <div className="text-center">
                     <BarChart3 className="mx-auto h-12 w-12 text-gray-600" />
                     <h2 className="mt-4 text-lg font-semibold text-white">No sites to analyse</h2>
                     <p className="mt-1 text-sm text-gray-500">Create and publish a site first</p>
+                    <a href="/dashboard"
+                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors">
+                        Go to Dashboard
+                    </a>
                 </div>
             </div>
         )
@@ -128,6 +138,7 @@ export default function AnalyticsDashboardPage() {
                 <div className="flex items-center gap-3">
                     {sites.length > 1 && (
                         <select value={selectedSiteId || ''} onChange={e => setSelectedSiteId(e.target.value)}
+                            aria-label="Select site"
                             className="rounded-lg border border-white/10 bg-[#1E293B] px-3 py-2 text-sm text-white outline-none">
                             {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
@@ -142,6 +153,7 @@ export default function AnalyticsDashboardPage() {
                         ))}
                     </div>
                     <button onClick={() => selectedSiteId && loadAnalytics(selectedSiteId)}
+                        aria-label="Refresh analytics"
                         className="rounded-lg bg-white/5 p-2 text-gray-400 hover:bg-white/10 transition-colors">
                         <RefreshCcw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
                     </button>
@@ -149,8 +161,22 @@ export default function AnalyticsDashboardPage() {
             </div>
 
             {isLoading ? (
-                <div className="flex h-64 items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                <div className="animate-pulse space-y-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-5">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="h-4 w-4 rounded bg-white/5" />
+                                    <div className="h-3 w-16 rounded bg-white/5" />
+                                </div>
+                                <div className="h-8 w-20 rounded bg-white/5" />
+                            </div>
+                        ))}
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6">
+                        <div className="h-4 w-24 rounded bg-white/5 mb-4" />
+                        <div className="h-40 rounded bg-white/5" />
+                    </div>
                 </div>
             ) : data ? (
                 <>

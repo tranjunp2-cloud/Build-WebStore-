@@ -35,6 +35,23 @@
     @apply bg-sky-500/30 text-sky-100;
   }
 
+  /* Override Chrome/Safari autofill light backgrounds on dark theme */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #0F172A inset !important;
+    -webkit-text-fill-color: #fff !important;
+    caret-color: #fff;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  /* Dark theme select/option styling */
+  select option {
+    background-color: #1E293B;
+    color: #fff;
+  }
+
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;

@@ -7,9 +7,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
+import type { BlockData, AIAction, ThemeData } from '@/types/editor'
 
 // ─── Types ──────────────────────────────────────────────────────────────
-type BlockData = { blockType: string;[key: string]: any }
 type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
 
 function getBlockInfo(blockType: string) {
@@ -24,9 +24,9 @@ interface AIChatPanelProps {
     blocks: BlockData[]
     onBlockSelect: (idx: number) => void
     selectedBlock: number
-    onAIAction: (action: any) => void
+    onAIAction: (action: AIAction) => void
     siteName: string
-    theme: any
+    theme: ThemeData | undefined
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ function AIChatPanelInner({
             }
 
             // Apply the AI action
-            onAIAction(data)
+            onAIAction(data as AIAction)
 
             const actionDesc = data.action === 'update_block' ? '✅ Block updated'
                 : data.action === 'update_theme' ? '🎨 Theme updated'
@@ -90,8 +90,9 @@ function AIChatPanelInner({
                 id: (Date.now() + 1).toString(), role: 'assistant',
                 content: `${actionDesc}\n${data.message || ''}`,
             }])
-        } catch (err: any) {
-            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `❌ Error: ${err.message}` }])
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error'
+            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `❌ Error: ${message}` }])
         } finally {
             setIsProcessing(false)
         }
@@ -100,6 +101,7 @@ function AIChatPanelInner({
     if (!isOpen) {
         return (
             <button onClick={onToggle}
+                aria-label="Open editor panel"
                 className="fixed left-0 top-14 z-30 rounded-r-lg bg-[#1E293B] p-2 text-gray-400 hover:text-white transition-colors border border-l-0 border-white/10"
                 title="Open Panel">
                 <PanelLeftOpen className="h-4 w-4" />
@@ -113,25 +115,25 @@ function AIChatPanelInner({
         <div className="flex h-full w-[380px] shrink-0 flex-col border-r border-white/10 bg-[#0B1120]">
             {/* Panel header with tabs */}
             <div className="flex h-12 items-center justify-between border-b border-white/10 px-3">
-                <div className="flex gap-1">
-                    <button onClick={() => setTab('blocks')}
+                <div className="flex gap-1" role="tablist" aria-label="Editor panel tabs">
+                    <button onClick={() => setTab('blocks')} role="tab" aria-selected={tab === 'blocks'}
                         className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
                             tab === 'blocks' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300')}>
                         <LayoutGrid className="h-3 w-3" /> Blocks
                     </button>
-                    <button onClick={() => setTab('chat')}
+                    <button onClick={() => setTab('chat')} role="tab" aria-selected={tab === 'chat'}
                         className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
                             tab === 'chat' ? 'bg-purple-500/10 text-purple-400' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300')}>
                         <Sparkles className="h-3 w-3" /> AI Chat
                     </button>
                 </div>
-                <button onClick={onToggle} className="rounded-lg p-1 text-gray-500 hover:bg-white/5 hover:text-white transition-colors">
+                <button onClick={onToggle} aria-label="Close editor panel" className="rounded-lg p-1 text-gray-500 hover:bg-white/5 hover:text-white transition-colors">
                     <PanelLeftClose className="h-4 w-4" />
                 </button>
             </div>
 
             {tab === 'blocks' ? (
-                <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                <div className="flex-1 overflow-y-auto p-3 space-y-1" role="tabpanel">
                     <div className="flex items-center justify-between mb-3">
                         <p className="text-xs text-gray-500">{blocks.length} blocks</p>
                         <button onClick={() => setShowAddBlock(!showAddBlock)}
@@ -160,24 +162,27 @@ function AIChatPanelInner({
                         const info = getBlockInfo(block.blockType)
                         return (
                             <button key={i} onClick={() => onBlockSelect(i)}
+                                aria-current={selectedBlock === i ? 'true' : undefined}
                                 className={cn('flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
                                     selectedBlock === i ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'text-gray-300 hover:bg-white/5 border border-transparent')}>
                                 <GripVertical className="h-3 w-3 text-gray-600" />
                                 <span className="mr-1">{info.icon}</span>
                                 <span className="font-medium">{info.label}</span>
-                                {block.variant && <span className="ml-auto text-[10px] text-gray-600">{block.variant}</span>}
+                                {block.variant ? <span className="ml-auto text-[10px] text-gray-600">{String(block.variant)}</span> : null}
                             </button>
                         )
                     })}
                 </div>
             ) : (
-                <>
+                <div role="tabpanel" className="flex flex-1 flex-col">
                     {/* AI Chat Messages */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                    <div className="flex-1 overflow-y-auto p-3 space-y-3" role="log" aria-label="AI chat messages">
                         {messages.map(msg => (
                             <div key={msg.id} className={cn('flex gap-2', msg.role === 'user' ? 'flex-row-reverse' : '')}>
                                 {msg.role === 'assistant' && (
-                                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500 text-[10px]">✨</div>
+                                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
+                                        <Sparkles className="h-3 w-3 text-white" />
+                                    </div>
                                 )}
                                 <div className={cn('max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed',
                                     msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-[#1E293B] text-gray-300 rounded-bl-sm border border-white/5')}>
@@ -186,8 +191,10 @@ function AIChatPanelInner({
                             </div>
                         ))}
                         {isProcessing && (
-                            <div className="flex gap-2">
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500 text-[10px]">✨</div>
+                            <div className="flex gap-2" role="status" aria-label="AI is thinking">
+                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
+                                    <Sparkles className="h-3 w-3 text-white" />
+                                </div>
                                 <div className="rounded-xl rounded-bl-sm border border-white/5 bg-[#1E293B] px-3 py-2">
                                     <div className="flex gap-1">
                                         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-500" style={{ animationDelay: '0ms' }} />
@@ -207,16 +214,18 @@ function AIChatPanelInner({
                                 onChange={e => setInput(e.target.value)}
                                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat() } }}
                                 placeholder="Ask AI to make changes..."
+                                aria-label="Chat message"
                                 className="flex-1 bg-transparent px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none"
                                 disabled={isProcessing}
                             />
                             <button onClick={handleSendChat} disabled={!input.trim() || isProcessing}
+                                aria-label="Send message"
                                 className="rounded-md bg-purple-600 p-1.5 text-white disabled:opacity-30 hover:bg-purple-500 transition-colors">
                                 <Send className="h-3.5 w-3.5" />
                             </button>
                         </div>
                     </div>
-                </>
+                </div>
             )}
         </div>
     )
