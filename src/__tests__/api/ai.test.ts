@@ -6,6 +6,17 @@ import { POST as ApplyTemplatePOST } from '@/app/api/ai/apply-template/route'
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 
+// Bypass withAuth HOC — inject mock user trực tiếp
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn().mockImplementation((handler: any) => {
+        return async (req: any, ctx: any) => {
+            const user = { id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }
+            return handler(user, req, ctx)
+        }
+    }),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }),
+}))
+
 // Mock next/headers
 vi.mock('next/headers', () => ({
     cookies: vi.fn().mockResolvedValue({
@@ -23,16 +34,9 @@ vi.mock('payload', () => {
             auth: vi.fn().mockResolvedValue({
                 user: { id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }
             }),
-            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
-                if (collection === 'templates' && id === 'tpl-1') {
-                    return { id: 'tpl-1', name: 'Premium Template', category: ['portfolio'], defaultTheme: {} }
-                }
-                return null
-            }),
             find: vi.fn().mockImplementation(async ({ collection }) => {
                 if (collection === 'sites') return { docs: mockSiteDB }
                 if (collection === 'pages') return { docs: mockPageDB }
-                if (collection === 'tenants') return { docs: [{ id: 'tenant-1' }] }
                 return { docs: [] }
             }),
             create: vi.fn().mockImplementation(async ({ collection, data }) => {

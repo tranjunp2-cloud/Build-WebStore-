@@ -5,26 +5,25 @@ import { GET as EditorDataGET } from '@/app/api/sites/[siteId]/editor-data/route
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 
-// Mock cookies từ next/headers
-vi.mock('next/headers', () => ({
-    cookies: vi.fn().mockResolvedValue({
-        get: vi.fn().mockReturnValue({ value: 'mock-valid-token' }),
-        set: vi.fn(),
-        delete: vi.fn()
-    })
+// Bypass withAuth HOC — inject mock user trực tiếp
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn().mockImplementation((handler: any) => {
+        return async (req: any, ctx: any) => {
+            const user = { id: 'user-1', email: 'admin@example.com' }
+            return handler(user, req, ctx)
+        }
+    }),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
 }))
 
-// Mock auth module globally so we can control auth in editor-data tests
-vi.mock('@/lib/auth', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('@/lib/auth')>()
+// Mock cookies từ next/headers
+vi.mock('next/headers', () => {
     return {
-        ...actual,
-        getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
-        withAuth: vi.fn().mockImplementation((handler: any) => {
-            return async (req: any, ctx: any) => {
-                const user = { id: 'user-1', email: 'admin@example.com' }
-                return handler(user, req, ctx)
-            }
+        cookies: vi.fn().mockResolvedValue({
+            get: vi.fn().mockImplementation((name) => {
+                if (name === 'payload-token') return { value: 'mock-valid-token' }
+                return undefined
+            })
         })
     }
 })
@@ -156,9 +155,7 @@ describe('Sites APIs', () => {
 
     describe('GET /api/sites/[siteId]/editor-data', () => {
 
-        beforeEach(() => {
-            vi.clearAllMocks()
-        })
+        beforeEach(() => { vi.clearAllMocks() })
 
         it('returns 404 if site is not found', async () => {
             // @ts-ignore
