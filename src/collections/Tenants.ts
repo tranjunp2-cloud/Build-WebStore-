@@ -81,6 +81,24 @@ export const Tenants: CollectionConfig = {
             admin: { readOnly: true },
         },
         {
+            name: 'stripeAccountId',
+            type: 'text',
+            index: true,
+            admin: {
+                readOnly: true,
+                description: 'Stripe Connected Account ID (acct_xxx) for Direct Charges',
+            },
+        },
+        {
+            name: 'stripeOnboardingComplete',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: {
+                readOnly: true,
+                description: 'Whether the merchant has completed Stripe Connect onboarding',
+            },
+        },
+        {
             name: 'status',
             type: 'select',
             required: true,
