@@ -131,7 +131,7 @@ async function handleCheckoutCompleted(
 
         console.log(`[Stripe Webhook] Order ${orderId} marked as paid`)
 
-        // Reduce stock for order items
+        // Reduce stock atomically (prevents race condition with concurrent purchases)
         const order = await payload.findByID({
             collection: 'orders',
             id: orderId,
@@ -139,22 +139,16 @@ async function handleCheckoutCompleted(
         })
 
         if (order?.items) {
+            const { sql } = await import('drizzle-orm')
+            const db = (payload.db as any).drizzle
+
             for (const item of order.items as any[]) {
                 const productId = typeof item.product === 'object' ? item.product.id : item.product
                 try {
-                    const product = await payload.findByID({
-                        collection: 'products',
-                        id: productId,
-                    })
-                    if (product && (product as any).inventory > 0) {
-                        await payload.update({
-                            collection: 'products',
-                            id: productId,
-                            data: {
-                                inventory: Math.max(0, (product as any).inventory - item.quantity),
-                            },
-                        })
-                    }
+                    // Atomic decrement: UPDATE products SET inventory = GREATEST(0, inventory - qty) WHERE id = X AND inventory > 0
+                    await db.execute(
+                        sql`UPDATE products SET inventory = GREATEST(0, inventory - ${item.quantity}) WHERE id = ${productId} AND inventory > 0`
+                    )
                 } catch (err) {
                     console.error(`[Stripe Webhook] Failed to update stock for product ${productId}:`, err)
                 }
