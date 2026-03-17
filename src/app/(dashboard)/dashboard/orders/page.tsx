@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import {
-    ClipboardList, Search, ChevronDown, Loader2,
+    ClipboardList, X,
     Clock, CheckCircle, Truck, Package, XCircle, RefreshCcw,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 type Order = {
@@ -19,7 +20,8 @@ type Order = {
     createdAt: string
 }
 
-const STATUS_CONFIG: Record<string, { color: string; icon: any; label: string }> = {
+type StatusConfigItem = { color: string; icon: React.ComponentType<{ className?: string }>; label: string }
+const STATUS_CONFIG: Record<string, StatusConfigItem> = {
     pending: { color: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30', icon: Clock, label: 'Pending' },
     paid: { color: 'bg-blue-500/15 text-blue-400 border-blue-500/30', icon: CheckCircle, label: 'Paid' },
     processing: { color: 'bg-purple-500/15 text-purple-400 border-purple-500/30', icon: Package, label: 'Processing' },
@@ -39,6 +41,7 @@ export default function OrdersPage() {
     const [orders, setOrders] = useState<Order[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [filterStatus, setFilterStatus] = useState<string>('all')
+    const [error, setError] = useState<string | null>(null)
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
     useEffect(() => {
@@ -47,14 +50,18 @@ export default function OrdersPage() {
 
     const loadOrders = async () => {
         setIsLoading(true)
+        setError(null)
         try {
             const res = await fetch('/api/orders', { credentials: 'include' })
-            if (res.ok) {
-                const data = await res.json()
-                setOrders(data.docs || [])
-            }
+            if (!res.ok) throw new Error(`Server returned ${res.status}`)
+            const data = await res.json()
+            setOrders(data.docs || [])
         } catch (err) {
-            console.error('Failed to load orders', err)
+            const message = err instanceof Error ? err.message : 'Failed to load orders'
+            setError(message)
+            toast.error('Failed to load orders', {
+                action: { label: 'Retry', onClick: () => loadOrders() },
+            })
         } finally {
             setIsLoading(false)
         }
@@ -64,13 +71,33 @@ export default function OrdersPage() {
         filterStatus === 'all' || o.status === filterStatus
     )
 
+    if (error && orders.length === 0) {
+        return (
+            <div className="flex h-[60vh] items-center justify-center">
+                <div className="text-center">
+                    <ClipboardList className="mx-auto h-12 w-12 text-red-400/60" />
+                    <h2 className="mt-4 text-lg font-semibold text-white">Failed to load orders</h2>
+                    <p className="mt-1 text-sm text-gray-500">{error}</p>
+                    <button onClick={loadOrders}
+                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors">
+                        <RefreshCcw className="h-4 w-4" /> Retry
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     if (!isLoading && orders.length === 0) {
         return (
-            <div className="flex h-full items-center justify-center">
+            <div className="flex h-[60vh] items-center justify-center">
                 <div className="text-center">
                     <ClipboardList className="mx-auto h-12 w-12 text-gray-600" />
                     <h2 className="mt-4 text-lg font-semibold text-white">No orders yet</h2>
                     <p className="mt-1 text-sm text-gray-500">Orders will appear here when customers make purchases</p>
+                    <a href="/dashboard"
+                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors">
+                        Go to Dashboard
+                    </a>
                 </div>
             </div>
         )
@@ -96,12 +123,31 @@ export default function OrdersPage() {
             </div>
 
             {isLoading ? (
-                <div className="flex h-48 items-center justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+                <div className="animate-pulse rounded-xl border border-white/10 bg-[#1E293B]/30 overflow-hidden">
+                    <div className="hidden sm:grid grid-cols-[1fr_140px_100px_120px_100px] gap-4 border-b border-white/10 px-6 py-3">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className="h-3 w-16 rounded bg-white/5" />
+                        ))}
+                    </div>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="sm:grid sm:grid-cols-[1fr_140px_100px_120px_100px] gap-4 px-6 py-4 border-b border-white/5">
+                            <div className="space-y-1.5">
+                                <div className="h-4 w-24 rounded bg-white/5" />
+                                <div className="h-3 w-16 rounded bg-white/5" />
+                            </div>
+                            <div className="space-y-1.5 hidden sm:block">
+                                <div className="h-4 w-28 rounded bg-white/5" />
+                                <div className="h-3 w-32 rounded bg-white/5" />
+                            </div>
+                            <div className="h-4 w-16 rounded bg-white/5 hidden sm:block" />
+                            <div className="h-5 w-20 rounded-full bg-white/5 hidden sm:block" />
+                            <div className="h-3 w-16 rounded bg-white/5 hidden sm:block" />
+                        </div>
+                    ))}
                 </div>
             ) : (
                 <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 overflow-hidden">
-                    <div className="grid grid-cols-[1fr_140px_100px_120px_100px] gap-4 border-b border-white/10 px-6 py-3 text-xs font-medium uppercase text-gray-500">
+                    <div className="hidden sm:grid grid-cols-[1fr_140px_100px_120px_100px] gap-4 border-b border-white/10 px-6 py-3 text-xs font-medium uppercase text-gray-500">
                         <span>Order</span>
                         <span>Customer</span>
                         <span>Total</span>
@@ -116,7 +162,7 @@ export default function OrdersPage() {
                             return (
                                 <button key={order.id}
                                     onClick={() => setSelectedOrder(selectedOrder?.id === order.id ? null : order)}
-                                    className="grid w-full grid-cols-[1fr_140px_100px_120px_100px] gap-4 px-6 py-4 text-left hover:bg-white/5 transition-colors items-center">
+                                    className="block w-full sm:grid sm:grid-cols-[1fr_140px_100px_120px_100px] gap-4 px-4 sm:px-6 py-4 text-left hover:bg-white/5 transition-colors sm:items-center">
                                     <div>
                                         <p className="text-sm font-medium text-white">#{order.orderNumber}</p>
                                         <p className="text-xs text-gray-500">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
@@ -147,13 +193,15 @@ export default function OrdersPage() {
 
             {/* Order Detail Drawer */}
             {selectedOrder && (
-                <div className="rounded-xl border border-white/10 bg-[#1E293B]/60 p-6">
+                <div className="rounded-xl border border-white/10 bg-[#1E293B]/60 p-4 sm:p-6">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-white">Order #{selectedOrder.orderNumber}</h3>
-                        <button onClick={() => setSelectedOrder(null)} className="text-gray-500 hover:text-white text-sm">Close ✕</button>
+                        <h3 className="text-base sm:text-lg font-semibold text-white">Order #{selectedOrder.orderNumber}</h3>
+                        <button onClick={() => setSelectedOrder(null)} aria-label="Close order details" className="rounded-lg p-1 text-gray-500 hover:bg-white/5 hover:text-white transition-colors">
+                            <X className="h-4 w-4" />
+                        </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div>
                             <p className="text-gray-500">Customer</p>
                             <p className="text-white">{selectedOrder.customerName}</p>

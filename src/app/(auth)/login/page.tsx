@@ -22,7 +22,7 @@ type LoginForm = z.infer<typeof loginSchema>
 function LoginFormContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const redirectUrl = searchParams.get('redirect') || '/dashboard'
+    const redirectUrl = searchParams.get('returnUrl') || '/dashboard'
     const [showPassword, setShowPassword] = useState(false)
 
     const {
@@ -37,13 +37,29 @@ function LoginFormContent() {
     })
 
     const onSubmit = async (data: LoginForm) => {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 15000)
+
         try {
-            const res = await fetch('/api/users/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-                credentials: 'include',
-            })
+            let res: Response
+            try {
+                res = await fetch('/api/users/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                    credentials: 'include',
+                    signal: controller.signal,
+                })
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') {
+                    setFormError('root', { message: 'Request timed out. Please try again.' })
+                    toast.error('Request timed out. Please try again.')
+                    return
+                }
+                throw err
+            } finally {
+                clearTimeout(timeout)
+            }
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => null)
@@ -55,7 +71,7 @@ function LoginFormContent() {
                 return
             }
 
-            toast.success('Welcome back! 🎉', {
+            toast.success('Welcome back!', {
                 description: 'Redirecting to your dashboard...',
             })
 
