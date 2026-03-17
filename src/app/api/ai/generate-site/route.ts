@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     siteType: result.siteType,
+                    locale: language,
                     theme: {
                         primaryColor: result.theme.primaryColor,
                         secondaryColor: result.theme.secondaryColor,
@@ -131,6 +132,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     siteType: result.siteType,
+                    locale: language,
                     theme: {
                         primaryColor: result.theme.primaryColor,
                         secondaryColor: result.theme.secondaryColor,
