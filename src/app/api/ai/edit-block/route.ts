@@ -7,6 +7,8 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
+import { editBlockSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
@@ -26,11 +28,11 @@ export const POST = withAuth(async (user, req) => {
                 { status: 429 }
             )
         }
-        const { instruction, block, blockIndex, allBlocks, theme, siteName } = await req.json()
 
-        if (!instruction) {
-            return NextResponse.json({ error: 'Instruction is required' }, { status: 400 })
-        }
+        const { data, errorResponse } = await parseRequest(req, editBlockSchema)
+        if (errorResponse) return errorResponse
+        
+        const { instruction, block, blockIndex = 0, allBlocks, theme, siteName } = data!
 
         // Build context-aware system prompt
         const blockMetas = blockRegistry.getAllMeta()
