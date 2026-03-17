@@ -82,6 +82,15 @@ export const Sites: CollectionConfig = {
             ],
         },
         {
+            name: 'locale',
+            type: 'select',
+            options: [
+                { label: 'Bahasa Melayu', value: 'bm' },
+                { label: 'English', value: 'en' },
+            ],
+            defaultValue: 'bm',
+        },
+        {
             name: 'theme',
             type: 'group',
             label: 'Site Theme & Branding',
@@ -221,17 +230,10 @@ export const Sites: CollectionConfig = {
             admin: { readOnly: true },
         },
         {
-            name: 'locale',
-            type: 'select',
-            options: [
-                { label: 'Bahasa Melayu', value: 'bm' },
-                { label: 'English', value: 'en' },
-            ],
-            defaultValue: 'bm',
-        },
-        {
             name: 'shippingConfig',
             type: 'group',
+            label: 'Shipping Configuration',
+            admin: { description: 'Shipping rates for Malaysia regions' },
             fields: [
                 {
                     name: 'westRate',
