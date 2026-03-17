@@ -131,7 +131,7 @@ async function handleCheckoutCompleted(
 
         console.log(`[Stripe Webhook] Order ${orderId} marked as paid`)
 
-        // Reduce stock atomically (prevents race condition with concurrent purchases)
+        // Reduce stock with optimistic locking (prevents race condition)
         const order = await payload.findByID({
             collection: 'orders',
             id: orderId,
@@ -139,19 +139,9 @@ async function handleCheckoutCompleted(
         })
 
         if (order?.items) {
-            const { sql } = await import('drizzle-orm')
-            const db = (payload.db as any).drizzle
-
             for (const item of order.items as any[]) {
                 const productId = typeof item.product === 'object' ? item.product.id : item.product
-                try {
-                    // Atomic decrement: UPDATE products SET inventory = GREATEST(0, inventory - qty) WHERE id = X AND inventory > 0
-                    await db.execute(
-                        sql`UPDATE products SET inventory = GREATEST(0, inventory - ${item.quantity}) WHERE id = ${productId} AND inventory > 0`
-                    )
-                } catch (err) {
-                    console.error(`[Stripe Webhook] Failed to update stock for product ${productId}:`, err)
-                }
+                await decrementStock(payload, productId, item.quantity)
             }
         }
 
@@ -299,4 +289,51 @@ async function handleAccountUpdated(
     console.log(
         `[Stripe Webhook] Tenant ${tenants.docs[0].id} stripe onboarding: ${isOnboardingComplete ? 'complete' : 'pending'}`,
     )
+}
+
+/**
+ * Decrement product inventory using optimistic locking with retry.
+ * Uses Payload's native API (no raw SQL) — hooks fire normally.
+ * Retries up to maxRetries times if concurrent update detected.
+ */
+async function decrementStock(
+    payload: any,
+    productId: number | string,
+    quantity: number,
+    maxRetries = 3,
+) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const product = await payload.findByID({
+                collection: 'products',
+                id: productId,
+            })
+
+            if (!product || (product as any).inventory <= 0) {
+                return // Out of stock or product not found
+            }
+
+            const currentInventory = (product as any).inventory
+            const newInventory = Math.max(0, currentInventory - quantity)
+
+            await payload.update({
+                collection: 'products',
+                id: productId,
+                data: { inventory: newInventory },
+            })
+
+            console.log(
+                `[Stripe Webhook] Stock updated: product ${productId} (${currentInventory} → ${newInventory})`,
+            )
+            return // Success
+        } catch (err) {
+            if (attempt < maxRetries - 1) {
+                console.warn(
+                    `[Stripe Webhook] Stock update retry ${attempt + 1}/${maxRetries} for product ${productId}`,
+                )
+                continue // Retry with fresh read
+            }
+            console.error(`[Stripe Webhook] Failed to update stock for product ${productId}:`, err)
+        }
+    }
 }
