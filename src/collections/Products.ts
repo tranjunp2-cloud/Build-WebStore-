@@ -177,6 +177,7 @@ export const Products: CollectionConfig = {
             name: 'weight',
             type: 'number',
             min: 0,
+            defaultValue: 0,
             admin: { description: 'Product weight in grams (for shipping calculation)' },
         },
         {
