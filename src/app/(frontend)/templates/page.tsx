@@ -18,6 +18,7 @@ import {
     Monitor,
     Smartphone,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -69,11 +70,11 @@ function PreviewModal({
 
             {/* Modal */}
             <div
-                className="relative w-[95vw] h-[92vh] rounded-2xl border border-white/10 bg-[#0B1120] overflow-hidden flex flex-col"
+                className="relative w-[95vw] h-[85vh] sm:h-[92vh] rounded-2xl border border-white/10 bg-[#0B1120] overflow-hidden flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Top bar */}
-                <div className="flex items-center justify-between px-6 py-3 border-b border-white/10 bg-[#0B1120]/95 backdrop-blur-md shrink-0">
+                <div className="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-white/10 bg-[#0B1120]/95 backdrop-blur-md shrink-0">
                     <div className="flex items-center gap-3">
                         <div
                             className="h-4 w-4 rounded-full border border-white/10"
@@ -121,6 +122,7 @@ function PreviewModal({
 
                         <button
                             onClick={onClose}
+                            aria-label="Close preview"
                             className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
                         >
                             <X className="h-4 w-4" />
@@ -133,7 +135,7 @@ function PreviewModal({
                     <div
                         className={cn(
                             'h-full rounded-xl overflow-hidden border border-white/5 transition-all duration-500 bg-[#09090b]',
-                            viewMode === 'desktop' ? 'w-full' : 'w-[390px]'
+                            viewMode === 'desktop' ? 'w-full' : 'w-[min(370px,90vw)]'
                         )}
                     >
                         <iframe
@@ -265,8 +267,8 @@ export default function TemplatesPage() {
                     const data = await res.json()
                     setTemplates(data.docs || [])
                 }
-            } catch (err) {
-                console.error('Failed to load templates', err)
+            } catch {
+                toast.error('Failed to load templates')
             } finally {
                 setIsLoading(false)
             }
@@ -285,10 +287,11 @@ export default function TemplatesPage() {
             })
             if (res.ok) {
                 const data = await res.json()
+                toast.success('Template applied! Redirecting to editor...')
                 router.push(`/editor/${data.siteId}`)
             }
-        } catch (err) {
-            console.error('Failed to apply template', err)
+        } catch {
+            toast.error('Failed to apply template')
         } finally {
             setIsApplying(null)
         }
@@ -306,27 +309,30 @@ export default function TemplatesPage() {
         <div className="min-h-screen bg-[#0B1120]">
             {/* Header */}
             <div className="border-b border-white/10 bg-[#0B1120]/95 backdrop-blur-md sticky top-0 z-20">
-                <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                         <Link
                             href="/onboarding"
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
+                            aria-label="Back to onboarding"
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition-colors shrink-0"
                         >
                             <ArrowLeft className="h-4 w-4" />
                         </Link>
-                        <div>
-                            <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                                <LayoutTemplate className="h-5 w-5 text-blue-400" />
+                        <div className="min-w-0">
+                            <h1 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                                <LayoutTemplate className="hidden sm:block h-5 w-5 text-blue-400 shrink-0" />
                                 {t.gallery.title}
                             </h1>
-                            <p className="text-xs text-gray-500">{t.gallery.subtitle}</p>
+                            <p className="hidden sm:block text-xs text-gray-500 truncate">{t.gallery.subtitle}</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <LanguageSwitcher variant="pill" />
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                        <div className="hidden sm:block">
+                            <LanguageSwitcher variant="pill" />
+                        </div>
                         <Link
                             href="/builder/new"
-                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
+                            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-white hover:opacity-90 transition-opacity whitespace-nowrap"
                         >
                             <Sparkles className="h-3.5 w-3.5" /> {t.gallery.createWithAI}
                         </Link>
@@ -334,7 +340,7 @@ export default function TemplatesPage() {
                 </div>
             </div>
 
-            <div className="mx-auto max-w-7xl px-6 py-8">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8">
                 {/* Search + Filters */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-8">
                     <div className="relative flex-1 max-w-sm">
@@ -343,6 +349,7 @@ export default function TemplatesPage() {
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder={t.gallery.searchPlaceholder}
+                            aria-label="Search templates"
                             className="w-full rounded-xl border border-white/10 bg-[#1E293B] py-2.5 pl-10 pr-4 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50 transition-colors"
                         />
                     </div>
@@ -366,8 +373,20 @@ export default function TemplatesPage() {
 
                 {/* Loading */}
                 {isLoading && (
-                    <div className="flex items-center justify-center py-32">
-                        <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} className="rounded-2xl border border-white/10 bg-[#1E293B] overflow-hidden">
+                                <div className="h-56 bg-white/5" />
+                                <div className="p-4 space-y-3">
+                                    <div className="h-5 w-32 rounded bg-white/5" />
+                                    <div className="h-3 w-48 rounded bg-white/5" />
+                                    <div className="flex gap-1.5">
+                                        <div className="h-5 w-16 rounded-full bg-white/5" />
+                                        <div className="h-5 w-14 rounded-full bg-white/5" />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
 

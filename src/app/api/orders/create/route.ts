@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { withAuth } from '@/lib/auth'
 
 /**
  * POST /api/orders/create
@@ -8,7 +9,7 @@ import config from '@payload-config'
  *
  * Body: { siteId, items: [{productId, quantity}], customer: {name, email, phone, address} }
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
         const body = await request.json()
         const { siteId, items, customer } = body
@@ -129,4 +130,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})
