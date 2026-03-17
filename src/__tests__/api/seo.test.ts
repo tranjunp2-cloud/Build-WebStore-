@@ -3,7 +3,13 @@ import { POST as AnalyzePOST } from '@/app/api/seo/analyze/route'
 import { POST as FixPOST } from '@/app/api/seo/fix/route'
 import { NextRequest } from 'next/server'
 
-// Giả lập OpenAI cho tính năng SEO Fix
+vi.mock('next/headers', () => ({
+    cookies: vi.fn().mockResolvedValue({
+        get: vi.fn().mockReturnValue({ value: 'mock-valid-token' }),
+        set: vi.fn(),
+        delete: vi.fn()
+    })
+}))
 vi.mock('openai', () => {
     const OpenAI = vi.fn()
     OpenAI.prototype.chat = {
@@ -27,6 +33,13 @@ vi.mock('openai', () => {
 vi.mock('payload', () => {
     return {
         getPayload: vi.fn().mockResolvedValue({
+            auth: vi.fn().mockImplementation(async ({ headers }) => {
+                const token = headers.get('Authorization')
+                if (token === 'JWT mock-valid-token') {
+                     return { user: { id: 'user-1', email: 'admin@example.com' } }
+                }
+                return { user: null }
+            }),
             findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
                 if (collection === 'sites' && id === 'site-valid') {
                     return { id: 'site-valid', name: 'Mock Site', seo: {} }

@@ -2,6 +2,27 @@ import { describe, it, expect, vi } from 'vitest'
 import { POST } from '@/app/api/products/generate-description/route'
 import { NextRequest } from 'next/server'
 
+vi.mock('next/headers', () => ({
+    cookies: vi.fn().mockResolvedValue({
+        get: vi.fn().mockReturnValue({ value: 'mock-valid-token' }),
+        set: vi.fn(),
+        delete: vi.fn()
+    })
+}))
+
+vi.mock('payload', () => ({
+    getPayload: vi.fn().mockResolvedValue({
+        auth: vi.fn().mockImplementation(async ({ headers }) => {
+            const token = headers.get('Authorization')
+            if (token === 'JWT mock-valid-token') {
+                return { user: { id: 'user-1', email: 'admin@example.com' } }
+            }
+            return { user: null }
+        }),
+        update: vi.fn().mockResolvedValue({})
+    })
+}))
+
 // Mock bài toán OpenAI để không gọi HTTP thật ra ngoài (tránh tốn xèng)
 vi.mock('openai', () => {
     const OpenAI = vi.fn()

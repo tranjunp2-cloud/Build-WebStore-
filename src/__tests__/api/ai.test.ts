@@ -23,9 +23,16 @@ vi.mock('payload', () => {
             auth: vi.fn().mockResolvedValue({
                 user: { id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }
             }),
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'templates' && id === 'tpl-1') {
+                    return { id: 'tpl-1', name: 'Premium Template', category: ['portfolio'], defaultTheme: {} }
+                }
+                return null
+            }),
             find: vi.fn().mockImplementation(async ({ collection }) => {
                 if (collection === 'sites') return { docs: mockSiteDB }
                 if (collection === 'pages') return { docs: mockPageDB }
+                if (collection === 'tenants') return { docs: [{ id: 'tenant-1' }] }
                 return { docs: [] }
             }),
             create: vi.fn().mockImplementation(async ({ collection, data }) => {

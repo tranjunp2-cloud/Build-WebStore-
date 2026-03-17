@@ -6,13 +6,25 @@ import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 
 // Mock cookies từ next/headers
-vi.mock('next/headers', () => {
+vi.mock('next/headers', () => ({
+    cookies: vi.fn().mockResolvedValue({
+        get: vi.fn().mockReturnValue({ value: 'mock-valid-token' }),
+        set: vi.fn(),
+        delete: vi.fn()
+    })
+}))
+
+// Mock auth module globally so we can control auth in editor-data tests
+vi.mock('@/lib/auth', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@/lib/auth')>()
     return {
-        cookies: vi.fn().mockResolvedValue({
-            get: vi.fn().mockImplementation((name) => {
-                if (name === 'payload-token') return { value: 'mock-valid-token' }
-                return undefined
-            })
+        ...actual,
+        getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
+        withAuth: vi.fn().mockImplementation((handler: any) => {
+            return async (req: any, ctx: any) => {
+                const user = { id: 'user-1', email: 'admin@example.com' }
+                return handler(user, req, ctx)
+            }
         })
     }
 })
@@ -144,12 +156,15 @@ describe('Sites APIs', () => {
 
     describe('GET /api/sites/[siteId]/editor-data', () => {
 
-        beforeEach(() => { vi.clearAllMocks() })
+        beforeEach(() => {
+            vi.clearAllMocks()
+        })
 
         it('returns 404 if site is not found', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                findByID: vi.fn().mockResolvedValue(null)
+                findByID: vi.fn().mockResolvedValue(null),
+                find: vi.fn().mockResolvedValue({ docs: [] }),
             })
 
             const req = new NextRequest('http://localhost:3000/api/sites/999/editor-data')
