@@ -38,7 +38,7 @@
 ### 🌟 Nhóm F01: AI Chat Builder
 
 #### 🎨 [UI-F01-01] Thiết kế màn hình Split-screen Chat & Preview `/builder/new`
-- **Story Ref:** `[US-F01-01]`, `[US-F01-05]` | ⏱️ **Thời gian:** 1 ngày
+- **Story Ref:** `[US-F01-01]`, `[US-F01-02]`, `[US-F01-05]` | ⏱️ **Thời gian:** 1 ngày
 - **Mô tả:** Thiết kế Figma cho chế độ tạo website bằng AI. Bản Desktop cần tách rành mạch 2 nửa (Chat Panel và Iframe). Bản Mobile thì khung chat phải đẩy xuống dạng bottom sheet thông minh.
 - **✅ DoD:** Bàn giao link thiết kế chuẩn Responsive (Mobile + Web).
 
@@ -48,7 +48,7 @@
 - **✅ DoD:** Hiển thị rõ ràng các màu sắc state active/inactive.
 
 #### 🎨 [UI-F01-03] Modal Chúc mừng (Post-generation) & Nút Điều Hướng CMS
-- **Story Ref:** `[US-F01-07]` | ⏱️ **Thời gian:** 0.5 ngày
+- **Story Ref:** `[US-F01-04]`, `[US-F01-07]` | ⏱️ **Thời gian:** 0.5 ngày
 - **Mô tả:** Vẽ một cái modal "Congratulations" bật lên lúc site vừa render xong. Hiển thị chữ to domain live, 1 nút copy domain và 1 nút chuyển về Admin Dashboard.
 - **✅ DoD:** Design sạch, phân cấp bậc Primary/Secondary button mạch lạc.
 
@@ -88,8 +88,8 @@
 - **✅ DoD:** Có fallback ảnh chống bể UI, up ảnh mượt.
 
 #### 👨‍💻 [DEV-F01-03] AI Nhận diện Context & Chọn thứ tiếng
-- **Vị trí:** Backend | **Story Ref:** `[US-F01-05]`, `[US-F01-06]` 
-- **Mô tả:** Lập trình luồng API `api/ai/chat` đếm số lần hỏi đáp (chặn <= 4 câu). Đọc format chat rồi trích xuất cắm cờ loại ngôn ngữ (BM/VI/EN).
+- **Vị trí:** Backend | **Story Ref:** `[US-F01-02]`, `[US-F01-05]`, `[US-F01-06]` 
+- **Mô tả:** Lập trình luồng API `api/ai/chat` đếm số lần hỏi đáp (chặn <= 4 câu). Đọc format chat rồi trích xuất cắm cờ loại ngôn ngữ (BM/VI/EN). Cập nhật context ngành/tên quán vào Payload CMS.
 - **✅ DoD:** Bot phản hồi đúng tiếng của khách chat, context chuẩn luồng.
 
 #### 👨‍💻 [DEV-F01-04] Dựng UI Nhận SSE & Iframe Live Preview 
@@ -161,7 +161,7 @@
 - **✅ DoD:** App Retry dẻo dai. User input còn nguyên không bay biến mất.
 
 #### 🔍 [QC-F02-01] Trình Diễn Băng Chuyền Auth Lifecycle
-- **Nguồn:** Toàn bộ US F02 | ⏱️ **Thời gian:** 1 ngày
+- **Nguồn:** `[US-F02-01]` -> `[US-F02-07]` | ⏱️ **Thời gian:** 1 ngày
 - **Mô tả:** Chạy E2E Regression: Tạo acc > Trích xuất mã mail > Điền OTP 6 số bảo vệ > Hứng Token lưu Cookie > Login > Tự chạy Logout chót lọt.
 - **✅ DoD:** Bot Playwright test vèo vèo qua 5 lớp thành công chặn Auth.
 
