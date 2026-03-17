@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { orderCreateSchema } from '@/lib/validations/orders'
+import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 
 /**
@@ -11,15 +13,10 @@ import { withAuth } from '@/lib/auth'
  */
 export const POST = withAuth(async (_user, request) => {
     try {
-        const body = await request.json()
-        const { siteId, items, customer } = body
-
-        if (!siteId || !items?.length || !customer?.name || !customer?.email) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Missing required fields' } },
-                { status: 422 }
-            )
-        }
+        const { data, errorResponse } = await parseRequest(request, orderCreateSchema)
+        if (errorResponse) return errorResponse
+        
+        const { siteId, items, customer } = data!
 
         const payload = await getPayload({ config })
 
