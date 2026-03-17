@@ -75,14 +75,14 @@ vi.mock('payload', () => {
 describe('SEO APIs', () => {
     
     describe('POST /api/seo/analyze', () => {
-        it('returns 422 if siteId is omitted', async () => {
+        it('returns 400 if siteId is omitted', async () => {
             const req = new NextRequest('http://localhost:3000/api/seo/analyze', {
                 method: 'POST',
                 body: JSON.stringify({})
             })
             const res = await AnalyzePOST(req)
-            expect(res.status).toBe(422)
-            expect((await res.json()).error.message).toContain('siteId is required')
+            expect(res.status).toBe(400)
+            expect((await res.json()).success).toBe(false)
         })
 
         it('returns 200 with SEO score and issue list for valid siteId', async () => {

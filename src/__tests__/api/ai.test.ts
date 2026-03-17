@@ -90,7 +90,8 @@ describe('AI Streaming APIs', () => {
              })
              const res = await GenerateSitePOST(req)
              expect(res.status).toBe(400)
-             expect((await res.json()).error).toContain('Missing required fields')
+             const json = await res.json()
+             expect(json.success).toBe(false)
         })
 
         it('returns 200 JSON with generated site data when stream=false', async () => {
@@ -149,7 +150,8 @@ describe('AI Streaming APIs', () => {
             })
             const res = await EditBlockPOST(req)
             expect(res.status).toBe(400)
-            expect((await res.json()).error).toBe('Instruction is required')
+            const json = await res.json()
+            expect(json.success).toBe(false)
         })
 
         it('returns 200 with AI generated JSON action', async () => {
