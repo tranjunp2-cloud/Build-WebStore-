@@ -33,7 +33,7 @@ export const POST = withAuth(async (user, req) => {
         const { data, errorResponse } = await parseRequest(req, rewriteTextSchema)
         if (errorResponse) return errorResponse
         
-        const { text, instruction, context, language = 'vi' } = data!
+        const { text, instruction, context, language = 'en' } = data!
 
         const openai = getOpenAI()
         if (!openai) {
