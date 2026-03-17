@@ -48,9 +48,10 @@ export const POST = withAuth(async (_user, request) => {
         }
 
         const stripeAccountId = (tenant as any).stripeAccountId
-        if (!stripeAccountId) {
+        const stripeOnboardingComplete = (tenant as any).stripeOnboardingComplete
+        if (!stripeAccountId || !stripeOnboardingComplete) {
             return NextResponse.json(
-                { success: false, error: { code: 'PAYMENT_NOT_CONFIGURED', message: 'Merchant has not connected Stripe' } },
+                { success: false, error: { code: 'PAYMENT_NOT_CONFIGURED', message: 'Merchant has not completed Stripe onboarding' } },
                 { status: 400 }
             )
         }

@@ -101,10 +101,13 @@ async function handleCheckoutCompleted(
         return
     }
 
-    // Idempotency: check if order already processed
+    // Idempotency: check if order already processed (status already 'paid')
     const existing = await payload.find({
         collection: 'orders',
-        where: { stripeSessionId: { equals: stripeSessionId } },
+        where: {
+            stripeSessionId: { equals: stripeSessionId },
+            status: { equals: 'paid' },
+        },
         limit: 1,
     })
 

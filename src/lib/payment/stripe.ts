@@ -139,6 +139,10 @@ export async function createStripeCheckoutSession(
             cancel_url: params.cancelUrl,
             payment_intent_data: {
                 application_fee_amount: applicationFeeAmount,
+                metadata: {
+                    orderId: params.orderId,
+                    ...(params.metadata ?? {}),
+                },
             },
         },
         {
