@@ -6,8 +6,10 @@
  * F-03: Inline AI Edit
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -15,8 +17,16 @@ function getOpenAI(): OpenAI | null {
     return new OpenAI({ apiKey: key })
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (user, req) => {
     try {
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
+        }
         const { text, instruction, context, language = 'vi' } = await req.json()
 
         if (!text || !instruction) {
@@ -66,4 +76,4 @@ Instruction: ${instruction}`,
             { status: 500 },
         )
     }
-}
+})

@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import OpenAI from 'openai'
+import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
  * POST /api/seo/fix
@@ -11,8 +13,19 @@ import OpenAI from 'openai'
  * Body: { siteId: string }
  */
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (user, request) => {
     try {
+        const payload = await getPayload({ config })
+
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
+        }
+
         const { siteId } = await request.json()
         if (!siteId) {
             return NextResponse.json(
@@ -20,8 +33,6 @@ export async function POST(request: NextRequest) {
                 { status: 422 }
             )
         }
-
-        const payload = await getPayload({ config })
 
         // Get site info
         const site = await payload.findByID({ collection: 'sites', id: siteId })
@@ -148,4 +159,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})

@@ -8,14 +8,15 @@ import {
     Check, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import { useEditorStore } from '@/store/editorStore'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
 
 // ─── Types ──────────────────────────────────────────────────────────────
-type BlockData = { blockType: string;[key: string]: any }
-type SiteData = { id: string; name: string; status: string; theme: any; siteType: string }
+type BlockData = { blockType: string } & Record<string, unknown>
+type SiteData = { id: string; name: string; status: string; theme: Record<string, unknown>; siteType: string }
 type PageData = { id: string; title: string; layout: BlockData[] }
 
 // ─── Main Editor Page ───────────────────────────────────────────────────
@@ -56,7 +57,10 @@ export default function EditorPage() {
                     if (data.page) setPage(data.page)
                     editorStore.init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '')
                 }
-            } catch (err) { console.error('Failed to load site data', err) }
+            } catch (err) {
+                const message = err instanceof Error ? err.message : 'Failed to load site data'
+                toast.error('Failed to load site', { description: message })
+            }
             finally { setIsLoading(false) }
         }
         loadData()
@@ -116,11 +120,15 @@ export default function EditorPage() {
                 setSaveSuccess(true)
                 setHasUnsavedChanges(false)
                 setIframeKey(k => k + 1)
+                toast.success('Changes saved')
                 setTimeout(() => setSaveSuccess(false), 2000)
             } else {
-                console.error('Save failed with status:', res.status)
+                toast.error('Save failed', { description: `Server returned ${res.status}` })
             }
-        } catch (err) { console.error('Save failed', err) }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Save failed'
+            toast.error('Save failed', { description: message })
+        }
         finally { setIsSaving(false) }
     }, [siteId, page, site?.theme])
 
@@ -161,7 +169,7 @@ export default function EditorPage() {
         setHasUnsavedChanges(true)
     }, [])
 
-    const handleBlockUpdate = useCallback((idx: number, changes: any) => {
+    const handleBlockUpdate = useCallback((idx: number, changes: Record<string, unknown>) => {
         setPage(prev => {
             if (!prev) return prev
             const newLayout = [...prev.layout]
@@ -171,32 +179,32 @@ export default function EditorPage() {
         setHasUnsavedChanges(true)
     }, [])
 
-    const handleAIAction = useCallback((action: any) => {
+    const handleAIAction = useCallback((action: Record<string, unknown>) => {
         if (!page) return
 
         switch (action.action) {
             case 'update_block': {
-                const idx = action.blockIndex ?? selectedBlock
+                const idx = (action.blockIndex as number) ?? selectedBlock
                 setPage(prev => {
                     if (!prev) return prev
                     const newLayout = [...prev.layout]
-                    newLayout[idx] = { ...newLayout[idx], ...action.changes }
+                    newLayout[idx] = { ...newLayout[idx], ...(action.changes as Record<string, unknown>) }
                     return { ...prev, layout: newLayout }
                 })
                 setHasUnsavedChanges(true)
                 break
             }
             case 'update_theme': {
-                setSite(prev => prev ? { ...prev, theme: { ...prev.theme, ...action.changes } } : prev)
+                setSite(prev => prev ? { ...prev, theme: { ...prev.theme, ...(action.changes as Record<string, unknown>) } } : prev)
                 setHasUnsavedChanges(true)
                 break
             }
             case 'add_block': {
-                const afterIdx = action.afterIndex ?? blocks.length - 1
+                const afterIdx = (action.afterIndex as number) ?? blocks.length - 1
                 setPage(prev => {
                     if (!prev) return prev
                     const newLayout = [...prev.layout]
-                    newLayout.splice(afterIdx + 1, 0, action.block)
+                    newLayout.splice(afterIdx + 1, 0, action.block as BlockData)
                     return { ...prev, layout: newLayout }
                 })
                 setSelectedBlock(afterIdx + 1)
@@ -204,13 +212,13 @@ export default function EditorPage() {
                 break
             }
             case 'delete_block': {
-                const idx = action.blockIndex ?? selectedBlock
+                const idx = (action.blockIndex as number) ?? selectedBlock
                 setPage(prev => {
                     if (!prev) return prev
                     const newLayout = prev.layout.filter((_, i) => i !== idx)
                     return { ...prev, layout: newLayout }
                 })
-                setSelectedBlock(Math.max(0, (action.blockIndex ?? selectedBlock) - 1))
+                setSelectedBlock(Math.max(0, ((action.blockIndex as number) ?? selectedBlock) - 1))
                 setHasUnsavedChanges(true)
                 break
             }
@@ -232,9 +240,15 @@ export default function EditorPage() {
             if (res.ok) {
                 setPublishSuccess(true)
                 setSite(prev => prev ? { ...prev, status: currentlyPublished ? 'draft' : 'published' } : prev)
+                toast.success(currentlyPublished ? 'Site unpublished' : 'Site published!')
                 setTimeout(() => setPublishSuccess(false), 3000)
+            } else {
+                toast.error('Publish failed', { description: `Server returned ${res.status}` })
             }
-        } catch (err) { console.error('Publish/unpublish failed', err) }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Publish failed'
+            toast.error('Publish failed', { description: message })
+        }
         finally { setIsPublishing(false) }
     }, [siteId, isPublishing, site?.status])
 
