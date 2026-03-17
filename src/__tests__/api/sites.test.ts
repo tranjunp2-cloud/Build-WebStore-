@@ -5,6 +5,17 @@ import { GET as EditorDataGET } from '@/app/api/sites/[siteId]/editor-data/route
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 
+// Bypass withAuth HOC — inject mock user trực tiếp
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn().mockImplementation((handler: any) => {
+        return async (req: any, ctx: any) => {
+            const user = { id: 'user-1', email: 'admin@example.com' }
+            return handler(user, req, ctx)
+        }
+    }),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
+}))
+
 // Mock cookies từ next/headers
 vi.mock('next/headers', () => {
     return {
@@ -149,7 +160,8 @@ describe('Sites APIs', () => {
         it('returns 404 if site is not found', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                findByID: vi.fn().mockResolvedValue(null)
+                findByID: vi.fn().mockResolvedValue(null),
+                find: vi.fn().mockResolvedValue({ docs: [] }),
             })
 
             const req = new NextRequest('http://localhost:3000/api/sites/999/editor-data')
