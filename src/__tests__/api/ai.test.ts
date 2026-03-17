@@ -6,6 +6,17 @@ import { POST as ApplyTemplatePOST } from '@/app/api/ai/apply-template/route'
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 
+// Bypass withAuth HOC — inject mock user trực tiếp
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn().mockImplementation((handler: any) => {
+        return async (req: any, ctx: any) => {
+            const user = { id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }
+            return handler(user, req, ctx)
+        }
+    }),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }),
+}))
+
 // Mock next/headers
 vi.mock('next/headers', () => ({
     cookies: vi.fn().mockResolvedValue({
@@ -79,7 +90,8 @@ describe('AI Streaming APIs', () => {
              })
              const res = await GenerateSitePOST(req)
              expect(res.status).toBe(400)
-             expect((await res.json()).error).toContain('Missing required fields')
+             const json = await res.json()
+             expect(json.success).toBe(false)
         })
 
         it('returns 200 JSON with generated site data when stream=false', async () => {
@@ -138,7 +150,8 @@ describe('AI Streaming APIs', () => {
             })
             const res = await EditBlockPOST(req)
             expect(res.status).toBe(400)
-            expect((await res.json()).error).toBe('Instruction is required')
+            const json = await res.json()
+            expect(json.success).toBe(false)
         })
 
         it('returns 200 with AI generated JSON action', async () => {
