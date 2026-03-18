@@ -167,5 +167,56 @@
                 "description": "Pesanan anda telah dibatalkan. Jika ada sebarang pertanyaan, sila hubungi kami."
             }
         }
+    },
+    "dashboard": {
+        "overview": {
+            "greeting": "Selamat",
+            "morning": "pagi",
+            "afternoon": "petang",
+            "evening": "malam",
+            "customize": "Sesuaikan Papan Pemuka",
+            "stats": {
+                "views": "Trafik / Paparan",
+                "leads": "Prospek / Klik",
+                "engagement": "Penglibatan",
+                "revenue": "Pendapatan",
+                "pendingOrders": "pesanan tertangguh"
+            },
+            "actions": {
+                "title": "Tindakan Diperlukan: Pesanan Tertangguh",
+                "viewAll": "Lihat semua",
+                "fulfill": "Penuhi",
+                "empty": "Tiada pesanan tertangguh."
+            },
+            "seo": {
+                "title": "Kesihatan SEO",
+                "score": "Skor:",
+                "statusGood": "Baik",
+                "statusWarning": "Perlu Pembaikan",
+                "fixAll": "✨ AI Baiki Semua Isu"
+            },
+            "periods": {
+                "today": "Hari ini",
+                "7d": "7 Hari",
+                "30d": "30 Hari"
+            },
+            "customizeModal": {
+                "title": "Sesuaikan Analitis",
+                "description": "Tarik dan lepas untuk menyusun semula atau sembunyikan/tunjukkan metrik pilihan anda.",
+                "cancel": "Batal",
+                "saving": "Sedang Simpan...",
+                "save": "Simpan Perubahan"
+            }
+        },
+        "sites": {
+            "title": "Laman Web Saya",
+            "viewAll": "Lihat Semua →",
+            "openEditor": "Buka Editor",
+            "published": "Diterbitkan",
+            "draft": "Draf",
+            "lastEdited": "Akhir disunting: ",
+            "edit": "Sunting",
+            "preview": "Pratonton"
+        }
     }
 }

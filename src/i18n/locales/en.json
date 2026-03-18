@@ -167,5 +167,56 @@
                 "description": "Your order has been cancelled. If you have any questions, please contact us."
             }
         }
+    },
+    "dashboard": {
+        "overview": {
+            "greeting": "Good",
+            "morning": "morning",
+            "afternoon": "afternoon",
+            "evening": "evening",
+            "customize": "Customize Dashboard",
+            "stats": {
+                "views": "Traffic / Views",
+                "leads": "Leads / Clicks",
+                "engagement": "Engagement",
+                "revenue": "Revenue",
+                "pendingOrders": "pending orders"
+            },
+            "actions": {
+                "title": "Action Required: Pending Orders",
+                "viewAll": "View all",
+                "fulfill": "Fulfill",
+                "empty": "No pending orders."
+            },
+            "seo": {
+                "title": "SEO Health",
+                "score": "Score:",
+                "statusGood": "Good",
+                "statusWarning": "Needs Improvement",
+                "fixAll": "✨ AI Fix All Issues"
+            },
+            "periods": {
+                "today": "Today",
+                "7d": "7 Days",
+                "30d": "30 Days"
+            },
+            "customizeModal": {
+                "title": "Customize Analytics",
+                "description": "Drag and drop to reorder or hide/show the metrics you care about.",
+                "cancel": "Cancel",
+                "saving": "Saving...",
+                "save": "Save Changes"
+            }
+        },
+        "sites": {
+            "title": "My Websites",
+            "viewAll": "View All →",
+            "openEditor": "Open Editor",
+            "published": "Published",
+            "draft": "Draft",
+            "lastEdited": "Last edited: ",
+            "edit": "Edit",
+            "preview": "Preview"
+        }
     }
 }
