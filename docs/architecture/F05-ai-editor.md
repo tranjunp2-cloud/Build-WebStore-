@@ -8,20 +8,20 @@
 ## 1. System Overview
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    /editor/:siteId                       │
-│ ┌──────────────┬──────────────────────┬────────────────┐ │
-│ │ AI Chat Panel│    Live Preview      │ Settings Panel │ │
-│ │   (380px)    │    (iframe SSR)      │   (320px)      │ │
-│ │              │                      │                │ │
-│ │  useChat()   │  /sites/:slug/       │  Block config  │ │
-│ │  Vercel SDK  │  (sandboxed iframe)  │  Theme/colors  │ │
-│ │              │                      │                │ │
-│ └──────────────┴──────────────────────┴────────────────┘ │
-│ ┌──────────────────────────────────────────────────────┐ │
-│ │ Toolbar: [Undo] [Redo] [Save] [Preview] [Publish]   │ │
-│ └──────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                       /editor/:siteId                        │
+│ ┌───────────────┬──────────────────────┬───────────────────┐ │
+│ │ AI Chat Panel │    Live Preview      │ Settings Panel    │ │
+│ │   / Blocks    │    (iframe SSR)      │ (Contextual/320px)│ │
+│ │   (380px)     │                      │                   │ │
+│ │  useChat()    │  /sites/:slug/       │ - Global Settings │
+│ │  Drag & Drop  │  (sandboxed iframe)  │ - Block Settings  │ │
+│ │  Components   │  WYSIWYG Overlay     │ - Navigation Tree │ │
+│ └───────────────┴──────────────────────┴───────────────────┘ │
+│ ┌──────────────────────────────────────────────────────────┐ │
+│ │ Toolbar: [Pages/Visibility] [Undo] [Redo] [Publish]      │ │
+│ └──────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## 2. Component Tree
@@ -30,60 +30,89 @@
 EditorPage (Server Component)
 ├── EditorToolbar
 │   ├── UndoRedoButtons
-│   ├── SaveIndicator (auto-save status)
-│   ├── PreviewToggle (desktop/mobile)
-│   └── PublishButton
+│   ├── PageVisibilityToggle
+│   └── PublishButton (Maintenance Mode Toggle)
 ├── EditorLayout (Client Component)
-│   ├── ChatPanel (380px, collapsible)
-│   │   ├── ChatMessages (useChat from Vercel AI SDK)
-│   │   ├── ChatInput
-│   │   └── QuickActions
+│   ├── LeftSidebar (Tabs: Chat | Blocks)
+│   │   ├── ChatPanel (useChat from Vercel SDK)
+│   │   └── BlockLibrary (Draggable components)
 │   ├── PreviewPanel (flex: 1)
-│   │   ├── PreviewIframe (sandboxed)
-│   │   └── InlineEditOverlay
+│   │   ├── PreviewIframe (sandboxed with postMessage sync)
+│   │   └── WYSIWYGOverlay (Rich-text Floating Toolbar)
 │   └── SettingsPanel (320px, context-sensitive)
-│       ├── BlockSettings
-│       ├── ThemeSettings
-│       └── SEOSettings
+│       ├── GlobalSettings (Name, Contact, SEO, Social, Favicon)
+│       ├── HeaderNavigationTree (Drag & Drop Submenu)
+│       ├── BlockSettings (Colors, config)
+│       └── ComponentSpecificSettings (e.g., Links, IDs)
 └── EditorProviders
-    ├── EditorStoreProvider (Zustand)
-    ├── HistoryProvider (undo/redo stack)
-    └── AutoSaveProvider (30s interval)
+    ├── EditorStoreProvider (Zustand: Blocks + Global Data)
+    ├── HistoryProvider (undo/redo stack max 50)
+    └── AutoSaveProvider (3s debounce interval)
 ```
 
 ## 3. State Management (Zustand)
 
 ```typescript
+interface GlobalSiteData {
+  storeName: string;
+  tagline: string;
+  logoUrl: string;       // Automates favicon generation
+  contact: { phone: string; email: string; address: string };
+  socialLinks: Record<string, string>; // Facebook, IG, etc.
+  seo: { metaTitle: string; metaDescription: string; ogImage: string };
+  isMaintenanceMode: boolean; // Site unpublish
+}
+
 interface EditorStore {
-  siteId: string
-  blocks: Block[]           // Current site blocks
-  selectedBlockId: string | null
-  isDirty: boolean          // Has unsaved changes
+  siteId: string;
+  pageId: string;
+  isVisible: boolean;       // Page hide/show toggle
+  blocks: Block[];          // Current site/page blocks
+  globalData: GlobalSiteData; // Bindings for Header/Footer/Widgets
+  selectedBlockId: string | null;
+  isDirty: boolean;         // Has unsaved changes
   
   // History (undo/redo)
-  history: Block[][]        // Max 50 states
-  historyIndex: number
-  undo: () => void
-  redo: () => void
-  pushHistory: (blocks: Block[]) => void
+  history: { blocks: Block[], globalData: GlobalSiteData }[]; // Save holistic state
+  historyIndex: number;
+  undo: () => void;
+  redo: () => void;
+  pushHistory: () => void;
   
   // Actions
-  updateBlock: (id: string, data: Partial<Block>) => void
-  addBlock: (block: Block, position?: number) => void
-  removeBlock: (id: string) => void
-  reorderBlocks: (from: number, to: number) => void
+  updateBlock: (id: string, data: Partial<Block>) => void;
+  updateGlobalData: (data: Partial<GlobalSiteData>) => void;
+  addBlock: (block: Block, position?: number) => void; // Via Chat or Drag/Drop
+  removeBlock: (id: string) => void;
+  reorderBlocks: (from: number, to: number) => void;
 }
 ```
 
-## 4. API Routes
+## 4. iframe Communication Protocol (postMessage)
+
+Because the Preview is rendered in an SSR sandboxed `iframe`, the parent Editor and iframe must sync states avoiding direct DOM injection:
+
+**Parent → Iframe:**
+- `SYNC_BLOCKS`: Push updated `blocks` state from Zustand to re-render iframe.
+- `SYNC_GLOBAL_DATA`: Push `globalData` so Header/Footer re-read variables.
+- `SET_THEME`: Change root CSS variables for dynamic AI styling.
+
+**Iframe → Parent:**
+- `BLOCK_SELECTED`: User clicked a block (sends `blockId` to open Settings Panel).
+- `TEXT_EDITED`: User finished WYSIWYG typing (sends payload to update Zustand).
+- `BLOCK_DROPPED`: User dropped a Block component from LeftSidebar into the iframe canvas.
+- `IMAGE_REPLACE_REQUEST`: User clicked "Replace Image". Parent opens file dialog.
+
+## 5. API Routes
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/api/ai/edit-block` | AI processes chat instruction → returns updated blocks |
-| POST | `/api/ai/rewrite-text` | Inline edit: rewrite specific text element |
-| GET | `/api/sites/[siteId]` | Load site data for editor |
-| PATCH | `/api/sites/[siteId]` | Save site changes (auto-save) |
-| POST | `/api/sites/[siteId]/publish` | Publish site live |
+| POST | `/api/ai/edit-block` | AI processes chat → stream blocks updates |
+| POST | `/api/ai/generate-favicon`| Triggers background job to create `.ico` from Logo |
+| POST | `/api/upload` | Handle image drops (validates >2MB → configures Crop/Compress) |
+| GET | `/api/sites/[siteId]` | Load site data & Global settings |
+| PATCH | `/api/sites/[siteId]` | Save site changes (auto-save debounce 3s) |
+| POST | `/api/sites/[siteId]/publish` | Toggle live status / Maintenance Mode |
 
 ## 5. Data Flow
 

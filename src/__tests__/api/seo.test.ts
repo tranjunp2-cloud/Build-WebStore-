@@ -3,6 +3,17 @@ import { POST as AnalyzePOST } from '@/app/api/seo/analyze/route'
 import { POST as FixPOST } from '@/app/api/seo/fix/route'
 import { NextRequest } from 'next/server'
 
+// Bypass withAuth HOC — inject mock user trực tiếp
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn().mockImplementation((handler: any) => {
+        return async (req: any, ctx: any) => {
+            const user = { id: 'user-1', email: 'admin@example.com' }
+            return handler(user, req, ctx)
+        }
+    }),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
+}))
+
 // Giả lập OpenAI cho tính năng SEO Fix
 vi.mock('openai', () => {
     const OpenAI = vi.fn()
@@ -64,7 +75,7 @@ vi.mock('payload', () => {
 describe('SEO APIs', () => {
     
     describe('POST /api/seo/analyze', () => {
-        it('returns 422 if siteId is omitted', async () => {
+        it('returns 400 if siteId is omitted', async () => {
             const req = new NextRequest('http://localhost:3000/api/seo/analyze', {
                 method: 'POST',
                 body: JSON.stringify({})

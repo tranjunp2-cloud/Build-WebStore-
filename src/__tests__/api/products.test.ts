@@ -2,6 +2,17 @@ import { describe, it, expect, vi } from 'vitest'
 import { POST } from '@/app/api/products/generate-description/route'
 import { NextRequest } from 'next/server'
 
+// Bypass withAuth HOC — inject mock user trực tiếp
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn().mockImplementation((handler: any) => {
+        return async (req: any, ctx: any) => {
+            const user = { id: 'user-1', email: 'admin@example.com' }
+            return handler(user, req, ctx)
+        }
+    }),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
+}))
+
 // Mock bài toán OpenAI để không gọi HTTP thật ra ngoài (tránh tốn xèng)
 vi.mock('openai', () => {
     const OpenAI = vi.fn()
@@ -28,7 +39,7 @@ vi.mock('openai', () => {
 
 describe('POST /api/products/generate-description', () => {
     
-    it('returns 422 validations error when name is missing', async () => {
+    it('returns 400 validation error when name is missing', async () => {
         // Thiết lập mock Request thiếu tham số 'name'
         const req = new NextRequest('http://localhost:3000/api/products/generate-description', {
             method: 'POST',

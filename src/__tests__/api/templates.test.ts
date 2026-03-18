@@ -4,6 +4,17 @@ import { GET as PreviewGET } from '@/app/api/templates/preview/route'
 import { POST as SeedPOST } from '@/app/api/templates/seed/route'
 import { NextRequest } from 'next/server'
 
+// Bypass withAuth HOC — inject mock user trực tiếp
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn().mockImplementation((handler: any) => {
+        return async (req: any, ctx: any) => {
+            const user = { id: 'user-1', email: 'admin@example.com' }
+            return handler(user, req, ctx)
+        }
+    }),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
+}))
+
 // Mock helper function sinh HTML giao diện từ payload CMS layout
 vi.mock('@/app/api/preview/[siteId]/route', () => ({
     buildFullHTML: vi.fn().mockReturnValue('<html><body>Mocked Theme HTML</body></html>')
