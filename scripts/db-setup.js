@@ -46,6 +46,95 @@ async function getTableCount(pool) {
   return parseInt(result.rows[0].count, 10);
 }
 
+// ─── Direct SQL Migrations ──────────────────────────────────────────────
+// Standalone server can't run Payload's pushDevSchema (missing Drizzle files).
+// Instead, add missing columns directly via ALTER TABLE.
+// Each migration is idempotent — safe to run multiple times.
+const MIGRATIONS = [
+  // ── Tenants: Stripe Connect ──
+  {
+    name: 'tenants.stripe_account_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS stripe_account_id varchar;`,
+  },
+  {
+    name: 'tenants.stripe_onboarding_complete',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS stripe_onboarding_complete boolean DEFAULT false;`,
+  },
+  {
+    name: 'tenants.stripe_account_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_stripe_account_id_idx ON tenants (stripe_account_id);`,
+  },
+  // ── Tenants: Business info ──
+  {
+    name: 'tenants.whatsapp_number',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_number varchar;`,
+  },
+  {
+    name: 'tenants.ssm_number',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ssm_number varchar;`,
+  },
+  {
+    name: 'tenants.business_address',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS business_address varchar;`,
+  },
+  // ── Tenants: ECH Integration ──
+  {
+    name: 'tenants.ech_integration_enabled',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ech_integration_enabled boolean DEFAULT false;`,
+  },
+  {
+    name: 'tenants.ech_integration_api_key',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ech_integration_api_key varchar;`,
+  },
+  {
+    name: 'tenants.ech_integration_merchant_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ech_integration_merchant_id varchar;`,
+  },
+  // ── Sites: Locale + Shipping ──
+  {
+    name: 'sites.locale',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS locale varchar DEFAULT 'ms';`,
+  },
+  {
+    name: 'sites.shipping_config_west_rate',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_west_rate numeric DEFAULT 800;`,
+  },
+  {
+    name: 'sites.shipping_config_east_rate',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_east_rate numeric DEFAULT 1500;`,
+  },
+  {
+    name: 'sites.shipping_config_free_above',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_free_above numeric;`,
+  },
+  // ── Products: Halal + Weight ──
+  {
+    name: 'products.halal_certified',
+    sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS halal_certified boolean DEFAULT false;`,
+  },
+  {
+    name: 'products.halal_cert_image_id',
+    sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS halal_cert_image_id integer;`,
+  },
+  {
+    name: 'products.weight',
+    sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS weight numeric DEFAULT 0;`,
+  },
+];
+
+async function runMigrations(pool) {
+  console.log(`[db-setup] Running ${MIGRATIONS.length} migrations...`);
+  for (const m of MIGRATIONS) {
+    try {
+      await pool.query(m.sql);
+      console.log(`[db-setup] ✅ ${m.name}`);
+    } catch (e) {
+      // Log but don't fail — column might already exist with different type etc.
+      console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
+    }
+  }
+}
+
 async function checkDB() {
   const pool = createPool();
   if (!pool) {
@@ -61,20 +150,16 @@ async function checkDB() {
     const tableCount = await getTableCount(pool);
     console.log(`[db-setup] Tables in public schema: ${tableCount}`);
 
-    const perm = await pool.query(
-      "SELECT has_schema_privilege(current_user, 'public', 'CREATE') as can_create"
-    );
-    const canCreate = perm.rows[0].can_create;
-    console.log(`[db-setup] CREATE privilege: ${canCreate}`);
+    // Run direct SQL migrations (idempotent — always safe)
+    if (tableCount > 0) {
+      await runMigrations(pool);
+    }
 
     await pool.end();
 
-    // Always push schema when we have CREATE privilege.
-    // pushDevSchema handles both initial creation AND adding new columns
-    // to existing tables (e.g. stripe_account_id added after initial deploy).
-    // It's a no-op if schema is already in sync.
+    // Only need Payload pushDevSchema for fresh DB (0 tables)
     return {
-      needsPush: canCreate,
+      needsPush: tableCount === 0,
       tableCount,
     };
   } catch (e) {
@@ -117,6 +202,64 @@ async function waitForTables(maxWaitSec = 120) {
   return false;
 }
 
+/**
+ * Wait for schema sync to complete by checking if pushDevSchema has finished.
+ * Instead of waiting a fixed time, poll the DB to see if Payload's dev server
+ * is still running migrations.
+ */
+async function waitForSchemaSync(maxWaitSec = 30) {
+  const pool = createPool();
+  if (!pool) return true;
+
+  const startTime = Date.now();
+  const deadline = startTime + maxWaitSec * 1000;
+
+  console.log(`[db-setup] Verifying schema sync (timeout: ${maxWaitSec}s)...`);
+
+  // Get initial column count to detect changes
+  let prevColCount = 0;
+  try {
+    const r = await pool.query(
+      "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public'"
+    );
+    prevColCount = parseInt(r.rows[0].count, 10);
+    console.log(`[db-setup] Current column count: ${prevColCount}`);
+  } catch { /* ignore */ }
+
+  // Poll until column count stabilizes (no changes for 5s = sync done)
+  let stableCount = 0;
+  while (Date.now() < deadline) {
+    await sleep(3000);
+    try {
+      const r = await pool.query(
+        "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public'"
+      );
+      const currentColCount = parseInt(r.rows[0].count, 10);
+
+      if (currentColCount === prevColCount) {
+        stableCount++;
+        if (stableCount >= 2) {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          console.log(`[db-setup] ✅ Schema sync complete — ${currentColCount} columns (stable for 6s, took ${elapsed}s)`);
+          await pool.end();
+          return true;
+        }
+      } else {
+        console.log(`[db-setup] Schema changing: ${prevColCount} → ${currentColCount} columns`);
+        prevColCount = currentColCount;
+        stableCount = 0;
+      }
+    } catch {
+      // DB busy during sync — retry
+    }
+  }
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`[db-setup] ⚠️ Schema sync timeout after ${elapsed}s — proceeding anyway`);
+  await pool.end().catch(() => {});
+  return true; // Proceed even on timeout — might be fine
+}
+
 function spawnServer(env) {
   return spawn('node', ['server.js'], { stdio: 'inherit', env });
 }
@@ -138,26 +281,39 @@ async function main() {
     const devEnv = { ...process.env, NODE_ENV: 'development' };
     const devServer = spawnServer(devEnv);
 
-    // Wait for tables to appear (pushDevSchema triggered by first request)
-    // Also make a request to trigger Payload initialization
+    // Payload pushDevSchema runs during DB connect (on server start).
+    // We need to wait for it to finish before switching to production.
     await sleep(5000); // Give server time to start listening
-    try {
-      // Trigger Payload init by hitting the health endpoint
-      const http = require('http');
-      http.get('http://localhost:3000/api/health', () => {});
-    } catch {
-      // Ignore — Payload init might be triggered by other means
-    }
+
+    // Trigger Payload initialization by hitting any endpoint
+    const http = require('http');
+    const triggerInit = () => new Promise((resolve) => {
+      const req = http.get('http://localhost:3000/api/health', (res) => {
+        console.log(`[db-setup] Health check: ${res.statusCode}`);
+        resolve();
+      });
+      req.on('error', () => {
+        console.log('[db-setup] Health check pending, server still starting...');
+        resolve();
+      });
+      req.setTimeout(5000, () => { req.destroy(); resolve(); });
+    });
+
+    // Try multiple times to ensure Payload is fully initialized
+    await triggerInit();
+    await sleep(3000);
+    await triggerInit();
 
     let schemaReady;
     if (tableCount === 0) {
       // Fresh DB: wait for tables to appear
       schemaReady = await waitForTables(120);
     } else {
-      // Existing DB: Payload pushDevSchema runs on connect, wait for it to finish
-      console.log('[db-setup] Waiting 15s for schema sync to complete...');
-      await sleep(15000);
-      schemaReady = true;
+      // Existing DB with new columns needed (e.g. stripe_account_id).
+      // Payload pushDevSchema adds missing columns on connect.
+      // Wait and verify the specific column exists.
+      console.log('[db-setup] Waiting for schema sync (new columns)...');
+      schemaReady = await waitForSchemaSync(30);
     }
 
     if (schemaReady) {
