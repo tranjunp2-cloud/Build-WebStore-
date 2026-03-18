@@ -18,17 +18,17 @@
 ## 0. Story Traceability
 
 > **[BẮT BUỘC]** Liệt kê đầy đủ các User Stories mà PRD này implement.
-> Tham chiếu file stories tại `docs/stories/F14-notification-center-stories.md`.
+> Tham chiếu file stories tại `docs/stories/F16-notification-center-stories.md`.
 
 | Story ID | Title | File | Status |
 |----------|-------|------|--------|
-| US-F16-01 | Xem tổng số thông báo chưa đọc (Unread Badge) | [F14-notification-center-stories.md](../stories/F14-notification-center-stories.md) | Draft |
-| US-F16-02 | Xem danh sách thông báo (Notification Dropdown) | [F14-notification-center-stories.md](../stories/F14-notification-center-stories.md) | Draft |
-| US-F16-03 | Chuyển hướng khi click thông báo (Actionable Links) | [F14-notification-center-stories.md](../stories/F14-notification-center-stories.md) | Draft |
-| US-F16-04 | Đánh dấu "Đã đọc" (Mark all as read) | [F14-notification-center-stories.md](../stories/F14-notification-center-stories.md) | Draft |
-| US-F16-05 | Nhận nhận thông báo từ Ban Quản Trị Hệ Thống (Global Broadcasts) | [F14-notification-center-stories.md](../stories/F14-notification-center-stories.md) | Draft |
-| US-F16-06 | Hiển thị Live Popup góc dưới chuông thông báo (In-app Toast/Popup) | [F14-notification-center-stories.md](../stories/F14-notification-center-stories.md) | Draft |
-| US-F16-07 | Nhận thông báo qua Trình duyêt Desktop (Browser Push Notifications) | [F14-notification-center-stories.md](../stories/F14-notification-center-stories.md) | Draft |
+| US-F16-01 | Xem tổng số thông báo chưa đọc (Unread Badge) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
+| US-F16-02 | Xem danh sách thông báo (Notification Dropdown) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
+| US-F16-03 | Chuyển hướng khi click thông báo (Actionable Links) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
+| US-F16-04 | Đánh dấu "Đã đọc" (Mark all as read) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
+| US-F16-05 | Nhận nhận thông báo từ Ban Quản Trị Hệ Thống (Global Broadcasts) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
+| US-F16-06 | Hiển thị Live Popup góc dưới chuông thông báo (In-app Toast/Popup) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
+| US-F16-07 | Nhận thông báo qua Trình duyêt Desktop (Browser Push Notifications) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
 
 ---
 
@@ -100,7 +100,7 @@ SO THAT tôi không bao giờ bỏ lỡ các đơn hàng mới hoặc thông bá
 | FR-03 | Phân biệt visual trạng thái Đã đọc / Chưa đọc | US-F16-02 | P1 | |
 | FR-04 | Click thông báo: Đánh dấu đã đọc & Điều hướng | US-F16-03 | P1 | Dựa vào `actionUrl` của notification |
 | FR-05 | Nút "Mark all as read" chuyển toàn bộ status thành read | US-F16-04 | P2 | |
-| FR-06 | Nhận và hiển thị Global System Broadcasts từ Admin (F16) | US-F16-05 | P2 | |
+| FR-06 | Nhận và hiển thị Global System Broadcasts từ Admin (F15) | US-F16-05 | P2 | |
 | FR-07 | Hiển thị Popup (Toast) góc dưới khi có notification mới realtime | US-F16-06 | P1 | Tự biến mất sau 5-7s |
 | FR-08 | Tự động tăng số badge khi có popup realtime | US-F16-06 | P1 | |
 | FR-09 | Flow xin quyền Native Browser Push Notification (Opt-in) | US-F16-07 | P2 | |
@@ -175,10 +175,10 @@ SO THAT tôi không bao giờ bỏ lỡ các đơn hàng mới hoặc thông bá
 
 ## 11. Acceptance Criteria
 
-> Các AC dưới đây được copy nguyên bản từ `F14-notification-center-stories.md`.
+> Các AC dưới đây được copy nguyên bản từ `F16-notification-center-stories.md`.
 
 ### AC-1: Hiển thị badge chính xác
-> 📌 Source: [US-F16-01](../stories/F14-notification-center-stories.md) — AC-1
+> 📌 Source: [US-F16-01](../stories/F16-notification-center-stories.md) — AC-1
 
 ```gherkin
 GIVEN hệ thống có thông báo mới gửi cho User chưa được đọc
@@ -188,7 +188,7 @@ THEN  biểu tượng cái chuông (Bell Icon) sẽ hiển thị một chấm đ
 ```
 
 ### AC-2: Cập nhật realtime (hoặc near-realtime)
-> 📌 Source: [US-F16-01](../stories/F14-notification-center-stories.md) — AC-2
+> 📌 Source: [US-F16-01](../stories/F16-notification-center-stories.md) — AC-2
 
 ```gherkin
 GIVEN User đang trực tuyến trên Dashboard
@@ -198,7 +198,7 @@ THEN  số lượng trên badge tự động tăng lên 1
 ```
 
 ### AC-3: Mở danh sách thông báo
-> 📌 Source: [US-F16-02](../stories/F14-notification-center-stories.md) — AC-1
+> 📌 Source: [US-F16-02](../stories/F16-notification-center-stories.md) — AC-1
 
 ```gherkin
 GIVEN User đang thấy badge thông báo chưa đọc
@@ -209,7 +209,7 @@ THEN  một dropdown (hoặc drawer panel) sẽ mở ra hiển thị danh sách 
 ```
 
 ### AC-4: Click điều hướng và đổi trạng thái
-> 📌 Source: [US-F16-03](../stories/F14-notification-center-stories.md) — AC-1
+> 📌 Source: [US-F16-03](../stories/F16-notification-center-stories.md) — AC-1
 
 ```gherkin
 GIVEN User đang mở Notification drop-down
@@ -219,7 +219,7 @@ THEN  thông báo đó tự động chuyển trạng thái thành "Đã đọc" 
 ```
 
 ### AC-5: Mark all as read
-> 📌 Source: [US-F16-04](../stories/F14-notification-center-stories.md) — AC-1
+> 📌 Source: [US-F16-04](../stories/F16-notification-center-stories.md) — AC-1
 
 ```gherkin
 GIVEN User có 15 thông báo chưa đọc
@@ -229,7 +229,7 @@ THEN  tất cả 15 thông báo lập tức chuyển trạng thái visual thành
 ```
 
 ### AC-6: Hiển thị popup tự động (In-app)
-> 📌 Source: [US-F16-06](../stories/F14-notification-center-stories.md) — AC-1
+> 📌 Source: [US-F16-06](../stories/F16-notification-center-stories.md) — AC-1
 
 ```gherkin
 GIVEN User đang trực tuyến (Online) trên hệ thống Dashboard
@@ -240,7 +240,7 @@ THEN  một popup nhỏ gọn xuất hiện ở góc dưới vị trí chuông t
 ```
 
 ### AC-7: Tự động cập nhật Badge đồng thời khi có Popup
-> 📌 Source: [US-F16-06](../stories/F14-notification-center-stories.md) — AC-2
+> 📌 Source: [US-F16-06](../stories/F16-notification-center-stories.md) — AC-2
 
 ```gherkin
 GIVEN popup được hiển thị
@@ -249,7 +249,7 @@ THEN  chấm đỏ (badge) ở chuông thông báo tự động tăng lên 1 đ�
 ```
 
 ### AC-8: Yêu cầu quyền thông báo (Opt-in) cho Desktop
-> 📌 Source: [US-F16-07](../stories/F14-notification-center-stories.md) — AC-1
+> 📌 Source: [US-F16-07](../stories/F16-notification-center-stories.md) — AC-1
 
 ```gherkin
 GIVEN User lần đầu truy cập Dashboard sau khi tính năng được bật
@@ -260,7 +260,7 @@ THEN  hệ thống hiển thị prompt xin quyền: "Cho phép Antigravity gửi
 ```
 
 ### AC-9: Native Push Notification Behavior
-> 📌 Source: [US-F16-07](../stories/F14-notification-center-stories.md) — AC-2
+> 📌 Source: [US-F16-07](../stories/F16-notification-center-stories.md) — AC-2
 
 ```gherkin
 GIVEN User đã cấp quyền Push Notification của trình duyệt

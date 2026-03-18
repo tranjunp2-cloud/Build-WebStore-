@@ -107,7 +107,7 @@ SO THAT I can easily create and publish content for my customers
 ## 9. User Flow
 
 ```
-[Entry point: Dashboard > "Blog" menu]
+[Entry point: CMS Sidebar > My Webstore > Blog menu]
   ↓
 Step 1: User sees list of Blog Posts (Empty state if none).
   ↓

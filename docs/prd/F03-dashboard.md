@@ -135,11 +135,11 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 ```text
 ┌─────────────────────────────────────────────────────┐
 │  Sidebar           │  Dashboard Overview            │
-│  Dashboard ☀️      │  Good morning, SME Owner! 👋    │
-│  My Sites          │  ┌────┐ ┌────┐ ┌────┐ ┌────┐   │
-│  SEO               │  │5.2K│ │150 │ │12  │ │$300│   │
-│  Analytics         │  │Viw │ │Lead│ │Ords│ │Rev │   │
-│                    │  └────┘ └────┘ └────┘ └────┘   │
+│  📊 Dashboard ▼    │  Good morning, SME Owner! 👋    │
+│    ├ Analytics     │  ┌────┐ ┌────┐ ┌────┐ ┌────┐   │
+│    └ SEO           │  │5.2K│ │150 │ │12  │ │$300│   │
+│  ✏️ Editor         │  │Viw │ │Lead│ │Ords│ │Rev │   │
+│  ...               │  └────┘ └────┘ └────┘ └────┘   │
 │                    │  ┌─ Actions Needed ───────┐    │
 │                    │  │ • Order #001 pending   │    │
 │                    │  │ • Order #002 pending   │    │

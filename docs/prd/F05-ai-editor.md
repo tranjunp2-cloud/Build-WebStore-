@@ -1,7 +1,7 @@
 # PRD: AI Editor — Split Screen (F05)
 > **Version:** 1.1 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
 > **Priority:** P0 🌟 | **Sprint:** Wave 1 | **Size:** XL
-> **Depends on:** F04 Block Renderer ✅, F01 AI Builder ✅ | **Blocks:** F11 Undo/Redo, F12 Auto-Save
+> **Depends on:** F04 Block Renderer ✅, F01 AI Builder ✅, F07 Template Gallery 🎨 | **Blocks:** F11 Undo/Redo, F12 Auto-Save
 
 ---
 
@@ -129,6 +129,7 @@ SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 | FR-25 | Logo Scaling & AI Favicon: Upload Logo → tự resize/adapt theo chuẩn (VD: max-height 60px). AI tự xử lý extract ra Favicon (file .ico/png nhỏ). | US-F05-07 | P1 | |
 | FR-26 | Global Settings Panel (Right Sidebar): Khi không focus block nào, hiển thị Cấu hình Toàn cục. Chứa mục Nhận diện (Tên cửa hàng, Logo), Liên hệ (SDT, Email, Trụ sở), Mạng xã hội, và Cấu hình SEO cơ bản (Title, Description). | US-F05-12 | P0 | Data bound |
 | FR-27 | Page-Level SEO & AI Content: Trong Page Manager hoặc Settings, cho phép tùy chỉnh Meta Title, Description, Slug cho từng trang. Bổ sung nút "✨ Tự động Tối ưu SEO" để AI đọc các text blocks trên canvas và tự sinh metadata phù hợp. | US-F05-13 | P1 | Content-aware AI |
+| FR-28 | Template Gallery Integration: Entry point để mở Template Gallery modal, hỗ trợ AI Search và Smart Swap. | US-F07-04 | P0 | Integrated with F07 |
 
 ---
 
@@ -144,6 +145,8 @@ SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 ## 9. User Flow
 
 ```
+[Entry point: CMS Sidebar > My Webstore > Editor]
+  ↓
 /editor/:siteId (authenticated)
   ↓
 Load 3-panel layout + fetch site blocks
@@ -151,6 +154,8 @@ Load 3-panel layout + fetch site blocks
 User action:
   ├── Chat "Đổi màu chủ → xanh mint"
   │     → AI stream → preview update → chat shows "Done + Undo"
+  ├── Templates Icon → Open Gallery Modal → AI Search/Browse → Apply
+  │     → Smooth Swap (Preserve content) → Undo support
   ├── Hover element → Click ✨ → mini popup → type instruction → apply
   ├── Drag handle → block reorder → update Zustand state + auto save
   ├── Pages tab → add/delete page → soft delete + undo toast
@@ -163,9 +168,9 @@ User action:
 
 ```
 ┌─ /editor/:siteId ──────────────────────────────────────────┐
-│ ┌─ Toolbar ──────────────────────────────────────────────┐ │
-│ │ [Pages ▼] [Undo] [Redo] [Màn hình 💻▼] [👁] [🚀 Publish] │ │
-│ └────────────────────────────────────────────────────────┘ │
+│ ┌─ Toolbar ────────────────────────────────────────────────────────────┐ │
+│ │ [Pages ▼] [Templates 🎨] [Undo] [Redo] [Màn hình 💻▼] [👁] [🚀 Publish] │ │
+│ └──────────────────────────────────────────────────────────────────────┘ │
 │ ┌────────────┐ ┌─────────────────────────┐ ┌──────────────┐│
 │ │ 🛠 BLOCKS / │ │  LIVE PREVIEW (iframe)  │ │ ⚙️ SETTINGS  ││
 │ │ 🤖 CHAT    │ │                         │ │ (Contextual) ││
