@@ -81,6 +81,34 @@ describe('Sites APIs', () => {
             expect(result.success).toBe(true)
             expect(result.message).toBe('Saved successfully')
         })
+
+        it('returns 200 and updates locale and shippingConfig', async () => {
+            const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
+                method: 'PATCH',
+                body: JSON.stringify({ 
+                    locale: 'ms',
+                    shippingConfig: { westRate: 1000, eastRate: 2000, freeAbove: 5000 }
+                })
+            })
+            
+            const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
+            const result = await res.json()
+            
+            expect(res.status).toBe(200)
+            expect(result.success).toBe(true)
+            
+            // Verify payload.update was called with the correct data
+            const { getPayload } = await import('payload')
+            const payload = await getPayload({ config: {} as any })
+            expect(payload.update).toHaveBeenCalledWith(expect.objectContaining({
+                collection: 'sites',
+                id: '123',
+                data: expect.objectContaining({
+                    locale: 'ms',
+                    shippingConfig: { westRate: 1000, eastRate: 2000, freeAbove: 5000 }
+                })
+            }))
+        })
     })
 
     describe('PATCH & DELETE /api/sites/[siteId]/publish', () => {
@@ -157,10 +185,17 @@ describe('Sites APIs', () => {
             expect(res.status).toBe(404)
         })
 
-        it('returns 200 with site and page data', async () => {
+        it('returns 200 with site and page data (including locale and shippingConfig)', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                findByID: vi.fn().mockResolvedValue({ id: '123', name: 'Test Site', status: 'draft', siteType: 'business' }),
+                findByID: vi.fn().mockResolvedValue({ 
+                    id: '123', 
+                    name: 'Test Site', 
+                    status: 'draft', 
+                    siteType: 'business',
+                    locale: 'ms',
+                    shippingConfig: { westRate: 800, eastRate: 1500 }
+                }),
                 find: vi.fn().mockResolvedValue({
                     docs: [{ id: 'page-1', title: 'Home', layout: [{ blockType: 'hero' }] }]
                 })
@@ -170,7 +205,10 @@ describe('Sites APIs', () => {
             const res = await EditorDataGET(req, { params: Promise.resolve({ siteId: '123' }) })
             expect(res.status).toBe(200)
             const result = await res.json()
+            
             expect(result.site.name).toBe('Test Site')
+            expect(result.site.locale).toBe('ms')
+            expect(result.site.shippingConfig.westRate).toBe(800)
             expect(result.page.layout[0].blockType).toBe('hero')
         })
     })
