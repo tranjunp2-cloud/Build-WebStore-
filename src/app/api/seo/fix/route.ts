@@ -13,6 +13,9 @@ import { checkRateLimit } from '@/lib/rateLimit'
  * Body: { siteId: string }
  */
 
+import { seoFixSchema } from '@/lib/validations/seo'
+import { parseRequest } from '@/lib/validations/helpers'
+
 export const POST = withAuth(async (user, request) => {
     try {
         const payload = await getPayload({ config })
@@ -26,13 +29,10 @@ export const POST = withAuth(async (user, request) => {
             )
         }
 
-        const { siteId } = await request.json()
-        if (!siteId) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'siteId is required' } },
-                { status: 422 }
-            )
-        }
+        const { data, errorResponse } = await parseRequest(request, seoFixSchema)
+        if (errorResponse) return errorResponse
+        
+        const { siteId } = data!
 
         // Get site info
         const site = await payload.findByID({ collection: 'sites', id: siteId })

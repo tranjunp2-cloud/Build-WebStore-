@@ -16,12 +16,12 @@
 
 | Story ID | Title | File | Status |
 |----------|-------|------|--------|
-| US-F02-01 | Register & Welcome | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Done ✅ |
-| US-F02-02 | Login | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Done ✅ |
-| US-F02-03 | Auth Guard | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Done ✅ |
-| US-F02-04 | Logout | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Done ✅ |
-| US-F02-05 | Forgot Password | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Done ✅ |
-| US-F02-06 | Reset Password | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Done ✅ |
+| US-F02-01 | Register & Welcome | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
+| US-F02-02 | Login | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
+| US-F02-03 | Auth Guard | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
+| US-F02-04 | Logout | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
+| US-F02-05 | Forgot Password | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
+| US-F02-06 | Reset Password | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
 | US-F02-07 | Two-Factor Authentication (Email) | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
 
 ---
