@@ -13,6 +13,14 @@ vi.mock('@/lib/auth', () => ({
     getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
 }))
 
+// Mock Stripe checkout session creation
+vi.mock('@/lib/payment/stripe', () => ({
+    createStripeCheckoutSession: vi.fn().mockResolvedValue({
+        sessionId: 'cs_test_123',
+        url: 'https://checkout.stripe.com/pay/cs_test_123',
+    }),
+}))
+
 // Mock thư viện PayloadCMS để không gọi DB thật
 vi.mock('payload', () => {
     // Tạo giả lập db Payload CMS
@@ -20,6 +28,14 @@ vi.mock('payload', () => {
         findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
             if (collection === 'sites' && id === 'site-123') {
                 return { id: 'site-123', tenant: 'tenant-456' }
+            }
+            if (collection === 'tenants' && id === 'tenant-456') {
+                return {
+                    id: 'tenant-456',
+                    slug: 'test-store',
+                    stripeAccountId: 'acct_test_merchant',
+                    stripeOnboardingComplete: true,
+                }
             }
             if (collection === 'products' && id === 'prod-1') {
                 return { id: 'prod-1', name: 'Mock Product', price: 100, inventory: 10, currency: 'MYR' }
@@ -97,5 +113,6 @@ describe('POST /api/orders/create', () => {
         expect(json.data.total).toBe(212)
         expect(json.data.currency).toBe('MYR')
         expect(json.data.status).toBe('pending')
+        expect(json.data.checkoutUrl).toBe('https://checkout.stripe.com/pay/cs_test_123')
     })
 })

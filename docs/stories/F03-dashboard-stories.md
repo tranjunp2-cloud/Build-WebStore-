@@ -1,53 +1,327 @@
-# User Stories: Dashboard (F03)
+# User Stories: Dashboard Suite (F03)
 
-> **Feature:** F03 — Dashboard Overview  
-> **Wave:** 1 | **Priority:** P0 | **Ref PRD:** [F03-dashboard.md](../prd/F03-dashboard.md)
+> **Feature:** F03 — Dashboard Overview, Analytics & SEO
+> **Wave:** 3 | **Priority:** P0 | **Ref PRD:** [F03-dashboard.md](../prd/F03-dashboard.md)
 
 ---
 
-## US-006: Dashboard — Overview
+## US-F03-01: Dashboard — Overview
 
-**Wave 1** | **P0** | **M** | Status: Ready
+**Wave 3** | **P0** | **M** | **Status:** Ready
 
 ### Story
+
 ```
-As a   site owner đã có website
-I want thấy tổng quan khi login
-So that tôi biết status, actions cần làm
+As a   site owner đang vận hành website
+I want thấy tổng quan Metrics và Action List theo nhu cầu tại Dashboard
+  AND có thể chọn khoảng thời gian (Hôm nay, 7 ngày, 30 ngày)
+So that tôi kiểm soát những chỉ số mình quan tâm nhất một cách linh hoạt
 ```
 
-### AC-006A: Dashboard — Has Sites
+### Acceptance Criteria
+
+#### AC-1: Happy Path — Dashboard Overview
+
+#### AC-1: Happy Path — Default Dashboard Overview
+
 ```gherkin
-GIVEN user login, có site
+GIVEN user login và có 1 site đang active
+WHEN  vào /dashboard (mặc định filter 7 ngày qua)
+THEN  hiện 4 stats cards mặc định (theo thứ tự ưu tiên):
+      1. Tỉ lệ người dùng truy cập / Lượt views (Traffic)
+      2. Số lượng clicks vào widgets/call (Leads)
+      3. Tổng số lượng clicks vào sản phẩm/giỏ hàng (Engagement/Sales intent)
+      4. Doanh thu hoặc Pending Orders (Nguồn: F10)
+  AND hiện danh sách 3-5 Pending Orders mới nhất
+  AND hiện SEO Health Widget (Score + CTA Fix)
+```
+
+#### AC-2: Time Period Filter on Overview
+
+```gherkin
+GIVEN user ở /dashboard
+WHEN  chọn bộ lọc thời gian (Today, 7 days, 30 days)
+THEN  các giá trị ở stats cards và biểu đồ (nếu có) update ngay lập tức theo khoảng thời gian mới
+  AND lưu lại lựa chọn này cho session hiện tại
+```
+
+#### AC-3: Customizing Widgets (Sắp xếp / Ẩn hiện)
+
+```gherkin
+GIVEN user ở /dashboard
+WHEN  click vào nút "Tùy chỉnh Dashboard"
+THEN  hiển thị modal/panel cho phép user chọn các metrics muốn hiển thị:
+      - Views tổng
+      - Lượt mở trang (Page views) theo URL cụ thể
+      - Lượt truy cập Blog nhiều nhất
+      - Lượt Clicks Widget
+      - Checkout/Cart clicks
+  AND user có thể kéo thả để reorder vị trí các metrics
+  AND save lại configuration vào account preference
+```
+
+#### AC-2: Empty State
+
+```gherkin
+GIVEN user login nhưng chưa có site nào
 WHEN  vào /dashboard
-THEN  hiện: Total Sites, Total Views, Storage Used, AI Credits
-AND   site cards grid: thumbnail + name + status badge + actions
-```
-
-### AC-006B: Dashboard — Empty State
-```gherkin
-GIVEN chưa có site
-WHEN  vào dashboard
 THEN  empty state: icon + "Tạo website đầu tiên" + CTA → /onboarding
 ```
 
-### AC-006C: Dashboard — Unpublished Banner
-```gherkin
-GIVEN site chưa publish
-WHEN  vào dashboard
-THEN  banner: "Website chưa live. Publish ngay →"
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Overview fetch đúng dữ liệu từ Analytics và Orders.
+
+---
+
+## US-F03-02: Analytics Details
+
+**Wave 3** | **P0** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   site owner
+I want xem chi tiết traffic và pages hiệu quả nhất
+So that tôi hiểu hành vi khách hàng
 ```
 
-### AC-006D: Dashboard — Loading
+### Acceptance Criteria
+
+#### AC-1: Analytics View
+
 ```gherkin
-GIVEN user vào /dashboard
-WHEN  data đang fetch
-THEN  hiện skeleton: 4 card placeholders + 3 site card skeletons
-AND   skeleton animate shimmer
-AND   KHÔNG hiện spinner tròn
+GIVEN user ở /dashboard/analytics
+WHEN  page load
+THEN  hiện Daily Bar Chart (theo Today, 7d, 30d)
+  AND hiện danh sách hạng mục hiệu quả nhất (chia tab hoặc list):
+      - Top Pages (Lượt mở trang nhiều nhất)
+      - Top Products (Sản phẩm được click nhiều nhất)
+      - Top Blogs (Bài blog nhiều page views nhất)
+  AND có so sánh % change so với kỳ trước đó
 ```
+
+#### AC-2: Empty Data State
+
+```gherkin
+GIVEN user ở /dashboard/analytics
+WHEN  chưa có dữ liệu tracking nào trong kỳ được chọn
+THEN  hiện empty state cho chart: "Chưa có dữ liệu trong khoảng thời gian này"
+  AND giá trị các metrics đều là 0
+```
+
+#### AC-3: API Failure
+
+```gherkin
+GIVEN user đang ở /dashboard/analytics
+WHEN  fetch data bị lỗi (timeout hoặc server error)
+THEN  hiển thị toast error "Không thể tải dữ liệu Analytics"
+  AND cho phép user nhấn "Thử lại"
+```
+
+### Analytics / Tracking Notes
+- Track sự kiện `view_analytics_dashboard` với properties `period_selected`.
+- Track sự kiện `change_analytics_period`.
 
 ### Definition of Done
+
 - [ ] 9-Point Checklist pass
-- [ ] Empty state renders correctly
-- [ ] Stats cards hiện đúng data
+- [ ] Date period selector filters charts correctly.
+
+---
+
+## US-F03-03: SEO Dashboard Overview ⭐
+
+**Wave 3** | **P0 🌟** | **L** | **Status:** Ready
+
+### Story
+
+```
+As a   site owner muốn traffic organic
+I want thấy SEO health tổng quan và fix bằng AI
+So that Google index site tốt hơn
+```
+
+### Acceptance Criteria
+
+#### AC-1: Happy Path — SEO Score Dashboard
+
+```gherkin
+GIVEN user ở /dashboard/seo
+WHEN  page load
+THEN  Overall SEO Score (0-100) hiển thị rõ
+  AND breakdown: Meta Tags, Content, Technical
+```
+
+#### AC-2: Generate Sitemap
+
+```gherkin
+GIVEN click "Generate Sitemap"
+WHEN  click
+THEN  auto-generate sitemap.xml
+  AND toast "Sitemap đã tạo"
+```
+
+#### AC-3: Auto-scan Failure
+
+```gherkin
+GIVEN user ở /dashboard/seo
+WHEN  hệ thống backend không thể scan trang (API error)
+THEN  hiển thị state lỗi cho widget thay vì score
+  AND có nút "Thử scan lại"
+```
+
+### Analytics / Tracking Notes
+- Track sự kiện `view_seo_dashboard`.
+- Track sự kiện `generate_sitemap_clicked`.
+
+### Definition of Done
+
+- [ ] Score calculation works correctly
+
+---
+
+## US-F03-04: Auto SEO Meta Generation
+
+**Wave 3** | **P0** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   store owner with no SEO knowledge
+I want store tự động có proper meta tags khi publish
+So that tôi xuất hiện trên Google không cần thuê SEO consultant
+```
+
+### Acceptance Criteria
+
+#### AC-1: Happy Path — Auto Meta on First Publish
+
+```gherkin
+GIVEN I publish my store for the first time và chưa manually set bất kỳ SEO meta nào
+WHEN  publish action completes
+THEN  all published pages have AI-generated:
+      meta title (≤ 60 chars, includes business name + primary keyword)
+  AND meta description (≤ 160 chars, compelling, includes a call-to-action)
+```
+
+#### AC-2: Retry mechanism if generation fails
+
+```gherkin
+GIVEN AI service fail khi đang generate meta tags
+WHEN  tiến trình publish hoàn tất
+THEN  hệ thống lưu lại log lỗi và queue để tự động retry background
+```
+
+### Analytics / Tracking Notes
+- Track sự kiện `auto_seo_meta_generated` (background).
+
+### Additional Criteria
+
+- [ ] Product pages: format = "{Product Name} | {Shop Name} | Buy Online Malaysia"
+- [ ] Homepage: format = "{Shop Name} | {Business Category} Online Malaysia"
+- [ ] JSON-LD Product schema auto-injected on every product page
+- [ ] Sitemap.xml auto-generated on publish
+
+### Definition of Done
+
+- [ ] Meta limits enforced.
+
+---
+
+## US-F03-05: AI SEO Fix All Issues
+
+**Wave 3** | **P0** | **L** | **Status:** Ready
+
+### Story
+
+```
+As a   store owner reviewing SEO dashboard
+I want một nút fix toàn bộ SEO issues tự động
+So that tôi cải thiện search ranking chỉ với 1 action
+```
+
+### Acceptance Criteria
+
+#### AC-1: Happy Path — Fix All với Preview
+
+```gherkin
+GIVEN my SEO dashboard shows warnings (missing alt text, heavy titles)
+WHEN  I click "AI Fix All Issues"
+THEN  AI proposes changes — user can approve or skip individual fixes
+  AND SEO score updates to reflect improvements
+  AND tất cả trong 15 giây
+  AND all fixes undoable as single batch action
+```
+
+#### AC-2: Timeout or Partial Failure
+
+```gherkin
+GIVEN I click "AI Fix All Issues"
+WHEN  tiến trình bị quá 15 giây hoặc lỗi nội bộ
+THEN  hiển thị toast lỗi: "Không thể hoàn tất AI Fix All, vui lòng thử lại"
+  AND rollback bất kỳ thay đổi nào chưa hoàn tất (nếu có thể)
+```
+
+### Analytics / Tracking Notes
+- Track sự kiện `ai_fix_all_seo_started`.
+- Track sự kiện `ai_fix_all_seo_completed` với properties `issues_fixed_count`.
+
+### Definition of Done
+
+- [ ] Fix-all completes trong < 15 giây
+- [ ] Undo batch fix hoạt động đúng
+
+---
+
+## US-F03-06: Basic SEO Keyword Tracker
+
+**Wave 3** | **P1** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   site owner
+I want theo dõi thứ hạng của một vài từ khóa quan trọng nhất trên Google
+So that tôi biết nỗ lực SEO của mình có đang mang lại kết quả thiết thực không
+```
+
+### Acceptance Criteria
+
+#### AC-1: Happy Path — Manage Tracked Keywords
+
+```gherkin
+GIVEN user ở /dashboard/seo
+WHEN  cuộn đến phần "Keyword Tracker"
+THEN  hiển thị dashboard nhỏ cho phép add tối đa 5 từ khóa (Core keywords)
+  AND có ô input để "Thêm từ khóa mới" (disable nếu đã đủ 5)
+```
+
+#### AC-2: View Keyword Ranks
+
+```gherkin
+GIVEN user đã add ít nhất 1 từ khóa vào tracker
+WHEN  ở /dashboard/seo
+THEN  hiển thị list các từ khóa đang track
+  AND hiển thị Thứ hạng (Rank) hiện tại trên SERP (Search Engine Results Page)
+  AND hiển thị mũi tên lên/xuống (Trend) so với lần audit trước đó
+```
+
+#### AC-3: Auto Update Frequency
+
+```gherkin
+GIVEN hệ thống có danh sách tracking keywords của user
+WHEN  cron job chạy (vd: 1 tuần 1 lần hoặc manual fetch)
+THEN  hệ thống tự động query hạng của website theo từng keyword
+  AND cập nhật kết quả mới nhất vào database
+```
+
+### Analytics / Tracking Notes
+- Track sự kiện `add_seo_keyword`.
+- Track sự kiện `remove_seo_keyword`.
+
+### Definition of Done
+
+- [ ] Giới hạn đúng 5 keywords/tenant để kiểm soát API cost.
+- [ ] Cron job hoặc API fetch rank hoạt động chính xác (dùng third-party API rẻ/scrape cơ bản).
