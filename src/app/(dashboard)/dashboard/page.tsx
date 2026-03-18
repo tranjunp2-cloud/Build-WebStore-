@@ -4,6 +4,9 @@ import { Plus, Sparkles } from 'lucide-react'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+// Force dynamic — requires auth context + getPayload() at runtime
+export const dynamic = 'force-dynamic'
+
 import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 import { formatRelativeTime, formatStorage } from '@/lib/utils'

@@ -2,6 +2,9 @@ import { RootPage, generatePageMetadata } from '@payloadcms/next/views'
 import config from '@payload-config'
 import { importMap } from '../importMap.js'
 
+// Force dynamic — Payload CMS admin requires full server context
+export const dynamic = 'force-dynamic'
+
 type PageProps = {
     params: Promise<{ segments?: string[] }>
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
