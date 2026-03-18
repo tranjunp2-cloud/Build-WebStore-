@@ -33,7 +33,7 @@ function isRemoteDatabase(): boolean {
     raw.length > 0 &&
     !raw.includes('localhost') &&
     !raw.includes('127.0.0.1') &&
-    !raw.includes('@postgres:') // Exclude Docker networking hostname
+    !raw.includes('postgres:')
   )
 }
 
