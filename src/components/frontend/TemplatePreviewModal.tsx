@@ -21,6 +21,7 @@ export function TemplatePreviewModal({
 }: TemplatePreviewModalProps) {
     const { t } = useI18n()
     const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop')
+    const [iframeLoaded, setIframeLoaded] = useState(false)
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -31,7 +32,7 @@ export function TemplatePreviewModal({
     }, [onClose])
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center" onClick={onClose}>
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
 
@@ -54,7 +55,7 @@ export function TemplatePreviewModal({
                     </div>
                     <div className="flex items-center gap-2">
                         {/* View mode toggle */}
-                        <div className="flex items-center gap-1 rounded-lg bg-white/5 p-0.5">
+                        <div className="hidden sm:flex items-center gap-1 rounded-lg bg-white/5 p-0.5">
                             <button
                                 onClick={() => setViewMode('desktop')}
                                 className={cn(
@@ -82,11 +83,11 @@ export function TemplatePreviewModal({
                         >
                             {isApplying ? (
                                 <>
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t.gallery.usingTemplate}
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t.gallery.usingTemplate || 'Applying...'}
                                 </>
                             ) : (
                                 <>
-                                    <Sparkles className="h-3.5 w-3.5" /> {t.gallery.useTemplate}
+                                    <Sparkles className="h-3.5 w-3.5" /> {t.gallery.useTemplate || 'Use This Template'}
                                 </>
                             )}
                         </button>
@@ -94,7 +95,7 @@ export function TemplatePreviewModal({
                         <button
                             onClick={onClose}
                             aria-label="Close preview"
-                            className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
+                            className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition-colors ml-2"
                         >
                             <X className="h-4 w-4" />
                         </button>
@@ -102,17 +103,23 @@ export function TemplatePreviewModal({
                 </div>
 
                 {/* Preview iframe */}
-                <div className="flex-1 flex items-center justify-center bg-[#09090b] overflow-hidden p-4">
+                <div className="flex-1 flex items-center justify-center bg-[#09090b] overflow-hidden p-2 sm:p-4">
                     <div
                         className={cn(
-                            'h-full rounded-xl overflow-hidden border border-white/5 transition-all duration-500 bg-[#09090b]',
-                            viewMode === 'desktop' ? 'w-full' : 'w-[min(370px,90vw)]'
+                            'relative h-full rounded-xl overflow-hidden border border-white/5 transition-all duration-500 bg-[#09090b]',
+                            viewMode === 'desktop' ? 'w-full' : 'w-[min(370px,100%)] h-[min(800px,100%)]'
                         )}
                     >
+                        {!iframeLoaded && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-[#09090b] z-10">
+                                <Loader2 className="h-8 w-8 animate-spin text-white/30" />
+                            </div>
+                        )}
                         <iframe
                             src={`/api/templates/preview?id=${template.id}`}
-                            className="w-full h-full border-0"
+                            className={cn("w-full h-full border-0 transition-opacity duration-300", iframeLoaded ? "opacity-100" : "opacity-0")}
                             title={`Preview: ${template.name}`}
+                            onLoad={() => setIframeLoaded(true)}
                         />
                     </div>
                 </div>
