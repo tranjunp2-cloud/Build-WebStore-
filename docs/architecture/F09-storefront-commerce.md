@@ -43,9 +43,10 @@ Visitor Browser
 
 /sites/[slug]/checkout/page.tsx (CSR - 'use client')
 ├── Nav (← Back to Products)
-├── CheckoutForm (contact + shipping fields)
-│   ├── ContactSection (name*, email*, phone)
-│   └── ShippingSection (line1, city, state dropdown, postcode)
+├── CheckoutForm (contact + shipping fields + payment)
+│   ├── ContactSection (name*, email*, phone*)
+│   ├── ShippingSection (line1*, line2, city*, state dropdown*, postcode*)
+│   └── PaymentSection (COD, QR Banking) + QR Proof Upload (nếu chọn QR)
 ├── OrderSummary (sticky sidebar)
 │   ├── CartItemList (name × qty = total per item)
 │   └── TotalSection (subtotal + SST 6% + total)
@@ -136,13 +137,17 @@ Visitor loads page → POST /api/analytics/track
   customer: {
     name: string,                    // required
     email: string,                   // required
-    phone?: string,
-    address?: {
-      line1: string, line2?: string,
-      city: string, state: string,   // Malaysian state
-      postcode: string,
+    phone: string,                   // required
+    address: {                       // required
+      line1: string, line2?: string, // line1 is required
+      city: string, state: string,   // Malaysian state required
+      postcode: string,              // required
       country: "Malaysia"
     }
+  },
+  payment: {
+    method: "COD" | "QR_BANKING",    // required (Stripe is hidden in this phase)
+    proofMediaId?: string            // required for QR_BANKING (reference to uploaded image)
   }
 }
 

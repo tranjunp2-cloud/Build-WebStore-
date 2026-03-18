@@ -1,11 +1,11 @@
-# User Stories: AI Chat Builder (F01)
+# User Stories: AI Web Builder (F01)
 
-> **Feature:** F01 — AI Chat Builder
-> **Wave:** 3 | **Priority:** P0 🌟 | **Ref PRD:** [F01-ai-chat-builder.md](../prd/F01-ai-chat-builder.md)
+> **Feature:** F01 — AI Web Builder
+> **Wave:** 3 | **Priority:** P0 🌟 | **Ref PRD:** [F01-ai-builder.md](../prd/F01-ai-builder.md)
 
 ---
 
-## US-F01-01: AI Chat Builder — Generate Site from Prompt ⭐
+## US-F01-01: AI Builder — Generate Site from Structured Input ⭐
 
 **Wave 3** | **P0 🌟** | **XL** | **Status:** Ready
 
@@ -13,39 +13,43 @@
 
 ```
 As a   SME owner mới đăng ký
-I want mô tả business bằng ngôn ngữ tự nhiên (BM/EN/Mixed)
-So that AI tạo đầy đủ website mà không cần pick template hay fill form
+I want điền thông tin vào ô nhập liệu (Tên doanh nghiệp, Mô tả ngắn, Mặt hàng/Dịch vụ)
+So that AI tạo đầy đủ website phù hợp và chính xác
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: Happy Path — Generate Site từ Prompt
+#### AC-1: Happy Path — Generate Site từ Form Nhập Liệu
 
 ```gherkin
-GIVEN user ở /builder/new
-WHEN  nhập mô tả (VD: "Tiệm bánh handmade quận 3, mở 2020")
-  AND click Enter hoặc nút gửi
-THEN  AI stream phản hồi ngay trong < 2 giây
+GIVEN user ở /builder/new có form nhập liệu
+WHEN  user điền đủ thông tin: Tên doanh nghiệp, Mô tả ngắn, Mặt hàng/Dịch vụ
+  AND click "Tạo Website"
+THEN  hệ thống kiểm tra thông tin đầu vào
+  AND AI bắt đầu sinh Media (Banner, Image Carousel) và Content (About Us, Vision, Mission)
   AND live preview ở khung bên phải cập nhật realtime
-  AND progress hiển thị: "Đang tạo Hero... About... Contact..."
+  AND progress hiển thị: "Đang tạo Banner... About Us... Vision..."
   AND toàn bộ site hoàn thành trong < 60 giây
 ```
 
-#### AC-2: Clarifying Questions — Prompt Thiếu Thông Tin
+#### AC-2: Input Validation — Thiếu Tên Hoặc Dịch Vụ
 
 ```gherkin
-GIVEN AI cần thêm thông tin
-WHEN  prompt thiếu tên cửa hàng hoặc ngành nghề
-THEN  AI hỏi tối đa 2 câu làm rõ (clarifying)
-  AND sau 2 câu → tự động generate với các giả định hợp lý (reasonable assumption)
+GIVEN user submit form tạo website
+WHEN  các trường Tên doanh nghiệp hoặc Bổ sung thông tin bị trống
+THEN  hiển thị báo lỗi đỏ tại ô nhập liệu
+  AND KHÔNG bắt đầu quá trình generate cho tới khi đủ điều kiện
 ```
 
-#### AC-3: Site Generated — Lựa Chọn Tiếp Theo
+#### AC-3: Live Preview & View Modes (View only vs Kéo Thả)
 
 ```gherkin
 GIVEN website đã được generate xong
-WHEN  người dùng nhìn thấy bản preview
-THEN  có 2 options: "Tinh chỉnh" (→ /editor) và "Publish ngay"
+WHEN  người dùng xem bản live preview kế bên
+THEN  hệ thống cung cấp 2 chế độ xem (View Modes):
+        - Full-screen view: Dạng lớn toàn màn hình, hỗ trợ toggle giữa Desktop/Mobile Layout (Chế độ View-only, không thể chỉnh sửa)
+        - Normal view: Hiển thị preview kèm drag handle, cho phép kéo thả (drag and drop) chỉnh sửa vị trí component
+  AND có 2 options next-step: "Tinh chỉnh" (→ /editor) và "Publish ngay"
   AND auto-save draft vào DB
 ```
 
@@ -66,17 +70,17 @@ THEN  toast đỏ "Không thể tạo website. Thử lại"
   AND nút "Thử lại" yêu cầu KHÔNG cần nhập lại prompt
 ```
 
-#### AC-6: Site Page Structure — 4 Trang Bắt Buộc
+#### AC-6: Site Page Structure — 4 Trang & Content Bắt Buộc
 
 ```gherkin
-GIVEN AI generate website cho bất kỳ danh mục business nào
+GIVEN AI generate website dựa trên form đã nhập
 WHEN  quá trình generate hoàn thành
-THEN  website phải có đầy đủ 4 trang:
-        - Homepage: tổng quan business, hero section, CTA thu hút
-        - About Us: lịch sử, năm thành lập, tầm nhìn, sứ mệnh
-        - Products & Services: liệt kê sản phẩm/dịch vụ kinh doanh
-        - Contact Us: địa chỉ, số điện thoại, email, contact form
-  AND   mỗi trang được cấu trúc tự động dựa trên thông tin từ prompt
+THEN  website phải có đầy đủ 4 trang với content được AI tự tạo:
+        - Homepage: Banner hình ảnh, Image Carousel nổi bật, tổng quan business
+        - About Us: Nội dung About Us, Vision (tầm nhìn), Mission (sứ mệnh)
+        - Products & Services: Liệt kê tối ưu các mặt hàng/dịch vụ kinh doanh
+        - Contact Us: Địa chỉ, số điện thoại, email, contact form
+  AND   mỗi trang được cấu trúc tự động dựa trên thông tin nhập vào
   AND   navigation menu hiển thị link đến cả 4 trang
 ```
 
@@ -111,7 +115,7 @@ THEN  layout được chọn tự động phù hợp với loại business:
 
 ---
 
-## US-F01-02: Store Setup — Basic Info (AI Context Collection)
+## US-F01-02: Store Setup — Basic Info Form (AI Context)
 
 **Wave 1** | **P0** | **S** | **Status:** Ready
 
@@ -119,19 +123,22 @@ THEN  layout được chọn tự động phù hợp với loại business:
 
 ```
 As a   owner vừa đăng ký
-I want cấu hình tên và ngành cho website
-So that AI có đủ context để generate đúng site
+I want nhập thông tin cơ bản vào ô nhập liệu nhanh gọn
+So that AI có đủ context (Tên, Mô tả, Mặt hàng) để generate nội dung chính xác
 ```
 
 ### Acceptance Criteria
 
-#### AC-1: Happy Path — Chọn AI Builder Flow
+#### AC-1: Happy Path — Chọn AI Builder Flow & Xem Form
 
 ```gherkin
 GIVEN user ở /onboarding chọn "Tạo bằng AI"
 WHEN  redirect sang /builder/new
-THEN  AI hỏi tên business + ngành trong chat (không form riêng)
-  AND thông tin này lưu vào site.aiContext trong DB
+THEN  hệ thống hiển thị form nhập liệu, bao gồm các ô: 
+        - [Tên doanh nghiệp]
+        - [Mô tả ngắn về doanh nghiệp]
+        - [Mặt hàng/Dịch vụ doanh nghiệp kinh doanh]
+  AND thông tin này tự động lưu vào site.aiContext trong DB
 ```
 
 #### AC-2: Alternative — Chọn Template Flow
@@ -161,7 +168,7 @@ THEN  AI nhắc user cung cấp thêm thông tin
 
 ## US-F01-03: AI Image Generation for Store
 
-**Wave 3** | **P0** | **L** | **Status:** Draft
+**Wave 3** | **P0** | **L** | **Status:** Ready
 
 ### Story
 
@@ -213,147 +220,75 @@ THEN  AI generate ảnh mới thay thế ảnh cũ
 - [ ] Fallback stock image hiển thị đúng khi API fail
 - [ ] Image label "AI Generated ✨" xuất hiện trong editor
 
----
-
-## US-F01-04: One-Click Publish to Live Store
-
-**Wave 3** | **P0** | **M** | **Status:** Draft
-
-### Story
-
-```
-As a   store owner who has finished building
-I want to publish my store with one click
-So that my website goes live immediately on my subdomain
-```
-
-### Acceptance Criteria
-
-#### AC-1: Happy Path — First Publish
-
-```gherkin
-GIVEN I click the "Publish" button in the editor toolbar
-WHEN  publish action completes
-THEN  my store is live at {slug}.primeweb.app within 30 seconds
-  AND a success toast shows the live URL with a "View Store" button
-```
-
-#### AC-2: Re-publish — Update Live Site
-
-```gherkin
-GIVEN my store is already published
-WHEN  I make changes and click "Publish" again
-THEN  changes are live within 30 seconds
-  AND sitemap is re-generated automatically
-```
-
-#### AC-3: Unpublish — Take Site Offline
-
-```gherkin
-GIVEN my store is published
-WHEN  I click "Unpublish"
-THEN  site goes offline
-  AND subdomain returns 404
-  AND editor shows "Draft" badge
-```
-
-### Additional Criteria
-
-- [ ] Publish button always visible in editor toolbar — disabled only if critical validation errors
-- [ ] Editor changes from "Draft" badge to "Live" badge with green dot after first publish
-- [ ] Published store URL is copyable — one-click copy with clipboard feedback toast
-- [ ] SEO meta tags auto-generated on first publish if not manually set
-
-### Definition of Done
-
-- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
-- [ ] Subdomain accessible within 30 seconds of publish
-- [ ] Unpublish works — site returns 404 after unpublish
 
 ---
 
-## US-F01-05: Conversational AI Onboarding Flow
+## US-F01-05: AI Builder Input Forms
 
-**Wave 3** | **P0** | **M** | **Status:** Draft
+**Wave 3** | **P0** | **M** | **Status:** Ready
 
 ### Story
 
 ```
 As a   newly registered SME owner
-I want the AI to guide me through setup with natural, short conversational questions
-So that I can provide my business info comfortably — like chatting with a person, not filling a form
+I want a simple, clear input interface
+So that I can quickly provide my business info without being confused by open-ended questions
 ```
 
 ### Business Value
 
-First impression của product xảy ra ở đây. Nếu AI hỏi quá nhiều câu hoặc dùng ngôn ngữ cứng nhắc như form, user sẽ drop ngay. Conversational flow tự nhiên = conversion rate cao hơn.
+Sử dụng trực tiếp các ô nhập liệu giúp owner có overview những gì AI cần. Validate ngay tại chỗ giúp đảm bảo AI lấy đủ các nội dung như (About us, Vision, Mission) mà không cần đoán hoặc suy luận sai qua các câu trả lời tự do trong chat.
 
 ### Acceptance Criteria
 
-#### AC-1: Happy Path — Chào Mừng Bằng Tiếng Anh
+#### AC-1: Form Interface Layout
 
 ```gherkin
-GIVEN người dùng mới truy cập /builder/new lần đầu
+GIVEN người dùng truy cập /builder/new lần đầu
 WHEN  trang tải (load) xong
-THEN  AI hiển thị tin nhắn chào bằng tiếng Anh
-        VD: "👋 Hi! I'm here to build your website. What's your business about?"
-  AND  tone thân thiện, ngắn gọn — không dài hơn 2 câu
-  AND  có gợi ý ví dụ ngắn bên dưới để user biết cách reply
-        VD: "Example: 'Handmade cake shop in District 3' or 'Online fashion store'"
+THEN  giao diện chính hiển thị một thẻ Card có 3 trường nhập liệu:
+        - Tên doanh nghiệp (Input text)
+        - Mô tả ngắn về doanh nghiệp (Textarea lớn)
+        - Mặt hàng / Dịch vụ kinh doanh (Input text hoặc Tags check)
+  AND  có phần ví dụ (placeholder) cho "Mô tả ngắn": "VD: Tiệm bánh handmade hoạt động từ 2020..."
 ```
 
-#### AC-2: Language Switch — Theo Ngôn Ngữ User Reply
+#### AC-2: Field Validation Before Generate
 
 ```gherkin
-GIVEN AI đang hỏi bằng tiếng Anh
-WHEN  user trả lời bằng ngôn ngữ khác (BM, Vietnamese, Manglish, v.v.)
-THEN  AI detect ngôn ngữ của user reply
-  AND  từ tin nhắn tiếp theo, AI chuyển sang ngôn ngữ đó hoàn toàn
-  AND  ngôn ngữ này được lưu vào session để dùng cho toàn bộ hội thoại
-  AND  KHÔNG yêu cầu user chọn ngôn ngữ qua dropdown hay button
+GIVEN user vừa điền form
+WHEN  click nút "Generate Website"
+THEN  xác thực (validation) các trường bắt buộc (Tên doanh nghiệp, Mặt hàng/Dịch vụ)
+  AND  nếu thiếu, hiển thị lỗi ngay tại ô text tương ứng
 ```
 
-#### AC-3: Conversational Flow — Tối Đa 4 Câu Hỏi / Lựa Chọn
+#### AC-3: Generation Processing
 
 ```gherkin
-GIVEN AI cần thu thập thông tin để generate site
-WHEN  user bắt đầu cuộc trò chuyện
-THEN  AI hỏi tối đa 4 câu hỏi ngắn (hoặc đưa ra quick-select options)
-  AND  mỗi câu hỏi chỉ hỏi 1 thông tin (không hỏi gộp)
-  AND  AI có thể đưa ra lựa chọn nhanh (quick reply chips) thay vì câu hỏi mở
-        VD: [🍔 F&B] [👗 Fashion] [💄 Beauty] [🔧 Services] [📦 Retail] [Khác]
-  AND  sau 4 câu → AI generate luôn, không hỏi thêm
-```
-
-#### AC-4: Natural Language Understanding
-
-```gherkin
-GIVEN user trả lời tự nhiên, không theo cấu trúc
-WHEN  AI nhận được reply như "bánh handmade quận 3, tui mở từ 2020 nha"
-THEN  AI extract được: loại business, location, năm mở
-  AND  AI xác nhận lại ngắn gọn trước khi generate
-        VD: "Got it! Handmade bakery in District 3, est. 2020. Building your site now... 🚀"
-  AND  KHÔNG hỏi lại những thông tin đã mention rồi
+GIVEN form đã điền đủ dữ kiện 
+WHEN  user click "Generate"
+THEN  hệ thống khoá (disable) form và nút bấm
+  AND  hiển thị trạng thái đang gọi AI phân tích content (About Us, Vision, Mission)
+  AND  hiển thị trạng thái đang lấy Banner / Image Carousel
 ```
 
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
-- [ ] AI chào bằng EN khi user vào /builder/new
-- [ ] Language switch xảy ra ngay từ tin nhắn tiếp theo sau khi user reply bằng ngôn ngữ khác
-- [ ] Toàn bộ flow không vượt quá 4 câu hỏi trước khi generate
-- [ ] Quick-reply chips hiển thị đúng và click được
+- [ ] Render đầy đủ 3 form inputs với placeholders
+- [ ] Submit button có validation
+- [ ] Chuyển trạng thái processing đúng khi đủ info
 
 ---
 
 ## US-F01-06: Multilingual Site Output
 
-**Wave 3** | **P0** | **S** | **Status:** Draft
+**Wave 3** | **P0** | **S** | **Status:** Ready
 
 ### Story
 
 ```
-As a   SME owner who chatted in my native language
+As a   SME owner who inputted data in my native language
 I want the generated website content to be in the same language I used in chat
 So that my website feels natural and ready-to-use for my local customers
 ```
@@ -367,7 +302,7 @@ User nói BM → website ra tiếng Anh là mismatch, tạo cảm giác AI khôn
 #### AC-1: Happy Path — Content Theo Ngôn Ngữ Chat
 
 ```gherkin
-GIVEN user đã chat với AI bằng Bahasa Melayu
+GIVEN user đã nhập form bằng Bahasa Melayu
 WHEN  site quá trình generate hoàn thành
 THEN  mọi text content trong site (headlines, body copy, CTA, nav labels)
         được generate bằng Bahasa Melayu
@@ -375,14 +310,14 @@ THEN  mọi text content trong site (headlines, body copy, CTA, nav labels)
 ```
 
 ```gherkin
-GIVEN user đã chat với AI bằng tiếng Việt
+GIVEN user đã nhập form bằng tiếng Việt
 WHEN  site quá trình generate hoàn thành
 THEN  mọi text content trong site được generate bằng tiếng Việt
   AND  tone chuyên nghiệp, phù hợp với SME Việt Nam
 ```
 
 ```gherkin
-GIVEN user chat bằng tiếng Anh hoặc Manglish
+GIVEN user nhập form bằng tiếng Anh hoặc Manglish
 WHEN  site quá trình generate hoàn thành
 THEN  content được generate bằng tiếng Anh
 ```
@@ -400,7 +335,7 @@ THEN  AI gợi ý thêm: "Want an English version too? [Add English Content]"
 #### AC-3: Fallback — Ngôn Ngữ Không Hỗ Trợ
 
 ```gherkin
-GIVEN user chat bằng ngôn ngữ AI chưa hỗ trợ tốt (VD: Tamil, Mandarin)
+GIVEN user nhập form bằng ngôn ngữ AI chưa hỗ trợ tốt (VD: Tamil, Mandarin)
 WHEN  generation chạy
 THEN  site content được generate bằng tiếng Anh (fallback)
   AND  AI thông báo: "Your site content has been generated in English. You can edit it in the editor."
@@ -418,7 +353,7 @@ THEN  site content được generate bằng tiếng Anh (fallback)
 
 ## US-F01-07: Post-Generation Confirm & CMS Redirect
 
-**Wave 3** | **P0** | **M** | **Status:** Draft
+**Wave 3** | **P0** | **M** | **Status:** Ready
 
 ### Story
 
@@ -489,7 +424,7 @@ THEN  domain được copy vào clipboard
 
 ## US-F01-08: Drag-and-Drop Block Reorder in Builder Preview
 
-**Wave 3** | **P0** | **M** | **Status:** Draft
+**Wave 3** | **P0** | **M** | **Status:** Ready
 
 ### Story
 
@@ -505,15 +440,16 @@ Sau khi AI generate site, bố cục có thể chưa đúng ý user. Nếu phả
 
 ### Acceptance Criteria
 
-#### AC-1: Happy Path — Kéo Thả Đổi Vị Trí Block
+#### AC-1: Happy Path — Kéo Thả Đổi Vị Trí Ở Normal View
 
 ```gherkin
-GIVEN website đã được generate xong và user đang xem preview ở /builder/new
-WHEN  user hover lên một section (VD: About Us block)
+GIVEN website đã được generate xong và user đang xem preview ở /builder/new (Normal view layout)
+WHEN  user hover lên một section component (VD: About Us block)
 THEN  hiển thị drag handle (⠿) ở cạnh trái/trên section
 WHEN  user kéo section đó lên/xuống và thả vào vị trí mới
 THEN  section di chuyển tức thì vào vị trí mới trong preview
   AND thứ tự blocks được cập nhật trong state (builderStore)
+  AND KHÔNG thể dùng drag-and-drop nếu preview đang ở dạng lớn toàn màn hình (Full-screen view)
   AND KHÔNG cần reload lại preview
 ```
 

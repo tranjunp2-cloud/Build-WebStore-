@@ -45,9 +45,9 @@
 
 | | |
 |---|---|
-| **Decision** | AI Chat Builder as primary, Template Gallery as fallback (P1) |
+| **Decision** | AI Web Builder as primary, Template Gallery as fallback (P1) |
 | **Options** | Template gallery first (v1), AI Chat only, Choice: Template OR AI |
-| **Chosen** | **AI Chat Builder primary** — Template Gallery kept as P1 fallback |
+| **Chosen** | **AI Web Builder primary** — Template Gallery kept as P1 fallback |
 | **Rationale** | Template selection creates choice paralysis (key v1 problem). AI Chat removes all decisions from user — fastest path to live. Consistent with "AI-first" positioning and 5-min benchmark. |
 | **Status** | ✅ Decided |
 
@@ -157,7 +157,7 @@
 | **Options** | No Halal feature, Text-only Halal claim, Cert upload + verified badge |
 | **Chosen** | **Cert upload + badge** — toggle per product, JAKIM cert image |
 | **Rationale** | F&B and Beauty are top categories for MY SMEs. Halal cert is critical trust signal — consumers check before buying. Badge on storefront + cert viewable = highest trust. |
-| **Status** | ✅ Decided — Added to F09 v2.0 |
+| **Status** | ✅ Decided — Added to F08 v2.0 |
 
 ---
 
@@ -169,7 +169,7 @@
 | **Options** | Email only, Live chat widget, WhatsApp button, All channels |
 | **Chosen** | **WhatsApp floating button** (storefront) + **wa.me notification** (orders) |
 | **Rationale** | 90%+ Malaysian users use WhatsApp daily. Lower friction than email for SMEs. P0: wa.me links (no API). P1: WhatsApp Business API for automated messages. |
-| **Status** | ✅ Decided — Added to F10 AC-11, F11 AC-3b |
+| **Status** | ✅ Decided — Added to F09 AC-11, F10 AC-3b |
 
 ---
 
@@ -181,7 +181,7 @@
 | **Options** | Free shipping all, Variable by weight, Flat rate by region, Carrier API |
 | **Chosen** | **Flat rate by region** — Semenanjung RM 8, Sabah/Sarawak RM 15 |
 | **Rationale** | Simple for MVP. 85% orders are Semenanjung. Seller can customize rates. Free shipping threshold (configurable). Carrier API (J&T, Pos Laju) in Wave 7 via EasyParcel. |
-| **Status** | ✅ Decided — F17 PRD created |
+| **Status** | ✅ Decided — F14 PRD created |
 
 ---
 
