@@ -554,9 +554,9 @@ graph LR
   F02 --> F06[F-06 Undo/Redo]
   F02 --> F07[F-07 Auto-Save]
   F02 --> F08[F-08 Publish]
-  F01 --> F09[F-09 AI Images]
+  F01 --> F08[F-09 AI Images]
   F04[F-04 SEO Engine] --> F08
-  F05 --> F10[F-10 Templates]
+  F05 --> F09[F-10 Templates]
 ```
 
 ### Sprint Order:
