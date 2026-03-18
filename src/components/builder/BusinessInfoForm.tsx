@@ -24,11 +24,17 @@ const STYLE_OPTIONS = [
     { value: 'minimal', label: 'Minimal & Simple' },
 ]
 
-export default function BusinessInfoForm() {
+interface BusinessInfoFormProps {
+    onSubmit?: (info: BusinessInfo) => void
+    isGenerating?: boolean
+}
+
+export default function BusinessInfoForm({ onSubmit, isGenerating }: BusinessInfoFormProps) {
     const setBusinessInfo = useBuilderStore(s => s.setBusinessInfo)
 
     const [form, setForm] = useState({
         businessName: '',
+        shortDescription: '',
         industry: '',
         products: '',
         targetAudience: '',
@@ -47,8 +53,12 @@ export default function BusinessInfoForm() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        if (!validate()) return
-        setBusinessInfo(form as BusinessInfo)
+        if (!validate() || isGenerating) return
+        if (onSubmit) {
+            onSubmit(form as BusinessInfo)
+        } else {
+            setBusinessInfo(form as BusinessInfo)
+        }
     }
 
     return (
@@ -89,6 +99,21 @@ export default function BusinessInfoForm() {
                                     ${errors.businessName ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-blue-500/50'}`}
                             />
                             {errors.businessName && <p className="text-xs text-red-400">{errors.businessName}</p>}
+                        </div>
+
+                        {/* Short Description */}
+                        <div className="space-y-1.5">
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                                <Briefcase className="h-3.5 w-3.5 text-gray-500" />
+                                Short Description
+                            </label>
+                            <textarea
+                                value={form.shortDescription}
+                                onChange={e => setForm(f => ({ ...f, shortDescription: e.target.value }))}
+                                placeholder="VD: Tiệm bánh handmade hoạt động từ 2020..."
+                                rows={2}
+                                className="w-full rounded-xl border border-white/10 bg-[#1E293B] px-4 py-3 text-sm text-white placeholder-gray-600 outline-none resize-none focus:border-blue-500/50 transition-colors"
+                            />
                         </div>
 
                         {/* Industry */}
@@ -175,10 +200,17 @@ export default function BusinessInfoForm() {
                         {/* Submit */}
                         <button
                             type="submit"
-                            className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:shadow-blue-500/40 hover:brightness-110"
+                            disabled={isGenerating}
+                            className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:shadow-blue-500/40 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Continue — AI will create your website
-                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                            {isGenerating ? (
+                                <>Generating Website...</>
+                            ) : (
+                                <>
+                                    Generate Website
+                                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                                </>
+                            )}
                         </button>
                     </form>
                 </div>

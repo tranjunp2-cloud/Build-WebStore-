@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
                     },
                     aiGenerationMetadata: {
                         generatedAt: new Date().toISOString(),
-                        originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.products}`,
+                        originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
                         businessType: result.siteType,
                     },
                 },
@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
                     },
                     aiGenerationMetadata: {
                         generatedAt: new Date().toISOString(),
-                        originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.products}`,
+                        originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
                         businessType: result.siteType,
                     },
                 },

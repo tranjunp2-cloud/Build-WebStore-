@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { useBuilderStore, type Message } from '@/store/builderStore'
+import { useBuilderStore, type Message, type BusinessInfo } from '@/store/builderStore'
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
@@ -99,7 +99,7 @@ export default function AIBuilderPage() {
     const {
         step, businessInfo,
         status, messages, blocks, theme, siteId, siteName, progress, error,
-        addMessage, setStatus, addBlock, setTheme, setProgress, setSiteId, setSiteName, setError,
+        addMessage, setStatus, addBlock, setTheme, setProgress, setSiteId, setSiteName, setError, setBusinessInfo,
     } = useBuilderStore()
 
     useEffect(() => {
@@ -111,7 +111,7 @@ export default function AIBuilderPage() {
     }, [])
 
     // SSE Stream consumer
-    const startSSEGeneration = useCallback(async (extraInstructions?: string) => {
+    const startSSEGeneration = useCallback(async (info: BusinessInfo, extraInstructions?: string) => {
         setStatus('streaming')
         addMessage({ role: 'assistant', content: '🚀 Starting website creation...' })
 
@@ -120,7 +120,7 @@ export default function AIBuilderPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    businessInfo,
+                    businessInfo: info,
                     extraInstructions,
                     language: 'vi',
                 }),
@@ -168,7 +168,7 @@ export default function AIBuilderPage() {
             setError({ code: 'generation_failed', message: err.message, retryable: true })
             addMessage({ role: 'assistant', content: `❌ An error occurred: ${err.message}\n\nPlease try again!` })
         }
-    }, [businessInfo, setStatus, addMessage, setError])
+    }, [setStatus, addMessage, setError])
 
     const handleSSEEvent = useCallback((event: string, data: any) => {
         switch (event) {
@@ -213,7 +213,7 @@ export default function AIBuilderPage() {
 
         // Start generation with optional extra instructions from user
         if (status === 'idle' || status === 'error') {
-            startSSEGeneration(currentInput)
+            if (businessInfo) startSSEGeneration(businessInfo, currentInput)
         }
     }
 
@@ -251,10 +251,15 @@ export default function AIBuilderPage() {
 
     const isGenerating = status === 'streaming'
     const isDone = status === 'done'
+    
+    const handleGenerateStart = (info: BusinessInfo) => {
+        setBusinessInfo(info)
+        startSSEGeneration(info)
+    }
 
     // Step 1: Show Business Info Form (after all hooks)
     if (step === 'info') {
-        return <BusinessInfoForm />
+        return <BusinessInfoForm onSubmit={handleGenerateStart} isGenerating={isGenerating} />
     }
 
     return (
