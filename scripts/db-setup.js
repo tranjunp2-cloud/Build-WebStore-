@@ -46,6 +46,38 @@ async function getTableCount(pool) {
   return parseInt(result.rows[0].count, 10);
 }
 
+// ─── Direct SQL Migrations ──────────────────────────────────────────────
+// Standalone server can't run Payload's pushDevSchema (missing Drizzle files).
+// Instead, add missing columns directly via ALTER TABLE.
+// Each migration is idempotent — safe to run multiple times.
+const MIGRATIONS = [
+  {
+    name: 'add_stripe_account_id_to_tenants',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS stripe_account_id varchar;`,
+  },
+  {
+    name: 'add_stripe_onboarding_complete_to_tenants',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS stripe_onboarding_complete boolean DEFAULT false;`,
+  },
+  {
+    name: 'add_stripe_account_id_index',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_stripe_account_id_idx ON tenants (stripe_account_id);`,
+  },
+];
+
+async function runMigrations(pool) {
+  console.log(`[db-setup] Running ${MIGRATIONS.length} migrations...`);
+  for (const m of MIGRATIONS) {
+    try {
+      await pool.query(m.sql);
+      console.log(`[db-setup] ✅ ${m.name}`);
+    } catch (e) {
+      // Log but don't fail — column might already exist with different type etc.
+      console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
+    }
+  }
+}
+
 async function checkDB() {
   const pool = createPool();
   if (!pool) {
@@ -61,20 +93,16 @@ async function checkDB() {
     const tableCount = await getTableCount(pool);
     console.log(`[db-setup] Tables in public schema: ${tableCount}`);
 
-    const perm = await pool.query(
-      "SELECT has_schema_privilege(current_user, 'public', 'CREATE') as can_create"
-    );
-    const canCreate = perm.rows[0].can_create;
-    console.log(`[db-setup] CREATE privilege: ${canCreate}`);
+    // Run direct SQL migrations (idempotent — always safe)
+    if (tableCount > 0) {
+      await runMigrations(pool);
+    }
 
     await pool.end();
 
-    // Always push schema when we have CREATE privilege.
-    // pushDevSchema handles both initial creation AND adding new columns
-    // to existing tables (e.g. stripe_account_id added after initial deploy).
-    // It's a no-op if schema is already in sync.
+    // Only need Payload pushDevSchema for fresh DB (0 tables)
     return {
-      needsPush: canCreate,
+      needsPush: tableCount === 0,
       tableCount,
     };
   } catch (e) {
