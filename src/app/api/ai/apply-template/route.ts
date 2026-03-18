@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { applyTemplateSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
@@ -11,9 +13,7 @@ import { checkRateLimit } from '@/lib/rateLimit'
  */
 export const POST = withAuth(async (user, req) => {
     try {
-        const payload = await getPayload({ config })
-
-        // Rate Limit: 20 AI tasks per hour
+        // Rate Limit: 20 template applications per hour
         const rateLimit = checkRateLimit(String(user.id), 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
@@ -21,12 +21,13 @@ export const POST = withAuth(async (user, req) => {
                 { status: 429 }
             )
         }
-        const body = await req.json()
-        const { templateId } = body
 
-        if (!templateId) {
-            return NextResponse.json({ error: 'templateId required' }, { status: 400 })
-        }
+        const payload = await getPayload({ config })
+
+        const { data, errorResponse } = await parseRequest(req, applyTemplateSchema)
+        if (errorResponse) return errorResponse
+        
+        const { templateId } = data!
 
         // Find template
         const template: any = await payload.findByID({

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { generateDescriptionSchema } from '@/lib/validations/products'
+import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
@@ -20,14 +22,11 @@ export const POST = withAuth(async (user, request) => {
                 { status: 429 }
             )
         }
-        const { name, category, features } = await request.json()
 
-        if (!name) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Product name is required' } },
-                { status: 422 }
-            )
-        }
+        const { data, errorResponse } = await parseRequest(request, generateDescriptionSchema)
+        if (errorResponse) return errorResponse
+
+        const { name, category, features } = data!
 
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
