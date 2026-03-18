@@ -307,13 +307,22 @@ export default function BlogListPage() {
                         {meta?.totalDocs || 0} post{(meta?.totalDocs || 0) !== 1 ? 's' : ''}
                     </p>
                 </div>
-                <button
-                    onClick={() => router.push('/dashboard/blog/new')}
-                    className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-400 transition-colors"
-                >
-                    <Plus className="h-4 w-4" />
-                    Create Post
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => router.push('/dashboard/blog/categories')}
+                        className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                    >
+                        <Tag className="h-4 w-4" />
+                        Categories
+                    </button>
+                    <button
+                        onClick={() => router.push('/dashboard/blog/new')}
+                        className="flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-cyan-500/25 hover:bg-cyan-500 transition-colors"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Create Post
+                    </button>
+                </div>
             </div>
 
             {/* Filters */}
