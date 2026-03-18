@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
     ArrowLeft, Save, Sparkles, Loader2, FileText,
-    ImageIcon, Eye, EyeOff, ChevronDown,
+    ImageIcon, Eye, EyeOff, ChevronDown, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -60,6 +60,12 @@ export default function BlogEditorPage() {
     const [categories, setCategories] = useState<BlogCategory[]>([])
     const [showSEO, setShowSEO] = useState(false)
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
+
+    // AI Generator State
+    const [showAIGenerator, setShowAIGenerator] = useState(false)
+    const [aiPrompt, setAiPrompt] = useState('')
+    const [aiLanguage, setAiLanguage] = useState('en')
+    const [isGenerating, setIsGenerating] = useState(false)
 
     // Load categories
     useEffect(() => {
@@ -258,6 +264,45 @@ export default function BlogEditorPage() {
         )
     }
 
+    const handleGenerateWithAI = async () => {
+        if (!aiPrompt.trim()) return
+
+        try {
+            setIsGenerating(true)
+            toast.loading('AI is writing your post...', { id: 'ai-blog' })
+
+            const res = await fetch('/api/ai/generate-blog', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: aiPrompt, language: aiLanguage })
+            })
+
+            const json = await res.json()
+            if (!res.ok || !json.success) throw new Error(json.error || 'Failed to generate')
+
+            const { title, content, seoTitle, seoDescription } = json.data
+
+            setForm(prev => ({
+                ...prev,
+                title: title || prev.title,
+                content: content || prev.content,
+                seoTitle: seoTitle || prev.seoTitle,
+                seoDescription: seoDescription || prev.seoDescription
+            }))
+
+            if (isNew && title) {
+                setForm(prev => ({ ...prev, slug: slugify(title) }))
+            }
+
+            toast.success('Post generated successfully!', { id: 'ai-blog' })
+            setShowAIGenerator(false)
+        } catch (error: any) {
+            toast.error(error.message || 'AI generation failed', { id: 'ai-blog' })
+        } finally {
+            setIsGenerating(false)
+        }
+    }
+
     return (
         <div className="mx-auto max-w-3xl space-y-6">
             {/* Header */}
@@ -276,6 +321,13 @@ export default function BlogEditorPage() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                        onClick={() => setShowAIGenerator(true)}
+                        className="flex items-center justify-center gap-2 rounded-lg border border-purple-500/50 bg-purple-500/10 px-4 py-2 text-sm font-medium text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 transition-colors"
+                    >
+                        <Sparkles className="w-4 h-4" />
+                        AI Write
+                    </button>
                     {/* Save as Draft */}
                     <button
                         onClick={() => handleSave('draft')}
@@ -464,9 +516,11 @@ export default function BlogEditorPage() {
 
             {/* SEO Panel — AC-3 */}
             <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 overflow-hidden">
-                <button
+                <div
                     onClick={() => setShowSEO(prev => !prev)}
-                    className="w-full flex items-center justify-between p-6 hover:bg-white/5 transition-colors"
+                    role="button"
+                    tabIndex={0}
+                    className="w-full flex items-center justify-between p-6 hover:bg-white/5 transition-colors cursor-pointer"
                 >
                     <div className="flex items-center gap-3">
                         <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500">SEO Settings</h2>
@@ -498,7 +552,7 @@ export default function BlogEditorPage() {
                             <Eye className="h-4 w-4 text-gray-500" />
                         )}
                     </div>
-                </button>
+                </div>
 
                 {showSEO && (
                     <div className="px-6 pb-6 space-y-4 border-t border-white/10 pt-5">
@@ -548,6 +602,79 @@ export default function BlogEditorPage() {
                     </div>
                 )}
             </div>
+
+            {/* AI Generator Modal */}
+            {showAIGenerator && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#0B1120] p-6 shadow-2xl">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-purple-400" />
+                                AI Blog Assistant
+                            </h3>
+                            <button onClick={() => setShowAIGenerator(false)} className="text-gray-400 hover:text-white transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-5">
+                            <div>
+                                <label className="text-sm font-medium text-gray-400 mb-1.5 block">What should the post be about?</label>
+                                <textarea
+                                    value={aiPrompt}
+                                    onChange={e => setAiPrompt(e.target.value)}
+                                    placeholder="e.g. 5 essential tips to start a successful online store in Malaysia in 2026"
+                                    className="w-full h-24 rounded-lg border border-white/10 bg-[#1E293B]/50 px-4 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 resize-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-sm font-medium text-gray-400 mb-1.5 block">Language</label>
+                                <div className="relative">
+                                    <select
+                                        value={aiLanguage}
+                                        onChange={e => setAiLanguage(e.target.value)}
+                                        className="w-full rounded-lg border border-white/10 bg-[#1E293B]/50 px-4 py-2.5 text-sm text-white outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/20 appearance-none"
+                                    >
+                                        <option value="en">English</option>
+                                        <option value="vi">Tiếng Việt</option>
+                                        <option value="ms">Bahasa Melayu</option>
+                                    </select>
+                                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-8 flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowAIGenerator(false)}
+                                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleGenerateWithAI}
+                                disabled={!aiPrompt.trim() || isGenerating}
+                                className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {isGenerating ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Writing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles className="w-4 h-4" />
+                                        Generate Post
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
