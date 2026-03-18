@@ -175,37 +175,8 @@ jobs:
               });
             }
 
-      # --- Lark: CI Passed ---
-      - name: Prepare CI status
-        if: success() && github.event_name == 'push'
-        id: ci_info
-        run: |
-          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
-          echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
-
-      - name: Notify Lark (CI Passed)
-        if: success() && github.event_name == 'push'
-        uses: ./.github/actions/lark-notify
-        with:
-          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          title: "✅ CI Passed — ${{ github.ref_name }}"
-          template: 'green'
-          meta-left-label: "📦 Project"
-          meta-left-value: "PrimeWeb"
-          meta-right-label: "🌿 Branch"
-          meta-right-value: "${{ github.ref_name }}"
-          meta2-left-label: "🔖 Commit"
-          meta2-left-value: "${{ steps.ci_info.outputs.short_sha }}"
-          meta2-right-label: "👤 Author"
-          meta2-right-value: "${{ github.actor }}"
-          content: |
-            📝 ${{ steps.ci_info.outputs.commit_msg }}
-            **Pipeline [1/2]** CI
-            Lint ✅  TypeCheck ✅  Test ✅  Build ✅
-          buttons: '[{"text":"📋 View CI Run","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"primary"},{"text":"📄 View Diff","url":"${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}","type":"default"}]'
-
-      # --- Lark: CI Failed ---
+      # --- Notification: CI Failed (push or PR) ---
+      # Only notify on failure — CI pass is silent (deploy job will notify)
       - name: Prepare failure info
         if: failure()
         id: fail_info
@@ -219,7 +190,6 @@ jobs:
           echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
           echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
 
-          # Determine icons
           LINT_ICON="✅"; TC_ICON="✅"; TEST_ICON="✅"; BUILD_ICON="⬜"; DOCKER_ICON="⬜"
           FAILED=""
           if [ "$LINT_OUTCOME" = "failure" ]; then LINT_ICON="❌"; FAILED="Lint"; fi
@@ -235,51 +205,22 @@ jobs:
           echo "failed_step=$FAILED" >> "$GITHUB_OUTPUT"
           echo "status_line=Lint ${LINT_ICON}  TypeCheck ${TC_ICON}  Test ${TEST_ICON}  Build ${BUILD_ICON}  Docker ${DOCKER_ICON}" >> "$GITHUB_OUTPUT"
 
-      - name: Notify Lark (CI Failed — push)
-        if: failure() && github.event_name == 'push'
-        uses: ./.github/actions/lark-notify
+      - name: Notify CI Failed
+        if: failure()
+        uses: ./.github/actions/smart-notify
         with:
-          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          title: "❌ CI Failed — ${{ github.ref_name }}"
-          template: 'red'
-          meta-left-label: "📦 Project"
-          meta-left-value: "PrimeWeb"
-          meta-right-label: "🌿 Branch"
-          meta-right-value: "${{ github.ref_name }}"
-          meta2-left-label: "🔖 Commit"
-          meta2-left-value: "${{ steps.fail_info.outputs.short_sha }}"
-          meta2-right-label: "👤 Author"
-          meta2-right-value: "${{ github.actor }}"
-          content: |
-            📝 ${{ steps.fail_info.outputs.commit_msg }}
-
-            ⚠️ **Failed at: ${{ steps.fail_info.outputs.failed_step }}**
-            ${{ steps.fail_info.outputs.status_line }}
-          buttons: '[{"text":"🔍 View Logs","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"danger"}]'
-
-      - name: Notify Lark (CI Failed — PR)
-        if: failure() && github.event_name == 'pull_request'
-        uses: ./.github/actions/lark-notify
-        with:
-          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          title: "❌ CI Failed — PR #${{ github.event.pull_request.number }}"
-          template: 'red'
-          meta-left-label: "📦 Project"
-          meta-left-value: "PrimeWeb"
-          meta-right-label: "🌿 Branch"
-          meta-right-value: "${{ github.head_ref }}"
-          meta2-left-label: "🔖 Commit"
-          meta2-left-value: "${{ steps.fail_info.outputs.short_sha }}"
-          meta2-right-label: "👤 Author"
-          meta2-right-value: "${{ github.actor }}"
-          content: |
-            📝 ${{ github.event.pull_request.title }}
-
-            ⚠️ **Failed at: ${{ steps.fail_info.outputs.failed_step }}**
-            ${{ steps.fail_info.outputs.status_line }}
-          buttons: '[{"text":"🔍 View Logs","url":"${{ github.event.pull_request.html_url }}","type":"danger"}]'
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          lark-webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          lark-sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          event: 'ci_fail'
+          branch: ${{ github.ref_name }}
+          author: ${{ github.actor }}
+          commit-sha: ${{ steps.fail_info.outputs.short_sha }}
+          commit-msg: ${{ steps.fail_info.outputs.commit_msg }}
+          ci-status: ${{ steps.fail_info.outputs.status_line }}
+          failed-step: ${{ steps.fail_info.outputs.failed_step }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
   # Job 2: Deploy Staging (push to staging, after CI passes)
@@ -313,48 +254,21 @@ jobs:
           echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
           echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
 
-      - name: Notify Lark (Staging Deployed)
-        if: success()
-        uses: ./.github/actions/lark-notify
+      - name: Notify — Staging Deploy Result
+        if: always()
+        uses: ./.github/actions/smart-notify
         with:
-          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          title: "🚀 Staging Deployed"
-          template: 'green'
-          meta-left-label: "📦 Project"
-          meta-left-value: "PrimeWeb"
-          meta-right-label: "🌍 Environment"
-          meta-right-value: "Staging"
-          meta2-left-label: "🔖 Commit"
-          meta2-left-value: "${{ steps.info.outputs.short_sha }}"
-          meta2-right-label: "👤 Author"
-          meta2-right-value: "${{ github.actor }}"
-          content: |
-            📝 ${{ steps.info.outputs.commit_msg }}
-            **Pipeline [2/2]** Staging Deploy
-            CI ✅  Deploy ✅
-          buttons: '[{"text":"📋 View Deploy","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"primary"},{"text":"🌐 Open Staging","url":"https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app","type":"default"}]'
-
-      - name: Notify Lark (Staging Deploy Failed)
-        if: failure()
-        uses: ./.github/actions/lark-notify
-        with:
-          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          title: "❌ Staging Deploy Failed"
-          template: 'red'
-          meta-left-label: "📦 Project"
-          meta-left-value: "PrimeWeb"
-          meta-right-label: "🌍 Environment"
-          meta-right-value: "Staging"
-          meta2-left-label: "🔖 Commit"
-          meta2-left-value: "${{ steps.info.outputs.short_sha }}"
-          meta2-right-label: "👤 Author"
-          meta2-right-value: "${{ github.actor }}"
-          content: |
-            📝 ${{ steps.info.outputs.commit_msg }}
-            ⚠️ **Staging deploy failed!** Check DO build logs.
-          buttons: '[{"text":"🔍 View Logs","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"danger"}]'
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          lark-webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          lark-sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          event: ${{ steps.deploy.outcome == 'success' && 'deploy_success' || 'deploy_fail' }}
+          branch: staging
+          environment: staging
+          author: ${{ github.actor }}
+          commit-sha: ${{ steps.info.outputs.short_sha }}
+          commit-msg: ${{ steps.info.outputs.commit_msg }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
   # Job 3: Deploy Production (push to main, after CI passes)
@@ -388,49 +302,22 @@ jobs:
           echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
           echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
 
-      - name: Notify Lark (Production Deployed)
-        if: success()
-        uses: ./.github/actions/lark-notify
+      - name: Notify — Production Deploy Result
+        if: always()
+        uses: ./.github/actions/smart-notify
         with:
-          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          title: "🚀 Production Deployed"
-          template: 'green'
-          meta-left-label: "📦 Project"
-          meta-left-value: "PrimeWeb"
-          meta-right-label: "🌍 Environment"
-          meta-right-value: "🔴 Production"
-          meta2-left-label: "🔖 Commit"
-          meta2-left-value: "${{ steps.info.outputs.short_sha }}"
-          meta2-right-label: "👤 Author"
-          meta2-right-value: "${{ github.actor }}"
-          content: |
-            📝 ${{ steps.info.outputs.commit_msg }}
-            ⚡ **Production is now live!**
-            CI ✅  Deploy ✅
-          buttons: '[{"text":"📋 View Deploy","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"primary"},{"text":"🌐 Open Production","url":"https://echprime.com","type":"default"}]'
-
-      - name: Notify Lark (Production Deploy FAILED)
-        if: failure()
-        uses: ./.github/actions/lark-notify
-        with:
-          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          title: "🚨 Production Deploy FAILED"
-          template: 'red'
-          meta-left-label: "📦 Project"
-          meta-left-value: "PrimeWeb"
-          meta-right-label: "🌍 Environment"
-          meta-right-value: "🔴 Production"
-          meta2-left-label: "🔖 Commit"
-          meta2-left-value: "${{ steps.info.outputs.short_sha }}"
-          meta2-right-label: "👤 Author"
-          meta2-right-value: "${{ github.actor }}"
-          content: |
-            📝 ${{ steps.info.outputs.commit_msg }}
-            🚨 **CRITICAL: Production deploy failed!**
-            ⚠️ Action required immediately!
-          buttons: '[{"text":"🔍 View Logs","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"danger"}]'
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          lark-webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          lark-sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          event: ${{ steps.deploy.outcome == 'success' && 'deploy_success' || 'deploy_fail' }}
+          branch: main
+          environment: production
+          author: ${{ github.actor }}
+          commit-sha: ${{ steps.info.outputs.short_sha }}
+          commit-msg: ${{ steps.info.outputs.commit_msg }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          staging-url: https://echprime.com
 
   # ──────────────────────────────────────
   # Job 4: Deploy Preview — DISABLED
