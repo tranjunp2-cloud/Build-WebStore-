@@ -52,6 +52,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
                 status: site.status || 'draft',
                 theme: site.theme || {},
                 siteType: site.siteType || 'business',
+                locale: site.locale || 'ms',
+                shippingConfig: site.shippingConfig || {},
             },
             page: page ? {
                 id: page.id,

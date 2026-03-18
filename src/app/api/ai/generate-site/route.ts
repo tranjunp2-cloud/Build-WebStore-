@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
@@ -20,12 +21,37 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
 
     try {
-        const user = await getCurrentUser()
+        const payload = await getPayload({ config })
+
+        // Authenticate user
+        let user: any = null
+        try {
+            const authResult = await payload.auth({ headers: req.headers })
+            user = authResult.user
+        } catch (authErr) {
+            console.warn('[AI Generate] Standard auth failed, trying cookie fallback')
+        }
+
+        // Fallback: read payload-token from cookies
+        if (!user) {
+            const cookieStore = await cookies()
+            const token = cookieStore.get('payload-token')?.value
+            if (token) {
+                try {
+                    // Create new headers with Authorization bearer token
+                    const authHeaders = new Headers(req.headers)
+                    authHeaders.set('Authorization', `JWT ${token}`)
+                    const authResult = await payload.auth({ headers: authHeaders })
+                    user = authResult.user
+                } catch (fallbackErr) {
+                    console.warn('[AI Generate] Cookie fallback auth failed too')
+                }
+            }
+        }
+
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
-
-        const payload = await getPayload({ config })
 
         // Rate Limit: 20 AI tasks per hour
         const rateLimit = checkRateLimit(String(user.id), 20)
@@ -94,6 +120,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     siteType: result.siteType,
+                    locale: language,
                     theme: {
                         primaryColor: result.theme.primaryColor,
                         secondaryColor: result.theme.secondaryColor,
@@ -131,6 +158,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     siteType: result.siteType,
+                    locale: language,
                     theme: {
                         primaryColor: result.theme.primaryColor,
                         secondaryColor: result.theme.secondaryColor,
