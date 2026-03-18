@@ -44,7 +44,7 @@ THEN  they see a table/list of posts displaying Title, Status (Draft/Published),
 
 ### Additional Criteria
 
-- [ ] Empty State component must follow the same shared design system layout used in Products (F17) and Orders (F17).
+- [ ] Empty State component must follow the same shared design system layout used in Products (F08) and Orders (F10).
 - [ ] Support basic search and filtering by status (Draft/Published).
 
 ### Definition of Done
@@ -157,6 +157,69 @@ THEN  the AI replaces or suggests a revision of the selected text
 
 ---
 
+## US-F17-04: Publish, Draft, and Delete Posts
+
+**Wave 4** | **P1** | **S** | **Status:** Ready
+
+### Story
+
+```
+As a   Store Owner
+I want to control the visibility of my blog posts (Publish/Unpublish) and delete old ones
+So that I have full control over what my customers see on the storefront
+```
+
+### Acceptance Criteria
+
+#### AC-1: Publish / Draft Toggle
+
+```gherkin
+GIVEN the user is editing a blog post
+WHEN  they change the status from "Draft" to "Published" and save
+THEN  the post becomes visible on the storefront blog page
+```
+
+#### AC-2: Unpublish a Post
+
+```gherkin
+GIVEN the user is viewing a Published post in the blog list
+WHEN  they change the status back to "Draft" and save
+THEN  the post is hidden from the storefront immediately
+  AND the post remains editable in the CMS
+```
+
+#### AC-3: Delete Post
+
+```gherkin
+GIVEN the user is viewing the blog list
+WHEN  they click "Delete" on a post and confirm the action
+THEN  the post is permanently removed from the system
+  AND a success toast is shown
+```
+
+### Additional Criteria
+
+- [ ] Warn user before deleting a published post (confirmation dialog with warning text).
+- [ ] Bulk delete phải hiển thị cảnh báo rõ ràng trước khi xóa.
+
+### Market Notes
+
+- SME owners MY thường viết blog theo mùa (Raya, CNY) — Unpublish sau sự kiện là workflow phổ biến, cần dễ dàng.
+- Delete confirmation dialog cần bằng ngôn ngữ site (BM/EN).
+
+### Open Questions
+
+- **Q:** Khi xóa một post đã Published, có cần redirect URL sang 404 hay hiển thị custom "Post not found" page không?
+- **Assumption:** Delete là hard delete — không có trash/recycle bin trong Phase 1.
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Publish/Unpublish cập nhật đúng visibility trên storefront trong < 30 giây
+- [ ] Delete confirmation dialog hiển thị trước khi xóa published post
+
+---
+
 ## US-F17-05: Simple Category Management
 
 **Wave 4** | **P2** | **S** | **Status:** Ready
@@ -187,52 +250,33 @@ WHEN  they select a Category from a drop-down list and save
 THEN  the post is associated with that Category
 ```
 
-### Additional Criteria
-
-- [ ] Categories are strictly 1-level deep (no sub-categories).
-- [ ] If a category is deleted, its assigned posts should revert to an "Uncategorized" state or default category.
-
-### Definition of Done
-
-- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
-
----
-
-## US-F17-04: Publish, Draft, and Delete Posts
-
-**Wave 4** | **P1** | **S** | **Status:** Ready
-
-### Story
-
-```
-As a   Store Owner
-I want to control the visibility of my blog posts (Publish/Unpublish) and delete old ones
-So that I have full control over what my customers see on the storefront
-```
-
-### Acceptance Criteria
-
-#### AC-1: Publish / Draft Toggle
+#### AC-3: Delete Category — Posts Fallback
 
 ```gherkin
-GIVEN the user is editing a blog post
-WHEN  they change the status from "Draft" to "Published" and save
-THEN  the post becomes visible on the storefront blog page
-```
-
-#### AC-2: Delete Post
-
-```gherkin
-GIVEN the user is viewing the blog list
-WHEN  they click "Delete" on a post and confirm the action
-THEN  the post is permanently removed from the system
-  AND a success toast is shown
+GIVEN a category has posts assigned to it
+WHEN  the user deletes that category
+THEN  all posts that were in that category revert to "Uncategorized" state
+  AND the posts are NOT deleted
 ```
 
 ### Additional Criteria
 
-- [ ] Warn user before deleting a published post.
+- [ ] Categories are strictly 1-level deep (no sub-categories).
+- [ ] Category name phải unique — không cho phép duplicate names.
+
+### Market Notes
+
+- Categories đơn giản (1-level) phù hợp với SME MY chưa quen content strategy phức tạp.
+- Gợi ý category mặc định: "Promosi", "Berita", "Tips" cho BM; "Promotions", "News", "Tips" cho EN.
+
+### Open Questions
+
+- **Q:** Category có hiển thị trên storefront như filter/tag navigation không trong Phase 1?
+- **Assumption:** Categories không có slug riêng — filter bằng category ID, không ảnh hưởng SEO URL.
 
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Category xóa → posts phải revert về Uncategorized (không mất bài viết)
+- [ ] Duplicate category name bị block với error message
+

@@ -244,9 +244,52 @@ Rate Limit: Free=1 total, Starter=5/mo, Pro=20/mo, Business=unlimited
 
 ---
 
-## 14. Definition of Ready & Done
-- [ ] PRD updated to Form Builder format.
-- [ ] Stories tracked.
-- [ ] Architecture diagrams updated to match Form Panel.
+## 16. Open Questions
 
-*(Remaining checks equivalent to F01 v2.0 checklist)*
+| # | Question | Owner | Status |
+|---|----------|-------|--------|
+| 1 | Rate limit Free tier (1 generation total) có thể gây friction cho user demo/test — có cần sandbox mode không? | PO | ⬜ Open |
+| 2 | AI image generation (DALL-E) cost per call có được track riêng theo tenant không? | Tech Lead | ⬜ Open |
+| 3 | Sau khi generate xong, user có thể re-generate toàn bộ site (xóa cũ, tạo lại) hay chỉ edit từng section? | BA | ⬜ Open |
+| 4 | Mobile preview toggle ([📝 Form] [👁 Preview]) — Preview có cần hiển thị realtime update hay chỉ show kết quả cuối? | Design | ⬜ Open |
+
+---
+
+## 17. 9-Point Done Checklist
+
+- [ ] Loading State — Progress indicator block-by-block khi AI đang stream
+- [ ] Empty State — `/builder/new` hiển thị form clean với placeholders hướng dẫn
+- [ ] Error State — Toast đỏ + "Thử lại" khi AI generation fail; giữ nguyên form data
+- [ ] Form Validation — Tên doanh nghiệp và Mặt hàng/Dịch vụ là required fields
+- [ ] Button States — "Tạo Website" disabled trong khi generating; enabled sau khi done
+- [ ] Toast Feedback — Toast xanh "Link copied! 🎉" khi copy domain; toast success post-publish
+- [ ] Auth Redirect — Route /builder/new yêu cầu auth → 401 redirect /login
+- [ ] Mobile 375px — Form full-width; Preview hidden mặc định với toggle [📝 Form] [👁 Preview]
+- [ ] TypeScript Clean — `tsc --noEmit` pass
+
+---
+
+## 18. Definition of Ready
+
+- [ ] PRD updated to Form Builder format (v2.1)
+- [ ] User Stories (US-F01-01 to US-F01-08) approved và linked ở Section 0
+- [ ] AC ở Section 11 đã được copy từ story file
+- [ ] FR ở Section 7 có đầy đủ Story Ref
+- [ ] Architecture diagrams updated to match Form Panel (`docs/architecture/F01-ai-builder.md`)
+- [ ] API contract defined (SSE streaming endpoint)
+- [ ] Rate limit tiers confirmed với Business
+- [ ] AI image fallback strategy confirmed với Dev
+
+---
+
+## 19. Definition of Done
+
+- [ ] All FR items (FR-01 to FR-22) implemented và verified
+- [ ] All AC in Section 11 pass (traced back to story)
+- [ ] 9-Point Checklist all pass
+- [ ] QA report written (`docs/qa/F01-ai-builder.md`)
+- [ ] Generation time < 60s (p95) — verified trên staging
+- [ ] Multilingual output: BM, VI, EN tested với real inputs
+- [ ] Mobile 375px form/preview toggle verified on real device
+- [ ] Non-Functional Requirements validated
+

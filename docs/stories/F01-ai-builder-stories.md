@@ -223,6 +223,60 @@ THEN  AI generate ảnh mới thay thế ảnh cũ
 
 ---
 
+## US-F01-04: One-Click Publish
+
+**Wave 3** | **P0** | **S** | **Status:** Ready
+
+### Story
+
+```
+As a   store owner who has reviewed the generated website
+I want to publish my site with one click
+So that my website goes live immediately without additional configuration
+```
+
+### Acceptance Criteria
+
+#### AC-1: Happy Path — Publish với 1 click
+
+```gherkin
+GIVEN website đã được generate xong và user đang xem preview
+WHEN  user click nút "Publish ngay"
+THEN  hệ thống bắt đầu quá trình publish trong < 30 giây
+  AND site status chuyển từ Draft → Published
+  AND URL `{slug}.primeweb.app` trở nên accessible công khai
+  AND hiển thị màn hình success với domain live được highlight
+```
+
+#### AC-2: Unpublish — Site trả về 404
+
+```gherkin
+GIVEN site đang ở trạng thái Published
+WHEN  owner vào Settings và click "Unpublish"
+THEN  site chuyển về trạng thái Draft
+  AND URL `{slug}.primeweb.app` trả về 404 cho visitor
+  AND dashboard hiển thị site đang ở trạng thái "Draft"
+```
+
+#### AC-3: Rate Limit — Free tier chỉ 1 lần generate
+
+```gherkin
+GIVEN user thuộc Free tier đã từng generate 1 site trước đó
+WHEN  user cố gắng generate site thứ 2
+THEN  hệ thống hiển thị modal Upgrade Prompt
+  AND KHÔNG gọi AI API
+  AND modal giải thích giới hạn và options nâng cấp
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Publish hoàn thành trong < 30 giây (p95)
+- [ ] Site accessible tại `{slug}.primeweb.app` ngay sau publish
+- [ ] Unpublish khiến URL trả về 404 trong < 60 giây
+
+---
+
 ## US-F01-05: AI Builder Input Forms
 
 **Wave 3** | **P0** | **M** | **Status:** Ready

@@ -1,12 +1,12 @@
 # Architecture: Notifications Center (F16)
 > **Version:** 1.0 | **Created:** 2026-03-17 | **Agent:** `project-planner`  
-> **PRD:** [`docs/prd/F14-notification-center.md`](../prd/F14-notification-center.md)
+> **PRD:** [`docs/prd/F16-notification-center.md`](../prd/F16-notification-center.md)
 
 ---
 
 ## 1. Overview
 
-Tài liệu này mô tả kiến trúc kỹ thuật cho tính năng Notification Center (F16). Bao gồm UI Dropdown trên thanh Navigation, hệ thống Badge đ đếm số lượng thông báo chưa đọc, Popup/Toast xuất hiện realtime ở góc màn hình, và tích hợp Push Notification API trên trình duyệt Desktop. Hệ thống sử dụng cơ chế Server-Sent Events (SSE) hoặc WebSocket/Polling để nhận data realtime từ backend.
+Tài liệu này mô tả kiến trúc kỹ thuật cho tính năng Notification Center (F16). Bao gồm UI Dropdown trên thanh Navigation, hệ thống Badge để đếm số lượng thông báo chưa đọc, Popup/Toast xuất hiện realtime ở góc màn hình, và tích hợp Push Notification API trên trình duyệt Desktop. Hệ thống sử dụng cơ chế Server-Sent Events (SSE) hoặc WebSocket/Polling để nhận data realtime từ backend.
 
 ## 2. System Context
 

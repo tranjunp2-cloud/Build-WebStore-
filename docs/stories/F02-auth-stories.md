@@ -62,7 +62,7 @@ THEN  Staff không thể tự sinh ra cấu trúc dữ liệu doanh nghiệp m�
 ```
 
 
-#### AC-4: Post-Login Auto Routing (Phân Luồng User Roles)
+#### AC-5: Post-Login Auto Routing (Phân Luồng User Roles)
 
 ```gherkin
 GIVEN user (Owner hoặc Staff) đã đăng nhập thành công ở /login chung

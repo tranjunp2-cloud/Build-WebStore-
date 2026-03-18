@@ -5,58 +5,6 @@
 
 ---
 
-## US-F06-01: User Registration & Auto-Login
-
-**Wave 1** | **P0** | **S** | **Status:** Ready
-
-### Story
-
-```
-As a   new user
-I want đăng ký bằng email/password và được auto-login sau xác thực
-So that tôi bắt đầu tạo store ngay mà không cần thêm bước
-```
-
-### Acceptance Criteria
-
-#### AC-1: Happy Path — Registration + Verification
-
-```gherkin
-GIVEN I am on the registration page
-WHEN  I submit a valid email + password (min 8 chars)
-THEN  I receive a verification email within 60 seconds
-  AND the page shows "Check your email" state
-```
-
-#### AC-2: Auto-Login after Verification
-
-```gherkin
-GIVEN I click the verification link in the email
-WHEN  the token is valid and not expired (< 24h)
-THEN  I am automatically logged in
-  AND redirected to /onboarding (Welcome screen)
-```
-
-#### AC-3: Duplicate Email Error
-
-```gherkin
-GIVEN I try to register with an already-registered email
-WHEN  I submit the form
-THEN  inline error "This email is already registered. Log in instead?"
-  AND a link to /login — NOT a generic error
-```
-
-### Additional Criteria
-
-- [ ] Auth handled by Payload CMS built-in auth. Email via Resend.
-
-### Definition of Done
-
-- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
-- [ ] Verification email delivered trong < 60 giây
-
----
-
 ## US-F06-02: Welcome Screen — Zero Friction to AI Builder
 
 **Wave 1** | **P0** | **S** | **Status:** Ready
@@ -74,9 +22,9 @@ So that tôi không bị lost hoặc confused về bước tiếp theo
 #### AC-1: Happy Path — Welcome Screen Display
 
 ```gherkin
-GIVEN user vừa register và xác thực thành công
+GIVEN user vừa authenticate thành công thông qua F02
 WHEN  vào /onboarding
-THEN  welcome screen có single primary CTA: "Buat Webstore Saya / Create My Store"
+THEN  welcome screen có single primary CTA: "Create My Store"
   AND không có competing actions khác
   AND screen giải thích "5-minute promise" trong tối đa 1-2 câu
   AND progress indicator: "Step 1 of 2: Create Store"
@@ -172,7 +120,7 @@ THEN  hiển thị tiêu đề: "AI SEO: Tối ưu trang web tự động"
 GIVEN user mở Modal Wizard
 WHEN  click "Bỏ qua hướng dẫn" hoặc hoàn thành Step 3
 THEN  Modal đóng lại
-  AND không bao giờ tự động hiện lại trong các lần đăng nhập sau (lưu state has_seen_onboarding_wizard = true)
+  AND không bao giờ tự động hiện lại trong các lần đăng nhập sau (lưu state has_seen_ai_wizard = true)
 ```
 
 ### Additional Criteria

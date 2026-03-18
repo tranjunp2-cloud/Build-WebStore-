@@ -1,5 +1,7 @@
 # User Stories: Storefront Commerce (F09)
 
+<!-- Rules & ID Convention: docs/stories/user-stories-p0.md | SPEC.md §2.4 -->
+
 > **Feature:** F09 — Storefront Commerce
 > **Wave:** 5 | **Priority:** P0 🌟 | **Ref PRD:** [F09-storefront-commerce.md](../prd/F09-storefront-commerce.md)
 > **Market Ref:** [malaysia-market-context.md](../malaysia-market-context.md)
@@ -51,10 +53,23 @@ THEN  products are paginated with exactly 10 items per page
   AND standard pagination controls (Previous, 1, 2..., Next) are displayed at the bottom
 ```
 
+### Additional Criteria
+
+- [ ] Product card phải hiển thị đúng trên cả 1-column (375px) và 3-column layout (desktop).
+- [ ] "Out of stock" products hiển thị mờ gầy hoặc badge để phân biệt, không hiển thị nút "Add to Cart".
+- [ ] Filter và Sort phải hoạt động đồng thời mà không conflict.
+
+### Market Notes
+
+- Hiển thị giá format `RM XX.XX` (không dùng ký hiệu $ hay không có currency prefix).
+- Category filter ở sidebar phải hiển thị tên BM lẫn EN tùy locale của site.
+- Sort labels: "Mới nhất", "Cũ nhất", "Giá tăng dần", "Giá giảm dần" — bàng ngôn ngữ cấu hình site.
+
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
 - [ ] Mobile layout 1-col works on 375px
+- [ ] SALE badge hiển thị đúng khi product có compareAtPrice
 
 ---
 
@@ -84,10 +99,45 @@ THEN  cart drawer slides in from right
   AND adding same product increases quantity (not duplicate)
 ```
 
+#### AC-2: Update Quantity in Cart
+
+```gherkin
+GIVEN visitor is in the cart drawer with items
+WHEN  visitor clicks "+" or "-" on a specific item
+THEN  quantity updates immediately
+  AND subtotal recalculates in real-time
+WHEN  visitor sets quantity to 0 (click "-" to 0)
+THEN  item is automatically removed from the cart
+  AND cart shows remaining items
+```
+
+#### AC-3: Remove Item from Cart
+
+```gherkin
+GIVEN visitor is viewing the cart drawer
+WHEN  visitor clicks the "Remove" (✕) icon on an item
+THEN  item is removed from the cart immediately
+  AND subtotal recalculates
+  AND if cart is now empty, show Empty Cart state with "Continue Shopping" link
+```
+
+### Additional Criteria
+
+- [ ] Cart badge count (icon on header) phải cập nhật realtime khi add/remove items.
+- [ ] Cart state dùng localStorage — phải persist khi refresh trang (không mất item).
+- [ ] Max quantity per product item: xác nhận với BA/PO (hiện chưa rõ giới hạn).
+
+### Market Notes
+
+- Cart drawer (slide-in) là pattern quen thuộc với user MY đang dùng Shopee/Lazada — không redirect sang trang cart riêng biệt.
+- Subtotal hiển thị `RM XX.XX` luôn, không làm tròn.
+
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
-- [ ] Cart persists sau page navigation
+- [ ] Cart persists sau page navigation (localStorage)
+- [ ] Empty cart state hiển thị đúng với "Continue Shopping" link
+- [ ] Mobile 375px: Cart drawer full-width
 
 ---
 

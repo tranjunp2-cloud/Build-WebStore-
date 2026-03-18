@@ -111,8 +111,8 @@ SO THAT hệ thống ngầm khởi tạo không gian dữ liệu của riêng t�
 | FR-08 | Login: Sau bước email/pass nhập đúng → Gọi màn OTP (nếu bật 2FA) | US-F02-07 | P0 |
 | FR-09 | Login: Gửi OTP 6 số, giới hạn hạn sử dụng 5 phút. Set auth cookie khi verify THÀNH CÔNG | US-F02-07 | P0 | Payload CMS
 | FR-10 | Login: alert banner + toast khi sai credentials | US-F02-02 | P0 | 401 response |
-| FR-11 | Auth Guard: Redirect ngay về `/login` nếu user chưa auth truy cập route bất kỳ, ưu tiên luồng Login | US-F02-03 | P0 |
-| FR-12 | Auth Guard: Phân luồng auto-routing: Owner (`/onboarding` hoặc `/dashboard`), Staff (`/admin` PayloadCMS) | US-F02-03 | P0 |
+| FR-11 | Auth Guard: Redirect ngay về `/login?redirect=[url]` nếu user chưa auth truy cập route bất kỳ, ưu tiên luồng Login | US-F02-03 | P0 |
+| FR-12 | Auth Guard: Phân luồng auto-routing: Owner (`/onboarding` nếu chưa có site, hoặc `/dashboard` nếu có site), Staff (`/admin` PayloadCMS) | US-F02-03 | P0 |
 | FR-13 | Logout: clear cookie + redirect `/login` | US-F02-04 | P0 |
 | FR-14 | Forgot pass: luôn hiện success state (không reveal email) | US-F02-05 | P0 | Security by design |
 | FR-15 | Reset pass: validate token, cập nhật password (tuân thủ trim và rule 8 chars) | US-F02-06 | P0 |
@@ -121,8 +121,8 @@ SO THAT hệ thống ngầm khởi tạo không gian dữ liệu của riêng t�
 
 ## 8. Business Rules
 
-- **BR-01 (Priority Routing):** Mặc định truy cập trang chủ `/` không có session sẽ bị điều hướng thẳng vào `/login` thay vì `/register`.
-- **BR-02 (Role Routing):** Phân luồng đăng nhập: Owner vào khu vực Customer Dashboard/Builder. Staff bị đẩy về Payload CMS Workspace để làm việc.
+- **BR-01 (Priority Routing):** Mặc định truy cập trang chủ `/` (hoặc nội bộ) không có session sẽ bị điều hướng thẳng vào `/login?redirect=[original_url]` thay vì `/register`.
+- **BR-02 (Role Routing):** Phân luồng đăng nhập: Owner vào khu vực `/onboarding` (nếu chưa có site) hoặc `/dashboard` (nếu đã có site). Staff bị đẩy về Payload CMS Workspace để làm việc.
 - **BR-03 (Invisible Workspace Limits):** Auto-create 1 Tenant duy nhất sau khi register (chạy ngầm ở Backend) — gán Role 'Owner'. Các account ko thể tạo ra Tenant số 2. Toàn bộ UI sẽ không bao giờ hiển thị từ khóa "Workspace" hay "Tenant" để tránh gây rối cho user.
 - **BR-04 (Staff Constraints):** Nhân viên (Staff) không được tự mở tài khoản ở `/register`. Staff Account chỉ sinh ra khi Owner dùng chức năng Invite.
 - **BR-05 (Data Format):** Validation tự động trim khoảng trắng (trailing space) cho Email và Password. Password đủ 8 ký tự, mix chữ hoa, chữ thường, số, đặc biệt.
@@ -269,6 +269,27 @@ GIVEN user vào /forgot-password
 WHEN  nhập email và click "Send reset link"
 THEN  LUÔN hiện success state (bảo vệ không reveal email của database)
   AND gửi link khôi phục nếu email hợp lệ
+```
+
+### AC-9: Logout System
+> 📌 Source: [US-F02-04](../stories/F02-auth-stories.md)
+
+```gherkin
+GIVEN user đã login
+WHEN  click Logout (sidebar bottom)
+THEN  clear session cookie
+  AND redirect → /login
+```
+
+### AC-10: Reset Password Flow
+> 📌 Source: [US-F02-06](../stories/F02-auth-stories.md)
+
+```gherkin
+GIVEN user click link /reset-password?token=xxx
+WHEN  nhập new password + confirm password hợp lệ
+THEN  POST /api/users/reset-password { token, password }
+  AND thành công → toast.success
+  AND redirect → /login
 ```
 
 ---
