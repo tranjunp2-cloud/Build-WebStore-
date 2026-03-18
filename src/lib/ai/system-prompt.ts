@@ -86,6 +86,7 @@ export type BusinessInfoInput = {
   businessName: string
   industry: string
   products: string
+  shortDescription?: string
   targetAudience?: string
   style?: string
 }
@@ -101,6 +102,9 @@ export function buildUserPrompt(
     `Main products/services: ${info.products}`,
   ]
 
+  if (info.shortDescription) {
+    parts.push(`Short description: ${info.shortDescription}`)
+  }
   if (info.targetAudience) {
     parts.push(`Target audience: ${info.targetAudience}`)
   }

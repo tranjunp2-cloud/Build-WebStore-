@@ -25,6 +25,7 @@ export type ProgressStep = {
 
 export type BusinessInfo = {
     businessName: string
+    shortDescription: string
     industry: string
     products: string
     targetAudience: string
@@ -94,21 +95,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>((set) => ({
         set({
             businessInfo: info,
             step: 'chat',
-            messages: [
-                {
-                    id: 'welcome',
-                    role: 'assistant',
-                    content:
-                        `Great! I have received the info for **${info.businessName}** (${info.industry}).` +
-                        `\n\nBased on your information, I will create a website with:` +
-                        `\n📄 **Homepage** with complete sections` +
-                        `\n🧩 **8-14 Sections:** Navigation, Hero, About, Features, Testimonials, Contact, Footer...` +
-                        `\n🎨 **Theme:** Auto-selected by AI based on your industry` +
-                        `\n📱 **Responsive:** Optimised for all devices` +
-                        `\n\nType **"Create now"** or describe any special requirements! 🚀`,
-                    timestamp: new Date(),
-                },
-            ],
+            messages: [],
         }),
 
     setStep: (step) => set({ step }),
