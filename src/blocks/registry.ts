@@ -18,6 +18,10 @@ import { TeamBlock } from './team'
 import { NewsletterBlock } from './newsletter'
 import { VideoBlock } from './video'
 import { LogoCloudBlock } from './logo-cloud'
+import { BlogListBlock } from './blog-list'
+import { ProductsGridBlock } from './products-grid'
+import { ProductsFeaturedBlock } from './products-featured'
+import { CustomHtmlBlock } from './custom-html'
 
 // ── Block Configs (Schemas + Meta) ───────────────────────────────────────────
 import { NavigationConfigSchema, navigationMeta } from './navigation/config'
@@ -36,6 +40,10 @@ import { TeamConfigSchema, teamMeta } from './team/config'
 import { NewsletterConfigSchema, newsletterMeta } from './newsletter/config'
 import { VideoConfigSchema, videoMeta } from './video/config'
 import { LogoCloudConfigSchema, logoCloudMeta } from './logo-cloud/config'
+import { BlogListConfigSchema, blogListMeta } from './blog-list/config'
+import { ProductsGridConfigSchema, productsGridMeta } from './products-grid/config'
+import { ProductsFeaturedConfigSchema, productsFeaturedMeta } from './products-featured/config'
+import { CustomHtmlConfigSchema, customHtmlMeta } from './custom-html/config'
 
 // ── Registry ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +70,10 @@ const REGISTRY: Record<string, BlockRegistryEntry> = {
     newsletter: { component: NewsletterBlock, schema: NewsletterConfigSchema, meta: newsletterMeta },
     video: { component: VideoBlock, schema: VideoConfigSchema, meta: videoMeta },
     'logo-cloud': { component: LogoCloudBlock, schema: LogoCloudConfigSchema, meta: logoCloudMeta },
+    'blog-list': { component: BlogListBlock, schema: BlogListConfigSchema, meta: blogListMeta },
+    'products-grid': { component: ProductsGridBlock, schema: ProductsGridConfigSchema, meta: productsGridMeta },
+    'products-featured': { component: ProductsFeaturedBlock, schema: ProductsFeaturedConfigSchema, meta: productsFeaturedMeta },
+    'custom-html': { component: CustomHtmlBlock, schema: CustomHtmlConfigSchema, meta: customHtmlMeta },
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
