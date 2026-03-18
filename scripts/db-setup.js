@@ -51,17 +51,74 @@ async function getTableCount(pool) {
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
+  // ── Tenants: Stripe Connect ──
   {
-    name: 'add_stripe_account_id_to_tenants',
+    name: 'tenants.stripe_account_id',
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS stripe_account_id varchar;`,
   },
   {
-    name: 'add_stripe_onboarding_complete_to_tenants',
+    name: 'tenants.stripe_onboarding_complete',
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS stripe_onboarding_complete boolean DEFAULT false;`,
   },
   {
-    name: 'add_stripe_account_id_index',
+    name: 'tenants.stripe_account_id_idx',
     sql: `CREATE INDEX IF NOT EXISTS tenants_stripe_account_id_idx ON tenants (stripe_account_id);`,
+  },
+  // ── Tenants: Business info ──
+  {
+    name: 'tenants.whatsapp_number',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_number varchar;`,
+  },
+  {
+    name: 'tenants.ssm_number',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ssm_number varchar;`,
+  },
+  {
+    name: 'tenants.business_address',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS business_address varchar;`,
+  },
+  // ── Tenants: ECH Integration ──
+  {
+    name: 'tenants.ech_integration_enabled',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ech_integration_enabled boolean DEFAULT false;`,
+  },
+  {
+    name: 'tenants.ech_integration_api_key',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ech_integration_api_key varchar;`,
+  },
+  {
+    name: 'tenants.ech_integration_merchant_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ech_integration_merchant_id varchar;`,
+  },
+  // ── Sites: Locale + Shipping ──
+  {
+    name: 'sites.locale',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS locale varchar DEFAULT 'ms';`,
+  },
+  {
+    name: 'sites.shipping_config_west_rate',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_west_rate numeric DEFAULT 800;`,
+  },
+  {
+    name: 'sites.shipping_config_east_rate',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_east_rate numeric DEFAULT 1500;`,
+  },
+  {
+    name: 'sites.shipping_config_free_above',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_free_above numeric;`,
+  },
+  // ── Products: Halal + Weight ──
+  {
+    name: 'products.halal_certified',
+    sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS halal_certified boolean DEFAULT false;`,
+  },
+  {
+    name: 'products.halal_cert_image_id',
+    sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS halal_cert_image_id integer;`,
+  },
+  {
+    name: 'products.weight',
+    sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS weight numeric DEFAULT 0;`,
   },
 ];
 
