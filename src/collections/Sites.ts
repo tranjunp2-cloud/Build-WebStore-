@@ -85,10 +85,10 @@ export const Sites: CollectionConfig = {
             name: 'locale',
             type: 'select',
             options: [
-                { label: 'Bahasa Melayu', value: 'bm' },
+                { label: 'Bahasa Melayu', value: 'ms' },
                 { label: 'English', value: 'en' },
             ],
-            defaultValue: 'bm',
+            defaultValue: 'ms',
         },
         {
             name: 'theme',

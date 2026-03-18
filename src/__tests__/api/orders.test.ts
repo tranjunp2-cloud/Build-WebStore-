@@ -70,6 +70,7 @@ describe('POST /api/orders/create', () => {
 
         expect(response.status).toBe(400)
         expect(json.success).toBe(false)
+        expect(json.error.code).toBe('VALIDATION_ERROR')
     })
     
     it('returns 404 if siteId does not exist in DB', async () => {
