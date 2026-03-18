@@ -199,7 +199,7 @@ Mono:     JetBrains Mono (code blocks)
 
 ---
 
-### 💳 H. Payment (2 screens — F16)
+### 💳 H. Payment (2 screens — F13)
 
 | # | Screen | Priority | Notes |
 |---|--------|:--------:|-------|
@@ -211,7 +211,7 @@ Mono:     JetBrains Mono (code blocks)
 
 ---
 
-### 📦 I. Shipping & Settings (3 screens — F17)
+### 📦 I. Shipping & Settings (3 screens — F14)
 
 | # | Screen | Priority | Notes |
 |---|--------|:--------:|-------|
@@ -317,22 +317,22 @@ Layer:  Tên có nghĩa, KHÔNG "Frame 123"
 | Feature | PRD | Figma Link | Desktop | Mobile | Status |
 |---------|-----|------------|:---:|:---:|:---:|
 | **DS** Design System (shadcn/ui) | [Docs](https://ui.shadcn.com/) | [Figma Kit](https://www.figma.com/design/VVSDY0EEZZEMvkDJ32JNz4/shadcn-ui-components-with-variables---Tailwind-classes---Updated-January-2026--Community-?node-id=72-2719&t=kfZtK78gqmsCLHlG-1) | ✅ | ✅ | ✅ Có sẵn |
-| **F01** AI Chat Builder | [PRD](../prd/F01-ai-chat-builder.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F01** AI Web Builder | [PRD](../prd/F01-ai-builder.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
 | **F02** Auth | [PRD](../prd/F02-auth.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
 | **F03** Dashboard | [PRD](../prd/F03-dashboard.md) | ✅ Có PNG cũ | ✅ | ⬜ | ⚠️ Cần mobile |
 | **F05** AI Editor | [PRD](../prd/F05-ai-editor.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
 | **F06** Onboarding | [PRD](../prd/F06-onboarding.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
 | **F07** Templates | [PRD](../prd/F07-template-gallery.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
 | **F08** Publish Flow | [PRD](../prd/F08-publish-flow.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
-| **F09** Products + Halal | [PRD](../prd/F09-products-crud.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
-| **F10** Storefront + Trust | [PRD](../prd/F10-storefront-commerce.md) | ✅ Có JPG cũ | ✅ | ⬜ | ⚠️ Cần mobile |
-| **F11** Orders + WhatsApp | [PRD](../prd/F11-orders-management.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
-| **F12** SEO Dashboard | [PRD](../prd/F12-seo-dashboard.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
-| **F13** Analytics | [PRD](../prd/F13-analytics-dashboard.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
-| **F14** Undo/Redo | [PRD](../prd/F14-undo-redo.md) | — | — | — | Trong F05 |
-| **F15** Auto-save | [PRD](../prd/F15-auto-save-draft.md) | — | — | — | Trong F05 |
-| **F16** Payment 🇲🇾 | [PRD](../prd/F16-payment-gateway.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
-| **F17** Shipping 🇲🇾 | [PRD](../prd/F17-shipping.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F08** Products + Halal | [PRD](../prd/F08-products-crud.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F09** Storefront + Trust | [PRD](../prd/F09-storefront-commerce.md) | ✅ Có JPG cũ | ✅ | ⬜ | ⚠️ Cần mobile |
+| **F10** Orders + WhatsApp | [PRD](../prd/F10-orders-management.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F11** SEO Dashboard | [PRD](../prd/F11-seo-dashboard.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F12** Analytics | [PRD](../prd/F12-analytics-dashboard.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F11** Undo/Redo | [PRD](../prd/F11-undo-redo.md) | — | — | — | Trong F05 |
+| **F12** Auto-save | [PRD](../prd/F12-auto-save-draft.md) | — | — | — | Trong F05 |
+| **F13** Payment 🇲🇾 | [PRD](../prd/F11-payment-gateway.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
+| **F14** Shipping 🇲🇾 | [PRD](../prd/F12-shipping.md) | <!-- PASTE --> | ⬜ | ⬜ | ⬜ Chưa có |
 
 ---
 

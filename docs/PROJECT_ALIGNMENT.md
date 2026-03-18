@@ -24,22 +24,25 @@ Tuần 1-2 (Mar 12-25)    Sprint 0: Foundation
                          ├── Test infra ready
                          └── Designer bắt đầu Figma
 
-Tuần 3-4 (Mar 26-Apr 8)  Sprint 1: Core Features
+Tuần 3-4 (Mar 26-Apr 8)  Sprint 1: Core Content & Framework
+                         ├── F18 CMS Layout & Navigation
                          ├── F01 AI Web Builder (polish)
-                         ├── F05 AI Editor (rebuild)
-                         ├── F06 Onboarding + Language (build)
-                         └── F08 Publish Flow (build)
+                         ├── F05 AI Editor (rebuild & text SEO)
+                         ├── F06 Onboarding + Language
+                         ├── F19 Store Config & Domains
+                         └── F17 Blog Management + AI Writing
 
-Tuần 5-6 (Apr 9-22)      Sprint 2: Commerce + MY Market
-                         ├── F08 Products + Halal cert (polish)
-                         ├── F10 Orders + WhatsApp (build)
-                         ├── F09 Storefront + Trust signals (polish)
-                         ├── F11 SEO Dashboard
-                         ├── F13 Payment Gateway (FPX)
-                         └── F14 Shipping (flat rate by state)
+Tuần 5-6 (Apr 9-22)      Sprint 2: Commerce & Advanced Ops
+                         ├── F08 Products (Bulk AI, Halal) & Publishing
+                         ├── F09 Storefront Commerce UI
+                         ├── F10 Orders & Checkout
+                         ├── F03 Dashboard & SEO Tracker
+                         ├── F13 Payment (FPX) & F14 Shipping
+                         ├── F16 Notification Center
+                         └── F15 Admin Management
 
 Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
-                         ├── Bug fixes
+                         ├── Bug fixes & Testings
                          ├── Performance (Lighthouse > 90)
                          ├── Security audit
                          └── 🚀 Launch
@@ -47,22 +50,25 @@ Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
 
 ---
 
-## Feature Priority (updated 13/3/2026)
+## Feature Priority (updated 18/3/2026)
 
 | Priority | Feature | Lý do |
 |:---:|---------|-------|
 | 🔴 1 | **F01 AI Web Builder** | USP #1 — core giá trị product |
 | 🔴 2 | **F05 AI Editor** | User dùng sau khi generate |
-| 🔴 3 | **F06 Onboarding** + Language | First impression + BM/EN selection |
-| 🔴 4 | **F08 Publish Flow** | Không có thì site không live dc |
-| 🟡 5 | **F08 Products** + Halal | Commerce + trust signal MY |
-| 🟡 6 | **F09 Storefront** + Trust signals | WhatsApp, SSM footer, language switcher |
-| 🟡 7 | **F10 Orders** + WhatsApp notify | Revenue flow + MY communication |
-| 🟡 8 | **F11 SEO Dashboard** | Growth, MY keywords |
-| 🟡 9 | **F13 Payment Gateway** 🇲🇾 | FPX (Wave 6) — most trusted in MY |
-| 🟡 10 | **F14 Shipping** 🇲🇾 | Flat rate by state (Wave 6) |
-| ⚪ 11 | **F07 Templates** | Fallback nếu AI không ok |
-| ⚪ 12 | **F12-F12** | Nice-to-have for launch |
+| 🔴 3 | **F18 CMS Layout & Navigation** | Khung giao diện chuẩn admin CMS |
+| 🔴 4 | **F06 Onboarding** | First impression + Settings |
+| 🔴 5 | **F19 Store Configuration** | Cấu hình Domain để go-live |
+| 🔴 6 | **F08 Products CRUD** | Base của Commerce + Setup Halal |
+| 🟡 7 | **F09 Storefront Commerce** | Trải nghiệm mua sắm e-commerce UX |
+| 🟡 8 | **F10 Orders Management** | Checkout completion + SMS/WhatsApp Ops |
+| 🟡 9 | **F13 Payment (FPX) & F14 Shipping** | Platform transactions MY |
+| 🟡 10 | **F17 Blog Management** | Content Marketing & AI Post Generation |
+| 🟡 11 | **F03 Dashboard & SEO Tracker** | Theo dõi Analytics & Từ khóa SEO |
+| ⚪ 12 | **F16 Notification Center** | In-app alerts, broadcasts |
+| ⚪ 13 | **F15 Admin Management** | Quản lý SaaS, internal users |
+| ⚪ 14 | **F07 Templates Gallery** | Fallback nếu AI không generate tốt |
+| ⚪ 15 | **F11/F12 Undo/Redo/Auto-save** | Tiện ích nâng cao |
 
 ---
 

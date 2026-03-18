@@ -1,6 +1,6 @@
-# Architecture: SEO Dashboard (F12)
+# Architecture: SEO Dashboard (F11)
 
-> **Version:** 1.0 | **PRD:** [F12-seo-dashboard.md](../prd/F12-seo-dashboard.md)  
+> **Version:** 1.0 | **PRD:** [F11-seo-dashboard.md](../prd/F11-seo-dashboard.md)  
 > **Tech:** Next.js 15 + Payload CMS 3 + OpenAI
 
 ---
