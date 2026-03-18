@@ -233,6 +233,52 @@
             "topBlogs": "Top Blogs",
             "views": "Views",
             "clicks": "Clicks"
+        },
+        "seo": {
+            "title": "SEO Dashboard",
+            "subtitle": "Analyse and optimise your site's search engine performance",
+            "reAnalyse": "Re-analyse",
+            "generateSitemap": "Generate Sitemap",
+            "sitemapSuccess": "Sitemap generated successfully",
+            "sitemapError": "Failed to generate sitemap",
+            "score": {
+                "good": "Good",
+                "needsWork": "Needs Work",
+                "poor": "Poor"
+            },
+            "stats": {
+                "totalIssues": "Total Issues",
+                "fixable": "Auto-Fixable by AI",
+                "pages": "Pages Analysed"
+            },
+            "breakdown": {
+                "title": "Category Breakdown",
+                "meta": "Meta Tags",
+                "content": "Content",
+                "technical": "Technical",
+                "noIssues": "No issues"
+            },
+            "aifix": {
+                "title": "AI SEO Fix",
+                "description": "Auto-generate missing meta titles & descriptions with AI",
+                "button": "Fix All with AI",
+                "fixing": "Fixing..."
+            },
+            "pages": {
+                "title": "Page-by-Page Analysis",
+                "allGood": "All good",
+                "issue": "issue",
+                "issues": "issues"
+            },
+            "empty": {
+                "title": "No sites to analyse",
+                "description": "Create a site first to use the SEO Dashboard",
+                "cta": "Go to Dashboard"
+            },
+            "error": {
+                "failed": "SEO analysis failed",
+                "retry": "Retry"
+            }
         }
     }
 }
