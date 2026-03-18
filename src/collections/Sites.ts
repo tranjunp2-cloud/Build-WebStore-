@@ -82,6 +82,15 @@ export const Sites: CollectionConfig = {
             ],
         },
         {
+            name: 'locale',
+            type: 'select',
+            options: [
+                { label: 'Bahasa Melayu', value: 'bm' },
+                { label: 'English', value: 'en' },
+            ],
+            defaultValue: 'bm',
+        },
+        {
             name: 'theme',
             type: 'group',
             label: 'Site Theme & Branding',
@@ -219,6 +228,31 @@ export const Sites: CollectionConfig = {
             name: 'publishedAt',
             type: 'date',
             admin: { readOnly: true },
+        },
+        {
+            name: 'shippingConfig',
+            type: 'group',
+            label: 'Shipping Configuration',
+            admin: { description: 'Shipping rates for Malaysia regions' },
+            fields: [
+                {
+                    name: 'westRate',
+                    type: 'number',
+                    defaultValue: 800,
+                    admin: { description: 'Semenanjung rate in sen (800 = RM 8)' },
+                },
+                {
+                    name: 'eastRate',
+                    type: 'number',
+                    defaultValue: 1500,
+                    admin: { description: 'Sabah/Sarawak rate in sen (1500 = RM 15)' },
+                },
+                {
+                    name: 'freeAbove',
+                    type: 'number',
+                    admin: { description: 'Free shipping above X sen (null = no free shipping)' },
+                },
+            ],
         },
     ],
     timestamps: true,

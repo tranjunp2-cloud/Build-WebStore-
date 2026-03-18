@@ -27,7 +27,7 @@ export type SSEEvent = {
 export async function generateSiteWithAI(
     businessInfo: BusinessInfoInput,
     extraInstructions?: string,
-    language: 'vi' | 'en' = 'vi',
+    language: 'en' | 'ms' = 'en',
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     const events: SSEEvent[] = []
     const promptText = `${businessInfo.businessName} - ${businessInfo.industry}`

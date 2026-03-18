@@ -74,17 +74,33 @@ export default function RegisterPage() {
 
     const onSubmit = async (data: RegisterForm) => {
         try {
-            // Step 1: Register user
-            const registerRes = await fetch('/api/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: data.email,
-                    password: data.password,
-                    firstName: data.firstName,
-                    lastName: data.lastName,
-                }),
-            })
+            // Step 1: Register user (with timeout)
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 15000)
+
+            let registerRes: Response
+            try {
+                registerRes = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: data.email,
+                        password: data.password,
+                        firstName: data.firstName,
+                        lastName: data.lastName,
+                    }),
+                    signal: controller.signal,
+                })
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') {
+                    setFormError('root', { message: 'Request timed out. Please try again.' })
+                    toast.error('Request timed out. Please try again.')
+                    return
+                }
+                throw err
+            } finally {
+                clearTimeout(timeout)
+            }
 
             if (!registerRes.ok) {
                 const errorData = await registerRes.json().catch(() => null)
@@ -124,23 +140,21 @@ export default function RegisterPage() {
                 return
             }
 
-            // Step 3: Create tenant
+            // Step 3: Create tenant (non-blocking)
             const storeName = `${data.firstName}'s Store`
-            try {
-                await fetch('/api/tenants', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: storeName,
-                        slug: generateSlug(storeName),
-                    }),
-                    credentials: 'include',
-                })
-            } catch {
+            fetch('/api/tenants', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: storeName,
+                    slug: generateSlug(storeName),
+                }),
+                credentials: 'include',
+            }).catch(() => {
                 // Non-blocking — tenant can be created later
-            }
+            })
 
-            toast.success('Account created! 🎉', {
+            toast.success('Account created!', {
                 description: "Let's build your first website!",
             })
 
@@ -175,7 +189,7 @@ export default function RegisterPage() {
                 )}
 
                 {/* Name row */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                         <Label htmlFor="firstName" className="text-gray-300">First name</Label>
                         <div className="relative mt-1.5">

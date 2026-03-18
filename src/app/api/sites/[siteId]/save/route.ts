@@ -3,6 +3,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { cookies } from 'next/headers'
 
+import { saveSiteSchema } from '@/lib/validations/sites'
+import { parseRequest } from '@/lib/validations/helpers'
+
 /**
  * PATCH /api/sites/[siteId]/save
  * Saves updated blocks (layout) and/or theme for a site.
@@ -46,8 +49,10 @@ export async function PATCH(
         }
 
         const { siteId } = await params
-        const body = await req.json()
-        const { blocks, theme } = body
+        const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
+        if (errorResponse) return errorResponse
+        
+        const { blocks, theme } = data!
 
         // Update theme on site if provided
         if (theme) {
