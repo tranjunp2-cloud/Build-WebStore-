@@ -36,6 +36,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check DB migrations
+        if: github.event_name == 'pull_request'
+        id: migrations
+        run: |
+          git fetch origin staging --depth=1
+          node scripts/check-migrations.js origin/staging
+
       - name: Lint
         id: lint
         run: npm run lint
