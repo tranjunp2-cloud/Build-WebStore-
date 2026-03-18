@@ -1,5 +1,8 @@
-import { blockRegistry } from '@/blocks/registry'
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
+
+// Prevent static prerender — SiteRenderer imports block registry which
+// pulls in isomorphic-dompurify/jsdom that fails in Docker standalone builds.
+export const dynamic = 'force-dynamic'
 
 export default function TestBlocksPage() {
     const site = {

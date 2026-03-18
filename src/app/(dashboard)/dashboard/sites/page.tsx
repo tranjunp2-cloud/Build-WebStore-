@@ -2,6 +2,10 @@ import Link from 'next/link'
 import { Plus, Sparkles, Globe, ExternalLink, Pencil, Eye } from 'lucide-react'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+
+// Force dynamic — requires auth context + getPayload() at runtime
+export const dynamic = 'force-dynamic'
+
 import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 import { formatRelativeTime } from '@/lib/utils'
