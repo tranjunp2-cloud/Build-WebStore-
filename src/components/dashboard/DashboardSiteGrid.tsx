@@ -1,5 +1,8 @@
+'use client'
+
 import Link from 'next/link'
 import { Pencil, ExternalLink } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 type SiteCardData = {
     id: string
@@ -34,8 +37,8 @@ function getInitials(name: string): string {
         .toUpperCase()
 }
 
-function SiteCard({ site }: { site: SiteCardData }) {
-    const status = site.isPublished ? 'Published' : 'Draft'
+function SiteCard({ site, t }: { site: SiteCardData, t: any }) {
+    const status = site.isPublished ? t.dashboard.sites.published : t.dashboard.sites.draft
     const gradient = getSiteGradient(site.name)
     const initials = getInitials(site.name)
 
@@ -59,7 +62,7 @@ function SiteCard({ site }: { site: SiteCardData }) {
                         href={`/editor/${site.id}`}
                         className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors shadow-lg"
                     >
-                        Open Editor
+                        {t.dashboard.sites.openEditor}
                     </Link>
                 </div>
             </div>
@@ -78,21 +81,21 @@ function SiteCard({ site }: { site: SiteCardData }) {
                     </span>
                 </div>
                 <p className="mt-1 text-xs text-gray-500">
-                    Last edited: {site.updatedAt}
+                    {t.dashboard.sites.lastEdited} {new Date(site.updatedAt).toLocaleDateString()}
                 </p>
                 <div className="mt-3 flex gap-2">
                     <Link
                         href={`/editor/${site.id}`}
                         className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 transition-colors"
                     >
-                        <Pencil className="h-3 w-3" /> Edit
+                        <Pencil className="h-3 w-3" /> {t.dashboard.sites.edit}
                     </Link>
                     <Link
                         href={`/api/preview/${site.id}`}
                         target="_blank"
                         className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 transition-colors"
                     >
-                        <ExternalLink className="h-3 w-3" /> Preview
+                        <ExternalLink className="h-3 w-3" /> {t.dashboard.sites.preview}
                     </Link>
                 </div>
             </div>
@@ -101,19 +104,21 @@ function SiteCard({ site }: { site: SiteCardData }) {
 }
 
 export function DashboardSiteGrid({ sites }: { sites: SiteCardData[] }) {
+    const { t } = useI18n()
+    
     return (
         <div>
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-white">My Websites</h2>
+                <h2 className="text-lg font-semibold text-white">{t.dashboard.sites.title}</h2>
                 {sites.length > 6 && (
                     <Link href="/dashboard/sites" className="text-sm text-blue-400 hover:text-blue-300">
-                        View All →
+                        {t.dashboard.sites.viewAll}
                     </Link>
                 )}
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {sites.map((site) => (
-                    <SiteCard key={site.id} site={site} />
+                    <SiteCard key={site.id} site={site} t={t} />
                 ))}
             </div>
         </div>

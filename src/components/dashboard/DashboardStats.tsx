@@ -1,78 +1,66 @@
-import { Globe, HardDrive } from 'lucide-react'
+'use client'
 
-type StatCardProps = {
-    icon: React.ElementType
-    label: string
-    value: string
-    sub?: string
-    progress?: number
-    iconColor?: string
-}
-
-function StatCard({ icon: Icon, label, value, sub, progress, iconColor = 'text-gray-500' }: StatCardProps) {
-    return (
-        <div className="rounded-xl border border-white/10 bg-[#1E293B] p-5 transition-all hover:border-white/20">
-            <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-400">{label}</span>
-                <div className="rounded-lg bg-white/5 p-2">
-                    <Icon className={`h-4 w-4 ${iconColor}`} />
-                </div>
-            </div>
-            <p className="mt-3 text-2xl font-bold text-white">{value}</p>
-            {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
-            {typeof progress === 'number' && (
-                <div className="mt-3 h-1.5 rounded-full bg-gray-800">
-                    <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                            width: `${Math.min(progress, 100)}%`,
-                            backgroundColor: progress > 80 ? '#EF4444' : progress > 50 ? '#F59E0B' : '#3B82F6',
-                        }}
-                    />
-                </div>
-            )}
-        </div>
-    )
-}
+import { Eye, MousePointerClick, ShoppingCart, DollarSign } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 type DashboardStatsProps = {
-    totalSites: number
-    storageUsed: number
-    storageLimit: number
-    publishedCount: number
+    views: number
+    leads: number
+    engagement: number
+    revenue: number
+    pendingOrdersCount: number
+    currency: string
+    preferences?: string[]
 }
 
-export function DashboardStats({
-    totalSites,
-    storageUsed,
-    storageLimit,
-    publishedCount,
-}: DashboardStatsProps) {
-    const draftCount = totalSites - publishedCount
+export function DashboardStats(props: DashboardStatsProps) {
+    const { t } = useI18n()
+    const defaultOrder = ['views', 'leads', 'engagement', 'revenue']
+    const order = props.preferences || defaultOrder
+    
+    const STAT_CARDS = {
+      views: (
+        <div className="rounded-xl border border-white/10 bg-[#1E293B] p-5" key="views">
+            <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-400">{t.dashboard.overview.stats.views}</span>
+                <Eye className="h-4 w-4 text-blue-400" />
+            </div>
+            <p className="mt-3 text-2xl font-bold text-white">{props.views.toLocaleString()}</p>
+        </div>
+      ),
+      leads: (
+        <div className="rounded-xl border border-white/10 bg-[#1E293B] p-5" key="leads">
+            <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-400">{t.dashboard.overview.stats.leads}</span>
+                <MousePointerClick className="h-4 w-4 text-emerald-400" />
+            </div>
+            <p className="mt-3 text-2xl font-bold text-white">{props.leads.toLocaleString()}</p>
+        </div>
+      ),
+      engagement: (
+        <div className="rounded-xl border border-white/10 bg-[#1E293B] p-5" key="engagement">
+            <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-400">{t.dashboard.overview.stats.engagement}</span>
+                <ShoppingCart className="h-4 w-4 text-amber-400" />
+            </div>
+            <p className="mt-3 text-2xl font-bold text-white">{props.engagement.toLocaleString()}</p>
+        </div>
+      ),
+      revenue: (
+        <div className="rounded-xl border border-white/10 bg-[#1E293B] p-5" key="revenue">
+            <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-400">{t.dashboard.overview.stats.revenue}</span>
+                <DollarSign className="h-4 w-4 text-purple-400" />
+            </div>
+            <p className="mt-3 text-2xl font-bold text-white">{props.currency} {props.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            <p className="mt-1 text-xs text-gray-500">{t.dashboard.overview.stats.pendingOrders.replace('{count}', props.pendingOrdersCount.toString())}</p>
+        </div>
+      )
+    }
 
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatCard
-                icon={Globe}
-                label="Total Websites"
-                value={String(totalSites)}
-                sub={`${publishedCount} published · ${draftCount} draft`}
-                iconColor="text-blue-400"
-            />
-            <StatCard
-                icon={Globe}
-                label="Published"
-                value={String(publishedCount)}
-                sub={publishedCount > 0 ? 'Sites are live' : 'No live sites yet'}
-                iconColor="text-green-400"
-            />
-            <StatCard
-                icon={HardDrive}
-                label="Storage"
-                value={storageUsed > 0 ? `${storageUsed}MB / ${storageLimit}MB` : 'Not used'}
-                progress={storageUsed > 0 ? (storageUsed / storageLimit) * 100 : 0}
-                iconColor="text-amber-400"
-            />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+            {order.map(key => STAT_CARDS[key as keyof typeof STAT_CARDS] || null)}
         </div>
     )
 }
