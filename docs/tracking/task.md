@@ -49,7 +49,7 @@
 
 ## Wave 3: AI Core (Done)
 
-### 3.1 AI Chat Builder
+### 3.1 AI Web Builder
 > **Chi tiết từ PRD F01**
 **Backend & Database**
 - [x] Rule-based block generator (5 business types × 7 blocks)
