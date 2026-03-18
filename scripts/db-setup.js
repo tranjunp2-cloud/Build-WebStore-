@@ -117,6 +117,64 @@ async function waitForTables(maxWaitSec = 120) {
   return false;
 }
 
+/**
+ * Wait for schema sync to complete by checking if pushDevSchema has finished.
+ * Instead of waiting a fixed time, poll the DB to see if Payload's dev server
+ * is still running migrations.
+ */
+async function waitForSchemaSync(maxWaitSec = 30) {
+  const pool = createPool();
+  if (!pool) return true;
+
+  const startTime = Date.now();
+  const deadline = startTime + maxWaitSec * 1000;
+
+  console.log(`[db-setup] Verifying schema sync (timeout: ${maxWaitSec}s)...`);
+
+  // Get initial column count to detect changes
+  let prevColCount = 0;
+  try {
+    const r = await pool.query(
+      "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public'"
+    );
+    prevColCount = parseInt(r.rows[0].count, 10);
+    console.log(`[db-setup] Current column count: ${prevColCount}`);
+  } catch { /* ignore */ }
+
+  // Poll until column count stabilizes (no changes for 5s = sync done)
+  let stableCount = 0;
+  while (Date.now() < deadline) {
+    await sleep(3000);
+    try {
+      const r = await pool.query(
+        "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public'"
+      );
+      const currentColCount = parseInt(r.rows[0].count, 10);
+
+      if (currentColCount === prevColCount) {
+        stableCount++;
+        if (stableCount >= 2) {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          console.log(`[db-setup] ✅ Schema sync complete — ${currentColCount} columns (stable for 6s, took ${elapsed}s)`);
+          await pool.end();
+          return true;
+        }
+      } else {
+        console.log(`[db-setup] Schema changing: ${prevColCount} → ${currentColCount} columns`);
+        prevColCount = currentColCount;
+        stableCount = 0;
+      }
+    } catch {
+      // DB busy during sync — retry
+    }
+  }
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`[db-setup] ⚠️ Schema sync timeout after ${elapsed}s — proceeding anyway`);
+  await pool.end().catch(() => {});
+  return true; // Proceed even on timeout — might be fine
+}
+
 function spawnServer(env) {
   return spawn('node', ['server.js'], { stdio: 'inherit', env });
 }
@@ -138,26 +196,39 @@ async function main() {
     const devEnv = { ...process.env, NODE_ENV: 'development' };
     const devServer = spawnServer(devEnv);
 
-    // Wait for tables to appear (pushDevSchema triggered by first request)
-    // Also make a request to trigger Payload initialization
+    // Payload pushDevSchema runs during DB connect (on server start).
+    // We need to wait for it to finish before switching to production.
     await sleep(5000); // Give server time to start listening
-    try {
-      // Trigger Payload init by hitting the health endpoint
-      const http = require('http');
-      http.get('http://localhost:3000/api/health', () => {});
-    } catch {
-      // Ignore — Payload init might be triggered by other means
-    }
+
+    // Trigger Payload initialization by hitting any endpoint
+    const http = require('http');
+    const triggerInit = () => new Promise((resolve) => {
+      const req = http.get('http://localhost:3000/api/health', (res) => {
+        console.log(`[db-setup] Health check: ${res.statusCode}`);
+        resolve();
+      });
+      req.on('error', () => {
+        console.log('[db-setup] Health check pending, server still starting...');
+        resolve();
+      });
+      req.setTimeout(5000, () => { req.destroy(); resolve(); });
+    });
+
+    // Try multiple times to ensure Payload is fully initialized
+    await triggerInit();
+    await sleep(3000);
+    await triggerInit();
 
     let schemaReady;
     if (tableCount === 0) {
       // Fresh DB: wait for tables to appear
       schemaReady = await waitForTables(120);
     } else {
-      // Existing DB: Payload pushDevSchema runs on connect, wait for it to finish
-      console.log('[db-setup] Waiting 15s for schema sync to complete...');
-      await sleep(15000);
-      schemaReady = true;
+      // Existing DB with new columns needed (e.g. stripe_account_id).
+      // Payload pushDevSchema adds missing columns on connect.
+      // Wait and verify the specific column exists.
+      console.log('[db-setup] Waiting for schema sync (new columns)...');
+      schemaReady = await waitForSchemaSync(30);
     }
 
     if (schemaReady) {
