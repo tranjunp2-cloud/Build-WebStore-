@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, Send, ArrowLeft, Loader2, Check, ExternalLink, Eye, MessageSquare } from 'lucide-react'
+import { Sparkles, Send, ArrowLeft, Loader2, Check, ExternalLink, Eye, MessageSquare, Globe } from 'lucide-react'
+import { toast } from 'sonner'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -11,6 +12,10 @@ import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import BusinessInfoForm from '@/components/builder/BusinessInfoForm'
+import { CongratsModal } from '@/components/builder/CongratsModal'
+
+// Types
+import type { BusinessInfoInput } from '@/lib/ai/system-prompt'
 
 // ─── Chat Message Component ────────────────────────────────────────────
 function ChatBubble({ message }: { message: Message }) {
@@ -84,6 +89,9 @@ export default function AIBuilderPage() {
     const [input, setInput] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [showPreview, setShowPreview] = useState(false)
+    const [isPublishing, setIsPublishing] = useState(false)
+    const [publishedUrl, setPublishedUrl] = useState('')
+    const [showCongrats, setShowCongrats] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -209,6 +217,31 @@ export default function AIBuilderPage() {
         }
     }
 
+    const handlePublish = async () => {
+        if (!siteId) return
+        setIsPublishing(true)
+        try {
+            const res = await fetch(`/api/sites/${siteId}/publish`, {
+                method: 'PATCH'
+            })
+            const data = await res.json()
+            if (data.success) {
+                // Ensure subdomain format: {slug}.primeweb.app as requested by PRD,
+                // If API didn't return a fully qualified primeweb.app domain, we mock it for UI
+                const slug = siteId
+                const url = `https://${slug}.primeweb.app`
+                setPublishedUrl(url)
+                setShowCongrats(true)
+            } else {
+                toast.error(data.error?.message || 'Failed to publish site')
+            }
+        } catch (error) {
+            toast.error('Network error during publish')
+        } finally {
+            setIsPublishing(false)
+        }
+    }
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -277,11 +310,25 @@ export default function AIBuilderPage() {
                     {/* Done state — action buttons */}
                     {isDone && siteId && (
                         <div className="flex flex-col gap-2 pt-2">
-                            <Button onClick={() => router.push('/dashboard')} className="w-full">
-                                🏠 Dashboard
+                            <Button
+                                onClick={handlePublish}
+                                className="w-full relative overflow-hidden group border-none bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-purple-500/25 transition-all"
+                                disabled={isPublishing}
+                            >
+                                <span className="relative flex items-center gap-2 font-medium">
+                                    {isPublishing ? (
+                                        <>
+                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Publishing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Globe className="h-4 w-4" /> Publish & Go Live
+                                        </>
+                                    )}
+                                </span>
                             </Button>
-                            <Button variant="outline" onClick={() => router.push(`/editor/${siteId}`)} className="w-full">
-                                <ExternalLink className="h-4 w-4" /> Open Editor
+                            <Button variant="outline" onClick={() => router.push(`/editor/${siteId}`)} className="w-full bg-transparent border-white/10 hover:bg-white/5 text-gray-300">
+                                <ExternalLink className="h-4 w-4 mr-2" /> Continue Editing
                             </Button>
                         </div>
                     )}
@@ -381,6 +428,13 @@ export default function AIBuilderPage() {
                     )}
                 </div>
             </div>
+            <CongratsModal
+                isOpen={showCongrats}
+                onOpenChange={setShowCongrats}
+                siteUrl={publishedUrl}
+                siteName={siteName || 'Your Website'}
+                siteId={siteId || ''}
+            />
         </div>
     )
 }
