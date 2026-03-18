@@ -5,11 +5,7 @@
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
     "dev": "cross-env NODE_OPTIONS=\"--require ./node-polyfill.js\" next dev",
-<<<<<<< Updated upstream
     "build": "NODE_OPTIONS='--require ./node-polyfill.js' next build",
-=======
-    "build": "cross-env NODE_OPTIONS=\"--require ./node-polyfill.js\" next build",
->>>>>>> Stashed changes
     "start": "next start",
     "lint": "next lint",
     "prepare": "husky || true",
