@@ -217,6 +217,22 @@
             "lastEdited": "Akhir disunting: ",
             "edit": "Sunting",
             "preview": "Pratonton"
+        },
+        "analytics": {
+            "title": "Analitis",
+            "subtitle": "Trafik terperinci dan tingkah laku pengguna",
+            "empty": {
+                "title": "Tiada data analitis tersedia",
+                "description": "Tiada data yang dijejak dalam tempoh masa ini. Sila semak semula nanti selepas menerima trafik."
+            },
+            "error": "Tidak dapat memuatkan data analitis",
+            "retry": "Cuba lagi",
+            "chart": "Tinjauan Trafik",
+            "topPages": "Halaman Utama",
+            "topProducts": "Produk Teratas",
+            "topBlogs": "Blog Teratas",
+            "views": "Paparan",
+            "clicks": "Klik"
         }
     }
 }

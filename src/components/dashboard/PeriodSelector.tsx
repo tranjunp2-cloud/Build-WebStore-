@@ -10,7 +10,7 @@ export function PeriodSelector() {
     const pathname = usePathname()
     const { t } = useI18n()
 
-    const currentPeriod = searchParams.get('period') || '30d'
+    const currentPeriod = searchParams.get('period') || '7d'
 
     const PERIODS = [
         { id: 'today', label: t.dashboard.overview.periods.today },
