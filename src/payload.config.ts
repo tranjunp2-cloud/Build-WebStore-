@@ -15,6 +15,7 @@ import { Subscriptions } from './collections/Subscriptions'
 import { Products } from './collections/Products'
 import { Orders } from './collections/Orders'
 import { Analytics } from './collections/Analytics'
+import { SEOMetaJobs } from './collections/SEOMetaJobs'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -62,6 +63,7 @@ export default buildConfig({
     Products,
     Orders,
     Analytics,
+    SEOMetaJobs,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',
