@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
+import { generateSiteSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
@@ -61,15 +63,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Parse request body — structured business info
-        const { businessInfo, extraInstructions, language = 'vi' } = await req.json()
-
-        // Validate required business info
-        if (!businessInfo || !businessInfo.businessName || !businessInfo.industry || !businessInfo.products) {
-            return NextResponse.json(
-                { error: 'Missing required fields: businessName, industry, products' },
-                { status: 400 },
-            )
-        }
+        const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
+        if (errorResponse) return errorResponse
+        
+        const { businessInfo, extraInstructions, language = 'en' } = data!
 
         // Check SSE mode
         const isStreaming = req.nextUrl.searchParams.get('stream') === 'true'
