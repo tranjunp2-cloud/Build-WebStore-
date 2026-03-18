@@ -69,8 +69,12 @@ async function checkDB() {
 
     await pool.end();
 
+    // Always push schema when we have CREATE privilege.
+    // pushDevSchema handles both initial creation AND adding new columns
+    // to existing tables (e.g. stripe_account_id added after initial deploy).
+    // It's a no-op if schema is already in sync.
     return {
-      needsPush: tableCount === 0 && canCreate,
+      needsPush: canCreate,
       tableCount,
     };
   } catch (e) {
@@ -124,7 +128,11 @@ async function main() {
 
   if (needsPush) {
     // ── Phase 1: Start with NODE_ENV=development to trigger pushDevSchema ──
-    console.log('[db-setup] ⚡ Empty database detected — starting schema push');
+    if (tableCount === 0) {
+      console.log('[db-setup] ⚡ Empty database detected — starting schema push');
+    } else {
+      console.log(`[db-setup] 🔄 ${tableCount} tables exist — syncing schema for new columns`);
+    }
     console.log('[db-setup] Phase 1: Starting server with NODE_ENV=development...');
 
     const devEnv = { ...process.env, NODE_ENV: 'development' };
@@ -141,9 +149,18 @@ async function main() {
       // Ignore — Payload init might be triggered by other means
     }
 
-    const tablesCreated = await waitForTables(120);
+    let schemaReady;
+    if (tableCount === 0) {
+      // Fresh DB: wait for tables to appear
+      schemaReady = await waitForTables(120);
+    } else {
+      // Existing DB: Payload pushDevSchema runs on connect, wait for it to finish
+      console.log('[db-setup] Waiting 15s for schema sync to complete...');
+      await sleep(15000);
+      schemaReady = true;
+    }
 
-    if (tablesCreated) {
+    if (schemaReady) {
       // ── Phase 2: Restart with NODE_ENV=production ──
       console.log('[db-setup] Phase 2: Restarting server with NODE_ENV=production...');
       devServer.kill('SIGTERM');
