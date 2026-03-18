@@ -1,6 +1,6 @@
-# Architecture: Products CRUD (F09)
+# Architecture: Products CRUD (F08)
 
-> **Version:** 1.0 | **PRD:** [F09-products-crud.md](../prd/F09-products-crud.md)  
+> **Version:** 1.0 | **PRD:** [F08-products-crud.md](../prd/F08-products-crud.md)  
 > **Tech:** Payload CMS 3 (Products collection) + OpenAI
 
 ---

@@ -10,7 +10,7 @@
 | # | Section | Description |
 |---|---------|-------------|
 | 1 | [AI Architecture Overview](#1-ai-architecture-overview) | System design, model routing, cost strategy |
-| 2 | [AI Chat Builder](#2-ai-chat-builder) | Full-screen chat → site generation |
+| 2 | [AI Web Builder](#2-ai-chat-builder) | Full-screen chat → site generation |
 | 3 | [AI Editor](#3-ai-editor) | Split-screen chat + live preview editing |
 | 4 | [Inline AI Edit](#4-inline-ai-edit) | Hover-to-edit element interactions |
 | 5 | [AI SEO Engine](#5-ai-seo-engine) | Auto SEO analysis, fix-all, sitemap |
@@ -36,7 +36,7 @@ Web Store is **AI-first**: AI is not a feature bolted on — it IS the product. 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    USER JOURNEY                          │
-│  Register → AI Chat Builder → AI Editor → Publish       │
+│  Register → AI Web Builder → AI Editor → Publish       │
 │             (generate site)   (refine site)              │
 │                   ↓                 ↓                    │
 │              Full Generation    Incremental Edit          │
@@ -90,7 +90,7 @@ type AIContext = {
 ## 2. AI CHAT BUILDER
 
 ### 2.1 Overview
-The AI Chat Builder is a **full-screen experience** where users describe their business and AI generates a complete website in real-time. This is the **#1 USP** of the product.
+The AI Web Builder is a **full-screen experience** where users describe their business and AI generates a complete website in real-time. This is the **#1 USP** of the product.
 
 ### 2.2 User Flow
 
@@ -600,7 +600,7 @@ const ThemeConfig = z.object({
 
 ## 8. SYSTEM PROMPTS
 
-### 8.1 AI Chat Builder — System Prompt
+### 8.1 AI Web Builder — System Prompt
 
 ```
 You are an expert website builder AI for Web Store, an AI-first website builder platform.
@@ -874,7 +874,7 @@ const RETRY_CONFIG = {
 
 ```
 IF OpenAI API is completely down:
-  → AI Chat Builder: Show "Chọn Template" fallback
+  → AI Web Builder: Show "Chọn Template" fallback
   → AI Editor: Disable chat, enable manual drag-drop only
   → Inline Edit: Disable AI popup, show manual text edit
   → SEO: Show static checklist (no AI analysis)
@@ -970,7 +970,7 @@ function enhancePrompt(userPrompt: string, category: BusinessCategory): string {
 
 ## 14. API CONTRACTS (AI)
 
-### 14.1 AI Chat Builder — Generate Site
+### 14.1 AI Web Builder — Generate Site
 
 ```typescript
 // POST /api/ai/generate-site
@@ -1116,7 +1116,7 @@ data: {"totalFixed":12,"scoreBefore":52,"scoreAfter":89}
 
 ## 15. ACCEPTANCE CRITERIA
 
-### AC-001: AI Chat Builder — Happy Path
+### AC-001: AI Web Builder — Happy Path
 
 ```gherkin
 GIVEN user ở /builder/new (đã đăng nhập)
@@ -1134,7 +1134,7 @@ AND hiện 2 options: "Tinh chỉnh →" (→ /editor) và "Publish ngay"
 AND draft tự động save vào DB
 ```
 
-### AC-002: AI Chat Builder — Clarifying Questions
+### AC-002: AI Web Builder — Clarifying Questions
 
 ```gherkin
 GIVEN user nhập prompt thiếu tên shop

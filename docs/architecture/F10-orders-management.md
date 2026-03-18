@@ -1,6 +1,6 @@
-# Architecture: Orders Management (F11)
+# Architecture: Orders Management (F10)
 
-> **Version:** 1.0 | **PRD:** [F11-orders-management.md](../prd/F11-orders-management.md)  
+> **Version:** 1.0 | **PRD:** [F10-orders-management.md](../prd/F10-orders-management.md)  
 > **Tech:** Payload CMS 3 + Stripe Webhooks + Resend Email
 
 ---
@@ -8,12 +8,10 @@
 ## 1. Order Lifecycle
 
 ```
-Customer adds to cart → Checkout → Stripe Payment
-                                       ↓
-                              Stripe Webhook: payment_intent.succeeded
+Customer adds to cart → Checkout (COD / QR Banking)
                                        ↓
                               Create Order in Payload CMS
-                              Status: NEW
+                              Status: PENDING
                               Decrement inventory
                               Send email to merchant (Resend)
                               Send confirmation to customer (Resend)
@@ -54,13 +52,13 @@ const Orders: CollectionConfig = {
       { name: 'trackingNumber', type: 'text' },
     ]},
     { name: 'payment', type: 'group', fields: [
-      { name: 'method', type: 'select', options: ['stripe', 'fpx', 'grabpay'] },
-      { name: 'stripePaymentId', type: 'text' },
+      { name: 'method', type: 'select', options: ['cod', 'qr_banking'] },
+      { name: 'proofMediaId', type: 'text' },
       { name: 'amount', type: 'number' },
       { name: 'currency', type: 'text', defaultValue: 'MYR' },
     ]},
     { name: 'status', type: 'select', options: [
-      'new', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'refunded'
+      'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'completed', 'cancelled', 'refunded'
     ]},
     { name: 'site', type: 'relationship', relationTo: 'sites', required: true },
   ],
@@ -89,30 +87,17 @@ OrdersPage (/dashboard/orders)
     └── StatusUpdater (dropdown + confirm)
 ```
 
-## 4. Webhook Flow (Stripe)
+## 4. Webhook Flow
 
 ```
-POST /api/webhooks/stripe
-  ↓
-Verify Stripe signature
-  ↓
-event.type === 'payment_intent.succeeded'
-  ↓
-Find pending order by stripePaymentId
-  ↓
-Update status: pending → new
-Decrement product stock
-  ↓
-Send emails via Resend:
-  - To merchant: "New order #ECH-001!"
-  - To customer: "Order confirmed"
+(Note: Webhooks for payment are disabled in this phase. The orders are created manually under COD or QR Banking via Payload APIs and confirmed manually by merchants).
 ```
 
 ## 5. Error Matrix
 
 | Error | Action |
 |-------|--------|
-| Webhook signature invalid | 400 response, log to Sentry |
+| Media upload failed | 400 response, "Image size > 2MB" |
 | Product out of stock during checkout | Show "Out of stock" before payment |
 | Email send failure | Retry 3x via queue, log failure |
 | Status update conflict | Optimistic lock via updatedAt check |

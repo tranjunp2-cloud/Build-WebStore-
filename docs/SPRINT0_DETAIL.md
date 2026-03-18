@@ -37,6 +37,7 @@
 | **Thực trạng** | Chỉ 4/16 routes có auth. 12 routes bất kỳ ai cũng gọi được |
 | **Việc làm** | Viết auth middleware + apply cho 12 routes còn lại |
 | **Thời gian** | 2 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Routes cần thêm auth (đã check, KHÔNG có):**
 ```
@@ -91,6 +92,7 @@ if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 | **Thực trạng** | 0/16 routes có Zod validation. Zod đã có trong package.json nhưng chỉ dùng trong blocks config |
 | **Việc làm** | Viết Zod schema cho request body mỗi POST/PATCH route |
 | **Thời gian** | 2 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Cụ thể phải viết cho mỗi route:**
 
@@ -133,6 +135,7 @@ export async function POST(req: Request) {
 | **Thực trạng** | Package `stripe` đã installed. Collections Orders/Subscriptions có. Nhưng KHÔNG có webhook endpoint |
 | **Việc làm** | Viết endpoint + handler cho 3 Stripe events |
 | **Thời gian** | 3 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Files tạo mới:**
 - `src/app/api/webhooks/stripe/route.ts`
@@ -179,6 +182,7 @@ stripe trigger checkout.session.completed
 | **Thực trạng** | Không tồn tại. Dev phải tự tạo data bằng tay |
 | **Việc làm** | Viết script tạo sample data |
 | **Thời gian** | 1 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **File tạo mới:** `scripts/seed.ts`
 
@@ -238,6 +242,7 @@ Thêm vào `package.json`:
 | **Thực trạng** | Không tồn tại. Bất kỳ ai cũng gọi AI API vô hạn |
 | **Việc làm** | Viết in-memory rate limiter cho `/api/ai/*` routes |
 | **Thời gian** | 1 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **File tạo mới:** `src/lib/rateLimit.ts`
 
@@ -282,6 +287,7 @@ if (!rateCheck.allowed) {
 | **Thực trạng** | Không tồn tại. Published sites không có sitemap SEO |
 | **Việc làm** | Viết dynamic sitemap route cho mỗi tenant site |
 | **Thời gian** | 0.5 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **File tạo mới:** `src/app/sites/[slug]/sitemap.xml/route.ts`
 
@@ -314,6 +320,7 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
 | **Thực trạng** | `src/lib/email/send.ts` có (helper gửi email). Nhưng KHÔNG CÓ templates |
 | **Việc làm** | Viết 3 HTML email templates |
 | **Thời gian** | 1.5 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Files tạo mới:**
 - `src/lib/email/templates/welcome.ts` — HTML template welcome
@@ -347,6 +354,7 @@ export function welcomeEmail(userName: string): { subject: string; html: string 
 | **Thực trạng** | 93 tests có nhưng KHÔNG CÓ API test nào. Tất cả là unit test cho stores/utils |
 | **Việc làm** | Viết integration tests cho 16 API routes |
 | **Thời gian** | 3 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Files tạo mới:** `src/__tests__/api/` — 1 file per route group:
 - `ai.test.ts` (generate-site, edit-block, rewrite-text, apply-template)
@@ -376,6 +384,7 @@ describe('POST /api/ai/generate-site', () => {
 | **Thực trạng** | Playwright config có nhưng KHÔNG CÓ test file nào |
 | **Việc làm** | Viết E2E tests cho critical user flows |
 | **Thời gian** | 2 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Files tạo mới:**
 - `tests/auth.spec.ts` — Login → dashboard
@@ -393,13 +402,14 @@ describe('POST /api/ai/generate-site', () => {
 | **Thực trạng** | `docs/qa/` folder trống hoặc không tồn tại |
 | **Việc làm** | Viết test plan cho 5 features chính dựa trên stories (Gherkin AC) |
 | **Thời gian** | 2 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Files tạo mới:**
-- `docs/qa/F01-test-plan.md` — AI Chat Builder
+- `docs/qa/F01-test-plan.md` — AI Web Builder
 - `docs/qa/F05-test-plan.md` — AI Editor
-- `docs/qa/F09-test-plan.md` — Products CRUD
-- `docs/qa/F11-test-plan.md` — Orders
-- `docs/qa/F12-test-plan.md` — SEO Dashboard
+- `docs/qa/F08-test-plan.md` — Products CRUD
+- `docs/qa/F10-test-plan.md` — Orders
+- `docs/qa/F11-test-plan.md` — SEO Dashboard
 
 **Mỗi file:** ≥5 test cases dạng: Scenario / Steps / Expected Result / Priority
 
@@ -416,6 +426,7 @@ describe('POST /api/ai/generate-site', () => {
 | **Thực trạng** | `ci.yml` tồn tại nhưng cần verify chạy đúng 4 steps |
 | **Việc làm** | Verify + fix CI: lint → typecheck → test → build |
 | **Thời gian** | 1 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **File:** `.github/workflows/ci.yml`
 
@@ -430,6 +441,7 @@ describe('POST /api/ai/generate-site', () => {
 | **Thực trạng** | Không có Sentry. Nếu production lỗi → không ai biết |
 | **Việc làm** | Install + config Sentry cho Next.js |
 | **Thời gian** | 1 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Phải viết:**
 ```bash
@@ -450,6 +462,7 @@ Thêm env: `SENTRY_DSN=https://xxx@sentry.io/yyy`
 | **Thực trạng** | Không có. Reviewer phải tự chạy local để test PR |
 | **Việc làm** | Viết GitHub Action tạo preview URL cho mỗi PR |
 | **Thời gian** | 2 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **File tạo mới:** `.github/workflows/preview.yml`
 
@@ -464,6 +477,7 @@ Thêm env: `SENTRY_DSN=https://xxx@sentry.io/yyy`
 | **Thực trạng** | Dockerfile tồn tại nhưng chưa check image size |
 | **Việc làm** | Multi-stage build, prune deps, optimize layers |
 | **Thời gian** | 1 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **DoD:** `docker build -t primeweb .` → `docker images primeweb` → < 500MB
 
@@ -478,9 +492,10 @@ Thêm env: `SENTRY_DSN=https://xxx@sentry.io/yyy`
 
 | | |
 |---|---|
-| **Thực trạng** | Products collection không có field Halal. Ref: F09 AC-7 |
+| **Thực trạng** | Products collection không có field Halal. Ref: F08 AC-7 |
 | **Việc làm** | Thêm fields vào `src/collections/Products.ts` |
 | **Thời gian** | 0.5 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Thêm vào Products collection:**
 ```typescript
@@ -516,9 +531,10 @@ Thêm env: `SENTRY_DSN=https://xxx@sentry.io/yyy`
 
 | | |
 |---|---|
-| **Thực trạng** | Tenants collection không có WhatsApp/SSM fields. Ref: F10 AC-11, AC-12 |
+| **Thực trạng** | Tenants collection không có WhatsApp/SSM fields. Ref: F09 AC-11, AC-12 |
 | **Việc làm** | Thêm fields vào `src/collections/Tenants.ts` |
 | **Thời gian** | 0.5 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Thêm vào Tenants collection:**
 ```typescript
@@ -547,9 +563,10 @@ Thêm env: `SENTRY_DSN=https://xxx@sentry.io/yyy`
 
 | | |
 |---|---|
-| **Thực trạng** | Sites collection không có shipping config hay locale. Ref: F17 §8, F06 AC-1 |
+| **Thực trạng** | Sites collection không có shipping config hay locale. Ref: F14 §8, F06 AC-1 |
 | **Việc làm** | Thêm shippingConfig group + locale vào `src/collections/Sites.ts` |
 | **Thời gian** | 0.5 ngày |
+| **Tiến độ** | [ ] To Do (👤 TBD) |
 
 **Thêm vào Sites collection:**
 ```typescript

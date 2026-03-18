@@ -1,7 +1,7 @@
 # PRD: AI Editor — Split Screen (F05)
 > **Version:** 1.1 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
-> **Priority:** P0 🌟 | **Sprint:** Wave 3 | **Size:** XL
-> **Depends on:** F04 Block Renderer ✅, F01 AI Builder ✅ | **Blocks:** F14 Undo/Redo, F15 Auto-Save
+> **Priority:** P0 🌟 | **Sprint:** Wave 1 | **Size:** XL
+> **Depends on:** F04 Block Renderer ✅, F01 AI Builder ✅ | **Blocks:** F11 Undo/Redo, F12 Auto-Save
 
 ---
 
@@ -17,15 +17,23 @@
 |----------|-------|------|--------|
 | US-F05-01 | AI Editor — Split Screen Chat + Preview | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
 | US-F05-02 | Page Manager | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
-| US-F05-03 | Inline Click-to-Edit Element | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Draft |
-| US-F05-04 | Add New Section via AI | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Draft |
-| US-F05-05 | Drag-and-Drop Block Reorder in Editor | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Draft |
+| US-F05-03 | Inline Click-to-Edit Element | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-04 | Add New Section via AI | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-05 | Drag-and-Drop Block Reorder in Editor | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-06 | Manual Visual Editing (WYSIWYG Text & Image) | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-07 | Global Header & Footer Management | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-08 | Drag-and-Drop Component Library | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-09 | Tùy chỉnh Trang 404 (404 Not Found Page) | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-10 | Tạm ẩn/Unpublish Toàn Bộ Website | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-11 | Interactive Widgets (Giỏ hàng & Social Media) | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-12 | Global Business Info & Settings Panel | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-13 | Page-Level SEO & AI Optimization | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
 
 ---
 
 ## 1. Problem Statement
 
-After AI generates a website, users need to refine and customize it. Currently the editor is a basic single-panel view with limited AI integration. Users need a powerful but simple split-screen editor where they can chat with AI to make changes while seeing live preview — similar to Lovable/Bolt.new.
+After AI generates a website, users need to refine and customize it. Currently, the editor relies too heavily on writing text prompts. Users need a powerful Hybrid Visual Builder where they can manually edit text/images, drag and drop rich components from a library, manage global structures (Header/Footer), while still keeping an AI Chat assistant as an intelligent overlay. Focus is on user-friendliness comparable to top-tier market products (Framer, Shopify, Bolt.new).
 
 ---
 
@@ -39,25 +47,32 @@ After AI generates a website, users need to refine and customize it. Currently t
 
 ## 3. Solution Overview
 
-3-panel split screen editor: AI Chat (380px trái), Live Preview iframe (giữa), Settings panel (320px phải). User chat để AI apply changes realtime lên preview. Hover element để click-to-edit inline. Undo/Redo support cả AI và manual edits. Auto-save mỗi 3 giây.
+3-panel layout: Chat/Blocks (380px trái), Live Preview iframe (giữa), Settings panel (320px phải). User chat hoặc kéo thả block để dựng trang. Panel Settings hiển thị tuỳ chọn theo ngữ cảnh (Context-sensitive): Nếu click block thì sửa block, nếu không click gì thì là Global Site Settings (SEO, Tên Doanh Nghiệp, Mạng Xã Hội). Undo/Redo support cả AI và manual edits. Auto-save mỗi 3 giây.
 
 ---
 
 ## 4. Scope
 
 ### In Scope
-- 3-panel layout: Chat + Preview + Settings (US-F05-01)
+- 3-panel layout: Chat/Blocks + Preview + Settings (US-F05-01)
 - AI chat → realtime preview update (US-F05-01)
+- Manual Visual Editing: Double-click text (WYSIWYG), upload/replace images with AI Auto-Scaling (US-F05-06)
+- Component Library (Side panel): Drag and drop new pre-defined blocks (Product List, Blog, Forms, Carousel, Banner, etc) into the live preview (US-F05-08)
+- All blocks are auto-responsive without explicit breakpoint configuration
+- Global Header & Footer management across pages (US-F05-07)
+- Page Manager: CRUD pages, soft delete, and Toggle Visibility (Hide/Show page from users & menu) (US-F05-02)
+- Custom 404 Not Found page design through the editor (US-F05-09)
+- Site-wide "Unpublish / Maintenance Mode" toggle (US-F05-10)
+- Interactive Widgets Component: Cart icon/drawer and Social Media link buttons (FB, WA, IG, LinkedIn, YT) (US-F05-11)
+- Global Site Settings Panel: Centralized management of Business Info (Name, Address, Phone, Social links) and SEO in the right sidebar (US-F05-12)
+- Page-Level SEO settings với tính năng AI tự động đọc nội dung trang để sinh Meta Title/Description (US-F05-13)
 - Undo/Redo (Ctrl+Z/Y) cho cả AI và manual changes (US-F05-01)
 - Hover element → inline AI edit popup (US-F05-03)
-- Page Manager: CRUD pages + soft delete (US-F05-02)
-- Add new section via AI chat (US-F05-04)
+- Drag-drop block reordering within iframe (US-F05-05)
 - Auto-save debounce 3s (US-F05-01)
-- Drag-drop block reordering in iframe (US-F05-05)
 
 ### Out of Scope
-- Custom HTML/CSS injection
-- Block Library sidebar (Wave 4+)
+- Custom HTML/CSS injection / Custom Breakpoint styling (Code override)
 
 ---
 
@@ -98,9 +113,22 @@ SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 | FR-09 | Delete page: soft delete + undo toast 5s | US-F05-02 | P0 | |
 | FR-10 | Hover element 200ms → hiện "✨ Edit with AI" button | US-F05-03 | P0 | top-right position |
 | FR-11 | Click ✨ → instruction popup → apply changes trong 300ms | US-F05-03 | P0 | |
-| FR-12 | Add section via chat (Testimonials, FAQ, Gallery, etc.) | US-F05-04 | P0 | 8 section types |
-| FR-13 | Drag handle on hover → drag to reorder blocks in preview | US-F05-05 | P0 | |
-| FR-14 | Drag-drop action pushes to Undo/Redo stack and triggers auto-save | US-F05-05 | P0 | |
+| FR-12 | Drag handle on hover → drag to reorder blocks in preview | US-F05-05 | P0 | |
+| FR-13 | Drag-drop action pushes to Undo/Redo stack and triggers auto-save | US-F05-05 | P0 | |
+| FR-14 | Manual Edit (Rich-Text): Double click text → popup Floating Toolbar xuất hiện với các nút format: Kiểu chữ (B, I, U), Canh lề (Trái, Giữa, Phải, Đều), Heading level (H1-H6, Body). | US-F05-06 | P0 | WYSIWYG Editor style |
+| FR-15 | Image Upload & Replace: Upload local file, AI/system **auto-crops/compresses** mọi ảnh >2MB trước khi lưu để giảm tải. | US-F05-06 | P0 | Limit 2MB in FE/BE, auto downscale |
+| FR-16 | Global Header: Sửa 1 lần áp dụng mọi trang. Hỗ trợ tạo Menu, Sub-menu nhiều cấp (nested). Người dùng có thể kéo thả để gom nhóm item, tạo dropdown menu. Đổi Logo tự adapt width/height. | US-F05-07 | P1 | Draggable tree menu |
+| FR-17 | Block Library Panel: Danh sách component chuẩn (Product, Blog, Form...) | US-F05-08 | P0-XL | |
+| FR-18 | Drag Block từ Sidebar thả vào iframe preview → Insert block + Save | US-F05-08 | P0-XL | |
+| FR-19 | Auto-Responsive: Các block kéo vào tự tương thích Mobile/Tablet/Desk | US-F05-08 | P0 | |
+| FR-20 | Toggle Visibility: Ẩn một page khỏi menu header và chặn truy cập (404) | US-F05-02 | P0 | |
+| FR-21 | Tùy chỉnh 404 Page bằng AI Editor (như một page thông thường) | US-F05-09 | P1 | |
+| FR-22 | Site Unpublish: Bật/Tắt trạng thái public toàn bộ website (Maintenance)  | US-F05-10 | P0 | 503 HTTP Code |
+| FR-23 | Widget Social Media: Thêm nút liên kết (FB, WA, IG, LinkedIn, YT) | US-F05-11 | P0 | |
+| FR-24 | Widget Cart: Tích hợp nút giỏ hàng, mở xem giỏ, ấn Mua → sang Checkout | US-F05-11 | P0 | |
+| FR-25 | Logo Scaling & AI Favicon: Upload Logo → tự resize/adapt theo chuẩn (VD: max-height 60px). AI tự xử lý extract ra Favicon (file .ico/png nhỏ). | US-F05-07 | P1 | |
+| FR-26 | Global Settings Panel (Right Sidebar): Khi không focus block nào, hiển thị Cấu hình Toàn cục. Chứa mục Nhận diện (Tên cửa hàng, Logo), Liên hệ (SDT, Email, Trụ sở), Mạng xã hội, và Cấu hình SEO cơ bản (Title, Description). | US-F05-12 | P0 | Data bound |
+| FR-27 | Page-Level SEO & AI Content: Trong Page Manager hoặc Settings, cho phép tùy chỉnh Meta Title, Description, Slug cho từng trang. Bổ sung nút "✨ Tự động Tối ưu SEO" để AI đọc các text blocks trên canvas và tự sinh metadata phù hợp. | US-F05-13 | P1 | Content-aware AI |
 
 ---
 
@@ -136,23 +164,25 @@ User action:
 ```
 ┌─ /editor/:siteId ──────────────────────────────────────────┐
 │ ┌─ Toolbar ──────────────────────────────────────────────┐ │
-│ │ [Pages ▼] [← Undo(3)] [Redo →] [💾] [👁] [🚀 Publish]│ │
-│ │                                     Draft · Saved 2s   │ │
+│ │ [Pages ▼] [Undo] [Redo] [Màn hình 💻▼] [👁] [🚀 Publish] │ │
 │ └────────────────────────────────────────────────────────┘ │
-│ ┌──────────────┐ ┌──────────────────────────────────────┐  │
-│ │  CHAT PANEL  │ │           LIVE PREVIEW (iframe)       │  │
-│ │  (380px)     │ │                                       │  │
-│ │  AI: How can │ │  [Nav Block]                          │  │
-│ │  I help?     │ │  [Hero Block] ← hover → blue outline  │  │
-│ │              │ │       ┌─────────────┐                 │  │
-│ │  User: Change│ │       │ ✨ Edit with│                 │  │
-│ │  hero color  │ │       │    AI       │                 │  │
-│ │              │ │       └─────────────┘                 │  │
-│ │  [Type...]   │ │  [Features] [About] [Contact]         │  │
-│ └──────────────┘ └──────────────────────────────────────┘  │
-│                                                              │
-│ Mobile: Preview full width, Chat = bottom sheet             │
-└──────────────────────────────────────────────────────────────┘
+│ ┌────────────┐ ┌─────────────────────────┐ ┌──────────────┐│
+│ │ 🛠 BLOCKS / │ │  LIVE PREVIEW (iframe)  │ │ ⚙️ SETTINGS  ││
+│ │ 🤖 CHAT    │ │                         │ │ (Contextual) ││
+│ │ -----------│ │  [Global Header]        │ │--------------││
+│ │ ├ Navbar   │ │  [Hero] ← Click!        │ │ *If Hero:*   ││
+│ │ ├ Banner   │ │       ┌─────────────┐   │ │ - Background ││
+│ │ ├ Carousel │ │       │ ✨ Edit with│   │ │ - Colors     ││
+│ │ ├ Product  │ │       │    AI       │   │ │--------------││
+│ │ ├ Form     │ │       └─────────────┘   │ │ *If None:*   ││
+│ │ (Drag ⠿)   │ │  [Features] [About]     │ │ - Store Name ││
+│ │            │ │  [Global Footer]        │ │ - Phone/Email││
+│ │            │ │                         │ │ - Social URL ││
+│ │            │ │                         │ │ - SEO Data   ││
+│ └────────────┘ └─────────────────────────┘ └──────────────┘│
+│                                                            │
+│ Mobile: Preview full width, Panels become bottom sheets    │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -252,10 +282,12 @@ THEN  preview takes full width
 | Component | File | Description |
 |-----------|------|-------------|
 | `EditorPage` | `app/(editor)/editor/[siteId]/page.tsx` | Layout orchestrator |
-| `EditorChatPanel` | `components/editor/EditorChatPanel.tsx` | AI chat (380px left) |
-| `EditorPreview` | `components/editor/EditorPreview.tsx` | Sandboxed iframe |
+| `EditorSidebar` | `components/editor/EditorSidebar.tsx` | Tabs for AI Chat / Blocks |
+| `BlockLibrary` | `components/editor/BlockLibrary.tsx` | Draggable component list |
+| `EditorPreview` | `components/editor/EditorPreview.tsx` | Sandboxed iframe, drop zone |
 | `EditorToolbar` | `components/editor/EditorToolbar.tsx` | Top actions bar |
-| `InlineEditPopup` | `components/editor/InlineEditPopup.tsx` | Hover → popup |
+| `EditorSettingsPanel` | `components/editor/EditorSettingsPanel.tsx` | 320px Right panel (Global & Contextual settings) |
+| `InlineEditTools`| `components/editor/InlineEditTools.tsx`| text contentEditable, upload img |
 | `PageManager` | `components/editor/PageManager.tsx` | Pages CRUD |
 
 ### 13.2 API Endpoints
@@ -282,8 +314,8 @@ iframe → Parent: BLOCK_CLICKED, BLOCK_HOVERED (with rect position)
 |-----------|--------|---------------|
 | F04 Block Renderer | ✅ Done | — |
 | F01 AI Builder | ✅ Done | — |
-| F14 Undo/Redo | ⬜ | Build concurrently |
-| F15 Auto-Save | ⬜ | Build concurrently |
+| F11 Undo/Redo | ⬜ | Build concurrently |
+| F12 Auto-Save | ⬜ | Build concurrently |
 
 ---
 

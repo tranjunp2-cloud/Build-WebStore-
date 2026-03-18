@@ -6,9 +6,9 @@
 ---
 
 
-## US-F02-01: Register & Welcome ✅
+## US-F02-01: Register & Welcome 
 
-**Wave 1** | **P0** | **M** | **Status:** Done ✅
+**Wave 1** | **P0** | **M** | **Status:** Ready
 
 ### Story
 
@@ -80,9 +80,9 @@ THEN  nếu Role = 'owner' → redirect về AI Builder (nếu chưa có site) h
 
 ---
 
-## US-F02-02: Login ✅
+## US-F02-02: Login 
 
-**Wave 1** | **P0** | **S** | **Status:** Done ✅
+**Wave 1** | **P0** | **S** | **Status:** Ready
 
 ### Story
 
@@ -136,7 +136,7 @@ THEN  màn hình hiển thị dạng Split Screen (chia đôi)
 
 ## US-F02-03: Auth Guard — Route Protection
 
-**Wave 1** | **P0** | **S** | **Status:** Done ✅
+**Wave 1** | **P0** | **S** | **Status:** Ready
 
 ### Story
 
@@ -175,7 +175,7 @@ THEN  auto-create Tenant { name: "[firstName]'s Store" }
 
 ## US-F02-04: Logout
 
-**Wave 1** | **P0** | **XS** | **Status:** Done ✅
+**Wave 1** | **P0** | **XS** | **Status:** Ready
 
 ### Story
 
@@ -202,9 +202,9 @@ THEN  clear session cookie
 
 ---
 
-## US-F02-05: Forgot Password ✅
+## US-F02-05: Forgot Password 
 
-**Wave 1** | **P0** | **S** | **Status:** Done ✅
+**Wave 1** | **P0** | **S** | **Status:** Ready
 
 ### Story
 
@@ -242,10 +242,9 @@ THEN  form reset, user có thể nhập lại email
 
 ---
 
-## US-F02-06: Reset Password ✅
+## US-F02-06: Reset Password 
 
-**Wave 1** | **P0** | **S** | **Status:** Done ✅
-
+**Wave 1** | **P0** | **S** | **Status:** Ready
 ### Story
 
 ```

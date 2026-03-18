@@ -52,14 +52,19 @@ export async function PATCH(
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
         
-        const { blocks, theme } = data!
+        const { blocks, theme, locale, shippingConfig } = data!
 
-        // Update theme on site if provided
-        if (theme) {
+        // Update site-level fields if provided
+        const siteUpdateData: any = {}
+        if (theme) siteUpdateData.theme = theme
+        if (locale) siteUpdateData.locale = locale
+        if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
+
+        if (Object.keys(siteUpdateData).length > 0) {
             await payload.update({
                 collection: 'sites',
                 id: siteId,
-                data: { theme },
+                data: siteUpdateData,
             })
         }
 
