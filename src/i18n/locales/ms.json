@@ -233,6 +233,52 @@
             "topBlogs": "Blog Teratas",
             "views": "Paparan",
             "clicks": "Klik"
+        },
+        "seo": {
+            "title": "Papan Pemuka SEO",
+            "subtitle": "Analisa dan optimumkan prestasi enjin carian laman anda",
+            "reAnalyse": "Analisis Semula",
+            "generateSitemap": "Jana Peta Laman",
+            "sitemapSuccess": "Peta Laman berjaya dijana",
+            "sitemapError": "Gagal menjana Peta Laman",
+            "score": {
+                "good": "Baik",
+                "needsWork": "Perlu Tambah Baik",
+                "poor": "Lemah"
+            },
+            "stats": {
+                "totalIssues": "Jumlah Isu",
+                "fixable": "Boleh Dibaiki AI",
+                "pages": "Halaman Dianalisis"
+            },
+            "breakdown": {
+                "title": "Pecahan Mengikut Kategori",
+                "meta": "Tag Meta",
+                "content": "Kandungan",
+                "technical": "Teknikal",
+                "noIssues": "Tiada isu"
+            },
+            "aifix": {
+                "title": "Baiki SEO dengan AI",
+                "description": "Jana tajuk & penerangan meta yang tiada secara automatik dengan AI",
+                "button": "Baiki Semua dengan AI",
+                "fixing": "Sedang Membaiki..."
+            },
+            "pages": {
+                "title": "Analisis Setiap Halaman",
+                "allGood": "Semuanya baik",
+                "issue": "isu",
+                "issues": "isu"
+            },
+            "empty": {
+                "title": "Tiada laman untuk dianalisis",
+                "description": "Cipta laman terlebih dahulu untuk menggunakan Papan Pemuka SEO",
+                "cta": "Pergi ke Papan Pemuka"
+            },
+            "error": {
+                "failed": "Analisis SEO gagal",
+                "retry": "Cuba Lagi"
+            }
         }
     }
 }

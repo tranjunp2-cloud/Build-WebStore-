@@ -1,9 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Search, AlertTriangle, CheckCircle, Info, Sparkles, Loader2, RefreshCcw } from 'lucide-react'
+import { useState, useEffect, Suspense } from 'react'
+import {
+    Search, AlertTriangle, CheckCircle, Info, Sparkles, Loader2, RefreshCcw,
+    FileText, BookOpen, Code, Map
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 type SEOIssue = {
     type: 'error' | 'warning' | 'info'
@@ -29,15 +33,14 @@ type SEOData = {
     pages: PageAnalysis[]
 }
 
-function ScoreGauge({ score }: { score: number }) {
+function ScoreGauge({ score, t }: { score: number; t: any }) {
     const color = score >= 80 ? 'text-green-400' : score >= 50 ? 'text-yellow-400' : 'text-red-400'
     const bgColor = score >= 80 ? 'from-green-500/20' : score >= 50 ? 'from-yellow-500/20' : 'from-red-500/20'
-    const label = score >= 80 ? 'Good' : score >= 50 ? 'Needs Work' : 'Poor'
+    const label = score >= 80 ? t.score.good : score >= 50 ? t.score.needsWork : t.score.poor
 
     return (
         <div className={cn('relative flex flex-col items-center justify-center rounded-2xl bg-gradient-to-br to-transparent p-8', bgColor)}>
             <div className="relative h-32 w-32">
-                {/* Background circle */}
                 <svg className="h-32 w-32 -rotate-90" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" className="text-white/10" strokeWidth="8" />
                     <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" className={color}
@@ -61,14 +64,61 @@ function IssueIcon({ type }: { type: string }) {
     return <Info className="h-3.5 w-3.5 text-blue-400" />
 }
 
-export default function SEODashboardPage() {
+function CategoryBreakdown({ pages, t }: { pages: PageAnalysis[]; t: any }) {
+    const allIssues = pages.flatMap(p => p.issues)
+
+    const metaIssues = allIssues.filter(i => i.field === 'metaTitle' || i.field === 'metaDescription')
+    const contentIssues = allIssues.filter(i => i.field === 'content')
+    const technicalIssues = allIssues.filter(i => i.field === 'images' || i.field === 'schema' || i.field === 'speed')
+
+    const categories = [
+        { icon: FileText, label: t.breakdown.meta, issues: metaIssues, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+        { icon: BookOpen, label: t.breakdown.content, issues: contentIssues, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+        { icon: Code, label: t.breakdown.technical, issues: technicalIssues, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+    ]
+
+    return (
+        <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6">
+            <h2 className="mb-4 text-base font-semibold text-white">{t.breakdown.title}</h2>
+            <div className="grid grid-cols-3 gap-4">
+                {categories.map(({ icon: Icon, label, issues, color, bg }) => (
+                    <div key={label} className={cn('rounded-xl p-4', bg)}>
+                        <div className="flex items-center gap-2 mb-2">
+                            <Icon className={cn('h-4 w-4', color)} />
+                            <span className="text-xs font-medium text-gray-300">{label}</span>
+                        </div>
+                        {issues.length === 0 ? (
+                            <div className="flex items-center gap-1 text-xs text-green-400 mt-2">
+                                <CheckCircle className="h-3 w-3" />
+                                <span>{t.breakdown.noIssues}</span>
+                            </div>
+                        ) : (
+                            <div className="mt-2">
+                                <p className={cn('text-2xl font-bold', color)}>{issues.length}</p>
+                                <p className="text-xs text-gray-500">
+                                    {issues.length === 1 ? t.pages.issue : t.pages.issues}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function SEODashboardInner() {
+    const { t } = useI18n()
+    const st = t.dashboard.seo
+
     const [seoData, setSeoData] = useState<SEOData | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isFixing, setIsFixing] = useState(false)
+    const [isGeneratingSitemap, setIsGeneratingSitemap] = useState(false)
     const [fixResult, setFixResult] = useState<string | null>(null)
+    const [hasError, setHasError] = useState(false)
     const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
     const [sites, setSites] = useState<Array<{ id: string; name: string }>>([])
-
     // Load user's sites
     useEffect(() => {
         async function loadSites() {
@@ -85,22 +135,25 @@ export default function SEODashboardPage() {
                     }
                 }
             } catch {
-                toast.error('Failed to load sites')
+                toast.error(st.error.failed)
                 setIsLoading(false)
             }
         }
         loadSites()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     // Analyse selected site
     useEffect(() => {
         if (!selectedSiteId) return
         analyseSite(selectedSiteId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedSiteId])
 
     const analyseSite = async (siteId: string) => {
         setIsLoading(true)
         setFixResult(null)
+        setHasError(false)
         try {
             const res = await fetch('/api/seo/analyze', {
                 method: 'POST',
@@ -111,10 +164,14 @@ export default function SEODashboardPage() {
             if (res.ok) {
                 const data = await res.json()
                 if (data.success) setSeoData(data.data)
+                else throw new Error(data.error?.message || 'Unknown error')
+            } else {
+                throw new Error('API returned an error')
             }
         } catch {
-            toast.error('SEO analysis failed', {
-                action: { label: 'Retry', onClick: () => analyseSite(siteId) },
+            setHasError(true)
+            toast.error(st.error.failed, {
+                action: { label: st.error.retry, onClick: () => analyseSite(siteId) },
             })
         } finally {
             setIsLoading(false)
@@ -137,7 +194,6 @@ export default function SEODashboardPage() {
                 if (data.success) {
                     setFixResult(`Fixed ${data.data.fixedPages} of ${data.data.totalPages} pages`)
                     toast.success(`Fixed ${data.data.fixedPages} pages with AI`)
-                    // Re-analyse
                     setTimeout(() => analyseSite(selectedSiteId), 1000)
                 }
             }
@@ -149,17 +205,64 @@ export default function SEODashboardPage() {
         }
     }
 
+    const handleGenerateSitemap = async () => {
+        if (!selectedSiteId || isGeneratingSitemap) return
+        setIsGeneratingSitemap(true)
+        try {
+            const res = await fetch('/api/seo/sitemap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ siteId: selectedSiteId }),
+                credentials: 'include',
+            })
+            if (res.ok) {
+                const data = await res.json()
+                if (data.success) {
+                    toast.success(`${st.sitemapSuccess} — ${data.data.pageCount} pages`)
+                } else {
+                    toast.error(st.sitemapError)
+                }
+            } else {
+                toast.error(st.sitemapError)
+            }
+        } catch {
+            toast.error(st.sitemapError)
+        } finally {
+            setIsGeneratingSitemap(false)
+        }
+    }
+
+    // AC-3: Error state — shows instead of score when API fails
+    if (!isLoading && hasError) {
+        return (
+            <div className="flex h-[60vh] items-center justify-center">
+                <div className="text-center">
+                    <AlertTriangle className="mx-auto h-12 w-12 text-red-400" />
+                    <h2 className="mt-4 text-lg font-semibold text-white">{st.error.failed}</h2>
+                    <p className="mt-1 text-sm text-gray-500">The SEO scan could not be completed. Please try again.</p>
+                    <button
+                        onClick={() => selectedSiteId && analyseSite(selectedSiteId)}
+                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+                    >
+                        <RefreshCcw className="h-4 w-4" />
+                        {st.error.retry}
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     // Empty state
     if (!isLoading && sites.length === 0) {
         return (
             <div className="flex h-[60vh] items-center justify-center">
                 <div className="text-center">
                     <Search className="mx-auto h-12 w-12 text-gray-600" />
-                    <h2 className="mt-4 text-lg font-semibold text-white">No sites to analyse</h2>
-                    <p className="mt-1 text-sm text-gray-500">Create a site first to use the SEO Dashboard</p>
+                    <h2 className="mt-4 text-lg font-semibold text-white">{st.empty.title}</h2>
+                    <p className="mt-1 text-sm text-gray-500">{st.empty.description}</p>
                     <a href="/dashboard"
                         className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors">
-                        Go to Dashboard
+                        {st.empty.cta}
                     </a>
                 </div>
             </div>
@@ -171,8 +274,8 @@ export default function SEODashboardPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">SEO Dashboard</h1>
-                    <p className="mt-1 text-sm text-gray-400">Analyse and optimise your site&apos;s search engine performance</p>
+                    <h1 className="text-2xl font-bold text-white">{st.title}</h1>
+                    <p className="mt-1 text-sm text-gray-400">{st.subtitle}</p>
                 </div>
                 <div className="flex items-center gap-3">
                     {/* Site selector */}
@@ -185,10 +288,22 @@ export default function SEODashboardPage() {
                             ))}
                         </select>
                     )}
+                    {/* AC-2: Generate Sitemap */}
+                    <button
+                        onClick={handleGenerateSitemap}
+                        disabled={isGeneratingSitemap || isLoading}
+                        className="flex items-center gap-2 rounded-lg bg-white/5 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 transition-colors disabled:opacity-50"
+                    >
+                        {isGeneratingSitemap
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <Map className="h-4 w-4" />
+                        }
+                        {st.generateSitemap}
+                    </button>
                     <button onClick={() => selectedSiteId && analyseSite(selectedSiteId)}
                         disabled={isLoading}
                         className="flex items-center gap-2 rounded-lg bg-white/5 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 transition-colors disabled:opacity-50">
-                        <RefreshCcw className={cn('h-4 w-4', isLoading && 'animate-spin')} /> Re-analyse
+                        <RefreshCcw className={cn('h-4 w-4', isLoading && 'animate-spin')} /> {st.reAnalyse}
                     </button>
                 </div>
             </div>
@@ -216,52 +331,48 @@ export default function SEODashboardPage() {
                     </div>
                     <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6">
                         <div className="h-5 w-40 rounded bg-white/5 mb-4" />
-                        {Array.from({ length: 3 }).map((_, i) => (
-                            <div key={i} className="flex items-center gap-3 py-3 border-b border-white/5">
-                                <div className="h-8 w-8 rounded-lg bg-white/5" />
-                                <div className="space-y-1.5 flex-1">
-                                    <div className="h-4 w-40 rounded bg-white/5" />
-                                    <div className="h-3 w-24 rounded bg-white/5" />
-                                </div>
-                            </div>
-                        ))}
+                        <div className="grid grid-cols-3 gap-4">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <div key={i} className="h-20 rounded-xl bg-white/5" />
+                            ))}
+                        </div>
                     </div>
                 </div>
             ) : seoData ? (
                 <>
                     {/* Score Overview */}
                     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                        <ScoreGauge score={seoData.score} />
+                        <ScoreGauge score={seoData.score} t={st} />
 
                         {/* Stats */}
                         <div className="flex flex-col justify-center space-y-4 rounded-2xl bg-[#1E293B]/50 p-6">
                             <div>
                                 <p className="text-3xl font-bold text-white">{seoData.totalIssues}</p>
-                                <p className="text-sm text-gray-400">Total Issues</p>
+                                <p className="text-sm text-gray-400">{st.stats.totalIssues}</p>
                             </div>
                             <div>
                                 <p className="text-3xl font-bold text-purple-400">{seoData.fixableIssues}</p>
-                                <p className="text-sm text-gray-400">Auto-Fixable by AI</p>
+                                <p className="text-sm text-gray-400">{st.stats.fixable}</p>
                             </div>
                             <div>
                                 <p className="text-3xl font-bold text-cyan-400">{seoData.pages.length}</p>
-                                <p className="text-sm text-gray-400">Pages Analysed</p>
+                                <p className="text-sm text-gray-400">{st.stats.pages}</p>
                             </div>
                         </div>
 
                         {/* Fix All */}
                         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-purple-500/30 bg-purple-500/5 p-6">
                             <Sparkles className="h-8 w-8 text-purple-400" />
-                            <h3 className="mt-3 text-sm font-semibold text-white">AI SEO Fix</h3>
+                            <h3 className="mt-3 text-sm font-semibold text-white">{st.aifix.title}</h3>
                             <p className="mt-1 text-center text-xs text-gray-500">
-                                Auto-generate missing meta titles & descriptions with AI
+                                {st.aifix.description}
                             </p>
                             <button onClick={handleFixAll} disabled={isFixing || seoData.fixableIssues === 0}
                                 className="mt-4 flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-purple-500 transition-colors disabled:opacity-50 shadow-lg shadow-purple-500/25">
                                 {isFixing ? (
-                                    <><Loader2 className="h-4 w-4 animate-spin" /> Fixing...</>
+                                    <><Loader2 className="h-4 w-4 animate-spin" /> {st.aifix.fixing}</>
                                 ) : (
-                                    <><Sparkles className="h-4 w-4" /> Fix All with AI</>
+                                    <><Sparkles className="h-4 w-4" /> {st.aifix.button}</>
                                 )}
                             </button>
                             {fixResult && (
@@ -276,10 +387,13 @@ export default function SEODashboardPage() {
                         </div>
                     </div>
 
+                    {/* AC-1: Category Breakdown */}
+                    <CategoryBreakdown pages={seoData.pages} t={st} />
+
                     {/* Per-Page Breakdown */}
                     <div className="rounded-xl border border-white/10 bg-[#1E293B]/30">
                         <div className="border-b border-white/10 px-6 py-4">
-                            <h2 className="text-lg font-semibold text-white">Page-by-Page Analysis</h2>
+                            <h2 className="text-lg font-semibold text-white">{st.pages.title}</h2>
                         </div>
                         <div className="divide-y divide-white/5">
                             {seoData.pages.map(page => (
@@ -302,11 +416,11 @@ export default function SEODashboardPage() {
                                         <div className="flex items-center gap-2">
                                             {page.issues.length === 0 ? (
                                                 <span className="flex items-center gap-1 text-xs text-green-400">
-                                                    <CheckCircle className="h-3.5 w-3.5" /> All good
+                                                    <CheckCircle className="h-3.5 w-3.5" /> {st.pages.allGood}
                                                 </span>
                                             ) : (
                                                 <span className="text-xs text-gray-500">
-                                                    {page.issues.length} issue{page.issues.length !== 1 ? 's' : ''}
+                                                    {page.issues.length} {page.issues.length !== 1 ? st.pages.issues : st.pages.issue}
                                                 </span>
                                             )}
                                         </div>
@@ -339,5 +453,13 @@ export default function SEODashboardPage() {
                 </>
             ) : null}
         </div>
+    )
+}
+
+export default function SEODashboardPage() {
+    return (
+        <Suspense>
+            <SEODashboardInner />
+        </Suspense>
     )
 }
