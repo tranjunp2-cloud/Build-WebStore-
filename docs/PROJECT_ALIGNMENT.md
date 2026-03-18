@@ -25,18 +25,18 @@ Tuần 1-2 (Mar 12-25)    Sprint 0: Foundation
                          └── Designer bắt đầu Figma
 
 Tuần 3-4 (Mar 26-Apr 8)  Sprint 1: Core Features
-                         ├── F01 AI Chat Builder (polish)
+                         ├── F01 AI Web Builder (polish)
                          ├── F05 AI Editor (rebuild)
                          ├── F06 Onboarding + Language (build)
                          └── F08 Publish Flow (build)
 
 Tuần 5-6 (Apr 9-22)      Sprint 2: Commerce + MY Market
-                         ├── F09 Products + Halal cert (polish)
-                         ├── F11 Orders + WhatsApp (build)
-                         ├── F10 Storefront + Trust signals (polish)
-                         ├── F12 SEO Dashboard
-                         ├── F16 Payment Gateway (FPX)
-                         └── F17 Shipping (flat rate by state)
+                         ├── F08 Products + Halal cert (polish)
+                         ├── F10 Orders + WhatsApp (build)
+                         ├── F09 Storefront + Trust signals (polish)
+                         ├── F11 SEO Dashboard
+                         ├── F13 Payment Gateway (FPX)
+                         └── F14 Shipping (flat rate by state)
 
 Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
                          ├── Bug fixes
@@ -51,18 +51,18 @@ Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
 
 | Priority | Feature | Lý do |
 |:---:|---------|-------|
-| 🔴 1 | **F01 AI Chat Builder** | USP #1 — core giá trị product |
+| 🔴 1 | **F01 AI Web Builder** | USP #1 — core giá trị product |
 | 🔴 2 | **F05 AI Editor** | User dùng sau khi generate |
 | 🔴 3 | **F06 Onboarding** + Language | First impression + BM/EN selection |
 | 🔴 4 | **F08 Publish Flow** | Không có thì site không live dc |
-| 🟡 5 | **F09 Products** + Halal | Commerce + trust signal MY |
-| 🟡 6 | **F10 Storefront** + Trust signals | WhatsApp, SSM footer, language switcher |
-| 🟡 7 | **F11 Orders** + WhatsApp notify | Revenue flow + MY communication |
-| 🟡 8 | **F12 SEO Dashboard** | Growth, MY keywords |
-| 🟡 9 | **F16 Payment Gateway** 🇲🇾 | FPX (Wave 6) — most trusted in MY |
-| 🟡 10 | **F17 Shipping** 🇲🇾 | Flat rate by state (Wave 6) |
+| 🟡 5 | **F08 Products** + Halal | Commerce + trust signal MY |
+| 🟡 6 | **F09 Storefront** + Trust signals | WhatsApp, SSM footer, language switcher |
+| 🟡 7 | **F10 Orders** + WhatsApp notify | Revenue flow + MY communication |
+| 🟡 8 | **F11 SEO Dashboard** | Growth, MY keywords |
+| 🟡 9 | **F13 Payment Gateway** 🇲🇾 | FPX (Wave 6) — most trusted in MY |
+| 🟡 10 | **F14 Shipping** 🇲🇾 | Flat rate by state (Wave 6) |
 | ⚪ 11 | **F07 Templates** | Fallback nếu AI không ok |
-| ⚪ 12 | **F13-F15** | Nice-to-have for launch |
+| ⚪ 12 | **F12-F12** | Nice-to-have for launch |
 
 ---
 
@@ -205,7 +205,7 @@ Index tổng hợp: docs/stories/user-stories-p0.md
 |---------|-------------|
 | Product vision, rules | `SPEC.md` |
 | Feature nào cần build? | `SPEC.md §20 Feature Registry` |
-| **User Stories (source of truth cho scope)** | **`docs/stories/user-stories-p0.md`** |
+| User Stories | **`docs/stories/user-stories-p0.md`** |
 | Story format chuẩn | `docs/stories/STORY_TEMPLATE.md` |
 | Feature cần gì để build? | `docs/prd/`, `docs/stories/`, `docs/architecture/` |
 | PRD format chuẩn | `docs/prd/PRD_TEMPLATE.md` |
