@@ -217,6 +217,22 @@
             "lastEdited": "Last edited: ",
             "edit": "Edit",
             "preview": "Preview"
+        },
+        "analytics": {
+            "title": "Analytics",
+            "subtitle": "Detailed traffic and user behavior",
+            "empty": {
+                "title": "No analytical data available",
+                "description": "There is no tracked data in this time period. Check back later after receiving some traffic."
+            },
+            "error": "Cannot load analytics data",
+            "retry": "Try again",
+            "chart": "Traffic Overview",
+            "topPages": "Top Pages",
+            "topProducts": "Top Products",
+            "topBlogs": "Top Blogs",
+            "views": "Views",
+            "clicks": "Clicks"
         }
     }
 }
