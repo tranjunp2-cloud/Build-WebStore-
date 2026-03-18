@@ -108,6 +108,25 @@ export const Orders: CollectionConfig = {
             ],
         },
         {
+            name: 'stripeSessionId',
+            type: 'text',
+            unique: true,
+            index: true,
+            admin: {
+                readOnly: true,
+                description: 'Stripe Checkout Session ID',
+            },
+        },
+        {
+            name: 'stripePaymentIntentId',
+            type: 'text',
+            index: true,
+            admin: {
+                readOnly: true,
+                description: 'Stripe PaymentIntent ID for failure tracking',
+            },
+        },
+        {
             name: 'status',
             type: 'select',
             required: true,
@@ -115,6 +134,7 @@ export const Orders: CollectionConfig = {
             options: [
                 { label: 'Pending', value: 'pending' },
                 { label: 'Paid', value: 'paid' },
+                { label: 'Payment Failed', value: 'payment_failed' },
                 { label: 'Processing', value: 'processing' },
                 { label: 'Shipped', value: 'shipped' },
                 { label: 'Completed', value: 'completed' },
