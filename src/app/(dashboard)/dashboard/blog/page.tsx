@@ -6,13 +6,18 @@ import {
     Plus,
     Search,
     Trash2,
-    MoreHorizontal,
     FileText,
     ChevronLeft,
     ChevronRight,
     ArrowUpDown,
     Tag,
+    AlertTriangle,
+    X,
+    Loader2,
+    Eye,
+    EyeOff,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 type BlogPost = {
     id: string
@@ -97,28 +102,58 @@ export default function BlogListPage() {
         setPage(1)
     }, [search, statusFilter, categoryFilter, sortBy])
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to permanently delete this post?')) return
+    // Delete confirmation modal state
+    const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string; status: string } | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
+
+    const openDeleteConfirm = (post: BlogPost) => {
+        setDeleteTarget({ id: post.id, title: post.title, status: post.status })
+    }
+
+    const handleConfirmDelete = async () => {
+        if (!deleteTarget) return
+        setIsDeleting(true)
         try {
-            const res = await fetch(`/api/blogs/${id}`, {
+            const res = await fetch(`/api/blogs/${deleteTarget.id}`, {
                 method: 'DELETE',
                 credentials: 'include',
             })
             if (!res.ok) throw new Error('Failed to delete')
+            toast.success(`"${deleteTarget.title}" has been permanently deleted`)
             fetchPosts()
             setSelectedIds((prev) => {
                 const next = new Set(prev)
-                next.delete(id)
+                next.delete(deleteTarget.id)
                 return next
             })
         } catch {
-            alert('Failed to delete blog post')
+            toast.error('Failed to delete blog post')
+        } finally {
+            setIsDeleting(false)
+            setDeleteTarget(null)
+        }
+    }
+
+    // Quick toggle status
+    const handleToggleStatus = async (post: BlogPost) => {
+        const newStatus = post.status === 'published' ? 'draft' : 'published'
+        try {
+            const res = await fetch(`/api/blogs/${post.id}`, {
+                method: 'PATCH',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus }),
+            })
+            if (!res.ok) throw new Error('Failed to update status')
+            toast.success(`Post ${newStatus === 'published' ? 'published' : 'moved to draft'}`)
+            fetchPosts()
+        } catch {
+            toast.error('Failed to update post status')
         }
     }
 
     const handleBulkDelete = async () => {
         if (selectedIds.size === 0) return
-        if (!confirm(`Delete ${selectedIds.size} selected posts permanently?`)) return
         setBulkActionLoading(true)
         try {
             await Promise.all(
@@ -126,10 +161,11 @@ export default function BlogListPage() {
                     fetch(`/api/blogs/${id}`, { method: 'DELETE', credentials: 'include' })
                 )
             )
+            toast.success(`${selectedIds.size} posts deleted successfully`)
             setSelectedIds(new Set())
             fetchPosts()
         } catch {
-            alert('Some posts failed to delete')
+            toast.error('Some posts failed to delete')
         } finally {
             setBulkActionLoading(false)
         }
@@ -149,10 +185,11 @@ export default function BlogListPage() {
                     })
                 )
             )
+            toast.success(`${selectedIds.size} posts published successfully`)
             setSelectedIds(new Set())
             fetchPosts()
         } catch {
-            alert('Some posts failed to publish')
+            toast.error('Some posts failed to publish')
         } finally {
             setBulkActionLoading(false)
         }
@@ -399,15 +436,21 @@ export default function BlogListPage() {
                                 <td className="px-4 py-3">
                                     <p className="font-medium text-white truncate max-w-[300px]">{post.title}</p>
                                 </td>
-                                <td className="px-4 py-3">
-                                    <span
-                                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${post.status === 'published'
-                                            ? 'bg-green-500/10 text-green-400'
-                                            : 'bg-yellow-500/10 text-yellow-400'
+                                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                    <button
+                                        onClick={() => handleToggleStatus(post)}
+                                        title={post.status === 'published' ? 'Move to Draft' : 'Publish'}
+                                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors cursor-pointer ${post.status === 'published'
+                                            ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                                            : 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
                                             }`}
                                     >
-                                        {post.status === 'published' ? 'Published' : 'Draft'}
-                                    </span>
+                                        {post.status === 'published' ? (
+                                            <><Eye className="h-3 w-3" /> Published</>
+                                        ) : (
+                                            <><EyeOff className="h-3 w-3" /> Draft</>
+                                        )}
+                                    </button>
                                 </td>
                                 <td className="hidden px-4 py-3 text-gray-400 md:table-cell">
                                     {getCategoryName(post.category)}
@@ -420,7 +463,7 @@ export default function BlogListPage() {
                                 </td>
                                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                     <button
-                                        onClick={() => handleDelete(post.id)}
+                                        onClick={() => openDeleteConfirm(post)}
                                         className="rounded-lg p-1.5 text-gray-500 opacity-0 group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400 transition-all"
                                         title="Delete"
                                     >
@@ -463,6 +506,64 @@ export default function BlogListPage() {
                             Next
                             <ChevronRight className="h-4 w-4" />
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal — AC-2 */}
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1120] p-6 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                <AlertTriangle className="w-5 h-5 text-red-400" />
+                                Delete Post
+                            </h3>
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                className="text-gray-400 hover:text-white transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <p className="text-sm text-gray-400 mb-2">
+                            Are you sure you want to permanently delete{' '}
+                            <span className="text-white font-medium">"{deleteTarget.title}"</span>?
+                        </p>
+                        <p className="text-xs text-gray-600 mb-4">
+                            This action cannot be undone.
+                        </p>
+
+                        {deleteTarget.status === 'published' && (
+                            <div className="mb-5 flex items-start gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-4 py-3">
+                                <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-yellow-400">
+                                    <strong>Warning:</strong> This post is currently published and visible to your customers.
+                                    Deleting it will immediately remove it from your storefront.
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmDelete}
+                                disabled={isDeleting}
+                                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                                {isDeleting ? (
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
+                                ) : (
+                                    <><Trash2 className="w-4 h-4" /> Delete Permanently</>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
