@@ -9,6 +9,7 @@
 > **Stories-First Rule:**
 > PRD này được xây dựng dựa trên các User Stories đề xuất tại `F13-admin-management-stories.md`.
 
+
 ---
 
 ## 0. Story Traceability
@@ -24,6 +25,7 @@
 | US-F15-07 | Gửi In-app Broadcast | [F13-admin-management-stories.md](../stories/F13-admin-management-stories.md) | Draft |
 | US-F15-08 | Tạo chiến dịch tự động (Automated Campaigns) | [F13-admin-management-stories.md](../stories/F13-admin-management-stories.md) | Draft |
 | US-F15-09 | Tích hợp Đa kênh (Email & Social Apps) | [F13-admin-management-stories.md](../stories/F13-admin-management-stories.md) | Draft |
+| US-F15-10 | Mobile Web UX — Responsive SaaS Dashboard | [F15-admin-management-stories.md](../stories/F15-admin-management-stories.md) | Ready |
 
 ---
 
@@ -91,6 +93,8 @@ Xây dựng module **Admin Management** tập trung, hoạt động độc lập
 | FR-08 | System must integrate with Email/Social APIs to send campaign messages | US-F15-09 | P1 (Mid) | Requires Zalo OA / SendGrid Setup |
 | FR-09 | System must log critical admin actions (Audit Log) | US-F15-06 | P2 (Low) | |
 | FR-10 | Admin can create global announcements using a Rich Text Editor (Support Image/Text format) | US-F15-07 | P2 (Low) | |
+| FR-11 | **[Mobile]** Layout Dashboard tự động cuộn ngang (Horizontal scroll) hoặc xếp dạng cột cho các thông số MRR, Users. | US-F15-10 | P1 (Mid) | Responsive |
+| FR-12 | **[Mobile]** Các bảng dữ liệu phức tạp (Workspaces) tự động ẩn cột phụ hoặc chuyển sang dạng Cards trên viewport < 768px. | US-F15-10 | P1 (Mid) | Tránh cuộn ngang table |
 
 ---
 
@@ -105,7 +109,107 @@ Xây dựng module **Admin Management** tập trung, hoạt động độc lập
 
 ---
 
-## 8. Open Questions (For Review)
+## 10. Screen Layout
+
+> **[Global CMS Constraint]** Đây là Super Admin Panel nội bộ (Host/Owner của hệ thống vận hành đa Tenants). Giao diện Admin này hoạt động độc lập và hoàn toàn tách biệt cấu trúc F18 CMS Layout (dành cho end-users). Ưu tiên Layout kiểu Dashboard tiêu chuẩn với Global Sidebar (Ant Design style).
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình Dashboard (Overview Metrics)
+- **Mô tả:** Màn hình chào ngay khi Admin đăng nhập, theo dõi KPI SaaS.
+- **Components chính:**
+  - Khu vực Overview Cards: MRR, Active Workspaces, Churn Rate (Của tháng này so với tháng trước).
+  - Biểu đồ Bar/Line Chart (doanh thu theo kế hoạch).
+  - Nút thao tác nhanh (Quick Actions): "Broadcast message", "Add Promotion".
+- **Wireframe:**
+```text
+┌─ Super Admin ───────────────────────────────────────────┐
+│ ┌─ Sidebar ────────┐ ┌─ Dashboard ─────────────────────┐│
+│ │ 📊 Overview      │ │ [MRR: $12K ↑] [Users: 15K ↑]    ││
+│ │ 🏢 Workspaces    │ │                                 ││
+│ │ 💳 Subscriptions │ │ ( ) MTD Revenue Chart          ││
+│ │ 🎟️ Promotions    │ │                                 ││
+│ │ 📢 Broadcasts    │ │ Recent Signups Table:           ││
+│ │ 🛡️ Audit Logs    │ │ 1. Kopi Shop (Standard)         ││
+│ └──────────────────┘ └─────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+### 10.2. Màn hình Data List (Các danh sách quản lý)
+- **Mô tả:** Format chung cho các màn hình Workspaces / Promotions / Subscriptions ...
+- **Components chính:**
+  - Header with Actions: Nút [+ Thêm Mới Khuyến Mãi] hoặc Search Box.
+  - Data Grid / Table: Hiển thị đầy đủ cột trạng thái, phân trang, có cột Action (Edit/Impersonate/Delete).
+- **Wireframe (Ví dụ màn Workspaces):**
+```text
+┌─ Workspaces Management ─────────────────────────────┐
+│  🔍 Search by ID/Email [Filter by Tier ▼]           │
+│  ────────────────────────────────────────────────── │
+│  ID │ Tenant Name │ Owner Email  │ Tier   │ Action  │
+│  1  │ Kopi Shop   │ owner@...    │ Pro    │ [👁] [🔑]│
+│  2  │ Fashion MY  │ fah@...      │ Starter│ [👁] [🔑]│
+│ * Lệnh 🔑 (Impersonate) đòi Pass Admin               │
+└─────────────────────────────────────────────────────┘
+```
+
+### 10.3. Các trạng thái UI (UI States) & Modals
+- **Impersonating State:** Khi Admin mượn quyền user (Ấn nút 🔑), Top Global Header của ứng dụng sẽ đổi sang HỒNG RỰC hoặc CÓ BANNER ĐỎ "You are impersonating [Tenant Name] - X Tắt", để Admin ý thức được mình đang thao tác dữ liệu khách.
+- **Modals:** Form tạo/sửa Subscription Tier là Sidebar Drawer lớn; Form tạo Promo Code hiển thị dạng Center Modal nhỏ; Modal Re-Authenticate Yêu cầu nhập mật khẩu bảo vệ ở những action cực nhạy cảm (Sửa giá Tier).
+
+### 10.4. Màn hình phụ & Chuyên sâu (Sub-screens)
+- **Wireframe (SaaS Subscription Tier Config Modal):**
+```text
+┌─ Configure Tier: [Professional] ────────────[X]┐
+│                                                │
+│  Biểu phí (Pricing)                            │
+│  Monthly: [ $49.00 ]     Yearly: [ $490.00 ]   │
+│                                                │
+│  Giới hạn tĩnh (Limits)                        │
+│  Max Products: [ Unlimited ]                   │
+│  Max Staff Accounts: [ 10 ]                    │
+│  Storage (GB): [ 50 ]                          │
+│                                                │
+│  Tính năng (Features Toggle)                   │
+│  [✓] Priority Support                          │
+│  [✓] Custom Domain                             │
+│  [✓] Advanced Analytics                        │
+│                                                │
+│  [ Bỏ qua ]                       [ Lưu Data ] │
+└────────────────────────────────────────────────┘
+
+### 10.5. Mobile View (SaaS Dashboard & Support)
+- **Mô tả:** Giao diện tối ưu cho Admin thao tác trên màn hình điện thoại (VD: Khi đi ra ngoài cần cấp quyền, support gấp).
+- **Wireframe:**
+```text
+┌─ Super Admin (Mobile) ────────┐
+│ [☰] [Logo]             [🔔] │
+│ ─────────────────────────── │
+│ Dashboard                   │
+│ ┌─────────────────────────┐ │
+│ │ MRR: $12K ↑             │ │
+│ └─────────────────────────┘ │
+│ ┌─────────────────────────┐ │
+│ │ Active Users: 15K ↑     │ │
+│ └─────────────────────────┘ │
+│                             │
+│ Recent Workspaces           │
+│ ┌─────────────────────────┐ │
+│ │ #1 Kopi Shop (Pro)      │ │
+│ │ owner@kopi.com          │ │
+│ │ [👁 View] [🔑 Impersonate]│ │
+│ └─────────────────────────┘ │
+│ ┌─────────────────────────┐ │
+│ │ #2 Fashion MY (Starter) │ │
+│ │ fah@fashion.com.my      │ │
+│ │ [👁 View] [🔑 Impersonate]│ │
+│ └─────────────────────────┘ │
+└─────────────────────────────┘
+```
+```
+
+---
+
+## 11. Open Questions (For Review)
 
 | # | Question | Owner | Status |
 |---|----------|-------|--------|
@@ -116,7 +220,7 @@ Xây dựng module **Admin Management** tập trung, hoạt động độc lập
 
 ---
 
-## 9. Definition of Ready (Next Steps)
+## 12. Definition of Ready (Next Steps)
 
 - [ ] PO/Team review và chốt phạm vi tính năng (In/Out scope).
 - [ ] Xác nhận các Open Questions.

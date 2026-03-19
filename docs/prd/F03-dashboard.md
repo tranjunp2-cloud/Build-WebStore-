@@ -9,6 +9,7 @@
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
 
+
 ---
 
 ## 0. Story Traceability
@@ -20,6 +21,7 @@
 | US-F03-03 | SEO Dashboard Overview ⭐ | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 | US-F03-04 | Auto SEO Meta Generation | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 | US-F03-05 | AI SEO Fix All Issues | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
+| US-F03-07 | Mobile Web UX — Responsive Dashboard Metrics & Charts | [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md) | Ready |
 
 ---
 
@@ -102,6 +104,9 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 | FR-13 | **SEO:** Auto-generate meta title (≤60) & description (≤160) on first publish | US-F03-04 | P0 | |
 | FR-14 | **Shared:** Empty state khi chưa có site/data | US-F03-01 | P0 | |
 | FR-15 | **Shared:** Loading skeleton components có shimmer | US-F03-01 | P0 | Không spinner |
+| FR-16 | **[Mobile]** Layout Dashboard hiển thị 4 stat cards thành lưới 2x2. | US-F03-07 | P0 | Không hiển thị 4x1 (scroll mỏi tay) |
+| FR-17 | **[Mobile]** Biểu đồ Analytics giản lược nhãn trục X (tick labels) và hỗ trợ tooltips khi chạm-giữ. | US-F03-07 | P0 | Trống chữ đè nhau |
+| FR-18 | **[Mobile]** Tùy chỉnh Dashboard dùng nút Up/Down thay vì Drag-drop hoặc render dưới dạng Bottom Sheet để chạm đổi vị trí. | US-F03-07 | P0 | Mobile friendly |
 
 ---
 
@@ -121,10 +126,10 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 /login → /dashboard (Command Center)
   │
   ├── Xem Top Metrics (Tiền & Leads)
-  ├── Click vào Pending Order → Chuyển sang /dashboard/orders (F10)
-  ├── Click vào "Xem Analytics chi tiết" → Chuyển sang /dashboard/analytics
+  ├── Click vào Pending Order → Chuyển sang /orders (F10)
+  ├── Click tab [Analytics] → Chuyển sang /dashboard/analytics
   │     └── Chọn biểu đồ, lọc theo 30 days
-  └── Click [AI Fix All SEO Issues] trực tiếp từ Dashboard
+  └── Click [AI Fix All SEO Issues] trực tiếp từ khung Overview hoặc chuyển tab [SEO]
         └── Call API → Streaming fix → Update điểm SEO
 ```
 
@@ -132,24 +137,128 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 
 ## 10. Screen Layout
 
+> **[Global CMS Constraint]** Đối với các tính năng quản trị, yêu cầu bắt buộc phải render bên trong Main Content Area của F18 CMS Layout (ngoại trừ các tính năng đặc thù cần Full-screen Editor).
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình chính (Dashboard Overview)
+- **Mô tả:** Trang chủ trung tâm hiển thị top metrics và widgets quản lý chung.
+- **Components chính:**
+  - Header: Lời chào user, Time Period Filter (Today, 7d, 30d).
+  - Tabs Navigation: Toolbar gồm 3 tab `[Overview]`, `[Analytics]`, `[SEO Health]` để chuyển đổi màn hình.
+  - Stat Cards View (4 cột): Traffic, Leads, Orders, Revenue.
+  - Action Required List: Các tác vụ đang pending.
+  - SEO Health Widget: Biểu đồ tròn điểm tổng quát và CTA AI Fix.
+- **Wireframe:**
 ```text
-┌─────────────────────────────────────────────────────┐
-│  Sidebar           │  Dashboard Overview            │
-│  Dashboard ☀️      │  Good morning, SME Owner! 👋    │
-│  My Sites          │  ┌────┐ ┌────┐ ┌────┐ ┌────┐   │
-│  SEO               │  │5.2K│ │150 │ │12  │ │$300│   │
-│  Analytics         │  │Viw │ │Lead│ │Ords│ │Rev │   │
-│                    │  └────┘ └────┘ └────┘ └────┘   │
-│                    │  ┌─ Actions Needed ───────┐    │
-│                    │  │ • Order #001 pending   │    │
-│                    │  │ • Order #002 pending   │    │
-│                    │  └────────────────────────┘    │
-│                    │  ┌─ SEO Health ───────────┐    │
-│                    │  │ 72/100                 │    │
-│                    │  │ [AI Fix All Issues ✨] │    │
-│                    │  └────────────────────────┘    │
-└────────────────────┴────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  Sidebar           │  Dashboard                          │
+│  📊 Dashboard      │                                     │
+│  🌐 My Webstore ▼  │  [🚀 Overview] [📈 Analytics] [🔍 SEO]│
+│    ├ Editor        │  ────────────────────────────────── │
+│    └ Blog          │  Good morning, SME Owner! 👋         │
+│  ...               │  ┌────┐ ┌────┐ ┌────┐ ┌────┐        │
+│                    │  │5.2K│ │150 │ │12  │ │$300│        │
+│                    │  │Viw │ │Lead│ │Ords│ │Rev │        │
+│                    │  └────┘ └────┘ └────┘ └────┘        │
+│                    │  ┌─ Actions Needed ───────┐         │
+│                    │  │ • Order #001 pending   │         │
+│                    │  │ • Order #002 pending   │         │
+│                    │  └────────────────────────┘         │
+│                    │  ┌─ SEO Health ───────────┐         │
+│                    │  │ 72/100                 │         │
+│                    │  │ [AI Fix All Issues ✨] │         │
+│                    │  └────────────────────────┘         │
+└────────────────────┴─────────────────────────────────────┘
+
+**Wireframe Mobile (< 768px): 2x2 Grid Overview**
+```text
+┌─ 📱 Mobile Browser ─────────────────────────┐
+│ [≡] Dashboard            [👤 Owner]         │
+│ ─────────────────────────────────────────── │
+│  Good morning, SME Owner! 👋                │
+│  [  Today ▼ ]  (Time Filter)                │
+│                                             │
+│  ┌─ 2x2 Stat Grid ────────────────┐         │
+│  │ ┌─────────┐      ┌─────────┐   │         │
+│  │ │ 5.2K    │      │ 150     │   │         │
+│  │ │ Views   │      │ Leads   │   │         │
+│  │ └─────────┘      └─────────┘   │         │
+│  │ ┌─────────┐      ┌─────────┐   │         │
+│  │ │ 12      │      │ $300    │   │         │
+│  │ │ Orders  │      │ Revenue │   │         │
+│  │ └─────────┘      └─────────┘   │         │
+│  └────────────────────────────────┘         │
+│                                             │
+│  ┌─ Actions Needed ───────────────┐         │
+│  │ • Order #001 pending      [→]  │         │
+│  └────────────────────────────────┘         │
+│                                             │
+│  ┌─ SEO Health ───────────────────┐         │
+│  │         ( 72/100 )             │         │
+│  │    [AI Fix All Issues ✨]       │         │
+│  └────────────────────────────────┘         │
+└─────────────────────────────────────────────┘
 ```
+```
+
+### 10.2. Màn hình Chi tiết (Analytics Detail & SEO Dashboard)
+- **Mô tả:** Các màn hình mở rộng Analytics và SEO.
+- **Components chính:**
+  - **Tabs Navigation:** Thanh Tab giống màn hình Overview (đang active ở tab tương ứng).
+  - **Analytics:** Daily Bar Chart lớn, Bảng xếp hạng Top Pages/Products/Blogs.
+  - **SEO Dashboard:** Bảng Breakdown điểm từng hạng mục, danh sách Keywords Tracker, tiến trình AI Fix All (SSE real-time streaming bar).
+
+- **Wireframe (Analytics Detail):**
+```text
+┌──────────────────────────────────────────────────────────┐
+│  Dashboard                [ Filter: Last 30 Days ▼]      │
+│  [🚀 Overview] [📈 Analytics (Active)] [🔍 SEO]              │
+│  ──────────────────────────────────────────────────────  │
+│  ┌─ Site Traffic (Daily) ─────────────────────────┐      │
+│  │   📈 +12% vs last period                       │      │
+│  │    _   _                                       │      │
+│  │  _ | | | |   _       _                         │      │
+│  │ | || | | |_ | | ... | |                        │      │
+│  │ 1  2  3  4  5       30                         │      │
+│  └────────────────────────────────────────────────┘      │
+│                                                          │
+│  ┌─ Top Pages ────────┐  ┌─ Top Products ─────────┐      │
+│  │ /home        1.2K  │  │ 1. Coffee Bean    800  │      │
+│  │ /about       500   │  │ 2. Espresso Mac.  450  │      │
+│  │ /products    400   │  │ 3. Filter Paper   200  │      │
+│  └────────────────────┘  └────────────────────────┘      │
+└──────────────────────────────────────────────────────────┘
+```
+
+- **Wireframe (SEO Dashboard):**
+```text
+┌──────────────────────────────────────────────────────────┐
+│  Dashboard                                               │
+│  [🚀 Overview] [📈 Analytics] [🔍 SEO (Active)]              │
+│  ──────────────────────────────────────────────────────  │
+│  ┌─ Overall Score ────────┐ ┌─ AI Actions ────────┐      │
+│  │       ( 72/100 )       │ │ Fix 5 issues now    │      │
+│  │  Needs Improvement     │ │ [✨ AI Fix All]      │      │
+│  │                        │ │                     │      │
+│  │  Meta Tags: 80/100     │ │ Status: Ready       │      │
+│  │  Headings:  60/100     │ │                     │      │
+│  └────────────────────────┘ └─────────────────────┘      │
+│                                                          │
+│  ┌─ Keyword Tracker ──────────────────────[+ Add]─┐      │
+│  │ Keyword            Rank          Trend         │      │
+│  │ 1. Cafe KL         #12           🔼 +2         │      │
+│  │ 2. Arabica beans   #4            ➖            │      │
+│  │ 3. Best pastry     #45           🔽 -5         │      │
+│  └────────────────────────────────────────────────┘      │
+└──────────────────────────────────────────────────────────┘
+```
+
+### 10.3. Các trạng thái UI (UI States) & Modals
+- **Empty State:** User chưa có site -> Hiển thị Prompt tạo website đầu tiên (Illustration box). Dashboards khác sẽ báo "Chưa có dữ liệu" với số liệu là 0.
+- **Loading State:** Skeleton Shimmer thay vì Spinner cho các widget để trải nghiệm mượt.
+- **Error State / Edge Cases:** Toast lỗi "Không thể tải dữ liệu" + Nút "Thử lại".
+- **Modals:** Modal "Tùy chỉnh Dashboard" cho phép user gạch/chọn (checkbox) và Drag-and-drop để reorder các Stat Cards.
 
 ---
 
@@ -286,6 +395,11 @@ WHEN  cron job chạy (vd: 1 tuần 1 lần hoặc manual fetch)
 THEN  hệ thống tự động query hạng của website theo từng keyword
   AND cập nhật kết quả mới nhất vào database
 ```
+
+### AC-14: Trải Nghiệm Dashboard trên Mobile (Responsive UI)
+> 📌 Source: [US-F03-07](../stories/F03-dashboard-stories.md)
+
+Khi truy cập màn hình `<768px`, 4 Stat Cards ở Overview tự động quy hoạch thành lưới `2x2 CSS Grid` giúp nắm bắt cùng lúc 4 chỉ số mà KHÔNG CẦN cuộn sâu. Biểu đồ trong Analytics sẽ giản lược các nhãn ngày tháng (e.g., nhảy cách 3-5 ngày hiển thị 1 nhãn) để không tràn chữ, cho phép scrub/chạm để xem chi tiết. Form tùy chỉnh hiển thị Dashboard thay Drag-and-drop bằng bảng danh sách có thao tác Tap nút `Lên/Xuống` hoặc hiện dưới dạng Bottom Sheet tiện lợi vuốt đóng (swipe-to-close).
 
 ---
 

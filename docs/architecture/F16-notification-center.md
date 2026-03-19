@@ -1,12 +1,12 @@
 # Architecture: Notifications Center (F16)
 > **Version:** 1.0 | **Created:** 2026-03-17 | **Agent:** `project-planner`  
-> **PRD:** [`docs/prd/F14-notification-center.md`](../prd/F14-notification-center.md)
+> **PRD:** [`docs/prd/F16-notification-center.md`](../prd/F16-notification-center.md)
 
 ---
 
 ## 1. Overview
 
-Tài liệu này mô tả kiến trúc kỹ thuật cho tính năng Notification Center (F16). Bao gồm UI Dropdown trên thanh Navigation, hệ thống Badge đ đếm số lượng thông báo chưa đọc, Popup/Toast xuất hiện realtime ở góc màn hình, và tích hợp Push Notification API trên trình duyệt Desktop. Hệ thống sử dụng cơ chế Server-Sent Events (SSE) hoặc WebSocket/Polling để nhận data realtime từ backend.
+Tài liệu này mô tả kiến trúc kỹ thuật cho tính năng Notification Center (F16). Bao gồm UI Dropdown trên thanh Navigation, hệ thống Badge để đếm số lượng thông báo chưa đọc, Popup/Toast xuất hiện realtime ở góc màn hình, và tích hợp Push Notification API trên trình duyệt Desktop. Hệ thống sử dụng cơ chế Server-Sent Events (SSE) hoặc WebSocket/Polling để nhận data realtime từ backend.
 
 ## 2. System Context
 
@@ -59,7 +59,7 @@ src/components/layout/Header/
    4.b. Nếu in-active tab: Service Worker gọi Native Push API của Browser.
 5. User click vào thông báo trong Dropdown:
    5.a. Gọi API `POST /mark-read` với ID của thông báo.
-   5.b. Navigate user tới `actionUrl` (e.g. `/dashboard/orders/123`).
+   5.b. Navigate user tới `actionUrl` (e.g. `/orders/123`).
 ```
 
 ## 5. State Management
@@ -88,7 +88,7 @@ Response (success):
         "type": "ORDER_NEW",
         "title": "📦 New Order #1024",
         "message": "RM 150.00 from Customer Name",
-        "actionUrl": "/dashboard/orders?id=1024",
+        "actionUrl": "/orders?id=1024",
         "isRead": false,
         "createdAt": "2026-03-17T14:30:00Z"
       }

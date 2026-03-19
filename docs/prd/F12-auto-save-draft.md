@@ -10,8 +10,8 @@
 > Mọi FR phải có Story Ref. AC được copy từ story file.
 
 > [!NOTE]
-> F12 chưa có Story file riêng. Scope được derived từ US-F12-01 (Auto-save AC).
-> **Action required:** Tạo `F12-auto-save-stories.md` hoặc merge vào F05 stories nếu scope nhỏ.
+> Scope được quy định chi tiết trong F12 stories.
+
 
 ---
 
@@ -19,9 +19,9 @@
 
 | Story ID | Title | File | Status |
 |----------|-------|------|--------|
-| US-F12-01 | AI Editor — Auto-save AC | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
-
-> ⚠️ Auto-save là sub-feature của F05. Story riêng cho F12 chưa tồn tại.
+| US-F12-01 | Auto-Save debounce 3s | [F12-auto-save-draft-stories.md](../stories/F12-auto-save-draft-stories.md) | Ready |
+| US-F12-02 | Draft Recovery | [F12-auto-save-draft-stories.md](../stories/F12-auto-save-draft-stories.md) | Ready |
+| US-F12-03 | Mobile Web UX — Compact Auto-Save Indicator | [F12-auto-save-draft-stories.md](../stories/F12-auto-save-draft-stories.md) | Ready |
 
 ---
 
@@ -73,6 +73,7 @@ Auto-save debounce 3s, manual save (Ctrl+S), save status indicator (Saved Xs ago
 | FR-07 | Manual save: Ctrl+S → immediate save + toast "Saved!" | US-F12-01 | P1 | |
 | FR-08 | Browser "unsaved changes" dialog khi navigate away với isDirty = true | US-F12-01 | P0 | |
 | FR-09 | Draft recovery: return to /editor/:siteId → load latest saved state | US-F12-01 | P0 | |
+| FR-10 | **[Mobile]** Thu gọn Auto-Save Indicator thành Icon-only (không text) để tiết kiệm diện tích thanh Toolbar. | US-F12-03 | P2 | Ngăn text dài đẩy label khác |
 
 ---
 
@@ -82,6 +83,42 @@ Auto-save debounce 3s, manual save (Ctrl+S), save status indicator (Saved Xs ago
 - **BR-02:** Draft valid nếu saved within 24h
 - **BR-03:** Auto-save không spam API — debounce 3s bắt buộc
 - **BR-04:** Manual Ctrl+S overrides debounce timer
+
+---
+
+## 10. Screen Layout
+
+> **[Global CMS Constraint]** Tính năng Auto-Save là một indicator trạng thái nền (Background Process Indicator) tích hợp ngay trong Toolbar của AI Editor (F05).
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình chính (Save Status Indicator)
+- **Mô tả:** Khu vực nhỏ hiển thị trạng thái lưu trữ đám mây.
+- **Components chính:**
+  - Status Text / Icon Box: Dạng một Text Label nằm cạnh nút [Publish], kèm theo Icon cloud/check.
+- **Wireframe:**
+```text
+┌────────────────────────────────────────────────────────┬─────┐
+│ Editor Toolbar ...             [☁️ Saving...]          │ [🚀]│
+└────────────────────────────────────────────────────────┴─────┘
+                            hoặc [✅ Saved 2 mins ago]
+                            hoặc [⚠️ Nút Thử Lại] (Chữ đỏ)
+```
+
+### 10.2. Mobile View (Tiny Cloud Status)
+- **Mô tả:** Indicator siêu nhỏ gọn trên thanh menu bar của Mobile Editor. Thay vì hiện chữ "Saved", chỉ hiện 1 icon mây đánh dấu tick xanh.
+- **Wireframe:**
+```text
+┌─ Mobile AI Editor ──────────────────────────┐
+│ [≡] Website      [☁️✔]  [Preview][Publish]  │
+└─────────────────────────────────────────────┘
+```
+
+### 10.3. Các trạng thái UI (UI States) & Modals
+- **Idle/Saved (Success State):** Biểu tượng Checkmark Cloud, text màu xám dịu ghi rõ timestamp: "Saved 2 mins ago" hoặc "Saved just now".
+- **Loading State:** Khi đang gửi Request API, Icon Cloud hiện vòng Spin xoay mượt, Text ghi: "Saving...".
+- **Error State / Edge Cases:** Icon Alert Tam giác ⚠️, text chữ đỏ: "Không thể lưu thay đổi (No Connection)". Khi đó, hiện thêm một Button nhỏ [Thử Lại Ngay]. Chặn Browser Navigation Popup: Cảnh báo "Có thay đổi chưa được lưu, bạn có chắc muốn thoát?".
+- **Modals:** Không có Modal, chỉ sử dụng Native Browser Dialog khi user ấn X tắt Tab giữa chừng lúc đang unsaved.
 
 ---
 
@@ -121,7 +158,7 @@ const RETRY_DELAYS = [5000, 10000, 20000]
 
 ## 18. Definition of Ready
 
-- [ ] ⚠️ Story file created (F12 hoặc added to F05)
+- [ ] User Stories F12 approved
 - [ ] F05 Editor editorStore designed
 
 ---
