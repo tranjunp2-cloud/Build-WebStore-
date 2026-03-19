@@ -1,4 +1,24 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, CollectionAfterChangeHook } from 'payload'
+import { sendEmail } from '@/lib/email/send'
+import { welcomeEmail } from '@/lib/email/templates/welcome'
+
+/**
+ * afterChange hook: send Welcome email to new users.
+ * Non-blocking — registration succeeds even if email fails.
+ */
+const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation }) => {
+    if (operation !== 'create') return doc
+
+    const userName = doc.firstName || doc.email?.split('@')[0] || 'there'
+    const { subject, html } = welcomeEmail({ userName })
+
+    // Fire-and-forget — don't block registration
+    sendEmail({ to: doc.email, subject, html }).catch((err) => {
+        console.error(`[Users] Failed to send welcome email to ${doc.email}:`, err)
+    })
+
+    return doc
+}
 
 export const Users: CollectionConfig = {
     slug: 'users',
@@ -6,6 +26,9 @@ export const Users: CollectionConfig = {
     admin: {
         useAsTitle: 'email',
         description: 'Platform users — can be super-admins or tenant members.',
+    },
+    hooks: {
+        afterChange: [sendWelcomeEmailHook],
     },
     access: {
         // Allow anyone to register (public create)
