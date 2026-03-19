@@ -27,7 +27,7 @@ export type SSEEvent = {
 export async function generateSiteWithAI(
     businessInfo: BusinessInfoInput,
     extraInstructions?: string,
-    language: 'vi' | 'en' = 'vi',
+    language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     const events: SSEEvent[] = []
     const promptText = `${businessInfo.businessName} - ${businessInfo.industry}`
@@ -129,6 +129,7 @@ export async function generateSiteWithAI(
             siteType: parsed.category || 'business',
             blocks: validBlocks,
             seo,
+            language: ['en', 'ms', 'vi'].includes(parsed.language) ? parsed.language : 'en',
             theme,
         }
 
@@ -145,7 +146,10 @@ export async function generateSiteWithAI(
 function generateWithFallback(prompt: string, events: SSEEvent[]): { result: GenerationResult; events: SSEEvent[] } {
     events.push({ event: 'step', data: { step: 'fallback', label: 'Creating from smart templates...', progress: 50 } })
 
-    const result = generateBlocks(prompt)
+    const result = {
+        ...generateBlocks(prompt),
+        language: 'en' as const
+    }
 
     events.push({ event: 'theme_set', data: { theme: result.theme } })
 

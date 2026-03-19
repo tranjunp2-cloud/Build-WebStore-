@@ -101,7 +101,11 @@
             "fitness": "💪 Fitness",
             "creative": "🎨 Portfolio",
             "business": "🏢 Business"
-        }
+        },
+        "sort": "Sort by",
+        "sortNewest": "Newest",
+        "sortFeatured": "Featured",
+        "sortName": "A-Z"
     },
     "onboarding": {
         "stepLabel": "Step",
@@ -115,5 +119,57 @@
         "step2Subtitle": "Pick a starting point — you can customize everything later.",
         "step3Title": "Customize your site",
         "step3Subtitle": "Add your brand details to make it yours."
+    },
+    "email": {
+        "welcome": {
+            "subject": "Welcome to PrimeWeb! 🎉",
+            "heading": "Welcome! 🎉",
+            "subheading": "Welcome to PrimeWeb",
+            "greeting": "Hi",
+            "body": "You're ready to create your first website with PrimeWeb! Just describe your idea, and AI will help you build a professional website in minutes.",
+            "stepsTitle": "Get started in 3 steps",
+            "step1": "Describe the website you want to create",
+            "step2": "Customize the content and design",
+            "step3": "Publish and share!",
+            "cta": "Get Started →",
+            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
+        },
+        "order": {
+            "subject": "Order Confirmed",
+            "heading": "Order Confirmed ✓",
+            "subheading": "Thank you for your purchase!",
+            "greeting": "Hi",
+            "body": "Your order has been placed successfully.",
+            "orderNumber": "Order Number",
+            "item": "Item",
+            "qty": "Qty",
+            "amount": "Amount",
+            "subtotal": "Subtotal",
+            "sst": "SST (6%)",
+            "total": "Total",
+            "shippingAddress": "Shipping Address",
+            "footer": "Powered by PrimeWeb"
+        },
+        "status": {
+            "greeting": "Hi",
+            "orderNumber": "Order Number",
+            "tracking": "Tracking",
+            "processing": {
+                "title": "Order is Processing",
+                "description": "Your order is being prepared. We will notify you when it has been shipped."
+            },
+            "shipped": {
+                "title": "Order Shipped",
+                "description": "Your order is on its way. You can track your shipment below."
+            },
+            "delivered": {
+                "title": "Order Delivered",
+                "description": "Your order has been delivered. Thank you for your purchase!"
+            },
+            "cancelled": {
+                "title": "Order Cancelled",
+                "description": "Your order has been cancelled. If you have any questions, please contact us."
+            }
+        }
     }
 }

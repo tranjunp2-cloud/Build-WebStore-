@@ -53,10 +53,14 @@ export function middleware(req: NextRequest) {
     }
 
     // ── Custom domain: anything that's not the platform domain ───────────────
+    // Note: Docker sets HOSTNAME=0.0.0.0, so standalone server may resolve
+    // req.nextUrl.hostname as '0.0.0.0' — treat as platform domain.
     if (
         hostname !== PLATFORM_DOMAIN &&
         hostname !== `www.${PLATFORM_DOMAIN}` &&
+        hostname !== '0.0.0.0' &&
         !hostname.includes('localhost') &&
+        !hostname.includes('127.0.0.1') &&
         !hostname.includes('vercel.app') &&
         !hostname.includes('ondigitalocean.app')
     ) {
@@ -77,7 +81,7 @@ export function middleware(req: NextRequest) {
     // Not logged in → trying to access protected route → redirect to login
     if (isProtectedRoute && !hasToken) {
         url.pathname = '/login'
-        url.searchParams.set('redirect', pathname)
+        url.searchParams.set('returnUrl', pathname)
         return NextResponse.redirect(url)
     }
 

@@ -1,105 +1,67 @@
-# PrimeWeb — Documentation Hub
+# 📚 PrimeWeb — Team Hub
 
-> Feature documentation organized by BMAD workflow.  
-> **Product:** PrimeWeb (AI-first SaaS website builder for SMEs — Malaysia market)  
-> **Authority:** `SPEC.md` §2 is the master rule — read it before coding.  
-> **Market Ref:** [`malaysia-market-context.md`](./malaysia-market-context.md)
+> **Đọc file này trước. Tất cả docs có link ở đây.**
 
-## 📂 Structure
+---
+
+## 🚀 Bắt đầu
+
+| Bạn là | Đọc file này |
+|--------|-------------|
+| **Dev mới** | [README.md](../README.md) (setup) → [CONTRIBUTING.md](../.github/CONTRIBUTING.md) (rules) |
+| **Designer** | [Design Guide](design/DESIGN_WORKFLOW.md) (rules + screens + tokens + Figma links) |
+| **QC** | [Features](#features) bên dưới → xem stories |
+| **DevOps** | [DEPLOY.md](../.github/DEPLOY.md) → [GIT_AND_CI_RULES.md](../.github/GIT_AND_CI_RULES.md) |
+| **Tất cả** | [PROJECT_ALIGNMENT.md](PROJECT_ALIGNMENT.md) (timeline, priority) |
+
+---
+
+## 📂 Cấu trúc docs
 
 ```
 docs/
-├── README.md                      ← This file
-├── malaysia-market-context.md     ← 🆕 MY market personas, JTBD, payments
-├── prd/                           ← Product Requirement Documents
-│   ├── _TEMPLATE.md
-│   ├── F01-ai-chat-builder.md
-│   ├── F02-auth.md
-│   ├── F03-dashboard.md
-│   ├── F04-block-renderer.md
-│   ├── F05-ai-editor.md           ← 🆕
-│   ├── F06-onboarding.md          ← 🆕
-│   ├── F07-template-gallery.md    ← 🆕
-│   ├── F08-publish-flow.md        ← 🆕
-│   ├── F09-products-crud.md       ← 🆕
-│   ├── F10-storefront-commerce.md
-│   ├── F11-orders-management.md   ← 🆕
-│   ├── F12-seo-dashboard.md       ← 🆕
-│   ├── F13-analytics-dashboard.md ← 🆕
-│   ├── F14-undo-redo.md           ← 🆕
-│   └── F15-auto-save-draft.md     ← 🆕
-├── architecture/                  ← System design & architecture
-│   ├── _TEMPLATE.md
-│   ├── AI_BUILDER_SPEC.md
-│   ├── F01-ai-chat-builder.md
-│   ├── F02-auth.md
-│   ├── F03-dashboard.md
-│   └── F10-storefront-commerce.md
-├── design/                        ← UI Mockups (required by BMAD gate)
-│   ├── F03-dashboard-mockup.png
-│   ├── F10-storefront-products.jpg
-│   ├── F10-storefront-detail.jpg
-│   ├── F10-storefront-checkout.jpg
-│   └── F10-storefront-cart.jpg
-├── stories/                       ← User Stories with Gherkin AC
-│   ├── user-stories-p0.md         ← Index file (links to per-feature)
-│   ├── F01-ai-chat-builder-stories.md  ← 🆕
-│   ├── F02-auth-stories.md             ← 🆕
-│   ├── F03-dashboard-stories.md        ← 🆕
-│   ├── F05-ai-editor-stories.md        ← 🆕
-│   ├── F08-publish-stories.md          ← 🆕
-│   ├── F09-products-crud-stories.md    ← 🆕
-│   ├── F10-storefront-stories.md       ← 🆕
-│   └── F12-seo-dashboard-stories.md    ← 🆕
-├── qa/                            ← QA Reports (after build)
-│   ├── F02-auth.md
-│   └── F03-dashboard.md
-├── decisions/                     ← Architecture Decision Records
-└── tracking/                      ← Build progress & plans
-    ├── product_plan.md
-    ├── PLAN-ai-webbuilder.md
-    ├── implementation_plan.md
-    ├── task.md
-    └── walkthrough.md
+├── README.md                    ← Bạn đang đây (Team Hub)
+├── PROJECT_ALIGNMENT.md         ← Timeline, priority, team rules, task tóm tắt
+├── SPRINT0_DETAIL.md            ← Chi tiết từng task (files, steps, DoD)
+│
+├── prd/                         ← PRD mỗi feature (yêu cầu)
+├── stories/                     ← User Stories + Gherkin AC
+├── architecture/                ← Technical design
+├── design/DESIGN_WORKFLOW.md     ← Design Guide: rules + 28 screens + tokens + Figma (1 file)
+├── decisions/decisions-log.md   ← Product decisions đã chốt
+└── malaysia-market-context.md   ← Ngữ cảnh thị trường MY
+
+.github/
+├── CONTRIBUTING.md              ← Git rules, PR rules, code rules
+├── GIT_AND_CI_RULES.md          ← Chi tiết Git workflow
+├── DEPLOY.md                    ← Deploy staging vs production
+├── TEST_PLAN.md                 ← Phạm vi test
+└── pull_request_template.md     ← Template PR
+
+Root:
+├── README.md                    ← Setup & run project
+└── SPEC.md                      ← Product spec gốc (reference)
 ```
 
-## 📑 Feature Registry (Unified F01-F15)
+---
 
-| ID | Feature | Wave | Priority | PRD | Stories | Code |
-|----|---------|------|----------|-----|---------|------|
-| F01 | AI Chat Builder | 3 | P0 🌟 | ✅ | ✅ | ✅ Built |
-| F02 | Auth | 1 | P0 | ✅ | ✅ | ✅ Built |
-| F03 | Dashboard | 1 | P0 | ✅ | ✅ | ✅ Built |
-| F04 | Block Renderer | 3 | P0 | ✅ | — | ⚠️ Monolith |
-| F05 | AI Editor | 3 | P0 🌟 | 📝 | ✅ | ⚠️ Basic |
-| F06 | Onboarding | 1 | P0 | 📝 | — | ⚠️ Basic |
-| F07 | Templates | 3.5 | P1 | 📝 | — | ⚠️ Static |
-| F08 | Publish Flow | 3 | P0 | 📝 | ✅ | ❌ |
-| F09 | Products CRUD | 4 | P0 | 📝 | ✅ | ⚠️ Basic |
-| F10 | Storefront | 5 | P0 🌟 | ✅ | ✅ | ✅ Built |
-| F11 | Orders | 4 | P0 | 📝 | — | ⚠️ Basic |
-| F12 | SEO Dashboard | 4 | P0 🌟 | 📝 | ✅ | ⚠️ Basic |
-| F13 | Analytics | 5 | P1 | 📝 | — | ⚠️ Basic |
-| F14 | Undo/Redo | 3 | P0 | 📝 | — | ❌ |
-| F15 | Auto-Save | 3 | P0 | 📝 | — | ❌ |
+## Features
 
-## 🛑 BMAD Gate (5/5 Required)
-
-Before coding any feature, verify:
-1. ☐ PRD exists (`docs/prd/F{XX}-{name}.md`)
-2. ☐ Architecture exists (`docs/architecture/F{XX}-{name}.md`)
-3. ☐ UI Mockups exist (`docs/design/F{XX}-{name}-*.jpg`)
-4. ☐ API contracts defined (in PRD §8)
-5. ☐ Dependencies resolved
-
-> **< 5/5 PASS → HOLD. Create docs FIRST.**
-
-## 🔗 Key References
-
-| Document | Purpose |
-|----------|---------|
-| [`SPEC.md`](../SPEC.md) | Constitution — master rules |
-| [`malaysia-market-context.md`](./malaysia-market-context.md) | MY market personas, payments, UX |
-| [`AI_BUILDER_SPEC.md`](./architecture/AI_BUILDER_SPEC.md) | AI features deep spec |
-| [`product_plan.md`](./tracking/product_plan.md) | Full product roadmap |
-| [`PLAN-ai-webbuilder.md`](./tracking/PLAN-ai-webbuilder.md) | BMAD build plan |
+| Feature | PRD | Stories | Architecture | Design |
+|---------|:---:|:-------:|:------------:|:------:|
+| **F01** AI Web Builder | [📄](prd/F01-ai-builder.md) | [📝](stories/F01-ai-builder-stories.md) | [🏗️](architecture/F01-ai-builder.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F02** Auth | [📄](prd/F02-auth.md) | [📝](stories/F02-auth-stories.md) | [🏗️](architecture/F02-auth.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F03** Dashboard | [📄](prd/F03-dashboard.md) | [📝](stories/F03-dashboard-stories.md) | [🏗️](architecture/F03-dashboard.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F05** AI Editor | [📄](prd/F05-ai-editor.md) | [📝](stories/F05-ai-editor-stories.md) | [🏗️](architecture/F05-ai-editor.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F06** Onboarding | [📄](prd/F06-onboarding.md) | [📝](stories/F06-onboarding-stories.md) | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F07** Templates | [📄](prd/F07-template-gallery.md) | [📝](stories/F07-template-gallery-stories.md) | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F08** Publish | [📄](prd/F08-publish-flow.md) | [📝](stories/F08-publish-stories.md) | [🏗️](architecture/F08-publish-flow.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F08** Products | [📄](prd/F08-products-crud.md) | [📝](stories/F08-products-crud-stories.md) | [🏗️](architecture/F08-products-crud.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F09** Storefront | [📄](prd/F09-storefront-commerce.md) | [📝](stories/F09-storefront-stories.md) | [🏗️](architecture/F09-storefront-commerce.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F10** Orders | [📄](prd/F10-orders-management.md) | [📝](stories/F10-orders-stories.md) | [🏗️](architecture/F10-orders-management.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F11** SEO | [📄](prd/F11-seo-dashboard.md) | [📝](stories/F11-seo-dashboard-stories.md) | [🏗️](architecture/F11-seo-dashboard.md) | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F12** Analytics | [📄](prd/F12-analytics-dashboard.md) | ❌ | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F11** Undo/Redo | [📄](prd/F11-undo-redo.md) | [📝](stories/F11-undo-redo-stories.md) | ❌ | — |
+| **F12** Auto-save | [📄](prd/F12-auto-save-draft.md) | ❌ | ❌ | — |
+| **F13** Payment Gateway 🇲🇾 | [📄](prd/F11-payment-gateway.md) | ❌ | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |
+| **F14** Shipping 🇲🇾 | [📄](prd/F12-shipping.md) | ❌ | ❌ | [🎨](design/DESIGN_WORKFLOW.md) |

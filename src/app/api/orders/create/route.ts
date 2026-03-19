@@ -1,24 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { orderCreateSchema } from '@/lib/validations/orders'
+import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
+import { createStripeCheckoutSession } from '@/lib/payment/stripe'
 
 /**
  * POST /api/orders/create
- * Creates a new order from cart items.
+ *
+ * Creates a pending order and redirects to Stripe Checkout (Direct Charges).
+ * Stock is only decremented after payment confirmation via webhook.
  *
  * Body: { siteId, items: [{productId, quantity}], customer: {name, email, phone, address} }
+ * Returns: { checkoutUrl } for client-side redirect
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
-        const body = await request.json()
-        const { siteId, items, customer } = body
-
-        if (!siteId || !items?.length || !customer?.name || !customer?.email) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Missing required fields' } },
-                { status: 422 }
-            )
-        }
+        const { data, errorResponse } = await parseRequest(request, orderCreateSchema)
+        if (errorResponse) return errorResponse
+        
+        const { siteId, items, customer } = data!
 
         const payload = await getPayload({ config })
 
@@ -33,8 +35,27 @@ export async function POST(request: NextRequest) {
 
         const tenantId = typeof site.tenant === 'object' ? (site.tenant as any).id : site.tenant
 
+        // Get tenant to check Stripe Connect
+        const tenant = await payload.findByID({ collection: 'tenants', id: tenantId })
+        if (!tenant) {
+            return NextResponse.json(
+                { success: false, error: { code: 'NOT_FOUND', message: 'Tenant not found' } },
+                { status: 404 }
+            )
+        }
+
+        const stripeAccountId = (tenant as any).stripeAccountId
+        const stripeOnboardingComplete = (tenant as any).stripeOnboardingComplete
+        if (!stripeAccountId || !stripeOnboardingComplete) {
+            return NextResponse.json(
+                { success: false, error: { code: 'PAYMENT_NOT_CONFIGURED', message: 'Merchant has not completed Stripe onboarding' } },
+                { status: 400 }
+            )
+        }
+
         // Validate products and calculate totals
         const orderItems = []
+        const checkoutItems = []
         let subtotal = 0
         let currency = 'MYR'
 
@@ -59,16 +80,13 @@ export async function POST(request: NextRequest) {
                 unitPrice: p.price,
             })
 
-            // Decrement inventory
-            if (p.inventory > 0) {
-                await payload.update({
-                    collection: 'products',
-                    id: item.productId,
-                    data: {
-                        inventory: Math.max(0, p.inventory - item.quantity),
-                    },
-                })
-            }
+            // For Stripe Checkout (prices in smallest unit — sen for MYR)
+            checkoutItems.push({
+                name: p.name,
+                price: Math.round(p.price * 100), // RM → sen
+                quantity: item.quantity,
+                images: p.images?.[0]?.url ? [p.images[0].url] : [],
+            })
         }
 
         if (orderItems.length === 0) {
@@ -85,7 +103,7 @@ export async function POST(request: NextRequest) {
         const tax = Math.round(subtotal * 0.06 * 100) / 100
         const total = subtotal + tax
 
-        // Create order
+        // Create order in PENDING status (will be updated to 'paid' by webhook)
         const order = await payload.create({
             collection: 'orders',
             data: {
@@ -112,6 +130,34 @@ export async function POST(request: NextRequest) {
             } as any,
         })
 
+        // Create Stripe Checkout Session (Direct Charges on merchant's connected account)
+        const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
+        const siteSlug = (tenant as any).slug || tenantId
+
+        const checkout = await createStripeCheckoutSession({
+            orderId: order.id as string,
+            items: checkoutItems,
+            currency: currency as 'MYR' | 'USD' | 'SGD',
+            customerEmail: customer.email,
+            successUrl: `${baseUrl}/sites/${siteSlug}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout/cancel`,
+            stripeAccountId,
+            metadata: {
+                siteId,
+                tenantId,
+                orderNumber,
+            },
+        })
+
+        // Save Stripe session ID to order
+        await payload.update({
+            collection: 'orders',
+            id: order.id,
+            data: {
+                stripeSessionId: checkout.sessionId,
+            } as any,
+        })
+
         return NextResponse.json({
             success: true,
             data: {
@@ -120,6 +166,7 @@ export async function POST(request: NextRequest) {
                 total,
                 currency,
                 status: 'pending',
+                checkoutUrl: checkout.url,
             },
         })
     } catch (error: any) {
@@ -129,4 +176,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})

@@ -1,28 +1,33 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { applyTemplateSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
  * POST /api/ai/apply-template
  * Creates a new site from a template's default blocks and theme.
  * Body: { templateId: string }
  */
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (user, req) => {
     try {
+        // Rate Limit: 20 template applications per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
+        }
+
         const payload = await getPayload({ config })
 
-        // Auth
-        const { user } = await payload.auth({ headers: req.headers })
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
-
-        const body = await req.json()
-        const { templateId } = body
-
-        if (!templateId) {
-            return NextResponse.json({ error: 'templateId required' }, { status: 400 })
-        }
+        const { data, errorResponse } = await parseRequest(req, applyTemplateSchema)
+        if (errorResponse) return errorResponse
+        
+        const { templateId } = data!
 
         // Find template
         const template: any = await payload.findByID({
@@ -52,7 +57,7 @@ export async function POST(req: NextRequest) {
                 name: template.name,
                 tenant: tenant.id,
                 status: 'draft',
-                siteType: template.category?.[0] || 'business',
+                siteType: Array.isArray(template.category) ? template.category[0] : (template.category || 'business'),
                 theme: template.defaultTheme || {
                     primaryColor: '#0ea5e9',
                     fontHeading: 'Outfit',
@@ -67,8 +72,8 @@ export async function POST(req: NextRequest) {
         await payload.create({
             collection: 'pages',
             data: {
-                title: 'Homepage',
-                slug: 'home',
+                title: 'Home',
+                slug: '/',
                 site: site.id,
                 tenant: tenant.id,
                 isHomepage: true,
@@ -98,4 +103,4 @@ export async function POST(req: NextRequest) {
             { status: 500 },
         )
     }
-}
+})

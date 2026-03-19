@@ -155,7 +155,7 @@
 
 | Priority | Feature | Rationale for MY Market |
 |----------|---------|------------------------|
-| **🔴 P0** | AI Chat Builder (BM/EN) | Removes language + tech barrier for SMEs |
+| **🔴 P0** | AI Web Builder (BM/EN) | Removes language + tech barrier for SMEs |
 | **🔴 P0** | Mobile-First Storefront | 97.4% shop on mobile |
 | **🔴 P0** | Card Payment (Stripe) | Basic payment — launch requirement |
 | **🔴 P0** | SST 6% Tax Calculation | Legal requirement in Malaysia |
@@ -185,4 +185,4 @@
 
 > [!NOTE]
 > This document should be updated as we learn more from beta users.  
-> Cross-reference this when writing PRDs for payment (F17), shipping, and trust features.
+> Cross-reference this when writing PRDs for payment (F14), shipping, and trust features.

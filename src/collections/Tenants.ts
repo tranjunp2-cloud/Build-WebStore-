@@ -12,8 +12,8 @@ export const Tenants: CollectionConfig = {
             return {
                 id: {
                     in: req.user?.tenants?.map((t: any) =>
-                        typeof t === 'object' && t !== null ? t.id : t
-                    ) ?? [],
+                        t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                    ).filter(Boolean) ?? [],
                 },
             }
         },
@@ -25,7 +25,7 @@ export const Tenants: CollectionConfig = {
             return {
                 id: {
                     in: req.user?.tenants?.map((t: any) =>
-                        typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+                        t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant
                     ) ?? [],
                 },
             }
@@ -81,6 +81,24 @@ export const Tenants: CollectionConfig = {
             admin: { readOnly: true },
         },
         {
+            name: 'stripeAccountId',
+            type: 'text',
+            index: true,
+            admin: {
+                readOnly: true,
+                description: 'Stripe Connected Account ID (acct_xxx) for Direct Charges',
+            },
+        },
+        {
+            name: 'stripeOnboardingComplete',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: {
+                readOnly: true,
+                description: 'Whether the merchant has completed Stripe Connect onboarding',
+            },
+        },
+        {
             name: 'status',
             type: 'select',
             required: true,
@@ -120,6 +138,27 @@ export const Tenants: CollectionConfig = {
             name: 'onboardingCompleted',
             type: 'checkbox',
             defaultValue: false,
+        },
+        {
+            name: 'whatsappNumber',
+            type: 'text',
+            admin: {
+                description: 'WhatsApp number with country code, e.g. 60123456789',
+            },
+        },
+        {
+            name: 'ssmNumber',
+            type: 'text',
+            admin: {
+                description: 'SSM Registration Number (Suruhanjaya Syarikat Malaysia)',
+            },
+        },
+        {
+            name: 'businessAddress',
+            type: 'textarea',
+            admin: {
+                description: 'Physical business address for trust signals',
+            },
         },
         {
             name: 'echIntegration',

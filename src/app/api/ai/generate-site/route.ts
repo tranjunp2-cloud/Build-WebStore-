@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { cookies } from 'next/headers'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
+import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
+import { generateSiteSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
+import { getCurrentUser } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
  * POST /api/ai/generate-site
@@ -20,20 +25,42 @@ export async function POST(req: NextRequest) {
         const payload = await getPayload({ config })
 
         // Authenticate user
-        const cookieStore = await cookies()
-        const token = cookieStore.get('payload-token')?.value
-        if (!token) {
+        let user: any = null
+        try {
+            const authResult = await payload.auth({ headers: req.headers })
+            user = authResult.user
+        } catch (authErr) {
+            console.warn('[AI Generate] Standard auth failed, trying cookie fallback')
+        }
+
+        // Fallback: read payload-token from cookies
+        if (!user) {
+            const cookieStore = await cookies()
+            const token = cookieStore.get('payload-token')?.value
+            if (token) {
+                try {
+                    // Create new headers with Authorization bearer token
+                    const authHeaders = new Headers(req.headers)
+                    authHeaders.set('Authorization', `JWT ${token}`)
+                    const authResult = await payload.auth({ headers: authHeaders })
+                    user = authResult.user
+                } catch (fallbackErr) {
+                    console.warn('[AI Generate] Cookie fallback auth failed too')
+                }
+            }
+        }
+
+        if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        // Build headers with JWT token for payload.auth()
-        // Next.js App Router may not forward cookies in req.headers properly
-        const authHeaders = new Headers(req.headers)
-        authHeaders.set('Authorization', `JWT ${token}`)
-
-        const { user } = await payload.auth({ headers: authHeaders })
-        if (!user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
         }
 
         // Get tenant ID — auto-create if missing (legacy accounts)
@@ -63,21 +90,29 @@ export async function POST(req: NextRequest) {
         }
 
         // Parse request body — structured business info
-        const { businessInfo, extraInstructions, language = 'vi' } = await req.json()
-
-        // Validate required business info
-        if (!businessInfo || !businessInfo.businessName || !businessInfo.industry || !businessInfo.products) {
-            return NextResponse.json(
-                { error: 'Missing required fields: businessName, industry, products' },
-                { status: 400 },
-            )
-        }
+        const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
+        if (errorResponse) return errorResponse
+        
+        const { businessInfo, extraInstructions, language = 'en' } = data!
 
         // Check SSE mode
         const isStreaming = req.nextUrl.searchParams.get('stream') === 'true'
 
+        // ────────────────────────────────────────────────────────────────────
+        // Start DALL-E Hero Image generation in parallel with GPT-4 Site Gen
+        // ────────────────────────────────────────────────────────────────────
+        const heroImagePromise = generateAndUploadHeroImage(businessInfo, resolvedTenantId, payload)
+
         // Generate with AI (or fallback)
         const { result, events } = await generateSiteWithAI(businessInfo, extraInstructions, language)
+
+        // Wait for hero image if it hasn't finished yet
+        let heroMedia: any = null
+        try {
+            heroMedia = await heroImagePromise
+        } catch (e) {
+            console.error('[AI Generate] Hero image promise error:', e)
+        }
 
         // ────────────────────────────────────────────────────────────────────
         // RULE 1: 1 site per user — Update existing site OR create new
@@ -99,6 +134,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     siteType: result.siteType,
+                    locale: result.language || language,
                     theme: {
                         primaryColor: result.theme.primaryColor,
                         secondaryColor: result.theme.secondaryColor,
@@ -112,7 +148,7 @@ export async function POST(req: NextRequest) {
                     },
                     aiGenerationMetadata: {
                         generatedAt: new Date().toISOString(),
-                        originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.products}`,
+                        originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
                         businessType: result.siteType,
                     },
                 },
@@ -136,6 +172,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     siteType: result.siteType,
+                    locale: result.language || language,
                     theme: {
                         primaryColor: result.theme.primaryColor,
                         secondaryColor: result.theme.secondaryColor,
@@ -149,7 +186,7 @@ export async function POST(req: NextRequest) {
                     },
                     aiGenerationMetadata: {
                         generatedAt: new Date().toISOString(),
-                        originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.products}`,
+                        originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
                         businessType: result.siteType,
                     },
                 },
@@ -158,6 +195,21 @@ export async function POST(req: NextRequest) {
 
         // Sanitize blocks for Payload CMS compatibility
         const sanitizedBlocks = sanitizeBlocksForPayload(result.blocks)
+
+        // Inject generated Hero Image into the hero block
+        if (heroMedia) {
+            const heroBlock = sanitizedBlocks.find(b => b.blockType === 'hero')
+            if (heroBlock) {
+                // Attach the payload block's backgroundImage field to the uploaded media ID (for DB save)
+                heroBlock.backgroundImage = heroMedia.id
+                
+                // Update the corresponding SSE event so the frontend preview gets the full image object immediately
+                const heroEvent = events.find((e: any) => e.event === 'block_complete' && (e.data as any).block?.blockType === 'hero')
+                if (heroEvent) {
+                    (heroEvent.data as any).block.backgroundImage = heroMedia
+                }
+            }
+        }
 
         // Create Homepage with generated blocks
         const page = await payload.create({
@@ -197,6 +249,7 @@ export async function POST(req: NextRequest) {
                             siteId: site.id,
                             pageId: page.id,
                             siteName: result.siteName,
+                            siteLanguage: result.language || language,
                             totalBlocks: result.blocks.length,
                             timeMs,
                         })}\n\n`
@@ -223,6 +276,7 @@ export async function POST(req: NextRequest) {
             siteId: site.id,
             pageId: page.id,
             siteName: result.siteName,
+            siteLanguage: result.language || language,
             siteType: result.siteType,
             blockCount: result.blocks.length,
             theme: result.theme,

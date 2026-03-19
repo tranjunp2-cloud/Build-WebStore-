@@ -4,7 +4,11 @@ import { Plus, Sparkles } from 'lucide-react'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+// Force dynamic — requires auth context + getPayload() at runtime
+export const dynamic = 'force-dynamic'
+
 import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
+import type { PlatformUser } from '@/types/user'
 import { formatRelativeTime, formatStorage } from '@/lib/utils'
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
@@ -20,7 +24,8 @@ export default async function DashboardPage() {
     const payload = await getPayload({ config })
 
     // Get real user name
-    const userName = (user as any)?.firstName || (user as any)?.email?.split('@')[0] || 'User'
+    const typedUser = user as PlatformUser | null
+    const userName = typedUser?.firstName || typedUser?.email?.split('@')[0] || 'User'
 
     // Fetch real sites from DB
     let sites: Array<{ id: string; name: string; slug: string; isPublished: boolean; updatedAt: string }> = []
@@ -34,13 +39,16 @@ export default async function DashboardPage() {
             limit: 20,
         })
         totalSites = sitesResult.totalDocs
-        sites = sitesResult.docs.map((doc: any) => ({
-            id: doc.id,
-            name: doc.name || 'Untitled Site',
-            slug: doc.domain || doc.id,
-            isPublished: doc.status === 'published',
-            updatedAt: doc.updatedAt ? formatRelativeTime(doc.updatedAt) : 'Just created',
-        }))
+        sites = sitesResult.docs.map((doc) => {
+            const d = doc as unknown as { id: string; name?: string; domain?: string; status?: string; updatedAt?: string }
+            return {
+                id: d.id,
+                name: d.name || 'Untitled Site',
+                slug: d.domain || d.id,
+                isPublished: d.status === 'published',
+                updatedAt: d.updatedAt ? formatRelativeTime(d.updatedAt) : 'Just created',
+            }
+        })
     }
 
     // Fetch real tenant data for stats
@@ -49,8 +57,9 @@ export default async function DashboardPage() {
     if (tenantId) {
         try {
             const tenant = await payload.findByID({ collection: 'tenants', id: tenantId })
-            storageUsed = (tenant as any)?.settings?.storageUsed || 0
-            storageLimit = ((tenant as any)?.settings?.storageLimitBytes || 524288000) / (1024 * 1024) // bytes → MB
+            const tenantData = tenant as unknown as { settings?: { storageUsed?: number; storageLimitBytes?: number } }
+            storageUsed = tenantData?.settings?.storageUsed || 0
+            storageLimit = (tenantData?.settings?.storageLimitBytes || 524288000) / (1024 * 1024) // bytes → MB
         } catch {
             // tenant not found — use defaults
         }

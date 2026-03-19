@@ -6,8 +6,12 @@
  * F-03: Inline AI Edit
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { rewriteTextSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -15,13 +19,21 @@ function getOpenAI(): OpenAI | null {
     return new OpenAI({ apiKey: key })
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (user, req) => {
     try {
-        const { text, instruction, context, language = 'vi' } = await req.json()
-
-        if (!text || !instruction) {
-            return NextResponse.json({ error: 'Text and instruction are required' }, { status: 400 })
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
         }
+
+        const { data, errorResponse } = await parseRequest(req, rewriteTextSchema)
+        if (errorResponse) return errorResponse
+        
+        const { text, instruction, context, language = 'en' } = data!
 
         const openai = getOpenAI()
         if (!openai) {
@@ -66,4 +78,4 @@ Instruction: ${instruction}`,
             { status: 500 },
         )
     }
-}
+})

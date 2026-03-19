@@ -24,7 +24,7 @@
 
 | # | Feature | Priority | Size | Wave | Agent(s) |
 |---|---------|----------|------|------|----------|
-| F-01 | [AI Chat Builder](#f-01-ai-chat-builder) | P0 🌟 | XL | 3 | `project-planner` → `backend-specialist` → `frontend-specialist` |
+| F-01 | [AI Web Builder](#f-01-ai-chat-builder) | P0 🌟 | XL | 3 | `project-planner` → `backend-specialist` → `frontend-specialist` |
 | F-02 | [AI Editor (Split Screen)](#f-02-ai-editor-split-screen) | P0 🌟 | XL | 3 | `frontend-specialist` → `backend-specialist` |
 | F-03 | [Inline AI Edit](#f-03-inline-ai-edit) | P0 | L | 3 | `frontend-specialist` → `backend-specialist` |
 | F-04 | [AI SEO Engine](#f-04-ai-seo-engine) | P0 🌟 | L | 4 | `seo-specialist` → `backend-specialist` → `frontend-specialist` |
@@ -37,7 +37,7 @@
 
 ---
 
-## F-01: AI Chat Builder
+## F-01: AI Web Builder
 
 ### 📌 Summary
 Full-screen chat interface where user describes their business → AI generates a complete website with 8-12 blocks in < 60 seconds using SSE streaming.
@@ -57,7 +57,7 @@ Full-screen chat interface where user describes their business → AI generates 
 ### 📝 PRD — `docs/prd/ai-chat-builder.md`
 
 ```markdown
-# PRD: AI Chat Builder (F-01)
+# PRD: AI Web Builder (F-01)
 
 ## Problem Statement
 SME owners waste 30-60 minutes configuring website builders 
@@ -192,7 +192,7 @@ AND show upgrade prompt
 ### 🏛️ Architecture — `docs/architecture/ai-chat-builder.md`
 
 ```markdown
-# Architecture: AI Chat Builder
+# Architecture: AI Web Builder
 
 ## System Flow
 ┌──────────┐    ┌──────────────┐    ┌──────────────┐
@@ -547,21 +547,21 @@ Fallback for users who prefer starting from a template. 6+ pre-made templates by
 
 ```mermaid
 graph LR
-  F05[F-05 Block Renderer] --> F01[F-01 AI Chat Builder]
+  F05[F-05 Block Renderer] --> F01[F-01 AI Web Builder]
   F05 --> F02[F-02 AI Editor]
   F01 --> F02
   F02 --> F03[F-03 Inline Edit]
   F02 --> F06[F-06 Undo/Redo]
   F02 --> F07[F-07 Auto-Save]
   F02 --> F08[F-08 Publish]
-  F01 --> F09[F-09 AI Images]
+  F01 --> F08[F-09 AI Images]
   F04[F-04 SEO Engine] --> F08
-  F05 --> F10[F-10 Templates]
+  F05 --> F09[F-10 Templates]
 ```
 
 ### Sprint Order:
 1. **Sprint 1:** F-05 (Block Renderer) — Foundation for everything
-2. **Sprint 2:** F-01 (AI Chat Builder) — Core USP
+2. **Sprint 2:** F-01 (AI Web Builder) — Core USP
 3. **Sprint 3:** F-02 (AI Editor) + F-06 (Undo) + F-07 (Auto-Save) — Refinement tools
 4. **Sprint 4:** F-03 (Inline Edit) + F-08 (Publish) — Polish
 5. **Sprint 5:** F-04 (SEO Engine) + F-09 (Images) + F-10 (Templates) — Growth features

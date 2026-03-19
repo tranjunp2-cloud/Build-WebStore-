@@ -1,6 +1,6 @@
-# CI Pipeline — Lint, typecheck, test, build
-# PR → CI → Deploy Preview (sequential)
-# Push → CI → Lark notify
+# CI Pipeline — Lint, typecheck, test, build, quality metrics
+# PR → CI (+ quality comment) → Deploy Preview
+# Push → CI → Deploy Staging/Production → Lark notify
 name: CI
 
 on:
@@ -15,11 +15,14 @@ concurrency:
 
 jobs:
   # ──────────────────────────────────────
-  # Job 1: CI — Lint, Typecheck, Test, Build
+  # Job 1: CI — Lint, Typecheck, Test, Build + Quality Metrics (PR)
   # ──────────────────────────────────────
   ci:
     name: "CI: Lint → Typecheck → Test → Build"
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,6 +36,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check DB migrations
+        if: github.event_name == 'pull_request'
+        id: migrations
+        run: |
+          git fetch origin staging --depth=1
+          node scripts/check-migrations.js origin/staging
+
       - name: Lint
         id: lint
         run: npm run lint
@@ -43,229 +53,276 @@ jobs:
 
       - name: Test
         id: test
-        run: npm run test
+        run: npm run test -- --coverage
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 3
 
       - name: Build
         id: build
         env:
           NODE_OPTIONS: '--require ./node-polyfill.js'
-        run: npm run build
+        run: npm run build 2>&1 | tee build-output.txt
 
-      # --- Lark: CI Passed ---
-      - name: Notify Lark (CI Passed)
-        if: success() && github.event_name == 'push'
-        env:
-          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
-          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+      # --- Docker Build Verification (PR only) ---
+      # This catches issues that pass local build but fail in Docker:
+      # - Missing force-dynamic exports (prerender crashes)
+      # - Missing dependencies in package.json
+      # - Dockerfile syntax or COPY errors
+      - name: Docker build check
+        if: success() && github.event_name == 'pull_request'
+        id: docker
         run: |
-          TIMESTAMP=$(date +%s)
-          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
-          BRANCH="${GITHUB_REF_NAME}"
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          TIME=$(date -u +"%H:%M UTC")
-          COMMIT_MSG=$(git log --format='%s' -n 1 | head -c 80)
-          curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
-            "timestamp": "'"$TIMESTAMP"'",
-            "sign": "'"$SIGN"'",
-            "msg_type": "interactive",
-            "card": {
-              "header": {"title": {"tag": "plain_text", "content": "✅ CI Passed — '"$BRANCH"'"}, "template": "green"},
-              "elements": [
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🌿 Branch**\n'"$BRANCH"'"}}]}
-                ]},
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
-                ]},
-                {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "📝 '"$COMMIT_MSG"'\n**Pipeline [1/2]** CI\n🕐 '"$TIME"'  ·  Lint ✅  TypeCheck ✅  Test ✅  Build ✅"}},
-                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "📋 View CI Run"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "primary"}]}
-              ]
-            }
-          }' || true
+          echo "🐳 Building Docker image (builder stage) to verify deploy compatibility..."
+          docker build \
+            --target builder \
+            -t primeweb-ci-check:${{ github.sha }} \
+            . 2>&1 | tee docker-build-output.txt
+          echo "✅ Docker build passed — deploy will succeed on DO"
 
-      # --- Lark: CI Failed (with error details) ---
-      - name: Notify Lark (CI Failed)
+      # --- Quality Metrics: Coverage + Bundle Size (PR only) ---
+      - name: Parse coverage report
+        if: success() && github.event_name == 'pull_request'
+        id: coverage
+        run: |
+          if [ -f "coverage/coverage-summary.json" ]; then
+            LINES=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.lines.pct)")
+            BRANCHES=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.branches.pct)")
+            FUNCTIONS=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.functions.pct)")
+            STATEMENTS=$(node -e "const c=require('./coverage/coverage-summary.json'); console.log(c.total.statements.pct)")
+          else
+            LINES="N/A"; BRANCHES="N/A"; FUNCTIONS="N/A"; STATEMENTS="N/A"
+          fi
+          echo "lines=$LINES" >> "$GITHUB_OUTPUT"
+          echo "branches=$BRANCHES" >> "$GITHUB_OUTPUT"
+          echo "functions=$FUNCTIONS" >> "$GITHUB_OUTPUT"
+          echo "statements=$STATEMENTS" >> "$GITHUB_OUTPUT"
+
+      - name: Measure bundle size
+        if: success() && github.event_name == 'pull_request'
+        id: bundle
+        run: |
+          if [ -d ".next" ]; then
+            TOTAL_SIZE=$(du -sh .next/ 2>/dev/null | cut -f1 || echo "N/A")
+            FIRST_LOAD=$(grep -oP 'First Load JS shared by all\s+\K[\d.]+ [kKmM]?B' build-output.txt 2>/dev/null || echo "N/A")
+            [ -z "$FIRST_LOAD" ] && FIRST_LOAD="N/A"
+          else
+            TOTAL_SIZE="N/A"; FIRST_LOAD="N/A"
+          fi
+          echo "total_size=$TOTAL_SIZE" >> "$GITHUB_OUTPUT"
+          echo "first_load=$FIRST_LOAD" >> "$GITHUB_OUTPUT"
+
+      - name: Comment quality metrics on PR
+        if: success() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const coverage = {
+              lines: '${{ steps.coverage.outputs.lines }}',
+              branches: '${{ steps.coverage.outputs.branches }}',
+              functions: '${{ steps.coverage.outputs.functions }}',
+              statements: '${{ steps.coverage.outputs.statements }}',
+            };
+            const bundle = {
+              totalSize: '${{ steps.bundle.outputs.total_size }}',
+              firstLoad: '${{ steps.bundle.outputs.first_load }}',
+            };
+
+            const marker = '<!-- quality-metrics -->';
+            const body = [
+              marker,
+              '## 📊 Quality Metrics',
+              '',
+              '### Test Coverage',
+              '| Metric | Value |',
+              '|--------|-------|',
+              `| Lines | ${coverage.lines}% |`,
+              `| Branches | ${coverage.branches}% |`,
+              `| Functions | ${coverage.functions}% |`,
+              `| Statements | ${coverage.statements}% |`,
+              '',
+              '### Bundle Size',
+              '| Asset | Size |',
+              '|-------|------|',
+              `| Total (.next/) | ${bundle.totalSize} |`,
+              `| First Load JS | ${bundle.firstLoad} |`,
+              '',
+              '---',
+              `_Updated: ${new Date().toISOString()} | [View CI Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+            });
+
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number, body,
+              });
+            }
+
+      # --- Notification: CI Failed (push or PR) ---
+      # Only notify on failure — CI pass is silent (deploy job will notify)
+      - name: Prepare failure info
         if: failure()
+        id: fail_info
         env:
-          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
-          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
           LINT_OUTCOME: ${{ steps.lint.outcome }}
           TYPECHECK_OUTCOME: ${{ steps.typecheck.outcome }}
           TEST_OUTCOME: ${{ steps.test.outcome }}
           BUILD_OUTCOME: ${{ steps.build.outcome }}
+          DOCKER_OUTCOME: ${{ steps.docker.outcome }}
         run: |
-          TIMESTAMP=$(date +%s)
-          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
-          BRANCH="${GITHUB_REF_NAME}"
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          TIME=$(date -u +"%H:%M UTC")
-          COMMIT_MSG=$(git log --format='%s' -n 1 | head -c 80)
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
 
-          # Determine which step failed
-          LINT_ICON="✅"; TYPECHECK_ICON="✅"; TEST_ICON="✅"; BUILD_ICON="⬜"
-          FAILED_STEP=""
-          if [ "$LINT_OUTCOME" = "failure" ]; then LINT_ICON="❌"; FAILED_STEP="Lint"; fi
-          if [ "$TYPECHECK_OUTCOME" = "failure" ]; then TYPECHECK_ICON="❌"; FAILED_STEP="TypeCheck"; fi
-          if [ "$TEST_OUTCOME" = "failure" ]; then TEST_ICON="❌"; FAILED_STEP="Test"; fi
-          if [ "$BUILD_OUTCOME" = "failure" ]; then BUILD_ICON="❌"; FAILED_STEP="Build"; fi
-          # Mark skipped steps
-          if [ "$TYPECHECK_OUTCOME" = "" ] || [ "$TYPECHECK_OUTCOME" = "skipped" ]; then TYPECHECK_ICON="⬜"; fi
-          if [ "$TEST_OUTCOME" = "" ] || [ "$TEST_OUTCOME" = "skipped" ]; then TEST_ICON="⬜"; fi
-          if [ "$BUILD_OUTCOME" = "" ] || [ "$BUILD_OUTCOME" = "skipped" ]; then BUILD_ICON="⬜"; fi
+          LINT_ICON="✅"; TC_ICON="✅"; TEST_ICON="✅"; BUILD_ICON="⬜"; DOCKER_ICON="⬜"
+          FAILED=""
+          if [ "$LINT_OUTCOME" = "failure" ]; then LINT_ICON="❌"; FAILED="Lint"; fi
+          if [ "$TYPECHECK_OUTCOME" = "failure" ]; then TC_ICON="❌"; FAILED="TypeCheck"; fi
+          if [ "$TEST_OUTCOME" = "failure" ]; then TEST_ICON="❌"; FAILED="Test"; fi
+          if [ "$BUILD_OUTCOME" = "failure" ]; then BUILD_ICON="❌"; FAILED="Build"; fi
+          if [ "$DOCKER_OUTCOME" = "failure" ]; then DOCKER_ICON="❌"; FAILED="Docker"; fi
+          if [ -z "$TYPECHECK_OUTCOME" ] || [ "$TYPECHECK_OUTCOME" = "skipped" ]; then TC_ICON="⬜"; fi
+          if [ -z "$TEST_OUTCOME" ] || [ "$TEST_OUTCOME" = "skipped" ]; then TEST_ICON="⬜"; fi
+          if [ -z "$BUILD_OUTCOME" ] || [ "$BUILD_OUTCOME" = "skipped" ]; then BUILD_ICON="⬜"; fi
+          if [ -z "$DOCKER_OUTCOME" ] || [ "$DOCKER_OUTCOME" = "skipped" ]; then DOCKER_ICON="⬜"; fi
 
-          # Build title with context
-          EVENT_TYPE="${GITHUB_EVENT_NAME}"
-          if [ "$EVENT_TYPE" = "pull_request" ]; then
-            PR_TITLE="${{ github.event.pull_request.title }}"
-            TITLE="❌ CI Failed — PR #${{ github.event.pull_request.number }}"
-            URL="${{ github.event.pull_request.html_url }}"
-            CONTEXT="📝 $PR_TITLE"
-          else
-            TITLE="❌ CI Failed — $BRANCH"
-            URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-            CONTEXT="📝 $COMMIT_MSG"
-          fi
+          echo "failed_step=$FAILED" >> "$GITHUB_OUTPUT"
+          echo "status_line=Lint ${LINT_ICON}  TypeCheck ${TC_ICON}  Test ${TEST_ICON}  Build ${BUILD_ICON}  Docker ${DOCKER_ICON}" >> "$GITHUB_OUTPUT"
 
-          curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
-            "timestamp": "'"$TIMESTAMP"'",
-            "sign": "'"$SIGN"'",
-            "msg_type": "interactive",
-            "card": {
-              "header": {"title": {"tag": "plain_text", "content": "'"$TITLE"'"}, "template": "red"},
-              "elements": [
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🌿 Branch**\n'"$BRANCH"'"}}]}
-                ]},
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
-                ]},
-                {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "'"$CONTEXT"'\n\n⚠️ **Failed at: '"$FAILED_STEP"'**\nLint '"$LINT_ICON"'  TypeCheck '"$TYPECHECK_ICON"'  Test '"$TEST_ICON"'  Build '"$BUILD_ICON"'\n🕐 '"$TIME"'"}},
-                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔍 View Logs"}, "url": "'"$URL"'", "type": "danger"}]}
-              ]
-            }
-          }' || true
+      - name: Notify CI Failed
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          lark-webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          lark-sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          event: 'ci_fail'
+          branch: ${{ github.ref_name }}
+          author: ${{ github.actor }}
+          commit-sha: ${{ steps.fail_info.outputs.short_sha }}
+          commit-msg: ${{ steps.fail_info.outputs.commit_msg }}
+          ci-status: ${{ steps.fail_info.outputs.status_line }}
+          failed-step: ${{ steps.fail_info.outputs.failed_step }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
-  # Job 2: Deploy Preview (PR only, after CI passes)
+  # Job 2: Deploy Staging (push to staging, after CI passes)
   # ──────────────────────────────────────
-  deploy-preview:
-    name: "Preview: Deploy PR"
+  deploy-staging:
+    name: "Deploy: Staging [2/2]"
     needs: ci
-    if: github.event_name == 'pull_request' && github.base_ref == 'staging'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     environment: staging
-    permissions:
-      contents: read
-      pull-requests: write
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy preview app
+      - name: Deploy to DigitalOcean App Platform
         id: deploy
         uses: digitalocean/app_action/deploy@v2
         with:
-          deploy_pr_preview: "true"
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          app_name: ech-prime-web-v2-staging
+          print_build_logs: "true"
+          print_deploy_logs: "true"
 
-      - name: Comment preview URL on PR
-        if: success()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const app = ${{ steps.deploy.outputs.app }};
-            const liveUrl = app.live_url;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `🚀 **Preview deployed!**\n\n🔗 **URL:** ${liveUrl}\n\n---\n_Deployed from commit ${context.sha.substring(0, 7)}_`
-            });
-
-      # --- Lark: Preview Deployed ---
-      - name: Notify Lark (Preview Deployed)
-        if: success()
-        env:
-          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
-          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+      - name: Prepare deploy info
+        if: always()
+        id: info
         run: |
-          TIMESTAMP=$(date +%s)
-          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
-          PR_NUM="${{ github.event.pull_request.number }}"
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          TIME=$(date -u +"%H:%M UTC")
-          curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
-            "timestamp": "'"$TIMESTAMP"'",
-            "sign": "'"$SIGN"'",
-            "msg_type": "interactive",
-            "card": {
-              "header": {"title": {"tag": "plain_text", "content": "🔍 Preview Deployed — PR #'"$PR_NUM"'"}, "template": "blue"},
-              "elements": [
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
-                ]},
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🔖 Commit**\n'"$SHORT_SHA"'"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**🌿 PR**\n#'"$PR_NUM"'"}}]}
-                ]},
-                {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "📝 '"$PR_TITLE"'\n**Pipeline [2/2]** Preview Deploy\n🕐 '"$TIME"'  ·  CI ✅  Preview ✅"}},
-                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔗 View PR"}, "url": "'"${{ github.event.pull_request.html_url }}"'", "type": "primary"}]}
-              ]
-            }
-          }' || true
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
 
-      - name: Comment failure on PR
-        if: failure()
-        uses: actions/github-script@v7
-        env:
-          BUILD_LOGS: ${{ steps.deploy.outputs.build_logs }}
-          DEPLOY_LOGS: ${{ steps.deploy.outputs.deploy_logs }}
+      - name: Notify — Staging Deploy Result
+        if: always()
+        uses: ./.github/actions/smart-notify
         with:
-          script: |
-            const { BUILD_LOGS, DEPLOY_LOGS } = process.env;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `❌ **Preview deploy failed.**\n\n[View logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n\n<details>\n<summary>Build logs</summary>\n\n\`\`\`\n${BUILD_LOGS}\n\`\`\`\n</details>\n\n<details>\n<summary>Deploy logs</summary>\n\n\`\`\`\n${DEPLOY_LOGS}\n\`\`\`\n</details>`
-            });
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          lark-webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          lark-sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          event: ${{ steps.deploy.outcome == 'success' && 'deploy_success' || 'deploy_fail' }}
+          branch: staging
+          environment: staging
+          author: ${{ github.actor }}
+          commit-sha: ${{ steps.info.outputs.short_sha }}
+          commit-msg: ${{ steps.info.outputs.commit_msg }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      # --- Lark: Preview Failed ---
-      - name: Notify Lark (Preview Failed)
-        if: failure()
-        env:
-          LARK_WEBHOOK: ${{ secrets.LARK_WEBHOOK_URL }}
-          LARK_SIGN_KEY: ${{ secrets.LARK_SIGN_KEY }}
+  # ──────────────────────────────────────
+  # Job 3: Deploy Production (push to main, after CI passes)
+  # ──────────────────────────────────────
+  deploy-production:
+    name: "Deploy: Production [2/2]"
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to DigitalOcean App Platform
+        id: deploy
+        uses: digitalocean/app_action/deploy@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          app_name: ech-prime-web-v2
+          print_build_logs: "true"
+          print_deploy_logs: "true"
+
+      - name: Prepare deploy info
+        if: always()
+        id: info
         run: |
-          TIMESTAMP=$(date +%s)
-          SIGN=$(echo -n "" | openssl dgst -sha256 -hmac "$(printf '%s\n%s' "$TIMESTAMP" "$LARK_SIGN_KEY")" -binary | base64 2>/dev/null || echo "")
-          PR_NUM="${{ github.event.pull_request.number }}"
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          SHORT_SHA="${GITHUB_SHA:0:7}"
-          TIME=$(date -u +"%H:%M UTC")
-          curl -s -X POST "$LARK_WEBHOOK" -H 'Content-Type: application/json' -d '{
-            "timestamp": "'"$TIMESTAMP"'",
-            "sign": "'"$SIGN"'",
-            "msg_type": "interactive",
-            "card": {
-              "header": {"title": {"tag": "plain_text", "content": "❌ Preview Failed — PR #'"$PR_NUM"'"}, "template": "red"},
-              "elements": [
-                {"tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**📦 Project**\nPrimeWeb"}}]},
-                  {"tag": "column", "width": "weighted", "weight": 1, "vertical_align": "top", "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": "**👤 Author**\n'"$GITHUB_ACTOR"'"}}]}
-                ]},
-                {"tag": "hr"},
-                {"tag": "div", "text": {"tag": "lark_md", "content": "📝 '"$PR_TITLE"'\n⚠️ **Preview deploy failed at step [2/2].**\n🕐 '"$TIME"'"}},
-                {"tag": "action", "actions": [{"tag": "button", "text": {"tag": "plain_text", "content": "🔍 View Logs"}, "url": "'"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'", "type": "danger"}]}
-              ]
-            }
-          }' || true
+          echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$(git log --format='%s' -n 1 | head -c 80)" >> "$GITHUB_OUTPUT"
+
+      - name: Notify — Production Deploy Result
+        if: always()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          lark-webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
+          lark-sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
+          event: ${{ steps.deploy.outcome == 'success' && 'deploy_success' || 'deploy_fail' }}
+          branch: main
+          environment: production
+          author: ${{ github.actor }}
+          commit-sha: ${{ steps.info.outputs.short_sha }}
+          commit-msg: ${{ steps.info.outputs.commit_msg }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          staging-url: https://echprime.com
+
+  # ──────────────────────────────────────
+  # Job 4: Deploy Preview — DISABLED
+  # Reason: Each PR preview creates a new DO app + dev database ($$$).
+  # The delete-preview workflow fails to clean up orphaned apps.
+  # Use staging deploy instead — merge PR to staging for testing.
+  # Re-enable when DO fixes preview app cleanup or we switch to Vercel previews.
+  # ──────────────────────────────────────
