@@ -281,7 +281,7 @@ export default function BlogCategoriesPage() {
                             </button>
                         </div>
                         <p className="text-sm text-gray-400 mb-2">
-                            Are you sure you want to delete <span className="text-white font-medium">"{deleteTarget.name}"</span>?
+                            Are you sure you want to delete <span className="text-white font-medium">&quot;{deleteTarget.name}&quot;</span>?
                         </p>
                         <p className="text-xs text-gray-600 mb-5">
                             Posts assigned to this category will become uncategorized.

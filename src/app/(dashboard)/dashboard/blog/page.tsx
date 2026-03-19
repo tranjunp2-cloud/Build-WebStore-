@@ -218,7 +218,7 @@ export default function BlogListPage() {
     }
 
     const getCategoryName = (category: BlogPost['category']) => {
-        if (!category) return '—'
+        if (!category) return '\u2014'
         if (typeof category === 'string') return category
         return category.name
     }
@@ -538,7 +538,7 @@ export default function BlogListPage() {
 
                         <p className="text-sm text-gray-400 mb-2">
                             Are you sure you want to delete{' '}
-                            <span className="text-white font-medium">"{deleteTarget.title}"</span>?
+                            <span className="text-white font-medium">&quot;{deleteTarget.title}&quot;</span>?
                         </p>
                         <p className="text-xs text-gray-600 mb-4">
                             This action cannot be undone.
