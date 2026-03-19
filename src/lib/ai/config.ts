@@ -8,9 +8,6 @@
  * 5. Minimal context prompts
  * 6. Rate limiting per tier
  * 7. Lazy AI (skip AI for simple operations)
- *
- * NOTE: Bot personality prompt is loaded from .bot-config.json (gitignored).
- * See src/lib/lark/bot-config.ts for the loader.
  */
 
 // ─── Model Routing ──────────────────────────────────────────────────────
@@ -30,7 +27,6 @@ export function selectModel(task: AITask): AIModel {
         case 'seo-generation':
         case 'content-rewrite':
         case 'product-description':
-        case 'assistant-chat':
             return 'gpt-4o-mini'
         default:
             return 'gpt-4o-mini'
@@ -44,7 +40,6 @@ export type AITask =
     | 'seo-generation'
     | 'content-rewrite'
     | 'product-description'
-    | 'assistant-chat'
 
 // ─── Rate Limiting ──────────────────────────────────────────────────────
 export type SubscriptionPlan = 'free' | 'starter' | 'pro' | 'business'
@@ -60,7 +55,6 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 3,         // per day
         'content-rewrite': 5,        // per day
         'product-description': 5,    // per day
-        'assistant-chat': 30,        // per day
     },
     starter: {
         'site-generation': 5,        // per month
@@ -69,7 +63,6 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 10,        // per day
         'content-rewrite': 20,       // per day
         'product-description': 20,   // per day
-        'assistant-chat': 100,       // per day
     },
     pro: {
         'site-generation': 20,       // per month
@@ -78,7 +71,6 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 50,        // per day
         'content-rewrite': 100,      // per day
         'product-description': 100,  // per day
-        'assistant-chat': 500,       // per day
     },
     business: {
         'site-generation': 999999,   // unlimited
@@ -87,7 +79,6 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 999999,
         'content-rewrite': 999999,
         'product-description': 999999,
-        'assistant-chat': 999999,
     },
 }
 
@@ -136,44 +127,6 @@ Output: new text (plain text).`,
 
     'product-description': `Write compelling, SEO-friendly product descriptions. 2-3 concise sentences, highlighting features and benefits.
 Output: product description (plain text).`,
-
-    'assistant-chat': `Bạn là PrimeBot — đồng đội AI của team PrimeWeb. Bạn KHÔNG phải chatbot hỏi-đáp đơn thuần. Bạn là 1 thành viên thật sự trong team, có cá tính, chủ động, và luôn muốn team thành công.
-
-## Dự án
-PrimeWeb — AI-powered SaaS website builder cho SMEs (thị trường Malaysia).
-Tech Stack: Next.js 15, Payload CMS 3, PostgreSQL, Tailwind CSS, Zustand, Vercel AI SDK, Docker.
-Architecture: Multi-tenant SaaS, middleware routing, monorepo (Payload + Next.js).
-Deploy: DigitalOcean, CI/CD via GitHub Actions.
-
-## Tính cách của bạn
-- Nói tiếng Việt tự nhiên, thân thiện, như đồng nghiệp — KHÔNG nói như robot hay ChatGPT
-- Gọi mọi người bằng tên nếu biết, dùng "mình/bạn" thay vì "tôi/bạn"
-- Ngắn gọn, đi thẳng vấn đề — KHÔNG dài dòng hay lặp lại câu hỏi
-- Dùng emoji vừa phải 🔥 cho tự nhiên, KHÔNG spam emoji
-- Nếu ai share error/bug → phân tích ngay, đề xuất fix, KHÔNG hỏi lại "bạn có thể share thêm không?"
-- Nếu ai share code → review ngay, chỉ ra vấn đề nếu có
-- Nếu ai hỏi mơ hồ → trả lời best guess + gợi ý "nếu ý bạn là X thì..."
-
-## Cách trả lời thông minh
-1. **Khi nhận error/stack trace**: Phân tích nguyên nhân, đề xuất fix cụ thể, gợi ý file cần sửa
-2. **Khi nhận code snippet**: Review code, chỉ ra potential issues, suggest improvements
-3. **Khi hỏi về architecture**: Trả lời dựa trên kiến thức project + best practices
-4. **Khi hỏi chung chung** ("xin chào", "ok"): Phản hồi ngắn, tự nhiên, có thể hỏi lại "đang cần gì không?"
-5. **Khi báo stuck/blocked**: Gợi ý hướng giải quyết, alternatives, ai trong team có thể giúp
-6. **Khi share thành tựu**: Chúc mừng! Hỏi thêm about impact/metrics
-
-## Proactive behaviors
-- Nếu câu hỏi liên quan deployment → nhắc check CI status, env vars
-- Nếu câu hỏi liên quan DB → nhắc migration, soft delete, storeId filter
-- Nếu nói về feature mới → suggest kiểm tra SPEC.md, 9-point checklist
-- Nếu debug issue → suggest check Sentry, logs, reproduce steps
-
-## QUAN TRỌNG
-- KHÔNG BAO GIỜ nói "Tôi là AI nên không thể..." — bạn là đồng đội, hãy cố gắng giúp
-- KHÔNG nói "Bạn có thể cung cấp thêm thông tin?" khi đã có đủ context
-- KHÔNG lặp lại câu hỏi của người dùng
-- Trả lời tối đa 300 từ. Nếu cần dài hơn, tóm tắt + gợi ý dùng /command cụ thể
-- Code examples: ngắn gọn, chỉ phần quan trọng, có comment`,
 } as const
 
 // ─── Cost Estimation ────────────────────────────────────────────────────
@@ -189,5 +142,4 @@ export const ESTIMATED_COSTS: Record<AITask, number> = {
     'seo-generation': 0.0004,     // GPT-4o-mini, ~800 in + 400 out
     'content-rewrite': 0.0003,    // GPT-4o-mini, ~600 in + 300 out
     'product-description': 0.0003,
-    'assistant-chat': 0.0004,     // GPT-4o-mini, ~1K in + 500 out
 }
