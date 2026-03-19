@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useCallback } from 'react'
 import {
     Search, AlertTriangle, CheckCircle, Info, Sparkles, Loader2, RefreshCcw,
     FileText, BookOpen, Code, Map
@@ -31,6 +31,21 @@ type SEOData = {
     totalIssues: number
     fixableIssues: number
     pages: PageAnalysis[]
+}
+
+type ProposedFix = {
+    id: string
+    targetId: string
+    collection: 'pages' | 'products'
+    name: string
+    proposedTitle?: string
+    proposedDescription?: string
+}
+
+type BatchFix = {
+    targetId: string
+    collection: 'pages' | 'products'
+    seo: { title?: string; description?: string }
 }
 
 function ScoreGauge({ score, t }: { score: number; t: any }) {
@@ -119,6 +134,29 @@ function SEODashboardInner() {
     const [hasError, setHasError] = useState(false)
     const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
     const [sites, setSites] = useState<Array<{ id: string; name: string }>>([])
+    
+    // AI Fix All States
+    const [isFixAllModalOpen, setIsFixAllModalOpen] = useState(false)
+    const [proposedFixes, setProposedFixes] = useState<ProposedFix[]>([])
+    const [approvedFixIds, setApprovedFixIds] = useState<Set<string>>(new Set())
+    const [appliedBackup, setAppliedBackup] = useState<BatchFix[]>([])
+    const [isApplyingFixes, setIsApplyingFixes] = useState(false)
+
+    const trackEvent = useCallback(async (eventName: string, metadata?: any) => {
+        if (!selectedSiteId) return
+        try {
+            await fetch('/api/analytics/track', {
+                method: 'POST',
+                body: JSON.stringify({
+                    siteId: selectedSiteId,
+                    event: eventName,
+                    pageUrl: window.location.pathname,
+                    metadata
+                })
+            })
+        } catch {}
+    }, [selectedSiteId])
+
     // Load user's sites
     useEffect(() => {
         async function loadSites() {
@@ -179,31 +217,134 @@ function SEODashboardInner() {
     }
 
     const handleFixAll = async () => {
-        if (!selectedSiteId || isFixing) return
+        if (!selectedSiteId || isFixing || !seoData) return
         setIsFixing(true)
         setFixResult(null)
+        trackEvent('ai_fix_all_seo_started')
+
         try {
-            const res = await fetch('/api/seo/fix', {
+            // Collect fixable items
+            const missingSeo = seoData.pages.filter(p => p.issues.some(i => i.autoFixable)).map(p => {
+                const autoFixableIssues = p.issues.filter(i => i.autoFixable).map(i => i.field)
+                return {
+                    collection: 'pages' as const,
+                    id: p.pageId,
+                    title: p.title,
+                    missingFields: autoFixableIssues
+                }
+            })
+
+            if (missingSeo.length === 0) {
+                toast.info("No auto-fixable issues found.")
+                setIsFixing(false)
+                return
+            }
+
+            const res = await fetch('/api/seo/fix-all', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ siteId: selectedSiteId }),
+                body: JSON.stringify({ siteId: selectedSiteId, missingSeo }),
                 credentials: 'include',
             })
+            
             if (res.ok) {
                 const data = await res.json()
                 if (data.success) {
-                    setFixResult(`Fixed ${data.data.fixedPages} of ${data.data.totalPages} pages`)
-                    toast.success(`Fixed ${data.data.fixedPages} pages with AI`)
-                    setTimeout(() => analyseSite(selectedSiteId), 1000)
+                    setProposedFixes(data.data)
+                    setApprovedFixIds(new Set(data.data.map((f: ProposedFix) => f.id)))
+                    setIsFixAllModalOpen(true)
+                } else {
+                    throw new Error(data.error?.message || 'Failed')
                 }
+            } else if (res.status === 504) {
+                toast.error('Không thể hoàn tất AI Fix All (Timeout), vui lòng thử lại')
+                setFixResult('Timeout. Vui lòng thử lại.')
+            } else {
+                throw new Error('API returned an error')
             }
         } catch {
             setFixResult('Fix failed — please try again')
-            toast.error('AI fix failed')
+            toast.error('Không thể hoàn tất AI Fix All, vui lòng thử lại')
         } finally {
             setIsFixing(false)
         }
     }
+
+    const handleApplyFixes = async () => {
+        if (!selectedSiteId || isApplyingFixes) return
+        setIsApplyingFixes(true)
+        try {
+            const approvedPrs = proposedFixes.filter(f => approvedFixIds.has(f.id))
+            const fixes: BatchFix[] = approvedPrs.map(f => ({
+                targetId: f.targetId,
+                collection: f.collection,
+                seo: { title: f.proposedTitle, description: f.proposedDescription }
+            }))
+
+            const res = await fetch('/api/seo/apply-fixes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fixes }),
+                credentials: 'include',
+            })
+
+            if (res.ok) {
+                const data = await res.json()
+                const undoData = data.undoData || []
+                setAppliedBackup(undoData)
+                setIsFixAllModalOpen(false)
+                toast.success(`Đã apply ${fixes.length} fixes thành công`, {
+                    action: {
+                        label: 'Undo (Ctrl+Z)',
+                        onClick: () => handleUndoFixes(undoData)
+                    },
+                    duration: 8000
+                })
+                setFixResult(`Fixed ${fixes.length} issues`)
+                trackEvent('ai_fix_all_seo_completed', { issues_fixed_count: fixes.length })
+                setTimeout(() => analyseSite(selectedSiteId), 500)
+            } else {
+               toast.error('Apply Failed')
+            }
+        } catch (error) {
+           toast.error('Apply Failed')
+        } finally {
+            setIsApplyingFixes(false)
+        }
+    }
+
+    const handleUndoFixes = useCallback(async (revertFixes: BatchFix[]) => {
+        try {
+            const res = await fetch('/api/seo/apply-fixes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fixes: revertFixes }),
+                credentials: 'include',
+            })
+
+            if (res.ok) {
+                toast.success('Đã Undo Batch Fix')
+                setAppliedBackup([]) // Clear state to avoid multiple undos
+                if (selectedSiteId) analyseSite(selectedSiteId)
+            }
+        } catch {
+            toast.error('Undo Failed')
+        }
+    }, [selectedSiteId])
+
+    // AC-1/FR-12: Keyboard shortcut for Undo Batch Fix
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                if (appliedBackup.length > 0) {
+                    e.preventDefault()
+                    handleUndoFixes(appliedBackup)
+                }
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [appliedBackup, handleUndoFixes])
 
     const handleGenerateSitemap = async () => {
         if (!selectedSiteId || isGeneratingSitemap) return
@@ -452,6 +593,66 @@ function SEODashboardInner() {
                     </div>
                 </>
             ) : null}
+
+            {/* AI Review Modal */}
+            {isFixAllModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="w-full max-w-3xl rounded-xl border border-white/10 bg-[#1E293B] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="flex items-center justify-between border-b border-white/10 p-5 bg-[#1E293B]/80 backdrop-blur">
+                            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                                <Sparkles className="h-5 w-5 text-purple-400" /> Review AI Fixes
+                            </h2>
+                            <button onClick={() => setIsFixAllModalOpen(false)} className="text-gray-400 hover:text-white">✕</button>
+                        </div>
+                        <div className="p-5 overflow-y-auto space-y-4 flex-1">
+                            {proposedFixes.map((fix) => (
+                                <div key={fix.id} className="rounded-lg border border-white/5 bg-white/5 p-4 relative">
+                                    <div className="absolute right-4 top-4">
+                                        <input
+                                            type="checkbox"
+                                            checked={approvedFixIds.has(fix.id)}
+                                            onChange={(e) => {
+                                                const next = new Set(approvedFixIds)
+                                                if (e.target.checked) next.add(fix.id)
+                                                else next.delete(fix.id)
+                                                setApprovedFixIds(next)
+                                            }}
+                                            className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-purple-500 focus:ring-offset-gray-800"
+                                        />
+                                    </div>
+                                    <h3 className="font-medium text-white mb-3 pr-8">{fix.name} <span className="text-xs text-gray-500 uppercase">({fix.collection})</span></h3>
+                                    
+                                    <div className="space-y-3">
+                                        {fix.proposedTitle && (
+                                            <div className="text-sm">
+                                                <div className="text-xs text-green-400 mb-1">New Title:</div>
+                                                <div className="text-gray-200 border-l-2 border-green-500/50 pl-2 py-1 bg-green-500/5 rounded-r">{fix.proposedTitle}</div>
+                                            </div>
+                                        )}
+                                        {fix.proposedDescription && (
+                                            <div className="text-sm">
+                                                <div className="text-xs text-green-400 mb-1">New Description:</div>
+                                                <div className="text-gray-200 border-l-2 border-green-500/50 pl-2 py-1 bg-green-500/5 rounded-r">{fix.proposedDescription}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex items-center justify-between border-t border-white/10 p-5 bg-[#1E293B]">
+                            <p className="text-sm text-gray-400">{approvedFixIds.size} of {proposedFixes.length} selected</p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setIsFixAllModalOpen(false)} className="px-4 py-2 text-sm text-gray-300 hover:text-white">Cancel</button>
+                                <button onClick={handleApplyFixes} disabled={isApplyingFixes || approvedFixIds.size === 0}
+                                    className="flex items-center gap-2 rounded-lg bg-purple-600 px-5 py-2 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-50 transition-colors">
+                                    {isApplyingFixes ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                                    Apply Approved Fixes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
