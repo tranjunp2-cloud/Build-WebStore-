@@ -119,7 +119,7 @@ export default function BlogListPage() {
                 credentials: 'include',
             })
             if (!res.ok) throw new Error('Failed to delete')
-            toast.success(`"${deleteTarget.title}" has been permanently deleted`)
+            toast.success(`"${deleteTarget.title}" has been deleted`)
             fetchPosts()
             setSelectedIds((prev) => {
                 const next = new Set(prev)
@@ -537,7 +537,7 @@ export default function BlogListPage() {
                         </div>
 
                         <p className="text-sm text-gray-400 mb-2">
-                            Are you sure you want to permanently delete{' '}
+                            Are you sure you want to delete{' '}
                             <span className="text-white font-medium">"{deleteTarget.title}"</span>?
                         </p>
                         <p className="text-xs text-gray-600 mb-4">
@@ -569,7 +569,7 @@ export default function BlogListPage() {
                                 {isDeleting ? (
                                     <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
                                 ) : (
-                                    <><Trash2 className="w-4 h-4" /> Delete Permanently</>
+                                    <><Trash2 className="w-4 h-4" /> Delete Post</>
                                 )}
                             </button>
                         </div>
