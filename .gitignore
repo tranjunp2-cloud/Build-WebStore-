@@ -40,6 +40,7 @@ src/payload-types.ts
 ## Logs
 *.log
 npm-debug.log*
+docs/qa/qa-automation/target/
 
 ## Test and AI Agent data
 test-results/
