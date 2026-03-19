@@ -270,8 +270,88 @@ const GalleryBlock = {
             name: 'images',
             type: 'array',
             fields: [
-                { name: 'image', type: 'upload', relationTo: 'media', required: true },
+                { name: 'image', type: 'upload', relationTo: 'media', required: false },
                 { name: 'caption', type: 'text' },
+            ],
+        },
+    ],
+}
+
+const StatsBlock = {
+    slug: 'stats',
+    labels: { singular: 'Stats Section', plural: 'Stats Sections' },
+    fields: [
+        { name: 'headline', type: 'text' },
+        {
+            name: 'stats',
+            type: 'array',
+            required: true,
+            fields: [
+                { name: 'value', type: 'text', required: true },
+                { name: 'label', type: 'text', required: true },
+            ],
+        },
+    ],
+}
+
+const PricingBlock = {
+    slug: 'pricing',
+    labels: { singular: 'Pricing Section', plural: 'Pricing Sections' },
+    fields: [
+        { name: 'headline', type: 'text', required: true },
+        { name: 'subheadline', type: 'textarea' },
+        {
+            name: 'plans',
+            type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'price', type: 'text', required: true },
+                { name: 'description', type: 'textarea' },
+                {
+                    name: 'features',
+                    type: 'array',
+                    fields: [
+                        { name: 'text', type: 'text', required: true },
+                        { name: 'included', type: 'checkbox', defaultValue: true },
+                    ],
+                },
+                { name: 'isPopular', type: 'checkbox', defaultValue: false },
+                { name: 'ctaLabel', type: 'text', defaultValue: 'Get Started' },
+                { name: 'ctaUrl', type: 'text' },
+            ],
+        },
+    ],
+}
+
+const FAQBlock = {
+    slug: 'faq',
+    labels: { singular: 'FAQ Section', plural: 'FAQ Sections' },
+    fields: [
+        { name: 'headline', type: 'text', defaultValue: 'Frequently Asked Questions' },
+        {
+            name: 'faqs',
+            type: 'array',
+            fields: [
+                { name: 'question', type: 'text', required: true },
+                { name: 'answer', type: 'textarea', required: true },
+            ],
+        },
+    ],
+}
+
+const TeamBlock = {
+    slug: 'team',
+    labels: { singular: 'Team Section', plural: 'Team Sections' },
+    fields: [
+        { name: 'headline', type: 'text', defaultValue: 'Meet Our Team' },
+        {
+            name: 'members',
+            type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'role', type: 'text' },
+                { name: 'bio', type: 'textarea' },
+                { name: 'image', type: 'upload', relationTo: 'media' },
             ],
         },
     ],
@@ -334,6 +414,10 @@ export const Pages: CollectionConfig = {
                 ContactBlock,
                 GalleryBlock,
                 FooterBlock,
+                StatsBlock,
+                PricingBlock,
+                FAQBlock,
+                TeamBlock,
             ] as Block[],
         },
         {

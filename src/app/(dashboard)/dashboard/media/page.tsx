@@ -71,7 +71,7 @@ export default function MediaLibraryPage() {
             try {
                 const formData = new FormData()
                 formData.append('file', file)
-                formData.append('alt', file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '))
+                formData.append('_payload', JSON.stringify({ alt: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ') }))
 
                 const res = await fetch('/api/media', {
                     method: 'POST',
