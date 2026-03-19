@@ -6,6 +6,9 @@ import Link from 'next/link'
 import { AddToCartButton } from '@/components/storefront/AddToCartButton'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 
+// Force dynamic — uses getPayload() for product data at runtime
+export const dynamic = 'force-dynamic'
+
 type Props = {
     params: Promise<{ slug: string; productSlug: string }>
 }

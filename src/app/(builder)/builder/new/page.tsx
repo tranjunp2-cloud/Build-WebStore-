@@ -114,14 +114,26 @@ export default function AIBuilderPage() {
                 body: JSON.stringify({
                     businessInfo,
                     extraInstructions,
-                    language: 'vi',
+                    language: 'en',
                 }),
                 credentials: 'include',
             })
 
             if (!res.ok) {
                 const errorData = await res.json()
-                throw new Error(errorData.error || 'Generation failed')
+                let errorMsg = 'Generation failed'
+                if (errorData.error) {
+                    if (typeof errorData.error === 'string') {
+                        errorMsg = errorData.error
+                    } else if (errorData.error.details) {
+                        errorMsg = typeof errorData.error.details === 'string' 
+                            ? errorData.error.details 
+                            : JSON.stringify(errorData.error.details)
+                    } else {
+                        errorMsg = JSON.stringify(errorData.error)
+                    }
+                }
+                throw new Error(errorMsg)
             }
 
             const reader = res.body?.getReader()

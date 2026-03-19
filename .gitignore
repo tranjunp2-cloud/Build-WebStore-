@@ -47,3 +47,6 @@ test-results/
 .agent/
 _agents/
 _agent/
+
+## Worktrees
+.worktrees/
