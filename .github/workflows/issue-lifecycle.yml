@@ -159,8 +159,96 @@ jobs:
             }
 
             console.log(`Found linked issues: ${linkedIssues.join(', ')}`);
-            // Note: Moving to "Review" column would use same GraphQL pattern as auto-project
-            // Skipping full implementation to keep workflow simple — the close event handles "Done"
+
+            // Get project and Status field
+            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
+              repository(owner: $owner, name: $repo) {
+                projectV2(number: $number) {
+                  id
+                  fields(first: 20) {
+                    nodes {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options { id name }
+                      }
+                    }
+                  }
+                }
+              }
+            }`;
+
+            let project;
+            try {
+              const result = await github.graphql(projectQuery, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                number: projectNumber,
+              });
+              project = result.repository.projectV2;
+            } catch (e) {
+              console.log(`Could not find project #${projectNumber}: ${e.message}`);
+              return;
+            }
+
+            const statusField = project.fields.nodes.find(f => f.name === 'Status');
+            if (!statusField) {
+              console.log('No Status field found in project');
+              return;
+            }
+
+            // Find "In Review" or "Review" status option
+            const reviewOption = statusField.options.find(o =>
+              o.name === 'In Review' || o.name === 'Review' || o.name === 'In review'
+            );
+            if (!reviewOption) {
+              console.log(`No Review status found. Available: ${statusField.options.map(o => o.name).join(', ')}`);
+              return;
+            }
+
+            // Move each linked issue to Review
+            for (const issueNumber of linkedIssues) {
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                });
+
+                // Add to project
+                const addMutation = `mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                    item { id }
+                  }
+                }`;
+
+                const { addProjectV2ItemById } = await github.graphql(addMutation, {
+                  projectId: project.id,
+                  contentId: issue.node_id,
+                });
+
+                // Set status to Review
+                const updateMutation = `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId, itemId: $itemId,
+                    fieldId: $fieldId, value: { singleSelectOptionId: $value }
+                  }) {
+                    projectV2Item { id }
+                  }
+                }`;
+
+                await github.graphql(updateMutation, {
+                  projectId: project.id,
+                  itemId: addProjectV2ItemById.item.id,
+                  fieldId: statusField.id,
+                  value: reviewOption.id,
+                });
+
+                console.log(`Issue #${issueNumber} → ${reviewOption.name}`);
+              } catch (e) {
+                console.log(`Failed to move issue #${issueNumber}: ${e.message}`);
+              }
+            }
 
   # ──────────────────────────────────────
   # Stale Issue Check — daily reminder
