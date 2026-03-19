@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
                 data: {
                     name: `${firstName}'s Store`,
                     slug: `store-${user.id}`,
+                    aiGenerationsCount: 0,
                 },
             })
             // Assign tenant to user
@@ -87,6 +88,21 @@ export async function POST(req: NextRequest) {
             })
             resolvedTenantId = newTenant.id
             console.log(`[AI Generate] Auto-created tenant ${newTenant.id} for user ${user.id}`)
+        }
+
+        // FR-15: Rate Limit - Free tier is limited to 1 AI generation
+        const tenant = await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
+        if (tenant.plan === 'free') {
+            const currentCount = tenant.aiGenerationsCount || 0
+            if (currentCount >= 1) {
+                return NextResponse.json(
+                    { 
+                        error: 'Tài khoản Free chỉ được tạo website bằng AI 1 lần duy nhất. Vui lòng nâng cấp gói cước để tiếp tục.',
+                        code: 'PAYMENT_REQUIRED'
+                    },
+                    { status: 402 }
+                )
+            }
         }
 
         // Parse request body — structured business info
@@ -211,7 +227,6 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Create Homepage with generated blocks
         const page = await payload.create({
             collection: 'pages',
             data: {
@@ -224,6 +239,15 @@ export async function POST(req: NextRequest) {
                     title: result.seo.title,
                     description: result.seo.description,
                 },
+            },
+        })
+
+        // FR-15: Increment AI generation count
+        await payload.update({
+            collection: 'tenants',
+            id: resolvedTenantId,
+            data: {
+                aiGenerationsCount: (tenant.aiGenerationsCount || 0) + 1,
             },
         })
 
