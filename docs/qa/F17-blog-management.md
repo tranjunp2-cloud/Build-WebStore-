@@ -53,17 +53,24 @@
 
 ---
 
-## 5. [US-F17-04 / 05] Status Workflow & Simple Category
+## 5. [US-F17-04] Status Workflow (Publish, Draft, Delete)
 
 | TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
 |-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
 | `TC_F17_018` | Func | [Pos] Switch Trạng Thái Draft <-> Publish | Yes | High | 1. Đổi Bài từ Pub sang Draft, check Storefront.<br> *`[Loc: button.toggle-status]`* | Bài Publish hiện Public Storefront. Chuyển thành Draft lập tức Gỡ Khỏi hệ thống Live (Cache invalidate). | | `Not Run` |
 | `TC_F17_019` | Func | [Pos] Delete Post Warning Dialog | Yes | High | 1. Xóa bài viết đang Published.<br> *`[Loc: button.delete-post]`, `[Loc: div.confirm-modal]`* | Dialog Confirm màu đỏ cản lại. Cảnh báo URL Storefront có thể lỗi 404 cho User. Xác nhận Delete DB. | | `Not Run` |
+
+---
+
+## 6. [US-F17-05] Simple Category Management
+
+| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
+|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
 | `TC_F17_020` | Func | [Pos] Luồng Category Fallback khi Xóa Gốc | Yes | High | 1. Bài "Sale" gắn Category "C1". Xóa Category "C1". Kiểm tra bài "Sale".<br> *`[Loc: button.delete-category]`* | Xóa Category thì Bài Viết `KHÔNG` bị xóa (Soft Fallback). Trạng thái phân loại của Bài "Sale" trả về Mặc định "Uncategorized"/Null. | | `Not Run` |
 
 ---
 
-## 6. [US-F17-06] Giao diện Mobile (On-the-go Editor)
+## 7. [US-F17-06] Giao diện Mobile (On-the-go Editor)
 
 | TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
 |-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
@@ -72,11 +79,18 @@
 
 ---
 
-## 7. [US-F17-07 / 08] Storefront Nhìn Tới (SEO, Public API, List)
+## 8. [US-F17-07] Public Blog List (Storefront)
 
 | TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
 |-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
 | `TC_F17_023` | Logic| [Neg] Bảo vệ Màn Trắng Pagination | Yes | High | 1. Khách xem List Trang 3. Admin Xóa cụm bài Trang 1. Khách Reload lại Trang 3.<br> *`[Loc: div.blog-grid-storefront]`* | Bẫy lỗi Out of Bound Page. Frontend đẩy khách về Trang 1 hoặc Text "Đã hết bài", Không Throw Runtime Crash Error làm trắng xóa App Web. | | `Not Run` |
+
+---
+
+## 9. [US-F17-08] Public Blog Detail (Storefront)
+
+| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
+|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
 | `TC_F17_024` | Sec | [Pos] Bảo mật Meta robots noindex Draft Bài | Yes | High | 1. Bật F12 soi thẻ `<head>` của link Preview 1 bài Đang Nháp (Draft).<br> *`[Loc: meta[name="robots"]]`* | Bắt buộc tiêm thẻ `<meta name="robots" content="noindex">`. Không cho Google Bot dò rỉ bò vào quét Content CMS nội bộ trước ngày ra mắt. | | `Not Run` |
 | `TC_F17_025` | Edge | [Pos] Cứu Lỗi SEO Thiếu Thẻ Ảnh JSON-LD | Yes | High | 1. Render bài Live KHÔNG có Ảnh Cover và Tóm tắt.<br> *`[Loc: script[type="application/ld+json"]]`* | Thẻ Schema JSON-LD vẫn xuất xưởng hợp lệ. Auto Render File Ảnh Placeholder ngầm và Tóm tắt tự cắt từ chữ Body. Tool Audit Google Không Báo Đỏ. | | `Not Run` |
 | `TC_F17_026` | Func | [Pos] Tích hợp Thẻ OpenGraph & Twitter Card | Yes | High | 1. Đọc bài Publish, view Page Source.<br> *`[Loc: meta[property="og:image"]]`* | Có đủ thẻ `og:title`, `og:description`, `og:image`. Bấm Share Link qua Facebook/Zalo phải Render ra đầy đủ Card chứa Khung Ảnh bự và Tiêu đề. | | `Not Run` |
@@ -84,7 +98,7 @@
 
 ---
 
-## 8. Payload Abuse & Edge Cases (Database, CMS Limit, Race Condition)
+## 10. Payload Abuse & Edge Cases (Database, CMS Limit, Race Condition)
 
 | TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
 |-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
@@ -98,7 +112,7 @@
 
 ---
 
-## 9. Kịch bản Hành trình Người dùng Thực tế (E2E Real User Journey)
+## 11. Kịch bản Hành trình Người dùng Thực tế (E2E Real User Journey)
 
 > **Mục tiêu:** Kiểm thử luồng tích hợp nguyên khối (Integration & Workflow) từ góc độ Người dùng thực tế (Store Owner) và Khách hàng (Customer) trải nghiệm xuyên suốt. Tuyệt đối không test rời rạc từng nút bấm.
 
@@ -110,7 +124,7 @@
 
 ---
 
-## 10. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates - F17)
+## 12. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates - F17)
 
 | Criteria | Status | Target Agent .SKILL |
 |---|---|---|
