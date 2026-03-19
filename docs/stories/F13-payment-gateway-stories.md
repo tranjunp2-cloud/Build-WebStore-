@@ -68,3 +68,39 @@ THEN  thay đổi được cập nhật vào settings của Site
 
 ### Definition of Done
 - [ ] UI Settings cập nhật real-time phía cổng thanh toán (Checkout).
+
+---
+
+## US-F13-03: Mobile Web UX — Seamless Mobile Payment Flow
+
+**Wave 6** | **P1** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile shopper
+I want the payment selection and banking interfaces to be optimized for my phone
+So that I can easily tap and select my bank without zooming in
+```
+
+### Acceptance Criteria
+
+#### AC-1: Tap-Friendly Payment Methods
+
+```gherkin
+GIVEN a mobile shopper is at the payment method selection stage
+WHEN  they view the options (Card, FPX)
+THEN  each option is rendered as a large, tappable Card or Row with ample padding (≥ 54px height)
+  AND the active state is clearly highlighted
+```
+
+#### AC-2: Native Bank Selection
+
+```gherkin
+GIVEN a mobile shopper selects FPX
+WHEN  they are prompted to choose their bank
+THEN  the bank selection dropdown triggers the OS-native select picker (iOS/Android) or a touch-friendly Bottom Sheet, rather than a cramped custom web dropdown
+```
+
+### Definition of Done
+- [ ] 9-Point Checklist pass.

@@ -5,6 +5,30 @@
 
 ---
 
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
 ## US-F10-01: Order Management & Status Updates
 
 **Wave 5** | **P0** | **L** | **Status:** Ready
@@ -200,3 +224,41 @@ GIVEN I am on the Orders list view
 WHEN  I click on the sorting dropdown
 THEN  I can sort orders by Date (Newest/Oldest), Total amount (High/Low)
 ```
+
+---
+
+## US-F10-05: Mobile Web UX — Order Management on the Go
+
+**Wave 5** | **P1** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user (Store Owner)
+I want the complex Orders table and detail drawer to be optimized for my phone
+So that I can quickly check new orders and update fulfillment status anywhere
+```
+
+### Acceptance Criteria
+
+#### AC-1: List to Cards Transformation
+
+```gherkin
+GIVEN the user is on the /orders view on a mobile device (< 768px)
+WHEN  the order list renders
+THEN  it does NOT use a scrollable horizontal table
+  AND instead renders each order as a stacked Card (Order #, Status, Customer, Total)
+```
+
+#### AC-2: Full-Screen Detail View
+
+```gherkin
+GIVEN the user taps an order card on mobile
+WHEN  the Order Detail opens
+THEN  it transforms from a side-drawer into a Full-Screen View
+  AND the Status Action buttons (Confirm, Ship, Cancel) are pinned as a Sticky Bottom Bar for easy thumb access
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass.

@@ -137,8 +137,8 @@ Redirect về /dashboard
 | F01: AI Builder | /builder/new | docs/prd/F01-ai-chat-builder.md | docs/qa/TC-F01-builder.md |
 | F05: Editor | /editor/:siteId | docs/prd/F05-ai-editor.md | docs/qa/TC-F05-editor.md |
 | F07: Templates | /templates | — | docs/qa/TC-F07-templates.md |
-| F09: Products | /dashboard/products | — | docs/qa/TC-F09-products.md |
-| F11: Orders | /dashboard/orders | — | docs/qa/TC-F11-orders.md |
+| F09: Products | /products | — | docs/qa/TC-F09-products.md |
+| F11: Orders | /orders | — | docs/qa/TC-F11-orders.md |
 | F12: SEO | /dashboard/seo | — | docs/qa/TC-F12-seo.md |
 
 ---

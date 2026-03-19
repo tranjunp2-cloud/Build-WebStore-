@@ -158,32 +158,44 @@ runs:
         COMMIT_MSG="${{ inputs.commit-msg }}"
         RUN_URL="${{ inputs.run-url }}"
 
+        SHORT_SHA="${{ inputs.commit-sha }}"
+        SHORT_SHA="${SHORT_SHA:0:7}"
+        COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ inputs.commit-sha }}"
+        ACTIONS_URL="$RUN_URL"
+
         case "$EVENT" in
           deploy_success)
-            TITLE="🚀 Staging cập nhật"
+            TITLE="🚀 Deploy Success — ${BRANCH}"
             COLOR="green"
-            BODY="$AUTHOR vừa deploy $BRANCH thành công!\n$COMMIT_MSG"
-            BTN_TEXT="🌐 Open Staging"
+            BODY="**Branch:** ${BRANCH}\n**Commit:** ${COMMIT_MSG}\n**Author:** ${AUTHOR}\n**Environment:** staging"
+            BTN_TEXT="🌐 Mở App"
             BTN_URL="${{ inputs.staging-url }}"
             ;;
           deploy_fail)
-            TITLE="❌ Deploy staging lỗi"
+            TITLE="💥 Deploy Failed — ${BRANCH}"
             COLOR="red"
-            BODY="Deploy $BRANCH thất bại. Check logs!\n$COMMIT_MSG"
-            BTN_TEXT="🔍 View Logs"
+            BODY="**Branch:** ${BRANCH}\n**Commit:** ${COMMIT_MSG}\n**Author:** ${AUTHOR}\n**Environment:** staging"
+            BTN_TEXT="📋 Xem Logs"
             BTN_URL="$RUN_URL"
             ;;
           ci_fail)
-            TITLE="❌ CI Failed — $BRANCH"
+            TITLE="❌ CI Failed — ${BRANCH}"
             COLOR="red"
-            BODY="CI lỗi ở bước: ${{ inputs.failed-step }}\n${{ inputs.ci-status }}"
-            BTN_TEXT="🔍 View Logs"
+            BODY="**Branch:** ${BRANCH}\n**Failed:** ${{ inputs.failed-step }}\n**Commit:** ${COMMIT_MSG}\n**Author:** ${AUTHOR}\n${{ inputs.ci-status }}"
+            BTN_TEXT="📋 Xem Logs"
             BTN_URL="$RUN_URL"
             ;;
+          ci_pass)
+            TITLE="✅ CI Passed — ${BRANCH}"
+            COLOR="green"
+            BODY="**Branch:** ${BRANCH}\n**Commit:** ${COMMIT_MSG}\n**Author:** ${AUTHOR}\n${{ inputs.ci-status }}"
+            BTN_TEXT="✅ Xem Commit"
+            BTN_URL="$COMMIT_URL"
+            ;;
           *)
-            TITLE="📢 $EVENT — $BRANCH"
+            TITLE="📢 ${EVENT} — ${BRANCH}"
             COLOR="blue"
-            BODY="$COMMIT_MSG"
+            BODY="**Commit:** ${COMMIT_MSG}\n**Author:** ${AUTHOR}"
             BTN_TEXT="View"
             BTN_URL="$RUN_URL"
             ;;
@@ -210,9 +222,13 @@ runs:
             },
             "elements": [
               {"tag": "div", "text": {"content": "$BODY", "tag": "lark_md"}},
+              {"tag": "hr"},
               {"tag": "action", "actions": [
-                {"tag": "button", "text": {"content": "$BTN_TEXT", "tag": "plain_text"}, "url": "$BTN_URL", "type": "primary"}
-              ]}
+                {"tag": "button", "text": {"content": "$BTN_TEXT", "tag": "plain_text"}, "url": "$BTN_URL", "type": "primary"},
+                {"tag": "button", "text": {"content": "📝 Xem Code", "tag": "plain_text"}, "url": "$COMMIT_URL", "type": "default"},
+                {"tag": "button", "text": {"content": "📋 CI Logs", "tag": "plain_text"}, "url": "$ACTIONS_URL", "type": "default"}
+              ]},
+              {"tag": "note", "elements": [{"tag": "plain_text", "content": "🚀 PrimeWeb · $BRANCH · $AUTHOR · $SHORT_SHA"}]}
             ]
           }
         }

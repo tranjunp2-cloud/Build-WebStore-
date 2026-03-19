@@ -10,6 +10,7 @@
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
 
+
 ---
 
 ## 0. Story Traceability
@@ -20,6 +21,7 @@
 | US-F10-02 | Customer Checkout | [F10-orders-stories.md](../stories/F10-orders-stories.md) | Ready |
 | US-F10-03 | Order Cancellation & Inventory Restock | [F10-orders-stories.md](../stories/F10-orders-stories.md) | Ready |
 | US-F10-04 | Order List Advanced Sorting & Filtering | [F10-orders-stories.md](../stories/F10-orders-stories.md) | Ready |
+| US-F10-05 | Mobile Web UX — Order Management on the Go | [F10-orders-stories.md](../stories/F10-orders-stories.md) | Ready |
 
 ---
 
@@ -39,7 +41,7 @@ When customers place orders through the storefront, site owners need a dashboard
 
 ## 3. Solution Overview
 
-Dashboard `/dashboard/orders`: stats bar (by status), table với order list (có search, filter, sort), order detail drawer với status timeline. Hỗ trợ 2 luồng đơn hàng: (1) Manual Flow (COD, QR Banking) cho phép merchant tự chỉnh status; (2) Automated Flow (Stripe) tự chuyển status thông qua API. Tích hợp tính năng Refund, Cancel logic (có lý do & restock), và Bulk Confirm.
+Dashboard `/orders`: stats bar (by status), table với order list (có search, filter, sort), order detail drawer với status timeline. Hỗ trợ 2 luồng đơn hàng: (1) Manual Flow (COD, QR Banking) cho phép merchant tự chỉnh status; (2) Automated Flow (Stripe) tự chuyển status thông qua API. Tích hợp tính năng Refund, Cancel logic (có lý do & restock), và Bulk Confirm.
 
 ---
 
@@ -98,6 +100,8 @@ SO THAT tôi quản lý fulfilment hiệu quả
 | FR-09 | Refund: Chuyển order sang Refund thủ công khi ở trạng thái hợp lệ (Shipped, Completed) | US-F10-01 | P0 | |
 | FR-10 | Customer payment flow: COD, QR Banking (Manual). Stripe tạm ẩn. | US-F10-02 | P0 | |
 | FR-11 | QR Payment Checkout: Hiển thị hình QR mã hoá, bắt buộc upload ảnh biên lai (<2MB, JPG/PNG) | US-F10-02 | P0 | Nút continue bị block nếu chưa upload |
+| FR-12 | **[Mobile]** Danh sách đơn hàng trên viewport < 768px chuyển đổi từ Bảng (Table) sang dạng Thẻ Card dọc (Stacked Cards). | US-F10-05 | P1 | UX chống cuộn ngang |
+| FR-13 | **[Mobile]** Chi tiết đơn hàng mở thành dạng Fullscreen thay vì Drawer, với các nút Action (Update Status, Cancel) sticky ở mép dưới màn hình. | US-F10-05 | P1 | Thumb-friendly |
 
 ---
 
@@ -120,7 +124,7 @@ New order placed (Storefront) → Order created 'pending'
   → Merchant notification (toast + email)
   → Customer confirmation email
   ↓
-/dashboard/orders
+/orders
   Order appears in list
   Click → detail drawer
   Change status: Pending → Confirmed
@@ -131,20 +135,95 @@ New order placed (Storefront) → Order created 'pending'
 
 ## 10. Screen Layout
 
+> **[Global CMS Constraint]** Mọi nội dung của tính năng này bắt buộc phải hiển thị bên trong Main Content Area của hệ thống CMS, tuân thủ chặt chẽ kiến trúc Global Header và Sidebar Navigation được định nghĩa trong F18 CMS Layout.
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình chính (Orders Dashboard / List)
+- **Mô tả:** Trung tâm quản lý toàn bộ đơn hàng của nhà bán.
+- **Components chính:**
+  - Status Stats Bar: Thanh ngang (Hoặc Widget KPIs) trên cùng tóm tắt số liệu đơn theo trạng thái (vd: Pending: 3, Confirmed: 5, Shipped: 12).
+  - Search & Filter Bar: Tìm theo Mã Đơn/KH; Lọc theo Ngày/Tháng; Khối thao tác Bulk Action "Confirm x Orders".
+  - Data Table: Cột Mã Đơn (Clickable), Tên Khách, Tổng tiền (RM), Status Badge (đổi màu theo state), Loại thanh toán, Thời gian.
+- **Wireframe:**
+```text
+┌─ /orders ────────────────────────────────────────────────┐
+│  Orders                                                  │
+│  Pending: 3  │ Confirmed: 5  │ Shipped: 12               │
+│  [All ▼] [Date Range] [🔍 Search]                        │
+│                                                          │
+│  Order#     │ Customer │ Total  │ Status                 │
+│  ORD-A1B2C3 │ Aisha    │ RM156  │ 🟡 Pending             │
+│  ORD-D4E5F6 │ Kumar    │ RM89   │ 🟢 Confirmed            │
+│  ORD-G7H8I9 │ Wei Lin  │ RM245  │ 📦 Shipped             │
+│                                                          │
+│ Mobile: cards, detail = full page                        │
+└──────────────────────────────────────────────────────────┘
 ```
-┌─ /dashboard/orders ────────────────────────────────┐
-│  Orders                                              │
-│  Pending: 3  │ Confirmed: 5  │ Shipped: 12          │
-│  [All ▼] [Date Range] [🔍 Search]                   │
-│                                                      │
-│  Order#     │ Customer │ Total  │ Status             │
-│  ORD-A1B2C3 │ Aisha    │ RM156  │ 🟡 Pending         │
-│  ORD-D4E5F6 │ Kumar    │ RM89   │ 🟢 Confirmed        │
-│  ORD-G7H8I9 │ Wei Lin  │ RM245  │ 📦 Shipped         │
-│                                                      │
-│ Mobile: cards, detail = full page                   │
-└────────────────────────────────────────────────────┘
+
+### 10.2. Màn hình Chi tiết (Order Detail / Info Drawer)
+- **Mô tả:** Màn hình chi tiết của 1 đơn hàng cụ thể, thường được thiết kế dưới dạng Flyout Sidebar trượt từ phải ra (hoặc Page riêng độc lập).
+- **Components chính:**
+  - Status Timeline (Progress Flow): Biểu đồ các mốc trạng thái từ Pending -> Confirmed -> Shipped... để user theo dõi tiến trình.
+  - Nút thao tác Status Actions: [Mark as Shipped], [Cancel Order], [Refund].
+  - Customer Block: Tên, SDT, Địa chỉ giao hàng, Địa chỉ email.
+  - Payment Detail: Loại hình (COD/QR), Nếu là QR thì hiển thị ảnh receipt do khách upload kèm nút [Mở To Ảnh].
+  - Line Items list: Danh sách các SKU khách đặt mua kèm Cân nặng, Giá tiền. Summary khối tính tổng: Subtotal, Shipping fee, SST 6%, Grand Total.
+- **Wireframe (Order Detail Drawer):**
+```text
+┌─ Order Detail: ORD-A1B2C3 ──────────[X]┐
+│  🟢 Confirmed  |  May 15, 2026 14:30   │
+│                                        │
+│  ┌─ STATUS TIMELINE ─────────────────┐ │
+│  │ (✓) Pending -> (✓) Confirmed      │ │
+│  │     -> ( ) Shipped -> ( ) Done    │ │
+│  └───────────────────────────────────┘ │
+│  [ Mark as Shipped ]  [ Cancel Order ] │
+│                                        │
+│  ┌─ CUSTOMER ────────────────────────┐ │
+│  │ Aisha Binti Omar | 012-345-6789   │ │
+│  │ aisha@email.com                   │ │
+│  │ 123 Jalan Ampang, Kuala Lumpur    │ │
+│  └───────────────────────────────────┘ │
+│  ┌─ ITEMS (2) ───────────────────────┐ │
+│  │ Baju Kurung (Đỏ, M) x1    RM 89   │ │
+│  │ Head Scarf (Đen) x2       RM 40   │ │
+│  └───────────────────────────────────┘ │
+│  Subtotal: RM 129 | Ship: RM 8 | SST: RM 7 │
+│  TOTAL: RM 144.00 (Paid via QR)        │
+└────────────────────────────────────────┘
 ```
+
+### 10.3. Mobile View (Order Cards & Full-page Detail)
+- **Mô tả:** Thay vì bảng Data Table khó xem trên mobile, danh sách đơn hàng biến thành các Blocks. Tương tác vuốt (Swipe) thẻ để thực hiện thao tác nhanh. Khi click vào chi tiết, Drawer chuyển thành một màn hình dọc toàn phần (Full-page modal) thay vì Sidebar móp méo bên phải.
+- **Wireframe:**
+```text
+┌─ 📱 Mobile Orders ──────────────────────────┐
+│ [≡] Orders                                  │
+│ ─────────────────────────────────────────── │
+│  Pending: 3  │ Conf: 5  │ Ship: 12          │
+│                                             │
+│ [ 🔍 Mã đơn / Tên khách... ]                │
+│ ─────────────────────────────────────────── │
+│ ┌─ ORD-A1B2C3 ─────────[ 🟡 Pending ]─┐     │
+│ │ Khách: Aisha Binti Omar             │     │
+│ │ Ngày: 15/05/26        Giá: RM 144   │     │
+│ │                                     │     │
+│ │ [ Hủy Đơn ]          [ Xác nhận ✔ ] │     │
+│ └─────────────────────────────────────┘     │
+│                                             │
+│ ┌─ ORD-D4E5F6 ─────────[ 🟢 Confirmed]─┐     │
+│ │ Khách: Kumar                        │     │
+│ │ Ngày: 14/05/26        Giá: RM 89    │     │
+│ └─────────────────────────────────────┘     │
+└─────────────────────────────────────────────┘
+```
+
+### 10.4. Các trạng thái UI (UI States) & Modals
+- **Empty State:** Hình xe giao hàng lủi thủi + "Bạn chưa có đơn hàng nào. Hãy chia sẻ link store!".
+- **Loading State:** Bảng Table Skeleton lines loading. Nút Update Status show Spinner.
+- **Error State / Edge Cases:** Toast đỏ báo lỗi không thể update status.
+- **Modals:** Modal Cancel Order buộc nhập Text Reason. Modal Image Viewer (khi click vào ảnh receipt QR Payment Proof).
 
 ---
 

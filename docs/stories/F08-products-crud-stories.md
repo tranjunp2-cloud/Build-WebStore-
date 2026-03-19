@@ -5,6 +5,30 @@
 
 ---
 
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
 ## US-F08-01: Products CRUD + Trạng thái Sản phẩm (Active/Draft)
 
 **Wave 4** | **P0** | **L** | **Status:** Ready
@@ -22,7 +46,7 @@ So that sản phẩm có mô tả đẹp mà không mất thời gian tự viế
 #### AC-1: Happy Path — Mở Form Thêm Sản Phẩm
 
 ```gherkin
-GIVEN user ở /dashboard/products
+GIVEN user ở /products
 WHEN  click "Thêm sản phẩm"
 THEN  form hiện: tên, giá thực bán (Price), giá khuyến mãi (Compare at Price), category, thông số đóng gói (Cân nặng, DxCxh), mô tả, ảnh (max 5, chuẩn <=5MB), tồn kho (Stock) và SKU.
 ```
@@ -30,7 +54,7 @@ THEN  form hiện: tên, giá thực bán (Price), giá khuyến mãi (Compare a
 #### AC-1.1: View Product List Empty State (Shared Component)
 
 ```gherkin
-GIVEN user ở /dashboard/products
+GIVEN user ở /products
   AND chưa có sản phẩm nào
 WHEN  xem danh sách sản phẩm
 THEN  hiển thị shared "No Data" Empty State component
@@ -258,7 +282,7 @@ So that tôi có thể tổ chức sơ đồ sản phẩm gọn gàng, khách h�
 
 #### AC-1: Tạo cây danh mục tối đa 3 Level
 ```gherkin
-GIVEN user đang ở trang Quản lý Danh mục (`/dashboard/products/categories`)
+GIVEN user đang ở trang Quản lý Danh mục (`/products/categories`)
 WHEN  user click "Thêm Mới"
 THEN  form yêu cầu nhập Tên Danh mục (Name), Slug, Ảnh đại diện (nếu có)
   AND có một dropdown "Chọn Danh mục Cha" (Parent Category).
@@ -318,5 +342,45 @@ THEN  các Attributes (Thuộc tính) đã nhập xuất hiện thành Grid ho�
 ```
 
 ### Definition of Done
-- [ ] Database Schema Collection Products có trường "Attributes" định dạng Array of Object `{ key: string, value: string }`.
 - [ ] Bản thiết kế Storefront Layout (PLP & PDP) đã được mô tả tại PRD.
+
+---
+
+## US-F08-07: Mobile Web UX — Product Management on Small Screens
+
+**Wave 4** | **P1** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user (Store Owner)
+I want the complex product list and variant forms to be optimized for my small screen
+So that I can quickly check inventory or update prices while away from my computer
+```
+
+### Acceptance Criteria
+
+#### AC-1: List to Cards Transformation
+
+```gherkin
+GIVEN the user is on the /products view on a mobile device (< 768px)
+WHEN  the product list renders
+THEN  it does NOT use a scrollable horizontal table
+  AND instead renders each product as a stacked Card (Thumbnail left, Details right)
+  AND Low Stock/Out of Stock alerts are displayed as a prominent red badge on the card
+```
+
+#### AC-2: Variant Matrix Accordion
+
+```gherkin
+GIVEN the user is adding/editing variants on mobile
+WHEN  the SKU matrix is generated
+THEN  the wide matrix table is transformed into a vertical Accordion list
+  AND each accordion item represents one SKU combination (e.g., "Red - M")
+  AND tapping the item reveals the Price, SKU, and Stock inputs vertically stacked
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass.
+- [ ] Ensure that deeply nested inputs (like 3-level categories or variant inputs) do not cause horizontal scrolling on 320px screens.

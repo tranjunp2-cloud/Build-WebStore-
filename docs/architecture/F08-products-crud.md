@@ -42,7 +42,7 @@ const Products: CollectionConfig = {
 ## 2. Component Tree
 
 ```
-ProductsPage (/dashboard/products)
+ProductsPage (/products)
 ├── ProductsHeader
 │   ├── Title + Count
 │   ├── FilterBar (status, category, search)
