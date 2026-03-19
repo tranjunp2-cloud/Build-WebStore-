@@ -166,22 +166,54 @@ async function seed() {
     console.log('  ✓ Orders already exist')
   }
 
-  // 6. Seed 10 Industry Templates
-  const existingTemplates = await payload.find({
-    collection: 'templates',
-    limit: 1,
-  })
+  // 6. Seed 10+ Industry Templates (Additive Update)
+  console.log('  🔍 Checking for new industry templates...')
+  let createdCount = 0
+  for (const tpl of SEED_TEMPLATES) {
+    const existing = await payload.find({
+      collection: 'templates',
+      where: { name: { equals: tpl.name } },
+      limit: 1,
+    })
 
-  if (existingTemplates.totalDocs === 0) {
-    for (const tpl of SEED_TEMPLATES) {
+    if (existing.totalDocs === 0) {
       await payload.create({
         collection: 'templates',
         data: {
           name: tpl.name,
           description: tpl.description,
-          category: tpl.category,
+          category: tpl.category as any,
           defaultTheme: tpl.defaultTheme,
           defaultBlocks: tpl.defaultBlocks,
+          pages: (tpl.pages || enrichWithDefaultPages(tpl)).map((p: any) => ({
+            ...p,
+            layout: (p.slug === 'index' && (!p.layout || p.layout.length === 0)) 
+                ? tpl.defaultBlocks 
+                : p.layout
+          })),
+          tags: tpl.tags,
+          sortOrder: tpl.sortOrder,
+          isPremium: tpl.isPremium,
+          isFeatured: tpl.isFeatured,
+        },
+      })
+      createdCount++
+    } else {
+      // Update existing template
+      await payload.update({
+        collection: 'templates',
+        id: existing.docs[0].id,
+        data: {
+          description: tpl.description,
+          category: tpl.category as any,
+          defaultTheme: tpl.defaultTheme,
+          defaultBlocks: tpl.defaultBlocks,
+          pages: (tpl.pages || enrichWithDefaultPages(tpl)).map((p: any) => ({
+            ...p,
+            layout: (p.slug === 'index' && (!p.layout || p.layout.length === 0)) 
+                ? tpl.defaultBlocks 
+                : p.layout
+          })),
           tags: tpl.tags,
           sortOrder: tpl.sortOrder,
           isPremium: tpl.isPremium,
@@ -189,10 +221,60 @@ async function seed() {
         },
       })
     }
-    console.log(`  ✓ Created ${SEED_TEMPLATES.length} industry templates`)
-  } else {
-    console.log(`  ✓ Templates already exist (${existingTemplates.totalDocs})`)
   }
+  console.log(`  ✓ Updated/Created ${SEED_TEMPLATES.length} industry templates`)
+
+/**
+ * Helper to generate 4 standard pages for a template that only has defaultBlocks (Home).
+ */
+function enrichWithDefaultPages(tpl: any) {
+    const blocks = tpl.defaultBlocks || []
+    const nav = blocks.find((b: any) => b.blockType === 'navigation')
+    const footer = blocks.find((b: any) => b.blockType === 'footer')
+    
+    // Find industry-specific blocks to reuse on secondary pages
+    const aboutBlock = blocks.find((b: any) => b.blockType === 'about')
+    const contactBlock = blocks.find((b: any) => b.blockType === 'contact')
+    const featuresBlock = blocks.find((b: any) => b.blockType === 'features')
+    const pricingBlock = blocks.find((b: any) => b.blockType === 'pricing')
+    
+    return [
+        {
+            slug: 'home',
+            title: 'Home',
+            layout: blocks
+        },
+        {
+            slug: 'about',
+            title: 'About Us',
+            layout: [
+                nav,
+                aboutBlock || { blockType: 'about', headline: `About ${tpl.name}`, body: 'Providing professional services since 2020.', sectionLabel: 'Our Story' },
+                { blockType: 'stats', headline: 'Our Milestone', stats: [{ value: '100+', label: 'Happy Clients' }, { value: '5+', label: 'Years Experience' }] },
+                footer
+            ].filter(Boolean)
+        },
+        {
+            slug: 'products',
+            title: 'Products & Services',
+            layout: [
+                nav,
+                featuresBlock || { blockType: 'features', headline: 'Our Services', subheadline: 'What we offer', features: [{ icon: '✨', title: 'Service 1', description: 'Quality service guaranteed.' }] },
+                pricingBlock,
+                footer
+            ].filter(Boolean)
+        },
+        {
+            slug: 'contact',
+            title: 'Contact Us',
+            layout: [
+                nav,
+                contactBlock || { blockType: 'contact', headline: 'Get In Touch', email: 'hello@example.com', phone: '+60 12-345 6789' },
+                footer
+            ].filter(Boolean)
+        }
+    ]
+}
 
   // 7. Seed Pages (homepage + about + contact)
   const existingPages = await payload.find({

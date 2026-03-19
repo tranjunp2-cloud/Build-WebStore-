@@ -101,7 +101,11 @@
             "fitness": "💪 Fitness",
             "creative": "🎨 Portfolio",
             "business": "🏢 Business"
-        }
+        },
+        "sort": "Sort by",
+        "sortNewest": "Newest",
+        "sortFeatured": "Featured",
+        "sortName": "A-Z"
     },
     "onboarding": {
         "stepLabel": "Step",

@@ -16,6 +16,8 @@ import { Products } from './collections/Products'
 import { Orders } from './collections/Orders'
 import { Analytics } from './collections/Analytics'
 import { SEOMetaJobs } from './collections/SEOMetaJobs'
+import { Blogs } from './collections/Blogs'
+import { BlogCategories } from './collections/BlogCategories'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -34,7 +36,7 @@ function isRemoteDatabase(): boolean {
     raw.length > 0 &&
     !raw.includes('localhost') &&
     !raw.includes('127.0.0.1') &&
-    !raw.includes('@postgres:') // Exclude Docker networking hostname
+    !raw.includes('postgres:')
   )
 }
 
@@ -64,6 +66,8 @@ export default buildConfig({
     Orders,
     Analytics,
     SEOMetaJobs,
+    Blogs,
+    BlogCategories,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

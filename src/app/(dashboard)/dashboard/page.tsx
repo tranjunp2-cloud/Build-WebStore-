@@ -3,6 +3,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { startOfDay, subDays } from 'date-fns'
 
+// Force dynamic — requires auth context + getPayload() at runtime
+export const dynamic = 'force-dynamic'
+
 import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'

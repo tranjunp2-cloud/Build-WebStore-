@@ -3,6 +3,7 @@ import { useBuilderStore } from '@/store/builderStore'
 
 const mockBusinessInfo = {
     businessName: 'Bella Bakery',
+    shortDescription: 'A friendly neighborhood bakery since 2010',
     industry: 'Food & Beverage',
     products: 'Cakes, Cookies, Bread',
     targetAudience: 'Young professionals',
@@ -31,12 +32,9 @@ describe('BuilderStore', () => {
             expect(state.step).toBe('chat')
         })
 
-        it('should add welcome message with business name', () => {
+        it('should clear messages when setting business info', () => {
             useBuilderStore.getState().setBusinessInfo(mockBusinessInfo)
-            const messages = useBuilderStore.getState().messages
-            expect(messages).toHaveLength(1)
-            expect(messages[0].role).toBe('assistant')
-            expect(messages[0].content).toContain('Bella Bakery')
+            expect(useBuilderStore.getState().messages).toHaveLength(0)
         })
     })
 
