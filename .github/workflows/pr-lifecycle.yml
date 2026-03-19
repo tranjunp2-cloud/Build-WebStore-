@@ -20,13 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
-      issues: write
       contents: read
     steps:
       - name: Checkout (for composite action)
         uses: actions/checkout@v4
 
-      - name: Auto-assign author + label + detect type
+      - name: Auto-assign author + label + detect type + check issue link
         uses: actions/github-script@v7
         id: size
         with:
@@ -85,30 +84,146 @@ jobs:
               labels,
             });
 
+            // ── 5. Auto-link PR → Issue ──
+            let body = pr.body || '';
+            const linkRe = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
+            const linkedIssues = [];
+            let match;
+            while ((match = linkRe.exec(body)) !== null) {
+              linkedIssues.push(parseInt(match[1]));
+            }
+
+            // Skip for chore/docs/refactor branches
+            const skipTypes = ['chore/', 'docs/', 'refactor/'];
+            const shouldCheck = !skipTypes.some(t => branch.startsWith(t));
+
+            if (shouldCheck && linkedIssues.length === 0) {
+              const title = pr.title || '';
+
+              // Strategy 1: Exact match from PR title — [US-F01-03] pattern
+              const storyMatch = title.match(/\[?(US-F\d{2}-\d{2})\]?/i);
+              let autoLinked = false;
+
+              if (storyMatch) {
+                const storyId = storyMatch[1].toUpperCase();
+                // Search issues whose title starts with [US-F01-03]
+                const { data: exactMatches } = await github.rest.issues.listForRepo({
+                  owner, repo, state: 'open', per_page: 5,
+                });
+                const exactIssue = exactMatches.find(i =>
+                  !i.pull_request && i.title.toUpperCase().includes(`[${storyId}]`)
+                );
+
+                if (exactIssue) {
+                  // Auto-inject Closes #N into PR body
+                  const updatedBody = body.replace(
+                    /- \*\*Closes:\*\* #(?:<!--.*?-->)?/,
+                    `- **Closes:** #${exactIssue.number}`
+                  );
+                  // Fallback: prepend if template pattern not found
+                  const finalBody = updatedBody !== body
+                    ? updatedBody
+                    : `Closes #${exactIssue.number}\n\n${body}`;
+
+                  await github.rest.pulls.update({
+                    owner, repo, pull_number: prNumber,
+                    body: finalBody,
+                  });
+
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: prNumber,
+                    body: `🔗 Auto-linked to **#${exactIssue.number}** (${exactIssue.title}).\nIssue will auto-close when this PR is merged.`,
+                  });
+                  linkedIssues.push(exactIssue.number);
+                  autoLinked = true;
+                }
+              }
+
+              // Strategy 2: Feature code from branch — feature/F01-xxx
+              if (!autoLinked) {
+                const featureMatch = branch.match(/\b(F\d{2})\b/i);
+                if (featureMatch) {
+                  const featureCode = featureMatch[1].toUpperCase();
+                  const { data: candidates } = await github.rest.issues.listForRepo({
+                    owner, repo, state: 'open',
+                    labels: `feature:${featureCode}`,
+                    per_page: 10,
+                  });
+                  const issues = candidates.filter(i => !i.pull_request);
+
+                  if (issues.length === 1) {
+                    // Single match → auto-link
+                    const issue = issues[0];
+                    const updatedBody = body.replace(
+                      /- \*\*Closes:\*\* #(?:<!--.*?-->)?/,
+                      `- **Closes:** #${issue.number}`
+                    );
+                    const finalBody = updatedBody !== body
+                      ? updatedBody
+                      : `Closes #${issue.number}\n\n${body}`;
+
+                    await github.rest.pulls.update({
+                      owner, repo, pull_number: prNumber,
+                      body: finalBody,
+                    });
+
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNumber,
+                      body: `🔗 Auto-linked to **#${issue.number}** (${issue.title}) — only open issue for \`${featureCode}\`.\nIssue will auto-close when this PR is merged.`,
+                    });
+                    linkedIssues.push(issue.number);
+                  } else if (issues.length > 1) {
+                    // Multiple matches → suggest
+                    const list = issues
+                      .map(i => `- \`Closes #${i.number}\` — ${i.title}`)
+                      .slice(0, 5)
+                      .join('\n');
+
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNumber,
+                      body: `⚠️ **Chưa link issue.** Tìm thấy ${issues.length} issues cho \`${featureCode}\`:\n\n${list}\n\n👉 Edit PR description → thêm \`Closes #<số>\` vào dòng **Closes:** ở trên.`,
+                    });
+                  } else {
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNumber,
+                      body: `⚠️ **Chưa link issue.** Không tìm thấy issue nào cho \`${featureCode}\`.\n\n👉 Tìm issue phù hợp trong tab Issues → thêm \`Closes #<số>\` vào PR description.`,
+                    });
+                  }
+                } else {
+                  // No feature code in branch name
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: prNumber,
+                    body: `⚠️ **Chưa link issue.** Thêm \`Closes #<số>\` vào PR description để link với user story.\n\n> _Tab Issues → tìm story → copy số → điền vào PR._`,
+                  });
+                }
+              }
+            }
+
             core.setOutput('size_label', sizeLabel);
             core.setOutput('changes', changes);
             core.setOutput('file_count', files.length);
             core.setOutput('labels', labels.join(', '));
+            core.setOutput('linked_issues', linkedIssues.join(', ') || 'none');
 
       - name: Notify Lark (PR Opened)
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
           sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
-          title: "\uD83C\uDD95 New PR #${{ github.event.pull_request.number }}"
+          title: "🆕 New PR #${{ github.event.pull_request.number }}"
           template: 'blue'
-          meta-left-label: "\uD83D\uDCE6 Repo"
+          meta-left-label: "📦 Repo"
           meta-left-value: "PrimeWeb"
-          meta-right-label: "\uD83C\uDF3F Branch"
-          meta-right-value: "${{ github.event.pull_request.head.ref }} \u2192 ${{ github.event.pull_request.base.ref }}"
-          meta2-left-label: "\uD83D\uDCCA Size"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.event.pull_request.head.ref }} → ${{ github.event.pull_request.base.ref }}"
+          meta2-left-label: "📊 Size"
           meta2-left-value: "${{ steps.size.outputs.size_label }} (${{ steps.size.outputs.changes }} lines)"
-          meta2-right-label: "\uD83D\uDC64 Author"
+          meta2-right-label: "👤 Author"
           meta2-right-value: "${{ github.event.pull_request.user.login }}"
           content: |
-            \uD83D\uDCDD ${{ github.event.pull_request.title }}
-            \uD83D\uDCC1 ${{ steps.size.outputs.file_count }} files changed
-          buttons: '[{"text":"\uD83D\uDD0D Review PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"},{"text":"\uD83D\uDCC4 View Files","url":"${{ github.event.pull_request.html_url }}/files","type":"default"}]'
+            📝 ${{ github.event.pull_request.title }}
+            📁 ${{ steps.size.outputs.file_count }} files changed
+          buttons: '[{"text":"🔍 Review PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"},{"text":"📄 View Files","url":"${{ github.event.pull_request.html_url }}/files","type":"default"}]'
 
   # ──────────────────────────────────────
   # PR Review Submitted — Notify on approve or changes requested
@@ -127,17 +242,17 @@ jobs:
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
           sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
-          title: "\u2705 PR Approved #${{ github.event.pull_request.number }}"
+          title: "✅ PR Approved #${{ github.event.pull_request.number }}"
           template: 'green'
-          meta-left-label: "\uD83D\uDCE6 Repo"
+          meta-left-label: "📦 Repo"
           meta-left-value: "PrimeWeb"
-          meta-right-label: "\u2705 Reviewer"
+          meta-right-label: "✅ Reviewer"
           meta-right-value: "${{ github.event.review.user.login }}"
           content: |
-            \uD83D\uDCDD ${{ github.event.pull_request.title }}
-            \uD83D\uDC64 Author: ${{ github.event.pull_request.user.login }}
-            \uD83C\uDF89 **Ready to merge!**
-          buttons: '[{"text":"\uD83D\uDD17 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'
+            📝 ${{ github.event.pull_request.title }}
+            👤 Author: ${{ github.event.pull_request.user.login }}
+            🎉 **Ready to merge!**
+          buttons: '[{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'
 
       - name: Notify Lark (Changes Requested)
         if: github.event.review.state == 'changes_requested'
@@ -145,17 +260,17 @@ jobs:
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
           sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
-          title: "\u26A0\uFE0F Changes Requested #${{ github.event.pull_request.number }}"
+          title: "⚠️ Changes Requested #${{ github.event.pull_request.number }}"
           template: 'yellow'
-          meta-left-label: "\uD83D\uDCE6 Repo"
+          meta-left-label: "📦 Repo"
           meta-left-value: "PrimeWeb"
-          meta-right-label: "\uD83D\uDC40 Reviewer"
+          meta-right-label: "👀 Reviewer"
           meta-right-value: "${{ github.event.review.user.login }}"
           content: |
-            \uD83D\uDCDD ${{ github.event.pull_request.title }}
-            \uD83D\uDC64 Author: ${{ github.event.pull_request.user.login }}
-            \u26A0\uFE0F Please address review feedback.
-          buttons: '[{"text":"\uD83D\uDCDD View Review","url":"${{ github.event.review.html_url }}","type":"primary"}]'
+            📝 ${{ github.event.pull_request.title }}
+            👤 Author: ${{ github.event.pull_request.user.login }}
+            ⚠️ Please address review feedback.
+          buttons: '[{"text":"📝 View Review","url":"${{ github.event.review.html_url }}","type":"primary"}]'
 
   # ──────────────────────────────────────
   # PR Merged — Notify team
@@ -173,19 +288,19 @@ jobs:
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
           sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
-          title: "\uD83C\uDF89 PR Merged #${{ github.event.pull_request.number }}"
+          title: "🎉 PR Merged #${{ github.event.pull_request.number }}"
           template: 'green'
-          meta-left-label: "\uD83D\uDCE6 Repo"
+          meta-left-label: "📦 Repo"
           meta-left-value: "PrimeWeb"
-          meta-right-label: "\uD83C\uDFAF Target"
+          meta-right-label: "🎯 Target"
           meta-right-value: "${{ github.event.pull_request.base.ref }}"
-          meta2-left-label: "\uD83D\uDD16 Merge"
+          meta2-left-label: "🔖 Merge"
           meta2-left-value: "${{ github.event.pull_request.merge_commit_sha }}"
-          meta2-right-label: "\uD83D\uDC64 Author"
+          meta2-right-label: "👤 Author"
           meta2-right-value: "${{ github.event.pull_request.user.login }}"
           content: |
-            \uD83D\uDCDD ${{ github.event.pull_request.title }}
-          buttons: '[{"text":"\uD83D\uDD17 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'
+            📝 ${{ github.event.pull_request.title }}
+          buttons: '[{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'
 
   # ──────────────────────────────────────
   # Stale PR Check — Remind reviewers and authors
@@ -231,11 +346,11 @@ jobs:
 
               if (pr.requested_reviewers.length > 0 && timeSinceUpdate > FOUR_HOURS) {
                 const reviewers = pr.requested_reviewers.map(r => r.login).join(', ');
-                needsReview.push(`#${pr.number} "${pr.title}" \u2014 waiting: ${reviewers}`);
+                needsReview.push(`#${pr.number} "${pr.title}" — waiting: ${reviewers}`);
               }
 
               if (timeSinceUpdate > FIVE_DAYS) {
-                stale.push(`#${pr.number} "${pr.title}" by ${pr.user.login} \u2014 ${Math.floor(timeSinceUpdate / (24*60*60*1000))}d inactive`);
+                stale.push(`#${pr.number} "${pr.title}" by ${pr.user.login} — ${Math.floor(timeSinceUpdate / (24*60*60*1000))}d inactive`);
               }
             }
 
@@ -243,12 +358,12 @@ jobs:
 
             if (needsReview.length > 0) {
               const items = needsReview.slice(0, MAX_NOTIFICATIONS).join('\n');
-              content += `**\u23F3 Pending Review (>4h):**\n${items}\n\n`;
+              content += `**⏳ Pending Review (>4h):**\n${items}\n\n`;
             }
 
             if (stale.length > 0) {
               const items = stale.slice(0, MAX_NOTIFICATIONS).join('\n');
-              content += `**\uD83D\uDD78\uFE0F Stale PRs (>5 days):**\n${items}`;
+              content += `**🕸️ Stale PRs (>5 days):**\n${items}`;
             }
 
             core.setOutput('has_issues', content.length > 0 ? 'true' : 'false');
@@ -261,11 +376,11 @@ jobs:
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
           sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
-          title: "\u23F0 Stale PR Alert \u2014 ${{ steps.stale.outputs.count }} items"
+          title: "⏰ Stale PR Alert — ${{ steps.stale.outputs.count }} items"
           template: 'yellow'
-          meta-left-label: "\uD83D\uDCE6 Repo"
+          meta-left-label: "📦 Repo"
           meta-left-value: "PrimeWeb"
-          meta-right-label: "\uD83D\uDCCA Total"
+          meta-right-label: "📊 Total"
           meta-right-value: "${{ steps.stale.outputs.count }} items"
           content: ${{ steps.stale.outputs.content }}
-          buttons: '[{"text":"\uD83D\uDCCB View Open PRs","url":"${{ github.server_url }}/${{ github.repository }}/pulls","type":"primary"}]'
+          buttons: '[{"text":"📋 View Open PRs","url":"${{ github.server_url }}/${{ github.repository }}/pulls","type":"primary"}]'
