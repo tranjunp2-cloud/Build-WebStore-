@@ -111,7 +111,7 @@ export function DashboardSiteGrid({ sites }: { sites: SiteCardData[] }) {
             <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-white">{t.dashboard.sites.title}</h2>
                 {sites.length > 6 && (
-                    <Link href="/dashboard/sites" className="text-sm text-blue-400 hover:text-blue-300">
+                    <Link href="/sites" className="text-sm text-blue-400 hover:text-blue-300">
                         {t.dashboard.sites.viewAll}
                     </Link>
                 )}

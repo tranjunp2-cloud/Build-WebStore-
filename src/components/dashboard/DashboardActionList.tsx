@@ -15,7 +15,7 @@ export function DashboardActionList({ pendingOrders }: { pendingOrders: any[] })
                     <AlertCircle className="h-5 w-5 text-amber-500" />
                     <h3 className="font-bold text-white">{t.dashboard.overview.actions.title}</h3>
                 </div>
-                <Link href="/dashboard/orders?status=pending" className="text-sm font-medium text-blue-400 hover:text-blue-300">
+                <Link href="/orders?status=pending" className="text-sm font-medium text-blue-400 hover:text-blue-300">
                     {t.dashboard.overview.actions.viewAll} <ArrowRight className="inline h-4 w-4" />
                 </Link>
             </div>
@@ -42,7 +42,7 @@ export function DashboardActionList({ pendingOrders }: { pendingOrders: any[] })
                                         {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
                                     </div>
                                     <Link 
-                                        href={`/dashboard/orders/${order.id}`}
+                                        href={`/orders/${order.id}`}
                                         className="rounded bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/20"
                                     >
                                         {t.dashboard.overview.actions.fulfill}

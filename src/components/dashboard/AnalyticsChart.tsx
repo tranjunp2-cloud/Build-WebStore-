@@ -38,6 +38,7 @@ export function AnalyticsChart({ data }: { data: ChartData[] }) {
                         fontSize={12} 
                         tickLine={false} 
                         axisLine={false} 
+                        minTickGap={30}
                     />
                     <YAxis 
                         stroke="#94A3B8" 
