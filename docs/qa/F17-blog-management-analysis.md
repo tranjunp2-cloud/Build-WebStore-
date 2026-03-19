@@ -59,6 +59,16 @@ Những điểm tài liệu đang viết thiếu logic, mơ hồ hoặc bỏ só
    * Nếu người dùng cố tình không tải ảnh Thumbnail, trên Storefront List có hiển thị ảnh Placeholder dự phòng mặc định của Template không hay bị vỡ Layout?
 5. **Cơ chế Draft Auto-Save:** 
    * Story US-F17-02 không nói rõ Blog có cơ chế `Auto-Save` như API Draft F01 hay không. Nếu lỡ tay tắt Tab đang viết Content, dữ liệu có được giữ lại trong LocalStorage hoặc Session không? Nếu không, User sẽ mất trắng bài dài 2000 chữ. Cần xác nhận ngay.
+6. **Vấn nạn Copy/Paste Media (Rich Text Payload Limit):**
+   * Nếu Khách lướt Web thấy 1 hình ảnh 5MB, Bấm Copy (dạng Base64) rồi sang Tab Editor Paste thẳng vào Body bài viết. Trình Rich Text Editor có ngầm tự đẩy (Auto-upload) file này sang CDN/Payload CMS không? Nếu nó lưu nguyên cục chuỗi Base64 cực đại 5MB này vào DB JSON, hệ thống sẽ bị Crash Request Limit (413 Payload Too Large) vì quá khổ dữ liệu Text.
+7. **Xung đột Xóa Danh Mục (Category Dependency Conflict):**
+   * PRD báo nếu xóa Danh mục thì bài viết chuyển về trạng thái Uncategorized. Nhưng bộ Lọc (Filter) ở List (AC-2) lại không nhắc đến tùy chọn list lọc "Uncategorized". Vậy chủ Shop tìm lại mấy chục bài "mồ côi" danh mục này ở đâu trên Panel Dashboard đông đúc?
+8. **Bảo vệ Bot dò quét Web Indexing & SEO:**
+   * Bài viết lúc gán trạng thái "Draft" có thực sự chặn Page Route (trả 404) chưa? Nếu URL bị vô tình lộ, thì Sitemap.xml của Storefront có nhả link này cho Google Bot cắn Index không? Đảm bảo bài Draft thì thẻ `<meta name="robots" content="noindex">` bắt buộc phải kích hoạt ngầm để chống Leak Web.
+9. **Kích thước Thumbnail quá khổ (Media Optimization):**
+   * PRD nêu Thumbnail là "Manual upload only". Nếu người dùng mù công nghệ upload 1 bức ảnh chụp điện thoại 4K nặng 10MB lên làm bìa thì Frontend/Backend có Node chức năng Pipeline tự động nén (Resize/Compress) không? Trôi cái file này ra ngoài Storefront thì người mua dùng mạng 3G sẽ bị giật lag nếu phải load List 10 bài Blog nặng tận 100MB tổng dung lượng trang.
+10. **Tranh chấp Session dữ liệu (Concurrent Editing Race Condition):**
+    * Chủ shop có thói quen mở 2 Tabs browser cùng lúc để soạn đi soạn lại 1 bài Blog. Tab 1 dùng AI Generate Text, Tab 2 gõ sửa phần Title rồi bấm Lưu đè. Tab nào sẽ thắng (Override)? Liệu hệ thống có cảnh báo (Conflict Alert): *"Dữ liệu đã bị cập nhật ở phiên làm việc khác"* không, hay nó cắn răng ghi đè bất cần làm cháy dữ liệu bài viết mới sinh Content?
 
 ---
 
