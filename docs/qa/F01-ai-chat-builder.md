@@ -1,5 +1,5 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F01 - AI Chat Builder
-> **Phiên bản:** 5.2 (52-Case Exhaustive Matrix AC-Mapped) | **Cập nhật:** 2026-03-18 | **Thực hiện:** QA Team
+> **Phiên bản:** 5.7 (57-Case Exhaustive Matrix AC-Mapped) | **Cập nhật:** 2026-03-19 | **Thực hiện:** QA Team
 > **Nguồn Tham chiếu:** PRD (`F01-ai-chat-builder.md`), User Stories (26 ACs), Figma Design (Node 30607:17719)
 > **Kỹ năng ứng dụng (.agent):** BDD (Gherkin Expectations), Performance SLA Validators, Security Contexting, Automation Locator Healer, Payload CMS DB Assertions.
 
@@ -8,8 +8,7 @@
 ## 1. Mục Tiêu (Objective)
 Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lượng toàn diện cho tính năng khởi tạo Website qua hội thoại AI (AI Chat Builder - F01). Mục tiêu cốt lõi là đạt độ phủ (Coverage) 100% cho 8 User Stories, bao quát chính xác **26 Acceptance Criteria (ACs)** đã định nghĩa tại tài liệu đặc tả và các yêu cầu thẩm mỹ UI từ bản thiết kế Figma hiện tại.
 
-Bộ kiểm thử bao gồm **52 kịch bản chi tiết** (Positive + Negative edge cases). Toàn bộ kịch bản được tổng hợp trong Unified Matrix.
-
+Bộ kiểm thử bao gồm **57 kịch bản chi tiết** (Positive + Negative edge cases). Toàn bộ kịch bản được tổng hợp trong Unified Matrix.
 ---
 
 ## 2. Test Environment (Môi trường Kiểm thử)
@@ -86,6 +85,12 @@ Bộ kiểm thử bao gồm **52 kịch bản chi tiết** (Positive + Negative 
 | **TC-F01.50** | `BR-09` | `Cron`| **[Positive]** Hệ Tự Dọn Trút Trọn Khung Khỏa Tẩy Bản Data Draft 30 Days Out Cũ | **1.** Kí Mongo DB Collection Sinh Draft Site Object Age Date 30 Days+. Trigger Node Cron API Mất.| Payload CMS Delete Cục Bản Rác (Hard Rớt Bỏ Data Object Status Không Hoàn Lại). Chống Ngập Khung CSD Storage Tốc Tốn Giữ Size Gọng Cốc Sạch. | High | [x] |
 | **TC-F01.51** | `BR-09` | `Cron`| **[Positive]** Tẩy Không Dọn Status Published Xuyên Rule Nặng Đè Bảo Tồn Live Core Cứng Site Vàng | **1.** Draft File Document Khớp Mốc Đã Cũ 31 Days, Cố Tình Thay Thuộc `Status == 'Published'`. Đắp Cron Job Target Data Nhắm Trừng Phạt Quét Thu.| Móc Quét Tách Lọc Lệnh Delete. Object Cánh Không Phai Mực Vẹn Nguyên Giữ An Toàn Cho Web Đã Bắn Link Live Sống Chắc Lên Mạng Tránh Dọn Nhầm. | Blocker | [x] |
 | **TC-F01.52** | `Limit` | `ToKen` | **[Negative]** Độ Bàn Phím Khung Nhồi Ký Tự Input Text Quá Biên Bóp Chặn Sập OpenAI| **1.** Chạy Test Code Paster Paste Nhả Dump Chuỗi Text Payload > `10,000` Size Chars Tới Khay Text Send.| Khóa Lại Frontend Validator Cấm Đi Phím JS Ngăn Submit Payload Trả Cảnh Báo Limit. API Chặn Không Bắn Request Kể Cả Hack Bypass Khống Khống Ngắn Thổi Khủng OOM Bộ LLM Băm Đo Cỡ Nát Core Tràn Nhớ Memory Leak Out.| High | [x] |
+| **[AI NLU Edge-Cases] Đa Ngôn Ngữ Nâng Cao (Real User Behaviors)** |
+| **TC-F01.53** | `NLU` | `Lang` | **[Positive]** Nhận diện Trộn Ngôn Ngữ (Code-switching / Spanglish) | **1.** Nhập Lệnh: *"Mình muốn open 1 cái coffee shop ở district 1, phong cách vintage"*. | Nhận diện Base Locale là Tiếng Việt. Hiểu rành mạch các Entity Tiếng Anh (coffee shop, district 1, vintage) để chọn Theme quán Ký Cà Phê Cổ Điển mà không nhầm sang Tiết mục Tạp Hóa. | High | [ ] |
+| **TC-F01.54** | `NLU` | `Logic`| **[Positive]** Xử lý Sai Lỗi Chính Tả Nặng / Tiếng Lóng (Typoes/Slang) | **1.** Nhập Lệnh: *"Mk mún dg 1 wán nướng vĩa hè cho shvu sinh vin"*. | AI Model Tự Động Normalize Dịch Ra: *"Tôi muốn dựng 1 quán nướng vỉa hè cho sinh viên"*. Tạo Copywriting Trang Web Lịch Sự, Phát Triển Văn Phong Tone Chuyên Nghiệp. Block Toàn Bộ Tiếng Lóng Lên UI Trang. | High | [ ] |
+| **TC-F01.55** | `NLU` | `Flow` | **[Positive]** Bẻ Lái Chuyển Ngữ Giữa Chừng (Mid-thread Pivot) | **1.** Bắt đầu Chat bằng Tiếng Anh: *"I need a pizza store"*. AI Reply Tiếng Anh.<br>**2.** Nhập tiếp: *"À quên, làm web tiếng Việt giúp nha, khách ở Hà Nội"*. | Từ Turn thứ 2, AI Phản Ứng Gắt Chuyển Trục Về Tiếng Việt Cả Bề Mặt Hội Thoại Lẫn Nội Dung Content (Menu, Khuyến Mãi) Chuẩn Format VN (Ví Dụ: VNĐ thay vì USD). | High | [ ] |
+| **TC-F01.56** | `UI/UX` | `Font` | **[Boundary]** Hiển Thị Ký Tự Đặc Biệt (RTL & Double Byte) Trên Chat UI | **1.** Nhập Câu Có Ký Tự Tiếng Trung: *"Mở Nhà Hàng Dimsum 點心"*. Hoặc Ký Tự Ả Rập (RTL). | Font Chữ Khung Chat Render Đẹp Ký Tự Tượng Hình Mà Không Bị Lỗi \square. Ký Tự Không Làm Tràn Hay Nhảy Dòng Của Ô Text Input Nhập Lệnh. | Medium | [ ] |
+| **TC-F01.57** | `NLU` | `Logic`| **[Positive]** Yêu Cầu Gắn Nội Dung Song Ngữ Rõ Ràng Trong 1 Câu | **1.** Nhập Lệnh: *"Tạo web bán áo thun, nội dung để cả tiếng Anh và tiếng Việt đan xen nhé"*. | Trực AI Bóc Được Option Multi-Language Content. Đổ Dữ Liệu CMS Layout Ra Ví Dụ: Tương Trợ Thẻ H1 Có Sub-text Eng *(VD: Sản Phẩm Mới Mẻ / New Arrivals)*. | High | [ ] |
 
 ---
 
@@ -109,4 +114,4 @@ _Mô tả kịch bản kiểm thử dựa trên hành vi tổng thể của Cử
 | **4. Performance SLA** | [ ] Not Run | Call Benchmark `Performance Load Tester Agent` SLA Cứng Đo API SSE & DALL-E Nháp |
 | **5. E2E UAT Approval** | [ ] Not Run | Chốt File P0/P1 Lệnh Hoàn Thành Cứng Cựa Cho Năng Lực Core Giá Giá Của App V2 |
 
-> **Khuyến Nghị Release:** Với việc bổ sung 52 Cases Tường Tận tới Độ Sâu Giới Hạn Boundary Payload Cập Nhập DB. Vòng Automation Regression Sẽ Cần Chặn Hầu Rate 100% Cột Điểm Auto[X] Tại Tương Lai Gần Chốt Cửa.
+> **Khuyến Nghị Release:** Với việc bổ sung 57 Cases Tường Tận tới Độ Sâu Giới Hạn Boundary Payload Cập Nhập DB. Vòng Automation Regression Sẽ Cần Chặn Hầu Rate 100% Cột Điểm Auto[X] Tại Tương Lai Gần Chốt Cửa.
