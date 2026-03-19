@@ -1,16 +1,22 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, Send, ArrowLeft, Loader2, Check, ExternalLink, Eye, MessageSquare } from 'lucide-react'
+import { Sparkles, Send, ArrowLeft, Loader2, Check, ExternalLink, Eye, MessageSquare, Globe, GripVertical, Lock } from 'lucide-react'
+import { toast } from 'sonner'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { useBuilderStore, type Message } from '@/store/builderStore'
+import { useBuilderStore, type Message, type BusinessInfo } from '@/store/builderStore'
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import BusinessInfoForm from '@/components/builder/BusinessInfoForm'
+import { CongratsModal } from '@/components/builder/CongratsModal'
+import { Reorder } from 'framer-motion'
+
+// Types
+import type { BusinessInfoInput } from '@/lib/ai/system-prompt'
 
 // ─── Chat Message Component ────────────────────────────────────────────
 function ChatBubble({ message }: { message: Message }) {
@@ -52,11 +58,15 @@ function GeneratingProgress({ progress }: { progress: { step: string; label: str
 }
 
 // ─── Live Preview Component ─────────────────────────────────────────────
-function LivePreview({ blocks, theme }: { blocks: any[]; theme: ThemeConfig | null }) {
+
+function LivePreview({ blocks, theme, onReorder }: { blocks: any[]; theme: ThemeConfig | null; onReorder?: (newOrder: any[]) => void }) {
     if (!theme || blocks.length === 0) return null
 
     return (
-        <div
+        <Reorder.Group
+            axis="y"
+            values={blocks}
+            onReorder={(newOrder) => onReorder?.(newOrder)}
             className="w-full min-h-full"
             style={{
                 fontFamily: `'${theme.fontBody}', sans-serif`,
@@ -68,13 +78,39 @@ function LivePreview({ blocks, theme }: { blocks: any[]; theme: ThemeConfig | nu
                 if (!block.blockType) return null
                 const BlockComponent = blockRegistry.getComponent(block.blockType)
                 if (!BlockComponent) return null
+
+                const isFixed = block.blockType === 'navigation' || block.blockType === 'footer'
+
                 return (
-                    <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
-                        <BlockComponent block={block} theme={theme} />
-                    </BlockErrorBoundary>
+                    <Reorder.Item
+                        key={block._id}
+                        value={block}
+                        dragListener={!isFixed}
+                        className="relative group/block"
+                    >
+                        {/* Drag Handle or Lock Indicator */}
+                        <div className="absolute left-4 top-4 z-40 opacity-0 group-hover/block:opacity-100 transition-opacity">
+                            {isFixed ? (
+                                <div className="p-2 rounded-md bg-white/10 backdrop-blur-sm border border-white/10 text-gray-400 cursor-not-allowed" title="Vị trí cố định (Navigation/Footer)">
+                                    <Lock className="h-4 w-4" />
+                                </div>
+                            ) : (
+                                <div className="p-2 rounded-md bg-blue-600 text-white shadow-lg cursor-grab active:cursor-grabbing border border-blue-500">
+                                    <GripVertical className="h-4 w-4" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Visual indicator when dragging */}
+                        <div className="absolute inset-0 pointer-events-none border-2 border-transparent group-active/block:border-blue-500/50 group-active/block:bg-blue-500/5 transition-colors z-30" />
+
+                        <BlockErrorBoundary blockType={block.blockType}>
+                            <BlockComponent block={block} theme={theme} />
+                        </BlockErrorBoundary>
+                    </Reorder.Item>
                 )
             })}
-        </div>
+        </Reorder.Group>
     )
 }
 
@@ -84,6 +120,9 @@ export default function AIBuilderPage() {
     const [input, setInput] = useState('')
     const [isLoading, setIsLoading] = useState(false)
     const [showPreview, setShowPreview] = useState(false)
+    const [isPublishing, setIsPublishing] = useState(false)
+    const [publishedUrl, setPublishedUrl] = useState('')
+    const [showCongrats, setShowCongrats] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -91,7 +130,7 @@ export default function AIBuilderPage() {
     const {
         step, businessInfo,
         status, messages, blocks, theme, siteId, siteName, progress, error,
-        addMessage, setStatus, addBlock, setTheme, setProgress, setSiteId, setSiteName, setError,
+        addMessage, setStatus, addBlock, setTheme, setProgress, setSiteId, setSiteName, setError, setBusinessInfo, setBlocks,
     } = useBuilderStore()
 
     useEffect(() => {
@@ -103,7 +142,7 @@ export default function AIBuilderPage() {
     }, [])
 
     // SSE Stream consumer
-    const startSSEGeneration = useCallback(async (extraInstructions?: string) => {
+    const startSSEGeneration = useCallback(async (info: BusinessInfo, extraInstructions?: string) => {
         setStatus('streaming')
         addMessage({ role: 'assistant', content: '🚀 Starting website creation...' })
 
@@ -112,9 +151,9 @@ export default function AIBuilderPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    businessInfo,
+                    businessInfo: info,
                     extraInstructions,
-                    language: 'en',
+                    language: info.language || 'auto',
                 }),
                 credentials: 'include',
             })
@@ -172,7 +211,7 @@ export default function AIBuilderPage() {
             setError({ code: 'generation_failed', message: err.message, retryable: true })
             addMessage({ role: 'assistant', content: `❌ An error occurred: ${err.message}\n\nPlease try again!` })
         }
-    }, [businessInfo, setStatus, addMessage, setError])
+    }, [setStatus, addMessage, setError])
 
     const handleSSEEvent = useCallback((event: string, data: any) => {
         switch (event) {
@@ -217,7 +256,42 @@ export default function AIBuilderPage() {
 
         // Start generation with optional extra instructions from user
         if (status === 'idle' || status === 'error') {
-            startSSEGeneration(currentInput)
+            if (businessInfo) startSSEGeneration(businessInfo, currentInput)
+        }
+    }
+
+    const handlePublish = async () => {
+        if (!siteId) return
+        setIsPublishing(true)
+        try {
+            // 1. Save current blocks (reordered) and theme first
+            const saveRes = await fetch(`/api/sites/${siteId}/save`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blocks, theme }),
+            })
+
+            if (!saveRes.ok) {
+                const saveData = await saveRes.json()
+                throw new Error(saveData.error || 'Failed to save website layout')
+            }
+
+            // 2. Then publish
+            const res = await fetch(`/api/sites/${siteId}/publish`, {
+                method: 'PATCH'
+            })
+            const data = await res.json()
+            if (data.success) {
+                const publishedSite = data.data
+                setPublishedUrl(publishedSite.url || `https://${publishedSite.domain || siteId}.primeweb.app`)
+                setShowCongrats(true)
+            } else {
+                toast.error(data.error?.message || 'Failed to publish site')
+            }
+        } catch (error: any) {
+            toast.error(error.message || 'Network error during publish')
+        } finally {
+            setIsPublishing(false)
         }
     }
 
@@ -230,10 +304,15 @@ export default function AIBuilderPage() {
 
     const isGenerating = status === 'streaming'
     const isDone = status === 'done'
+    
+    const handleGenerateStart = (info: BusinessInfo) => {
+        setBusinessInfo(info)
+        startSSEGeneration(info)
+    }
 
     // Step 1: Show Business Info Form (after all hooks)
     if (step === 'info') {
-        return <BusinessInfoForm />
+        return <BusinessInfoForm onSubmit={handleGenerateStart} isGenerating={isGenerating} />
     }
 
     return (
@@ -289,11 +368,25 @@ export default function AIBuilderPage() {
                     {/* Done state — action buttons */}
                     {isDone && siteId && (
                         <div className="flex flex-col gap-2 pt-2">
-                            <Button onClick={() => router.push('/dashboard')} className="w-full">
-                                🏠 Dashboard
+                            <Button
+                                onClick={handlePublish}
+                                className="w-full relative overflow-hidden group border-none bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-purple-500/25 transition-all"
+                                disabled={isPublishing}
+                            >
+                                <span className="relative flex items-center gap-2 font-medium">
+                                    {isPublishing ? (
+                                        <>
+                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" /> Publishing...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Globe className="h-4 w-4" /> Publish & Go Live
+                                        </>
+                                    )}
+                                </span>
                             </Button>
-                            <Button variant="outline" onClick={() => router.push(`/editor/${siteId}`)} className="w-full">
-                                <ExternalLink className="h-4 w-4" /> Open Editor
+                            <Button variant="outline" onClick={() => router.push(`/editor/${siteId}`)} className="w-full bg-transparent border-white/10 hover:bg-white/5 text-gray-300">
+                                <ExternalLink className="h-4 w-4 mr-2" /> Continue Editing
                             </Button>
                         </div>
                     )}
@@ -357,7 +450,7 @@ export default function AIBuilderPage() {
                 {/* Preview content */}
                 <div className="flex-1 overflow-y-auto bg-[#0F172A]">
                     {blocks.length > 0 && theme ? (
-                        <LivePreview blocks={blocks} theme={theme} />
+                        <LivePreview blocks={blocks} theme={theme} onReorder={setBlocks} />
                     ) : isDone && siteId ? (
                         <div className="flex h-full items-center justify-center">
                             <div className="text-center space-y-6">
@@ -393,6 +486,13 @@ export default function AIBuilderPage() {
                     )}
                 </div>
             </div>
+            <CongratsModal
+                isOpen={showCongrats}
+                onOpenChange={setShowCongrats}
+                siteUrl={publishedUrl}
+                siteName={siteName || 'Your Website'}
+                siteId={siteId || ''}
+            />
         </div>
     )
 }
