@@ -81,8 +81,9 @@ describe('SEO APIs', () => {
                 body: JSON.stringify({})
             })
             const res = await AnalyzePOST(req)
+            const body = await res.json()
             expect(res.status).toBe(400)
-            expect((await res.json()).success).toBe(false)
+            expect(body.error.code).toBe('VALIDATION_ERROR')
         })
 
         it('returns 200 with SEO score and issue list for valid siteId', async () => {

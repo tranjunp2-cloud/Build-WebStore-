@@ -5,6 +5,9 @@ import config from '@payload-config'
 import type { Metadata } from 'next'
 import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
 
+// Force dynamic — uses getPayload() + SiteRenderer (jsdom chain) at runtime
+export const dynamic = 'force-dynamic'
+
 type Props = {
     params: Promise<{ slug: string; path?: string[] }>
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>

@@ -1,56 +1,106 @@
-# QA Report: Dashboard
-
-> **Date:** 2026-03-07 | **Agent:** QA Agent  
-> **PRD:** `docs/prd/dashboard.md` | **Stories:** US-006A → US-006D
+# Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F03 - Dashboard Suite
+> **Phiên bản:** 4.2 (Professional Reporting Edition & Full 48-Case) | **Cập nhật:** 2026-03-18 | **Thực hiện:** QA Team
+> **Tài liệu tham chiếu PRD:** [F03-dashboard.md](../prd/F03-dashboard.md) | **Tài liệu tham chiếu User Stories (18 ACs):** [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md)
 
 ---
 
-## 9-Point Checklist
+## 1. Mục Tiêu (Objective)
+Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lượng toàn diện cho tính năng Bảng điều khiển Tổng Quan (Dashboard Suite - F03). Mục tiêu cốt lõi là đạt độ phủ (Coverage) 100% cho 6 User Stories và 18 Acceptance Criteria (ACs) đã định nghĩa tại tài liệu đặc tả, cùng toàn bộ Non-Functional Requirements về Hiệu năng và Bảo mật.
 
-| # | Check | Status | Notes |
-|---|-------|--------|-------|
-| 1 | Loading State (Skeleton) | ✅ | `DashboardSkeleton.tsx` — shimmer animation, matches layout |
-| 2 | Empty State | ✅ | `DashboardEmptyState.tsx` — icon + text + CTA → /onboarding |
-| 3 | Error State | ⚠️ | Mock data (no API yet), will add error boundary in Wave 3 |
-| 4 | Form Validation | N/A | No forms on Dashboard |
-| 5 | Button States | ✅ | CTA hover:scale + transition |
-| 6 | Toast Feedback | N/A | No mutations on Dashboard (view-only) |
-| 7 | Auth Redirect | ⚠️ | Layout-level auth guard needed (Wave 3) |
-| 8 | Mobile 375px | ✅ | Cards stack vertical, FAB for create button |
-| 9 | TypeScript Clean | ✅ | No `any`, proper types on all props |
+Bộ kiểm thử bao gồm chính xác **48 kịch bản chi tiết** (áp dụng các nguyên tắc chuyên môn từ vòng đời QA: BDD, Performance SLA, Locator Healer, Test Data Generation, Security). Tài liệu được cấu trúc dưới định dạng chuyên nghiệp phục vụ cho mục tiêu nghiệm thu, đánh giá và báo cáo chuẩn mực.
 
-**Score: 6/7 applicable = PASS** (2 items deferred to Wave 3 when API integrated)
+---
 
-## Story Verification
+## 2. Test Environment (Môi trường Kiểm thử)
+| Biến (Variable) | Yêu cầu (Requirements) |
+|---|---|
+| Môi trường (Env) | Staging / Pre-Production |
+| Browsers | Chrome (v110+), Firefox (v105+), Safari |
+| OS / Desktop | Windows 11, macOS |
+| Devices (Responsive) | Desktop (1920x1080), Mobile (iPhone 14 Pro 375px) |
+| Network | 4G (Fast/Slow), Mô phỏng gián đoạn kết nối HTTP 500/504 |
+| Test Data | Database Mock (Data Analytics), Kịch bản Performance SLA `< 2s` |
 
-| Story | Description | Status |
-|-------|------------|--------|
-| US-006A | Has Sites — stats + grid | ✅ |
-| US-006B | Empty State — icon + CTA | ✅ |
-| US-006C | Unpublished Banner | ✅ |
-| US-006D | Loading Skeleton | ✅ |
+---
 
-## Component Architecture Verified
+## 3. Unified Test Cases (Traceability Matrix)
+_Bảng tổng hợp kịch bản kiểm thử, phân loại theo User Story nhằm đảm bảo khả năng truy vết._
 
-```
-page.tsx (Server Component) ✅
-├── DashboardGreeting (Client) ✅
-├── DashboardBanner (Client) ✅
-├── DashboardStats (Server) ✅
-├── DashboardSiteGrid (Server) ✅
-├── DashboardEmptyState (Server) ✅
-└── DashboardSkeleton (Server) ✅
-```
+| ID | Tham chiếu | LOẠI (Type) | TIÊU ĐỀ (Scenario) | CÁC BƯỚC THỰC HIỆN (Steps) | KẾT QUẢ MONG ĐỢI (Expected) | MỨC ĐỘ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **[Security & Non-Functional: Xác thực & Layout]** |
+| **TC-F03.01** | `NFR`       | `Safety`    | **[Bảo mật]** Ngăn chặn truy cập khi chưa xác thực (401) | 1. Xóa toàn bộ Cookie/Token đăng nhập.<br>2. Chủ động truy cập đường dẫn `/dashboard`. | Hệ thống từ chối quyền truy cập (API trả về `401 Unauthorized`) và tự động điều hướng người dùng về trang đăng nhập `/login`. | Blocker | [x] |
+| **TC-F03.02** | `NFR`       | `Sec/Data`  | **[Bảo mật]** Cách ly dữ liệu độc lập (Tenant Isolation) | 1. Đăng nhập bằng tài khoản Quản trị viên A.<br>2. Sử dụng công cụ chặn bắt (Intercept) sửa Payload gửi Session của Cửa hàng B. | Server CMS từ chối yêu cầu truy xuất chéo với thông báo `403 Forbidden`. Đảm bảo an toàn tuyệt đối dữ liệu Analytics giữa các Cửa hàng khác nhau. | Blocker | [x] |
+| **TC-F03.03** | `BR-01`     | `Perf/SLA`  | **[Hiệu năng]** Khung thời gian tải Overview không vượt quá 2 giây | 1. Đăng nhập thành công và tải trang `/dashboard`.<br>2. Giám sát trên Network Waterfall. | Giao diện hiển thị Animation tải trang (Skeleton Shimmer) an toàn. Quá trình kết xuất dữ liệu hiển thị (Render) hoàn tất hoàn toàn dưới `2000ms`. | High    | [x] |
+| **TC-F03.04** | `NFR`       | `UI/UX`     | **[Responsive]** Hiển thị trên thiết bị Di động 375px | 1. Mở trang `/dashboard` trên trình giả lập thiết bị Mobile (375px). | Thanh điều hướng (Sidebar) thu gọn (Collapsed). Lưới 4 thẻ thống kê chuyển sang cấu trúc `2x2 Grid` tự động điều chỉnh theo tỷ lệ khung hình. | High    | [ ] |
+| **TC-F03.05** | `NFR`       | `UI/UX`     | **[Responsive]** Hiển thị trên thiết bị Tablet 768px | 1. Mở trang `/dashboard` trên kích thước thiết bị Tablet (768px). | Layout tự động thu nhỏ kích thước Thẻ nhưng vẫn đảm bảo cấu trúc ngang không gây tràn chữ (No Overflow Text). | Medium  | [ ] |
+| **[US-01: Dashboard — Overview & Personalization]** |
+| **TC-F03.06** | `US-01/AC4` | `UI/State`  | **[Empty State]** Giao diện trống khi tài khoản chưa cấu hình Website | 1. Đăng nhập bằng tài khoản người dùng Mới (Chưa thiết lập Site).<br>2. Truy cập `/dashboard`. | Khung hiển thị rỗng bao gồm Hình ảnh chú thích "Tạo Website đầu tiên", đi kèm nút lệnh Gọi Hành Động (Call-to-Action) điều hướng sang `/onboarding`. | Blocker | [x] |
+| **TC-F03.07** | `US-01/AC1` | `Func`      | **[Happy Path]** Hiển thị mặc định 4 Thẻ Thống Kê (Core Stat Cards) | 1. Vào `/dashboard` đối với tài khoản đang có dữ liệu Tracking. | Biểu đồ thống kê hiển thị chính xác theo thứ tự mặc định: Lượt Truy Cập (Traffic), Khách hàng tiềm năng (Leads), Độ Tương Tác (Engagement), và Doanh Thu (Revenue). | Blocker | [x] |
+| **TC-F03.08** | `US-01/AC1` | `Math`      | **[Độ Chính Xác]** Quy tắc định dạng rút gọn số lượng lớn | 1. Thiết lập chỉ số 1,520 lượt Truy Cập vào nguồn Database CMS.<br>2. Tải lại bảng Dashboard. | Giao diện trên Thẻ (Card) tự động thu gọn hiển thị giá trị thành định dạng ngắn gọn `1.5K`. | Medium  | [ ] |
+| **TC-F03.09** | `US-01/AC1` | `Func`      | **[Action List]** Trích xuất Danh sách Đơn hàng Chờ Xử Lý mới nhất | 1. Cuộn màn hình trang Overview xuống chuyên mục "Pending Orders". | Hệ thống lấy đúng dữ liệu hiển thị tuần tự Tối Đa 3-5 Đơn hàng Mới Nhất ở trạng thái Chờ xác nhận liên kết trực tiếp từ Module F10. | High    | [x] |
+| **TC-F03.10** | `US-01/AC1` | `UI`        | **[Action List]** Tích hợp URL điều hướng tới chi tiết Đơn Hàng | 1. Thực hiện thao tác nhấp chuột trực tiếp vào 1 dòng Pending Order thuộc danh sách hiển thị. | Liên kết URL thành công điều hướng chuyển trang sang màn hình quản trị chi tiết của Đơn hàng vừa chọn dựa theo mã ID Order hợp lệ. | High    | [x] |
+| **TC-F03.11** | `US-01/AC1` | `UI`        | **[Widget SEO]** Chuyên mục hiển thị Hệ Thống Sức Khỏe SEO | 1. Tải trang Overview. Đánh giá Khối thông tin Sức khỏe SEO tích hợp. | Đánh giá tổng điểm SEO theo chuẩn vòng lồng (Score Ring) lấy từ API xuất hiện rõ tại cột phân chia bố cục dưới. | Blocker | [x] |
+| **TC-F03.12** | `US-01/AC1` | `UI`        | **[Widget SEO]** Nút lệnh hỗ trợ trực tiếp xử lý lỗi | 1. Đo lường giao diện tại vị trí Cạnh vòng hiển thị SEO Score. | Thành phần Nút (Button) Gọi hành động `[AI Fix All Issues]` nhấn mạnh, trực quan để người dùng thực thi tiến trình xử lý tự động cảnh báo. | High    | [x] |
+| **TC-F03.13** | `US-01/AC2` | `Logic/UX`  | **[Bộ Lọc Today]** Kiểm thử logic cập nhật khoảng thời gian Hôm Nay | 1. Lựa chọn Dropdown mục "Kỳ Báo Cáo".<br>2. Thay đổi giá trị tùy chọn thành phần "Today". | Giá trị hiển thị trên 4 Thẻ biểu đồ được cập nhật Real-time trên cơ sở trạng thái State mà không yêu cầu làm mới toàn trình duyệt (No Full Page Reload). | High    | [ ] |
+| **TC-F03.14** | `US-01/AC2` | `Logic/UX`  | **[Bộ Lọc 7d]** Kiểm thử chức năng phân tích khung 7 Ngày Qua | 1. Lựa chọn Dropdown "Kỳ Báo Cáo".<br>2. Chủ động chuyển tùy chọn theo "Trong 7 ngày qua". | Toàn bộ thẻ và mốc hiển thị Biểu đồ được yêu cầu làm mới thông qua nền REST API theo khoảng 7 ngày vừa qua đảm bảo sự chính xác. | High    | [ ] |
+| **TC-F03.15** | `US-01/AC2` | `Logic/UX`  | **[Bộ Lọc 30d]** Giới hạn hiệu năng kết xuất dữ liệu khối lượng lớn (30 Days Payload) | 1. Lựa chọn mục Dropdown "Kỳ Báo Cáo".<br>2. Chọn giá trị "Trong 30 ngày qua". | Yêu cầu truy vấn Database từ phía máy chủ hoạt động trơn tru thông qua luồng dữ liệu ngầm (Pagination ngầm) mà không gây tắc nghẽn luồng DOM hoặc treo giao diện người dùng. | High    | [ ] |
+| **TC-F03.16** | `US-01/AC2` | `State`     | **[Bộ Lọc Cache]** Lưu trữ thiết đặt tại phiên làm việc (Session) | 1. Đặt Filter "Trong 30 ngày".<br>2. Đóng thẻ (Tab), thao tác truy cập lại tên miền lần nữa. | Cấu hình chọn Kỳ Báo cáo được hệ thống Ghi nhớ trên Cookies/Local Storage của trình duyệt, tự động khôi phục lại thẻ chọn ở vị trí `Trong 30 ngày`. | Medium  | [ ] |
+| **TC-F03.17** | `US-01/AC3` | `Func`      | **[Customize]** Giao diện kích hoạt hộp thoại tùy chọn Quản trị Layout | 1. Click cấu hình phím "Tùy Chỉnh Dashboard" hiển thị ở vị trí góc phía trên, cùng bên phải. | Màn hình hiển thị cửa sổ hộp thoại bao gồm danh sách tùy chọn cấu hình phụ (Chẳng hạn như: Lượt Click Blog, Tỷ Lệ Chuyển Đổi) nhằm thêm/bớt luồng UI. | Medium  | [ ] |
+| **TC-F03.18** | `US-01/AC3` | `Func`      | **[Customize]** Thao tác ngắt liên kết hiển thị chức năng cốt lõi | 1. Tại Modal Panel "Tuỳ Chỉnh Dashboard", gỡ bỏ chọn Checkbox tùy chọn "Lượt Truy Cập". | Module hiển thị Tổng Views ngay lập tức bị loại bỏ khỏi luồng (Grid Layout). Khoảng trống bị thay thế dịch lấp tức thì theo cấu trúc hiển thị Masonry mà không phát sinh vùng chết. | High    | [x] |
+| **TC-F03.19** | `US-01/AC3` | `Func`      | **[Customize]** Thao tác cho phép bổ sung hiển thị chức năng mở rộng | 1. Kích hoạt Checkbox Option "Lượt Click Bài Viết Blog". | Hệ Thống Bổ sung Khối Metric phụ mở rộng chèn tiếp vào Lưới lưới hiển thị, kèm theo hiệu ứng xuất hiện Trơn Tru Đồng dạng nguyên tắc Component gốc. | High    | [x] |
+| **TC-F03.20** | `US-01/AC3` | `UX`        | **[Customize]** Kéo thả (Drag and Drop) thay đổi trật tự ưu tiên | 1. Nhấn giữ chuột trái (Hold Left-Click) tại thanh kéo Grip Handle thuộc Module "Doanh Thu", di chuyển thiết bị trỏ lên vị trí Khác (Ex: Lên Đầu). | Thẻ Card "Doanh Thu" thay đổi vị trí Trực quan kèm hiệu ứng CSS Transform Transition. Trật tự sắp xếp mới cập nhật trên cây chỉ mục (Array State) ở luồng cục bộ của React. | Medium  | [ ] |
+| **TC-F03.21** | `US-01/AC3` | `DB`        | **[Customize]** Chuẩn hóa Truyền dữ liệu Lưu Vị Trí Cấu hình | 1. Bấm lưu cấu hình lệnh "Save Configuration" Modal Tùy Chỉnh.<br>2. Xóa Cache, Tải lại trình duyệt qua thao tác Refresh Trang F5. | Phát sinh lệnh đẩy thông tin cấu hình qua API REST (Phương thức POST: `/api/dashboard/preferences`). Tải lại trả về màn hình chính xác Layout vừa tùy chỉnh mà không bị reset về Base. | High    | [x] |
+| **[US-02: Analytics Details]** |
+| **TC-F03.22** | `US-02/AC1` | `Func`      | **[Chart]** Tích hợp và Render kết quả Đồ Thị Hình Cột Cơ Bản (Bar Chart) | 1. Điều hướng Sang trang chuyên Mục Báo Cáo Phân Tích `/dashboard/analytics`. | Tái dựng Component vẽ Biểu Đồ Hình Cột phân theo Trục x(Thời Gian) và y(Giá trị Metric). Cam kết hiển thị đúng số liệu API trả về, không làm thay đổi Scale Tỷ lệ Canvas. | Blocker | [x] |
+| **TC-F03.23** | `US-02/AC1` | `UI`        | **[Tooltip]** Cơ Chế Tương tác Mô Tả Thông Tin Nổi Nhanh Theo Hover | 1. Thực hiện thao tác Hover (Đưa trỏ chuột vào vùng diện tích Cột dữ liệu) biểu thị của một ngày Cụ thể bất kì trên Đồ Tỷ Lệ Đếm. | Bảng nhỏ chứa thông tin Component Tooltip xuất hiện, liệt kê giá trị Đếm Tuyệt Đối (Value) trong đúng khoảng thời gian Ngày đó nhằm hỗ trợ đọc thông số nhanh. Hộp thoại nổi hạn chế tràn góc lấp biểu đồ che mất tầm nhìn. | Medium  | [x] |
+| **TC-F03.24** | `US-02/AC1` | `Boundary`  | **[Top List]** Kiểm soát phân trang danh sách Top Pages | 1. Chuẩn bị dữ liệu hơn 50+ bản ghi trang web.<br>2. Truy cập tab "Top Pages" tại trang Analytics. | Hệ thống phân trang chính xác, giới hạn hiển thị tối đa 10 dòng (Limit = 10) trên mỗi trang, đảm bảo không tràn giao diện và tối ưu DOM load. | High    | [x] |
+| **TC-F03.25** | `US-02/AC1` | `Boundary`  | **[Top List]** Kiểm soát phân trang danh sách Top Products | 1. Chuyển sang tab "Top Products" tại trang Analytics. | Danh sách sản phẩm hiển thị nhất quán với giới hạn tối đa 10 dòng (Limit = 10), tương tự như quy tắc của Top Pages. | High    | [ ] |
+| **TC-F03.26** | `US-02/AC1` | `Boundary`  | **[Top List]** Kiểm soát phân trang danh sách Top Blogs | 1. Chuyển sang tab "Top Blogs" tại trang Analytics. | Tương tự quy tắc phân trang: Danh sách bài viết blog giới hạn tối đa 10 bản ghi trên mỗi trang. | High    | [ ] |
+| **TC-F03.27** | `US-02/AC1` | `Math`      | **[Delta]** Hiển thị hệ số tăng trưởng điện toán (Positive Delta) | 1. So sánh dữ liệu tháng hiện tại (2,000 views) với tháng trước (1,500 views). | Hệ thống tính toán độ lệch và hiển thị tỷ lệ tăng chuẩn xác `<span class='text-green-500'>+33.3%</span>` kèm theo biểu tượng mũi tên đi lên (Growth Arrow). | Blocker | [x] |
+| **TC-F03.28** | `US-02/AC1` | `Math`      | **[Delta]** Hiển thị tỷ lệ sụt giảm (Negative Delta) | 1. So sánh dữ liệu tháng hiện tại (200 views) với tháng trước (300 views). | Hệ thống tính toán và hiển thị tỷ lệ sụt giảm chính xác `<span class='text-red-500'>-33.3%</span>` kèm theo biểu tượng mũi tên đi xuống màu đỏ. | Blocker | [x] |
+| **TC-F03.29** | `US-02/AC1` | `Math`      | **[Delta]** Hiển thị hệ số ổn định (Zero Change) | 1. Mô phỏng dữ liệu tháng hiện tại và tháng trước không đổi (ví dụ: 500 views). | Hệ thống hiển thị tỷ lệ thay đổi là `0%` với giao diện trung tính (màu xám, không có mũi tên tăng/giảm) để tối ưu UX. | Medium  | [ ] |
+| **TC-F03.30** | `US-02/AC2` | `State`     | **[Empty State]** Xử lý hiển thị khoảng thời gian không có dữ liệu | 1. Chọn khung thời gian chưa có bất kỳ dữ liệu tracking nào từ hệ thống. | Giao diện hiển thị Empty State nội dung "Chưa có dữ liệu phân tích trong khoảng thời gian này", đảm bảo hệ thống không phát sinh lỗi hoặc crash trình duyệt. | High    | [x] |
+| **TC-F03.31** | `US-02/AC3` | `Edge`      | **[Failover]** Xử lý ngoại lệ khi mất kết nối API Analytics | 1. Dùng DevTools (Offline mode) chặn URL `/analytics/summary` trả về HTTP 500. | Hệ thống bắt lỗi (Error Boundary), hiển thị thông báo "Không thể tải thông số Analytics" tại widget tương ứng mà không làm gián đoạn các thành phần khác. | Blocker | [x] |
+| **TC-F03.32** | `US-02/AC3` | `Failover`  | **[Retry]** Chức năng thử lại (Retry) khi tải dữ liệu thất bại | 1. Tạo điều kiện lỗi mạng như TC-31.<br>2. Nhấn nút "Thử lại" trên giao diện báo lỗi của widget. | Hệ thống gọi lại API (Refetch). Nếu kết nối thành công, widget tự phục hồi hiển thị báo cáo bình thường và loại bỏ thông báo lỗi. | High    | [x] |
+| **[US-03: SEO Dashboard Overview]** |
+| **TC-F03.33** | `US-03/AC1` | `Func`      | **[Score]** Hiển thị tổng điểm SEO Health Score | 1. Truy cập URL `/dashboard/seo`. | Biểu đồ vòng (Progress Ring) hiển thị chính xác tổng điểm SEO (ví dụ: 75/100) được trả về từ API, tự động thay đổi màu sắc dựa theo mức điểm chuẩn. | Blocker | [x] |
+| **TC-F03.34** | `US-03/AC1` | `UI`        | **[Breakdown]** Phân tích chi tiết các nhóm tiêu chí SEO | 1. Quan sát widget SEO Health Breakdown trên dashboard. | Giao diện liệt kê 3 nhóm thành phần chính (SEO Technical, Meta Content, SEO Tags) đi kèm trạng thái (Pass/Warning/Fail) trực quan. | High    | [ ] |
+| **TC-F03.35** | `US-03/AC2` | `Func`      | **[Sitemap]** Chức năng tự động khởi tạo sitemap.xml | 1. Nhấn nút "Generate Sitemap" trên bảng điều khiển. | Hệ thống gửi yêu cầu API thành công (HTTP 200). Sitemap XML được máy chủ tạo mới và đường dẫn tải tệp sitemap được cập nhật ngay lập tức. | High    | [x] |
+| **TC-F03.36** | `US-03/AC2` | `UX`        | **[Sitemap Toast]** Hiển thị thông báo khi tạo Sitemap thành công | 1. Hoàn tất thao tác tạo Sitemap tại bước TC-35. | Một cảnh báo tạm thời (Toast Notification) hiển thị "Đã tạo tập tin Sitemap thành công!" màu xanh lá, biến mất trong vòng 2 giây không gây gián đoạn UX. | Low | [ ] |
+| **TC-F03.37** | `US-03/AC3` | `Edge`      | **[Failover]** Xử lý ngoại lệ Timeout khi quét SEO Score | 1. Sử dụng Network Throttling mô phỏng việc Scanner tốn quá nhiều thời gian gây Timeout. | Giao diện không bị treo. Báo cáo hiển thị trạng thái Timeout thay vì Skeleton dài hạn và cung cấp nút bấm "Quét lại" (Retry Scan) để người dùng chủ động thử lại. | High    | [x] |
+| **[US-04: Auto SEO Meta Generation]** |
+| **TC-F03.38** | `US-04/AC1` | `Func`      | **[Auto Gen]** AI Tự động tạo SEO Meta Description & Title | 1. Thiết lập bài viết mới với nội dung trống thẻ SEO.<br>2. Nhấn "Publish" trên Editor. | Dịch vụ AI (LLM Pipeline) tự phát sinh thẻ tiêu đề (Title) lấy từ từ khóa nội dung và chèn tự động vào meta HTML chuẩn xác. | Blocker | [x] |
+| **TC-F03.39** | `US-04/AC1` | `Boundary`  | **[Limit Title]** Giới hạn ký tự Title do AI tạo | 1. Gửi chuỗi Prompt yêu cầu AI khởi tạo Title với độ dài lớn >100. | Máy chủ có bộ lọc tự động cắt bớt độ dài Title (Max length = 60 chars) nhằm đảm bảo tiêu chuẩn SEO tránh bị Google ẩn text (Truncated). | High    | [x] |
+| **TC-F03.40** | `US-04/AC1` | `Boundary`  | **[Limit Desc]** Giới hạn ký tự Meta Description do AI tạo | 1. Yêu cầu AI sinh chuỗi văn bản mô tả > 300 từ. | Output được bộ lọc định dạng khống chế giới hạn ký tự cứng ở mức Max Length = 160 ký tự đảm bảo tiêu chuẩn meta tag chuẩn. | High    | [x] |
+| **TC-F03.41** | `US-04/AC2` | `Logic`     | **[Queue Retry]** Xử lý hàng đợi Background Jobs khi OpenAI gặp sự cố 504 | 1. Đóng băng Endpoint OpenAI qua API Gateway (mô phỏng Timeout 504).<br>2. Thao tác Publish. | Người dùng vẫn lưu bài viết thành công (không treo UI). Event AI Generation tự động đưa vào Retry Queue chạy ngầm (Background Job) thử lại sau thay vì báo lỗi toàn trang. | Blocker | [x] |
+| **[US-05: AI SEO Fix All Issues - ✨ Vũ Khí Hạt Nhân System]** |
+| **TC-F03.42** | `US-05/AC1` | `UI/Func`   | **[Propose]** Chức năng xem trước đề xuất (Review Action) | 1. Bấm nút [AI Fix All Issues]. | Modal hộp thoại hiển thị danh sách dạng Bảng Gốc / Đề Xuất (Before/After) nội dung sửa lỗi của AI trước khi người quản trị Commit ấn "Chấp nhận". | Blocker | [x] |
+| **TC-F03.43** | `US-05/AC1` | `Perf/SLA`  | **[SLA 15s]** Đáp ứng thời gian tải đề xuất Streaming dưới 15 giây | 1. Bấm [AI Fix All Issues]. Giám sát độ trễ của API Streaming (Server-Sent Events). | Quy trình đẩy dữ liệu Chunk HTML hiển thị lên trình duyệt không vượt quá giới hạn `< 15s`, tuân thủ đúng yêu cầu hiệu năng SLA khắt khe. | Blocker | [x] |
+| **TC-F03.44** | `US-05/AC1` | `UI/Debug`  | **[Network]** Khảo sát dạng giao thức truyền API kết xuất dữ liệu tự động | 1. Kiểm tra Network Inspector với Event Request thực hiền Fix All. | Dữ liệu trả về đúng Header `text/event-stream`, đảm bảo kết nối liên tục (Keep-Alive) thay vì Load trọn cục DOM gây quá tải Client. | High    | [x] |
+| **TC-F03.45** | `US-05/AC1` | `Safety`    | **[Ctrl+Z]** Tính năng phục hồi điểm thiết lập (Rollback / Undo) | 1. Sau khi đồng ý AI thay thế hơn hàng chục chuỗi SEO lỗi, Nhấn nút "Hoàn tác" (Undo). | Toàn bộ các thay đổi được Database ghi nhận theo Single Transaction Batch bị Rollback đồng nhất, dữ liệu trả lại trạng thái nguyên bản trước lúc nhấn AI Fix. | Blocker | [x] |
+| **[US-06: Basic SEO Keyword Tracker]** |
+| **TC-F03.46** | `US-06/AC1` | `Func`      | **[Tracker UI]** Giao diện thêm từ khóa Tracking | 1. Tại khung Keyword Tracker, nhập từ khóa hợp lệ vào Text Input và ấn Enter/Submit. | Khối Text Input xóa trống ô nhập, Keyword Tag mới xuất hiện vào danh sách Tag List động trên giao diện ngay lập tức. | Medium  | [ ] |
+| **TC-F03.47** | `US-06/AC1` | `Boundary`  | **[Limit]** Giới hạn thẻ từ khóa tối đa (Max 5 Keywords) | 1. Nhập từ khóa tracking thứ 6 vào danh sách. | Nút Add tự động vô hiệu hóa (Disabled) hoặc hiển thị thông báo "Chỉ cho phép theo dõi tối đa 5 từ khóa", chặn lưu thêm vào DB. | High    | [x] |
+| **TC-F03.48** | `US-06/AC3` | `Cron/Perf` | **[Ranking Cron]** Tác vụ nền tự động cập nhật xếp hạng SEO | 1. Kiểm tra Schedule Cron Job tại Backend lúc định kỳ (VD: 00:00 AM). | Worker tự lấy List 5 Keywords của tài khoản, query check hạng và cập nhật Ranking Database thành công mà không gây nghẽn kết nối Server chính. | Blocker | [x] |
 
-## Files Changed
-- MODIFIED: `src/app/(dashboard)/dashboard/page.tsx`
-- NEW: `src/components/dashboard/DashboardGreeting.tsx`
-- NEW: `src/components/dashboard/DashboardStats.tsx`
-- NEW: `src/components/dashboard/DashboardSiteGrid.tsx`
-- NEW: `src/components/dashboard/DashboardEmptyState.tsx`
-- NEW: `src/components/dashboard/DashboardBanner.tsx`
-- NEW: `src/components/dashboard/DashboardSkeleton.tsx`
+---
 
-## Verdict
+## 4. Hành trình Trải nghiệm End-to-End (E2E UAT Flow)
+_Mô tả kịch bản kiểm thử tích hợp dựa trên hành vi tổng thể của Khách hàng Cửa hàng Bán lẻ (SME Owner)._
 
-**✅ PASS** — Dashboard feature ready for Wave 1. API integration deferred to Wave 3.
+**Kịch bản Use Case Chính (Luồng Vận Hành Cốt Lõi):**
+1. **[Tương Tác Đầu Cuối - Dashboard View Overview]** Khách hàng sau khi đăng nhập thành công truy xuất URL `/dashboard`. Lượt tải màn hình hoàn thiện dưới mốc đo đạc `< 2 giây`. Tùy biến thực hành Thao tác sử dụng Lọc Phễu `Hôm Nay` cho kết quả chính xác không Refresh Trình duyệt (Tái tạo React Query) (TC-F03.03, TC-F03.13). Việc cấu hình Drag-Drop, Kéo nhấc Thử Các Module Analytics Khác lưu ổn tại Backend Database Account Preferences (TC-F03.20, TC-F03.21).
+2. **[Thâm Nhập Chi Tiết - Báo Cáo Kinh Doanh]** Người dùng đi sâu Tab `Analytics` thẩm tra Khảo sát mốc tăng tưởng Khối lượng. Chức năng Đo Toán học Delta Thống kê chuẩn mốc % Dương (Có dấu mũi tên Lên, Chữ xanh) (TC-F03.27, TC-F03.28). Đánh giá mảng Table Limits Ràng buộc Max 10 Dòng không làm Crash Node Document Lắp Layout Danh Mục Yếu / Điểm Cao (TC-F03.24 - 26).
+3. **[Hồi Biến AI Tự Hành - SEO Framework]** Người Quản trị thấy Biểu độ Khuyên Vòng SEO Điểm Thấp (Bad SEO Score Health Ring) dưới mục Báo cáo Score (TC-F03.33). Họ tiến Tác Nhấn Gọi Nút Điểm `[AI Fix All]`. Hệ Thống gọi Render List Before / After Khuyên Dịch Lệnh (Modal Propose Changes) (TC-F03.42). Khi Khách Cập Nhận Đồng ý Hành Động, Máy tính AI gọi Dịch Stream SSE Dây Chạy Update Bền Code Background Không Chạm Áp `< 15s`. (TC-F03.43). Khung Layout Nổi bật Điểm Xanh Khoe Thành quả Hoàn Thiết HTML Lịch Sự Chốt Nút Báo Hiệu Đã Xử Lỗi Kịp Lúc Data Update Gọn CMS (TC-F03.44) Thỏa Độ Ráng Giới Gốc Yêu Cầu.
+
+---
+
+## 5. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates)
+
+| Nhóm Kiểm thử (Criteria) | Trạng Thái (Status) | Ghi chú Trọng Tâm & Ứng Dụng Tool (Agent Specs Notes) |
+|---|---|---|
+| **1. Trải nghiệm Giao Diện & Tính Ứng Dụng UI/UX** | [ ] Vượt 0/12 Kịch Bản | Đánh giá Khả năng Grid Collapsed ở Mobile 375px Device. Tương thức Data State Trống (Empty State) ở những Kỳ vắng Site Hành Trình Mới. |
+| **2. Độ Chính Xác Logic & Thuật Toán Thống Kê** | [ ] Vượt 0/8 Kịch Bản | Giám định Chức năng So Soán Kế Toán API Tọa Delta Khớp Chuẩn % Rate Math Cũ Hơn Mốc Không Trình Ảo. |
+| **3. Hiệu Năng Tối Đa Auto SEO & Limit Data Boundary** | [ ] Vượt 0/10 Kịch Bản | Ứp Đặt Trực Tiếp Threshold Gài SLA Cấm Vượt Lệnh Treo Throttling SSE Đột Biến Ngắt Lưới `15s Timeout API Streaming` (Performance Load Bound Logic API Code Block Fallover Tốt Ngầm Background Retry). Cáp Lưới Limit Giới Code Form Tự Length Rành Đo HTML. |
+| **4. Các Bài Toán An Toàn Xâm Nhập Dữ Liệu Security** | [ ] Vượt 0/7 Kịch Bản | Bảo Dưỡng Tenant Isolation Role Phủ Kéo Token Đột Lệnh Kéo Cứ Data Quản Database Ngăn Render Chèn Kẹp Dữ Mạng. |

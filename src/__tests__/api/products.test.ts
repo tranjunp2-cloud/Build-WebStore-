@@ -51,6 +51,7 @@ describe('POST /api/products/generate-description', () => {
 
         expect(response.status).toBe(400)
         expect(json.success).toBe(false)
+        expect(json.error.code).toBe('VALIDATION_ERROR')
     })
 
     it('returns 200 with AI generated JSON data for correct inputs', async () => {
