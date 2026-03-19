@@ -39,7 +39,10 @@ export const GET = withAuth(async (user) => {
             limit: 100,
         })
 
-        return NextResponse.json({ success: true, data: result.docs })
+        // Filter out soft-deleted categories
+        const activeCategories = result.docs.filter((doc: any) => doc.status !== 'deleted')
+
+        return NextResponse.json({ success: true, data: activeCategories })
     } catch (error) {
         console.error('GET /api/blog-categories error:', error)
         return NextResponse.json(

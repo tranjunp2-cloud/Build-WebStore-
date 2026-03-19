@@ -6,8 +6,8 @@ export const createBlogSchema = z.object({
     title: z.string().min(1, 'Title is required').max(200),
     content: z.any().optional(),
     status: z.enum(['draft', 'published']).default('draft'),
-    category: z.string().optional(),
-    thumbnail: z.string().optional(),
+    category: z.union([z.string(), z.number()]).transform(v => v ? String(v) : null).nullable().optional(),
+    thumbnail: z.union([z.string(), z.number()]).transform(v => v ? String(v) : null).nullable().optional(),
     seo: z
         .object({
             metaTitle: z.string().max(70).optional(),
@@ -21,8 +21,8 @@ export const updateBlogSchema = z.object({
     slug: z.string().min(1).max(200).optional(),
     content: z.any().optional(),
     status: z.enum(['draft', 'published']).optional(),
-    category: z.string().nullable().optional(),
-    thumbnail: z.string().nullable().optional(),
+    category: z.union([z.string(), z.number()]).transform(v => v ? String(v) : null).nullable().optional(),
+    thumbnail: z.union([z.string(), z.number()]).transform(v => v ? String(v) : null).nullable().optional(),
     seo: z
         .object({
             metaTitle: z.string().max(70).optional(),

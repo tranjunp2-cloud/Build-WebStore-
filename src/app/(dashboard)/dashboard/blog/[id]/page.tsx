@@ -60,6 +60,8 @@ export default function BlogEditorPage() {
     const [categories, setCategories] = useState<BlogCategory[]>([])
     const [showSEO, setShowSEO] = useState(false)
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
+    const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
+    const [thumbnailId, setThumbnailId] = useState<string | null>(null)
 
     // AI Generator State
     const [showAIGenerator, setShowAIGenerator] = useState(false)
@@ -82,17 +84,24 @@ export default function BlogEditorPage() {
             try {
                 const res = await fetch(`/api/blogs/${blogId}`, { credentials: 'include' })
                 if (res.ok) {
-                    const data = await res.json()
+                    const json = await res.json()
+                    const data = json.data
                     setForm({
                         title: data.title || '',
                         slug: data.slug || '',
                         content: data.content || '',
                         status: data.status || 'draft',
-                        category: typeof data.category === 'object' ? data.category?.id : data.category || '',
-                        seoTitle: data.seo?.title || '',
-                        seoDescription: data.seo?.description || '',
+                        category: typeof data.category === 'object' ? String(data.category?.id ?? '') : String(data.category ?? ''),
+                        seoTitle: data.seo?.metaTitle || '',
+                        seoDescription: data.seo?.metaDescription || '',
                     })
-                    if (data.thumbnail?.url) setThumbnailPreview(data.thumbnail.url)
+                    if (data.thumbnail?.url) {
+                        // Strip origin to get relative path (Payload returns absolute URLs)
+                        const thumbUrl = data.thumbnail.url.replace(/^https?:\/\/[^/]+/, '')
+                        setThumbnailPreview(thumbUrl)
+                        const existingThumbId = typeof data.thumbnail === 'object' ? data.thumbnail.id : data.thumbnail
+                        if (existingThumbId) setThumbnailId(existingThumbId)
+                    }
                 } else {
                     toast.error('Failed to load post')
                     setError('Failed to load post')
@@ -138,15 +147,40 @@ export default function BlogEditorPage() {
         setError(null)
 
         try {
-            const body = {
+            // Upload thumbnail if a new file was selected
+            let resolvedThumbnailId = thumbnailId
+            if (thumbnailFile) {
+                try {
+                    const formData = new FormData()
+                    formData.append('file', thumbnailFile)
+                    formData.append('_payload', JSON.stringify({ alt: form.title || thumbnailFile.name }))
+                    const uploadRes = await fetch('/api/media', {
+                        method: 'POST',
+                        credentials: 'include',
+                        body: formData,
+                    })
+                    if (uploadRes.ok) {
+                        const uploadJson = await uploadRes.json()
+                        resolvedThumbnailId = uploadJson.doc?.id || uploadJson.id || null
+                        if (resolvedThumbnailId) setThumbnailId(resolvedThumbnailId)
+                    } else {
+                        toast.error('Failed to upload thumbnail')
+                    }
+                } catch {
+                    toast.error('Thumbnail upload error')
+                }
+            }
+
+            const body: Record<string, any> = {
                 title: form.title.trim(),
                 slug: form.slug || slugify(form.title),
                 content: form.content,
                 status: overrideStatus ?? form.status,
-                category: form.category || undefined,
+                category: form.category || null,
+                thumbnail: resolvedThumbnailId || (thumbnailPreview ? undefined : null),
                 seo: {
-                    title: form.seoTitle,
-                    description: form.seoDescription,
+                    metaTitle: form.seoTitle,
+                    metaDescription: form.seoDescription,
                 },
             }
 
@@ -171,9 +205,26 @@ export default function BlogEditorPage() {
                 }, 1000)
             } else {
                 const data = await res.json()
-                const msg = data.error?.message || data.error || 'Failed to save'
-                setError(msg)
-                toast.error(msg)
+                const errObj = data.error
+                let displayMsg = 'Failed to save'
+                if (typeof errObj === 'string') {
+                    displayMsg = errObj
+                } else if (errObj?.details?.fieldErrors) {
+                    // Zod validation errors → extract field-level messages
+                    const fieldErrors = errObj.details.fieldErrors as Record<string, string[]>
+                    const messages = Object.entries(fieldErrors)
+                        .map(([field, errs]) => `${field}: ${errs.join(', ')}`)
+                        .join('; ')
+                    displayMsg = messages || errObj.code || 'Validation error'
+                } else if (typeof errObj?.details === 'string') {
+                    displayMsg = errObj.details
+                } else if (errObj?.message) {
+                    displayMsg = errObj.message
+                } else if (errObj?.code) {
+                    displayMsg = errObj.code
+                }
+                setError(displayMsg)
+                toast.error(displayMsg)
             }
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Network error'
@@ -184,28 +235,48 @@ export default function BlogEditorPage() {
         }
     }
 
+    // Helper: safely extract plain text from content (richText JSON or string)
+    const getContentText = (content: any): string => {
+        if (!content) return ''
+        if (typeof content === 'string') return content.replace(/<[^>]*>/g, '')
+        // Payload richText (Lexical) → extract text from JSON
+        try {
+            const extractText = (node: any): string => {
+                if (!node) return ''
+                if (node.text) return node.text
+                if (node.children) return node.children.map(extractText).join(' ')
+                return ''
+            }
+            return extractText(content.root || content).trim()
+        } catch {
+            return ''
+        }
+    }
+
     // AC-3: AI generate SEO metadata from blog content
     const handleGenerateSEO = async () => {
-        if (!form.title.trim() && !form.content.trim()) {
+        const contentText = getContentText(form.content)
+        if (!form.title.trim() && !contentText) {
             toast.error('Enter title or content first')
             return
         }
         setIsGeneratingSEO(true)
         setError(null)
         try {
-            const res = await fetch('/api/ai/generate-seo', {
+            // Use generate-blog API with SEO-focused prompt
+            const res = await fetch('/api/ai/generate-blog', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
-                    title: form.title,
-                    content: form.content.substring(0, 1000), // Send first 1000 chars
-                    type: 'blog',
+                    prompt: `Generate ONLY SEO metadata (seoTitle and seoDescription) for this blog post. Title: "${form.title}". Content snippet: "${contentText.substring(0, 500)}"`,
+                    language: 'en',
                 }),
             })
 
             if (res.ok) {
-                const data = await res.json()
+                const json = await res.json()
+                const data = json.data || json
                 if (data.seoTitle || data.metaTitle) {
                     setForm(prev => ({
                         ...prev,
@@ -214,23 +285,32 @@ export default function BlogEditorPage() {
                     }))
                     setShowSEO(true)
                     toast.success('SEO metadata generated!')
+                } else {
+                    // AI returned but no SEO fields → fallback
+                    setForm(prev => ({
+                        ...prev,
+                        seoTitle: prev.title.substring(0, 60),
+                        seoDescription: contentText.substring(0, 155),
+                    }))
+                    setShowSEO(true)
+                    toast.success('SEO auto-filled from content')
                 }
             } else {
-                // Fallback: auto-fill from title
+                // API error → Fallback: auto-fill from title/content
                 setForm(prev => ({
                     ...prev,
                     seoTitle: prev.title.substring(0, 60),
-                    seoDescription: prev.content.replace(/<[^>]*>/g, '').substring(0, 155),
+                    seoDescription: contentText.substring(0, 155),
                 }))
                 setShowSEO(true)
                 toast.success('SEO auto-filled from content')
             }
         } catch {
-            // Fallback
+            // Network error → Fallback
             setForm(prev => ({
                 ...prev,
                 seoTitle: prev.title.substring(0, 60),
-                seoDescription: prev.content.replace(/<[^>]*>/g, '').substring(0, 155),
+                seoDescription: contentText.substring(0, 155),
             }))
             setShowSEO(true)
             toast.success('SEO auto-filled from content')
@@ -460,7 +540,7 @@ export default function BlogEditorPage() {
             <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500">Content</h2>
-                    <span className="text-xs text-gray-600">{form.content.length} chars</span>
+                    <span className="text-xs text-gray-600">{getContentText(form.content).length} chars</span>
                 </div>
                 <textarea
                     id="blog-content"
@@ -484,7 +564,7 @@ export default function BlogEditorPage() {
                             className="w-full max-h-48 object-cover rounded-lg border border-white/10"
                         />
                         <button
-                            onClick={() => setThumbnailPreview(null)}
+                            onClick={() => { setThumbnailPreview(null); setThumbnailFile(null); setThumbnailId(null) }}
                             className="absolute top-2 right-2 rounded-lg bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80 transition-colors"
                         >
                             Remove
@@ -504,13 +584,14 @@ export default function BlogEditorPage() {
                                 if (file) {
                                     const url = URL.createObjectURL(file)
                                     setThumbnailPreview(url)
+                                    setThumbnailFile(file)
                                 }
                             }}
                         />
                     </label>
                 )}
                 <p className="text-xs text-gray-600">
-                    Note: Thumbnail upload requires Media API integration (coming in next sprint).
+                    PNG, JPG, WebP — max 5MB. Image will be uploaded when you save.
                 </p>
             </div>
 
@@ -595,7 +676,7 @@ export default function BlogEditorPage() {
                                     yoursite.com/blog/{form.slug || 'post-slug'}
                                 </p>
                                 <p className="text-xs text-gray-400 mt-1 line-clamp-2">
-                                    {form.seoDescription || form.content.replace(/<[^>]*>/g, '').substring(0, 155) || 'No description'}
+                                    {form.seoDescription || getContentText(form.content).substring(0, 155) || 'No description'}
                                 </p>
                             </div>
                         )}

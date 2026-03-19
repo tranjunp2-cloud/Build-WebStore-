@@ -39,7 +39,10 @@ export const GET = withAuth(async (user, req) => {
         const page = parseInt(url.searchParams.get('page') || '1')
         const limit = parseInt(url.searchParams.get('limit') || '20')
 
-        const where: any = { tenant: { equals: resolvedTenantId } }
+        const where: any = {
+            tenant: { equals: resolvedTenantId },
+            status: { not_equals: 'deleted' },
+        }
 
         if (search) {
             where.title = { contains: search }
@@ -136,8 +139,8 @@ export const POST = withAuth(async (user, req) => {
                 slug,
                 content: data!.content,
                 status: data!.status || 'draft',
-                category: data!.category || undefined,
-                thumbnail: data!.thumbnail || undefined,
+                category: data!.category ? Number(data!.category) : undefined,
+                thumbnail: data!.thumbnail ? Number(data!.thumbnail) : undefined,
                 author: user.id,
                 seo: data!.seo,
             },

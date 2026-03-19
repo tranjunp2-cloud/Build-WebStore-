@@ -53,6 +53,17 @@ export const BlogCategories: CollectionConfig = {
             unique: true,
             index: true,
         },
+        {
+            name: 'status',
+            type: 'select',
+            required: true,
+            defaultValue: 'active',
+            options: [
+                { label: 'Active', value: 'active' },
+                { label: 'Deleted', value: 'deleted' },
+            ],
+            admin: { position: 'sidebar' },
+        },
     ],
     timestamps: true,
 }

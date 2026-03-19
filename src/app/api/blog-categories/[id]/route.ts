@@ -74,14 +74,12 @@ export const DELETE = withAuth<RouteContext>(async (user, _req, ctx) => {
             )
         }
 
-        // Unset category on related blogs before deleting
+        // Soft delete: set status to 'deleted'
         await payload.update({
-            collection: 'blogs',
-            where: { category: { equals: id } },
-            data: { category: null as any },
+            collection: 'blog_categories',
+            id,
+            data: { status: 'deleted' },
         })
-
-        await payload.delete({ collection: 'blog_categories', id })
 
         return NextResponse.json({ success: true, data: { deleted: id } })
     } catch (error: any) {
