@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, Send, ArrowLeft, Loader2, Check, ExternalLink, Eye, MessageSquare, Globe, GripVertical, Lock } from 'lucide-react'
+import { Sparkles, Send, ArrowLeft, Loader2, Check, ExternalLink, Eye, MessageSquare, Globe, GripVertical, Lock, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -140,6 +140,33 @@ export default function AIBuilderPage() {
     useEffect(() => {
         inputRef.current?.focus()
     }, [])
+
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+    // FR-06: Auto-save draft to DB when blocks or theme change
+    useEffect(() => {
+        // Only auto-save if generation is complete and we have a site ID
+        if (!siteId || status !== 'done' || blocks.length === 0 || !theme) return
+
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+        
+        saveTimeoutRef.current = setTimeout(async () => {
+            try {
+                await fetch(`/api/sites/${siteId}/save`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ blocks, theme }),
+                })
+                console.log('[Auto-save] Draft saved successfully')
+            } catch (err) {
+                console.error('[Auto-save] Failed to save draft:', err)
+            }
+        }, 2000) // 2 second debounce
+
+        return () => {
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+        }
+    }, [blocks, theme, siteId, status])
 
     // SSE Stream consumer
     const startSSEGeneration = useCallback(async (info: BusinessInfo, extraInstructions?: string) => {
@@ -332,6 +359,19 @@ export default function AIBuilderPage() {
                             <Sparkles className="h-4 w-4 text-purple-400" />
                             <span className="text-sm font-semibold text-white">AI Builder</span>
                         </div>
+                        {siteId && (
+                            <button
+                                onClick={() => {
+                                    if (confirm('Bắt đầu tạo website mới? Bản nháp hiện tại sẽ bị xóa khỏi phiên làm việc này.')) {
+                                        useBuilderStore.getState().reset()
+                                        router.push('/builder/new')
+                                    }
+                                }}
+                                className="ml-2 flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                            >
+                                <Plus className="h-3 w-3" /> New
+                            </button>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         {/* Mobile: toggle preview */}
