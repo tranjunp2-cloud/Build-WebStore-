@@ -10,6 +10,7 @@ import {
     Image,
     Settings,
     LogOut,
+    Loader2,
     MousePointerClick,
     Search,
     ShoppingBag,
@@ -19,6 +20,7 @@ import {
     X,
     FileText,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -42,6 +44,7 @@ type SidebarProps = {
 export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
     const pathname = usePathname()
     const [mobileOpen, setMobileOpen] = useState(false)
+    const [loggingOut, setLoggingOut] = useState(false)
 
     // Close sidebar on route change
     useEffect(() => {
@@ -109,23 +112,30 @@ export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
                         <p className="truncate text-xs text-gray-500">Owner</p>
                     </div>
                     <button
+                        disabled={loggingOut}
                         onClick={async () => {
+                            if (loggingOut) return
+                            setLoggingOut(true)
                             try {
                                 await fetch('/api/users/logout', {
                                     method: 'POST',
                                     credentials: 'include',
                                 })
+                                toast.success('Đã đăng xuất thành công')
                             } catch {
-                                // Ignore server errors
+                                toast.error('Lỗi khi đăng xuất, vui lòng thử lại!')
                             }
                             // Always clear cookie client-side as fallback
                             document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
                             window.location.href = '/login'
                         }}
-                        className="rounded-lg p-1.5 text-gray-500 hover:bg-white/5 hover:text-white transition-colors"
+                        className={cn(
+                            "rounded-lg p-1.5 text-gray-500 hover:bg-white/5 hover:text-white transition-colors",
+                            loggingOut && "opacity-50 cursor-not-allowed"
+                        )}
                         title="Log Out"
                     >
-                        <LogOut className="h-4 w-4" />
+                        {loggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
                     </button>
                 </div>
             </div>
