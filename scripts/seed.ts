@@ -166,20 +166,40 @@ async function seed() {
     console.log('  ✓ Orders already exist')
   }
 
-  // 6. Seed 10 Industry Templates
-  const existingTemplates = await payload.find({
-    collection: 'templates',
-    limit: 1,
-  })
+  // 6. Seed 10+ Industry Templates (Additive Update)
+  console.log('  🔍 Checking for new industry templates...')
+  let createdCount = 0
+  for (const tpl of SEED_TEMPLATES) {
+    const existing = await payload.find({
+      collection: 'templates',
+      where: { name: { equals: tpl.name } },
+      limit: 1,
+    })
 
-  if (existingTemplates.totalDocs === 0) {
-    for (const tpl of SEED_TEMPLATES) {
+    if (existing.totalDocs === 0) {
       await payload.create({
         collection: 'templates',
         data: {
           name: tpl.name,
           description: tpl.description,
-          category: tpl.category,
+          category: tpl.category as any,
+          defaultTheme: tpl.defaultTheme,
+          defaultBlocks: tpl.defaultBlocks,
+          tags: tpl.tags,
+          sortOrder: tpl.sortOrder,
+          isPremium: tpl.isPremium,
+          isFeatured: tpl.isFeatured,
+        },
+      })
+      createdCount++
+    } else {
+      // Update existing template
+      await payload.update({
+        collection: 'templates',
+        id: existing.docs[0].id,
+        data: {
+          description: tpl.description,
+          category: tpl.category as any,
           defaultTheme: tpl.defaultTheme,
           defaultBlocks: tpl.defaultBlocks,
           tags: tpl.tags,
@@ -189,10 +209,8 @@ async function seed() {
         },
       })
     }
-    console.log(`  ✓ Created ${SEED_TEMPLATES.length} industry templates`)
-  } else {
-    console.log(`  ✓ Templates already exist (${existingTemplates.totalDocs})`)
   }
+  console.log(`  ✓ Updated/Created ${SEED_TEMPLATES.length} industry templates`)
 
   // 7. Seed Pages (homepage + about + contact)
   const existingPages = await payload.find({

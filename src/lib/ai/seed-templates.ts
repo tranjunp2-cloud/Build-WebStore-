@@ -24,7 +24,7 @@ export interface TemplateSeed {
 
 // Helper to build nav block
 const nav = (logo: string, links: string[], cta: string) => ({
-    blockType: 'navigation', variant: 'simple',
+    blockType: 'navigation', style: 'fixed',
     logoText: logo, links: links.map(l => ({ label: l, url: '#' })),
     ctaButton: { show: true, label: cta, url: '#' },
 })
@@ -41,7 +41,7 @@ const hero = (h: string, sub: string, cta1: string, cta2?: string, variant = 'ce
 
 // Helper to build features block
 const features = (h: string, sub: string, items: { icon: string; title: string; desc: string }[], label?: string) => ({
-    blockType: 'features', variant: 'grid-3', headline: h, subheadline: sub,
+    blockType: 'features', layout: 'grid-3', headline: h, subheadline: sub,
     sectionLabel: label || 'Services',
     features: items.map(i => ({ icon: i.icon, title: i.title, description: i.desc })),
 })
@@ -124,7 +124,7 @@ export const SEED_TEMPLATES: TemplateSeed[] = [
         defaultTheme: { primaryColor: '#D97706', secondaryColor: '#92400E', fontHeading: 'Playfair Display', fontBody: 'Inter', colorMode: 'dark' },
         defaultBlocks: [
             nav('Sample Restaurant', ['Home', 'Menu', 'About Us', 'Contact'], 'Book a Table'),
-            hero('Rich Flavours, Incredible Experiences', 'Discover refined cuisine crafted from the freshest ingredients by our award-winning chefs.', 'View Menu', 'Book a Table', 'split'),
+            hero('Rich Flavours, Incredible Experiences', 'Discover refined cuisine crafted from the freshest ingredients by our award-winning chefs.', 'View Menu', 'Book a Table', 'split-left'),
             features('Featured Menu', 'Our most popular dishes', [
                 { icon: '🥩', title: 'Wagyu Steak', desc: 'Premium A5 Wagyu beef, grilled on traditional charcoal.' },
                 { icon: '🍝', title: 'Truffle Pasta', desc: 'Fresh pasta with black truffle and Parmesan cheese.' },
@@ -193,7 +193,7 @@ export const SEED_TEMPLATES: TemplateSeed[] = [
         defaultTheme: { primaryColor: '#D946EF', secondaryColor: '#A855F7', fontHeading: 'Cormorant Garamond', fontBody: 'Inter', colorMode: 'dark' },
         defaultBlocks: [
             nav('Beauty Spa', ['Home', 'Services', 'Pricing', 'Book Now'], 'Book Now'),
-            hero('Radiate Your Natural Beauty', 'Experience premium beauty treatments that help you feel confident and radiant every day.', 'Book Now', 'View Services', 'split'),
+            hero('Radiate Your Natural Beauty', 'Experience premium beauty treatments that help you feel confident and radiant every day.', 'Book Now', 'View Services', 'split-left'),
             pricing('Service Pricing', 'Choose the package that suits you', [
                 { name: 'Basic', price: 'RM99', desc: 'Basic facial treatment', features: ['Deep cleansing', 'Face mask', '15-min facial massage'] },
                 { name: 'Premium', price: 'RM199', desc: 'Complete care package', features: ['Deep cleansing', 'Skin peel', 'Collagen mask', '30-min massage', 'Hand care'] },
@@ -266,7 +266,7 @@ export const SEED_TEMPLATES: TemplateSeed[] = [
         defaultTheme: { primaryColor: '#059669', secondaryColor: '#10B981', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
         defaultBlocks: [
             nav('Health Clinic', ['Home', 'Services', 'Doctors', 'Contact'], 'Book Appointment'),
-            hero('Your Health is Our Priority', 'Experienced medical professionals, modern equipment, and dedicated care.', 'Book Appointment', 'Free Consultation', 'split'),
+            hero('Your Health is Our Priority', 'Experienced medical professionals, modern equipment, and dedicated care.', 'Book Appointment', 'Free Consultation', 'split-left'),
             features('Medical Services', 'Comprehensive healthcare', [
                 { icon: '🦷', title: 'General Dentistry', desc: 'Complete dental examination, treatment, and oral care.' },
                 { icon: '💉', title: 'Vaccination', desc: 'Full vaccination programmes for all ages.' },
@@ -304,7 +304,7 @@ export const SEED_TEMPLATES: TemplateSeed[] = [
         defaultTheme: { primaryColor: '#7C3AED', secondaryColor: '#8B5CF6', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
         defaultBlocks: [
             nav('Training Academy', ['Home', 'Courses', 'Instructors', 'Contact'], 'Enrol Now'),
-            hero('Learn Today, Succeed Tomorrow', 'Practical courses from industry experts. Guaranteed outcomes and career support.', 'View Courses', 'Free Consultation', 'split'),
+            hero('Learn Today, Succeed Tomorrow', 'Practical courses from industry experts. Guaranteed outcomes and career support.', 'View Courses', 'Free Consultation', 'split-left'),
             features('Featured Courses', 'High-quality training programmes', [
                 { icon: '💻', title: 'Web Development', desc: 'Fullstack JavaScript from zero to hero in 6 months.' },
                 { icon: '📱', title: 'Mobile App Dev', desc: 'React Native / Flutter — build real-world apps.' },
@@ -376,7 +376,7 @@ export const SEED_TEMPLATES: TemplateSeed[] = [
         defaultTheme: { primaryColor: '#DC2626', secondaryColor: '#EF4444', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
         defaultBlocks: [
             nav('FitZone', ['Home', 'Plans', 'Facilities', 'Contact'], 'Join Now'),
-            hero('Stronger Every Day', 'Modern gym, professional trainers. Start your journey to transform your life.', 'Free Trial', 'View Plans', 'split'),
+            hero('Stronger Every Day', 'Modern gym, professional trainers. Start your journey to transform your life.', 'Free Trial', 'View Plans', 'split-left'),
             pricing('Membership Plans', 'Choose the plan that fits your goals', [
                 { name: 'Basic', price: 'RM99/mo', desc: 'Gym access', features: ['Main gym floor', 'Locker', 'Drinking water'] },
                 { name: 'Premium', price: 'RM179/mo', desc: 'Gym + Group classes', features: ['All Basic benefits', 'Yoga, Zumba, Boxing', 'Steam & sauna', 'PT 2 sessions/mo'] },
@@ -447,7 +447,7 @@ export const SEED_TEMPLATES: TemplateSeed[] = [
         defaultTheme: { primaryColor: '#1E293B', secondaryColor: '#334155', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
         defaultBlocks: [
             nav('Prime Corp', ['Home', 'Services', 'Team', 'Contact'], 'Consultation'),
-            hero('Excellence in Strategic Consulting', 'We provide data-driven solutions to help your business scale globally.', 'Our Services', 'Contact Us', 'split'),
+            hero('Excellence in Strategic Consulting', 'We provide data-driven solutions to help your business scale globally.', 'Our Services', 'Contact Us', 'split-left'),
             features('Core Services', 'Professional expertise for your growth', [
                 { icon: '📈', title: 'Strategic Planning', desc: 'Comprehensive business roadmaps for sustainable growth.' },
                 { icon: '💼', title: 'Financial Advisory', desc: 'Expert financial management and investment strategy.' },
