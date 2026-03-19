@@ -19,10 +19,36 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>
 
+/**
+ * Determine post-login redirect based on user role (BR-02, AC-5).
+ * - Owner without tenant/site → /onboarding
+ * - Owner with tenant → /dashboard (or returnUrl)
+ * - Staff → /admin (Payload CMS workspace)
+ */
+function getRedirectByRole(
+    user: { roles?: string[]; tenants?: { tenant: unknown }[] },
+    returnUrl: string,
+): string {
+    const roles = user.roles || []
+
+    // Staff → always Payload admin
+    if (roles.includes('editor') || roles.includes('viewer')) {
+        return '/admin'
+    }
+
+    // Owner without any tenant → onboarding
+    if (roles.includes('tenant-owner') && (!user.tenants || user.tenants.length === 0)) {
+        return '/onboarding'
+    }
+
+    // Owner with tenant → returnUrl or dashboard
+    return returnUrl
+}
+
 function LoginFormContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const redirectUrl = searchParams.get('returnUrl') || '/dashboard'
+    const returnUrl = searchParams.get('returnUrl') || '/dashboard'
     const [showPassword, setShowPassword] = useState(false)
 
     const {
@@ -46,7 +72,10 @@ function LoginFormContent() {
                 res = await fetch('/api/users/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data),
+                    body: JSON.stringify({
+                        email: data.email.trim(),
+                        password: data.password.trim(),
+                    }),
                     credentials: 'include',
                     signal: controller.signal,
                 })
@@ -71,11 +100,17 @@ function LoginFormContent() {
                 return
             }
 
+            // Parse user data for role-based routing
+            const { user } = await res.json().catch(() => ({ user: null }))
+            const redirect = user
+                ? getRedirectByRole(user, returnUrl)
+                : returnUrl
+
             toast.success('Welcome back!', {
                 description: 'Redirecting to your dashboard...',
             })
 
-            router.push(redirectUrl)
+            router.push(redirect)
             router.refresh()
         } catch {
             setFormError('root', { message: 'Connection error. Please try again.' })
@@ -136,7 +171,7 @@ function LoginFormContent() {
                         <Input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
-                            placeholder="••••••••"
+                            placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
                             className={`pl-10 pr-10 bg-white/[0.06] border-white/[0.08] text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors ${errors.password ? 'border-red-500/50' : ''}`}
                             {...register('password')}
                         />
@@ -191,7 +226,7 @@ function LoginFormContent() {
                     href="/register"
                     className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
                 >
-                    Create one free →
+                    Create one free \u2192
                 </Link>
             </p>
         </div>
