@@ -13,6 +13,18 @@
 
 ---
 
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
 ## 2. Proposed Modules & Prioritization
 
 Dưới đây là các Epic được đề xuất, phân loại theo độ ưu tiên **Mid** (Cần thiết cho vận hành cơ bản SaaS) và **Low** (Tính năng nâng cao, có thể bổ sung ở Phase sau).
