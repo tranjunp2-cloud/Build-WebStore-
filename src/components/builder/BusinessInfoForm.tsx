@@ -1,35 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, ArrowRight, Building2, ShoppingBag, Briefcase, Globe, ChevronRight } from 'lucide-react'
+import { Sparkles, ArrowRight, LayoutTemplate } from 'lucide-react'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
 import { cn } from '@/lib/utils'
 
 const INDUSTRY_OPTIONS = [
-    { value: 'restaurant', label: 'Restaurant / Café / F&B', icon: '🍽️' },
-    { value: 'ecommerce', label: 'Shop / Fashion / E-commerce', icon: '🛍️' },
-    { value: 'beauty', label: 'Beauty / Spa / Wellness', icon: '💄' },
+    { value: 'restaurant', label: 'Restaurant / Cafe / F&B', icon: '🍕' },
+    { value: 'shop', label: 'Shop / Fashion / Ecommerce', icon: '🛍️' },
     { value: 'tech', label: 'Tech / IT / SaaS', icon: '💻' },
     { value: 'health', label: 'Health / Dental / Clinic', icon: '🏥' },
-    { value: 'education', label: 'Education / Training', icon: '📚' },
     { value: 'realestate', label: 'Real Estate / Property', icon: '🏠' },
-    { value: 'fitness', label: 'Gym / Fitness / Yoga', icon: '💪' },
-    { value: 'creative', label: 'Portfolio / Agency', icon: '🎨' },
-    { value: 'other', label: 'Other', icon: '🏢' },
+    { value: 'portfolio', label: 'Portfolio / Freelancer / Agency', icon: '💼' },
+    { value: 'education', label: 'Education / Training', icon: '🎓' },
+    { value: 'fitness', label: 'Gym / Fitness / Yoga', icon: '🏋️' },
+    { value: 'other', label: 'Other', icon: '📦' },
 ]
 
 const STYLE_OPTIONS = [
-    { value: 'modern', label: 'Modern', sub: 'Clean & Minimal' },
-    { value: 'classic', label: 'Classic', sub: 'Timeless & Elegant' },
-    { value: 'bold', label: 'Bold', sub: 'Vibrant & Energetic' },
-    { value: 'minimal', label: 'Minimal', sub: 'Pure & Simple' },
-]
-
-const LANGUAGE_OPTIONS = [
-    { value: 'auto', label: 'Auto', flag: '🌐' },
-    { value: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
-    { value: 'ms', label: 'Bahasa Melayu', flag: '🇲🇾' },
-    { value: 'en', label: 'English', flag: '🇬🇧' },
+    { value: 'modern', label: 'Modern & Clean' },
+    { value: 'classic', label: 'Classic & Elegant' },
+    { value: 'bold', label: 'Bold & Vibrant' },
+    { value: 'minimal', label: 'Minimal & Simple' },
 ]
 
 interface BusinessInfoFormProps {
@@ -42,12 +34,12 @@ export default function BusinessInfoForm({ onSubmit, isGenerating }: BusinessInf
 
     const [form, setForm] = useState({
         businessName: '',
-        shortDescription: '',
+        shortDescription: '', // kept for compatibility, but omitted visually
         industry: '',
         products: '',
         targetAudience: '',
         style: 'modern',
-        language: 'auto',
+        language: 'auto', // kept for compatibility
     })
     const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -71,99 +63,64 @@ export default function BusinessInfoForm({ onSubmit, isGenerating }: BusinessInf
     }
 
     return (
-        <div className="relative flex min-h-screen overflow-hidden bg-[#080E1E]">
-            {/* Ambient Background Orbs */}
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
-                <div className="absolute -left-64 -top-64 h-[600px] w-[600px] rounded-full bg-purple-600/10 blur-[120px]" />
-                <div className="absolute -right-64 top-1/3 h-[500px] w-[500px] rounded-full bg-blue-600/10 blur-[120px]" />
-                <div className="absolute bottom-0 left-1/3 h-[400px] w-[400px] rounded-full bg-indigo-600/8 blur-[120px]" />
-            </div>
-
-            {/* ─── Left side — Form ─────────────────────────────── */}
-            <div className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 py-12">
-                <div className="w-full max-w-[520px] space-y-7">
-
-                    {/* Logo + Title */}
-                    <div className="space-y-5">
-                        <div className="flex items-center gap-3">
-                            <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-blue-500/25">
-                                <Sparkles className="h-5 w-5 text-white" />
-                                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/20 to-transparent" />
-                            </div>
-                            <div>
-                                <h1 className="text-lg font-bold tracking-tight text-white">
-                                    PrimeWeb <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">AI Builder</span>
-                                </h1>
-                                <p className="text-xs text-white/30">Step 1 of 3 — Business Information</p>
-                            </div>
+        <div className="flex h-screen w-full bg-[#0B1120] text-white overflow-hidden font-['Inter']">
+            {/* ─── Left Panel: Form ─────────────────────────────────────── */}
+            <div className="flex w-full flex-col overflow-y-auto lg:w-1/2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
+                {/* Form Container imitating layout_TAPY5V (width ~775.5 inside 50%) */}
+                <div className="w-full max-w-[695px] px-8 py-10 md:px-[40px] md:py-[40px] mx-auto lg:ml-auto lg:mr-0 flex flex-col gap-[44px]">
+                    
+                    {/* Header */}
+                    <div className="flex items-center gap-[12px] h-[44px]">
+                        <div className="flex h-[40px] w-[40px] items-center justify-center rounded-[16px] bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] shadow-[0_0_40px_rgba(45,212,191,0.3),0_0_24px_rgba(59,130,246,0.6)] shrink-0">
+                            <Sparkles className="h-[20px] w-[20px] text-white" />
                         </div>
-
-                        {/* Step indicator */}
-                        <div className="flex items-center gap-2">
-                            <div className="flex h-1.5 flex-1 overflow-hidden rounded-full bg-white/5">
-                                <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-700" />
-                            </div>
-                            <span className="text-[10px] font-medium text-white/30">33%</span>
+                        <div className="flex flex-col justify-center h-[44px]">
+                            <h1 className="text-[20px] font-semibold text-transparent bg-clip-text bg-gradient-to-br from-[#F8FAFC] to-[#F8FAFC] leading-[1.4em]">
+                                Create Website with AI
+                            </h1>
+                            <p className="text-[12px] text-[#94A3B8] leading-[1.333em]">
+                                Step 1/3 — Business Information
+                            </p>
                         </div>
-
-                        <p className="text-sm leading-[1.7] text-white/50">
-                            Tell us about your business and we'll craft a professional website in minutes using AI.
-                        </p>
                     </div>
 
-                    {/* ─── Form Card ─────────────────────────────────── */}
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <p className="text-[14px] leading-[1.428em] text-[#94A3B8] max-w-[466px] -mt-[30px]">
+                        Provide basic information so AI can create the perfect website for you.
+                    </p>
 
-                        {/* Business Name */}
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/40">
-                                <Building2 className="h-3 w-3" />
-                                Business Name <span className="text-red-400/70">*</span>
+                    {/* Form Fields container layout_X1XR1C */}
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-[24px] pr-0 md:pr-[19px]">
+                        
+                        {/* 1. Business Name */}
+                        <div className="flex flex-col gap-[8px]">
+                            <label className="flex items-center text-[14px] font-medium text-[#F8FAFC] h-[24px]">
+                                <span className="w-[20px] leading-none text-center transform -translate-y-px">📝</span>
+                                <span className="ml-[8px]">Business Name </span>
+                                <span className="ml-[1px] text-[#EF4444]">*</span>
                             </label>
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    value={form.businessName}
-                                    onChange={e => setForm(f => ({ ...f, businessName: e.target.value }))}
-                                    placeholder="e.g. The Coffee House, Beauty Spa Hana..."
-                                    className={cn(
-                                        'w-full rounded-2xl border bg-white/[0.04] px-4 py-3.5 text-sm text-white backdrop-blur-sm placeholder:text-white/20 outline-none transition-all duration-200',
-                                        errors.businessName
-                                            ? 'border-red-500/40 focus:border-red-500/60 focus:ring-2 focus:ring-red-500/10'
-                                            : 'border-white/[0.08] focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10'
-                                    )}
-                                />
-                            </div>
-                            {errors.businessName && (
-                                <p className="flex items-center gap-1 text-xs text-red-400/80">
-                                    <span className="h-1 w-1 rounded-full bg-red-400" />
-                                    {errors.businessName}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Short Description */}
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/40">
-                                <Briefcase className="h-3 w-3" />
-                                Short Description
-                            </label>
-                            <textarea
-                                value={form.shortDescription}
-                                onChange={e => setForm(f => ({ ...f, shortDescription: e.target.value }))}
-                                placeholder="e.g. A cozy handmade bakery operating since 2020..."
-                                rows={2}
-                                className="w-full resize-none rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3.5 text-sm text-white backdrop-blur-sm placeholder:text-white/20 outline-none transition-all duration-200 focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10"
+                            <input
+                                type="text"
+                                value={form.businessName}
+                                onChange={e => setForm(f => ({ ...f, businessName: e.target.value }))}
+                                placeholder="Business Name"
+                                className={cn(
+                                    'w-full rounded-[16px] border bg-[rgba(30,41,59,0.6)] px-[12px] py-[12px] text-[14px] text-white placeholder:text-[#94A3B8] outline-none transition-all duration-200 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)]',
+                                    errors.businessName
+                                        ? 'border-red-500/40 focus:border-red-500/60 focus:ring-1 focus:ring-red-500/10'
+                                        : 'border-[rgba(59,130,246,0.15)] focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/10'
+                                )}
                             />
+                            {errors.businessName && <span className="text-xs text-red-400">{errors.businessName}</span>}
                         </div>
 
-                        {/* Industry */}
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/40">
-                                <Briefcase className="h-3 w-3" />
-                                Industry <span className="text-red-400/70">*</span>
+                        {/* 2. Industry */}
+                        <div className="flex flex-col gap-[8px]">
+                            <label className="flex items-center text-[14px] font-medium text-[#F8FAFC] h-[24px]">
+                                <span className="w-[20px] leading-none text-center transform -translate-y-px">🏢</span>
+                                <span className="ml-[8px]">Industry </span>
+                                <span className="ml-[1px] text-[#EF4444]">*</span>
                             </label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-x-[12px] gap-y-[10px]">
                                 {INDUSTRY_OPTIONS.map(opt => (
                                     <button
                                         key={opt.value}
@@ -173,227 +130,169 @@ export default function BusinessInfoForm({ onSubmit, isGenerating }: BusinessInf
                                             setErrors(e => ({ ...e, industry: '' }))
                                         }}
                                         className={cn(
-                                            'group relative flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left text-xs font-medium transition-all duration-200 hover:scale-[1.02]',
+                                            'flex items-center gap-[8px] rounded-[16px] border px-[10px] py-[10px] text-left transition-all duration-200 min-h-[40px]',
                                             form.industry === opt.value
-                                                ? 'border-blue-500/40 bg-blue-500/10 text-blue-300 shadow-lg shadow-blue-500/10'
-                                                : 'border-white/[0.06] bg-white/[0.025] text-white/40 hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-white/70'
+                                                ? 'border-[#3B82F6] bg-gradient-to-r from-[rgba(59,130,246,0.2)] to-[rgba(45,212,191,0.2)] text-[#F8FAFC] shadow-[0_4px_6px_-4px_rgba(59,130,246,0.25),0_10px_15px_-3px_rgba(59,130,246,0.25)]'
+                                                : 'border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] text-[#94A3B8] shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] hover:border-blue-500/30'
                                         )}
                                     >
-                                        <span className="text-base leading-none">{opt.icon}</span>
-                                        <span className="truncate">{opt.label}</span>
-                                        {form.industry === opt.value && (
-                                            <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
-                                        )}
+                                        <span className="w-[20px] leading-[24px] text-center shrink-0">{opt.icon}</span>
+                                        <span className={cn('text-[12px] leading-[1.333em]', form.industry === opt.value ? 'font-semibold text-[#03V6UO]' : 'font-medium text-[#94A3B8]')}>
+                                            {opt.label}
+                                        </span>
                                     </button>
                                 ))}
                             </div>
-                            {errors.industry && (
-                                <p className="flex items-center gap-1 text-xs text-red-400/80">
-                                    <span className="h-1 w-1 rounded-full bg-red-400" />
-                                    {errors.industry}
-                                </p>
-                            )}
+                            {errors.industry && <span className="text-xs text-red-400">{errors.industry}</span>}
                         </div>
 
-                        {/* Products / Services */}
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/40">
-                                <ShoppingBag className="h-3 w-3" />
-                                Products / Services <span className="text-red-400/70">*</span>
+                        {/* 3. Products / Services */}
+                        <div className="flex flex-col gap-[8px]">
+                            <label className="flex items-center text-[14px] font-medium text-[#F8FAFC] h-[24px]">
+                                <span className="w-[20px] leading-none text-center transform -translate-y-px">📦</span>
+                                <span className="ml-[8px]">Products / Services </span>
+                                <span className="ml-[1px] text-[#EF4444]">*</span>
                             </label>
-                            <textarea
-                                value={form.products}
-                                onChange={e => setForm(f => ({ ...f, products: e.target.value }))}
-                                placeholder="e.g. Specialty coffee, bubble tea, handmade pastries, co-working space..."
-                                rows={3}
-                                className={cn(
-                                    'w-full resize-none rounded-2xl border bg-white/[0.04] px-4 py-3.5 text-sm text-white backdrop-blur-sm placeholder:text-white/20 outline-none transition-all duration-200',
-                                    errors.products
-                                        ? 'border-red-500/40 focus:border-red-500/60 focus:ring-2 focus:ring-red-500/10'
-                                        : 'border-white/[0.08] focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10'
-                                )}
-                            />
-                            {errors.products && (
-                                <p className="flex items-center gap-1 text-xs text-red-400/80">
-                                    <span className="h-1 w-1 rounded-full bg-red-400" />
-                                    {errors.products}
-                                </p>
-                            )}
+                            <div className="relative">
+                                <textarea
+                                    value={form.products}
+                                    onChange={e => setForm(f => ({ ...f, products: e.target.value }))}
+                                    placeholder="e.g., Specialty coffee, bubble tea, handmade pastries, croissants etc..."
+                                    rows={3}
+                                    className={cn(
+                                        'w-full resize-none rounded-[16px] border bg-[rgba(30,41,59,0.6)] pl-[12px] pr-[40px] py-[12px] text-[14px] text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.5)] outline-none transition-all duration-200 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)]',
+                                        errors.products
+                                            ? 'border-red-500/40 focus:border-red-500/60 focus:ring-1 focus:ring-red-500/10'
+                                            : 'border-[rgba(59,130,246,0.15)] focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/10'
+                                    )}
+                                />
+                                <div className="absolute right-[12px] top-[12px] flex h-[24px] w-[24px] items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
+                                    <Sparkles className="h-[12px] w-[12px] text-[#3B82F6]" />
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-[8px] text-[12px] text-[#94A3B8] pl-[2px]">
+                                <span>AI will use this to suggest product images and layout</span>
+                            </div>
+                            {errors.products && <span className="text-xs text-red-400">{errors.products}</span>}
                         </div>
 
-                        {/* Target Audience */}
-                        <div className="space-y-2">
-                            <label className="text-xs font-semibold uppercase tracking-wider text-white/40">
-                                Target Audience <span className="ml-1 text-[10px] font-normal normal-case text-white/20">(optional)</span>
+                        {/* 4. Target Audience */}
+                        <div className="flex flex-col gap-[8px]">
+                            <label className="flex items-center text-[14px] font-medium text-[#F8FAFC] h-[24px]">
+                                <span className="w-[20px] leading-none text-center transform -translate-y-px">🎯</span>
+                                <span className="ml-[8px]">Target Audience </span>
+                                <span className="ml-[4px] text-[12px] text-[#94A3B8] font-medium">(optional)</span>
                             </label>
                             <input
                                 type="text"
                                 value={form.targetAudience}
                                 onChange={e => setForm(f => ({ ...f, targetAudience: e.target.value }))}
-                                placeholder="e.g. Young adults 18–35, office workers, families..."
-                                className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3.5 text-sm text-white backdrop-blur-sm placeholder:text-white/20 outline-none transition-all duration-200 focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10"
+                                placeholder="Enter target audience..."
+                                className="w-full rounded-[16px] border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[12px] py-[12px] text-[14px] text-white placeholder:text-[#94A3B8] outline-none transition-all duration-200 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/10"
                             />
                         </div>
 
-                        {/* Style & Language row */}
-                        <div className="grid grid-cols-2 gap-4">
-                            {/* Style */}
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase tracking-wider text-white/40">Style</label>
-                                <div className="space-y-1.5">
-                                    {STYLE_OPTIONS.map(opt => (
-                                        <button
-                                            key={opt.value}
-                                            type="button"
-                                            onClick={() => setForm(f => ({ ...f, style: opt.value }))}
-                                            className={cn(
-                                                'group flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-medium transition-all duration-200',
-                                                form.style === opt.value
-                                                    ? 'border-purple-500/40 bg-purple-500/10 text-purple-300'
-                                                    : 'border-white/[0.06] bg-white/[0.025] text-white/40 hover:border-white/[0.12] hover:text-white/70'
-                                            )}
-                                        >
-                                            <span>{opt.label}</span>
-                                            {form.style === opt.value && <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Language */}
-                            <div className="space-y-2">
-                                <label className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-white/40">
-                                    <Globe className="h-3 w-3" />
-                                    Language
-                                </label>
-                                <div className="space-y-1.5">
-                                    {LANGUAGE_OPTIONS.map(opt => (
-                                        <button
-                                            key={opt.value}
-                                            type="button"
-                                            onClick={() => setForm(f => ({ ...f, language: opt.value }))}
-                                            className={cn(
-                                                'group flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-medium transition-all duration-200',
-                                                form.language === opt.value
-                                                    ? 'border-blue-500/40 bg-blue-500/10 text-blue-300'
-                                                    : 'border-white/[0.06] bg-white/[0.025] text-white/40 hover:border-white/[0.12] hover:text-white/70'
-                                            )}
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                <span className="text-sm leading-none">{opt.flag}</span>
-                                                {opt.label}
-                                            </span>
-                                            {form.language === opt.value && <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />}
-                                        </button>
-                                    ))}
-                                </div>
+                        {/* 5. Style */}
+                        <div className="flex flex-col gap-[8px]">
+                            <label className="flex items-center text-[14px] font-medium text-[#F8FAFC] h-[24px]">
+                                <span className="w-[20px] leading-none text-center transform -translate-y-px">🎨</span>
+                                <span className="ml-[8px]">Style</span>
+                            </label>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-[4px]">
+                                {STYLE_OPTIONS.map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setForm(f => ({ ...f, style: opt.value }))}
+                                        className={cn(
+                                            'flex w-full items-center justify-center rounded-[16px] border px-[8px] h-[44px] text-[12px] transition-all duration-200',
+                                            form.style === opt.value
+                                                ? 'border-[#3B82F6] bg-gradient-to-r from-[rgba(59,130,246,0.2)] to-[rgba(45,212,191,0.2)] text-[#03V6UO] font-semibold shadow-[0_4px_6px_-4px_rgba(59,130,246,0.25),0_10px_15px_-3px_rgba(59,130,246,0.25)]'
+                                                : 'border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] text-[#94A3B8] font-medium shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] hover:border-blue-500/30'
+                                        )}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
                         {/* Submit Button */}
-                        <div className="pt-2">
+                        <div className="pt-[24px]">
                             <button
                                 type="submit"
                                 disabled={isGenerating}
-                                className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 text-sm font-semibold text-white shadow-xl shadow-blue-600/25 transition-all duration-300 hover:shadow-blue-600/40 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:brightness-100"
+                                className="flex w-full items-center justify-center gap-[6px] rounded-[16px] bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] h-[48px] text-[14px] font-semibold text-white transition-all duration-300 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)]"
                             >
-                                {/* Shine overlay */}
-                                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                                <span className="relative flex items-center gap-2.5">
-                                    {isGenerating ? (
-                                        <>
-                                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-                                            Generating Website...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Sparkles className="h-4 w-4" />
-                                            Generate My Website
-                                            <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                                        </>
-                                    )}
-                                </span>
+                                {isGenerating ? (
+                                    <>
+                                        <span className="h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-white/20 border-t-white" />
+                                        <span>Initializing...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="leading-[20px]">Continue — AI will create your website</span>
+                                        <ArrowRight className="h-[16px] w-[16px] text-white opacity-80" />
+                                    </>
+                                )}
                             </button>
-
-                            <p className="mt-3 text-center text-[11px] text-white/20">
-                                ✨ AI will craft your professional website in under 60 seconds
-                            </p>
                         </div>
                     </form>
                 </div>
             </div>
 
-            {/* ─── Right side — Visual Panel ─────────────────────── */}
-            <div className="relative hidden flex-1 items-center justify-center border-l border-white/[0.04] bg-gradient-to-br from-[#0B1220] via-[#0E1530] to-[#13103A] lg:flex">
-                {/* Decorative mesh gradient */}
-                <div className="pointer-events-none absolute inset-0">
-                    <div className="absolute left-1/4 top-1/4 h-80 w-80 rounded-full bg-blue-500/8 blur-[80px]" />
-                    <div className="absolute bottom-1/4 right-1/4 h-60 w-60 rounded-full bg-purple-500/10 blur-[60px]" />
-                </div>
-
-                <div className="relative z-10 w-full max-w-xs space-y-8 px-6">
-                    {/* Hero Icon */}
-                    <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 shadow-2xl shadow-blue-500/10 ring-1 ring-white/10">
-                        <Sparkles className="h-11 w-11 text-blue-400/90" />
+            {/* ─── Right Panel: AI Website Builder Promo ────────────────── */}
+            <div className="hidden lg:flex w-1/2 h-full items-center justify-center bg-gradient-to-br from-[rgba(59,130,246,0.1)] via-[rgba(45,212,191,0.1)] to-transparent relative">
+                {/* Promo Card layout_DLRHEE */}
+                <div className="relative z-10 w-[448px] h-[419.5px] rounded-[16px] border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] backdrop-blur-xl shrink-0 p-8 flex flex-col justify-center">
+                    
+                    {/* Header icon */}
+                    <div className="h-[64px] w-[64px] rounded-[16px] bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] shadow-[0_0_40px_rgba(45,212,191,0.3),0_0_24px_rgba(59,130,246,0.6)] flex items-center justify-center mb-[24px]">
+                        <LayoutTemplate className="h-[32px] w-[32px] text-white" />
                     </div>
 
-                    <div className="space-y-1 text-center">
-                        <h2 className="text-xl font-bold text-white/90">AI Website Builder</h2>
-                        <p className="text-sm leading-relaxed text-white/35">
-                            Just 3 quick steps.<br />Your professional website — ready in minutes.
+                    {/* Header text */}
+                    <div className="mb-[32px]">
+                        <h2 className="text-[24px] font-semibold text-[#F8FAFC] leading-[1.333em] mb-[8px]">
+                            AI Website Builder
+                        </h2>
+                        <p className="text-[14px] text-[#94A3B8] leading-[1.625em] max-w-[373px]">
+                            Just 3 simple steps, AI will create a professional website in minutes.
                         </p>
                     </div>
 
-                    {/* Step guide */}
-                    <div className="space-y-2">
-                        {[
-                            { num: 1, text: 'Tell us about your business', active: true },
-                            { num: 2, text: 'AI creates your content & design', active: false },
-                            { num: 3, text: 'Preview, edit & publish', active: false },
-                        ].map(step => (
-                            <div
-                                key={step.num}
-                                className={cn(
-                                    'flex items-center gap-3.5 rounded-2xl border px-4 py-3.5 transition-all',
-                                    step.active
-                                        ? 'border-blue-500/30 bg-blue-500/10 shadow-lg shadow-blue-500/5'
-                                        : 'border-white/[0.04] bg-white/[0.02] opacity-40'
-                                )}
-                            >
-                                <div className={cn(
-                                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                                    step.active
-                                        ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-lg shadow-blue-500/30'
-                                        : 'bg-white/10 text-white/40'
-                                )}>
-                                    {step.num}
-                                </div>
-                                <span className={cn('text-sm', step.active ? 'font-medium text-white/80' : 'text-white/40')}>
-                                    {step.text}
-                                </span>
-                                {step.active && <ChevronRight className="ml-auto h-4 w-4 text-blue-400/60" />}
+                    {/* Steps List layout_KS5UKP */}
+                    <div className="flex flex-col gap-[16px]">
+                        {/* Step 1 */}
+                        <div className="flex items-center gap-[16px]">
+                            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] text-white font-semibold text-[16px]">
+                                1
                             </div>
-                        ))}
-                    </div>
-
-                    {/* Stat chips */}
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                        {[
-                            { label: '< 60s', sub: 'Generate' },
-                            { label: '10+', sub: 'Sections' },
-                            { label: 'Free', sub: 'To start' },
-                        ].map(stat => (
-                            <div key={stat.label} className="rounded-xl border border-white/[0.06] bg-white/[0.025] px-2 py-3">
-                                <div className="text-sm font-bold text-white/80">{stat.label}</div>
-                                <div className="mt-0.5 text-[10px] text-white/30">{stat.sub}</div>
+                            <span className="text-[14px] font-medium text-[#F8FAFC]">
+                                Enter business information
+                            </span>
+                        </div>
+                        
+                        {/* Step 2 */}
+                        <div className="flex items-center gap-[16px]">
+                            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-[rgba(30,41,59,0.6)] border border-[rgba(59,130,246,0.15)] shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] text-[#94A3B8] font-semibold text-[16px]">
+                                2
                             </div>
-                        ))}
+                            <span className="text-[14px] font-medium text-[#94A3B8]">
+                                AI creates content & design
+                            </span>
+                        </div>
+                        
+                        {/* Step 3 */}
+                        <div className="flex items-center gap-[16px]">
+                            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-[rgba(30,41,59,0.6)] border border-[rgba(59,130,246,0.15)] shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] text-[#94A3B8] font-semibold text-[16px]">
+                                3
+                            </div>
+                            <span className="text-[14px] font-medium text-[#94A3B8]">
+                                Preview & Publish
+                            </span>
+                        </div>
                     </div>
-
-                    {/* Footer */}
-                    <p className="text-center text-[11px] text-white/15">
-                        © 2026 PrimeWeb. AI-powered website builder.
-                    </p>
                 </div>
             </div>
         </div>
