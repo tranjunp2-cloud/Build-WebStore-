@@ -8,16 +8,17 @@
 
 ### Branch Naming
 ```
-feat/F{XX}-tên-feature    # Feature mới
-fix/mô-tả-bug             # Bug fix
-chore/mô-tả               # Cleanup, CI, docs
+feature/F01-ai-builder     # Feature mới (FXX = feature code, bot dùng để auto-link issue)
+feat/F07-template-gallery  # Cũng OK — bot nhận FXX từ tên branch
+fix/F01-login-redirect     # Bug fix
+chore/deps-upgrade         # Cleanup, CI, docs (bot skip check issue)
 ```
 
 ### Commit Convention
 ```
-feat(F{XX}): mô tả ngắn
-fix(F{XX}): mô tả bug
-chore: mô tả
+feat(F01): add AI template selection
+fix(F01): handle null response in builder
+chore: upgrade Next.js to 15.1
 ```
 
 ### PR Rules
@@ -25,6 +26,31 @@ chore: mô tả
 - Title: `type(scope): mô tả` (Conventional Commits)
 - Điền đủ [PR Template](pull_request_template.md)
 - CI phải xanh (lint + typecheck + test + build) mới merge
+- **⚠️ BẮT BUỘC link issue:** Thêm `Closes #<số>` trong PR description
+
+### Link PR → Issue (bot tự làm!)
+
+Story-sync tự tạo issues từ `docs/stories/`. Bot sẽ **tự động link** PR → Issue:
+
+**Cách nhanh nhất (zero effort):** Đặt PR title có story ID:
+```
+feat(F01): [US-F01-03] AI template selection
+→ Bot tự tìm issue #59 → tự sửa PR body: Closes #59
+```
+
+**Nếu bot không match được:** Bot comment gợi ý danh sách issues → dev chọn 1 → edit PR.
+
+**Keywords hợp lệ** (GitHub tự đóng issue khi PR merged):
+```
+Closes #123     Fixes #123     Resolves #123
+```
+
+**Tại sao quan trọng?**
+- Tránh tạo ticket trùng
+- Auto-close issue khi merge → board tự cập nhật
+- Tracking progress chính xác theo milestone
+
+Chi tiết: [GIT_AND_CI_RULES.md](GIT_AND_CI_RULES.md) §4.3
 
 ### Branch Flow
 ```
