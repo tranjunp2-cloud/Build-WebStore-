@@ -10,6 +10,7 @@
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
 
+
 ---
 
 ## 0. Story Traceability
@@ -20,6 +21,7 @@
 | US-F09-02 | Add to Cart + Cart Drawer | [F09-storefront-stories.md](../stories/F09-storefront-stories.md) | Ready |
 | US-F09-03 | Checkout — Purchase Flow | [F09-storefront-stories.md](../stories/F09-storefront-stories.md) | Ready |
 | US-F09-04 | Order Confirmation | [F09-storefront-stories.md](../stories/F09-storefront-stories.md) | Ready |
+| US-F09-05 | Mobile Web UX — Native-Feeling Storefront | [F09-storefront-stories.md](../stories/F09-storefront-stories.md) | Ready |
 
 ---
 
@@ -108,6 +110,9 @@ SO THAT tôi mua hàng và seller nhận được đơn
 | FR-12 | Confirmation page: order number, items, total | US-F09-04 | P0 | |
 | FR-13 | WhatsApp floating button (nếu store owner set phone) | US-F09-01 | P1 | MY market |
 | FR-14 | Trust signals footer: Halal badge, SSM number, payment icons | US-F09-01 | P1 | MY market |
+| FR-15 | **[Mobile]** PDP hỗ trợ Sticky Bottom Bar cho nút Add to Cart. | US-F09-05 | P1 | Conversion Booster |
+| FR-16 | **[Mobile]** PLP Filters & Sort chuyển thành Bottom Sheet mở từ dưới lên. | US-F09-05 | P1 | Ergonomics |
+| FR-17 | **[Mobile]** Cart Drawer chiếm 100% chiều rộng màn hình (Full-screen). | US-F09-05 | P1 | |
 
 ---
 
@@ -144,8 +149,20 @@ Add to Cart → cart drawer slide in
 
 ## 10. Screen Layout
 
-**10.1 Màn hình PLP (Product List Page - Shop Page)**
-```
+> **[Global CMS Constraint]** Storefront là giao diện hiển thị phía End-user. Tuyệt đối không nhúng các header/sidebar của CMS Admin (F18 Layout) vào Storefront.
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình chính (PLP: Product List Page - Shop Page)
+- **Mô tả:** Màn hình khách hàng lướt xem danh sách sản phẩm.
+- **Components chính:**
+  - Breadcrumbs: Home > Danh mục cha > Danh mục con.
+  - Sidebar Left (Desktop): Khối Filter list checkbox (Danh mục, Màu sắc, Size, Mức giá).
+  - Top Bar: Text "Hiển thị X kết quả", Nút Sort By Dropdown (Mới nhất, Giá tăng/giảm), Nút Grid/List view toggle.
+  - Product Grid: Danh sách card sản phẩm (Ảnh, Tên, Giá, Badge Sale). Cấu trúc 3-col Desktop, 1-col Mobile.
+  - Bottom Pagination: Phân trang `< [1] [2] [3] >`.
+- **Wireframe:**
+```text
 ┌─ /sites/[slug]/shop/category/[category-slug] ──────────┐
 │ [Crumbs: Home > Fashion > Men > Shirts]                │
 │                                                        │
@@ -170,8 +187,14 @@ Add to Cart → cart drawer slide in
 └────────────────────────────────────────────────────────┘
 ```
 
-**10.2 Màn hình PDP (Product Detail Page)**
-```
+### 10.2. Màn hình Chi tiết (PDP: Product Detail Page)
+- **Mô tả:** Xem chi tiết 1 sản phẩm cụ thể để bỏ vào giỏ hàng.
+- **Components chính:**
+  - Gallery (Left): Ảnh vuông lớn, thumbnail strip bên dưới.
+  - Thông tin (Right): Tên SP, Đánh giá, Giá (giá gạch ngang nếu sale), Các khối chọn Biến thể (Tier 1, Tier 2), Số lượng điều chỉnh (+/-), Nút siêu to "🛒 THÊM VÀO GIỎ / ADD TO CART".
+  - Mô tả & Attributes (Bottom): Khối tab chuyển đổi Rich Text giới thiệu và Bảng thông số chi tiết (Key-Value attributes).
+- **Wireframe:**
+```text
 ┌─ /sites/[slug]/product/[friendly-slug] ────────────────┐
 │ [Crumbs: Home > Fashion > Men > Shirts > Polo Black]   │
 │                                                        │
@@ -196,6 +219,99 @@ Add to Cart → cart drawer slide in
 │ │                        │ │ (Hiển thị Attributes)   │ │
 │ └────────────────────────┘ └─────────────────────────┘ │
 └────────────────────────────────────────────────────────┘
+```
+
+### 10.3. Mobile View (Storefront PLP / PDP & Cart)
+- **Mô tả:** Trải nghiệm mua sắm trên điện thoại của khách hàng, lưới 1 cột, Filter giấu vào Bottom Sheet, Giỏ hàng hiển thị toàn màn hình (Full Screen Drawer).
+- **Wireframe:**
+```text
+┌─ 📱 Mobile Shop (PLP) ──────────────────────┐
+│ [☰] Store Logo                 [🛒 2] │
+│ ─────────────────────────────────────────── │
+│ < Home / Fashion / Men                      │
+│                                             │
+│ [ 🔍 Search ]  [ ⧨ Sort ]  [ ⚙ Filters ]   │
+│ ─────────────────────────────────────────── │
+│ ┌────────────────────────┐                  │
+│ │ [ MAIN IMAGE ]         │                  │
+│ │ Polo Black Nhập Khẩu   │                  │
+│ │ RM 120.00              │                  │
+│ └────────────────────────┘                  │
+│ ┌────────────────────────┐                  │
+│ │ [ MAIN IMAGE ]         │                  │
+│ │ Áo Thun Basic Trắng    │                  │
+│ │ RM 89.00               │                  │
+│ └────────────────────────┘                  │
+│                                             │
+│                [ Load More ]                │
+└─────────────────────────────────────────────┘
+
+┌─ 📱 Mobile Cart Drawer ─────────────────────┐
+│ TÚI HÀNG (2)                           [✕] │
+│ ─────────────────────────────────────────── │
+│ ┌───┐ Polo Black               [ 🗑 ]     │
+│ │ 🖼️ │ Size L, Trắng                      │
+│ └───┘ [-] 1 [+]                  RM 120     │
+│                                             │
+│ ┌───┐ Cà Phê Hạt               [ 🗑 ]     │
+│ │ 🖼️ │ 500g                               │
+│ └───┘ [-] 2 [+]                  RM  60     │
+│ ─────────────────────────────────────────── │
+│ Chú ý: Miễn phí vận chuyển cho đơn > RM 150!│
+│ ─────────────────────────────────────────── │
+│ Tổng cộng:                           RM 180 │
+│                                             │
+│ [ THÀNH TOÁN AN TOÀN ]                      │
+└─────────────────────────────────────────────┘
+```
+
+### 10.4. Các trạng thái UI (UI States) & Modals
+- **Empty State:** PLP (Shop) hiện icon túi giấy rỗng text "Không tìm thấy sản phẩm nào". Drawer Cart hiển thị text "Giỏ hàng trống, hãy mua sắm".
+- **Loading State:** Shimmer Skeleton Cards tại PLP trong 0.5s lúc fetch data. Skeleton vuông cho ảnh Gallery tại PDP.
+- **Error State / Edge Cases:** Nếu item "Out of stock", Nút "Add to Cart" bị disabled màu xám gạch ngang. Nếu load fail: màn hình Error Fallback "Không thể tải trang".
+- **Modals & Drawers:** 
+  - Cart Drawer: Slide từ phải (Right Screen Edge) đè lên nội dung, hỗ trợ +/- số lượng và Checkout button.
+
+### 10.4. Màn hình Checkout & Cart Drawer
+- **Wireframe (Cart Drawer):**
+```text
+[Bên phải màn hình trượt ra]
+┌─ TÚI HÀNG (2) ────────[✕]┐
+│                          │
+│ ┌───┐ Polo Black Nhập  🗑│
+│ │ 🖼️ │ Size L, Trắng     │
+│ └───┘ [-] 1 [+]   RM 120 │
+│                          │
+│ ┌───┐ Cà Phê Hạt Nguyên🗑│
+│ │ 🖼️ │ 500g              │
+│ └───┘ [-] 2 [+]   RM  60 │
+│                          │
+│ ──────────────────────── │
+│ Tổng cộng:        RM 180 │
+│                          │
+│ [ THÀNH TOÁN ]           │
+└──────────────────────────┘
+```
+
+- **Wireframe (Guest Checkout):**
+```text
+┌─ Checkout ───────────────────────────────────────────┐
+│ ┌─ THÔNG TIN GIAO HÀNG (Guest) ────────────────────┐ │
+│ │ Họ Tên: [_________________]  SĐT: [___________]  │ │
+│ │ Email:  [_________________]                      │ │
+│ │                                                  │ │
+│ │ Tỉnh/Bang: [ Selangor ▼ ]    Mã Bưu: [ 40000 ]   │ │
+│ │ Địa chỉ:   [_____________________________]       │ │
+│ └──────────────────────────────────────────────────┘ │
+│ ┌─ PHƯƠNG THỨC THANH TOÁN ─────────────────────────┐ │
+│ │ ( ) COD - Thanh toán khi nhận hàng               │ │
+│ │ (•) QR Banking                                   │ │
+│ │     [ 🖼 Upload Receipt (Bắt buộc) ]             │ │
+│ └──────────────────────────────────────────────────┘ │
+│ ──────────────────────────────────────────────────   │
+│ Tạm tính: RM 180.00 | Shipping: RM 8 | SST 6%: RM 10 │
+│ TỔNG CỘNG: RM 198.80           [ PLACE ORDER ]       │
+└──────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -270,6 +386,11 @@ GIVEN screen width < 768px
 WHEN  on any storefront page
 THEN  product grid 1-col, all buttons ≥ 44px tap target
 ```
+
+### AC-7: Mobile Native-Feeling (App-like UX)
+> 📌 Source: [US-F09-05](../stories/F09-storefront-stories.md)
+
+Trên điện thoại (< 768px), PDP có thanh Sticky Add-to-Cart cố định bên dưới để luôn thúc đẩy chuyển đổi khi cuộn trang đọc mô tả. Các thao tác Lọc (Filter) và Sắp xếp (Sort) tại mục Shop (PLP) gọi ra Bottom Sheet trượt từ mép dưới lên thay vì dropdown. Khi mở Giỏ hàng (Cart Drawer), nó sẽ chiếm toàn bộ màn hình (Fullscreen) để tối đa hoá không gian hiển thị danh sách item và nút Checkout.
 
 ---
 

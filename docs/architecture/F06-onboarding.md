@@ -1,13 +1,11 @@
 # Architecture: Onboarding Flow & AI Discovery Wizard (F06)
 
 ## 1. Overview
-The F06 Onboarding Flow handles user registration, automatic login post-verification, and the crucial first-time experience in the CMS dashboard via the AI Discovery Wizard.
+The F06 Onboarding Flow handles the crucial first-time experience via the Welcome Screen and the CMS dashboard via the AI Discovery Wizard, assuming the user has already been authenticated through F02.
 
 ## 2. Core Components
 
 ### 2.1 Frontend Components (`app/(frontend)`)
-- `RegisterForm`: Connects to Payload's `/api/users/login` and `/api/users/register`.
-- `VerifyEmail`: Handles token parsing from the URL and auto authentication.
 - `WelcomeScreen` (`/onboarding`): A simple bridge page with a single CTA pushing users to `/builder/new` (F01).
 
 ### 2.2 Backend / CMS Dashboard Components (`app/(dashboard)`)

@@ -68,7 +68,7 @@ const Orders: CollectionConfig = {
 ## 3. Component Tree
 
 ```
-OrdersPage (/dashboard/orders)
+OrdersPage (/orders)
 ├── OrderStats (New: 3 | Processing: 5 | Shipped: 12)
 ├── OrderFilters (status, date range, payment method)
 ├── OrdersTable

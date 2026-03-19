@@ -14,6 +14,7 @@
 > F13 chưa có Story file riêng (sử dụng US-F13-02 từ F10 Orders).
 > **Action required:** Tạo `F11-payment-stories.md` với stories cho FPX, e-wallet, seller settings.
 
+
 ---
 
 ## 0. Story Traceability
@@ -79,7 +80,7 @@ I WANT pay sử dụng FPX (online banking)
 SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 ```
 
-> Story pending — xem Section 0 note.
+> Source: [US-F13-01](../stories/F13-payment-gateway-stories.md)
 
 ---
 
@@ -87,13 +88,15 @@ SO THAT tôi thanh toán trực tiếp từ bank mà không cần credit card
 
 | FR-ID | Requirement | Story Ref | Priority | Notes |
 |-------|-------------|-----------|----------|-------|
-| FR-01 | FPX payment via Stripe Payment Element | US-F13-02 | P0 | Wave 6 |
-| FR-02 | Bank dropdown cho FPX: Maybank, CIMB, etc. | *(Pending)* | P0 | |
-| FR-03 | Redirect to bank → approval → back to confirmation | *(Pending)* | P0 | 3D Secure flow |
-| FR-04 | Payment fail: error message BM "Pembayaran gagal. Sila cuba lagi." | *(Pending)* | P0 | |
-| FR-05 | Cart preserved nếu payment fail | US-F13-02 | P0 | |
-| FR-06 | Seller payment settings: enable/disable Card, FPX | *(Pending)* | P0 | |
-| FR-07 | Webhook: payment_intent.succeeded → order status update | US-F13-02 | P0 | |
+| FR-01 | FPX payment via Stripe Payment Element | US-F13-01 | P0 | Wave 6 |
+| FR-02 | Bank dropdown cho FPX: Maybank, CIMB, etc. | US-F13-01 | P0 | |
+| FR-03 | Redirect to bank → approval → back to confirmation | US-F13-01 | P0 | 3D Secure flow |
+| FR-04 | Payment fail: error message BM "Pembayaran gagal. Sila cuba lagi." | US-F13-01 | P0 | |
+| FR-05 | Cart preserved nếu payment fail | US-F13-01 | P0 | |
+| FR-06 | Seller payment settings: enable/disable Card, FPX | US-F13-02 | P0 | |
+| FR-07 | Webhook: payment_intent.succeeded → order status update | US-F13-01 | P0 | |
+| FR-08 | **[Mobile]** Layout chọn phương thức thanh toán kiểu Cột đứng (Stacked), các hitbox thanh toán rộng (>= 54px). | US-F13-03 | P1 | Chống chạm nhầm |
+| FR-09 | **[Mobile]** Sử dụng giao diện chọn Ngân hàng thân thiện chạm (Native OS dropdown hoặc Bottom Sheet). | US-F13-03 | P1 | Tốc độ thanh toán |
 
 ---
 
@@ -121,7 +124,18 @@ Checkout → "Choose payment method"
 
 ## 10. Screen Layout
 
-```
+> **[Global CMS Constraint]** Tính năng Payment Method hiển thị tại bước cuối cùng của Checkout Flow ở Storefront. Cấu hình Payment Settings nằm trong Dashboard CMS F18 Layout.
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình Checkout Payment Selection (Storefront)
+- **Mô tả:** Màn hình thanh toán bên phí khách hàng (Buyer).
+- **Components chính:**
+  - Khối Phương thức thanh toán (Radio group): "FPX (Online Banking)", "Credit/Debit Card", "E-wallet".
+  - Khi chọn FPX: Hiển thị Bank Selection Dropdown.
+  - Khối Order Summary (Bên phải/Dưới): Phân rã Total (Subtotal, Shipping, SST). Bấm [Pay Now].
+- **Wireframe:**
+```text
 ┌─ Payment Method ──────────────────────┐
 │  ⦿ 🏦 FPX (Online Banking)           │
 │     Select your bank: [Maybank ▼]     │
@@ -137,14 +151,62 @@ Checkout → "Choose payment method"
 └────────────────────────────────────────┘
 ```
 
+### 10.2. Màn hình Seller Payment Settings (CMS Dashboard)
+- **Mô tả:** Nơi chủ shop bật tắt phương thức thanh toán cho Storefront.
+- **Wireframe:**
+```text
+┌─ Payment Settings ──────────────────────────┐
+│  Configure how you receive money:           │
+│                                             │
+│  [✓] 💳 Credit/Debit Card (Stripe)         │
+│      Allow Visa, Mastercard.                │
+│                                             │
+│  [✓] 🏦 Online Banking (FPX)               │
+│      Allow Maybank, CIMB, RHB, etc.         │
+│                                             │
+│  [ ] 💵 Cash on Delivery (COD)             │
+│      Pay when item arrives.                 │
+│                                             │
+│  [ Save Settings ]                          │
+└─────────────────────────────────────────────┘
+```
+
+### 10.3. Mobile View (Checkout Payment & Config)
+- **Mô tả:** Màn hình Checkout Payment cho khách mua hàng trên giao diện dọc điện thoại, và trang Settings bật/tắt Payment cho chủ shop.
+- **Wireframe (Storefront Mobile):**
+```text
+┌─ Mobile Checkout: Payment ──────────────────┐
+│ [←] Back         [🔒 Secure]                │
+│ ─────────────────────────────────────────── │
+│ Phương thức thanh toán:                     │
+│ ┌────────────────────────────────────────┐  │
+│ │ ⦿ 🏦 FPX (Online Banking)              │  │
+│ │   [ Chọn Ngân hàng ▼ ]                   │  │
+│ ├────────────────────────────────────────┤  │
+│ │ ○ 💳 Thẻ Tín dụng/Ghi nợ               │  │
+│ ├────────────────────────────────────────┤  │
+│ │ ○ 📱 E-wallet (Wave 7)                 │  │
+│ └────────────────────────────────────────┘  │
+│                                             │
+│ ─────────────────────────────────────────── │
+│ Tổng thanh toán: RM 208.82                  │
+│ [ THÀNH TOÁN NGAY ]                         │
+└─────────────────────────────────────────────┘
+```
+
+### 10.4. Các trạng thái UI (UI States) & Modals
+- **Loading State:** Nút "Pay Now" hiển thị Spinner và text "Processing...". Khi submit thành công có thể hiện một màng mờ overlay toàn trang "Redirecting to your bank...".
+- **Error State / Edge Cases:** Toast đỏ: "Pembayaran gagal. Sila cuba lagi." Bị từ chối thẻ hoặc API timeout.
+- **Success State:** Redirect tự động về Order Confirmation Page.
+
 ---
 
 ## 11. Acceptance Criteria
 
-> AC pending — story file belum ada. AC sementara derived dari F10 scope.
+> AC được lấy từ `F13-payment-gateway-stories.md`.
 
 ### AC-1: FPX Payment Happy Path
-> 📌 Source: US-F13-02 (extended) — derived requirement
+> 📌 Source: [US-F13-01](../stories/F13-payment-gateway-stories.md) — AC-1
 
 ```gherkin
 GIVEN buyer at checkout selects FPX
@@ -156,7 +218,7 @@ THEN  redirect to bank's login page (3D Secure)
 ```
 
 ### AC-2: Payment Failed
-> 📌 Source: US-F13-02 — AC-2
+> 📌 Source: [US-F13-01](../stories/F13-payment-gateway-stories.md) — AC-2
 
 ```gherkin
 GIVEN payment fails (bank declined, timeout)
@@ -208,7 +270,7 @@ const paymentIntent = await stripe.paymentIntents.create({
 
 ## 18. Definition of Ready
 
-- [ ] ⚠️ Story file `F11-payment-stories.md` created
+- [ ] User Stories F13 approved
 - [ ] Stripe Malaysia enabled
 - [ ] F09, F10 done
 

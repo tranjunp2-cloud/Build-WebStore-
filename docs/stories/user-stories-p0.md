@@ -84,13 +84,13 @@
 | US-F15-07 | F15 Admin Management | Gửi In-app Broadcast & Release Notes | [F15-admin-management-stories.md](./F15-admin-management-stories.md) | P2 | 4 | M | Draft |
 | US-F15-08 | F15 Admin Management | Tạo chiến dịch tự động (Automated Campaigns) | [F15-admin-management-stories.md](./F15-admin-management-stories.md) | P1 | 4 | L | Draft |
 | US-F15-09 | F15 Admin Management | Tích hợp Đa kênh (Email & Social Apps) | [F15-admin-management-stories.md](./F15-admin-management-stories.md) | P1 | 4 | M | Draft |
-| US-F16-01 | F16 In-app Notification Center for Owner & Employee | Notification Center — Unread Badge | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P1 | 2 | S | Draft |
-| US-F16-02 | F16 In-app Notification Center for Owner & Employee | Notification Center — Dropdown List | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P1 | 2 | M | Draft |
-| US-F16-03 | F16 In-app Notification Center for Owner & Employee | Notification Center — Actionable Links | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P1 | 2 | S | Draft |
-| US-F16-04 | F16 In-app Notification Center for Owner & Employee | Notification Center — Mark All as Read | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P2 | 2 | XS | Draft |
-| US-F16-05 | F16 In-app Notification Center for Owner & Employee | Notification Center — Global System Broadcasts | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P2 | 2 | S | Draft |
-| US-F16-06 | F16 In-app Notification Center for Owner & Employee | Notification Center — Live In-app Popup | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P1 | 2 | S | Draft |
-| US-F16-07 | F16 In-app Notification Center for Owner & Employee | Notification Center — Browser Push Notifications | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P2 | 2 | M | Draft |
+| US-F16-01 | F16 In-app Notification Center for Owner & Employee | Notification Center — Unread Badge | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P1 | 2 | S | Ready |
+| US-F16-02 | F16 In-app Notification Center for Owner & Employee | Notification Center — Dropdown List | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P1 | 2 | M | Ready |
+| US-F16-03 | F16 In-app Notification Center for Owner & Employee | Notification Center — Actionable Links | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P1 | 2 | S | Ready |
+| US-F16-04 | F16 In-app Notification Center for Owner & Employee | Notification Center — Mark All as Read | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P2 | 2 | XS | Ready |
+| US-F16-05 | F16 In-app Notification Center for Owner & Employee | Notification Center — Global System Broadcasts | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P2 | 2 | S | Ready |
+| US-F16-06 | F16 In-app Notification Center for Owner & Employee | Notification Center — Live In-app Popup | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P1 | 2 | S | Ready |
+| US-F16-07 | F16 In-app Notification Center for Owner & Employee | Notification Center — Browser Push Notifications | [F16-notification-center-stories.md](./F16-notification-center-stories.md) | P2 | 2 | M | Ready |
 | US-F17-01 | F17 Blog Management | Blog Management Dashboard | [F17-blog-management-stories.md](./F17-blog-management-stories.md) | P1 | 4 | M | Ready |
 | US-F17-02 | F17 Blog Management | Create & Edit Blog Post | [F17-blog-management-stories.md](./F17-blog-management-stories.md) | P1 | 4 | M | Ready |
 | US-F17-03 | F17 Blog Management | AI Blog Writing Assistant (Text Only) | [F17-blog-management-stories.md](./F17-blog-management-stories.md) | P1 | 4 | M | Ready |
