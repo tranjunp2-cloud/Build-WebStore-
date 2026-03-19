@@ -19,6 +19,18 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
 
 ---
 
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
 ## Báo Cáo Phân Tích & Rà Soát Trùng Lặp (BA Analysis)
 
 **1. Kết quả rà soát các feature hiện tại:**
@@ -152,7 +164,7 @@ So that hệ thống đánh dấu nó là "Đã đọc" và điều hướng tô
 GIVEN User đang mở Notification drop-down
 WHEN  User click vào thông báo "Đơn hàng mới #1024"
 THEN  thông báo đó tự động chuyển trạng thái thành "Đã đọc" (Unread count giảm 1)
-  AND hệ thống điều hướng (navigate) mở trang /dashboard/orders với drawer số #1024
+  AND hệ thống điều hướng (navigate) mở trang /orders với drawer số #1024
 ```
 
 #### AC-2: Thông báo không có liên kết điều hướng
@@ -349,3 +361,39 @@ THEN  một Native Push Notification của hệ điều hành Desktop xuất hi�
 - [ ] Browser Push opt-in flow tested trên Chrome, Firefox, Edge
 - [ ] Safari Desktop tested (iOS 16.4+)
 - [ ] Settings toggle bật/tắt Browser Push hoạt động và persist
+
+---
+
+## US-F16-08: Mobile Web UX — Touch-friendly Notification Hub
+
+**Wave 2** | **P1** | **S** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user (Owner / Employee)
+I want the notification list to be easy to read and tap on my phone
+So that I don't misclick on tiny notification dropdowns
+```
+
+### Acceptance Criteria
+
+#### AC-1: Full-Screen or Bottom Sheet Hub
+
+```gherkin
+GIVEN a user is on a mobile device (< 768px)
+WHEN  they tap the Notification Bell icon
+THEN  instead of a floating dropdown, a Full-Screen Drawer or Bottom Sheet opens up
+  AND the notification items are rendered with large touch targets (≥ 44px height)
+```
+
+#### AC-2: Prominent "Mark All as Read"
+
+```gherkin
+GIVEN the mobile notification drawer is open
+WHEN  the user wants to clear their notifications
+THEN  the "Mark all as read" button is prominently displayed at the top or bottom sticky bar, making it easy to tap with one thumb
+```
+
+### Definition of Done
+- [ ] 9-Point Checklist pass for mobile mode.

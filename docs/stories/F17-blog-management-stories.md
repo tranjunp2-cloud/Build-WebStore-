@@ -19,6 +19,18 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
 
 ---
 
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
 ## US-F17-01: Blog Management Dashboard
 
 **Wave 4** | **P1** | **M** | **Status:** Ready
@@ -292,3 +304,128 @@ THEN  all posts that were in that category revert to "Uncategorized" state
 - [ ] Category xóa → posts phải revert về Uncategorized (không mất bài viết)
 - [ ] Duplicate category name bị block với error message
 
+---
+
+## US-F17-06: Mobile Web UX — On-the-Go Blogging
+
+**Wave 4** | **P1** | **S** | **Status:** Ready
+
+### Story
+
+```
+As a   Store Owner
+I want to manage and write blog posts from my smartphone
+So that I can quickly publish updates or fix typos without waiting to use a laptop
+```
+
+### Acceptance Criteria
+
+#### AC-1: Sticky Formatting Toolbar
+
+```gherkin
+GIVEN the user is writing a blog post on a mobile device
+WHEN  the virtual keyboard is active
+THEN  the Rich Text formatting toolbar (B, I, U, Link) sticks to the bottom of the screen (just above the keyboard)
+  AND it remains accessible while scrolling through the content
+```
+
+#### AC-2: Tap-Friendly AI Assistant
+
+```gherkin
+GIVEN the user opens the AI Assistant on mobile
+WHEN  the generative modal appears
+THEN  it opens as a full-screen drawer
+  AND the buttons (Generate, Insert, Regenerate) are full-width and easy to tap with one thumb
+```
+
+### Definition of Done
+- [ ] 9-Point Checklist pass for mobile mode.
+
+---
+
+## US-F17-07: Public Blog List (Storefront)
+
+**Wave 4** | **P1** | **M** | **Status:** Ready
+
+### Story
+
+```text
+As a   Site Visitor (Customer)
+I want to view a list of published blog posts on the storefront
+So that I can read news, updates, and articles from the store
+```
+
+### Acceptance Criteria
+
+#### AC-1: View Blog List
+```gherkin
+GIVEN a published site with active blog posts
+WHEN  visitor navigates to /sites/[slug]/blogs
+THEN  they see a list of published blog posts (grid or list view)
+  AND each post card displays: Thumbnail image, Category, Title, Excerpt, and Publish Date
+  AND only posts with status="Published" are visible
+```
+
+#### AC-2: Blog Pagination
+```gherkin
+GIVEN there are more than 12 published blog posts
+WHEN  viewing the blog list
+THEN  posts are paginated (e.g., 12 posts per page or Load More button)
+```
+
+#### AC-3: Filter by Category
+```gherkin
+GIVEN the visitor is on the public blog list
+WHEN  they click on a specific Category tag/link
+THEN  the list filters to show only posts belonging to that category
+```
+
+### Additional Criteria
+- [ ] If there are no published posts, show a friendly Empty State ("Chưa có bài viết nào").
+- [ ] Mobile responsive: 1-column layout on < 768px screens.
+
+### Definition of Done
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+
+---
+
+## US-F17-08: Public Blog Detail (Storefront)
+
+**Wave 4** | **P1** | **S** | **Status:** Ready
+
+### Story
+
+```text
+As a   Site Visitor (Customer)
+I want to read the full content of a blog post
+So that I can consume the information and potentially share it
+```
+
+### Acceptance Criteria
+
+#### AC-1: Read Blog Post
+```gherkin
+GIVEN the visitor clicks on a blog post from the list
+WHEN  they navigate to the post detail page (/sites/[slug]/blogs/[post-slug])
+THEN  they see the full Thumbnail, Title, Publish Date, Category, and the Rich Text Content
+  AND the content is formatted correctly as styled in the editor (headings, links, bold/italic, etc.)
+```
+
+#### AC-2: SEO Metadata & Meta Tags
+```gherkin
+GIVEN the visitor accesses a specific blog post
+WHEN  the page loads
+THEN  the HTML `<title>` and `<meta name="description">` tags use the Meta Title and Meta Description defined by the seller
+  AND JSON-LD Article Schema is rendered for SEO
+```
+
+#### AC-3: Navigation Back
+```gherkin
+GIVEN the visitor is reading a blog post
+WHEN  they scroll or look at the top/bottom of the article
+THEN  there is a "Back to Blogs" link or Breadcrumb to return to the list
+```
+
+### Definition of Done
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Responsive design ensures text is readable on mobile devices with proper padding.

@@ -9,6 +9,7 @@
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
 
+
 ---
 
 ## 0. Story Traceability
@@ -23,6 +24,8 @@
 | US-F01-06 | Multilingual Site Output | [F01-ai-builder-stories.md](../stories/F01-ai-builder-stories.md) | Ready |
 | US-F01-07 | Post-Generation Confirm & CMS Redirect | [F01-ai-builder-stories.md](../stories/F01-ai-builder-stories.md) | Ready |
 | US-F01-08 | Drag-and-Drop Block Reorder in Builder Preview | [F01-ai-builder-stories.md](../stories/F01-ai-builder-stories.md) | Ready |
+| US-F01-09 | Mobile Web UX — Input Form & Immersive Preview | [F01-ai-builder-stories.md](../stories/F01-ai-builder-stories.md) | Ready |
+| US-F01-10 | Mobile Web UX — Touch-Safe Block Reordering | [F01-ai-builder-stories.md](../stories/F01-ai-builder-stories.md) | Ready |
 
 ---
 
@@ -60,7 +63,8 @@ Người dùng truy cập vào `/builder/new`, điền thông tin doanh nghiệp
 - Nội dung site được generate theo ngôn ngữ input của người dùng, dự phòng (fallback) về tiếng Anh (US-F01-06)
 - Bắt buộc tạo đủ 4 trang: Homepage, About Us, Products & Services, Contact Us (US-F01-01)
 - Layout thay đổi linh hoạt tùy theo danh mục business (US-F01-01)
-- Cho phép người dùng thao tác Drag-and-drop đổi vị trí Block ở Preview Panel ngay tại màn hình builder (US-F01-08)
+- Môi trường Mobile Web: Vertical input form trực quan, sau đó hiển thị chế độ Immersive Preview full-screen và UI Reordering thân thiện chạm (Touch-safe) (US-F01-09, US-F01-10)
+- Cho phép người dùng thao tác Drag-and-drop đổi vị trí Block ở Preview Panel ngay tại màn hình builder (Desktop) (US-F01-08)
 
 ### Out of Scope
 - Custom domain (Sẽ xử lý ở Wave 6+)
@@ -120,6 +124,10 @@ SO THAT AI tạo đầy đủ website phù hợp và chính xác
 | FR-20 | Post-publish: "Go to Admin Dashboard" redirects to /admin | US-F01-07 | P0 | No re-login required |
 | FR-21 | Drag handle appears on hover for reorderable blocks in builder preview | US-F01-08 | P0 | Exclude Navigation & Footer |
 | FR-22 | Block reorder persisted to DB (Page.layout sortOrder) on confirm/publish | US-F01-08 | P0 | Works on Desktop & Mobile |
+| FR-23 | [Mobile] Layout thay form nhập liệu thành dạng dọc (Vertical) chữ >16px chống auto-zoom và nút Submit sticky dính cạnh đáy để không bị bàn phím che khuất. | US-F01-09 | P0 | Ergonomics |
+| FR-24 | [Mobile] Khi nhấn Tạo Website ở mobile, form trượt đi nhường 100% diện tích màn hình cho Live Preview tự render (Immersive). | US-F01-09 | P0 | See-through view |
+| FR-25 | [Mobile] Thông báo tiến trình khởi tạo (SSE events) và các lỗi phải hiển thị dưới dạng một thẻ (Floating Pill) nằm cuối màn hình để không chắn preview. | US-F01-09 | P0 | Bottom Sheet |
+| FR-26 | [Mobile] Để đổi vị trí block trên màn hình hẹp, cung cấp List Mode chuyên sắp xếp (native DOM items dễ kéo chạm) hoặc nút Up/Down thay vì kéo thả iframe dễ xung đột với scroll. | US-F01-10 | P0 | Touch safe UI |
 
 ---
 
@@ -162,7 +170,17 @@ User click "Tạo Website"
 
 ## 10. Screen Layout
 
-```
+> **[Global CMS Constraint]** Đối với các tính năng quản trị, yêu cầu bắt buộc phải render bên trong Main Content Area của F18 CMS Layout (ngoại trừ các tính năng đặc thù cần Full-screen Editor).
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình chính (Builder Screen)
+- **Mô tả:** Màn hình chính cho phép user nhập form để AI generate website và xem live preview.
+- **Components chính:**
+  - Form Panel (Left): [Các trường input Tên DN, Mô tả, Dịch vụ, Nút Generate]
+  - Live Preview (Right): [Hiển thị website được generate block-by-block dạng iframe, thao tác drag-and-drop]
+- **Wireframe:**
+```text
 ┌─ /builder/new ─────────────────────────────────────────┐
 │  ┌──────────────┐          ┌──────────────────────┐    │
 │  │  FORM PANEL  │          │    LIVE PREVIEW       │    │
@@ -177,8 +195,61 @@ User click "Tạo Website"
 │  └──────────────┘          └──────────────────────┘    │
 └─────────────────────────────────────────────────────────┘
 
-Mobile (< 768px):
-  Form = full width | Preview hidden (toggle: [📝 Form] [👁 Preview])
+**Wireframe Mobile (< 768px): Vertical Form & Immersive Preview**
+```text
+┌─ 📱 Mobile Browser ─────────┐  ┌─ 📱 Immersive Preview ──────┐
+│ [≡] Builder                 │  │           [Hero]            │
+│ ─────────────────────────── │  │          PrimeWeb           │
+│ Tên Doanh Nghiệp:           │  │                             │
+│ [ _______________________ ] │  │         [Features]          │
+│                             │  │       - Feature 1           │
+│ Mô tả ngắn:                 │  │       - Feature 2           │
+│ [                         ] │  │                             │
+│ [ _______________________ ] │  │                             │
+│                             │  │                             │
+│                             │  │      ╭────────────────╮     │
+│ ─────────────────────────── │  │      │ ⏳ Đang tạo...  │     │
+│        [✨ Tạo Website]      │  │      ╰────────────────╯     │
+└─────────────────────────────┘  └─────────────────────────────┘
+  (Nút bấm Sticky dưới cùng)      (Chỉ hiện Live Site + Progress)
+```
+
+### 10.2. Các trạng thái UI (UI States) & Modals
+- **Empty State:** Form sạch sẽ với placeholder rõ ràng. Banner preview trống.
+- **Loading State:** Live Preview hiển thị skeleton UI và progress indicator block-by-block mượt mà bằng SSE.
+- **Error State / Edge Cases:** Form giữ nguyên data, hiển thị Toast báo lỗi màu đỏ kèm nút "Thử lại". Rate limit popup thông báo Upgrade.
+- **Success State (Post-Publish Modal):** Hiển thị Modal/Toast chúc mừng kèm liên kết copy link website (`{slug}.primeweb.app`) và nút "Đến Dashboard".
+
+**Wireframe Mobile Reorder Mode (< 768px):**
+```text
+┌─ 📱 Mobile Browser ─────────┐
+│ [X Đóng] Sắp xếp bố cục     │
+│ ─────────────────────────── │
+│  [ Header (Cố định)     ] 🔒│
+│                             │
+│  [ Hero Banner          ] ≡ │
+│                             │
+│  [ About Us             ] ≡ │  ← Kéo thả thẻ (Card List) thay 
+│                             │     vì kéo cả khối Iframe to    
+│  [ Products & Services  ] ≡ │
+│                             │
+│  [ Footer (Cố định)     ] 🔒│
+│ ─────────────────────────── │
+│        [✓ Hoàn tất]         │
+└─────────────────────────────┘
+```
+
+**Wireframe Success Modal:**
+```text
+┌─────────────────────────────────┐
+│ ✨ Website Generated!           │
+│                                 │
+│ Your website is now live at:    │
+│ 🌐 my-bakery.primeweb.app [Copy]│
+│                                 │
+│ [ Go to Admin Dashboard ]       │
+│ [ Edit in Advanced Mode ]       │
+└─────────────────────────────────┘
 ```
 
 ---
@@ -204,6 +275,12 @@ Nếu nội dung input ở form là tiếng Malay, trang web hoàn chỉnh ra ti
 
 ### AC-6: AI Image Generation
 Banner Hero sẽ được generate ảnh tự động (1200x400) thông qua DALL-E. Nếu call API thất bại, fallback sang stock image. *(Source: US-F01-03)*
+
+### AC-7: Trải Nghiệm Nhập Form và Preview Mobile (Touch-Device)
+Khi ở màn hình nhỏ (<768px), form nhập liệu xếp dọc với nút "Tạo Website" sticky ở đáy. Khi bấm Tạo, form tự động trượt (collapse/slide away) nhường chỗ cho Immersive Preview 100vh để user xem live generate, kèm theo 1 bảng Bottom Sheet mini (Floating Pill) góc dưới báo hiệu tiến trình đang diễn ra mà KHÔNG chắn mất UI site đang build ở chế độ nền. *(Source: US-F01-09)*
+
+### AC-8: Sắp Xếp Block Thân Thiện Chạm (Touch-safe Mobile)
+Người dùng mobile có View Mode "Sắp xếp bố cục" biến màn hình preview HTML thành một danh sách các Thẻ Khối (Card List). Kéo thả các Card nhỏ gọn được native hỗ trợ giúp tránh xung đột với scroll dọc gốc của iframe. *(Source: US-F01-10)*
 
 ---
 

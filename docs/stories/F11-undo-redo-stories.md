@@ -48,5 +48,42 @@ THEN  the previously undone change is re-applied
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
-- [ ] 50 history states supported
 - [ ] AI generation reverts thành 1 action duy nhất
+
+---
+
+## US-F11-02: Mobile Web UX — Touch-Accessible Undo/Redo
+
+**Wave 3** | **P1** | **S** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user (Store Owner)
+I want prominent Undo/Redo buttons since I cannot use keyboard shortcuts (Ctrl+Z)
+So that I can quickly fix mistakes while editing on my phone
+```
+
+### Acceptance Criteria
+
+#### AC-1: Persistent Mobile Icons
+
+```gherkin
+GIVEN the user is on the AI Editor on a mobile device (< 768px)
+WHEN  they make a change
+THEN  Undo and Redo icons are pinned to a persistent toolbar (Top or Bottom)
+  AND the tap targets are at least 44x44px to prevent misclicks
+```
+
+#### AC-2: Visual & Haptic Feedback
+
+```gherkin
+GIVEN the user taps "Undo" on their phone
+WHEN  the action is reverted
+THEN  the icon visually flashes or briefly changes color
+  AND if supported by the browser, a subtle haptic feedback (vibration) is triggered to confirm the action
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass.

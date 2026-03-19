@@ -30,7 +30,7 @@
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | Mở /dashboard/products | Hiện product list (hoặc empty state) |
+| 1 | Mở /products | Hiện product list (hoặc empty state) |
 | 2 | Check search bar | Có search input |
 | 3 | Check status filter | All / Active / Draft filter |
 | 4 | Check "Create Product" button | Button hiện, click navigate tới form |
@@ -65,7 +65,7 @@
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | Click vào product card | Navigate /dashboard/products/:id |
+| 1 | Click vào product card | Navigate /products/:id |
 | 2 | Đổi tên sản phẩm | |
 | 3 | Đổi giá | |
 | 4 | Click "Save" | Toast "Product updated!" |
@@ -114,7 +114,7 @@
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | Mở /dashboard/orders | Hiện order list (hoặc empty state) |
+| 1 | Mở /orders | Hiện order list (hoặc empty state) |
 | 2 | Check columns | Order #, Customer, Total, Status, Date |
 | 3 | Check status badges | Pending (vàng), Shipped (xanh dương), Delivered (xanh lá) |
 | 4 | Click refresh | List reload |
@@ -135,7 +135,7 @@
 | 3 | Mở cart → Click "Checkout" | Navigate /sites/:slug/checkout |
 | 4 | Điền shipping info (name, email, address, phone) | |
 | 5 | Click "Place Order" | Order confirmation hiện |
-| 6 | Quay lại /dashboard/orders | Order mới xuất hiện status "Pending" |
+| 6 | Quay lại /orders | Order mới xuất hiện status "Pending" |
 
 **Result:** ⬜
 **Bug #:** —
@@ -148,8 +148,8 @@
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | Mở /dashboard/orders | Table scroll horizontal hoặc stack cards |
-| 2 | Mở /dashboard/products | Product cards stack 1 column |
+| 1 | Mở /orders | Table scroll horizontal hoặc stack cards |
+| 2 | Mở /products | Product cards stack 1 column |
 
 **Result:** ⬜
 **Bug #:** —

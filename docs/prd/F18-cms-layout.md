@@ -9,6 +9,7 @@
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
 
+
 ---
 
 ## 0. Story Traceability
@@ -46,7 +47,7 @@ Thiết kế layout CMS 3-phần chuẩn:
 ## 4. Scope
 
 ### In Scope
-- Global Sidebar Navigation với icon + text, active states, WhatsApp support link (US-F18-01).
+- Global Sidebar Navigation với icon + text, active states (US-F18-01).
 - Top Header: Logo, Notification Bell (tích hợp F16), Avatar dropdown (Profile, Language, Workspace, Logout) (US-F18-02).
 - Main Content Area: Independent scrolling (US-F18-03).
 - Mobile responsive: Hamburger → Slide-in drawer.
@@ -88,7 +89,7 @@ SO THAT tôi có thể quản lý cửa hàng dễ dàng từ bất kỳ thiết
 |-------|-------------|-----------|----------|-------|
 | FR-01 | Sidebar expanded với icon + text trên desktop | US-F18-01 | P0 | Active state highlight |
 | FR-02 | Mobile: Sidebar ẩn mặc định, Hamburger → Slide-in drawer + overlay | US-F18-01 | P0 | z-index > main content |
-| FR-03 | Sidebar footer: WhatsApp Support link, mở tab mới | US-F18-01 | P0 | Malaysia-specific |
+| FR-03 | Sidebar footer: Help Center link, mở nội bộ CMS | US-F18-01 | P0 | Link dến màn hình F20 |
 | FR-04 | Top Header: Logo PrimeWeb → click → /dashboard | US-F18-02 | P0 | Fixed, always visible |
 | FR-05 | Top Header: Notification Bell + Red dot badge + số lượng | US-F18-02 | P0 | Link đến F16 |
 | FR-06 | Top Header: Avatar dropdown (Profile, Language BM/EN, Workspace switch, Logout) | US-F18-02 | P0 | |
@@ -99,10 +100,10 @@ SO THAT tôi có thể quản lý cửa hàng dễ dàng từ bất kỳ thiết
 ## 7. Business Rules
 
 - **BR-01:** Sidebar menu items đều có Icon + Text — không dùng icon đơn thuần (phù hợp SME thị trường MY).
-- **BR-02:** WhatsApp link mở tab mới, không điều hướng trong app.
+- **BR-02:** Nút Help Center mở trang F20 nội bộ trong CMS; link WhatsApp Support nếu có sẽ nằm bên trong trang Help Center.
 - **BR-03:** Language switch (BM/EN) phải được lưu persistent theo user preference.
 - **BR-04:** Notification bell connect với real-time data từ F16 Notification Center.
-- **BR-05:** Các nhóm menu chính (Dashboard, My Webstore) có thể được mở rộng (expand/collapse) để chứa sub-menu tương ứng.
+- **BR-05:** Các nhóm menu chính (như My Webstore) có thể được mở rộng (expand/collapse) để chứa sub-menu tương ứng. (Dashboard là menu đơn).
 
 ---
 
@@ -111,15 +112,13 @@ SO THAT tôi có thể quản lý cửa hàng dễ dàng từ bất kỳ thiết
 | # | Menu Item | Icon | Route | Feature |
 |---|-----------|------|-------|---------|
 | 1 | Dashboard | 📊 | /dashboard | F03 |
-|   | ↳ Analytics | | /dashboard/analytics | F03 |
-|   | ↳ SEO | | /dashboard/seo | F03 |
 | 2 | My Webstore | 🌐 | /editor | F05 |
 |   | ↳ Editor | | /editor | F05 |
 |   | ↳ Blog | | /blog | F17 |
 | 3 | Products | 📦 | /products | F08 |
 | 4 | Orders | 🛒 | /orders | F10 |
 | 5 | Store Config| ⚙️ | /settings | F19 |
-| — | Help Support| 🎧 | WhatsApp URL | F18 |
+| — | Help Center | 🎧 | /help | F20 |
 
 ---
 
@@ -145,7 +144,18 @@ Click Avatar → Dropdown: Profile | Language BM/EN | Workspace | Logout
 
 ## 10. Screen Layout
 
-```
+> **[Global CMS Constraint]** Đây là Root Layout của toàn bộ CMS Admin (Dashboard Panel). Mọi module tính năng khác đều phải load chèn vào phần Main Content Area của khung giao diện này.
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình CMS Framework Layout
+- **Mô tả:** Bản vẽ bộ khung Layout chung chứa Header, Sidebar và Main Content.
+- **Components chính:**
+  - Top Header: Nơi chứa Logo, Nút Menu Collapse/Hamburger, Icon Notification, Avatar/Profile dropdown.
+  - Left Sidebar Navigation: Thanh trượt chứa các Menu tính năng dạng nhóm (Dashboard, Store, Config). WhatsApp Hỗ Trợ ở chân.
+  - Main Content Box: Nơi chứa ruột các module F03, F08, F10... Phần này được gắn quyền scroll-y độc lập.
+- **Wireframe:**
+```text
 ┌─ CMS Layout ──────────────────────────────────────────────┐
 │ ┌─ Top Header ───────────────────────────────────────────┐ │
 │ │ [☰] [Logo PrimeWeb]                [🔔 3] [Avatar ▼]  │ │
@@ -154,7 +164,7 @@ Click Avatar → Dropdown: Profile | Language BM/EN | Workspace | Logout
 │ │ SIDEBAR         │ │ MAIN CONTENT (scrollable)         │ │
 │ │                 │ │                                   │ │
 │ │ 📊 Dashboard ▼  │ │  [Feature Content Here]           │ │
-│ │   ├ Analytics   │ │                                   │ │
+│ │   ├ Analytics   │ │  (VD: Bảng Danh Sách Sản Phẩm)    │ │
 │ │   └ SEO         │ │                                   │ │
 │ │ 🌐 My Webstore ▼│ │                                   │ │
 │ │   ├ Editor      │ │                                   │ │
@@ -163,10 +173,32 @@ Click Avatar → Dropdown: Profile | Language BM/EN | Workspace | Logout
 │ │ 🛒 Orders       │ │                                   │ │
 │ │ ⚙️  Config      │ │                                   │ │
 │ │─────────────────│ │                                   │ │
-│ │ 🎧 Help(WA)     │ │                                   │ │
+│ │ 🎧 Help Center  │ │                                   │ │
 │ └─────────────────┘ └───────────────────────────────────┘ │
 └────────────────────────────────────────────────────────────┘
 Mobile: Sidebar hides → ☰ at Header top-left
+```
+
+### 10.2. Các trạng thái UI (UI States) & Modals
+- **Sidebar State:** 1) Expanded Mode: Chứa cả Icon + Text (Desktop mặc định). 2) Collapsed Mode: Thu gọn chỉ hiện Icon (Khi người dùng đóng hẹp thanh bar hoặc thiết bị Tablet). 3) Drawer Mode: Dành riêng cho Mobile dưới 768px, được gọi ẩn chứa bên ngoài màn hình và trượt vào khi click Hamburger.
+- **Loading State:** Khi Router chuyển hướng giữa các module, Progress Bar chạy trên mép Top Header.
+### 10.3. Màn hình phụ & Modals
+- **Avatar Dropdown Popover:** Chứa Language Switcher (BM/EN), Workspace Switch, Nút Đăng Xuất.
+- **Wireframe (Avatar Dropdown):**
+```text
+┌────────────────────────┐
+│  👤 Aisha Store        │
+│  aisha@email.com       │
+│  ────────────────────  │
+│  ⚙️ Profile            │
+│  🌐 Workspace: MY      │
+│  ────────────────────  │
+│  🗣 Language:          │
+│    (•) English         │
+│    ( ) B. Melayu       │
+│  ────────────────────  │
+│  🚪 Logout             │
+└────────────────────────┘
 ```
 
 ---
@@ -273,7 +305,7 @@ THEN  chỉ Main Content scroll
 |---|----------|-------|--------|
 | 1 | Sidebar có cần hỗ trợ mini mode (icon-only) trên tablet không, hay chỉ Expanded / Hidden? | Design | ⬜ Open |
 | 2 | Switch Workspace (multi-site) có trong Phase 1 không hay defer sang Wave 2+? | PO | ⬜ Open |
-| 3 | WhatsApp Business số điện thoại sẽ do team nào cung cấp/maintain? | Ops | ⬜ Open |
+| 3 | Link WhatsApp Business có được nhúng vĩnh viễn trong Help Center hay tùy biến? | Ops | ⬜ Open |
 
 ---
 
@@ -291,7 +323,7 @@ THEN  chỉ Main Content scroll
 - [ ] All FR implemented
 - [ ] All AC pass
 - [ ] Mobile 375px tested trên real device
-- [ ] WhatsApp link active và đúng número
+- [ ] Link điều hướng đến Help Center (F20) test ok
 - [ ] Language toggle persist qua sessions
 - [ ] ARIA labels implemented cho Sidebar, Bell, Avatar
 - [ ] Non-Functional Requirements validated (Lighthouse ≥ 90 mobile)

@@ -561,3 +561,107 @@ THEN  drag handle không xuất hiện trên 2 block này
 - [ ] Thứ tự sau reorder được persist vào DB đúng khi user confirm
 - [ ] Navigation và Footer không thể kéo được — tooltip xuất hiện
 - [ ] Smooth animation 200ms khi drop
+
+---
+
+## US-F01-09: Mobile Web UX — Input Form & Immersive Preview
+
+**Wave 3** | **P0 🌟** | **L** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user (SME owner)
+I want the input form to be clearly laid out vertically and transition into an immersive full-screen preview when generating
+So that I can easily type my details and get the "wow" factor of seeing my site built without a cramped screen
+```
+
+### Acceptance Criteria
+
+#### AC-1: Vertical Form & Sticky CTA
+
+```gherkin
+GIVEN the user accesses /builder/new on a smartphone (width < 768px)
+WHEN  the page loads
+THEN  the 3 form inputs (Name, Description, Services) are stacked vertically taking full width
+  AND labels are positioned above the inputs to maximize tap area
+  AND input font size is exactly 16px to prevent iOS Safari auto-zooming
+  AND the "✨ Tạo Website" button remains sticky at the bottom of the screen to prevent being hidden by the virtual keyboard
+```
+
+#### AC-2: Transition to Immersive Preview
+
+```gherkin
+GIVEN the user has successfully submitted the Builder form on mobile
+WHEN  the generation process starts (SSE stream initiates)
+THEN  the form UI smoothly slides away or collapses
+  AND the Live Preview iframe expands to take up 100% of the viewport height and width
+```
+
+#### AC-3: Floating Progress Indicator
+
+```gherkin
+GIVEN the AI is streaming the site generation on mobile
+WHEN  viewing the full-screen preview
+THEN  a compact floating pill (Bottom Sheet mini) appears at the bottom of the screen
+  AND it displays the current generation step (e.g., "✨ Đang tạo Hero Banner...")
+  AND its backdrop is slightly blurred to ensure background visibility without completely opaque blocking
+WHEN  the generation completes
+THEN  the pill expands into a Bottom Sheet containing the success message and CTAs
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass
+- [ ] No horizontal scrolling when typing
+- [ ] Safe area insets (iOS notch, Android home bar) handled gracefully
+- [ ] Smooth CSS transition (60fps) from Form to Preview layout
+
+---
+
+## US-F01-10: Mobile Web UX — Touch-Safe Block Reordering
+
+**Wave 3** | **P0** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user
+I want an easy, touch-friendly way to reorder sections
+So that I don't accidentally swipe or scroll the page when trying to drag a heavy iframe block
+```
+
+### Business Value
+
+Kéo thả (drag and drop) các component lớn trên màn hình cảm ứng thường xuyên xung đột với thao tác cuộn dòng (scroll) gốc của trình duyệt. Việc đổi sang UI Tap Up/Down hoặc "Reorder Mode" chuyên dụng (Card List) giải quyết triệt để lỗi UX này.
+
+### Acceptance Criteria
+
+#### AC-1: Action Bar Tap to Move (Up/Down)
+
+```gherkin
+GIVEN the user is viewing the generated site preview on mobile
+WHEN  the user taps a section (e.g., About Us)
+THEN  the section is highlighted with an outline
+  AND a floating action bar appears anchored to that section containing [⬆ Lên] and [⬇ Xuống] buttons
+WHEN  the user taps [⬆ Lên]
+THEN  the section swaps position with the one above it instantly
+  AND the state is saved for the next publish (no reload required)
+```
+
+#### AC-2: Dedicated Reorder Mode (Card List)
+
+```gherkin
+GIVEN the user wants to see all blocks to reorder them on mobile
+WHEN  the user taps an "≡ Sắp xếp" button in the mobile toolbar
+THEN  the live iframe is temporarily replaced by a simple list of cards representing the sections (Hero, About, Products, Contact)
+  AND dragging these lightweight native cards is smooth and doesn't trigger iframe scroll conflicts
+WHEN  the user taps "Xong"
+THEN  the list returns to the updated full iframe preview
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass
+- [ ] Up/Down arrows have minimum 44x44px touch targets
+- [ ] Reordering does not trigger accidental native page refreshing (pull-to-refresh)

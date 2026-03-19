@@ -13,6 +13,7 @@
 > - Nếu FR không có story cover → đó là scope chưa approve → tạo story mới trước, sau đó mới update PRD.
 > - **Rule:** Stories → PRD. Không bao giờ ngược lại.
 
+
 ---
 
 ## 0. Story Traceability
@@ -29,6 +30,7 @@
 | US-F16-05 | Nhận nhận thông báo từ Ban Quản Trị Hệ Thống (Global Broadcasts) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
 | US-F16-06 | Hiển thị Live Popup góc dưới chuông thông báo (In-app Toast/Popup) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
 | US-F16-07 | Nhận thông báo qua Trình duyêt Desktop (Browser Push Notifications) | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
+| US-F16-08 | Mobile Web UX — Touch-friendly Notification Hub | [F16-notification-center-stories.md](../stories/F16-notification-center-stories.md) | Ready |
 
 ---
 
@@ -105,6 +107,7 @@ SO THAT tôi không bao giờ bỏ lỡ các đơn hàng mới hoặc thông bá
 | FR-08 | Tự động tăng số badge khi có popup realtime | US-F16-06 | P1 | |
 | FR-09 | Flow xin quyền Native Browser Push Notification (Opt-in) | US-F16-07 | P2 | |
 | FR-10 | Hiển thị thông báo Native Browser Desktop khi tab inactive | US-F16-07 | P2 | Focus tab Antigravity khi click Notification |
+| FR-11 | **[Mobile]** Thay vì Dropdown nhỏ, tính năng xem thông báo chuyển thành Drawer trượt toàn màn hình (hoặc Bottom Sheet) để phù hợp thao tác tay trên đt. | US-F16-08 | P1 | Touch usability |
 
 ---
 
@@ -136,14 +139,24 @@ SO THAT tôi không bao giờ bỏ lỡ các đơn hàng mới hoặc thông bá
   ↓
 [System marks as Read -> Decrements Badge count]
   ↓
-[System navigates user to target URL (e.g., /dashboard/orders)]
+[System navigates user to target URL (e.g., /orders)]
 ```
 
 ---
 
 ## 10. Screen Layout
 
-```
+> **[Global CMS Constraint]** Mọi nội dung của tính năng này bắt buộc phải hiển thị bên trong Main Content Area của hệ thống CMS, tuân thủ chặt chẽ kiến trúc Global Header và Sidebar Navigation được định nghĩa trong F18 CMS Layout (Trừ các popup/toast override toàn màn hình).
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình Dropdown / Drawer (Danh sách thông báo)
+- **Mô tả:** Màn hình popup list khi click vào biểu tượng chuông.
+- **Components chính:**
+  - Header: Tiêu đề "Notifications" và nút "Mark all as read".
+  - List View: Danh sách các item thông báo (Title, Nội dung ngắn, Icon tròn, Timestamp). Item chưa đọc có chấm xanh hoặc in đậm.
+- **Wireframe:**
+```text
 [Header Navigation]
   Logo    |   Search                          |   [🔔 (3)]   UserAvatar
                                                   |
@@ -160,15 +173,50 @@ SO THAT tôi không bao giờ bỏ lỡ các đơn hàng mới hoặc thông bá
                                       | [ ]  📦 New Order #1023       |
                                       |      RM 80.00 • 5 hours ago   |
                                       +-------------------------------+
+```
 
+### 10.2. Các trạng thái UI (UI States) & Modals
+- **Empty State:** Hình ảnh cái loa không có tin báo, chữ "You have no new notifications".
+- **Loading State:** Skeletons hiển thị lúc đang fetch list từ DB.
+- **Modals & Toasts:**
+  - Live Popup (Toast Corner): Hiện ở góc phải dưới (Bottom Right) dạng card nổi tự tắt sau 5s.
+```text
 [Màn hình Dashboard]
-...
 ...
                                                            +-------------------+
                                                            | 📦 New Order #1025|
                                                            | Just now          |
                                                            +-------------------+
                                                            (Live Popup Corner)
+```
+  - Native Push Notification:
+```text
+┌──────────────────────────────────────────────┐
+│ 🔔 [PrimeWeb] - System                       │
+│ 📦 Đơn hàng mới: ORD-1025                   │
+│ Khách hàng Aisha vừa đặt Baju Kurung.       │
+└──────────────────────────────────────────────┘
+```
+
+### 10.3. Mobile View (Full-screen Drawer / Bottom Sheet)
+- **Mô tả:** Trên mobile (<768px), Dropdown list không đủ chỗ hiển thị. Giao diện trở thành một cửa sổ trượt từ dưới lên (Bottom Sheet) hoặc Full-screen phủ hết toàn màn hình đễ dễ bấm ngón tay.
+- **Wireframe:**
+```text
+┌─ Mobile Screen ───────────────┐
+│ Notifications           [ X ] │
+│ ───────────────────────────── │
+│                  [Mark Read]  │
+│                               │
+│ [🔵] 📦 New Order #1024       │
+│      RM 150.00 • 2 mins ago   │
+│ ───────────────────────────── │
+│ [🔵] 📢 System Maintenance    │
+│      Downtime at 2AM • 1 hr   │
+│ ───────────────────────────── │
+│ [ ]  📦 New Order #1023       │
+│      RM 80.00 • 5 hours ago   │
+│                               │
+└───────────────────────────────┘
 ```
 
 ---
@@ -215,7 +263,7 @@ THEN  một dropdown (hoặc drawer panel) sẽ mở ra hiển thị danh sách 
 GIVEN User đang mở Notification drop-down
 WHEN  User click vào thông báo "Đơn hàng mới #1024"
 THEN  thông báo đó tự động chuyển trạng thái thành "Đã đọc" (Unread count giảm 1)
-  AND hệ thống điều hướng (navigate) mở trang /dashboard/orders với drawer số #1024
+  AND hệ thống điều hướng (navigate) mở trang /orders với drawer số #1024
 ```
 
 ### AC-5: Mark all as read

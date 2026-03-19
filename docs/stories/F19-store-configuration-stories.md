@@ -21,6 +21,18 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
 
 ---
 
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
 ## 📋 Story Index
 
 | Story ID | Title | Status | Priority |
@@ -28,6 +40,7 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
 | US-F19-01 | Add Custom Domain | Draft | P1 |
 | US-F19-02 | Set Primary Domain | Draft | P1 |
 | US-F19-03 | Configure Payment Methods | Draft | P0 |
+| US-F19-04 | Mobile Web UX — Camera Roll & Tap-to-Copy | Ready | P1 |
 
 ---
 
@@ -99,3 +112,20 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
    - **Given** QR Banking is enabled and has a valid QR image
    - **When** I delete the uploaded QR image
    - **Then** the system automatically disables the "QR Banking" payment method for my store.
+
+---
+
+### US-F19-04: Mobile Web UX — Camera Roll & Tap-to-Copy
+**As a** mobile store owner
+**I want to** easily copy DNS records or upload QR codes directly from my phone
+**So that** I don't get frustrated typing long IPs or transferring images from PC to phone.
+
+#### Acceptance Criteria
+1. **Camera Roll Integration:**
+   - **Given** I am configuring QR Banking on my phone
+   - **When** I tap "Upload Image"
+   - **Then** the native iOS/Android camera roll picker is triggered, allowing me to easily select an image from my device.
+2. **Tap-to-Copy DNS:**
+   - **Given** I am viewing the DNS instructions
+   - **When** I tap the "Copy" icon next to the CNAME or A Record
+   - **Then** the value is copied instantly, and a success Toast confirms the action, optimized for easy pasting into my mobile registrar app.

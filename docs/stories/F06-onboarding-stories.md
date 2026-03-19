@@ -136,3 +136,43 @@ THEN  Modal đóng lại
 
 - [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
 - [ ] Trạng thái đã xem Wizard được lưu trữ liên tục ở user document
+
+---
+
+## US-F06-04: Mobile Web UX — Fullscreen Onboarding & Swipe Gestures
+
+**Wave 1** | **P1** | **S** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user (SME owner)
+I want the onboarding screens to fit my phone perfectly and allow swipe gestures
+So that I can quickly pass the intro steps without struggling with small buttons
+```
+
+### Acceptance Criteria
+
+#### AC-1: Ergonomic Welcome Screen
+
+```gherkin
+GIVEN the user is on the Welcome Screen on a mobile device (< 768px)
+WHEN  the screen renders
+THEN  the "Create My Store" CTA is fixed at the bottom of the screen (thumb zone)
+  AND spans 100% of the container width
+```
+
+#### AC-2: Swipeable Discovery Carousel
+
+```gherkin
+GIVEN the user is viewing the AI Discovery Wizard modal on mobile
+WHEN  they want to go to the next slide
+THEN  they can swipe left/right on the screen
+  AND the slide transitions smoothly without requiring them to tap the small "Next" button
+  AND the modal takes up 100% of the screen height to prevent background scrolling issues
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass.
+- [ ] CSS Touch-action pan-y is configured so swipe gestures don't trigger native pull-to-refresh.

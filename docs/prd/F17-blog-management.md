@@ -8,12 +8,15 @@
 ## 0. Story Traceability
 
 | Story ID | Title | File | Status |
-|----------|-------|------|--------|
+|
+----------|-------|------|--------|
 | US-F17-01 | Blog Management Dashboard | [F17-blog-management-stories.md](../stories/F17-blog-management-stories.md) | Ready |
 | US-F17-02 | Create & Edit Blog Post | [F17-blog-management-stories.md](../stories/F17-blog-management-stories.md) | Ready |
 | US-F17-03 | AI Blog Writing Assistant (Text Only) | [F17-blog-management-stories.md](../stories/F17-blog-management-stories.md) | Ready |
 | US-F17-04 | Publish, Draft, and Delete Posts | [F17-blog-management-stories.md](../stories/F17-blog-management-stories.md) | Ready |
 | US-F17-05 | Simple Category Management | [F17-blog-management-stories.md](../stories/F17-blog-management-stories.md) | Ready |
+| US-F17-07 | Public Blog List (Storefront) | [F17-blog-management-stories.md](../stories/F17-blog-management-stories.md) | Ready |
+| US-F17-08 | Public Blog Detail (Storefront) | [F17-blog-management-stories.md](../stories/F17-blog-management-stories.md) | Ready |
 
 ---
 
@@ -48,6 +51,7 @@ A lightweight, built-in blog management module in the dashboard. Users can view,
 - Delete post functionality. (US-F17-04)
 - Basic SEO fields (Meta Title, Meta Description, auto-generated URL Slug). (US-F17-02)
 - Simple 1-level Category management (Create/Edit/Delete/Assign). (US-F17-05)
+- Public Storefront Blog List and Blog Detail pages. (US-F17-07, US-F17-08)
 
 ### Out of Scope
 - AI Generation of Blog Images (explicitly excluded based on requirements).
@@ -93,6 +97,8 @@ SO THAT I can easily create and publish content for my customers
 | FR-07 | User can toggle post status between Draft and Published. | US-F17-04 | P1 | |
 | FR-08 | User can delete a post permanently, with a confirmation warning. | US-F17-04 | P1 | |
 | FR-09 | User can manage (create, edit, delete) flat, single-level categories for posts. | US-F17-05 | P2 | Deleting a category moves posts to unassigned. |
+| FR-10 | Storefront MUST display a list of all Published blog posts with pagination and category filtering. | US-F17-07 | P1 | Distinct layout from eCommerce. |
+| FR-11 | Storefront MUST display the full content of a selected blog post, properly rendering rich text and SEO metadata. | US-F17-08 | P1 | Responsive design for mobile reading. |
 
 ---
 
@@ -122,13 +128,29 @@ Step 4: User uploads thumbnail manually, sets status to "Published", and saves.
   ↓
   ├── Success → Toast "Post Published", return to Blog List.
   └── Failure (e.g. No title) → Show validation error.
+
+[Storefront Flow: Customer sees the blog]
+  ↓
+Step 1: Visitor navigates to /sites/[slug]/blogs -> Sees List of Published Posts
+  ↓
+Step 2: Visitor clicks on a Post -> Reads full article at /sites/[slug]/blogs/[post-slug]
 ```
 
 ---
 
 ## 10. Screen Layout
 
-```
+> **[Global CMS Constraint]** Mọi nội dung của tính năng này bắt buộc phải hiển thị bên trong Main Content Area của hệ thống CMS, tuân thủ chặt chẽ kiến trúc Global Header và Sidebar Navigation được định nghĩa trong F18 CMS Layout.
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình chính (Blog List Dashboard)
+- **Mô tả:** Danh sách các bài đăng Blog của cửa hàng.
+- **Components chính:**
+  - Toolbar: Nút [+ Create Post]. Search, Filter, Bulk Actions.
+  - Data Grid: Cột Title, Status, Date, Action (Edit/Delete).
+- **Wireframe:**
+```text
 [Blog List]
 +---------------------------------------------------+
 | Blog                           [+ Create Post]    |
@@ -137,7 +159,17 @@ Step 4: User uploads thumbnail manually, sets status to "Published", and saves.
 | 1. My First Post     Published   Today      [Edit]|
 | 2. Draft Post        Draft       Yesterday  [Edit]|
 +---------------------------------------------------+
+```
 
+### 10.2. Màn hình Chi tiết (Blog Editor Area)
+- **Mô tả:** Soạn thảo, thiết lập thông tin Metadata.
+- **Components chính:**
+  - Title input siêu to khổng lồ.
+  - Category Select, Slug input.
+  - Vùng Rich Text. Cụm nút Magic ✨ "Generate with AI".
+  - Khu vực SEO Metadata & Thumbnail Upload bên phải hoặc dưới cùng.
+- **Wireframe:**
+```text
 [Blog Editor]
 +---------------------------------------------------+
 | Title: [_____________________]      [Unpublish]   |
@@ -158,6 +190,123 @@ Step 4: User uploads thumbnail manually, sets status to "Published", and saves.
 | Thumbnail: [ Upload Image ]                       |
 |                                     [ Save ]      |
 +---------------------------------------------------+
+```
+
+### 10.3. Các trạng thái UI (UI States) & Modals
+- **Empty State:** Ảnh illustration người cầm bút, "Chưa có bài viết nào, hãy tạo bài đăng đầu tiên".
+- **Loading State:** Dashboard List hiện Skeleton Rows. Editor hiện Skeleton Form Elements khi mở bài cũ.
+- **Error State / Edge Cases:** Validate Title trống (viền đỏ, toast error).
+- **Modals:** Modal Delete Confirmation "Có chắc muốn xóa bài đăng này không?". Modal Category Quản lý (Thêm/Sửa/Xóa category).
+- **Wireframe (AI Text Assistant Modal/Popover):**
+```text
+┌─ ✨ Generate Content ────────────────────────[X]┐
+│  Topic Prompt:                                  │
+│  [ Write a catchy intro for my new coffee... ]  │
+│                                                 │
+│  Tone: [ Professional ▼ ]   Length: [ Short ▼ ] │
+│                                                 │
+│  [ ✨ Generate ]                                │
+│  ────────────────────────────────────────────── │
+│  Result:                                        │
+│  "Welcome to the ultimate coffee experience..." │
+│                                                 │
+│  [ ↻ Regenerate ]             [ Insert to Post ]│
+└─────────────────────────────────────────────────┘
+```
+
+### 10.4. Màn hình Public Blog List (Storefront)
+- **Mô tả:** Danh sách bài viết blog dành cho khách hàng truy cập từ Storefront.
+- **Components chính:**
+  - Header & Navigation (chuẩn của Storefront).
+  - List/Grid layout các bài đã Publish. Mỗi card gồm Thumbnail, Title, Date, Category.
+  - Sidebar hoặc Tags chứa danh sách Categories để lọc.
+  - Phân trang (Pagination) hoặc Load More.
+- **Wireframe:**
+```text
+┌─ /sites/[slug]/blogs ──────────────────────────────┐
+│ [ Storefront Header & Menu ]                       │
+│ ────────────────────────────────────────────────── │
+│ ┌─ CATEGORIES ──┐ ┌─ LATEST ARTICLES ────────────┐ │
+│ │ ├ All Posts   │ │ ┌─────────┐ ┌─────────┐      │ │
+│ │ ├ Promosi     │ │ │ [Image] │ │ [Image] │      │ │
+│ │ ├ Berita      │ │ │ Title A │ │ Title B │      │ │
+│ │ └ Tips        │ │ │ Oct 12  │ │ Oct 10  │      │ │
+│ │               │ │ └─────────┘ └─────────┘      │ │
+│ │               │ │ ┌─────────┐ ┌─────────┐      │ │
+│ │               │ │ │ [Image] │ │ [Image] │      │ │
+│ │               │ │ │ Title C │ │ Title D │      │ │
+│ │               │ │ │ Oct 05  │ │ Oct 01  │      │ │
+│ │               │ │ └─────────┘ └─────────┘      │ │
+│ │               │ │  < [1] [2] [3] >             │ │
+│ └───────────────┘ └──────────────────────────────┘ │
+│ [ Storefront Footer ]                              │
+└────────────────────────────────────────────────────┘
+```
+
+### 10.5. Màn hình Public Blog Detail (Storefront)
+- **Mô tả:** Màn hình đọc bài viết chi tiết dành cho khách hàng (End-user).
+- **Components chính:**
+  - Hero image (Thumbnail lớn).
+  - Post Title, Publish Date, Category tag.
+  - Rich Text Content (Bài viết được định dạng theo HTML từ CMS).
+  - Nút Back to Blogs, và "Share" buttons (nếu có).
+- **Wireframe:**
+```text
+┌─ /sites/[slug]/blogs/[post-slug] ──────────────────┐
+│ [ Storefront Header & Menu ]                       │
+│ ────────────────────────────────────────────────── │
+│ < Back to Blogs        [Category: Tips]            │
+│ ────────────────────────────────────────────────── │
+│                                                    │
+│  Làm thế nào để pha cà phê ngon tại nhà?           │
+│  Published: Oct 12, 2023                           │
+│                                                    │
+│  [       L A R G E   T H U M B N A I L       ]     │
+│                                                    │
+│  Pha cà phê ngon không chỉ cần nguyên liệu tốt...  │
+│                                                    │
+│  1. Chọn hạt cà phê                                │
+│  Hạt cà phê Arabica thường có vị chua thanh...     │
+│  ...                                               │
+│ ────────────────────────────────────────────────── │
+│ [ Storefront Footer ]                              │
+└────────────────────────────────────────────────────┘
+```
+
+### 10.4. Mobile View (On-the-go Blog Editor)
+- **Mô tả:** Khi user sửa bài blog bằng điện thoại, toolbar định dạng văn bản (B, I, U, Link) sẽ trượt xuống "sticky" dính ngay trên mép bàn phím ảo. AI Generator hiển thị dạng Bottom Sheet thay cho Modal popover.
+- **Wireframe:**
+```text
+┌─ Mobile Blog Editor ──────────┐
+│ [←] Edit    [Unpublish][Save] │
+│ ───────────────────────────── │
+│ Title: Welcome to my store    │
+│                               │
+│ Content:                      │
+│ We are very excited to ...    │
+│ |(Cursor)                     │
+│                               │
+│                               │
+│ ───────────────────────────── │
+│ [B] [I] [U] [Link] [✨ AI]    │ (Sticky Toolbar)
+│ ┌───────────────────────────┐ │
+│ │ 1 2 3 4 5 6 7 8 9 0       │ │
+│ │ Q W E R T Y U I O P       │ │ (Virtual Keyboard)
+│ │  A S D F G H J K L        │ │
+│ │   Z X C V B N M           │ │
+│ └───────────────────────────┘ │
+└───────────────────────────────┘
+
+┌─ AI Assist (Bottom Sheet) ────┐
+│ ✨ Generate Content       [X] │
+│ ───────────────────────────── │
+│ Topic: [ Catchy intro... ]    │
+│ [ ✨ Generate ]               │
+│                               │
+│ Result: "Welcome to..."       │
+│                               │
+│ [Insert] [Regenerate]         │
+└─────────────────────────────────────────────────┘
 ```
 
 ---
@@ -293,6 +442,8 @@ THEN  the post is associated with that Category
 |-----------|------|-------------|
 | `BlogList` | `app/(dashboard)/blog/page.tsx` | View listing drafts/published posts |
 | `BlogEditor` | `app/(dashboard)/blog/[id]/page.tsx` | Rich text editor with AI button |
+| `PublicBlogList` | `app/sites/[slug]/blogs/page.tsx` | Storefront Blog Listing |
+| `PublicBlogDetail`| `app/sites/[slug]/blogs/[slug]/page.tsx` | Storefront Blog Reading Page |
 
 ### 13.2 API Endpoints
 
@@ -310,6 +461,9 @@ DELETE /api/blogs/categories/:id → Delete category
 POST /api/ai/blog-assist → AI Text generation
 Request: { prompt: string, action: 'generate' | 'rewrite' | 'shorten', textContext?: string }
 Response: { success: boolean, data: { text: string } }
+
+GET /api/storefront/blogs → Fetch published blogs for storefront
+GET /api/storefront/blogs/:slug → Fetch single blog post by slug
 ```
 
 ---
@@ -320,7 +474,7 @@ Response: { success: boolean, data: { text: string } }
 |-----------|--------|---------------|
 | F02 Auth (Roles) | ✅ | Ensure `blog:manage` / owner check works. |
 | F05 AI System | ✅ | Use existing text generation endpoints, apply prompt constraints to reject image requests. |
-| F09 Storefront | ⬜ | Requires a completely separate storefront UI layout dedicated for blog reading, distinct from the eCommerce flows. |
+| F09 Storefront | ✅ | Requires a completely separate storefront UI layout dedicated for blog reading. Defined in this PRD (10.4 & 10.5). |
 
 ---
 

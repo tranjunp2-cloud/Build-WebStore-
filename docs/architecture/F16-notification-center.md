@@ -59,7 +59,7 @@ src/components/layout/Header/
    4.b. Nếu in-active tab: Service Worker gọi Native Push API của Browser.
 5. User click vào thông báo trong Dropdown:
    5.a. Gọi API `POST /mark-read` với ID của thông báo.
-   5.b. Navigate user tới `actionUrl` (e.g. `/dashboard/orders/123`).
+   5.b. Navigate user tới `actionUrl` (e.g. `/orders/123`).
 ```
 
 ## 5. State Management
@@ -88,7 +88,7 @@ Response (success):
         "type": "ORDER_NEW",
         "title": "📦 New Order #1024",
         "message": "RM 150.00 from Customer Name",
-        "actionUrl": "/dashboard/orders?id=1024",
+        "actionUrl": "/orders?id=1024",
         "isRead": false,
         "createdAt": "2026-03-17T14:30:00Z"
       }

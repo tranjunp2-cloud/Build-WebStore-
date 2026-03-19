@@ -1,5 +1,5 @@
 # PRD: Template Gallery — AI Editor Integration (F07)
-> **Version:** 2.1 | **Updated:** 2026-03-18 | **Agent:** `Antigravity-BA-Copilot`
+> **Version:** 2.2 | **Updated:** 2026-03-19 | **Agent:** `Antigravity-BA-Copilot`
 > **Priority:** P1 | **Sprint:** Wave 3 | **Size:** L
 > **Depends on:** F05 AI Editor, F04 Block Renderer
 
@@ -12,6 +12,7 @@
 > - Mọi Functional Requirement (Section 7) PHẢI có Story ID tham chiếu trong cột `Story Ref`.
 > - Nếu FR không có story cover → đó là scope chưa approve → tạo story mới trước, sau đó mới update PRD.
 > - **Rule:** Stories → PRD. Không bao giờ ngược lại.
+
 
 ---
 
@@ -26,6 +27,7 @@
 | US-F07-05 | Content-Preserving Template Swap | [F07-template-gallery-stories.md](../stories/F07-template-gallery-stories.md) | Ready |
 | US-F07-06 | Undo Template Application | [F07-template-gallery-stories.md](../stories/F07-template-gallery-stories.md) | Ready |
 | US-F07-07 | Full Preview (View Only) | [F07-template-gallery-stories.md](../stories/F07-template-gallery-stories.md) | Draft |
+| US-F07-08 | Mobile Web UX — Touch-Friendly Template Gallery | [F07-template-gallery-stories.md](../stories/F07-template-gallery-stories.md) | Ready |
 
 > ⚠️ **Kiểm tra:** Mọi FR trong Section 7 phải có Story ID ở bảng trên.
 
@@ -117,6 +119,8 @@ SO THAT tôi có thể thay đổi thiết kế mà không mất công nhập l�
 | FR-10 | Undo bị overwrite nếu apply template tiếp theo | US-F07-06 | P0 | Single-step undo |
 | FR-11 | Guard Rail: Cảnh báo không thể Undo sau khi Save | US-F07-06 | P0 | Modal confirmation |
 | FR-12 | Nút Undo disabled/ẩn sau khi Save thành công | US-F07-06 | P1 | UI clarity |
+| FR-13 | **[Mobile]** Giao diện Modal Template Gallery chuyển đổi thành Bottom Sheet (swipe up/down) trên viewport < 768px. | US-F07-08 | P1 | Ergonomics |
+| FR-14 | **[Mobile]** Template list hiển thị dưới dạng grid 2 cột để tiết kiệm không gian và tăng số lượng mẫu được xem lướt. | US-F07-08 | P1 | |
 
 > **Priority key:** P0 = must have (blocker) / P1 = important / P2 = nice to have
 
@@ -132,6 +136,11 @@ SO THAT tôi có thể thay đổi thiết kế mà không mất công nhập l�
 - **BR-04:** Sau khi bấm SAVE, trạng thái Undo cũ sẽ bị xoá bỏ và ghi đè bằng trạng thái mới.
 - **BR-05:** Template phải đạt tiêu chuẩn: Thẩm mỹ cao, layout đa dạng nhưng tối ưu (không bloating), đảm bảo tốc độ load.
 - **BR-06:** Nếu hệ thống lỗi trong quá trình swap, bắt buộc rollback về trạng thái cũ — không được để mất dữ liệu content.
+- **BR-07:** **[Performance]** Sử dụng cơ chế Cuộn vô cực (Infinite Scroll) thay vì gọi 1 lần toàn bộ danh sách. Bắt đầu fetch thêm Template khi user cuộn gần tới đáy danh sách Grid.
+- **BR-08:** **[Security]** Modal Preview nhúng Iframe bắt buộc mang cờ bảo mật `sandbox="allow-scripts allow-same-origin"` để vô hiệu hóa target="_top", ngăn rủi ro Clickjacking.
+- **BR-09:** **[UX Auth]** Flow Đăng nhập (Login): Nếu Guest bấm Template, trạng thái Template ID được ghi nhớ truyền qua route Auth. Ngay khi cấp Login/Token thành công hệ thống tự động bắt tiếp luồng tạo Site ngay lập tức, không bắt quay về Dashboard.
+- **BR-10:** **[Growth]** Shareability Deep Link: Khi truy cập `domain.com/templates?previewId=XYZ`, hệ thống tự hook ID và Open Overlay Modal Template tức thì.
+- **BR-11:** **[UI Rule]** Chức năng "Clear Filter" được ẩn ý qua tab "All" cố định. Click `All` sẽ gỡ nhãn Category/Tag đang ngắm.
 
 ---
 
@@ -161,7 +170,18 @@ graph TD
 
 ## 10. Screen Layout
 
-```
+> **[Global CMS Constraint]** Tính năng Template Gallery được mở dưới dạng popup/modal hoặc sidebar đè lên AI Editor F05.
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình chính (Templates Modal / Popup)
+- **Mô tả:** Nơi cho phép hiển thị list templates và tương tác tìm kiếm AI.
+- **Components chính:**
+  - Search Bar: Form nhập liệu văn bản với kiểu Gemini-style chat input.
+  - Template Grid: Lưới hiển thị Card cho các templates.
+  - Card Item: Thumbnail ảnh, Tiêu đề template, Nút [Apply], [Preview].
+- **Wireframe:**
+```text
 ┌─ AI Editor ─────────────────────────────────────────────┐
 │  [Templates Icon] → Opens Modal                          │
 │                                                          │
@@ -177,7 +197,15 @@ graph TD
 │  After Apply:                                            │
 │  [Undo ↩] button appears in Editor toolbar              │
 └──────────────────────────────────────────────────────────┘
+```
 
+### 10.2. Màn hình Chi tiết (Full View-Only Preview Mode)
+- **Mô tả:** Fullscreen modal để xem trước kết quả áp dụng Template với dữ liệu site hiện tại.
+- **Components chính:**
+  - Header Navbar (Fixed): Nút tắt chế độ Preview, Nút [Apply This Template] ở trên cùng.
+  - Iframe Content Area: Trang web rendered bởi component view-only (disable events).
+- **Wireframe:**
+```text
 Full Preview Mode (fullscreen modal):
 ┌──────────────────────────────────────────────────────────┐
 │  [✕ Close]                    [Apply This Template ▶]   │
@@ -185,6 +213,34 @@ Full Preview Mode (fullscreen modal):
 │  [Template rendered full page — view only]               │
 └──────────────────────────────────────────────────────────┘
 ```
+
+### 10.3. Mobile View (Bottom Sheet Gallery)
+- **Mô tả:** Gallery chọn Template được đổi kiểu thành Bottom sheet vuốt từ dưới lên, danh sách Card chia 2 cột.
+- **Wireframe:**
+```text
+┌─ Mobile AI Editor ──────────────────────────┐
+│ [≡] Website             [Preview][Publish]  │
+│ ─────────────────────────────────────────── │
+│ ...                                         │
+│                                             │
+│ ╭─ Templates (Swipe Up) ──────────────────╮ │
+│ │ 🔍 Chat: "tìm mẫu quán cafe..."         │ │
+│ │ ─────────────────────────────────────── │ │
+│ │  ┌──────────┐      ┌──────────┐         │ │
+│ │  │ [ Image] │      │ [ Image] │         │ │
+│ │  │ Nhà hàng │      │ Fashion  │         │ │
+│ │  └──────────┘      └──────────┘         │ │
+│ │  [Apply][👁]      [Apply][👁]         │ │
+│ │                                         │ │
+│ ╰─────────────────────────────────────────╯ │
+└─────────────────────────────────────────────┘
+```
+
+### 10.4. Các trạng thái UI (UI States) & Modals
+- **Empty State:** Hình khối vector lỗi 404 + text "Không tìm thấy mẫu phù hợp" xuất hiện khi text Search vô nghiệm.
+- **Loading State:** Skeleton Image Loader cho các Cards lúc đang fetching.
+- **Error State / Edge Cases:** Hiện Toast + "Thử Lại" khi load templates bị timeout.
+- **Modals:** (Ngoài Template Preview), hiển thị Guard Rail Warn modal (Confirmation Dialog) chống Undo khi bấm núy Save ở editor.
 
 ---
 
@@ -253,6 +309,35 @@ THEN  modal full-screen mở ra hiển thị template rendered đầy đủ vớ
 GIVEN user đang ở Full Preview mode
 WHEN  user thử click/tap vào các elements trong preview
 THEN  không có gì thay đổi — preview chỉ là view-only
+```
+
+### AC-5: Trải Nghiệm Khách Hàng Mobile (Touch-Friendly)
+> 📌 Source: [US-F07-08](../stories/F07-template-gallery-stories.md)
+
+Khi sử dụng trên điện thoại (< 768px), hệ thống thay thế Modal giữa màn hình bằng Bottom Sheet trượt từ dưới lên (chiếm 90% chiều cao). Giao diện hiển thị các mẫu dưới dạng lưới 2 cột. Các nút "Preview" và "Apply" được làm to (tối thiểu 44x44px) để dễ chạm (Thumb-friendly tap zone).
+
+---
+
+### AC-6: Business Rules & Edge Cases (Security, UX & Growth)
+> 📌 Source: Copilot Ambiguities Resolutions
+
+```gherkin
+GIVEN user là Guest (Chưa đăng nhập) đang xem xem 1 Template
+WHEN  click nút "Use Template"
+THEN  bị điều hướng sang trang Login/Register
+  AND url chứa tham số `returnUrl` kèm `templateId` (Hoặc persist trong Session storage)
+WHEN  đăng nhập thành công
+THEN  tự động redirect đến màn hình Setup Web ban đầu có pick sẵn Template đó.
+
+GIVEN designer upload 1 Template Master HTML
+WHEN  Template chứa mã độc script đổi hướng top level `window.top.location = "malicious.com"`
+THEN  khi mở Modal Preview, thao tác này bị Block ngầm bởi thuộc tính `sandbox` của iframe
+  AND hệ thống Editor PrimeWeb an toàn
+
+GIVEN user nhận được đường link chia sẻ có đính URL Query: `/editor?previewId=123`
+WHEN  site khởi tạo
+THEN  layer Frontend tự đọc Query Parameter và fetch dữ liệu ID 123
+  AND tự động Open pop-up Preview của Template đó lập tức
 ```
 
 ---

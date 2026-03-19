@@ -378,3 +378,46 @@ BMAD GATE — Feature: F02-auth
 Result: 5/5 PASS → PROCEED ✅
 ──────────────────────────────────────────────────
 ```
+
+---
+
+## US-F02-08: Mobile Web UX — Adaptive Auth Layout & Numeric Inputs
+
+**Wave 1** | **P0 🌟** | **S** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user
+I want the login form to be perfectly sized for my screen and show the numeric keyboard when entering OTP
+So that I can log in quickly without zooming, panning, or switching keyboards
+```
+
+### Acceptance Criteria
+
+#### AC-1: Adaptive Split Screen to Stacked Layout
+
+```gherkin
+GIVEN the user accesses /login or /register on a smartphone (< 768px)
+WHEN  the page loads
+THEN  the Split Screen layout adapts into a vertical stack
+  AND the large Brand Banner is either hidden to save space OR collapsed into a compact top header logo
+  AND the Form Area takes up 100% of the viewport width and remaining height
+  AND all text inputs use font-size 16px to prevent iOS Safari auto-zooming
+```
+
+#### AC-2: Tap-Friendly OTP & Virtual Keyboard (Numpad)
+
+```gherkin
+GIVEN the user is at the /verify-otp screen on a mobile device
+WHEN  they tap on the 6-digit OTP input fields
+THEN  the browser natively triggers the Numeric Keyboard (Numpad) instead of the full text keyboard
+  AND typing a digit auto-advances focus to the next input box
+  AND this auto-advance does NOT cause the mobile viewport to scroll or jump unexpectedly
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] OTP inputs use `inputmode="numeric"` or `type="tel"`
+- [ ] iOS auto-zoom is prevented via 16px font size on inputs

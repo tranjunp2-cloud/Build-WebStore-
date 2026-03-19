@@ -1,5 +1,5 @@
 # PRD: AI Editor — Split Screen (F05)
-> **Version:** 1.1 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
+> **Version:** 1.2 | **Updated:** 2026-03-19 | **Agent:** `project-planner` & `ba-copilot`
 > **Priority:** P0 🌟 | **Sprint:** Wave 1 | **Size:** XL
 > **Depends on:** F04 Block Renderer ✅, F01 AI Builder ✅, F07 Template Gallery 🎨 | **Blocks:** F11 Undo/Redo, F12 Auto-Save
 
@@ -8,8 +8,6 @@
 > [!IMPORTANT]
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
-
----
 
 ## 0. Story Traceability
 
@@ -28,6 +26,7 @@
 | US-F05-11 | Interactive Widgets (Giỏ hàng & Social Media) | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
 | US-F05-12 | Global Business Info & Settings Panel | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
 | US-F05-13 | Page-Level SEO & AI Optimization | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
+| US-F05-14 | Mobile Web UX — Adaptive Editor Interface | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | Ready |
 
 ---
 
@@ -105,8 +104,8 @@ SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 | FR-01 | 3-panel layout: Chat (380px) + Preview (iframe) + Settings (320px) | US-F05-01 | P0 | Collapsible panels |
 | FR-02 | Toolbar: Undo, Redo, Save, Preview, Publish | US-F05-01 | P0 | |
 | FR-03 | AI chat → apply changes to preview realtime (SSE) | US-F05-01 | P0 | < 3s |
-| FR-04 | Undo (Ctrl+Z) reverts most recent change — AI or manual | US-F05-01 | P0 | Max 50 states |
-| FR-05 | Auto-save debounce 3s — prevent data loss on tab close | US-F05-01 | P0 | Payload PATCH |
+| FR-04 | Tính năng Undo / Redo toàn diện | US-F11-01 | P0 | Xem chi tiết tại PRD F11 |
+| FR-05 | Tính năng Auto-save & Draft recovery | US-F12-01 | P0 | Xem chi tiết tại PRD F12 |
 | FR-06 | Badge: Draft / Published visible in header | US-F05-01 | P0 | |
 | FR-07 | Page Manager: list pages với status, block count, last edited | US-F05-02 | P0 | |
 | FR-08 | Add page: điền tên → slug auto-generated → redirect editor | US-F05-02 | P0 | |
@@ -130,6 +129,9 @@ SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 | FR-26 | Global Settings Panel (Right Sidebar): Khi không focus block nào, hiển thị Cấu hình Toàn cục. Chứa mục Nhận diện (Tên cửa hàng, Logo), Liên hệ (SDT, Email, Trụ sở), Mạng xã hội, và Cấu hình SEO cơ bản (Title, Description). | US-F05-12 | P0 | Data bound |
 | FR-27 | Page-Level SEO & AI Content: Trong Page Manager hoặc Settings, cho phép tùy chỉnh Meta Title, Description, Slug cho từng trang. Bổ sung nút "✨ Tự động Tối ưu SEO" để AI đọc các text blocks trên canvas và tự sinh metadata phù hợp. | US-F05-13 | P1 | Content-aware AI |
 | FR-28 | Template Gallery Integration: Entry point để mở Template Gallery modal, hỗ trợ AI Search và Smart Swap. | US-F07-04 | P0 | Integrated with F07 |
+| FR-29 | **[Mobile]** Layout Editor trên mobile từ bỏ Split-Screen, thay bằng `Live Preview` làm background chiếm toàn màn hình, và `AI Chat` trở thành nút nổi (FAB) góc phải dưới màn hình. | US-F05-14 | P0 | Tiết kiệm diện tích |
+| FR-30 | **[Mobile]** Hủy tính năng Drag & Drop component blocks trên viewport mobile. Thay bằng nút `[+] Tap to Add` chèn thẳng vào đầu/cuối trang. | US-F05-14 | P0 | Tránh xung đột cuộn mượt |
+| FR-31 | **[Mobile]** Khi chạm (Tap) vào element muốn Edit, công cụ Formatting và AI command hiện lên dưới định dạng Bottom Sheet vuốt từ dưới lên thay vì floating popup. | US-F05-14 | P0 | Công thái học |
 
 ---
 
@@ -139,6 +141,10 @@ SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 - **BR-02:** Soft delete page only — không hard delete
 - **BR-03:** AI chat action được ghi vào chat history để user trace được
 - **BR-04:** Inline edit chỉ modify element được click — không affect phần còn lại
+- **BR-05:** **[System Pages]** Bắt buộc vô hiệu hóa (Disable) tính năng Ẩn (Hide) và Xóa (Delete) đối với Trang Chủ (Homepage), kèm Tooltip giải thích.
+- **BR-06:** **[System Pages]** Trang 404 (Not Found) chỉ cấp quyền Edit nội dung, KHÔNG cho phép Ẩn, Xóa hoặc thay đổi URL Slug.
+- **BR-07:** **[Offline Fallback]** Tiến trình Auto-save nếu gặp lỗi Mạng (Network Failed) thì phải lưu payload vào LocalStorage (Offline queue), hiển thị trạng thái cảnh báo trên UI và chặn hành vi đóng Tab (window.onbeforeunload).
+- **BR-08:** **[Feature Fallback]** Mọi nút có chức năng "Checkout" hoặc "Thanh Toán" (trong Cart widget / Product block) chỉ hiển thị Toast Message: "Tính năng Checkout đang được phát triển". Không thực hiện trigger redirect gây lỗi 404.
 
 ---
 
@@ -166,7 +172,19 @@ User action:
 
 ## 10. Screen Layout
 
-```
+> **[Global CMS Constraint]** Tính năng Editor là một ngoại lệ do cần không gian tối ưu cho live preview, màn hình này chiếm toàn bộ diện tích trình duyệt.
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình chính (Split-Screen Editor)
+- **Mô tả:** Màn hình làm việc chính khi chỉnh sửa trang web.
+- **Components chính:**
+  - Header Toolbar: Nút điều hướng Pages, Templates, Undo/Redo, Viewport Toggle, Publish.
+  - Left Panel (Chat & Blocks): Tab quản lý library blocks và chat AI thao tác.
+  - Center Panel (Live Preview): Iframe sandbox hiển thị nội dung website đang chỉnh sửa.
+  - Right Panel (Contextual Settings): Global Settings hoặc Settings riêng của block đang click.
+- **Wireframe:**
+```text
 ┌─ /editor/:siteId ──────────────────────────────────────────┐
 │ ┌─ Toolbar ────────────────────────────────────────────────────────────┐ │
 │ │ [Pages ▼] [Templates 🎨] [Undo] [Redo] [Màn hình 💻▼] [👁] [🚀 Publish] │ │
@@ -185,10 +203,84 @@ User action:
 │ │            │ │                         │ │ - Social URL ││
 │ │            │ │                         │ │ - SEO Data   ││
 │ └────────────┘ └─────────────────────────┘ └──────────────┘│
-│                                                            │
-│ Mobile: Preview full width, Panels become bottom sheets    │
 └────────────────────────────────────────────────────────────┘
+
+**Wireframe Mobile (< 768px): Overlay Floating Chat & Bottom Sheet**
+```text
+┌─ 📱 Mobile Browser ─────────────────────────┐
+│ [≡] My Webstore          [👁] [🚀 Publish] │
+│ ─────────────────────────────────────────── │
+│                                             │
+│  [Hero Block]                               │
+│  Let us help you build...                   │
+│                                             │
+│  [Features Block]                           │
+│  ...                                        │
+│                                             │
+│                  ─────────────              │
+│                  [✨ AI Chat ] (FAB button) │
+│                  ─────────────              │
+└─────────────────────────────────────────────┘
+
+Khi Tap vào một Element (Ví dụ: Hero Text), Bottom Sheet mở lên:
+┌─ 📱 Mobile Browser ─────────────────────────┐
+│  Let us help you build... (Text being edite │
+│                                             │
+│ ╭─────────────────────────────────────────╮ │
+│ │ ⚙️ Text Options                  [X]    │ │
+│ │ ─────────────────────────────────────── │ │
+│ │  [✨ Edit with AI]                      │ │
+│ │  [ B ] [ I ] [ U ] [ H1 ▼ ] [ ≡ ]       │ │
+│ │  [ Khóa thay đổi ]                      │ │
+│ ╰─────────────────────────────────────────╯ │
+└─────────────────────────────────────────────┘
 ```
+```
+
+### 10.2. Các màn hình phụ & Modals (Sub-screens & Modals)
+
+- **Wireframe (Page Manager Modal):**
+```text
+┌─ 📄 Page Manager ─────────────────────────[X]┐
+│                                              │
+│  [+ Thêm trang mới]                          │
+│                                              │
+│  Tên Trang          Trạng thái     Hành động │
+│  ------------------------------------------- │
+│  🏠 Homepage        [Published]    [Edit]    │
+│  ℹ️ About Us        [Draft]        [Edit][🗑]│
+│  🛍️ Products        [Published]    [Edit][🗑]│
+│  📞 Contact         [Published]    [Edit][🗑]│
+│                                              │
+└──────────────────────────────────────────────┘
+```
+
+- **Wireframe (Inline Edit & Context Settings):**
+```text
+[Trên Live Preview - Khi Hover/Click vào Text]
+
+ ┌─────────────────────────────────┐
+ │ B  I  U  [H1 ▼]  ≡  =  Ξ  [🔗]  │  (Floating Formatting Toolbar)
+ └─────────────────────────────────┘
+  Let us help you build...
+                                    [✨ Edit with AI] (Nút góc phải của Block)
+
+[Right Sidebar - Cấu hình Component / Global]
+┌─ ⚙️ Settings ─────────────────────┐
+│ 📍 Global Settings                │
+│ --------------------------------- │
+│ Tên Website: [ PrimeWeb ]         │
+│ Logo: [ Upload Image 🖼️ ]         │
+│ Facebook URL: [ https://... ]     │
+│ SEO Meta Title:                   │
+│ [ _________________ ]  [✨ Auto ] │
+└───────────────────────────────────┘
+```
+
+### 10.3. Các trạng thái UI (UI States)
+- **Loading State:** Thấy Skeleton frame cho preview khi mở Editor; typing indicator khi AI chat response.
+- **Error State / Edge Cases:** Inline field errors; Toast "Failed to fetch response" khi chat AI có lỗi.
+- **Success State:** Toast màu xanh báo Apply thay đổi thành công, hiển thị nút "Undo" nổi bật.
 
 ---
 
@@ -221,15 +313,10 @@ THEN  AI stream response
   AND có nút "Hoàn tác" trong chat message
 ```
 
-### AC-3: Undo — Ctrl+Z
-> 📌 Source: [US-F05-01](../stories/F05-ai-editor-stories.md) — AC-3
+### AC-3: Undo & Auto-Save (Delegated)
+> 📌 Source: [US-F11-01](../stories/F11-undo-redo-stories.md) and [US-F12-01](../stories/F12-auto-save-draft-stories.md)
 
-```gherkin
-GIVEN user đã thực hiện thay đổi (AI hoặc manual)
-WHEN  nhấn Ctrl+Z
-THEN  revert change gần nhất (cả AI changes và manual edits)
-  AND preview cập nhật trong < 200ms
-```
+*Ghi chú: Các tiêu chí nghiệm thu về hoàn tác (Undo/Redo) và lưu tự động (Auto-save) đã được tách thành feature độc lập F11 và F12 để quản lý. Vui lòng xem chi tiết tại story files tương ứng.*
 
 ### AC-4: Inline Click-to-Edit
 > 📌 Source: [US-F05-03](../stories/F05-ai-editor-stories.md) — AC-1 & AC-2
@@ -257,14 +344,34 @@ THEN  soft delete (deletedAt set)
   AND toast "Đã xóa. Hoàn tác?" 5s
 ```
 
-### AC-6: Mobile Responsive
-> 📌 Source: [US-F05-01](../stories/F05-ai-editor-stories.md) — Additional Criteria
+### AC-6: Trải Nghiệm Biên Tập Trên Mobile
+> 📌 Source: [US-F05-14](../stories/F05-ai-editor-stories.md)
+
+Khi truy cập vào Editor qua điện thoại, giao diện Split-Screen bị vô hiệu hóa vì không đủ diện tích. Phần Live Preview của website chiếm 100% tỷ lệ khung hình. Các công cụ thiết kế chuyển tiếp thành Bottom Sheets (vuốt từ dưới lên khi tap), AI Chat biến thành nút Floating Action Button (FAB). Tính năng kéo thả bị tắt hoàn toàn khỏi thư viện (Component Library), thay bằng phương thức Tap the Component (Click) để tự động Insert block xuống dưới cùng của giao diện và cuộn tới vị trí đó.
+
+---
+
+### AC-7: Ràng buộc An toàn Hệ thống & Edge Cases (Business Rules)
+> 📌 Source: Phân tích bảo vệ rủi ro và các điểm mù của kiến trúc
 
 ```gherkin
-GIVEN screen width < 768px
-WHEN  on /editor/:siteId
-THEN  preview takes full width
-  AND chat panel becomes bottom sheet (swipe up to open)
+GIVEN user thao tác trên bảng quản lý Page Manager
+WHEN  chọn Trang Chủ (Homepage) hoặc Trang 404
+THEN  nút Ẩn (Hide) và Xóa (Delete) sẽ bị mờ (Disabled) hoàn toàn
+  AND hover vào sẽ hiện Tooltip: "Không thể chỉnh sửa trạng thái hiển thị của trang hệ thống"
+  AND đối với trang 404, field URL Slug bị khóa (Read-only)
+
+GIVEN tiến trình Auto-save (3s) đang chạy ngầm
+WHEN  trình duyệt bị mất kết nối mạng và API calls failed
+THEN  trạng thái Saving (Icon góc trên) đổi màu đỏ báo lỗi
+  AND hiện thông báo Toast: "Mất kết nối mạng. Hãy giữ nguyên trang để tránh mất dữ liệu."
+  AND dữ liệu tạm được queue vào bộ nhớ LocalStorage
+  AND kích hoạt popup cảnh báo của trình duyệt nếu user nhấn nút Close Tab (window.onbeforeunload)
+
+GIVEN user đang trải nghiệm Widget Giỏ hàng (Cart)
+WHEN  bấm vào nút chức năng "Checkout / Mua hàng"
+THEN  hệ thống hiển thị Toast báo: "Tính năng thanh toán đang được phát triển cho bản sau"
+  AND ngăn chặn (Prevent default) mọi hành vi Redirect ra khỏi Editor gây lỗi 404
 ```
 
 ---
@@ -333,7 +440,6 @@ iframe → Parent: BLOCK_CLICKED, BLOCK_HOVERED (with rect position)
 - [ ] Button States — Send disabled during streaming, Undo/Redo greyed khi empty
 - [ ] Toast Feedback — Success/Error cho all actions
 - [ ] Auth Redirect — 401 → /login
-- [ ] Mobile 375px — Bottom sheet chat, full-width preview
 - [ ] TypeScript Clean — `tsc --noEmit` pass
 
 ---
@@ -354,4 +460,3 @@ iframe → Parent: BLOCK_CLICKED, BLOCK_HOVERED (with rect position)
 - [ ] 9-Point Checklist all pass
 - [ ] Chat edit → preview < 3s measured
 - [ ] Undo/Redo works cho cả AI + manual
-- [ ] Mobile 375px tested

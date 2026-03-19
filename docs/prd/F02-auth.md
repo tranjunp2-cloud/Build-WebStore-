@@ -10,6 +10,7 @@
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
 
+
 ---
 
 ## 0. Story Traceability
@@ -23,6 +24,7 @@
 | US-F02-05 | Forgot Password | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
 | US-F02-06 | Reset Password | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
 | US-F02-07 | Two-Factor Authentication (Email) | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
+| US-F02-08 | Mobile Web UX — Adaptive Auth Layout & Numeric Inputs | [F02-auth-stories.md](../stories/F02-auth-stories.md) | Ready |
 
 ---
 
@@ -116,6 +118,8 @@ SO THAT hệ thống ngầm khởi tạo không gian dữ liệu của riêng t�
 | FR-13 | Logout: clear cookie + redirect `/login` | US-F02-04 | P0 |
 | FR-14 | Forgot pass: luôn hiện success state (không reveal email) | US-F02-05 | P0 | Security by design |
 | FR-15 | Reset pass: validate token, cập nhật password (tuân thủ trim và rule 8 chars) | US-F02-06 | P0 |
+| FR-16 | [Mobile] Màn hình Split Screen chuyển sang dạng cột dọc (Stack Width 100%), ẩn/thu nhỏ khối Brand Banner. | US-F02-08 | P0 | Tiết kiệm diện tích |
+| FR-17 | [Mobile] Màn hình OTP phải gọi đúng Numpad ảo (Bàn phím số) trên thiết bị di động bằng thuộc tính `inputmode="numeric"`. | US-F02-08 | P0 | Ergonomics |
 
 ---
 
@@ -163,9 +167,17 @@ SO THAT hệ thống ngầm khởi tạo không gian dữ liệu của riêng t�
 
 ## 10. Screen Layout
 
-```text
-Auth screens nâng cấp lên giao diện Full Split Screen (Màn hình Login làm xương sống):
+> **[Global CMS Constraint]** Tính năng Auth là ngoại lệ - rendering full màn hình ngoài Layout CMS.
 
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình Login / Register gốc (Split-Screen Interface)
+- **Mô tả:** Màn hình chính phục vụ đăng nhập/đăng ký tài khoản cho Owner và redirect tương ứng định tuyến.
+- **Components chính:**
+  - Hero Image/Banner (Trái): [Visual image, slogan quảng cáo thương hiệu]
+  - Form Area (Phải): [Logo, Input Form: Email, Pass, v.v., Nút Submit Primary, Link Register/Forgot]
+- **Wireframe:**
+```text
 ┌─ [Desktop] /login hay /register ────────────────────────────────────┐
 │  [BRAND IMAGE / BANNER LỚN BÊN TRÁI] │  [PrimeWeb Logo]             │
 │  (Hiệu ứng đồ họa, Slogan quảng cáo) │                              │
@@ -178,8 +190,68 @@ Auth screens nâng cấp lên giao diện Full Split Screen (Màn hình Login l�
 │                                      │                              │
 │                                      │ 🔗 [Hướng dẫn sử dụng Help]   │
 └─────────────────────────────────────────────────────────────────────┘
-Mobile: UI chuyển sang card form xếp dọc (Stack column), 44px tap targets.
+
+**Wireframe Mobile (< 768px): Stacked Laytout**
+```text
+┌─ 📱 Mobile Browser ─────────────────┐
+│ [PrimeWeb Logo]                     │
+│ ─────────────────────────────────── │
+│          [Glassmorphism Form]       │
+│  Email address                      │
+│  [ _____________________________ ]  │
+│                                     │
+│  Password                           │
+│  [ _____________________________ ]  │
+│  Forgot password?                   │
+│                                     │
+│  [ Sign In (Primary CTA)         ]  │
+│  [ Register (Secondary CTA)      ]  │
+│                                     │
+│ ─────────────────────────────────── │
+│ 🔗 [Hướng dẫn sử dụng Help]         │
+└─────────────────────────────────────┘
 ```
+
+### 10.2. Màn hình OTP / Khôi phục mật khẩu (2FA / Recovery Screen)
+- **Mô tả:** UI đơn giản tập trung vào Verify OTP hoặc nhập Email quên mk. Không chứa Banner trái phức tạp.
+- **Components chính:**
+  - OTP Input Form: [6 ô text fields cho OTP, đồng hồ Countdown 5 phút, Nút Resend]
+  - Forgot/Reset Form: [Trường nhập Email, Mật khẩu mới, Nút Xác nhận]
+- **Wireframe (OTP Verification):**
+```text
+┌─ 2FA Verification ──────────────────────────┐
+│                                             │
+│  🔒 Enter Security Code                     │
+│  We sent a 6-digit code to ow***@sme.com    │
+│                                             │
+│  [ ] [ ] [ ] - [ ] [ ] [ ]                  │
+│                                             │
+│  [ Verify Code ]                            │
+│                                             │
+│  Didn't receive it? Resend in 04:59         │
+└─────────────────────────────────────────────┘
+```
+
+- **Wireframe (Forgot Password):**
+```text
+┌─ Reset Password ────────────────────────────┐
+│                                             │
+│  🔑 Forgot your password?                   │
+│  Enter your email below to receive a link   │
+│                                             │
+│  Email address                              │
+│  [ you@company.com ]                        │
+│                                             │
+│  [ Send Reset Link ]                        │
+│                                             │
+│  ← Back to login                            │
+└─────────────────────────────────────────────┘
+```
+
+### 10.3. Các trạng thái UI (UI States) & Modals
+- **Loading State:** Thay text "Sign In" bằng dạng Button Spinner isLoading. Không chặn toàn trang.
+- **Error State / Edge Cases:** Inline field validation lỗi viền đỏ (sai format, pass ngắn). Alert banner báo tài khoản không tồn tại.
+- **Success State:** Sonner Toast xanh báo tạo Account, Forgot Pass link sent.
 
 ---
 
@@ -291,6 +363,11 @@ THEN  POST /api/users/reset-password { token, password }
   AND thành công → toast.success
   AND redirect → /login
 ```
+
+### AC-11: Trải Nghiệm Nhập Liệu Mobile Auth
+> 📌 Source: [US-F02-08](../stories/F02-auth-stories.md)
+
+Khi truy cập màn hình `/login` hoặc `/register` trên view dưới 768px, Brand Banner bị loại bỏ hoặc thu nhỏ thành Top Header. Giao diện form lấy trọn 100% width. Tại trang nhập OTP (`/verify-otp`), việc chạm vào ô điền OTP sẽ kích hoạt bàn phím số (Numeric Numpad) thay vì bàn phím chữ QWERTY. Tự động focus sang ô OTP kế tiếp mà KHÔNG gây khựng / giật màn hình (scroll jumping).
 
 ---
 

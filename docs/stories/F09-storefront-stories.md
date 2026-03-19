@@ -237,5 +237,53 @@ THEN  confirmation page shows: order number, total, items list
 
 ### Definition of Done
 
-- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
 - [ ] Order number format: ORD-XXXXXXXX
+
+---
+
+## US-F09-05: Mobile Web UX — Native-Feeling Storefront
+
+**Wave 5** | **P1** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile shopper
+I want the storefront to feel like a native app with thumb-friendly controls
+So that I can easily filter products and checkout without frustration
+```
+
+### Acceptance Criteria
+
+#### AC-1: Sticky "Add to Cart" on Mobile PDP
+
+```gherkin
+GIVEN a mobile visitor is viewing a Product Detail Page (PDP)
+WHEN  they scroll down past the initial product image and details
+THEN  a persistent "Add to Cart" bar (and price) sticks to the bottom of the screen (Thumb zone)
+  AND it remains visible until they reach the footer
+```
+
+#### AC-2: Bottom Sheet Filters & Sorting
+
+```gherkin
+GIVEN a mobile visitor is on the Product Listing Page (PLP)
+WHEN  they tap "Filter" or "Sort"
+THEN  instead of a cramped dropdown or sidebar, a Bottom Sheet slides up
+  AND it provides large, touch-friendly checkboxes and radio buttons
+  AND it can be dismissed by swiping down
+```
+
+#### AC-3: Full-Screen Cart Drawer
+
+```gherkin
+GIVEN a mobile visitor triggers the Cart Drawer
+WHEN  the drawer opens
+THEN  it takes up 100% of the mobile screen width (fullscreen overlay) instead of a partial side-panel
+  AND the "Checkout" button is fixed at the bottom thumb zone
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass.
+- [ ] Safe-area-inset-bottom is supported on iOS to avoid overlapping the home indicator.

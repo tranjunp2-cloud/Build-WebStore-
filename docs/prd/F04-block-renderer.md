@@ -14,6 +14,7 @@
 > Không có Story file riêng — scope được gated bởi usage từ F01 (AI Builder), F05 (Editor), F09 (Storefront).
 > Không cần tạo story file cho F04.
 
+
 ---
 
 ## 0. Story Traceability
@@ -292,7 +293,13 @@ export type BlockMeta = {
 6. Add 12 new block types
 7. Test backward compatibility with existing pages
 
-## 8. 9-Point Done Checklist
+## 10. Screen Layout
+
+> **N/A - Technical Architecture PRD**
+> Tính năng này là infrastructure rendering blocks, không có màn hình UI riêng. 
+> Block rendering sẽ phụ thuộc vào layout của F01 (Builder), F05 (Editor) và F09 (Storefront).
+
+## 11. 9-Point Done Checklist
 
 - [ ] Loading State — Block skeleton while rendering (n/a for SSR)
 - [ ] Empty State — Graceful error placeholder for invalid blocks
@@ -304,7 +311,7 @@ export type BlockMeta = {
 - [ ] Mobile 375px — All 20 blocks responsive (must test)
 - [ ] TypeScript Clean — Zero `any` types, tsc --noEmit pass
 
-## 9. Definition of Ready
+## 12. Definition of Ready
 
 - [x] This PRD reviewed and approved
 - [x] AI_BUILDER_SPEC.md §7 (Block Output Schema) exists
@@ -312,7 +319,7 @@ export type BlockMeta = {
 - [x] Existing 8 blocks in SiteRenderer.tsx to refactor from
 - [ ] Docker environment working (check at sprint start)
 
-## 10. Definition of Done
+## 13. Definition of Done
 
 - [ ] 20 block types render correctly
 - [ ] Zero `any` types across all block files

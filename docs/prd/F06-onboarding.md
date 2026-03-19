@@ -9,6 +9,7 @@
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
 
+
 ---
 
 ## 0. Story Traceability
@@ -17,6 +18,7 @@
 |----------|-------|------|--------|
 | US-F06-02 | Welcome Screen — Zero Friction | [F06-onboarding-stories.md](../stories/F06-onboarding-stories.md) | Ready |
 | US-F06-03 | AI Feature Discovery Wizard | [F06-onboarding-stories.md](../stories/F06-onboarding-stories.md) | Ready |
+| US-F06-04 | Mobile Web UX — Fullscreen Onboarding | [F06-onboarding-stories.md](../stories/F06-onboarding-stories.md) | Ready |
 
 ---
 
@@ -88,6 +90,8 @@ SO THAT tôi hiểu ngay giá trị của nền tảng và bắt đầu tạo we
 | FR-09 | Carousel Slide 2: Giới thiệu chức năng AI Content | US-F06-03 | P0 | Title, Description, GIF |
 | FR-10 | Carousel Slide 3: Giới thiệu chức năng AI SEO | US-F06-03 | P0 | Title, Description, GIF |
 | FR-11 | Nút "Bỏ qua hướng dẫn" / "Khám phá CMS" đóng modal & lưu state | US-F06-03 | P0 | |
+| FR-12 | **[Mobile]** Layout Welcome screen: Nút thiết lập tràn viền 100% và dính (fixed) dưới cùng màn hình (Thumb zone). | US-F06-04 | P1 | |
+| FR-13 | **[Mobile]** AI Discovery Carousel hỗ trợ Swipe gestures qua lại trên màn hình cảm ứng. | US-F06-04 | P1 | Tránh chạm nhầm nút nhỏ |
 
 ---
 
@@ -131,16 +135,41 @@ The Onboarding Wizard (AI Discovery) relies on a database flag: `has_seen_ai_wiz
 
 ---
 
-## 10. Screen Layout & UI Philosophy
+## 10. Screen Layout
 
-### 10.1 Design Principle
-**"Minimal, Focus, No Complex Interaction"**
-- The UI must be highly focused. Darken the background (backdrop) so the user only sees the modal.
-- No form inputs, no checkboxes, no complicated nested settings.
-- The visual (GIF/Image) must do the heavy lifting of explanation.
+> **[Global CMS Constraint]** Tính năng Onboarding khởi tạo một Welcome Screen trọn vẹn màn hình và một Carousel Wizard Overlay đè lên Dashboard CMS.
 
-### 10.2 Modal Structure
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+### 10.1. Màn hình Welcome (Zero-Friction Welcome)
+- **Mô tả:** Màn hình chào mừng siêu tốc sau khi Sign Up.
+- **Components chính:**
+  - Tiêu đề thông điệp chào mừng trung tâm.
+  - Only ONE Primary Action: Nút CTA lớn "Create My Store".
+  - Một link phụ bên dưới: "Bỏ qua & Đi tới Dashboard".
+- **Wireframe:**
+```text
+┌──────────────────────────────────────────┐
+│                                          │
+│        🎉 Chào mừng tới PrimeWeb         │
+│     Bắt đầu xây dựng cửa hàng của bạn    │
+│                                          │
+│       [ 🚀 Create My Store ]             │
+│                                          │
+│       Bỏ qua & Đi tới Dashboard          │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+### 10.2. Màn hình AI Discovery Wizard (CMS Overlay Carousel)
+- **Mô tả:** Modal tự bật hiện tại Dashboard hướng dẫn sử dụng AI CMS.
+- **Principle thiết kế:** Focus, Làm Mờ background (opacity 0.6), không phức tạp form input.
+- **Components chính:**
+  - Header: Simple Title + Nút X Close.
+  - Media Box: Khung hiển thị GIF/Video (16:9 ratio, max 500KB).
+  - Content Text: Heading, Body (14-16px).
+  - Navigation Footer: Nút Skip (phụ), Nút Next (chính), Progress dots (● ○ ○).
+- **Wireframe:**
 ```text
 CMS Dashboard - Background is darkened (opacity 0.6)
 ┌──────────────────────────────────────────┐
@@ -162,15 +191,41 @@ CMS Dashboard - Background is darkened (opacity 0.6)
 └──────────────────────────────────────────┘
 ```
 
-### 10.3 UI Components Requirements
-- **Container:** Centered Modal (Max-width: 600px).
-- **Header:** Simple Title + Close Button (Top Right).
-- **Media Box:** 16:9 ratio container for the GIF. Must handle loading skeleton gracefully.
-- **Typography:** Very readable. Heading (H3/H4), Body (14px-16px).
-- **Actions:** 
-  - Secondary Action (Left): "Bỏ qua hướng dẫn" (Text button).
-  - Primary Action (Right): "Tiếp tục" (Solid button). On the last slide, changes to "Khám phá CMS ngay".
-- **Pagination:** Simple dots `(●) (○) (○)` to show progress.
+### 10.3. Mobile View (Stack Onboarding)
+- **Mô tả:** Màn hình Welcome và CMS AI Wizard trên Mobile, tối ưu cho việc sử dụng ngón cái (Thumb-zone) và trình diễn theo chiều dọc.
+- **Wireframe:**
+```text
+┌─ 📱 Mobile Browser ─────────────────────────┐
+│        🎉 Chào mừng tới PrimeWeb           │
+│     Bắt đầu xây dựng cửa hàng của           │
+│     bạn ngay hôm nay!                       │
+│                                             │
+│       [ 🚀 Create My Store ]                │
+│                                             │
+│       Bỏ qua & Đi tới Dashboard             │
+└─────────────────────────────────────────────┘
+
+┌─ 📱 Mobile AI Wizard (Overlay) ─────────────┐
+│ ✦ Khám phá Quyền năng AI               [✕]  │
+│                                             │
+│   ┌──────────────────────────────────┐      │
+│   │        [ 🖼️ GIF/Video ]          │      │
+│   └──────────────────────────────────┘      │
+│                                             │
+│  [Tiêu đề] Thiết kế bằng AI                 │
+│  [Mô tả] Hỗ trợ bạn thay đổi thiết kế       │
+│  chỉ với một cú chạm.                       │
+│                                             │
+│               (●) (○) (○)                   │
+│                                             │
+│  [ Bỏ qua ]              [ ➔ Tiếp tục ]     │
+└─────────────────────────────────────────────┘
+```
+
+### 10.4. Các trạng thái UI (UI States) & Modals
+- **Loading State:** Có Shimmer skeleton chờ GIF tải xong bên trong hộp ảnh 16:9. Nút CTA Disable lúc transition slide.
+- **Error State / Edge Cases:** Fallback ảnh tĩnh nếu video/GIF không load được.
+- **Success State:** Fade-out mượt khi hoàn tất Carousel và Update state vô db.
 
 ---
 
@@ -210,6 +265,11 @@ WHEN  click "Bỏ qua hướng dẫn" hoặc hoàn thành Step 3
 THEN  Modal đóng lại
   AND không bao giờ tự động hiện lại trong các lần đăng nhập sau (lưu state has_seen_onboarding_wizard = true)
 ```
+
+### AC-4: Mobile Web Experience
+> 📌 Source: [US-F06-04](../stories/F06-onboarding-stories.md)
+
+Trên giao diện điện thoại (< 768px), Onboarding Welcome view có nút CTA tràn viền, cố định ở mép dưới màn hình. Modal Carousel chiếm toàn bộ không gian (fullscreen) làm mờ background hoàn toàn và cho phép vuốt (swipe) để đổi slide, ẩn đi các nút tới/lui nhỏ để tối ưu touch target.
 
 ---
 

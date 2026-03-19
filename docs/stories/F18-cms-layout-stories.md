@@ -13,7 +13,7 @@ Theo bối cảnh thị trường Malaysia (`malaysia-market-context.md`), đố
 1. **Rõ ràng và trực quan (Clear & Straightforward):** Tránh sử dụng icon quá trừu tượng. Phải có text đi kèm icon ở Side Menu.
 2. **Hỗ trợ đa ngôn ngữ (Multi-language):** Dễ dàng chuyển đổi giữa Bahasa Melayu (BM) và English (EN) ngay tại top header (Avatar dropdown).
 3. **Mobile-Responsive:** Dropshippers thường xuyên kiểm tra đơn hàng (Orders) qua điện thoại. Sidebar cần có dạn hamburger menu chuẩn chỉ trên màn hình nhỏ.
-4. **Hỗ trợ qua kênh quen thuộc:** Nút Support/Help nên dẫn thẳng ra WhatsApp, kênh ưa thích số 1 tại Malaysia.
+4. **Hỗ trợ qua kênh quen thuộc:** Tích hợp Help Center (F20) nội bộ cung cấp hướng dẫn sử dụng và Q&A, giúp giảm tải cho bộ phận support, từ đó mới hiển thị link lên WhatsApp dành cho Support nếu cần thiết.
 
 ---
 
@@ -53,12 +53,12 @@ THEN  Side Menu trượt từ trái sang (Slide-in drawer)
   AND có overlay mờ che phần nội dung chính
 ```
 
-#### AC-3: WhatsApp Support Link
+#### AC-3: Help Center Link
 
 ```gherkin
 GIVEN user nhìn vào cuối Side Menu
-WHEN  click vào nút "Help / Support"
-THEN  hệ thống mở tab mới dẫn đến link WhatsApp Business của PrimeWeb Support
+WHEN  click vào item "Help Center"
+THEN  hệ thống điều hướng sang trang Help Center (F20)
 ```
 
 ### Additional Criteria
@@ -69,7 +69,7 @@ THEN  hệ thống mở tab mới dẫn đến link WhatsApp Business của Prim
 ### Open Questions
 
 - **Q:** Sidebar có cần hỗ trợ mini mode (collapsed icon-only) trên tablet không, hay chỉ có 2 trạng thái (expanded / hidden)?
-- **Assumption:** WhatsApp Business link sẽ được cấu hình ở environment config, không hardcode trong source code.
+- **Assumption:** Nút Help Center sẽ điều hướng vào module F20. Link WhatsApp sẽ nằm trong nội dung của F20.
 
 ### Market Notes *(nếu có)*
 

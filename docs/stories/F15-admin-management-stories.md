@@ -25,6 +25,18 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
 
 ---
 
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
 ## 2. Proposed Modules & Prioritization
 
 Dưới đây là các Epic được đề xuất, phân loại theo độ ưu tiên **Mid** (Cần thiết cho vận hành cơ bản SaaS) và **Low** (Tính năng nâng cao, có thể bổ sung ở Phase sau).
@@ -162,6 +174,17 @@ SO THAT hệ thống kết nối với các contact channel của khách hàng �
 - **Acceptance Criteria:**
   - Giao diện Admin có "Integrations Settings" để nhập API Key, Secret/Token cho: Email provider (Postmark, SendGrid) và Social Apps (Zalo OA, Facebook Page).
   - Khi thiết lập Campaign (US-F15-08), Admin có thể chọn 1 hoặc nhiều Channel: `Email`, `Zalo`, `Messenger` và soạn message template/nội dung tương ứng cho từng kênh.
+
+### Epic 7: Mobile Responsiveness
+#### US-F15-10: Mobile Web UX — Responsive SaaS Dashboard
+```text
+AS A System Admin on the go
+I WANT TO quản lý hệ thống trên điện thoại di động
+SO THAT tôi có thể xử lý các sự cố khẩn cấp (ban account, check doanh thu) khi không ngồi máy tính.
+```
+- **Acceptance Criteria:**
+  - Overview Metrics (MRR, Users) form horizontally scrollable cards or stack vertically on mobile (< 768px).
+  - Complex data tables (List of Workspaces) transform into individual Cards or collapse secondary columns, making primary actions (Impersonate, Edit) highly accessible via touch.
 
 ---
 

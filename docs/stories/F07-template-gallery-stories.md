@@ -237,4 +237,38 @@ THEN  preview đóng lại và US-F07-05 (Content-Preserving Swap) được kíc
 
 ---
 
-<!-- Lặp lại block ## US-F[XX]-[NN] cho mỗi story tiếp theo. Tối đa 5 stories/file. -->
+## US-F07-08: Mobile Web UX — Touch-Friendly Template Gallery
+
+**Wave 3** | **P1** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user (Store Owner)
+I want the Template Gallery to open as a Bottom Sheet with a thumb-friendly grid
+So that I can easily browse and preview templates on a small screen
+```
+
+### Acceptance Criteria
+
+#### AC-1: Bottom Sheet Gallery
+
+```gherkin
+GIVEN the user is in the Editor on a mobile device (< 768px)
+WHEN  they tap the "Templates" icon
+THEN  instead of a floating modal, a Bottom Sheet slides up covering 90% of the screen height
+  AND the AI Chat search input is fixed at the top of this sheet
+```
+
+#### AC-2: Optimized Mobile Grid
+
+```gherkin
+GIVEN the Template Gallery is open on mobile
+WHEN  viewing the template list
+THEN  the templates are displayed in a 2-column grid to maximize visible options
+  AND tap targets for "Preview" and "Apply" are at least 44x44px
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass.
