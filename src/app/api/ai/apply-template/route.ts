@@ -57,7 +57,7 @@ export const POST = withAuth(async (user, req) => {
                 name: template.name,
                 tenant: tenant.id,
                 status: 'draft',
-                siteType: template.category?.[0] || 'business',
+                siteType: Array.isArray(template.category) ? template.category[0] : (template.category || 'business'),
                 theme: template.defaultTheme || {
                     primaryColor: '#0ea5e9',
                     fontHeading: 'Outfit',
@@ -72,8 +72,8 @@ export const POST = withAuth(async (user, req) => {
         await payload.create({
             collection: 'pages',
             data: {
-                title: 'Homepage',
-                slug: 'home',
+                title: 'Home',
+                slug: '/',
                 site: site.id,
                 tenant: tenant.id,
                 isHomepage: true,

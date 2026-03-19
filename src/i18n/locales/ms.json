@@ -101,7 +101,11 @@
             "fitness": "💪 Kecergasan",
             "creative": "🎨 Portfolio",
             "business": "🏢 Perniagaan"
-        }
+        },
+        "sort": "Susun mengikut",
+        "sortNewest": "Terbaharu",
+        "sortFeatured": "Pilihan",
+        "sortName": "A-Z"
     },
     "onboarding": {
         "stepLabel": "Langkah",
