@@ -2,6 +2,7 @@
 
 > **Feature:** F05 — AI Editor (Split Screen)
 > **Wave:** 3 | **Priority:** P0 🌟 | **Ref PRD:** [F05-ai-editor.md](../prd/F05-ai-editor.md)
+> *Lưu ý: UX/UI Mobile Web Responsive/Adaptive được tách tại [F05-mobile-responsive-ai-editor-stories.md](./F05-mobile-responsive-ai-editor-stories.md).*
 
 ---
 
@@ -42,15 +43,8 @@ THEN  AI stream response
   AND có nút "Hoàn tác" trong chat message
 ```
 
-#### AC-3: Undo — Ctrl+Z Revert
-
-```gherkin
-GIVEN user đã thực hiện thay đổi (AI hoặc manual)
-WHEN  nhấn Ctrl+Z
-THEN  revert change gần nhất (cả AI changes và manual edits)
-  AND preview cập nhật trong < 200ms
-```
-
+#### AC-3: Undo / Redo (Delegated)\r
+> *Ghi chú: Chức năng Undo/Redo đã được tách thành [US-F11-01](../stories/F11-undo-redo-stories.md). Vui lòng xem chi tiết tại đó.*\r
 #### AC-4: Inline Edit — Click Element
 
 ```gherkin
@@ -63,19 +57,12 @@ WHEN  accept
 THEN  chỉ element đó thay đổi, phần còn lại không ảnh hưởng
 ```
 
-#### AC-5: Auto-save — Prevent Data Loss
-
-```gherkin
-GIVEN user chỉnh sửa nhưng chưa publish
-WHEN  đóng tab hoặc navigate đi
-THEN  auto-save (debounce 3s) đảm bảo không mất data
-  AND badge "Draft" hiện trên header
-```
-
+#### AC-5: Auto-Save & Draft (Delegated)\r
+> *Ghi chú: Chức năng Auto-save đã được tách thành [US-F12-01](../stories/F12-auto-save-draft-stories.md). Vui lòng xem chi tiết tại đó.*\r
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
-- [ ] 3-panel layout responsive — chat collapsible trên mobile
+- [ ] 3-panel layout support resize màn hình Desktop/Tablet ngang
 - [ ] Undo/Redo hoạt động đúng với cả AI changes
 
 ---
@@ -383,7 +370,7 @@ THEN  ảnh Logo mới tự động adaptive thu phóng (scale) theo hình dáng
 ```
 As a   store owner
 I want xem danh sách các Component dựng sẵn và kéo thả chúng trực tiếp vào màn hình Preview
-So that xây dựng bố cục trang trực quan, thân thiện giống các công cụ thiết kế, tự động responsive cho Mobile/Web
+So that xây dựng bố cục trang trực quan, thân thiện giống các công cụ thiết kế.
 ```
 
 ### Acceptance Criteria

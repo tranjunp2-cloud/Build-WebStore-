@@ -72,3 +72,41 @@ THEN  system lưu JSON config vào `site.shippingConfig`
 
 ### Definition of Done
 - [ ] Dữ liệu Rate được persist an toàn.
+
+---
+
+## US-F14-03: Mobile Web UX — Shipping Form Optimization
+
+**Wave 6** | **P1** | **S** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user (Shopper / Store Owner)
+I want the shipping address forms and settings to be touch-friendly and use the correct keyboards
+So that I can type quickly without errors on a small screen
+```
+
+### Acceptance Criteria
+
+#### AC-1: Numeric Keyboards for Postcode
+
+```gherkin
+GIVEN a mobile shopper is entering their shipping address
+WHEN  they tap the "Postcode" field
+THEN  the device's native numeric keypad (Numpad) opens automatically (using `inputmode="numeric"`)
+  AND all address fields are stacked vertically (100% width) to maximize typing space
+```
+
+#### AC-2: Tap-Friendly Shipping Settings
+
+```gherkin
+GIVEN a store owner is configuring shipping rates on a mobile device
+WHEN  they view the settings page
+THEN  the input fields for West/East Malaysia rates are vertically stacked
+  AND the inputs are at least 44px tall
+  AND the checkbox for "Enable free shipping" has a large tap target
+```
+
+### Definition of Done
+- [ ] 9-Point Checklist pass.

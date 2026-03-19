@@ -27,19 +27,21 @@ Tuần 1-2 (Mar 12-25)    Sprint 0: Foundation
 Tuần 3-4 (Mar 26-Apr 8)  Sprint 1: Core Content & Framework
                          ├── F18 CMS Layout & Navigation
                          ├── F01 AI Web Builder (polish)
+                         ├── F02 Auth web
                          ├── F05 AI Editor (rebuild & text SEO)
-                         ├── F06 Onboarding + Language
+                         ├── F06 Onboarding
                          ├── F19 Store Config & Domains
                          └── F17 Blog Management + AI Writing
+                         └── F07 Template Gallery
 
 Tuần 5-6 (Apr 9-22)      Sprint 2: Commerce & Advanced Ops
-                         ├── F08 Products (Bulk AI, Halal) & Publishing
+                         ├── F08 Products & Publishing
                          ├── F09 Storefront Commerce UI
                          ├── F10 Orders & Checkout
                          ├── F03 Dashboard & SEO Tracker
-                         ├── F13 Payment (FPX) & F14 Shipping
                          ├── F16 Notification Center
-                         └── F15 Admin Management
+                         └── F18 CMS Layout & Navigation
+                         
 
 Tuần 7 (Apr 23-30)       Sprint 3: Polish & Launch
                          ├── Bug fixes & Testings

@@ -5,6 +5,30 @@
 
 ---
 
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
 ## US-F03-01: Dashboard — Overview
 
 **Wave 3** | **P0** | **M** | **Status:** Ready
@@ -325,3 +349,53 @@ THEN  hệ thống tự động query hạng của website theo từng keyword
 
 - [ ] Giới hạn đúng 5 keywords/tenant để kiểm soát API cost.
 - [ ] Cron job hoặc API fetch rank hoạt động chính xác (dùng third-party API rẻ/scrape cơ bản).
+
+---
+
+## US-F03-07: Mobile Web UX — Responsive Dashboard Metrics & Charts
+
+**Wave 3** | **P0 🌟** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user (Store Owner)
+I want my dashboard to concisely display metrics in a thumb-friendly grid and simplify complex charts
+So that I can quickly check my business health on-the-go without aggressive scrolling or squinting
+```
+
+### Acceptance Criteria
+
+#### AC-1: Metrics 2x2 Grid Layout
+
+```gherkin
+GIVEN the user accesses /dashboard on a mobile device (< 768px)
+WHEN  the page loads
+THEN  the 4 top stat cards (Traffic, Leads, Orders, Revenue) are rendered in a 2x2 CSS Grid
+  AND the padding within each card is tightened appropriately to ensure text fits without truncating critical figures
+  AND the "Action Required" list is shown immediately below the grid
+```
+
+#### AC-2: Touch-Optimized Charts (Analytics)
+
+```gherkin
+GIVEN the user navigates to /dashboard/analytics on mobile
+WHEN  viewing the Daily Bar Chart
+THEN  the chart's X-Axis (dates) automatically skips rendering some labels (e.g., shows every 5th day) to prevent overlapping text
+  AND the user can scrub/touch-drag across the bars to see precise daily values in a tooltip positioned above their finger
+```
+
+#### AC-3: Customization Panel on Mobile
+
+```gherkin
+GIVEN the user taps "Tùy chỉnh Dashboard" on mobile
+WHEN  the customization modal/bottom sheet opens
+THEN  instead of drag-and-drop, the user can reorder widgets using large native `[⬆]` and `[⬇]` buttons next to each widget name in the list
+  AND the modal acts as a bottom sheet (Swipeable drawer) easily closable with a downward swipe gesture
+```
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass
+- [ ] Responsive UI grid breaks down smoothly from 4-col (desktop) to 2-col (tablet/mobile).
+- [ ] Recharts/Chart.js mobile touch events verified.

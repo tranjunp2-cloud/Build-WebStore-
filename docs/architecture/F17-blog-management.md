@@ -1,6 +1,6 @@
 # Architecture: Blog Management (F17)
 
-> **Date:** 2026-03-17 | **Related PRD:** `docs/prd/F15-blog-management.md`  
+> **Date:** 2026-03-17 | **Related PRD:** `docs/prd/F17-blog-management.md` 
 > **Agent:** Architect Agent
 
 ---

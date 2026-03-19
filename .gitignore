@@ -17,6 +17,9 @@ build/
 .env.production
 .env.staging
 
+## Bot config (personality controlled by PM/Lead only)
+.bot-config.json
+
 ## IDE
 .idea/
 .vscode/
@@ -40,6 +43,7 @@ src/payload-types.ts
 ## Logs
 *.log
 npm-debug.log*
+docs/qa/qa-automation/target/
 
 ## Test and AI Agent data
 test-results/

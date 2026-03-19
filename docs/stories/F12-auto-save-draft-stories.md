@@ -65,3 +65,31 @@ THEN  website hiển thị lại bản nháp (draft) mới nhất
 
 ### Definition of Done
 - [ ] Database fetch đúng bản `isDraft = true` mới nhất.
+
+---
+
+## US-F12-03: Mobile Web UX — Compact Auto-Save Indicator
+
+**Wave 3** | **P2** | **S** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user
+I want the save status to take up minimal space on my small screen
+So that it doesn't clutter the editor UI
+```
+
+### Acceptance Criteria
+
+#### AC-1: Icon-Only Indicator
+
+```gherkin
+GIVEN the user is editing on a mobile device (< 768px)
+WHEN  the system performs an auto-save
+THEN  the text "Saved just now" is hidden
+  AND only a compact icon (e.g., spinning cloud, checkmark) is displayed in the corner or toolbar
+```
+
+### Definition of Done
+- [ ] 9-Point Checklist pass.

@@ -10,6 +10,7 @@
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
 
+
 ---
 
 ## 0. Story Traceability
@@ -20,6 +21,7 @@
 | US-F08-04 | AI Chat Create Product & Hình ảnh mặc định | [F08-products-crud-stories.md](../stories/F08-products-crud-stories.md) | Ready |
 | US-F08-05 | Quản lý Danh mục Phân cấp (Category 3-Level) | [F08-products-crud-stories.md](../stories/F08-products-crud-stories.md) | Ready |
 | US-F08-06 | Thuộc tính Mở rộng (Attributes) & Giao diện Storefront | [F08-products-crud-stories.md](../stories/F08-products-crud-stories.md) | Ready |
+| US-F08-07 | Mobile Web UX — Product Management on Small Screens | [F08-products-crud-stories.md](../stories/F08-products-crud-stories.md) | Ready |
 
 ---
 
@@ -40,7 +42,7 @@ Site owners need to manage products from the dashboard — create, edit, delete,
 
 ## 3. Solution Overview
 
-Trang `/dashboard/products` hỗ trợ người bán quản lý catalog trọn vẹn chuẩn e-commerce. Tính năng xoay quanh: Tạo/sửa sản phẩm, **Tạo biến thể bán hàng (2-tier Variants)**, Quản lý Tồn kho cấp độ **SKU**, Hệ thống **Status (Active/Draft/Archived)**. Hỗ trợ "One-click" **AI sinh nội dung mô tả & thông tin SEO thân thiện**. Phù hợp với thị trường MY (giá RM, chứng nhận Halal).
+Trang `/products` hỗ trợ người bán quản lý catalog trọn vẹn chuẩn e-commerce. Tính năng xoay quanh: Tạo/sửa sản phẩm, **Tạo biến thể bán hàng (2-tier Variants)**, Quản lý Tồn kho cấp độ **SKU**, Hệ thống **Status (Active/Draft/Archived)**. Hỗ trợ "One-click" **AI sinh nội dung mô tả & thông tin SEO thân thiện**. Phù hợp với thị trường MY (giá RM, chứng nhận Halal).
 
 ---
 
@@ -108,6 +110,8 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 | FR-13 | Dynamic Attributes: Ô thêm/xóa Key-Value tùy biến (VD: "Chất liệu": "Cotton"). Gen thành SEO Rich Snippets ngoài storefront. | US-F08-06 | P0 | Key-Value Array / JSON |
 | FR-14 | Storefront PLP Layout: View danh sách Grid/List, Sidebar Filters (Menu theo Category 3-Level, Khoảng Giá, Attributes). | US-F08-06 | P0 | F09 Dependency |
 | FR-15 | Storefront PDP Layout: Breadcrumbs (L1 > L2), Gallery ảnh (Trái), Thông tin (Phải). Khối Attributes Table ở nửa dưới trang. | US-F08-06 | P0 | F09 Dependency |
+| FR-16 | **[Mobile]** Danh sách quản lý sản phẩm trên màn hình < 768px chuyển từ cấu trúc Bảng (Data Table) sang dạng Thẻ Card xổ dọc (Stacked Cards Layout). | US-F08-07 | P1 | Chống scroll ngang |
+| FR-17 | **[Mobile]** Bảng cấu hình SKU Matrix (Variants) trên điện thoại chuyển thành nhóm Accordion xếp dọc. | US-F08-07 | P1 | Tối ưu touch target |
 
 ---
 
@@ -125,7 +129,7 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 ## 9. User Flow
 
 ```
-/dashboard/products
+/products
   ↓
 [+ Add Product] HOẶC [✨ Tạo hàng loạt bằng AI Chat]
   ├── (Chat): "Nhập kho 2 mặt hàng: Áo khoác da size M L giá 500k và Mù tạt lọ 10k"
@@ -164,8 +168,20 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
 
 ## 10. Screen Layout
 
-```
-┌─ /dashboard/products ─────────────────────────────────┐
+> **[Global CMS Constraint]** Đối với các tính năng quản trị, yêu cầu bắt buộc phải render bên trong Main Content Area của F18 CMS Layout (ngoại trừ các tính năng đặc thù cần Full-screen Editor).
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình chính (Products Data Grid / List)
+- **Mô tả:** Danh sách quản lý tất cả các sản phẩm thuộc tài khoản cửa hàng.
+- **Components chính:**
+  - Top Toolbar: Nút [+ Add Product], Nút [✨ Tạo Hàng Loạt Bằng AI].
+  - Tabs Header: Active, Draft, Archived có kèm badged counter.
+  - Search & Filters: Search bar (theo tên/SKU), bộ lọc Dropdowns (Category, Sort by Price).
+  - Data Table: Cột Ảnh đại diện, Tên Sản Phẩm (kèm Tên Biến thể nhỏ bên trong hàng Expandable), Phân loại, Giá, Stock quantity.
+- **Wireframe:**
+```text
+┌─ /products ─────────────────────────────────┐
 │  Products                          [+ Add Product]     │
 │  [✨ Chat: Tạo "Móc khóa cute giá 5k, màu xanh đỏ"...] │
 │  ───────────────────────────────────────────────────── │
@@ -187,7 +203,83 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
 └────────────────────────────────────────────────────────┘
 ```
 
-### 10.2 Giao diện Hiển thị Storefront (PLP & PDP)
+### 10.2. Màn hình Chi tiết (Create / Edit Product Form)
+- **Mô tả:** Trang Form nhập đa lớp để khởi tạo 1 sản phẩm mới.
+- **Components chính:**
+  - Hình ảnh: Khu vực Dropzone đa tệp (Max 5 items).
+  - General Info: Tên (Required), Ngành hàng (Dropdown parent-child trees).
+  - Pricing & Variants: Tổ hợp Checkbox "Biến Thể", nếu Tích sẽ nổ ra Bảng Data Grid điền SKU, Giá Bán, Stock Cho Từng SKU.
+  - Vận chuyển: Các NumberInputs nhập khối lượng và chu vi.
+  - Content & SEO: Hộp soạn thảo Rich Text + Nút gọi API AI Viết Mô Tả; Khối chỉnh tùy biến JSON KV Custom Attributes.
+  - Header Navbar Actions: Nút "Save as Draft", Nút "Publish/Active", Nút Delete.
+- **Wireframe:**
+```text
+┌─ 📝 Thêm Sản Phẩm Mới ─────────────────[Save Draft] [Publish] ┐
+│                                                                 │
+│ ┌─ THÔNG TIN CHUNG ───────────┐ ┌─ HÌNH ẢNH ──────────────────┐ │
+│ │ Tên: [ Áo khoác da ]        │ │ ┌─────┐ ┌───┐ ┌───┐         │ │
+│ │ Ngành: [ Fashion ▼ ]        │ │ │ 🖼️  │ │ 🖼️ │ │ + │         │ │
+│ │                             │ │ └─────┘ └───┘ └───┘         │ │
+│ │ MÔ TẢ (AI Supported)     ✨ │ │ Max 5 images, <5MB          │ │
+│ │ [ B  I  U  H1  =  Ξ ]       │ └─────────────────────────────┘ │
+│ │ Áo khoác da bò thật 100%... │ ┌─ TỒN KHO & BIẾN THỂ ────────┐ │
+│ │                             │ │ 🔲 Sản phẩm có nhiều Opts   │ │
+│ └─────────────────────────────┘ │ Giá Bán: [ RM 500  ]        │ │
+│                                 │ SKU:     [ AKD-001 ]        │ │
+│ ┌─ CATEGORY & SEO ────────────┐ │ Stock:   [ 15      ]        │ │
+│ │ [ Fashion ▼ ] [ Áo Nam ▼]   │ └─────────────────────────────┘ │
+│ │ Meta: [ Áo khoác da... ]  ✨│                                 │
+│ └─────────────────────────────┘                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 10.3. Mobile View (Products List & Stacked Form)
+- **Mô tả:** Danh sách sản phẩm thu gọn cột dư thừa thành các Card hoặc Swipeable Rows. Form tạo sản phẩm đổ dọc (Stack) với Accordion cho phần hiển thị biến thể.
+- **Wireframe:**
+```text
+┌─ Mobile Products ───────────────────────────┐
+│ [≡] Products               [+ Add] [✨ AI] │
+│ ─────────────────────────────────────────── │
+│ [ 🔍 Search by Name/SKU...               ]  │
+│ [ Filters ▼ ] [ Sort ▼ ]                    │
+│                                             │
+│ ┌─ 📦 Baju Kurung ────────────────────────┐ │
+│ │ Fashion • RM 89 • Stock: 25   [Edit][⋮]│ │
+│ │ ├ Đỏ - S (Qty: 10)                      │ │
+│ │ └ Đỏ - M (Qty: 15)                      │ │
+│ └─────────────────────────────────────────┘ │
+│                                             │
+│ ┌─ 📦 Lip Gloss ──────────────────────────┐ │
+│ │ Beauty • RM 39 • Stock: 0 🔴  [Edit][⋮]│ │
+│ └─────────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘
+
+┌─ Mobile Edit Form ──────────────────────────┐
+│ [←] Back                     [Save][Publish]│
+│ ─────────────────────────────────────────── │
+│ 🖼 HÌNH ẢNH                                 │
+│ [ + Add Photo ] (Max 5)                     │
+│                                             │
+│ 📄 THÔNG TIN                                │
+│ Name: [Baju Kurung]                         │
+│ Price: [RM 89]                              │
+│                                             │
+│ 🛍 TỒN KHO & BIẾN THỂ  [+] Thêm Option      │
+│ [ Màu sắc ▼ ] : Đỏ, Xanh                    │
+│ [ Kích cỡ ▼ ] : S, M                        │
+│                                             │
+│ ⚙ CÀI ĐẶT NÂNG CAO (Shipping, SEO...)  ▼    │
+└─────────────────────────────────────────────┘
+```
+
+### 10.4. Các trạng thái UI (UI States) & Modals
+- **Empty State:** Icon khay hàng trống + CTA "Hãy tạo sản phẩm đầu tiên".
+- **Loading State:** Skeleton table trong Data list. Spin icon trong các Nút Save và các Button AI Generate.
+- **Error State / Edge Cases:** Highlight đỏ đường kẻ viền TextInput nếu Submit form mà Name trống / Price < 0. Nếu Stock = 0, Cột list nổi bật đỏ (High Attention).
+- **Modals (nếu có):** Nút Delete gọi màn hình Confirmation Modal "Bạn có chắc muốn xóa mềm phẩm này? Hành động này có thể hồi phục từ Archive.". Bulk AI Modal (Bảng Preview Table) sinh ra sau khi gọi tính năng Bulk Create Chat AI để user xác nhận trước DB Commit.
+
+---
+### 10.4. Giao diện Hiển thị Storefront (PLP & PDP)
 
 > 📌 **Lưu ý:** Giao diện hiển thị phía End-user (Storefront) đã được chuyển giao cho **PRD: F09-storefront-commerce.md**. Vui lòng sang tài liệu F09 để xem mockups chi tiết cho màn hình Danh sách Sản phẩm (Shop) và Chi tiết Sản phẩm (Product View).
 
@@ -201,7 +293,7 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
 > 📌 Source: [US-F08-01](../stories/F08-products-crud-stories.md) — AC-1
 
 ```gherkin
-GIVEN user ở /dashboard/products
+GIVEN user ở /products
 WHEN  click "Thêm sản phẩm"
 THEN  form hiện: tên, giá (RM), category, mô tả, ảnh (max 5, max 5MB/ảnh), stock
 ```
