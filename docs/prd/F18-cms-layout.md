@@ -163,10 +163,8 @@ Click Avatar → Dropdown: Profile | Language BM/EN | Workspace | Logout
 │ ┌─────────────────┐ ┌───────────────────────────────────┐ │
 │ │ SIDEBAR         │ │ MAIN CONTENT (scrollable)         │ │
 │ │                 │ │                                   │ │
-│ │ 📊 Dashboard ▼  │ │  [Feature Content Here]           │ │
-│ │   ├ Analytics   │ │  (VD: Bảng Danh Sách Sản Phẩm)    │ │
-│ │   └ SEO         │ │                                   │ │
-│ │ 🌐 My Webstore ▼│ │                                   │ │
+│ │ 📊 Dashboard    │ │  [Feature Content Here]           │ │
+│ │ 🌐 My Webstore ▼│ │  (VD: Bảng Danh Sách Sản Phẩm)    │ │
 │ │   ├ Editor      │ │                                   │ │
 │ │   └ Blog        │ │                                   │ │
 │ │ 📦 Products     │ │                                   │ │
