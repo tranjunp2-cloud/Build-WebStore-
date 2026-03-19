@@ -26,6 +26,21 @@ export function KeywordTracker({ siteId }: { siteId: string | null }) {
     const [isAdding, setIsAdding] = useState(false)
     const [newKeyword, setNewKeyword] = useState('')
 
+    const trackEvent = async (eventName: string, metadata?: any) => {
+        if (!siteId) return
+        try {
+            await fetch('/api/analytics/track', {
+                method: 'POST',
+                body: JSON.stringify({
+                    siteId,
+                    event: eventName,
+                    pageUrl: window.location.pathname,
+                    metadata
+                })
+            })
+        } catch {}
+    }
+
     useEffect(() => {
         if (!siteId) return
         loadKeywords()
@@ -65,8 +80,16 @@ export function KeywordTracker({ siteId }: { siteId: string | null }) {
                 setKeywords(prev => [...prev, json.data])
                 setNewKeyword('')
                 toast.success(t.successAdd)
+                trackEvent('add_seo_keyword', { keyword: newKeyword.trim() })
             } else {
-                toast.error(json.error?.message || t.errorAdd)
+                const errCode = json.error?.code
+                if (errCode === 'MAX_KEYWORDS_REACHED') {
+                    toast.error(t.errorMaxKeywords)
+                } else if (errCode === 'KEYWORD_EXISTS') {
+                    toast.error(t.errorKeywordExists)
+                } else {
+                    toast.error(json.error?.message || t.errorAdd)
+                }
             }
         } catch (error) {
             toast.error(t.errorConnect)
@@ -90,6 +113,8 @@ export function KeywordTracker({ siteId }: { siteId: string | null }) {
             if (!json.success) {
                 setKeywords(previous)
                 toast.error(json.error?.message || t.errorDelete)
+            } else {
+                trackEvent('remove_seo_keyword')
             }
         } catch (error) {
             setKeywords(previous)
@@ -160,7 +185,7 @@ export function KeywordTracker({ siteId }: { siteId: string | null }) {
                                                     {kw.trend === 'same' && <Minus className="w-4 h-4 text-muted-foreground" />}
                                                 </>
                                             ) : (
-                                                <span className="text-muted-foreground text-xs italic">N/A</span>
+                                                <span className="text-muted-foreground text-xs font-medium bg-muted/30 px-1.5 py-0.5 rounded cursor-help" title={t.notInTopResults}>&gt;30</span>
                                             )}
                                         </div>
                                         <Button 

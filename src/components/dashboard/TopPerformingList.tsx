@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useI18n } from '@/i18n'
-import { FileText, ShoppingBag, PenTool } from 'lucide-react'
+import { FileText, ShoppingBag, PenTool, Globe } from 'lucide-react'
 
 export type PerformingItem = {
     id: string
@@ -15,16 +15,18 @@ type Props = {
     pages: PerformingItem[]
     products: PerformingItem[]
     blogs: PerformingItem[]
+    referrers: PerformingItem[]
 }
 
-export function TopPerformingList({ pages, products, blogs }: Props) {
+export function TopPerformingList({ pages, products, blogs, referrers }: Props) {
     const { t } = useI18n()
-    const [activeTab, setActiveTab] = useState<'pages' | 'products' | 'blogs'>('pages')
+    const [activeTab, setActiveTab] = useState<'pages' | 'products' | 'blogs' | 'referrers'>('pages')
 
     const TABS = [
         { id: 'pages', label: t.dashboard.analytics.topPages, icon: FileText, data: pages },
         { id: 'products', label: t.dashboard.analytics.topProducts, icon: ShoppingBag, data: products },
         { id: 'blogs', label: t.dashboard.analytics.topBlogs, icon: PenTool, data: blogs },
+        { id: 'referrers', label: t.dashboard.analytics.topReferrers, icon: Globe, data: referrers },
     ] as const
 
     const activeData = TABS.find(t => t.id === activeTab)?.data || []
@@ -39,7 +41,7 @@ export function TopPerformingList({ pages, products, blogs }: Props) {
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as 'pages' | 'products' | 'blogs')}
+                            onClick={() => setActiveTab(tab.id as 'pages' | 'products' | 'blogs' | 'referrers')}
                             className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
                         >
                             <Icon className="h-4 w-4" />

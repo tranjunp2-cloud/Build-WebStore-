@@ -258,14 +258,14 @@ function SEODashboardInner() {
                     throw new Error(data.error?.message || 'Failed')
                 }
             } else if (res.status === 504) {
-                toast.error('Không thể hoàn tất AI Fix All (Timeout), vui lòng thử lại')
-                setFixResult('Timeout. Vui lòng thử lại.')
+                toast.error(st.aifix.errorTimeout)
+                setFixResult(st.aifix.errorTimeout)
             } else {
                 throw new Error('API returned an error')
             }
         } catch {
-            setFixResult('Fix failed — please try again')
-            toast.error('Không thể hoàn tất AI Fix All, vui lòng thử lại')
+            setFixResult(st.aifix.errorFailed)
+            toast.error(st.aifix.errorFailed)
         } finally {
             setIsFixing(false)
         }
@@ -294,21 +294,21 @@ function SEODashboardInner() {
                 const undoData = data.undoData || []
                 setAppliedBackup(undoData)
                 setIsFixAllModalOpen(false)
-                toast.success(`Đã apply ${fixes.length} fixes thành công`, {
+                toast.success(st.aifix.applySuccess.replace('{count}', String(fixes.length)), {
                     action: {
-                        label: 'Undo (Ctrl+Z)',
+                        label: st.aifix.undoLabel,
                         onClick: () => handleUndoFixes(undoData)
                     },
                     duration: 8000
                 })
-                setFixResult(`Fixed ${fixes.length} issues`)
+                setFixResult(st.aifix.fixResult.replace('{count}', String(fixes.length)))
                 trackEvent('ai_fix_all_seo_completed', { issues_fixed_count: fixes.length })
                 setTimeout(() => analyseSite(selectedSiteId), 500)
             } else {
-               toast.error('Apply Failed')
+               toast.error(st.aifix.applyFailed)
             }
         } catch (error) {
-           toast.error('Apply Failed')
+           toast.error(st.aifix.applyFailed)
         } finally {
             setIsApplyingFixes(false)
         }
@@ -324,7 +324,7 @@ function SEODashboardInner() {
             })
 
             if (res.ok) {
-                toast.success('Đã Undo Batch Fix')
+                toast.success(st.aifix.undoSuccess)
                 setAppliedBackup([]) // Clear state to avoid multiple undos
                 if (selectedSiteId) analyseSite(selectedSiteId)
             }
@@ -519,7 +519,7 @@ function SEODashboardInner() {
                             </button>
                             {fixResult && (
                                 <div className="mt-3 flex items-center gap-1.5 text-xs">
-                                    {fixResult.startsWith('Fix failed') ? (
+                                    {fixResult.startsWith(st.aifix.errorFailed.substring(0, 3)) ? (
                                         <><AlertTriangle className="h-3 w-3 text-red-400" /><span className="text-red-400">{fixResult}</span></>
                                     ) : (
                                         <><CheckCircle className="h-3 w-3 text-green-400" /><span className="text-green-400">{fixResult}</span></>

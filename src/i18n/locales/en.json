@@ -231,6 +231,7 @@
             "topPages": "Top Pages",
             "topProducts": "Top Products",
             "topBlogs": "Top Blogs",
+            "topReferrers": "Top Referrers",
             "views": "Views",
             "clicks": "Clicks"
         },
@@ -262,7 +263,14 @@
                 "title": "AI SEO Fix",
                 "description": "Auto-generate missing meta titles & descriptions with AI",
                 "button": "Fix All with AI",
-                "fixing": "Fixing..."
+                "fixing": "Fixing...",
+                "applySuccess": "Applied {count} fixes successfully",
+                "applyFailed": "Failed to apply fixes. Please try again.",
+                "fixResult": "Fixed {count} issues",
+                "undoLabel": "Undo (Ctrl+Z)",
+                "undoSuccess": "Batch Fix has been undone",
+                "errorTimeout": "AI Fix All timed out. Please try again.",
+                "errorFailed": "Cannot complete AI Fix All, please try again"
             },
             "keywordTracker": {
                 "title": "Keyword Tracker",
@@ -274,7 +282,10 @@
                 "errorAdd": "Error adding keyword",
                 "errorConnect": "Connection error when adding keyword",
                 "errorLoad": "Error loading keywords",
-                "errorDelete": "Error deleting keyword"
+                "errorDelete": "Error deleting keyword",
+                "errorMaxKeywords": "You can only track a maximum of 5 keywords.",
+                "errorKeywordExists": "This keyword already exists in the list.",
+                "notInTopResults": "Not in top 30 results"
             },
             "pages": {
                 "title": "Page-by-Page Analysis",

@@ -32,6 +32,17 @@ export const POST = withAuth(async (_user, request) => {
         // 1. Fetch site name
         const site = await payload.findByID({ collection: 'sites', id: siteId })
         if (!site) return NextResponse.json({ success: false, error: { message: 'Site not found' } }, { status: 404 })
+
+        // IDOR Protection: ensure user has access to this site's tenant
+        const userTenantIds = _user.tenants?.map((t: any) =>
+            t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        ).map(String) || []
+        const siteTenantId = site.tenant && typeof site.tenant === 'object' ? site.tenant.id : site.tenant
+
+        if (!_user.roles?.includes('super-admin') && !userTenantIds.includes(String(siteTenantId))) {
+             return NextResponse.json({ success: false, error: { message: 'Forbidden' } }, { status: 403 })
+        }
+
         const siteName = site.businessName || site.name || 'Website'
 
         // 2. Map promises for AI parallel generation

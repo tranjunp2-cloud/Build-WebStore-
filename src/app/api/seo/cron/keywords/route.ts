@@ -31,28 +31,30 @@ export async function GET(request: Request) {
             const domain = site.domain || site.name
             let hasChanges = false
             
-            const updatedKeywords = await Promise.all(site.seo!.trackedKeywords!.map(async (kw: any) => {
+            const updatedKeywords = []
+            for (const kw of site.seo!.trackedKeywords!) {
                 // Check if it's been updated recently (e.g. within 23 hours to allow daily cron slop)
                 const lastChecked = new Date(kw.lastCheckedAt).getTime()
                 const now = Date.now()
                 if (now - lastChecked < 23 * 60 * 60 * 1000) {
-                    return kw // Skip if checked recently
+                    updatedKeywords.push(kw) // Skip if checked recently
+                    continue
                 }
 
-                // Wait 1 second between checks to prevent spamming Google too hard
-                await new Promise(r => setTimeout(r, 1000))
+                // Wait 2 second between checks to prevent spamming Google too hard
+                await new Promise(r => setTimeout(r, 2000))
                 
                 const rank = await checkKeywordRank(domain, kw.keyword)
                 hasChanges = true
                 updatedCount++
                 
-                return {
+                updatedKeywords.push({
                     ...kw,
                     previousRank: kw.currentRank,
                     currentRank: rank,
                     lastCheckedAt: new Date().toISOString()
-                }
-            }))
+                })
+            }
 
             if (hasChanges) {
                 await payload.update({

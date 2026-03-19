@@ -14,6 +14,7 @@ import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
 import { DashboardSiteGrid } from '@/components/dashboard/DashboardSiteGrid'
+import { AISmartInsights } from '@/components/dashboard/AISmartInsights'
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -55,10 +56,20 @@ export default async function DashboardPage({ searchParams }: Props) {
 
     const now = new Date()
     let startDate = subDays(startOfDay(now), 7)
-    if (period === 'today') startDate = startOfDay(now)
-    if (period === '30d') startDate = subDays(startOfDay(now), 30)
+    let daysDiff = 7
+    if (period === 'today') {
+        startDate = startOfDay(now)
+        daysDiff = 1
+    }
+    if (period === '30d') {
+        startDate = subDays(startOfDay(now), 30)
+        daysDiff = 30
+    }
+
+    const prevStartDate = subDays(startDate, daysDiff)
 
     let views = 0
+    let prevViews = 0
     let leads = 0
     let engagement = 0
     let revenue = 0
@@ -70,26 +81,27 @@ export default async function DashboardPage({ searchParams }: Props) {
         const tenantResult: any = await payload.findByID({ collection: 'tenants', id: tenantId })
         dashboardPreferences = tenantResult?.settings?.dashboardPreferences
 
-        const [viewsRes, leadsRes, engagementRes, ordersRes, pendingOrdersRes] = await Promise.all([
-            payload.find({ 
+        const [viewsRes, prevViewsRes, leadsRes, engagementRes, ordersRes, pendingOrdersRes] = await Promise.all([
+            payload.count({ 
                 collection: 'analytics', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'pageview' } }, 
-                pagination: false 
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'pageview' } }
             }),
-            payload.find({ 
+            payload.count({ 
                 collection: 'analytics', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'click' } }, 
-                pagination: false 
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevStartDate.toISOString(), less_than: startDate.toISOString() }, event: { equals: 'pageview' } }
             }),
-            payload.find({ 
+            payload.count({ 
                 collection: 'analytics', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { in: ['add_to_cart', 'checkout'] } }, 
-                pagination: false 
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'click' } }
+            }),
+            payload.count({ 
+                collection: 'analytics', 
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { in: ['add_to_cart', 'checkout'] } }
             }),
             payload.find({ 
                 collection: 'orders', 
                 where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, status: { in: ['paid', 'completed'] } }, 
-                pagination: false 
+                limit: 2000 
             }),
             payload.find({ 
                 collection: 'orders', 
@@ -100,6 +112,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         ])
 
         views = viewsRes.totalDocs
+        prevViews = prevViewsRes.totalDocs
         leads = leadsRes.totalDocs
         engagement = engagementRes.totalDocs
 
@@ -122,6 +135,9 @@ export default async function DashboardPage({ searchParams }: Props) {
                         <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
                     </div>
                 </div>
+
+                {/* AI Insights & Alerts */}
+                <AISmartInsights views={views} prevViews={prevViews} />
 
                 {/* Stats Cards */}
                 <DashboardStats 

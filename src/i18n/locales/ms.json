@@ -231,6 +231,7 @@
             "topPages": "Halaman Utama",
             "topProducts": "Produk Teratas",
             "topBlogs": "Blog Teratas",
+            "topReferrers": "Sumber Utama",
             "views": "Paparan",
             "clicks": "Klik"
         },
@@ -262,7 +263,14 @@
                 "title": "Baiki SEO dengan AI",
                 "description": "Jana tajuk & penerangan meta yang tiada secara automatik dengan AI",
                 "button": "Baiki Semua dengan AI",
-                "fixing": "Sedang Membaiki..."
+                "fixing": "Sedang Membaiki...",
+                "applySuccess": "{count} pembaikan berjaya digunakan",
+                "applyFailed": "Gagal menggunakan pembaikan. Sila cuba lagi.",
+                "fixResult": "Selesai {count} isu",
+                "undoLabel": "Batal (Ctrl+Z)",
+                "undoSuccess": "Pembaikan Batch telah dibatalkan",
+                "errorTimeout": "AI Fix All tamat masa. Sila cuba lagi.",
+                "errorFailed": "Tidak dapat melengkapkan AI Fix All, sila cuba lagi"
             },
             "keywordTracker": {
                 "title": "Penjejak Kata Kunci",
@@ -274,7 +282,10 @@
                 "errorAdd": "Ralat menambah kata kunci",
                 "errorConnect": "Ralat sambungan semasa menambah kata kunci",
                 "errorLoad": "Ralat memuatkan kata kunci",
-                "errorDelete": "Ralat memadam kata kunci"
+                "errorDelete": "Ralat memadam kata kunci",
+                "errorMaxKeywords": "Anda hanya boleh menjejaki maksimum 5 kata kunci.",
+                "errorKeywordExists": "Kata kunci ini sudah wujud dalam senarai.",
+                "notInTopResults": "Tiada dalam 30 teratas"
             },
             "pages": {
                 "title": "Analisis Setiap Halaman",

@@ -92,14 +92,35 @@ export const POST = withAuth(async (_user, request) => {
 
         const trackedKeywords = site.seo?.trackedKeywords || []
 
-        // Validate max 5
-        if (trackedKeywords.length >= 5) {
-            return NextResponse.json({ success: false, error: { message: 'Bạn chỉ có thể theo dõi tối đa 5 từ khóa (Core Keywords).' } }, { status: 400 })
+        // Extract tenant ID robustly
+        let tenantId = ''
+        if (typeof site.tenant === 'string') tenantId = site.tenant
+        else if (site.tenant && typeof site.tenant === 'object' && 'id' in site.tenant) tenantId = String(site.tenant.id)
+
+        if (!tenantId) {
+            return NextResponse.json({ success: false, error: { message: 'Site has no associated tenant' } }, { status: 400 })
+        }
+
+        // Validate max 5 PER TENANT instead of per site
+        const allSites = await payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: tenantId } },
+            limit: 200, // Should be enough to cover a tenant's sites
+            depth: 0,
+        })
+        
+        let totalTenantKeywords = 0
+        allSites.docs.forEach((s: any) => {
+            totalTenantKeywords += (s.seo?.trackedKeywords?.length || 0)
+        })
+
+        if (totalTenantKeywords >= 5) {
+            return NextResponse.json({ success: false, error: { code: 'MAX_KEYWORDS_REACHED', message: 'Maximum keywords limit reached for this tenant.' } }, { status: 400 })
         }
 
         // Check duplicates
         if (trackedKeywords.some((k: any) => k.keyword.toLowerCase() === keyword.toLowerCase())) {
-            return NextResponse.json({ success: false, error: { message: 'Từ khóa này đã tồn tại trong danh sách.' } }, { status: 400 })
+            return NextResponse.json({ success: false, error: { code: 'KEYWORD_EXISTS', message: 'Keyword already exists.' } }, { status: 400 })
         }
 
         // Initial check rank

@@ -79,6 +79,7 @@ export default async function AnalyticsDashboardPage({ searchParams }: Props) {
     const pageViews: Record<string, number> = {}
     const productClicks: Record<string, number> = {}
     const blogViews: Record<string, number> = {}
+    const referrers: Record<string, number> = {}
 
     for (const doc of currentDocs) {
         const date = new Date(doc.createdAt).toISOString().split('T')[0]
@@ -103,6 +104,23 @@ export default async function AnalyticsDashboardPage({ searchParams }: Props) {
         // Top Products
         if (url.startsWith('/product/') || isClick) {
             productClicks[url] = (productClicks[url] || 0) + 1
+        }
+
+        // Top Referrers
+        if (doc.referrer) {
+            try {
+                const refUrl = new URL(doc.referrer)
+                // Filter out internal traffic or empty domains
+                if (refUrl.hostname && !refUrl.hostname.includes('localhost') && !refUrl.hostname.includes(process.env.NEXT_PUBLIC_SERVER_URL || '')) {
+                    const domain = refUrl.hostname.replace(/^www\./, '')
+                    referrers[domain] = (referrers[domain] || 0) + 1
+                }
+            } catch {
+                // Not a valid URL, could be a UTM source string
+                if (doc.referrer.length < 100 && !doc.referrer.startsWith('/')) {
+                    referrers[doc.referrer] = (referrers[doc.referrer] || 0) + 1
+                }
+            }
         }
     }
 
@@ -134,6 +152,7 @@ export default async function AnalyticsDashboardPage({ searchParams }: Props) {
     const topPages = mapToPerformingItem(pageViews)
     const topProducts = mapToPerformingItem(productClicks)
     const topBlogs = mapToPerformingItem(blogViews)
+    const topReferrers = mapToPerformingItem(referrers)
 
     return (
         <Suspense fallback={<DashboardSkeleton />}>
@@ -155,6 +174,7 @@ export default async function AnalyticsDashboardPage({ searchParams }: Props) {
                             pages={topPages}
                             products={topProducts}
                             blogs={topBlogs}
+                            referrers={topReferrers}
                         />
                     </div>
                 </div>

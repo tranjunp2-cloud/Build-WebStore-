@@ -10,8 +10,8 @@ export async function checkKeywordRank(domain: string, keyword: string): Promise
         // Clean domain (remove protocol and www.)
         const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]
         
-        // Fetch top 30 results
-        const url = `https://www.google.com/search?q=${encodeURIComponent(keyword)}&num=30&hl=en`
+        // Fetch top 30 results, targeting Malaysia market per BR-05
+        const url = `https://www.google.com/search?q=${encodeURIComponent(keyword)}&num=30&hl=ms&gl=my`
         
         const response = await fetch(url, {
             headers: {

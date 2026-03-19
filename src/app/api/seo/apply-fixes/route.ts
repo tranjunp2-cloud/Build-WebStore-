@@ -29,15 +29,33 @@ export const POST = withAuth(async (_user, request) => {
         const { fixes } = data!
         const payload = await getPayload({ config })
 
+        // IDOR Protection: pre-calculate user tenants
+        const userTenantIds = _user.tenants?.map((t: any) =>
+            t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        ).map(String) || []
+
         // Process sequentially to avoid SQLite locking issues if using local DB,
         // or just Promise.all for Postgres. We use Promise.all for speed.
         const undoData = await Promise.all(fixes.map(async (fix) => {
-            // First fetch current to merge
+            // First fetch current to check access and merge
             const current = await payload.findByID({
                 collection: fix.collection,
                 id: fix.targetId,
-                depth: 0,
+                depth: 1,
             })
+
+            if (!current) throw new Error(`Document not found: ${fix.targetId}`)
+
+            let recordTenantId = null
+            if (fix.collection === 'products') {
+                recordTenantId = current.tenant?.id || current.tenant
+            } else if (fix.collection === 'pages') {
+                recordTenantId = current.site?.tenant?.id || current.site?.tenant
+            }
+
+            if (!_user.roles?.includes('super-admin') && !userTenantIds.includes(String(recordTenantId))) {
+                throw new Error(`Forbidden access to ${fix.targetId}`)
+            }
             
             await payload.update({
                 collection: fix.collection,
