@@ -6,6 +6,7 @@ import { CheckCircle2, Copy, ExternalLink, Globe, LayoutDashboard, PartyPopper, 
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 
 interface CongratsModalProps {
     isOpen: boolean
@@ -76,13 +77,18 @@ export function CongratsModal({ isOpen, onOpenChange, siteUrl, siteName, siteId 
                                             </div>
                                             <button
                                                 onClick={handleCopy}
-                                                className="ml-3 flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm font-medium text-gray-300 hover:bg-white/20 hover:text-white transition-colors min-w-[100px]"
+                                                className={cn(
+                                                    "ml-3 flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all min-w-[100px]",
+                                                    copied 
+                                                        ? "bg-green-500/20 text-green-400 border border-green-500/30" 
+                                                        : "bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white"
+                                                )}
                                                 title="Copy Link"
                                             >
                                                 {copied ? (
                                                     <>
-                                                        <CheckCircle2 className="h-4 w-4 text-green-400" />
-                                                        <span className="text-green-400">Copied ✓</span>
+                                                        <CheckCircle2 className="h-4 w-4" />
+                                                        <span>Copied ✓</span>
                                                     </>
                                                 ) : (
                                                     <>
