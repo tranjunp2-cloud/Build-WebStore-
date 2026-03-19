@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     siteType: result.siteType,
-                    locale: language,
+                    locale: result.language || language,
                     theme: {
                         primaryColor: result.theme.primaryColor,
                         secondaryColor: result.theme.secondaryColor,
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     siteType: result.siteType,
-                    locale: language,
+                    locale: result.language || language,
                     theme: {
                         primaryColor: result.theme.primaryColor,
                         secondaryColor: result.theme.secondaryColor,
@@ -249,6 +249,7 @@ export async function POST(req: NextRequest) {
                             siteId: site.id,
                             pageId: page.id,
                             siteName: result.siteName,
+                            siteLanguage: result.language || language,
                             totalBlocks: result.blocks.length,
                             timeMs,
                         })}\n\n`
@@ -275,6 +276,7 @@ export async function POST(req: NextRequest) {
             siteId: site.id,
             pageId: page.id,
             siteName: result.siteName,
+            siteLanguage: result.language || language,
             siteType: result.siteType,
             blockCount: result.blocks.length,
             theme: result.theme,

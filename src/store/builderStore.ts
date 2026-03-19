@@ -30,6 +30,7 @@ export type BusinessInfo = {
     products: string
     targetAudience: string
     style: string
+    language?: 'en' | 'ms' | 'vi' | 'auto'
 }
 
 type BuilderState = {
