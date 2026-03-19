@@ -19,14 +19,15 @@ export async function getCurrentUser() {
     try {
         const payload = await getPayload({ config })
 
-        const { user } = await payload.auth({
+        const authResult = await payload.auth({
             headers: new Headers({
                 Authorization: `JWT ${token}`,
             }),
         })
 
-        return user || null
-    } catch {
+        return authResult?.user || null
+    } catch (error) {
+        console.error('getCurrentUser error:', error)
         return null
     }
 }
