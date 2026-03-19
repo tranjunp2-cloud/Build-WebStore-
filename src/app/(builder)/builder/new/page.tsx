@@ -122,7 +122,7 @@ export default function AIBuilderPage() {
                 body: JSON.stringify({
                     businessInfo: info,
                     extraInstructions,
-                    language: 'vi',
+                    language: info.language || 'auto',
                 }),
                 credentials: 'include',
             })

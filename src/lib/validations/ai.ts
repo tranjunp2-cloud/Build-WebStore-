@@ -10,7 +10,7 @@ export const generateSiteSchema = z.object({
         style: z.string().optional(),
     }),
     extraInstructions: z.string().optional(),
-    language: z.enum(['en', 'ms']).optional(),
+    language: z.enum(['en', 'ms', 'vi', 'auto']).optional(),
 })
 
 export const editBlockSchema = z.object({

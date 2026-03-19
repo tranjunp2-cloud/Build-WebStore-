@@ -24,6 +24,13 @@ const STYLE_OPTIONS = [
     { value: 'minimal', label: 'Minimal & Simple' },
 ]
 
+const LANGUAGE_OPTIONS = [
+    { value: 'auto', label: '🌐 Auto-detect' },
+    { value: 'vi', label: '🇻🇳 Tiếng Việt' },
+    { value: 'ms', label: '🇲🇾 Bahasa Melayu' },
+    { value: 'en', label: '🇬🇧 English' },
+]
+
 interface BusinessInfoFormProps {
     onSubmit?: (info: BusinessInfo) => void
     isGenerating?: boolean
@@ -39,6 +46,7 @@ export default function BusinessInfoForm({ onSubmit, isGenerating }: BusinessInf
         products: '',
         targetAudience: '',
         style: 'modern',
+        language: 'auto',
     })
     const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -188,6 +196,27 @@ export default function BusinessInfoForm({ onSubmit, isGenerating }: BusinessInf
                                         className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-all
                                             ${form.style === opt.value
                                                 ? 'border-purple-500 bg-purple-500/10 text-purple-300'
+                                                : 'border-white/10 bg-[#1E293B] text-gray-400 hover:border-white/20'
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Language */}
+                        <div className="space-y-1.5">
+                            <label className="text-sm font-medium text-gray-300">Website Language</label>
+                            <div className="flex flex-wrap gap-2">
+                                {LANGUAGE_OPTIONS.map(opt => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setForm(f => ({ ...f, language: opt.value }))}
+                                        className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-all
+                                            ${form.language === opt.value
+                                                ? 'border-blue-500 bg-blue-500/10 text-blue-300'
                                                 : 'border-white/10 bg-[#1E293B] text-gray-400 hover:border-white/20'
                                             }`}
                                     >
