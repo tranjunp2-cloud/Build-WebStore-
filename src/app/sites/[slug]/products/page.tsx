@@ -4,6 +4,9 @@ import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
+// Force dynamic — uses getPayload() for product listing at runtime
+export const dynamic = 'force-dynamic'
+
 type Props = {
     params: Promise<{ slug: string }>
 }
