@@ -264,6 +264,18 @@
                 "button": "Baiki Semua dengan AI",
                 "fixing": "Sedang Membaiki..."
             },
+            "keywordTracker": {
+                "title": "Penjejak Kata Kunci",
+                "description": "Jejaki kedudukan sehingga 5 kata kunci utama di Google.",
+                "placeholder": "Tambah kata kunci baharu...",
+                "add": "Tambah",
+                "empty": "Tiada kata kunci yang dijejaki lagi.",
+                "successAdd": "Kata kunci berjaya ditambah",
+                "errorAdd": "Ralat menambah kata kunci",
+                "errorConnect": "Ralat sambungan semasa menambah kata kunci",
+                "errorLoad": "Ralat memuatkan kata kunci",
+                "errorDelete": "Ralat memadam kata kunci"
+            },
             "pages": {
                 "title": "Analisis Setiap Halaman",
                 "allGood": "Semuanya baik",

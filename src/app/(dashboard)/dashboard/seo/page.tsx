@@ -8,6 +8,7 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { KeywordTracker } from '@/components/seo/KeywordTracker'
 
 type SEOIssue = {
     type: 'error' | 'warning' | 'info'
@@ -526,6 +527,11 @@ function SEODashboardInner() {
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* AC-11: Keyword Tracker */}
+                    <div className="mt-6 mb-6">
+                        <KeywordTracker siteId={selectedSiteId} />
                     </div>
 
                     {/* AC-1: Category Breakdown */}
