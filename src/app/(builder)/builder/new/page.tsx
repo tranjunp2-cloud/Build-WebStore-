@@ -226,11 +226,8 @@ export default function AIBuilderPage() {
             })
             const data = await res.json()
             if (data.success) {
-                // Ensure subdomain format: {slug}.primeweb.app as requested by PRD,
-                // If API didn't return a fully qualified primeweb.app domain, we mock it for UI
-                const slug = siteId
-                const url = `https://${slug}.primeweb.app`
-                setPublishedUrl(url)
+                const publishedSite = data.data
+                setPublishedUrl(publishedSite.url || `https://${publishedSite.domain || siteId}.primeweb.app`)
                 setShowCongrats(true)
             } else {
                 toast.error(data.error?.message || 'Failed to publish site')

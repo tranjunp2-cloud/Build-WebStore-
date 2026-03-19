@@ -53,6 +53,20 @@ export async function PATCH(
             },
         })
 
+        // Get tenant slug for the domain URL
+        let tenantSlug = 'site'
+        const fullSite = await payload.findByID({
+            collection: 'sites',
+            id: siteId,
+            depth: 1, // Populate tenant
+        })
+        
+        if (fullSite.tenant && typeof fullSite.tenant === 'object') {
+            tenantSlug = (fullSite.tenant as any).slug || 'site'
+        }
+
+        const domainUrl = `${tenantSlug}.primeweb.app`
+
         return NextResponse.json({
             success: true,
             data: {
@@ -60,7 +74,8 @@ export async function PATCH(
                 name: site.name,
                 status: 'published',
                 publishedAt: site.publishedAt,
-                url: `/sites/${site.domain || site.id}`,
+                url: `https://${domainUrl}`,
+                domain: domainUrl,
             },
         })
 
