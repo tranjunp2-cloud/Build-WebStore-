@@ -8,7 +8,7 @@
 ## 1. Mục Tiêu (Objective)
 Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lượng toàn diện cho tính năng khởi tạo Website qua hội thoại AI (AI Chat Builder - F01). Mục tiêu cốt lõi là đạt độ phủ (Coverage) 100% cho 8 User Stories, bao quát chính xác **26 Acceptance Criteria (ACs)** đã định nghĩa tại tài liệu đặc tả và các yêu cầu thẩm mỹ UI từ bản thiết kế Figma hiện tại.
 
-Bộ kiểm thử bao gồm **57 kịch bản chi tiết** (Positive + Negative edge cases). Toàn bộ kịch bản được tổng hợp trong Unified Matrix.
+Bộ kiểm thử bao gồm **62 kịch bản chi tiết** (Positive + Negative edge cases). Toàn bộ kịch bản được tổng hợp trong Unified Matrix.
 ---
 
 ## 2. Test Environment (Môi trường Kiểm thử)
@@ -29,6 +29,12 @@ Bộ kiểm thử bao gồm **57 kịch bản chi tiết** (Positive + Negative 
 | **TC-F01.01** | `Design` | `UI` | **[Negative]** Validation Form Đăng Ký (Password Strength) | **1.** Tới `/signup`. Nhập Name, Email hợp lệ.<br>**2.** Nhập Password: `abcxyz12` (Không in hoa). | **GIVEN** User nhập Pass thiếu In Hoa **WHEN** Submit **THEN** Nut đăng ký Disabled.<br>UI Đỏ 1 mục checklist `One uppercase`. | High | [ ] |
 | **TC-F01.02** | `Design` | `Sec` | **[Negative]** Ràng buộc SQL Injection Đăng nhập | **1.** Tới `/login`. Email nhập: `admin' OR 1=1--`.<br>**2.** Nhập Pass ngẫu nhiên, ấn Submit. | Request trả Http 401. Không lỗi SQL ra ngoài màn hình. Backend Sanitized payload sạch sẽ. | Blocker | [x] |
 | **TC-F01.03** | `Design` | `Func` | **[Positive]** Đăng nhập thành công với Remember Me | **1.** Điền Email & Pass chuẩn xác.<br>**2.** Tích ô "Remember me" và Login. | **THEN** Điều hướng `/builder/new`. Trình duyệt ghi nhận Auth Cookie sống tới 30 ngày (Expire Limit). | Blocker | [x] |
+| **[FIGMA Design System] Kiểm tra Pixel-Perfect & Trạng Thái Giao Diện** |
+| **TC-F01.03a** | `UI/UX` | `Design` | **[Positive]** Typography & Color Scheme (Design System) | **1.** Mở màn hình `/builder/new`.<br>**2.** Dùng công cụ Inspect (F12) soi các Headline và Nút bấm. | Mã màu Primary (VD: `#1D4ED8`), Secondary, Error đỏ, và Font chữ (VD: `Inter` hoặc `Roboto`) phải khớp 100% với Figma Design Token. Không dùng font mặc định của trình duyệt. | High | [ ] |
+| **TC-F01.03b** | `UI/UX` | `Layout` | **[Positive]** Layout Bố Cục Phân Trữ Khung Chat (Grid System) | **1.** Chát văn bản dài.<br>**2.** Đo khoảng cách Margin/Padding của Bong bóng chat (Bubble). | Khoảng cách Padding giữa các Bubble chuẩn xác (VD: `16px`). Border Radius bo góc mềm mại (VD: `8px`). Không bị méo xệch tỷ lệ khi khung chữ dài ra. | High | [ ] |
+| **TC-F01.03c** | `UI/UX` | `State` | **[Positive]** Trạng Thái Khung Chat Rỗng (Empty State Visuals) | **1.** Vào `/builder/new` khi chưa gõ bất cứ từ nào.<br>**2.** Quan sát phần màn hình trắng bên phải. | Hiển thị hình ảnh minh họa (Illustration) mượt mà kèm dòng chữ gợi ý "Hãy bắt đầu bằng cách mô tả cửa hàng của bạn", không để trang trắng bóc gây hụt hẫng. | Medium | [ ] |
+| **TC-F01.03d** | `UI/UX` | `Interact`| **[Positive]** Trạng Thái Hover & Active Của Các Nút CTA | **1.** Dùng chuột rê (Hover) và Click giữ (Active) lên nút `[Gửi lệnh]` hoặc `[Publish]`. | Nút bấm phải có hiệu ứng CSS Transition mượt mà chuyển màu (Darken 10% khi Hover, Scale down 0.98 khi Click). Thể hiện nút có hồn và phản hồi tốt. | Medium | [ ] |
+| **TC-F01.03e** | `UI/UX` | `State` | **[Positive]** Hiển Thị Khung Tải Dữ Liệu Ảo (Skeleton Loading UI) | **1.** Gửi lệnh tạo Website.<br>**2.** Nhìn sang khung Preview trong 3 giây đầu. | Box Preview phải hiển thị các khối xám chớp nháy (Shimmer effect / Skeleton) tạo cảm giác đợi mượt mà, thay vì khung trắng toát (White Screen) chờ DOM load. | High | [ ] |
 | **[FIGMA Step 1/3] Biểu mẫu Thông tin Doanh nghiệp thay thế Chat** |
 | **TC-F01.04** | `Design` | `UI` | **[Positive]** Hiển thị Form thông tin UI Step 1/3 | **1.** Truy cập luồng Create AI Website. | Màn hình Form thay vì Chat. Hiển thị đủ Input: Business Name, Industry, Products, Style Button Single. | Blocker | [x] |
 | **TC-F01.05** | `Design` | `Boundary`| **[Negative]** Ngăn chặn Form thiếu trường bắt buộc | **1.** Để trống toàn bộ Box.<br>**2.** Nhấn `Continue`. | UI Báo lỗi bắt buộc ở `Business Name` (`Must be at least 3 chars`) và `Industry`. DOM chặn không bắn API POST. | High | [ ] |
@@ -114,4 +120,4 @@ _Mô tả kịch bản kiểm thử dựa trên hành vi tổng thể của Cử
 | **4. Performance SLA** | [ ] Not Run | Call Benchmark `Performance Load Tester Agent` SLA Cứng Đo API SSE & DALL-E Nháp |
 | **5. E2E UAT Approval** | [ ] Not Run | Chốt File P0/P1 Lệnh Hoàn Thành Cứng Cựa Cho Năng Lực Core Giá Giá Của App V2 |
 
-> **Khuyến Nghị Release:** Với việc bổ sung 57 Cases Tường Tận tới Độ Sâu Giới Hạn Boundary Payload Cập Nhập DB. Vòng Automation Regression Sẽ Cần Chặn Hầu Rate 100% Cột Điểm Auto[X] Tại Tương Lai Gần Chốt Cửa.
+> **Khuyến Nghị Release:** Với việc bổ sung 62 Cases Tường Tận tới Độ Sâu Giới Hạn Boundary Payload Cập Nhập DB. Vòng Automation Regression Sẽ Cần Chặn Hầu Rate 100% Cột Điểm Auto[X] Tại Tương Lai Gần Chốt Cửa.
