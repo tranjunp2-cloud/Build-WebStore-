@@ -72,6 +72,20 @@ Những điểm tài liệu đang viết thiếu logic, mơ hồ hoặc bỏ só
 
 ---
 
+## 6. Phân Tích Bổ Sung Bản Cập Nhật Mới (US-F17-06, 07, 08)
+Bản cập nhật gần nhất đã đắp thêm 3 tính năng mới tinh: Mobile Editor, Public Blog List, và Public Blog Detail. Dưới góc độ QC, đây là các Điểm Mù (Blind Spots) và rủi ro đi kèm:
+
+1. **Mobile Editor - UX Gõ Phím Ảo Bị Che Khuất (US-F17-06):**
+   * Điện thoại ảo (Virtual Keyboard) chiếm 50% màn hình thiết bị. Nếu Toolbar Sticky nằm đè lên trên bàn phím thì vùng gõ Text (Viewport) chỉ còn khoảng 30%. Sẽ thế nào nếu đoạn văn quá dài? Sticky Toolbar có chặn mất chữ đang gõ của người dùng không? Cần test kỹ Auto-Scroll Cursor Input Focus trên thiết bị thực tế (iOS Safari/Android Chrome).
+2. **AI Bottom Sheet Bị Dính Z-Index (US-F17-06):**
+   * Khi bật "Generate Content" bằng AI trên Mobile, Modal bật dạng Bottom Sheet. Có trường hợp Bottom Sheet chìm dưới cái Sticky Toolbar ở trên không?
+3. **Public Storefront - Lỗi Pagination & Xóa Bài (US-F17-07):**
+   * Khách đang đứng ở Page 3 của Public Blog List. Admin ở trong Dashboard lẳng lặng xóa đi 10 bài. Khách bấm nút sang Page 4 hoặc mạo hiểm F5 lại Page 3 thì Array Index bị lệch, Storefront trả về màn trắng (Crash) hay hiển thị "Không tìm thấy bài"?
+4. **Public Storefront - JSON-LD SEO Schema Thiếu Dữ Liệu (US-F17-08):**
+   * AC yêu cầu thẻ JSON-LD Article Schema. Nếu chủ Shop lười viết Description, và cũng từ chối cung cấp Ảnh Thumbnail, thẻ JSON-LD khi Render sẽ bị Null/Rỗng một số Field cốt lõi. Lúc này Google Rich Snippet Audit Check sẽ báo lỗi Đỏ rực "Missing image/description field". Frontend phải có cơ chế đẩy Thumbnail rỗng (Placeholder URL) hoặc chặn Save SEO.
+5. **Private Draft Security Leak qua API (US-F17-08):**
+   * Public API Route `GET /api/storefront/blogs/:slug`. Dù bài đang Draft (mới chỉ copy link Slug đưa review), nếu Khách thử ném cái Slug này gửi GET request thông qua Postman thì API có dại dột bưng luôn Response bài Draft về không? Chỗ này phải Audit khép kín chặt Logic Route API Storefront.
+
 ## 5. Vùng Nguy Hiểm & Dễ Bug Nhất (High-risk Areas)
 Khu vực ảnh hưởng lớn đến Hệ thống và Bảo mật cần Focus Test sát nút:
 
