@@ -98,7 +98,19 @@
 
 ---
 
-## 9. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates - F17)
+## 9. Kịch bản Hành trình Người dùng Thực tế (E2E Real User Journey)
+
+> **Mục tiêu:** Kiểm thử luồng tích hợp nguyên khối (Integration & Workflow) từ góc độ Người dùng thực tế (Store Owner) và Khách hàng (Customer) trải nghiệm xuyên suốt. Tuyệt đối không test rời rạc từng nút bấm.
+
+| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
+|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
+| `TC_F17_E2E_01` | E2E | [Pos] Luồng xuất bản và hiển thị hoàn hảo | Yes | Blocker| **Chủ Shop:**<br>1. Login CMS -> Blog Menu.<br>2. Empty State, tạo Category "Sự kiện".<br>3. Tạo Bài, gõ Title "Khai Trương", dùng AI sinh text, up Thumbnail.<br>4. Save as Published.<br>**Khách hàng:**<br>5. Mở Tab ẩn danh, truy cập `/blogs`.<br>6. Đọc chi tiết Bài "Khai Trương". | 1-4. CMS lưu trơn tru, Toast xanh. Bảng dữ liệu update.<br>5. Khách thấy bài ở Grid.<br>6. Màn xem mượt, check JSON-LD SEO đầy đủ ảnh và Meta description. | | `Not Run` |
+| `TC_F17_E2E_02` | E2E | [Neg] Viết bài trên Mobile & Gián đoạn Offline | Man | High | **Chủ Shop:**<br>1. Safari iOS (375px), mở bài "Khai Trương" Published để sửa (gõ text qua Toolbar Sticky).<br>2. Chưa kịp lưu, cúp Wifi (Offline).<br>3. Có mạng lại, đổi Status -> Draft, Lưu.<br>**Khách hàng:**<br>4. Khách đang xem bài Khai trương, bấm F5. | 1-3. Mobile UI không vỡ. Báo lỗi mạng Toast đỏ. Data gõ dở không bay màu (Auto-save/Local). Lưu Draft thành công.<br>4. Khách bị 404 hoặc trả về trang `/blogs` do bài đã rút khỏi Public. | | `Not Run` |
+| `TC_F17_E2E_03` | E2E | [Neg] Xóa Danh mục & Link SEO 301 Sharing | Yes | High | **Chủ Shop CMS:**<br>1. Xóa vĩnh viễn Category "Sự kiện".<br>2. Đổi Slug bài "Khai Trương" sang "khai-truong-2026".<br>**Khách Mạng Xã Hội:**<br>3. Khách click URL cũ chia sẻ trên Zalo. | 1-2. Xóa Category không mất bài (Trả về Uncategorized). Đổi Slug ép sinh rule 301 ngầm.<br>3. URL cũ lập tức Redirect 301 (Permanent) sang URL `khai-truong-2026`. Trải nghiệm xuyên suốt. | | `Not Run` |
+
+---
+
+## 10. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates - F17)
 
 | Criteria | Status | Target Agent .SKILL |
 |---|---|---|
