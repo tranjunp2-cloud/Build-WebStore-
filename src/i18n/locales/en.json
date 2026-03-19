@@ -264,6 +264,18 @@
                 "button": "Fix All with AI",
                 "fixing": "Fixing..."
             },
+            "keywordTracker": {
+                "title": "Keyword Tracker",
+                "description": "Track the ranking of up to 5 core keywords on Google.",
+                "placeholder": "Add new keyword...",
+                "add": "Add",
+                "empty": "No keywords are being tracked yet.",
+                "successAdd": "Keyword added successfully",
+                "errorAdd": "Error adding keyword",
+                "errorConnect": "Connection error when adding keyword",
+                "errorLoad": "Error loading keywords",
+                "errorDelete": "Error deleting keyword"
+            },
             "pages": {
                 "title": "Page-by-Page Analysis",
                 "allGood": "All good",
