@@ -6,6 +6,17 @@ import { POST as ApplyTemplatePOST } from '@/app/api/ai/apply-template/route'
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 
+// Bypass withAuth HOC — inject mock user trực tiếp
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn().mockImplementation((handler: any) => {
+        return async (req: any, ctx: any) => {
+            const user = { id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }
+            return handler(user, req, ctx)
+        }
+    }),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }),
+}))
+
 // Mock next/headers
 vi.mock('next/headers', () => ({
     cookies: vi.fn().mockResolvedValue({
@@ -78,8 +89,9 @@ describe('AI Streaming APIs', () => {
                  body: JSON.stringify({ extraInstructions: 'Make it pop' }) // Missing businessInfo
              })
              const res = await GenerateSitePOST(req)
-             expect(res.status).toBe(400)
-             expect((await res.json()).error).toContain('Missing required fields')
+             const body = await res.json()
+             expect(body.error.code).toBe('VALIDATION_ERROR')
+             expect(body.error.details.fieldErrors).toHaveProperty('businessInfo')
         })
 
         it('returns 200 JSON with generated site data when stream=false', async () => {
@@ -137,8 +149,9 @@ describe('AI Streaming APIs', () => {
                 body: JSON.stringify({ blockIndex: 0 }) // Missing instruction
             })
             const res = await EditBlockPOST(req)
-            expect(res.status).toBe(400)
-            expect((await res.json()).error).toBe('Instruction is required')
+            const body = await res.json()
+            expect(body.error.code).toBe('VALIDATION_ERROR')
+            expect(body.error.details.fieldErrors).toHaveProperty('instruction')
         })
 
         it('returns 200 with AI generated JSON action', async () => {
@@ -175,7 +188,9 @@ describe('AI Streaming APIs', () => {
                 body: JSON.stringify({ text: 'Hello' }) // Missing instruction
             })
             const res = await RewriteTextPOST(req)
-            expect(res.status).toBe(400)
+            const body = await res.json()
+            expect(body.error.code).toBe('VALIDATION_ERROR')
+            expect(body.error.details.fieldErrors).toHaveProperty('instruction')
         })
 
         it('returns 200 with rewritten text', async () => {
@@ -196,7 +211,9 @@ describe('AI Streaming APIs', () => {
                 body: JSON.stringify({})
             })
             const res = await ApplyTemplatePOST(req)
-            expect(res.status).toBe(400)
+            const body = await res.json()
+            expect(body.error.code).toBe('VALIDATION_ERROR')
+            expect(body.error.details.fieldErrors).toHaveProperty('templateId')
         })
 
         it('returns 200 and creates site based on template', async () => {

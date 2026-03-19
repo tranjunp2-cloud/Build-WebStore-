@@ -8,6 +8,8 @@
 
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { rewriteTextSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 
@@ -27,11 +29,11 @@ export const POST = withAuth(async (user, req) => {
                 { status: 429 }
             )
         }
-        const { text, instruction, context, language = 'vi' } = await req.json()
 
-        if (!text || !instruction) {
-            return NextResponse.json({ error: 'Text and instruction are required' }, { status: 400 })
-        }
+        const { data, errorResponse } = await parseRequest(req, rewriteTextSchema)
+        if (errorResponse) return errorResponse
+        
+        const { text, instruction, context, language = 'en' } = data!
 
         const openai = getOpenAI()
         if (!openai) {

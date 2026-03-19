@@ -14,13 +14,21 @@
 ## Wave 2: Auth + Onboarding (🔄 Current — follows user journey)
 
 ### 2.1 Auth Flow ← **NEXT**
-- [ ] Login page (`/login`) — email + password
-- [ ] Register page (`/register`) — email + password + name
-- [ ] Payload auth session (built-in JWT)
-- [ ] Auth guard middleware (protect /dashboard, /builder, /editor)
-- [ ] 401 → redirect /login
-- [ ] Logout action
-- [ ] BMAD: PRD → Arch → Dev → QA
+> **Chi tiết từ PRD F02**
+**Backend & Database**
+- [ ] Cập nhật DB: `Users` (thêm Role, 2FaConfig), `Tenants` (thêm Company, BRN, Phone)
+- [ ] API Endpoints: `/api/users/register`, `login`, `verify-otp`, `logout`, `forgot-password`, `reset-password`
+- [ ] Logic Register: Auto-create 1 Tenant cho Owner, check email unique toàn hệ thống
+- [ ] Xử lý Email: Tích hợp Resend gửi Welcome Email (HTML banner) và 2FA OTP
+- [ ] Auth Guard: Middleware bảo vệ (/dashboard, /builder...), auto-route Owner vs Staff, redirect 401 về /login
+
+**Frontend UI/UX**
+- [ ] `AuthLayout`: Dựng layout Split-Screen (Banner trái + Form card phải)
+- [ ] `LoginPage`: Giao diện login, trim khoảng trắng, call API login xử lý OTP/Direct
+- [ ] `RegisterPage`: Form đăng ký chi tiết (Email, Pass validation 8 ký tự, Name, Company, BRN...)
+- [ ] `OTPPage`: Form nhập 6 số xác thực 2FA
+- [ ] `ForgotPasswordPage` & `ResetPasswordPage`: Luồng quên mật khẩu bảo mật (always success UI)
+- [ ] Test Mobile responsive: Stack column layout, 44px tap targets
 
 ### 2.2 Onboarding
 - [ ] Onboarding Welcome (`/onboarding`) — post-register landing
@@ -41,11 +49,28 @@
 
 ## Wave 3: AI Core (Done)
 
-### 3.1 AI Chat Builder
+### 3.1 AI Web Builder
+> **Chi tiết từ PRD F01**
+**Backend & Database**
 - [x] Rule-based block generator (5 business types × 7 blocks)
-- [x] POST /api/ai/generate-site (creates Site + Page in DB)
-- [x] Full-screen chat + 3-step flow (describe → confirm → generate)
-- [ ] LLM integration (OpenAI GPT-4) — currently rule-based
+- [x] Hành vi tạo Site + Page vào DB (POST `/api/ai/generate-site`)
+- [ ] Tích hợp OpenAI GPT-4o cho generation stream
+- [ ] Server Action: `generateSite` hỗ trợ SSE streaming (step, block_complete, theme_set)
+- [ ] Payload CMS: Thêm `sites.aiContext` và bảng `ai-messages`
+- [ ] Kiểm tra Rate limit: Free = 1 generation
+- [ ] AI Image: Tích hợp DALL-E 3 tạo Hero banner tự động + CDN upload
+
+**Frontend UI/UX**
+- [x] Khung UI: Full-screen chat + preview layout cơ bản
+- [ ] `BuilderPage`: Orchestrator layout quản lý state
+- [ ] `BuilderChatPanel`: AI Welcome (tiếng Anh có gợi ý), auto detect ngôn ngữ chat user
+- [ ] `BuilderPreview`: iframe render blocks realtime từ SSE `block_complete` event
+- [ ] `BuilderProgress`: Thanh tiến trình (tiến độ theo từng step)
+- [ ] `useAIStream` Hook: Tiêu thụ SSE, xử lý event
+- [ ] Store `builderStore`: Zustand state (messages, blocks, theme, status)
+- [ ] Tính năng kéo thả: DND block reorder trong UI Preview (lưu Payload DB layout sortOrder)
+- [ ] Draft recovery: Khôi phục bản nháp khi user quay lại (`DraftRecoveryDialog`)
+- [ ] Luồng Post-Generation: Confirm & hiển thị domain copy link, tuỳ chọn "Tinh chỉnh" / "Publish chạy"
 
 ### 3.2 AI Editor
 - [x] 3-panel layout: block list + live iframe preview + settings panel

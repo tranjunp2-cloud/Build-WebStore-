@@ -1,7 +1,30 @@
-# PRD: Block Renderer Engine (F-05)
-> **Version:** 1.0 | **Created:** 2026-03-08 | **Agent:** `project-planner`  
-> **Priority:** P0 | **Sprint:** Wave 3 — Sprint 1 | **Size:** L  
-> **Depends on:** Payload CMS collections ✅ | **Blocks:** F-01, F-02, storefront
+# PRD: Block Renderer Engine (F04)
+> **Version:** 1.1 | **Updated:** 2026-03-16 | **Agent:** `project-planner`
+> **Priority:** P0 | **Sprint:** Wave 3 — Sprint 1 | **Size:** L
+> **Depends on:** Payload CMS collections ✅ | **Blocks:** F01, F05, F09 (Storefront)
+
+---
+
+> [!IMPORTANT]
+> **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
+> Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
+
+> [!NOTE]
+> **F04 là technical infrastructure PRD.** Target user là AI engine, không phải end user.
+> Không có Story file riêng — scope được gated bởi usage từ F01 (AI Builder), F05 (Editor), F09 (Storefront).
+> Không cần tạo story file cho F04.
+
+---
+
+## 0. Story Traceability
+
+| Story ID | Title | File | Notes |
+|----------|-------|------|-------|
+| US-F01-01 | Generate Site from Prompt | [F01-ai-builder-stories.md](../stories/F01-ai-builder-stories.md) | F04 enables this |
+| US-F05-01 | AI Editor — Split Screen | [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md) | F04 enables this |
+| US-F09-01 | Browse Storefront Products | [F09-storefront-stories.md](../stories/F09-storefront-stories.md) | F04 enables this |
+
+> F04 is a **prerequisite** for F01, F05, F09 — it has no direct user story of its own.
 
 ---
 

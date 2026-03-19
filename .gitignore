@@ -34,6 +34,9 @@ public/media/*
 ## Payload generated
 src/payload-types.ts
 
+## TypeScript build cache
+*.tsbuildinfo
+
 ## Logs
 *.log
 npm-debug.log*
@@ -45,3 +48,6 @@ test-results/
 .agent/
 _agents/
 _agent/
+
+## Worktrees
+.worktrees/
