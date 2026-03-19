@@ -442,267 +442,283 @@ export const SEED_TEMPLATES: TemplateSeed[] = [
     // ─── 10. BUSINESS / CORPORATE ─────────────────────────────────────
     {
         name: 'Business / Corporate',
-        description: 'Versatile template for any type of business.',
+        description: 'Template for companies, consultancies, and corporate services with team and services.',
         category: ['business'],
-        defaultTheme: { primaryColor: '#2563EB', secondaryColor: '#3B82F6', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
+        defaultTheme: { primaryColor: '#1E293B', secondaryColor: '#334155', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
         defaultBlocks: [
-            nav('Enterprise Co', ['Home', 'Services', 'About Us', 'Contact'], 'Contact Us'),
-            hero('Professional Solutions for Your Business', 'Your trusted partner for sustainable and effective business growth.', 'Learn More', 'Get in Touch'),
-            features('Our Services', 'Comprehensive solutions for businesses', [
-                { icon: '📋', title: 'Strategy Consulting', desc: 'Building the right growth strategy for your goals.' },
-                { icon: '⚙️', title: 'Implementation', desc: 'Expert team for fast, effective deployment.' },
-                { icon: '📊', title: 'Measure & Optimise', desc: 'KPI tracking, continuous performance improvement.' },
+            nav('Prime Corp', ['Home', 'Services', 'Team', 'Contact'], 'Consultation'),
+            hero('Excellence in Strategic Consulting', 'We provide data-driven solutions to help your business scale globally.', 'Our Services', 'Contact Us', 'split'),
+            features('Core Services', 'Professional expertise for your growth', [
+                { icon: '📈', title: 'Strategic Planning', desc: 'Comprehensive business roadmaps for sustainable growth.' },
+                { icon: '💼', title: 'Financial Advisory', desc: 'Expert financial management and investment strategy.' },
+                { icon: '👥', title: 'HR Solutions', desc: 'Talent management and organisational development.' },
             ], 'Services'),
-            about('About Us', 'We are a team of experienced professionals committed to delivering the best solutions for your business.', 'About Us'),
-            stats('Achievements', [
-                { value: '100+', label: 'Clients' }, { value: '10+', label: 'Years Experience' },
-                { value: '500+', label: 'Projects' }, { value: '99%', label: 'Satisfaction' },
+            team('Leadership Team', [
+                { name: 'Dato\' Seri Ibrahim', role: 'Chairman — 30 years experience' },
+                { name: 'Sarah Tan', role: 'CEO — International Business Expert' },
+                { name: 'M. Hafiz', role: 'Director of Innovation' },
             ]),
             testimonials('Partner Testimonials', [
-                { name: 'CEO, Company A', quote: 'Professional service, results exceeded expectations.', title: 'CEO' },
-                { name: 'Manager, Company B', quote: 'Dedicated team, always available when needed.', title: 'Manager' },
+                { name: 'Director, Global Tech', quote: 'Prime Corp is our most trusted strategic partner.', title: 'Director' },
+                { name: 'Founder, Retail Plus', quote: 'Their financial insights were game-changing for us.', title: 'Founder' },
             ]),
-            cta('Ready to Grow?', 'Contact us today for a tailored consultation.', 'Get in Touch'),
-            contact('Contact Us', 'info@enterprise.my', '+60 3-1234 5678', 'Kuala Lumpur, Malaysia'),
-            footer('Enterprise Co', 'Growing together with your business.', [
-                { title: 'Services', links: ['Consulting', 'Implementation', 'Support'] },
-                { title: 'Quick Links', links: ['Blog', 'Careers', 'Partners'] },
+            contact('Business Enquiries', 'contact@primecorp.my', '+60 3-8888 7777', 'Level 50, Menara Petronas, KL'),
+            footer('Prime Corp', 'Excellence in strategic consulting.', [
+                { title: 'Company', links: ['About Us', 'Team', 'Careers'] },
+                { title: 'Services', links: ['Consulting', 'Finance', 'Strategy'] },
             ]),
         ],
-        tags: [{ tag: 'business' }, { tag: 'corporate' }, { tag: 'enterprise' }],
-        sortOrder: 10, isPremium: false, isFeatured: false,
+        tags: [{ tag: 'business' }, { tag: 'corporate' }, { tag: 'consulting' }],
+        sortOrder: 10, isPremium: true, isFeatured: false,
     },
-,
-    // ─── ADDITIONAL RESTAURANT / F&B ─────────────────────────────────────
+
+    // ─── 11. BOUTIQUE COFFEE SHOP ─────────────────────────────────────
     {
         name: 'Boutique Coffee Shop',
-        description: 'Perfect for local cafes with a focus on artisanal coffee and pastries.',
-        category: ['restaurant', 'cafe'],
-        defaultTheme: { primaryColor: '#8B4513', secondaryColor: '#A0522D', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
+        description: 'A cozy template for specialty coffee shops and local roasteries.',
+        category: ['restaurant'],
+        defaultTheme: { primaryColor: '#4b3832', secondaryColor: '#be9b7b', fontHeading: 'Montserrat', fontBody: 'Lora', colorMode: 'light' },
         defaultBlocks: [
-            nav('ArtisanBrew', ['Menu', 'Our Story', 'Locations'], 'Order Online'),
-            hero('Crafted With Love', 'Experience the finest artisanal coffee sourced responsibly from local farmers.', 'View Menu', undefined, 'minimal'),
-            gallery('Our Cafe', 4),
-            contact('Find Us', 'hello@artisanbrew.my', '+60 12-321 4321', 'KL'),
-            footer('ArtisanBrew', 'Bringing you the perfect cup every day.', [])
+            nav('Bean & Brew', ['Home', 'Menu', 'Brewing', 'Location'], 'Order Now'),
+            hero('Brewing Moments, One Cup at a Time', 'Experience the finest artisanal coffee sourced directly from ethical farms.', 'View Menu', 'Our Story', 'centered'),
+            features('Our Favorites', 'Hand-picked beans & brews', [
+                { icon: '☕', title: 'Manual Brew', desc: 'V60, Chemex, and Aeropress options.' },
+                { icon: '🥐', title: 'Artisan Pastries', desc: 'Baked fresh every morning.' },
+                { icon: '🍃', title: 'Specialty Tea', desc: 'Organic loose leaf tea selection.' },
+            ], 'Menu'),
+            contact('Visit Us', 'hello@beanbrew.my', '+60 3-2161 8888', 'Lot 10, Bukit Bintang, KL'),
+            footer('Bean & Brew', 'Coffee for the soul.', [
+                { title: 'Links', links: ['Menu', 'Shipping', 'Events'] },
+            ]),
         ],
         tags: [{ tag: 'cafe' }, { tag: 'coffee' }],
         sortOrder: 11, isPremium: false, isFeatured: false,
     },
+
+    // ─── 12. FINE DINING RESTAURANT ───────────────────────────────────
     {
-        name: 'Fine Dining Experience',
-        description: 'An elegant template for upscale restaurants and exclusive dining venues.',
+        name: 'Fine Dining Restaurant',
+        description: 'Elite template for high-end dining experiences with reservation focus.',
         category: ['restaurant'],
-        defaultTheme: { primaryColor: '#B8860B', secondaryColor: '#DAA520', fontHeading: 'Playfair Display', fontBody: 'Inter', colorMode: 'dark' },
+        defaultTheme: { primaryColor: '#1c1c1c', secondaryColor: '#c5a059', fontHeading: 'Cinzel', fontBody: 'Inter', colorMode: 'dark' },
         defaultBlocks: [
-            nav('L\'Élégance', ['Menu', 'Reservations', 'Private Dining'], 'Book Table'),
-            hero('A Symphony of Taste', 'Indulge in a culinary journey crafted by Michelin-starred chefs.', 'Make a Reservation', undefined, 'centered'),
-            about('The Chef', 'Chef Pierre brings 20 years of Parisian excellence to Kuala Lumpur.', 'About Us'),
-            contact('Reservations', 'reserve@lelegance.my', '+60 3-8888 9999', 'Bukit Bintang, KL'),
-            footer('L\'Élégance', 'A taste of perfection.', [])
+            nav('L\'Excellence', ['Experience', 'Menu', 'Wine', 'Reservations'], 'Reserve'),
+            hero('Culinary Masterpieces', 'A symphony of flavors crafted for the most discerning palates.', 'The Menu', 'Table for Two'),
+            testimonials('The Reviews', [{ name: 'Chef Mario', quote: 'A standard of excellence in the region.', title: 'Michelin Star Chef' }]),
+            footer('L\'Excellence', 'Elegance served.', [{ title: 'Info', links: ['Terms', 'Privacy'] }]),
         ],
-        tags: [{ tag: 'restaurant' }, { tag: 'fine-dining' }],
+        tags: [{ tag: 'dining' }, { tag: 'luxury' }],
         sortOrder: 12, isPremium: true, isFeatured: true,
     },
-    // ─── ADDITIONAL ECOMMERCE / FASHION ──────────────────────────────
+
+    // ─── 13. MINIMALIST FASHION LABEL ──────────────────────────────────
     {
-        name: 'Minimalist Fashion Store',
-        description: 'Clean and modern template perfect for boutique clothing and accessories.',
-        category: ['ecommerce', 'fashion'],
-        defaultTheme: { primaryColor: '#27272A', secondaryColor: '#52525B', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
+        name: 'Minimalist Fashion Label',
+        description: 'Sleek, image-heavy template for modern clothing brands.',
+        category: ['ecommerce'],
+        defaultTheme: { primaryColor: '#000000', secondaryColor: '#ffffff', fontHeading: 'Helvetica', fontBody: 'Inter', colorMode: 'light' },
         defaultBlocks: [
-            nav('NOIR', ['Shop', 'Collections', 'Lookbook'], 'Cart'),
-            hero('Essential Neutrals', 'Discover our new collection of sustainable, everyday essentials.', 'Shop Collection', undefined, 'split'),
-            features('Why Choose Us', 'Sustainable and ethical.', [
-                { icon: '🌿', title: 'Eco-Friendly', desc: '100% organic cotton.' },
-                { icon: '♻️', title: 'Sustainable', desc: 'Recycled packaging.' }
-            ], 'Ethics'),
-            footer('NOIR', 'Minimalist fashion for the modern era.', [])
+            nav('NORD', ['Shop', 'Journal', 'Archive'], 'Login'),
+            hero('Essential Silhouettes', 'Sustainable materials. Timeless design.', 'Shop Collection', undefined, 'centered'),
+            gallery('SS26 Collection', 4),
+            footer('NORD', 'Minimalism elevated.', [{ title: 'Shop', links: ['All', 'Men', 'Women'] }]),
         ],
-        tags: [{ tag: 'fashion' }, { tag: 'clothing' }],
-        sortOrder: 13, isPremium: false, isFeatured: false,
+        tags: [{ tag: 'fashion' }, { tag: 'minimal' }],
+        sortOrder: 13, isPremium: true, isFeatured: false,
     },
+
+    // ─── 14. MODERN FURNITURE STORE ────────────────────────────────────
     {
-        name: 'Tech Gadgets Store',
-        description: 'Optimized for electronics and digital accessory retailers.',
-        category: ['ecommerce', 'tech'],
-        defaultTheme: { primaryColor: '#0EA5E9', secondaryColor: '#0284C7', fontHeading: 'Inter', fontBody: 'Inter', colorMode: 'dark' },
+        name: 'Modern Furniture Store',
+        description: 'Product-focused template for home decor and furniture retailers.',
+        category: ['ecommerce'],
+        defaultTheme: { primaryColor: '#2d5a27', secondaryColor: '#f4f1ea', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
         defaultBlocks: [
-            nav('GadgetPro', ['Products', 'Brands', 'Support'], 'Deals'),
-            hero('Next-Gen Tech', 'Upgrade your life with the latest smart devices and wearables.', 'Shop Now', undefined, 'centered'),
-            stats('Our Reach', [{ value: '1M+', label: 'Products Sold' }, { value: '24/7', label: 'Support' }]),
-            footer('GadgetPro', 'Your lifestyle, upgraded.', [])
-        ],
-        tags: [{ tag: 'tech' }, { tag: 'gadgets' }],
-        sortOrder: 14, isPremium: false, isFeatured: true,
-    },
-    // ─── ADDITIONAL TECH / SAAS ──────────────────────────────────────
-    {
-        name: 'SaaS Startup Landing',
-        description: 'A vibrant template designed to convert visitors into software users.',
-        category: ['tech', 'saas'],
-        defaultTheme: { primaryColor: '#4F46E5', secondaryColor: '#4338CA', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
-        defaultBlocks: [
-            nav('AppFlow', ['Features', 'Pricing', 'Docs'], 'Get Started'),
-            hero('Streamline Your Workflow', 'The all-in-one platform for team productivity and collaboration.', 'Start Free Trial', 'Watch Video', 'split'),
-            pricing('Simple Pricing', 'Pay as you grow', [
-                { name: 'Basic', price: '$0/mo', desc: 'Free forever', features: ['Core features'] },
-                { name: 'Pro', price: '$15/mo', desc: 'For teams', features: ['All features', 'Priority support'] }
+            nav('Habitat', ['Living', 'Dining', 'Bedroom', 'Office'], 'Cart'),
+            hero('Design for Living', 'Transform your space with curated pieces that blend form and function.', 'Browse Catalog', 'Latest Arrivals'),
+            features('Our Quality', 'Craftsmanship matters', [
+                { icon: '🪑', title: 'Solid Wood', desc: 'Sustainably sourced teak and oak.' },
+                { icon: '🛠️', title: 'Handmade', desc: 'Crafted by master artisans.' },
             ]),
-            footer('AppFlow', 'Work smarter, not harder.', [])
+            footer('Habitat', 'Live beautifully.', [{ title: 'Policies', links: ['Shipping', 'Returns'] }]),
         ],
-        tags: [{ tag: 'saas' }, { tag: 'software' }],
+        tags: [{ tag: 'home' }, { tag: 'furniture' }],
+        sortOrder: 14, isPremium: false, isFeatured: false,
+    },
+
+    // ─── 15. HIGH-INTENSITY FITNESS GYM ────────────────────────────────
+    {
+        name: 'High-Intensity Fitness Gym',
+        description: 'Action-oriented template for CrossFit and HIIT studios.',
+        category: ['fitness'],
+        defaultTheme: { primaryColor: '#ff5f1f', secondaryColor: '#222222', fontHeading: 'Impact', fontBody: 'Inter', colorMode: 'dark' },
+        defaultBlocks: [
+            nav('IRON DEPOT', ['Schedule', 'Coaches', 'Location'], 'JOIN'),
+            hero('Unleash the Beast', 'Push your limits with elite coaching and community.', 'Get Started', 'The Program'),
+            stats('Community', [{ value: '300+', label: 'Athletes' }, { value: '12', label: 'Coaches' }]),
+            footer('IRON DEPOT', 'No excuses.', [{ title: 'Connect', links: ['Instagram', 'Facebook'] }]),
+        ],
+        tags: [{ tag: 'gym' }, { tag: 'crossfit' }],
         sortOrder: 15, isPremium: false, isFeatured: false,
     },
+
+    // ─── 16. YOGA & PILATES STUDIO ─────────────────────────────────────
     {
-        name: 'CyberSecurity Firm',
-        description: 'Build trust and authority with this sleek, secure-looking template.',
-        category: ['tech', 'business'],
-        defaultTheme: { primaryColor: '#10B981', secondaryColor: '#047857', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
+        name: 'Yoga & Pilates Studio',
+        description: 'Serene template for wellness centers and mindfulness studios.',
+        category: ['fitness'],
+        defaultTheme: { primaryColor: '#a8d5ba', secondaryColor: '#f7f1e3', fontHeading: 'Quicksand', fontBody: 'Inter', colorMode: 'light' },
         defaultBlocks: [
-            nav('ShieldGuard', ['Services', 'Threat Intel', 'Contact'], 'Get Audit'),
-            hero('Secure Your Digital Assets', 'Enterprise-grade protection against modern cyber threats.', 'Request Assessment', undefined, 'centered'),
-            features('Our Expertise', 'Comprehensive defense', [
-                { icon: '🛡️', title: 'Endpoint Protection', desc: 'AI-driven malware defense.' },
-                { icon: '🔒', title: 'Network Security', desc: 'Zero-trust architecture implementation.' }
-            ], 'Services'),
-            footer('ShieldGuard', 'Protecting your digital frontier.', [])
+            nav('OM Shanti', ['Classes', 'Workshops', 'Pricing'], 'Book Class'),
+            hero('Find Your Inner Balance', 'Gentle flow and mindful movement for every body.', 'Trial Class', 'View Schedule'),
+            testimonials('Teacher Profile', [{ name: 'Maya', quote: 'Yoga saved my mind.', title: 'Lead Instructor' }]),
+            footer('OM Shanti', 'Breathing life.', [{ title: 'Schedule', links: ['Monday', 'Tuesday'] }]),
         ],
-        tags: [{ tag: 'security' }, { tag: 'tech' }],
-        sortOrder: 16, isPremium: true, isFeatured: false,
+        tags: [{ tag: 'yoga' }, { tag: 'pilates' }],
+        sortOrder: 16, isPremium: false, isFeatured: false,
     },
-    // ─── ADDITIONAL FITNESS / GYM ────────────────────────────────────
+
+    // ─── 17. SPECIALIZED DENTAL CLINIC ─────────────────────────────────
     {
-        name: 'Yoga Retreat Studio',
-        description: 'Serene and calming template designed for yoga studios and wellness retreats.',
-        category: ['fitness', 'wellness'],
-        defaultTheme: { primaryColor: '#14B8A6', secondaryColor: '#0D9488', fontHeading: 'Cormorant Garamond', fontBody: 'Inter', colorMode: 'light' },
+        name: 'Specialized Dental Clinic',
+        description: 'Patient-centric template for advanced orthodontic and cosmetic clinics.',
+        category: ['health'],
+        defaultTheme: { primaryColor: '#0077b6', secondaryColor: '#caf0f8', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
         defaultBlocks: [
-            nav('Zenith Yoga', ['Classes', 'Retreats', 'Instructors'], 'Book Class'),
-            hero('Find Your Inner Peace', 'Join our community and discover harmony of mind, body, and spirit.', 'Join Now', 'Learn More', 'centered'),
-            gallery('Our Sanctuary', 4),
-            footer('Zenith Yoga', 'Breathe deeply. Live fully.', [])
+            nav('SmileBright', ['Services', 'About', 'Technology'], 'Appoint'),
+            hero('Confidence in Every Smile', 'Advanced dentistry for the whole family.', 'Our Services', 'Meet Doctors'),
+            features('Our Technology', 'Cutting edge', [{ icon: '🦷', title: '3D Scanning', desc: 'No more messy molds.' }]),
+            footer('SmileBright', 'Healthy teeth, happy life.', [{ title: 'Emergency', links: ['Call Now'] }]),
         ],
-        tags: [{ tag: 'yoga' }, { tag: 'wellness' }],
+        tags: [{ tag: 'dental' }, { tag: 'clinic' }],
         sortOrder: 17, isPremium: false, isFeatured: false,
     },
+
+    // ─── 18. MENTAL WELLNESS CENTER ────────────────────────────────────
     {
-        name: 'CrossFit Box',
-        description: 'High-energy template for CrossFit boxes and intense training centers.',
-        category: ['fitness', 'gym'],
-        defaultTheme: { primaryColor: '#F97316', secondaryColor: '#EA580C', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
+        name: 'Mental Wellness Center',
+        description: 'Safe and supportive template for therapy and counseling practices.',
+        category: ['health'],
+        defaultTheme: { primaryColor: '#5c677d', secondaryColor: '#daeaf6', fontHeading: 'Lora', fontBody: 'Inter', colorMode: 'light' },
         defaultBlocks: [
-            nav('IronForge', ['WODs', 'Coaches', 'Drop-in'], 'Join the Box'),
-            hero('Push Your Limits', 'Elite training facility for those who demand more from themselves.', 'Start Training', undefined, 'split'),
-            team('Expert Coaches', [{ name: 'Coach Mike', role: 'Head Trainer' }]),
-            footer('IronForge CrossFit', 'Forged in sweat.', [])
+            nav('MindPath', ['Therapy', 'Resources', 'About'], 'Heal'),
+            hero('You Are Not Alone', 'Compassionate care for your mental well-being.', 'Contact Us', 'Our Approach'),
+            faq('Common Questions', [{ q: 'Is it confidential?', a: 'Completely.' }]),
+            footer('MindPath', 'Path to peace.', [{ title: 'Support', links: ['Crisis Line'] }]),
         ],
-        tags: [{ tag: 'crossfit' }, { tag: 'gym' }],
-        sortOrder: 18, isPremium: true, isFeatured: false,
+        tags: [{ tag: 'wellness' }, { tag: 'therapy' }],
+        sortOrder: 18, isPremium: false, isFeatured: false,
     },
-    // ─── ADDITIONAL HEALTH / MEDICAL ─────────────────────────────────
+
+    // ─── 19. LANGUAGE LEARNING SCHOOL ──────────────────────────────────
     {
-        name: 'Pediatric Clinic',
-        description: 'Friendly and reassuring template for pediatricians and child healthcare.',
-        category: ['health', 'clinic'],
-        defaultTheme: { primaryColor: '#06B6D4', secondaryColor: '#0891B2', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
+        name: 'Language Learning School',
+        description: 'Engagement-focused template for language centers and tutors.',
+        category: ['education'],
+        defaultTheme: { primaryColor: '#ffb703', secondaryColor: '#fb8500', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
         defaultBlocks: [
-            nav('LittleSmiles', ['Services', 'Doctors', 'Parent Resources'], 'Book Appointment'),
-            hero('Caring for Your Little Ones', 'Expert pediatric care in a fun, child-friendly environment.', 'Schedule Visit', undefined, 'split'),
-            testimonials('Happy Parents', [{ name: 'Sarah', quote: 'The doctors are so patient and kind.', title: 'Mom of two' }]),
-            footer('LittleSmiles Clinic', 'Growing healthy together.', [])
+            nav('Lingua', ['Languages', 'Method', 'Apply'], 'Join'),
+            hero('Speak the World', 'Interactive language classes taught by native speakers.', 'Free Lesson', 'See Levels'),
+            stats('Progress', [{ value: '50+', label: 'Teachers' }, { value: '10', label: 'Languages' }]),
+            footer('Lingua', 'Connect through speech.', [{ title: 'Courses', links: ['English', 'Chinese', 'Malay'] }]),
         ],
-        tags: [{ tag: 'pediatric' }, { tag: 'clinic' }],
+        tags: [{ tag: 'school' }, { tag: 'language' }],
         sortOrder: 19, isPremium: false, isFeatured: false,
     },
+
+    // ─── 20. PROFESSIONAL LAW FIRM ─────────────────────────────────────
     {
-        name: 'Specialist Medical Center',
-        description: 'Professional template for specialized medical practices and diagnostic centers.',
-        category: ['health'],
-        defaultTheme: { primaryColor: '#2563EB', secondaryColor: '#1D4ED8', fontHeading: 'Inter', fontBody: 'Inter', colorMode: 'light' },
+        name: 'Professional Law Firm',
+        description: 'Authority-driven template for legal experts and advocacy groups.',
+        category: ['business'],
+        defaultTheme: { primaryColor: '#0d1b2a', secondaryColor: '#e0e1dd', fontHeading: 'Playfair Display', fontBody: 'Inter', colorMode: 'dark' },
         defaultBlocks: [
-            nav('Apex Specialists', ['Specialties', 'Patient Info', 'Contact'], 'Patient Portal'),
-            hero('Advanced Medical Care', 'Leading experts providing world-class specialized treatments.', 'Our Services', 'Contact Us', 'centered'),
-            stats('Excellence', [{ value: '50+', label: 'Specialists' }, { value: '24/7', label: 'Emergency Care' }]),
-            footer('Apex Medical Center', 'Excellence in healthcare.', [])
-        ],
-        tags: [{ tag: 'hospital' }, { tag: 'health' }],
-        sortOrder: 20, isPremium: true, isFeatured: true,
-    },
-    // ─── ADDITIONAL EDUCATION ────────────────────────────────────────
-    {
-        name: 'Language Institute',
-        description: 'Perfect for language schools offering online or in-person courses.',
-        category: ['education'],
-        defaultTheme: { primaryColor: '#8B5CF6', secondaryColor: '#7C3AED', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
-        defaultBlocks: [
-            nav('Polyglot Academy', ['Languages', 'Tutors', 'Pricing'], 'Start Learn'),
-            hero('Master a New Language', 'Interactive courses taught by native speakers. Fluency guaranteed.', 'Explore Courses', undefined, 'split'),
-            stats('Languages', [{ value: '20+', label: 'To choose from' }]),
-            footer('Polyglot Academy', 'Connect with the world.', [])
-        ],
-        tags: [{ tag: 'language' }, { tag: 'education' }],
-        sortOrder: 21, isPremium: false, isFeatured: false,
-    },
-    {
-        name: 'Online Bootcamp',
-        description: 'Modern landing for coding or design bootcamps moving fast.',
-        category: ['education', 'tech'],
-        defaultTheme: { primaryColor: '#EC4899', secondaryColor: '#DB2777', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
-        defaultBlocks: [
-            nav('CodeCamp', ['Curriculum', 'Alumni', 'Admissions'], 'Apply Now'),
-            hero('Launch Your Tech Career', 'Intensive 12-week programs to transform your future.', 'Apply Today', 'Download Syllabus', 'centered'),
-            faq('Admissions FAQ', [{ q: 'Is financing available?', a: 'Yes, we offer ISA and direct loans.' }]),
-            footer('CodeCamp', 'Code your future.', [])
-        ],
-        tags: [{ tag: 'bootcamp' }, { tag: 'coding' }],
-        sortOrder: 22, isPremium: true, isFeatured: true,
-    },
-    // ─── ADDITIONAL BUSINESS / SERVICES ──────────────────────────────
-    {
-        name: 'Consulting Agency',
-        description: 'Sleek corporate template for management and financial consultants.',
-        category: ['business', 'service'],
-        defaultTheme: { primaryColor: '#0F172A', secondaryColor: '#1E293B', fontHeading: 'Playfair Display', fontBody: 'Inter', colorMode: 'light' },
-        defaultBlocks: [
-            nav('Nexus Consulting', ['Expertise', 'Industries', 'Insights'], 'Get Advice'),
-            hero('Strategic Growth Partners', 'Data-driven insights to navigate complex business challenges.', 'Our Expertise', undefined, 'minimal'),
-            about('Our Vision', 'We partner with visionary leaders to create lasting impact.', 'About Us'),
-            footer('Nexus Consulting', 'Strategy. Execution. Results.', [])
-        ],
-        tags: [{ tag: 'consulting' }, { tag: 'business' }],
-        sortOrder: 23, isPremium: false, isFeatured: false,
-    },
-    {
-        name: 'Legal Services',
-        description: 'Trustworthy and authoritative design for law firms and legal advisors.',
-        category: ['business', 'service'],
-        defaultTheme: { primaryColor: '#6B7280', secondaryColor: '#4B5563', fontHeading: 'Cormorant Garamond', fontBody: 'Inter', colorMode: 'light' },
-        defaultBlocks: [
-            nav('Liberty Law', ['Practice Areas', 'Attorneys', 'Case Studies'], 'Free Consultation'),
-            hero('Defending Your Rights', 'Experienced advocates dedicated to achieving the best outcomes.', 'Practice Areas', undefined, 'split'),
-            team('Partners', [{ name: 'John Doe, Esq.', role: 'Senior Partner' }]),
-            footer('Liberty Law Firm', 'Justice prevails.', [])
+            nav('Lexington', ['Practice', 'Attorneys', 'Blog'], 'Contact'),
+            hero('Protecting Your Interests', 'Top-tier legal representation for corporate and personal matters.', 'Our Expertise', 'Get Advice'),
+            team('The Team', [{ name: 'Tan Sri Wong', role: 'Senior Partner' }]),
+            footer('Lexington', 'Justice first.', [{ title: 'Search', links: ['Cases'] }]),
         ],
         tags: [{ tag: 'law' }, { tag: 'legal' }],
-        sortOrder: 24, isPremium: true, isFeatured: false,
+        sortOrder: 20, isPremium: true, isFeatured: false,
     },
-    {
-        name: 'Home Repair Services',
-        description: 'Accessible template for plumbers, electricians, and local contractors.',
-        category: ['service', 'business'],
-        defaultTheme: { primaryColor: '#F59E0B', secondaryColor: '#D97706', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
-        defaultBlocks: [
-            nav('FixIt Pros', ['Services', 'Reviews', 'Contact'], 'Book Service'),
-            hero('Fast, Reliable Repairs', 'Your trusted local experts for all home maintenance needs.', 'Get an Estimate', 'Call Now', 'split'),
-            features('Our Services', 'We fix it all', [
-                { icon: '🔧', title: 'Plumbing', desc: 'Leaks, clogs, and piping.' },
-                { icon: '⚡', title: 'Electrical', desc: 'Wiring, fixtures, and panels.' }
-            ], 'Services'),
-            footer('FixIt Pros', 'We do it right the first time.', [])
-        ],
-        tags: [{ tag: 'contractor' }, { tag: 'repair' }],
-        sortOrder: 25, isPremium: false, isFeatured: true,
-    }
 
+    // ─── 21. DIGITAL MARKETING AGENCY ──────────────────────────────────
+    {
+        name: 'Digital Marketing Agency',
+        description: 'Dynamic template showing results and past client work.',
+        category: ['creative'],
+        defaultTheme: { primaryColor: '#6a0572', secondaryColor: '#ab83a1', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
+        defaultBlocks: [
+            nav('Vortex', ['Work', 'Labs', 'Contact'], 'Pitch Us'),
+            hero('Scale Your Impact', 'Data-driven marketing for high-growth brands.', 'Case Studies', 'Services'),
+            gallery('Selected Works', 4),
+            footer('Vortex', 'Digital domination.', [{ title: 'Agency', links: ['About'] }]),
+        ],
+        tags: [{ tag: 'marketing' }, { tag: 'agency' }],
+        sortOrder: 21, isPremium: false, isFeatured: false,
+    },
+
+    // ─── 22. WEDDING PHOTOGRAPHY ───────────────────────────────────────
+    {
+        name: 'Wedding Photography',
+        description: 'Visual storytelling template for photographers.',
+        category: ['creative'],
+        defaultTheme: { primaryColor: '#f7ede2', secondaryColor: '#84a59d', fontHeading: 'Italiana', fontBody: 'Inter', colorMode: 'light' },
+        defaultBlocks: [
+            nav('Moments', ['Galleries', 'Weddings', 'Contact'], 'Book'),
+            hero('Capture the Magic', 'Timeless wedding photography for your once-in-a-lifetime moments.', 'View Gallery', 'Packages'),
+            gallery('Featured Weddings', 6),
+            footer('Moments', 'Forever young.', [{ title: 'Follow', links: ['IG'] }]),
+        ],
+        tags: [{ tag: 'wedding' }, { tag: 'photo' }],
+        sortOrder: 22, isPremium: true, isFeatured: false,
+    },
+
+    // ─── 23. LUXURY TRAVEL AGENCY ──────────────────────────────────────
+    {
+        name: 'Luxury Travel Agency',
+        description: 'High-end imagery template for curated travel experiences.',
+        category: ['business'],
+        defaultTheme: { primaryColor: '#013a63', secondaryColor: '#a9d6e5', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
+        defaultBlocks: [
+            nav('Voyage', ['Destinations', 'Yachts', 'Contact'], 'Plan'),
+            hero('Escape the Ordinary', 'Bespoke adventures crafted by travel experts.', 'Explore', 'Concierge'),
+            features('Pillars', 'Why us', [{ icon: '✈️', title: 'Private Jet', desc: 'Arrive in style.' }]),
+            footer('Voyage', 'The world is yours.', [{ title: 'News', links: ['Blog'] }]),
+        ],
+        tags: [{ tag: 'travel' }, { tag: 'luxury' }],
+        sortOrder: 23, isPremium: true, isFeatured: false,
+    },
+
+    // ─── 24. PET GROOMING & SPA ───────────────────────────────────────
+    {
+        name: 'Pet Grooming & Spa',
+        description: 'Fun and friendly template for pet services.',
+        category: ['beauty'],
+        defaultTheme: { primaryColor: '#ff99c8', secondaryColor: '#fcf6bd', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
+        defaultBlocks: [
+            nav('Pawsome', ['Services', 'Pals', 'Contact'], 'Book'),
+            hero('Pamper Your Best Friend', 'Professional grooming and spa for your furry companions.', 'Our Services', 'See Pals'),
+            testimonials('Happy Pets', [{ name: 'Buddy', quote: 'Woof!', title: 'Golden Retriever' }]),
+            footer('Pawsome', 'Love on four legs.', [{ title: 'Care', links: ['Grooming'] }]),
+        ],
+        tags: [{ tag: 'pets' }, { tag: 'dog' }],
+        sortOrder: 24, isPremium: false, isFeatured: false,
+    },
+
+    // ─── 25. PERSONAL BRANDING ─────────────────────────────────────────
+    {
+        name: 'Personal Branding',
+        description: 'Direct and professional template for influencers and public speakers.',
+        category: ['creative'],
+        defaultTheme: { primaryColor: '#2b2d42', secondaryColor: '#8d99ae', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'dark' },
+        defaultBlocks: [
+            nav('John Doe', ['Work', 'Speaking', 'Contact'], 'Reach Out'),
+            hero('Elevate Your Voice', 'Speaker. Author. Consultant.', 'Hire Me', 'My Story', 'minimal'),
+            about('The Journey', 'From zero to authority.', 'About'),
+            footer('John Doe', 'Influence.', [{ title: 'Connect', links: ['Linked'] }]),
+        ],
+        tags: [{ tag: 'brand' }, { tag: 'speaker' }],
+        sortOrder: 25, isPremium: false, isFeatured: false,
+    },
 ]
