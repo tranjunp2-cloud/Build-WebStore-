@@ -68,6 +68,8 @@ type BuilderActions = {
     setProgress: (progress: ProgressStep) => void
     setSiteId: (siteId: string) => void
     setSiteName: (name: string) => void
+    setBlocks: (blocks: any[]) => void
+
 
     // Error
     setError: (error: BuilderState['error']) => void
@@ -115,7 +117,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>((set) => ({
 
     addBlock: (block) =>
         set((state) => ({
-            blocks: [...state.blocks, block],
+            blocks: [...state.blocks, { ...block, _id: block._id || `${block.blockType}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }],
         })),
 
     setTheme: (theme) => set({ theme }),
@@ -125,6 +127,8 @@ export const useBuilderStore = create<BuilderState & BuilderActions>((set) => ({
     setSiteId: (siteId) => set({ siteId }),
 
     setSiteName: (name) => set({ siteName: name }),
+
+    setBlocks: (blocks) => set({ blocks }),
 
     setError: (error) => set({ error, status: 'error' }),
 

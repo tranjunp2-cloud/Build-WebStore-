@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, Send, ArrowLeft, Loader2, Check, ExternalLink, Eye, MessageSquare, Globe } from 'lucide-react'
+import { Sparkles, Send, ArrowLeft, Loader2, Check, ExternalLink, Eye, MessageSquare, Globe, GripVertical, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -13,6 +13,7 @@ import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import BusinessInfoForm from '@/components/builder/BusinessInfoForm'
 import { CongratsModal } from '@/components/builder/CongratsModal'
+import { Reorder } from 'framer-motion'
 
 // Types
 import type { BusinessInfoInput } from '@/lib/ai/system-prompt'
@@ -57,11 +58,15 @@ function GeneratingProgress({ progress }: { progress: { step: string; label: str
 }
 
 // ─── Live Preview Component ─────────────────────────────────────────────
-function LivePreview({ blocks, theme }: { blocks: any[]; theme: ThemeConfig | null }) {
+
+function LivePreview({ blocks, theme, onReorder }: { blocks: any[]; theme: ThemeConfig | null; onReorder?: (newOrder: any[]) => void }) {
     if (!theme || blocks.length === 0) return null
 
     return (
-        <div
+        <Reorder.Group
+            axis="y"
+            values={blocks}
+            onReorder={(newOrder) => onReorder?.(newOrder)}
             className="w-full min-h-full"
             style={{
                 fontFamily: `'${theme.fontBody}', sans-serif`,
@@ -73,13 +78,39 @@ function LivePreview({ blocks, theme }: { blocks: any[]; theme: ThemeConfig | nu
                 if (!block.blockType) return null
                 const BlockComponent = blockRegistry.getComponent(block.blockType)
                 if (!BlockComponent) return null
+
+                const isFixed = block.blockType === 'navigation' || block.blockType === 'footer'
+
                 return (
-                    <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
-                        <BlockComponent block={block} theme={theme} />
-                    </BlockErrorBoundary>
+                    <Reorder.Item
+                        key={block._id}
+                        value={block}
+                        dragListener={!isFixed}
+                        className="relative group/block"
+                    >
+                        {/* Drag Handle or Lock Indicator */}
+                        <div className="absolute left-4 top-4 z-40 opacity-0 group-hover/block:opacity-100 transition-opacity">
+                            {isFixed ? (
+                                <div className="p-2 rounded-md bg-white/10 backdrop-blur-sm border border-white/10 text-gray-400 cursor-not-allowed" title="Vị trí cố định (Navigation/Footer)">
+                                    <Lock className="h-4 w-4" />
+                                </div>
+                            ) : (
+                                <div className="p-2 rounded-md bg-blue-600 text-white shadow-lg cursor-grab active:cursor-grabbing border border-blue-500">
+                                    <GripVertical className="h-4 w-4" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Visual indicator when dragging */}
+                        <div className="absolute inset-0 pointer-events-none border-2 border-transparent group-active/block:border-blue-500/50 group-active/block:bg-blue-500/5 transition-colors z-30" />
+
+                        <BlockErrorBoundary blockType={block.blockType}>
+                            <BlockComponent block={block} theme={theme} />
+                        </BlockErrorBoundary>
+                    </Reorder.Item>
                 )
             })}
-        </div>
+        </Reorder.Group>
     )
 }
 
@@ -99,7 +130,7 @@ export default function AIBuilderPage() {
     const {
         step, businessInfo,
         status, messages, blocks, theme, siteId, siteName, progress, error,
-        addMessage, setStatus, addBlock, setTheme, setProgress, setSiteId, setSiteName, setError, setBusinessInfo,
+        addMessage, setStatus, addBlock, setTheme, setProgress, setSiteId, setSiteName, setError, setBusinessInfo, setBlocks,
     } = useBuilderStore()
 
     useEffect(() => {
@@ -221,6 +252,19 @@ export default function AIBuilderPage() {
         if (!siteId) return
         setIsPublishing(true)
         try {
+            // 1. Save current blocks (reordered) and theme first
+            const saveRes = await fetch(`/api/sites/${siteId}/save`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blocks, theme }),
+            })
+
+            if (!saveRes.ok) {
+                const saveData = await saveRes.json()
+                throw new Error(saveData.error || 'Failed to save website layout')
+            }
+
+            // 2. Then publish
             const res = await fetch(`/api/sites/${siteId}/publish`, {
                 method: 'PATCH'
             })
@@ -232,8 +276,8 @@ export default function AIBuilderPage() {
             } else {
                 toast.error(data.error?.message || 'Failed to publish site')
             }
-        } catch (error) {
-            toast.error('Network error during publish')
+        } catch (error: any) {
+            toast.error(error.message || 'Network error during publish')
         } finally {
             setIsPublishing(false)
         }
@@ -394,7 +438,7 @@ export default function AIBuilderPage() {
                 {/* Preview content */}
                 <div className="flex-1 overflow-y-auto bg-[#0F172A]">
                     {blocks.length > 0 && theme ? (
-                        <LivePreview blocks={blocks} theme={theme} />
+                        <LivePreview blocks={blocks} theme={theme} onReorder={setBlocks} />
                     ) : isDone && siteId ? (
                         <div className="flex h-full items-center justify-center">
                             <div className="text-center space-y-6">
