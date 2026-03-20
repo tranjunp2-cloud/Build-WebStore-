@@ -131,30 +131,63 @@ jobs:
                 ? story.definitionOfDone.map(d => `- [ ] ${d}`).join('\n')
                 : '- [ ] 9-Point Checklist pass\n- [ ] TypeScript clean (tsc --noEmit)';
 
+              // Build source link (relative to repo, not absolute CI path)
+              const sourceRelative = story.sourceFile.replace(/^.*?(docs\/stories\/)/, '$1');
+              const sourceUrl = `${{ github.server_url }}/${{ github.repository }}/blob/staging/${sourceRelative}`;
+              const prdRelative = story.prdLink ? story.prdLink.replace(/^\.\.\//, 'docs/') : '';
+              const prdUrl = prdRelative ? `${{ github.server_url }}/${{ github.repository }}/blob/staging/${prdRelative}` : '';
+
+              // Build story as readable table
+              const storyLines = (story.storyText || '').split('\n').map(l => l.trim()).filter(Boolean);
+              let storyFormatted = '';
+              for (const line of storyLines) {
+                if (line.startsWith('As a')) storyFormatted += `> **${line}**\n`;
+                else if (line.startsWith('I want')) storyFormatted += `> ${line}\n`;
+                else if (line.startsWith('So that')) storyFormatted += `> _${line}_\n`;
+                else storyFormatted += `> ${line}\n`;
+              }
+              if (!storyFormatted) storyFormatted = '> N/A';
+
+              // Build AC section — preserve full markdown with sub-headings
+              let acFormatted = story.acceptanceCriteria || '_Chưa có AC — cần BA bổ sung._';
+
+              // Build additional criteria
+              const addCriteria = story.additionalCriteria
+                ? `\n### Additional Criteria\n${story.additionalCriteria}\n`
+                : '';
+
+              // Build business value
+              const bizValue = story.businessValue
+                ? `\n### Business Value\n${story.businessValue}\n`
+                : '';
+
               const body = `## ${story.storyId}: ${story.title}
-            **Wave ${story.wave}** | **${story.priority}** | **${story.size}** | Feature: ${story.featureId}
 
-            ### Story
-            \`\`\`
-            ${story.storyText || 'N/A'}
-            \`\`\`
+| Wave | Priority | Size | Feature |
+|:----:|:--------:|:----:|:-------:|
+| ${story.wave} | ${story.priority} | ${story.size} | ${story.featureId} |
 
-            ### Acceptance Criteria
-            \`\`\`gherkin
-            ${story.acceptanceCriteria || 'N/A'}
-            \`\`\`
+---
 
-            ${story.marketNotes ? `### MY Market Notes\n${story.marketNotes}\n` : ''}
-            ### Definition of Done
-            ${dodChecklist}
+### 📖 Story
+${storyFormatted}
+${bizValue}
+### ✅ Acceptance Criteria
+${acFormatted}
+${addCriteria}
+${story.marketNotes ? `### 🇲🇾 MY Market Notes\n${story.marketNotes}\n` : ''}
+### 🏁 Definition of Done
+${dodChecklist}
 
-            ### References
-            - PRD: ${story.prdLink || 'N/A'}
-            - Source: \`${story.sourceFile}\`
-            - SPEC.md §6
+### 📎 References
+| Doc | Link |
+|-----|------|
+| PRD | ${prdUrl ? `[${prdRelative}](${prdUrl})` : 'N/A'} |
+| Story source | [${sourceRelative}](${sourceUrl}) |
+| Spec | SPEC.md §6 |
 
-            ---
-            _Auto-synced by [Story Sync](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`;
+---
+_Auto-synced by [Story Sync](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`;
 
               // Build labels
               const labels = ['user-story'];
