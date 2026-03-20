@@ -386,3 +386,4 @@ THEN  the wide matrix table is transformed into a vertical Accordion list
 - [ ] Ensure that deeply nested inputs (like 3-level categories or variant inputs) do not cause horizontal scrolling on 320px screens.
 
 
+
