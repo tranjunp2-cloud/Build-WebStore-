@@ -1,13 +1,14 @@
 ## Story
 
-- **Closes:** #<!-- ⚠️ BẮT BUỘC: Điền issue number! VD: Closes #123. Bot sẽ warn nếu thiếu. -->
+- **Issue:** #<!-- Bot sẽ tự tìm và link issue. Hoặc điền thủ công: Relates to #123 -->
 - **Mô tả ngắn:** [1–2 câu: feature/fix này làm gì, cho ai]
 
 <!-- 💡 Cách tìm issue number:
      1. Vào tab Issues → tìm user story liên quan
      2. Copy số issue (VD: #123)
-     3. Điền ở trên: Closes #123
-     Keyword hợp lệ: Closes, Fixes, Resolves (GitHub tự đóng issue khi PR merged)
+     3. Điền ở trên: Relates to #123
+     ⚠️ KHÔNG dùng "Closes #N" — Issue chỉ close khi QC test pass.
+     Bot sẽ tự link nếu PR title có [US-F01-03] hoặc branch có F01.
      Nếu PR không liên quan issue nào (chore/docs), bỏ trống — bot sẽ skip check.
 -->
 
