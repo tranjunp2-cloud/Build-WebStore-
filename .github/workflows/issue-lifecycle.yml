@@ -186,7 +186,7 @@ jobs:
               return;
             }
 
-            // ── Handle qa:failed: re-assign dev + comment ──
+            // ── Handle qa:failed: re-assign dev + auto bug report template ──
             if (label === 'qa:failed') {
               // Remove qa:pending if present
               try {
@@ -197,12 +197,86 @@ jobs:
                 });
               } catch (e) { /* label might not exist */ }
 
+              // Find linked PRs for context
+              const timeline = await github.rest.issues.listEventsForTimeline({
+                owner, repo,
+                issue_number: issue.number,
+                per_page: 50,
+              });
+              const linkedPRs = timeline.data
+                .filter(e => e.event === 'cross-referenced' && e.source?.issue?.pull_request)
+                .map(e => `#${e.source.issue.number}`)
+                .slice(-3);
+              const prContext = linkedPRs.length > 0
+                ? `PRs liên quan: ${linkedPRs.join(', ')}`
+                : 'Không tìm thấy PR liên quan';
+
+              // Find dev assignee
+              const devAssignee = issue.assignees?.length > 0
+                ? issue.assignees.map(a => `@${a.login}`).join(', ')
+                : '_chưa assign_';
+
+              // Extract AC summary from issue body (first 3 GIVEN/WHEN/THEN)
+              const bodyText = issue.body || '';
+              const acMatch = bodyText.match(/```gherkin\n([\s\S]*?)```/);
+              const acPreview = acMatch
+                ? acMatch[1].trim().split('\n').slice(0, 4).join('\n')
+                : '_không tìm thấy AC_';
+
+              // Build structured bug report template
+              const bugTemplate = [
+                '## 🔴 QA Failed — Bug Report',
+                '',
+                `**Issue:** #${issue.number} — ${issue.title}`,
+                `**Dev:** ${devAssignee}`,
+                `**${prContext}**`,
+                '',
+                '---',
+                '',
+                '### Mô tả lỗi',
+                '<!-- QC: Mô tả ngắn gọn bug ở đây -->',
+                '',
+                '',
+                '',
+                '### Steps to Reproduce',
+                '1. Vào trang: `https://staging.echprime.com/...`',
+                '2. Thao tác: ...',
+                '3. Kết quả lỗi: ...',
+                '',
+                '### Expected vs Actual',
+                '| | Mô tả |',
+                '|---|---|',
+                '| **Expected** | <!-- Mong đợi gì --> |',
+                '| **Actual** | <!-- Thực tế xảy ra gì --> |',
+                '',
+                '### Mức độ',
+                '- [ ] 🔴 Critical — Không dùng được feature',
+                '- [ ] 🟠 Major — Feature hoạt động sai',
+                '- [ ] 🟡 Minor — Lỗi nhỏ, không ảnh hưởng flow chính',
+                '- [ ] ⚪ Cosmetic — UI/text sai',
+                '',
+                '### Screenshot / Video',
+                '<!-- Kéo thả ảnh/video vào đây -->',
+                '',
+                '---',
+                '',
+                '<details><summary>📋 AC liên quan (reference)</summary>',
+                '',
+                '```gherkin',
+                acPreview,
+                '```',
+                '',
+                '</details>',
+                '',
+                '> 💡 **Dev:** fix xong tạo PR mới → merge → issue tự chuyển lại QA Testing.',
+              ].join('\n');
+
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,
-                body: `🔴 **QA Failed** — trả về dev fix.\n\n> Dev: check comment của QC bên trên, fix rồi tạo PR mới.`,
+                body: bugTemplate,
               });
-              console.log(`Issue #${issue.number} → QA Failed → re-assign dev`);
+              console.log(`Issue #${issue.number} → QA Failed → bug report template posted`);
             }
 
             // ── Handle review:rejected: notify PM ──
