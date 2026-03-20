@@ -107,7 +107,7 @@ Repo dùng **Commitlint + Husky** để chặn commit không đúng format (ch�
 
 - **Title:** Theo Conventional Commits. Nên có story ID: `feat(F01): [US-F01-03] AI template selection`
 - **Description:** Điền đủ [template](.github/PULL_REQUEST_TEMPLATE.md) (Story, Changes, Checklist, Test steps).
-- **Issue link:** `Closes #<số>` trong PR description (**bắt buộc** cho feature/fix).
+- **Issue link:** `Relates to #<số>` trong PR description (**bắt buộc** cho feature/fix). ⚠️ KHÔNG dùng `Closes #`.
 - **Review:** ≥ 1 approval.
 - **CI:** Toàn bộ status check pass (lint, typecheck, test, build).
 - **Branch:** Cập nhật với base (rebase hoặc merge base vào branch).
@@ -361,8 +361,8 @@ git push -u origin feature/F01-ai-builder
 
 Trên GitHub: Compare & pull request:
 1. **Title:** `feat(F01): [US-F01-03] AI template selection` — có `[US-F01-03]` để bot auto-link
-2. **Description:** Điền template — bot tự điền `Closes #<số>` nếu match
-3. Assign reviewer → đợi CI + approval
+2. **Description:** Điền template — bot tự điền `Relates to #<số>` nếu match
+3. Assign reviewer → đợi CI + approval → merge khi có `ready-to-merge`
 
 > Bot sẽ auto-link issue nếu title có story ID. Nếu không match, bot comment gợi ý issues để chọn.
 
@@ -378,7 +378,7 @@ git push origin feature/F01-ai-builder
 
 **Bước 6 — Sau khi merge PR**
 
-Xóa branch (trên GitHub hoặc `git branch -d ...` và `git push origin --delete ...`).
+Issue tự chuyển **QA Testing**. QC test trên staging → pass thì close issue → **Done**. Xóa branch.
 
 ---
 
