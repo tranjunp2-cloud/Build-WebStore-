@@ -134,6 +134,18 @@
             "cta": "Mula Sekarang →",
             "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia"
         },
+        "forgotPassword": {
+            "subject": "Tetapkan semula kata laluan PrimeWeb anda 🔐",
+            "heading": "Tetapan Semula Kata Laluan",
+            "subheading": "Kami menerima permintaan tetapan semula anda",
+            "greeting": "Hai",
+            "body": "Kami menerima permintaan untuk menetapkan semula kata laluan akaun PrimeWeb anda. Klik butang di bawah untuk menetapkan kata laluan baharu. Pautan ini akan tamat tempoh dalam 1 jam.",
+            "cta": "Tetapkan Semula Kata Laluan →",
+            "fallback": "Jika butang tidak berfungsi, salin dan tampal pautan ini ke pelayar anda:",
+            "expiry": "Pautan ini tamat tempoh dalam 1 jam. Jika anda tidak meminta ini, abaikan e-mel ini.",
+            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
+            "ignore": "Jika anda tidak meminta tetapan semula kata laluan, tiada tindakan diperlukan."
+        },
         "order": {
             "subject": "Pesanan Disahkan",
             "heading": "Pesanan Disahkan ✓",
