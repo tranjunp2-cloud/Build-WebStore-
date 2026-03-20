@@ -1,6 +1,7 @@
 import type { CollectionConfig, CollectionAfterChangeHook } from 'payload'
 import { sendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
+import { forgotPasswordEmail } from '@/lib/email/templates/forgot-password'
 
 /**
  * afterChange hook: send Welcome email to new users.
@@ -22,7 +23,22 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
 
 export const Users: CollectionConfig = {
     slug: 'users',
-    auth: true,
+    auth: {
+        forgotPassword: {
+            generateEmailHTML: (args) => {
+                const token = args?.token || ''
+                const user = args?.user || {}
+                const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
+                const resetUrl = `${serverUrl}/reset-password?token=${token}`
+                const userName = user.firstName || user.email?.split('@')[0] || 'there'
+                const { html } = forgotPasswordEmail({ userName, resetUrl })
+                return html
+            },
+            generateEmailSubject: () => {
+                return 'Reset your PrimeWeb password \uD83D\uDD10'
+            },
+        },
+    },
     admin: {
         useAsTitle: 'email',
         description: 'Platform users — can be super-admins or tenant members.',

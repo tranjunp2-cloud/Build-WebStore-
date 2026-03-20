@@ -134,6 +134,18 @@
             "cta": "Get Started →",
             "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
         },
+        "forgotPassword": {
+            "subject": "Reset your PrimeWeb password 🔐",
+            "heading": "Password Reset",
+            "subheading": "We received your reset request",
+            "greeting": "Hi",
+            "body": "We received a request to reset the password for your PrimeWeb account. Click the button below to set a new password. This link will expire in 1 hour.",
+            "cta": "Reset Password →",
+            "fallback": "If the button doesn't work, copy and paste this link into your browser:",
+            "expiry": "This link expires in 1 hour. If you didn't request this, you can safely ignore this email.",
+            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
+            "ignore": "If you didn't request a password reset, no action is needed."
+        },
         "order": {
             "subject": "Order Confirmed",
             "heading": "Order Confirmed ✓",
