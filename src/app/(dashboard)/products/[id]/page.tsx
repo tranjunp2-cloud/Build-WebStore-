@@ -147,7 +147,7 @@ export default function ProductEditPage() {
                 setSuccess(true)
                 toast.success(isNew ? 'Product created!' : 'Product updated!')
                 setTimeout(() => {
-                    router.push('/dashboard/products')
+                    router.push('/products')
                 }, 1000)
             } else {
                 const data = await res.json()
@@ -239,7 +239,7 @@ export default function ProductEditPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Link href="/dashboard/products"
+                    <Link href="/products"
                         aria-label="Back to products"
                         className="rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                         <ArrowLeft className="h-4 w-4" />

@@ -23,16 +23,15 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { label: 'My Sites', href: '/dashboard/sites', icon: Globe },
-    { label: 'Templates', href: '/templates', icon: LayoutTemplate },
+    { label: 'My Sites', href: '/sites', icon: Globe },
     { label: 'SEO', href: '/dashboard/seo', icon: Search },
-    { label: 'Products', href: '/dashboard/products', icon: ShoppingBag },
-    { label: 'Orders', href: '/dashboard/orders', icon: ClipboardList },
-    { label: 'Blog', href: '/dashboard/blog', icon: FileText },
+    { label: 'Products', href: '/products', icon: ShoppingBag },
+    { label: 'Orders', href: '/orders', icon: ClipboardList },
+    { label: 'Blog', href: '/blog', icon: FileText },
     { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
-    { label: 'Media', href: '/dashboard/media', icon: Image },
-    { label: 'Settings', href: '/dashboard/settings', icon: Settings },
-]
+    { label: 'Media', href: '/media', icon: Image },
+    { label: 'Settings', href: '/settings', icon: Settings },
+  ]
 
 type SidebarProps = {
     userName: string

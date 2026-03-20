@@ -9,6 +9,7 @@
 > **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
 > Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
 
+
 ---
 
 ## 0. Story Traceability
@@ -16,6 +17,7 @@
 | Story ID | Title | File | Status |
 |----------|-------|------|--------|
 | US-F11-01 | Undo / Redo All Changes Including AI | [F11-undo-redo-stories.md](../stories/F11-undo-redo-stories.md) | Draft |
+| US-F11-02 | Mobile Web UX — Touch-Accessible Undo/Redo | [F11-undo-redo-stories.md](../stories/F11-undo-redo-stories.md) | Ready |
 
 ---
 
@@ -86,6 +88,8 @@ SO THAT tôi experiment thoải mái mà không sợ break store
 | FR-05 | Max 50 history states — oldest dropped khi new change added | US-F11-01 | P0 | |
 | FR-06 | AI generation (toàn bộ) = 1 single undoable action | US-F11-01 | P0 | |
 | FR-07 | History cleared on page refresh | US-F11-01 | P0 | Session only |
+| FR-08 | **[Mobile]** Đảm bảo Undo/Redo có nút luôn nổi (pinned) trên màn hình vì không có keyboard shortcut. Nút chạm > 44px. | US-F11-02 | P1 | Touch usability |
+| FR-09 | **[Mobile]** Tính năng Haptic Feedback (nếu browser hỗ trợ) khi thực hiện Undo/Redo trên mobile. | US-F11-02 | P2 | Micro-interactions |
 
 ---
 
@@ -112,6 +116,46 @@ Ctrl+Y
   → redoStack.pop() → apply changes
   → undoStack.push(action)
 ```
+
+---
+
+## 10. Screen Layout
+
+> **[Global CMS Constraint]** Tính năng Undo/Redo này là một công cụ tích hợp, nó nằm trên Top Header (Toolbar) của F05 AI Editor.
+
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình chính (Undo/Redo Toolbar Buttons)
+- **Mô tả:** Cụm nút thao tác (Ctrl+Z/Ctrl+Y) nằm sát nhau trên Editor Toolbar.
+- **Components chính:**
+  - Undo Button: Biểu tượng mũi tên vòng trái ↩. Nếu có stack, kèm theo con số badge nhỏ: "Undo (3)". Khi di chuột qua, hiển thị tooltip Text Title của action gần nhất.
+  - Redo Button: Biểu tượng mũi tên vòng phải ↪. Nếu có stack redo, kèm theo badge số lượng.
+- **Wireframe:**
+```text
+┌────────────────────────────────────────────────────────┐
+│ [≡ Menu]  [ Pages ▼ ]  [ Theme 🎨 ]     [↩ Undo (3)] [↪]│
+└────────────────────────────────────────────────────────┘
+  *Tooltip khi hover ↩:* "Undo: Đổi màu nền thành Xanh"
+```
+
+### 10.2. Mobile View (Undo/Redo Stack)
+- **Mô tả:** Nút Undo/Redo trên Mobile Editor được thu lại thành Icon và nhét khéo vào Toolbar phụ phía dưới cùng màn hình (dưới cả content preview).
+- **Wireframe:**
+```text
+┌─ Mobile AI Editor ──────────────────────────┐
+│ [≡] Website             [Preview][Publish]  │
+│ ─────────────────────────────────────────── │
+│ [ Preview Nội dung web đang edit... ]       │
+│                                             │
+│ ─────────────────────────────────────────── │
+│ [↩ Undo]   [↪ Redo]   [+] Add Block   [⚙]  │
+└─────────────────────────────────────────────┘
+```
+
+### 10.3. Các trạng thái UI (UI States) & Modals
+- **Empty State:** Khi không có lịch sử (Mới mở site, hoặc vừa Save), Nút Undo/Redo bị đổi sang màu Xám nhạt (Disabled), không có con trỏ pointer, và ẩn badge số đi.
+- **Success State:** Khi bấm hoạt động, phát một tiếng *bop* (optional sound UX) hoặc Toast nổi nhanh "Đã Undo: [Change Text]".
+- **Modals:** (Không có Modal).
 
 ---
 

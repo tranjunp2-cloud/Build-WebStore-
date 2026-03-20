@@ -66,13 +66,13 @@
 | Step | Action | Expected |
 |---|---|---|
 | 1 | Check sidebar links | Dashboard, My Sites, Templates, SEO, Products, Orders, Analytics, Media, Settings |
-| 2 | Click "My Sites" | Navigate /dashboard/sites |
+| 2 | Click "My Sites" | Navigate /sites |
 | 3 | Click "Templates" | Navigate /templates |
-| 4 | Click "Products" | Navigate /dashboard/products |
-| 5 | Click "Orders" | Navigate /dashboard/orders |
+| 4 | Click "Products" | Navigate /products |
+| 5 | Click "Orders" | Navigate /orders |
 | 6 | Click "Analytics" | Navigate /dashboard/analytics |
-| 7 | Click "Media" | Navigate /dashboard/media |
-| 8 | Click "Settings" | Navigate /dashboard/settings |
+| 7 | Click "Media" | Navigate /media |
+| 8 | Click "Settings" | Navigate /settings |
 | 9 | Click "SEO" | Navigate /dashboard/seo |
 
 **Result:** ⬜
@@ -102,7 +102,7 @@
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | Mở /dashboard/sites | Hiện danh sách sites |
+| 1 | Mở /sites | Hiện danh sách sites |
 | 2 | Check mỗi site card | Tên, status badge, type badge, last edited |
 | 3 | Click Edit | Navigate /editor/:siteId |
 | 4 | Click Preview | Mở site public /sites/:slug |
@@ -118,7 +118,7 @@
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | Mở /dashboard/media | Hiện media grid hoặc empty state |
+| 1 | Mở /media | Hiện media grid hoặc empty state |
 | 2 | Click "Upload" | Mở file picker |
 | 3 | Chọn 1 ảnh | Upload thành công, ảnh hiện trong grid |
 | 4 | Click vào ảnh | Hiện detail modal (preview, alt text, URL) |
@@ -137,7 +137,7 @@
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | Mở /dashboard/settings | Hiện profile section |
+| 1 | Mở /settings | Hiện profile section |
 | 2 | Check fields | Name (editable), Email (read-only), Role badge |
 | 3 | Đổi tên → Click Save | Toast "Profile updated" |
 | 4 | Scroll xuống Change Password | Hiện 3 fields: current, new, confirm |

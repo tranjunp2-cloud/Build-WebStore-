@@ -1,7 +1,22 @@
-import type { CollectionConfig, Where } from 'payload'
+import type { CollectionConfig, Where, CollectionAfterChangeHook } from 'payload'
+import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
+
+const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation }) => {
+    const isPublishingUpdate = operation === 'update' && doc.status === 'active' && previousDoc?.status !== 'active'
+    const isActiveCreate = operation === 'create' && doc.status === 'active'
+
+    // Wait until it becomes active and seo title is empty
+    if ((isPublishingUpdate || isActiveCreate) && !doc.seo?.title) {
+        // Trigger background generation
+        queueSEOAutoGeneration('products', doc.id, typeof doc.site === 'object' ? doc.site.id : doc.site, doc.name, doc.shortDescription)
+    }
+}
 
 export const Products: CollectionConfig = {
     slug: 'products',
+    hooks: {
+        afterChange: [afterChangeHook],
+    },
     admin: {
         useAsTitle: 'name',
         description: 'Products belong to a site and can be listed in the storefront.',

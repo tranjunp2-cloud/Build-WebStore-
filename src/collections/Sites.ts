@@ -193,6 +193,18 @@ export const Sites: CollectionConfig = {
                     name: 'googleVerificationToken',
                     type: 'text',
                 },
+                {
+                    name: 'trackedKeywords',
+                    type: 'array',
+                    maxRows: 5,
+                    admin: { description: 'Track up to 5 core keywords for SEO ranking' },
+                    fields: [
+                        { name: 'keyword', type: 'text', required: true },
+                        { name: 'currentRank', type: 'number' },
+                        { name: 'previousRank', type: 'number' },
+                        { name: 'lastCheckedAt', type: 'date' },
+                    ],
+                },
             ],
         },
         {

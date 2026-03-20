@@ -14,6 +14,7 @@
 > F14 chưa có Story file riêng. Checkout shipping (WestMY/EastMY) được derived từ US-F14-03.
 > **Action required:** Tạo `F12-shipping-stories.md` trước Wave 6 development.
 
+
 ---
 
 ## 0. Story Traceability
@@ -81,7 +82,7 @@ I WANT thấy shipping cost trước khi thanh toán
 SO THAT tôi biết tổng tiền thực sự phải trả
 ```
 
-> Source: [US-F14-03](../stories/F09-storefront-stories.md#us-f10-03)
+> Source: [US-F14-01](../stories/F14-shipping-stories.md)
 
 ---
 
@@ -89,13 +90,14 @@ SO THAT tôi biết tổng tiền thực sự phải trả
 
 | FR-ID | Requirement | Story Ref | Priority | Notes |
 |-------|-------------|-----------|----------|-------|
-| FR-01 | State dropdown: 16 Malaysian states + territories | US-F14-03 | P0 | |
-| FR-02 | Shipping auto-calculate: West MY = RM 8, East MY = RM 15 | US-F14-03 | P0 | |
-| FR-03 | Order summary: Subtotal + Shipping + SST = Total | US-F14-03 | P0 | |
-| FR-04 | Free shipping khi subtotal ≥ threshold | *(Pending)* | P1 | Seller configurable |
-| FR-05 | "Add RM X more for free shipping" hint | *(Pending)* | P1 | |
-| FR-06 | Seller Settings: customize West/East rates, free threshold | *(Pending)* | P0 | |
-| FR-07 | Seller Settings: estimated delivery days per region | *(Pending)* | P1 | |
+| FR-01 | State dropdown: 16 Malaysian states + territories | US-F14-01 | P0 | |
+| FR-02 | Shipping auto-calculate: West MY = RM 8, East MY = RM 15 | US-F14-01 | P0 | |
+| FR-03 | Order summary: Subtotal + Shipping + SST = Total | US-F14-01 | P0 | |
+| FR-04 | Free shipping khi subtotal ≥ threshold | US-F14-02 | P1 | Seller configurable |
+| FR-05 | "Add RM X more for free shipping" hint | US-F14-01 | P1 | |
+| FR-06 | Seller Settings: customize West/East rates, free threshold | US-F14-02 | P0 | |
+| FR-07 | Seller Settings: estimated delivery days per region | US-F14-02 | P1 | |
+| FR-08 | **[Mobile]** Khung Form địa chỉ trên điện thoại sử dụng Numpad (`inputmode="numeric"`) cho postcode number, form fields full-width. | US-F14-03 | P1 | UX Form |
 
 ---
 
@@ -132,19 +134,18 @@ Checkout form → type address
 
 ## 10. Screen Layout
 
-```
-Checkout (/sites/[slug]/checkout):
-┌─ Shipping ─────────────────────────────┐
-│  [Address Line 1*     ]                │
-│  [City*   ] [Postcode*]                │
-│  [State ▼ — 16 states]                 │
-│                                         │
-│  📦 Standard Delivery — RM 8.00        │
-│     Est. 3-5 business days             │
-│     (Sabah/Sarawak: RM 15, 5-7 days)  │
-└────────────────────────────────────────┘
+> **[Global CMS Constraint]** Cấu hình Shipping được hiển thị trong trang Settings của CMS Dashboard (F18 Layout), trong khi thông tin tính toán Shipping được đặt trong luồng Checkout Storefront (F09).
 
-Settings (/dashboard/settings/shipping):
+> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+
+### 10.1. Màn hình Cấu hình Shipping (CMS Dashboard)
+- **Mô tả:** Màn hình do người bán thiết lập mức phí vận chuyển.
+- **Components chính:**
+  - Card: Các Vùng Địa Lý (Semenanjung, Sabah/Sarawak). Field cho Giá Vận Chuyển.
+  - Tích chọn: Enable Free Shipping Threshold và điền Amount.
+- **Wireframe:**
+```text
+Settings (/settings/shipping):
 ┌──────────────────────────────────────┐
 │  Semenanjung (West):  [RM 8  ]       │
 │  Sabah & Sarawak:     [RM 15 ]       │
@@ -154,14 +155,57 @@ Settings (/dashboard/settings/shipping):
 └──────────────────────────────────────┘
 ```
 
+### 10.2. Màn hình Tính phí Shipping Checkout (Storefront)
+- **Mô tả:** Phần điền địa chỉ để tính phí tự động.
+- **Components chính:**
+  - Form nhập: Điền State (16 Vùng).
+  - Tự động nhảy text "Standard Delivery – RM X.00".
+- **Wireframe:**
+```text
+Checkout (/sites/[slug]/checkout):
+┌─ Shipping ─────────────────────────────┐
+│  [Address Line 1*     ]                │
+│  [City*   ] [Postcode*]                │
+│  [State ▼ — 16 states]                 │
+│                                         │
+│  📦 Standard Delivery — RM 8.00        │
+│     Est. 3-5 business days             │
+│     (Sabah/Sarawak: RM 15, 5-7 days)  │
+│                                         │
+│  ✨ Add RM 20.00 more to unlock        │
+│     FREE Shipping!                     │
+└────────────────────────────────────────┘
+```
+
+### 10.3. Mobile View (Shipping Configuration & Checkout)
+- **Mô tả:** Hiển thị cấu hình vận chuyển thu gọn trên Settings CMS của Mobile, và khối chọn State trong Form Checkout của Mobile Storefront.
+- **Wireframe:**
+```text
+┌─ Mobile Settings: Shipping ─────────────────┐
+│ [←] Back         [Save]                     │
+│ ─────────────────────────────────────────── │
+│ 📦 STANDARD DELIVERY                        │
+│ Semenanjung:     [RM 8  ]                   │
+│ Sabah/Sarawak:   [RM 15 ]                   │
+│                                             │
+│ 🎁 CẤU HÌNH FREE SHIPPING                   │
+│ Free shipping từ [RM 150]                   │
+│ [ON] Kích hoạt Free Shipping                │
+└─────────────────────────────────────────────┘
+```
+
+### 10.4. Các trạng thái UI (UI States) & Modals
+- **Loading State:** Text Shipping mờ nhẹ hoặc hiện vòng quay Spinner mỗi khi User Trigger đổi giá trị ô State (debounced).
+- **Error State / Edge Cases:** Nếu nhập thiếu Postal Code, ô input highlight viền Đỏ.
+
 ---
 
 ## 11. Acceptance Criteria
 
-> AC từ US-F14-03. Seller Settings AC pending story.
+> AC từ `F14-shipping-stories.md`.
 
 ### AC-1: West Malaysia Shipping
-> 📌 Source: [US-F14-03](../stories/F09-storefront-stories.md) — Market Notes
+> 📌 Source: [US-F14-01](../stories/F14-shipping-stories.md) — AC-1
 
 ```gherkin
 GIVEN buyer at checkout selects state = "Selangor"
@@ -171,7 +215,7 @@ THEN  shipping cost shows RM 8.00
 ```
 
 ### AC-2: East Malaysia Shipping
-> 📌 Source: [US-F14-03](../stories/F09-storefront-stories.md) — Market Notes
+> 📌 Source: [US-F14-01](../stories/F14-shipping-stories.md) — AC-2
 
 ```gherkin
 GIVEN buyer selects state = "Sabah" or "Sarawak"
@@ -181,7 +225,7 @@ THEN  shipping cost shows RM 15.00
 ```
 
 ### AC-3: Malaysian States Dropdown
-> 📌 Source: [US-F14-03](../stories/F09-storefront-stories.md) — AC-3
+> 📌 Source: [US-F14-01](../stories/F14-shipping-stories.md) — AC-3
 
 ```gherkin
 GIVEN buyer at checkout address form
@@ -262,7 +306,7 @@ POST /api/orders/calculate-shipping         → returns cost based on state
 
 ## 18. Definition of Ready
 
-- [ ] ⚠️ Story file `F12-shipping-stories.md` created
+- [ ] User Stories F14 approved
 - [ ] F09, F10 done
 - [ ] All 16 MY states list confirmed
 

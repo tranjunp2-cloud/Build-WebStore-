@@ -7,6 +7,30 @@
 
 ---
 
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
+## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
+
+> **Áp dụng cho mọi User Story trong file này.**
+
+```gherkin
+GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
+THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
+  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
+```
+
+---
+
 ## Báo Cáo Phân Tích & Rà Soát Trùng Lặp (BA Analysis)
 
 **1. Kết quả rà soát các feature hiện tại:**
@@ -24,7 +48,7 @@
 
 ## US-F16-01: Notification Center — Unread Badge
 
-**Wave 2** | **P1** | **S** | **Status:** Draft
+**Wave 2** | **P1** | **S** | **Status:** Ready
 
 ### Story
 
@@ -57,11 +81,22 @@ THEN  số lượng trên badge tự động tăng lên 1
 ### Additional Criteria
 - [ ] Số lượng unread count cần lấy từ API gọn nhẹ hoặc Webhook/Socket để tránh lag hệ thống.
 
+### Market Notes
+
+- Badge realtime là điều quen thuộc với user MY qua Facebook/Shopee — cần đảm bảo UX tương đương.
+- Polling interval 5s là phù hợp với hạ tầng hiện tại cho thị trường SEA.
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Badge cập nhật đúng khi có notification mới (tested với websocket/polling)
+- [ ] Mobile 375px — badge hiển thị đúng trên mọi screen size
+
 ---
 
 ## US-F16-02: Notification Center — Dropdown List
 
-**Wave 2** | **P1** | **M** | **Status:** Draft
+**Wave 2** | **P1** | **M** | **Status:** Ready
 
 ### Story
 
@@ -93,13 +128,25 @@ THEN  phải thấy các thông tin: Icon phân loại (Ví dụ: Giỏ hàng ch
 
 ### Additional Criteria
 - [ ] Infinite scrolling hoặc nút "Xem tất cả" (View all) ở cuối dropdown để xem danh sách đầy đủ.
-- [ ] Hỗ trợ render an toàn cho Rich Text/HTML nếu là thông báo gửi từ System Admin (F16).
+- [ ] Hỗ trợ render an toàn cho Rich Text/HTML nếu là thông báo gửi từ System Admin (F15).
+
+### Market Notes
+
+- User MY quen với Shopee/TikTok Shop notification style — dropdown cần clean, không rối.
+- Icon phân loại (giỏ hàng vs loa) giúp người dùng tech thấp nhận diện nhanh loại thông báo.
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Dropdown hiển thị đúng sorting Newest First
+- [ ] Visual phân biệt rõ Đã đọc / Chưa đọc được verify bằng QA
+- [ ] Mobile 375px — dropdown responsive thành Bottom Sheet
 
 ---
 
 ## US-F16-03: Notification Center — Actionable Links
 
-**Wave 2** | **P1** | **S** | **Status:** Draft
+**Wave 2** | **P1** | **S** | **Status:** Ready
 
 ### Story
 
@@ -117,7 +164,7 @@ So that hệ thống đánh dấu nó là "Đã đọc" và điều hướng tô
 GIVEN User đang mở Notification drop-down
 WHEN  User click vào thông báo "Đơn hàng mới #1024"
 THEN  thông báo đó tự động chuyển trạng thái thành "Đã đọc" (Unread count giảm 1)
-  AND hệ thống điều hướng (navigate) mở trang /dashboard/orders với drawer số #1024
+  AND hệ thống điều hướng (navigate) mở trang /orders với drawer số #1024
 ```
 
 #### AC-2: Thông báo không có liên kết điều hướng
@@ -129,11 +176,21 @@ THEN  thông báo chuyển thành "Đã đọc"
   AND dropdown được đóng lại (hoặc giữ nguyên tuỳ UX) nhưng không redirect đi đâu
 ```
 
+### Market Notes
+
+- Actionable links giảm số bước từ "nhận thông báo đơn hàng" → "xem chi tiết đơn hàng" — quan trọng với Dropshippers hay check trên mobile.
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Click notification → mark as read + navigate đúng resource (verified với Order #1024)
+- [ ] Thông báo không có link không redirect nhưng vẫn mark as read
+
 ---
 
 ## US-F16-04: Notification Center — Mark All as Read
 
-**Wave 2** | **P2** | **XS** | **Status:** Draft
+**Wave 2** | **P2** | **XS** | **Status:** Ready
 
 ### Story
 
@@ -154,11 +211,21 @@ THEN  tất cả 15 thông báo lập tức chuyển trạng thái visual thành
   AND unread badge trên biểu tượng chuông biến mất (hoặc về 0)
 ```
 
+### Market Notes
+
+- "Mark all as read" là tính năng quen thuộc từ email và Shopee — giảm cognitive load cho user.
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Mark all as read: confirm toàn bộ items đổi visual và badge về 0
+- [ ] Nút disabled khi unreadCount = 0
+
 ---
 
 ## US-F16-05: Notification Center — Global System Broadcasts
 
-**Wave 2** | **P2** | **S** | **Status:** Draft
+**Wave 2** | **P2** | **S** | **Status:** Ready
 
 ### Story
 
@@ -179,11 +246,21 @@ THEN  họ sẽ nhận được 1 thông báo vào Notification Center (kèm unr
   AND thông báo có tag/icon riêng biệt (System/Announcement)
 ```
 
+### Market Notes
+
+- Global announcements từ Platform (lịch bảo trì, tính năng mới) là kênh quan trọng với SME MY đang dùng trial hoặc gói thấp.
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Global broadcast từ Admin xuất hiện trong Notification Center của Owner với tag/icon riêng
+- [ ] Tested integration với F15 Admin Broadcast
+
 ---
 
 ## US-F16-06: Notification Center — Live In-app Popup
 
-**Wave 2** | **P1** | **S** | **Status:** Draft
+**Wave 2** | **P1** | **S** | **Status:** Ready
 
 ### Story
 
@@ -214,14 +291,25 @@ THEN  chấm đỏ (badge) ở chuông thông báo tự động tăng lên 1 đ�
 ```
 
 ### Additional Criteria
-- [ ] Không spam: Nếu có quá trình tao ra nhiều item cùng lúc, popup có thể gom nhóm (VD: "Có 5 đơn hàng mới trong 1 phút vừa qua").
+- [ ] Không spam: Nếu có quá trình tạo ra nhiều item cùng lúc, popup có thể gom nhóm (VD: "Có 5 đơn hàng mới trong 1 phút vừa qua").
 - [ ] UI/UX không che chắn các nút chức năng chính trên màn hình hiện tại.
+
+### Market Notes
+
+- In-app popup quan trọng với Owner MY thường mở dashboard nhưng đang làm việc khác — cần popup không xâm phạm để không làm gián đoạn.
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Popup xuất hiện đúng vị trí và tự biến mất sau 5-7 giây
+- [ ] Popup không che khuất navigation hoặc primary action buttons
+- [ ] Badge tăng đồng thời khi popup xuất hiện
 
 ---
 
 ## US-F16-07: Notification Center — Browser Push Notifications
 
-**Wave 2** | **P2** | **M** | **Status:** Draft
+**Wave 2** | **P2** | **M** | **Status:** Ready
 
 ### Story
 
@@ -257,7 +345,55 @@ THEN  một Native Push Notification của hệ điều hành Desktop xuất hi�
 - [ ] Bổ sung khu vực Toggles trong User Profile / Settings -> Notification Preferences để User tuỳ chỉnh bật/tắt nhận Browser Push.
 - [ ] Công nghệ sử dụng: Web Push API (Service Worker) hoặc Firebase Cloud Messaging (FCM).
 
+### Market Notes
+
+- Desktop Push ít phổ biến hơn ở MY do user thường dùng mobile — tính năng này là P2, không block launch.
+- Safari Desktop (iOS 16.4+) mới hỗ trợ Web Push — cần test đặc biệt với Safari version cũ.
+
 ### Open Questions & Assumptions
 - **Q:** Chúng ta có cần filter (Lọc theo Order, Lọc theo System) ngay trong Dropdown không? -> *Đề xuất tạm thời chỉ gom chung, tính năng Filter sẽ cho vào trang `View All Notifications`.*
 - **Assumption:** Việc đẩy realtime thông báo sẽ sử dụng cơ chế có sẵn của frontend polling (5s/lần) hoặc websocket nếu hạ tầng đã sẵn sàng. Dành riêng cho US-F16-07 (Browser Push) bắt buộc cần Service Worker / FCM.
 - **Roles:** Cả Owner và Nhân viên đều thấy chung thông báo hệ thống, NHƯNG chỉ thấy thông báo đơn hàng nếu họ có quyền xem đơn hàng (Role-based access).
+
+### Definition of Done
+
+- [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
+- [ ] Browser Push opt-in flow tested trên Chrome, Firefox, Edge
+- [ ] Safari Desktop tested (iOS 16.4+)
+- [ ] Settings toggle bật/tắt Browser Push hoạt động và persist
+
+---
+
+## US-F16-08: Mobile Web UX — Touch-friendly Notification Hub
+
+**Wave 2** | **P1** | **S** | **Status:** Ready
+
+### Story
+
+```
+As a   mobile user (Owner / Employee)
+I want the notification list to be easy to read and tap on my phone
+So that I don't misclick on tiny notification dropdowns
+```
+
+### Acceptance Criteria
+
+#### AC-1: Full-Screen or Bottom Sheet Hub
+
+```gherkin
+GIVEN a user is on a mobile device (< 768px)
+WHEN  they tap the Notification Bell icon
+THEN  instead of a floating dropdown, a Full-Screen Drawer or Bottom Sheet opens up
+  AND the notification items are rendered with large touch targets (≥ 44px height)
+```
+
+#### AC-2: Prominent "Mark All as Read"
+
+```gherkin
+GIVEN the mobile notification drawer is open
+WHEN  the user wants to clear their notifications
+THEN  the "Mark all as read" button is prominently displayed at the top or bottom sticky bar, making it easy to tap with one thumb
+```
+
+### Definition of Done
+- [ ] 9-Point Checklist pass for mobile mode.
