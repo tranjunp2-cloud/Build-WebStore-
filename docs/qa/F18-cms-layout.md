@@ -1,5 +1,5 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F18 - CMS Core Layout & Navigation
-> **Phiên bản:** 2.2 (25-Case Cập nhật AC Mới BA-QC-Design) | **Cập nhật:** 2026-03-20 | **Thực hiện:** QA Team (Antigravity QC)
+> **Phiên bản:** 3.0 (29-Case Final - Zero Bug Tolerance) | **Cập nhật:** 2026-03-20 | **Thực hiện:** QA Team (Antigravity QC)
 > **Nguồn Tham chiếu:** PRD (`F18-cms-layout.md`), User Stories (3 US chính)
 > **Kỹ năng ứng dụng (.agent):** UI/UX Boundary Check, Mobile Touch Validation, i18n Localization Testing, Performance SLA Metrics.
 
@@ -55,6 +55,11 @@ Bộ test đặc biệt nhấn mạnh vào **trải nghiệm Mobile (Hamburger D
 | **TC-F18.18** | `Sec`  | `Header` | **[Negative]** XSS Injection vào Vùng Cảnh Báo Avatar Name | **1.** Cho User tên là dài có bọc `<script>alert('idor')</script>`. | **EXPECTED** Khung Avatar Header Ráp Hàm Sanitize Html Cắt Mã Nóng Độc Quyền, Chỉ Hiện Nguyên Bản Chữ PlainText. Thắt Nút Sập DOM CMS. | Blocker | [x] |
 | **TC-F18.19** | `Perf` | `Load`   | **[Negative]** Giới hạn Bơm Nhồi DOM (Sidebar React Rerender Load Testing) | **1.** Run Script k6 bắn Click liên thanh vào 5 Sidebar Menu Items (200 clicks/min). | Khung Giao Diện Được Sử Dụng `React.memo` Và Không Bị Bào Lấy RAM, Khóa Bug Lỏng State Gây Unmount Component Con Layout Áp Đảo Trình Duyệt. Trả mượt Web Vitals. | High | [ ] |
 | **TC-F18.20** | `UX`   | `A11y`   | **[Positive]** Phóng To Giao Diện Lên Cỡ Đại (Zoom 200%) | **1.** Nhấn `Ctrl +` zoom 200%. Tắt Thu Phóng. | Dính Khớp Cấp Khống UI Accessbility Màn WCAG Lõi: Không Vỡ Tràn Header Box, Cột Chữ Sidebar Chữ Mèo Co Túm Nhưng Quả Nút Kế Đăng Xuất Vẫn Hiện Dễ Thấy. | Medium | [ ] |
+| **[DEEP BUGS & ARCHITECTURE - BỔ SUNG AUDIT CUỐI]** |
+| **TC-F18.26** | `Sec`  | `RBAC`   | **[Negative]** Ẩn Menu Cứng Dựa Vào Phân Quyền Giả (Role Override) | **1.** Đăng nhập tài khoản Staff thấp (Không có quyền Store Config).<br>**2.** F12 sửa config ráng gọi API. | **EXPECTED** Sidebar NGAY TỪ ĐẦU KHÔNG THỀ render ra chữ "Store Config". UI Auth-Guard chặn đứng, nếu gõ thẳng URL ra màn 403 thay vì sập Layout. | Blocker | [x] |
+| **TC-F18.27** | `Logic`| `Router` | **[Boundary]** Mất Dấu Đồng Bộ Active State Khi Dùng Browser Back/Forward | **1.** Đang ở "Products". Box sáng màu rực.<br>**2.** Nhấn Back của Trình Duyệt lùi về "Dashboard". | URL đổi về `/dashboard` VÀ CÙNG LÚC State sáng đèn Sidebar nhảy tương ứng về Dashboard. Không bị bug "URL 1 đằng, Active Box 1 nẻo". | High | [ ] |
+| **TC-F18.28** | `UI`   | `Layout` | **[Boundary]** Vỡ Khung Avatar Dropdown Bằng Email Cực Dài | **1.** Đổi Email thành chuỗi 100 character: `nguyenthidieulam.marketing.manager.primeweb@domain.com.my`.<br>**2.** Bật Avatar Menu. | Chiều rộng khay Dropdown không bị kéo căng đứt nắp. Email dài tự động bị cắt bằng hàm CSS `text-overflow: ellipsis` (hiển thị... ở cuối). | Medium | [ ] |
+| **TC-F18.29** | `UX`   | `Net`    | **[Negative]** Treo Progress Bar Khi Đứt Mạng / Timeout Giữa Chừng | **1.** Click Menu sang "Orders".<br>**2.** Tắt Network (Chrome Offline) ngay khi Bar Loading chạy được nửa. | **EXPECTED** Progress loading bar (TC-F18.25) KHÔNG BỊ kẹt mãi ở 90%. Trả Toast Error "Network Timeout" và thanh trượt đỏ lên / ẩn đi gỡ kẹt UI cho User rẽ sang module khác. | High | [ ] |
 
 ---
 
