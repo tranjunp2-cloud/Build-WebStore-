@@ -35,6 +35,13 @@ export function I18nProvider({ children, defaultLocale = 'en' }: { children: Rea
         setLocaleState(newLocale)
         localStorage.setItem('primeweb-locale', newLocale)
         document.documentElement.lang = newLocale
+
+        // Sync to backend DB for logged-in users (FR-05)
+        fetch('/api/users/me/preferences', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prefer_lang: newLocale })
+        }).catch(err => console.warn('Failed to sync language', err))
     }, [])
 
     const toggleLocale = useCallback(() => {

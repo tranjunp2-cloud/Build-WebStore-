@@ -5,6 +5,7 @@ import { Menu } from 'lucide-react'
 import { NotificationBell } from './NotificationBell'
 import { UserAvatarMenu } from './UserAvatarMenu'
 
+
 type TopHeaderProps = {
     userName: string
     userInitial: string
@@ -27,10 +28,10 @@ export function TopHeader({ userName, userInitial, sidebarOpen, setSidebarOpen }
 
                 {/* Logo */}
                 <Link href="/dashboard" className="flex items-center gap-3 no-underline outline-none">
-                    <img 
-                        src="/images/logo-icon-3c4d76.png" 
-                        alt="PrimeWeb Logo" 
-                        className="w-[42px] h-[42px] object-contain drop-shadow-[0px_0px_16px_rgba(6,182,212,0.6)]" 
+                    <img
+                        src="/images/logo-icon-3c4d76.png"
+                        alt="PrimeWeb Logo"
+                        className="w-[42px] h-[42px] object-contain drop-shadow-[0px_0px_16px_rgba(6,182,212,0.6)]"
                     />
                     <div className="hidden md:flex items-center text-[24px] font-bold leading-[1.33] tracking-tight">
                         <span className="text-[#F8FAFC]">Prime</span>
@@ -40,6 +41,7 @@ export function TopHeader({ userName, userInitial, sidebarOpen, setSidebarOpen }
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
+
                 <NotificationBell />
                 <UserAvatarMenu userName={userName} userInitial={userInitial} />
             </div>
