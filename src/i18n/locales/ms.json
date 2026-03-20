@@ -11,9 +11,10 @@
         "search": "Cari..."
     },
     "nav": {
-        "features": "Ciri-ciri",
-        "pricing": "Harga",
-        "templates": "Templat"
+        "platform": "Nền tảng",
+        "solutions": "Giải pháp",
+        "features": "Tính năng",
+        "pricing": "Bảng giá"
     },
     "hero": {
         "badge": "Pembina Laman Web Berkuasa AI",
@@ -100,7 +101,11 @@
             "fitness": "💪 Kecergasan",
             "creative": "🎨 Portfolio",
             "business": "🏢 Perniagaan"
-        }
+        },
+        "sort": "Susun mengikut",
+        "sortNewest": "Terbaharu",
+        "sortFeatured": "Pilihan",
+        "sortName": "A-Z"
     },
     "onboarding": {
         "stepLabel": "Langkah",
@@ -114,5 +119,80 @@
         "step2Subtitle": "Pilih titik permulaan — anda boleh menyesuaikan semua nanti.",
         "step3Title": "Sesuaikan laman anda",
         "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda."
+    },
+    "email": {
+        "welcome": {
+            "subject": "Selamat Datang ke PrimeWeb! 🎉",
+            "heading": "Selamat Datang! 🎉",
+            "subheading": "Selamat datang ke PrimeWeb",
+            "greeting": "Hai",
+            "body": "Anda sudah bersedia untuk mencipta laman web pertama anda dengan PrimeWeb! Hanya huraikan idea anda, dan AI akan membantu anda membina laman web profesional dalam beberapa minit.",
+            "stepsTitle": "Mula dalam 3 langkah",
+            "step1": "Huraikan laman web yang anda mahu cipta",
+            "step2": "Sesuaikan kandungan dan reka bentuk",
+            "step3": "Terbitkan dan kongsi!",
+            "cta": "Mula Sekarang →",
+            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia"
+        },
+        "forgotPassword": {
+            "subject": "Tetapkan semula kata laluan PrimeWeb anda 🔐",
+            "heading": "Tetapan Semula Kata Laluan",
+            "subheading": "Kami menerima permintaan tetapan semula anda",
+            "greeting": "Hai",
+            "body": "Kami menerima permintaan untuk menetapkan semula kata laluan akaun PrimeWeb anda. Klik butang di bawah untuk menetapkan kata laluan baharu. Pautan ini akan tamat tempoh dalam 1 jam.",
+            "cta": "Tetapkan Semula Kata Laluan →",
+            "fallback": "Jika butang tidak berfungsi, salin dan tampal pautan ini ke pelayar anda:",
+            "expiry": "Pautan ini tamat tempoh dalam 1 jam. Jika anda tidak meminta ini, abaikan e-mel ini.",
+            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
+            "ignore": "Jika anda tidak meminta tetapan semula kata laluan, tiada tindakan diperlukan."
+        },
+        "otp": {
+            "subject": "Kod pengesahan PrimeWeb anda 🔐",
+            "heading": "Pengesahan E-mel",
+            "subheading": "Sahkan identiti anda untuk meneruskan",
+            "greeting": "Hai",
+            "body": "Masukkan kod ini untuk mengesahkan identiti anda:",
+            "expiry": "Kod ini tamat tempoh dalam 5 minit",
+            "security": "Jika anda tidak meminta kod ini, sila abaikan e-mel ini. Seseorang mungkin telah memasukkan e-mel anda secara tidak sengaja.",
+            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
+            "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
+        },
+        "order": {
+            "subject": "Pesanan Disahkan",
+            "heading": "Pesanan Disahkan ✓",
+            "subheading": "Terima kasih atas pembelian anda!",
+            "greeting": "Hai",
+            "body": "Pesanan anda telah berjaya dibuat.",
+            "orderNumber": "Nombor Pesanan",
+            "item": "Barangan",
+            "qty": "Kuantiti",
+            "amount": "Jumlah",
+            "subtotal": "Jumlah Kecil",
+            "sst": "SST (6%)",
+            "total": "Jumlah Besar",
+            "shippingAddress": "Alamat Penghantaran",
+            "footer": "Dikuasakan oleh PrimeWeb"
+        },
+        "status": {
+            "greeting": "Hai",
+            "orderNumber": "Nombor Pesanan",
+            "tracking": "Penjejakan",
+            "processing": {
+                "title": "Pesanan Sedang Diproses",
+                "description": "Pesanan anda sedang disediakan. Kami akan memaklumkan anda apabila ia telah dihantar."
+            },
+            "shipped": {
+                "title": "Pesanan Telah Dihantar",
+                "description": "Pesanan anda sedang dalam perjalanan. Anda boleh menjejaki penghantaran di bawah."
+            },
+            "delivered": {
+                "title": "Pesanan Telah Dihantar",
+                "description": "Pesanan anda telah dihantar. Terima kasih atas pembelian anda!"
+            },
+            "cancelled": {
+                "title": "Pesanan Dibatalkan",
+                "description": "Pesanan anda telah dibatalkan. Jika ada sebarang pertanyaan, sila hubungi kami."
+            }
+        }
     }
 }

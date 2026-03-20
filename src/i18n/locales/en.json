@@ -11,9 +11,10 @@
         "search": "Search..."
     },
     "nav": {
+        "platform": "Platform",
+        "solutions": "Solutions",
         "features": "Features",
-        "pricing": "Pricing",
-        "templates": "Templates"
+        "pricing": "Pricing"
     },
     "hero": {
         "badge": "AI-Powered Website Builder",
@@ -100,7 +101,11 @@
             "fitness": "💪 Fitness",
             "creative": "🎨 Portfolio",
             "business": "🏢 Business"
-        }
+        },
+        "sort": "Sort by",
+        "sortNewest": "Newest",
+        "sortFeatured": "Featured",
+        "sortName": "A-Z"
     },
     "onboarding": {
         "stepLabel": "Step",
@@ -114,5 +119,80 @@
         "step2Subtitle": "Pick a starting point — you can customize everything later.",
         "step3Title": "Customize your site",
         "step3Subtitle": "Add your brand details to make it yours."
+    },
+    "email": {
+        "welcome": {
+            "subject": "Welcome to PrimeWeb! 🎉",
+            "heading": "Welcome! 🎉",
+            "subheading": "Welcome to PrimeWeb",
+            "greeting": "Hi",
+            "body": "You're ready to create your first website with PrimeWeb! Just describe your idea, and AI will help you build a professional website in minutes.",
+            "stepsTitle": "Get started in 3 steps",
+            "step1": "Describe the website you want to create",
+            "step2": "Customize the content and design",
+            "step3": "Publish and share!",
+            "cta": "Get Started →",
+            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
+        },
+        "forgotPassword": {
+            "subject": "Reset your PrimeWeb password 🔐",
+            "heading": "Password Reset",
+            "subheading": "We received your reset request",
+            "greeting": "Hi",
+            "body": "We received a request to reset the password for your PrimeWeb account. Click the button below to set a new password. This link will expire in 1 hour.",
+            "cta": "Reset Password →",
+            "fallback": "If the button doesn't work, copy and paste this link into your browser:",
+            "expiry": "This link expires in 1 hour. If you didn't request this, you can safely ignore this email.",
+            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
+            "ignore": "If you didn't request a password reset, no action is needed."
+        },
+        "otp": {
+            "subject": "Your PrimeWeb verification code 🔐",
+            "heading": "Email Verification",
+            "subheading": "Verify your identity to continue",
+            "greeting": "Hi",
+            "body": "Enter this code to verify your identity:",
+            "expiry": "This code expires in 5 minutes",
+            "security": "If you didn't request this code, please ignore this email. Someone may have entered your email by mistake.",
+            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
+            "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
+        },
+        "order": {
+            "subject": "Order Confirmed",
+            "heading": "Order Confirmed ✓",
+            "subheading": "Thank you for your purchase!",
+            "greeting": "Hi",
+            "body": "Your order has been placed successfully.",
+            "orderNumber": "Order Number",
+            "item": "Item",
+            "qty": "Qty",
+            "amount": "Amount",
+            "subtotal": "Subtotal",
+            "sst": "SST (6%)",
+            "total": "Total",
+            "shippingAddress": "Shipping Address",
+            "footer": "Powered by PrimeWeb"
+        },
+        "status": {
+            "greeting": "Hi",
+            "orderNumber": "Order Number",
+            "tracking": "Tracking",
+            "processing": {
+                "title": "Order is Processing",
+                "description": "Your order is being prepared. We will notify you when it has been shipped."
+            },
+            "shipped": {
+                "title": "Order Shipped",
+                "description": "Your order is on its way. You can track your shipment below."
+            },
+            "delivered": {
+                "title": "Order Delivered",
+                "description": "Your order has been delivered. Thank you for your purchase!"
+            },
+            "cancelled": {
+                "title": "Order Cancelled",
+                "description": "Your order has been cancelled. If you have any questions, please contact us."
+            }
+        }
     }
 }
