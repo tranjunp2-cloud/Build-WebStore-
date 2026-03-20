@@ -171,5 +171,141 @@
                 "description": "Pesanan anda telah dibatalkan. Jika ada sebarang pertanyaan, sila hubungi kami."
             }
         }
+    },
+    "dashboard": {
+        "overview": {
+            "greeting": "Selamat",
+            "morning": "pagi",
+            "afternoon": "petang",
+            "evening": "malam",
+            "customize": "Sesuaikan Papan Pemuka",
+            "stats": {
+                "views": "Trafik / Paparan",
+                "leads": "Prospek / Klik",
+                "engagement": "Penglibatan",
+                "revenue": "Pendapatan",
+                "pendingOrders": "pesanan tertangguh"
+            },
+            "actions": {
+                "title": "Tindakan Diperlukan: Pesanan Tertangguh",
+                "viewAll": "Lihat semua",
+                "fulfill": "Penuhi",
+                "empty": "Tiada pesanan tertangguh."
+            },
+            "seo": {
+                "title": "Kesihatan SEO",
+                "score": "Skor:",
+                "statusGood": "Baik",
+                "statusWarning": "Perlu Pembaikan",
+                "fixAll": "✨ AI Baiki Semua Isu"
+            },
+            "periods": {
+                "today": "Hari ini",
+                "7d": "7 Hari",
+                "30d": "30 Hari"
+            },
+            "customizeModal": {
+                "title": "Sesuaikan Analitis",
+                "description": "Tarik dan lepas untuk menyusun semula atau sembunyikan/tunjukkan metrik pilihan anda.",
+                "cancel": "Batal",
+                "saving": "Sedang Simpan...",
+                "save": "Simpan Perubahan"
+            }
+        },
+        "sites": {
+            "title": "Laman Web Saya",
+            "viewAll": "Lihat Semua →",
+            "openEditor": "Buka Editor",
+            "published": "Diterbitkan",
+            "draft": "Draf",
+            "lastEdited": "Akhir disunting: ",
+            "edit": "Sunting",
+            "preview": "Pratonton"
+        },
+        "analytics": {
+            "title": "Analitis",
+            "subtitle": "Trafik terperinci dan tingkah laku pengguna",
+            "empty": {
+                "title": "Tiada data analitis tersedia",
+                "description": "Tiada data yang dijejak dalam tempoh masa ini. Sila semak semula nanti selepas menerima trafik."
+            },
+            "error": "Tidak dapat memuatkan data analitis",
+            "retry": "Cuba lagi",
+            "chart": "Tinjauan Trafik",
+            "topPages": "Halaman Utama",
+            "topProducts": "Produk Teratas",
+            "topBlogs": "Blog Teratas",
+            "topReferrers": "Sumber Utama",
+            "views": "Paparan",
+            "clicks": "Klik"
+        },
+        "seo": {
+            "title": "Papan Pemuka SEO",
+            "subtitle": "Analisa dan optimumkan prestasi enjin carian laman anda",
+            "reAnalyse": "Analisis Semula",
+            "generateSitemap": "Jana Peta Laman",
+            "sitemapSuccess": "Peta Laman berjaya dijana",
+            "sitemapError": "Gagal menjana Peta Laman",
+            "score": {
+                "good": "Baik",
+                "needsWork": "Perlu Tambah Baik",
+                "poor": "Lemah"
+            },
+            "stats": {
+                "totalIssues": "Jumlah Isu",
+                "fixable": "Boleh Dibaiki AI",
+                "pages": "Halaman Dianalisis"
+            },
+            "breakdown": {
+                "title": "Pecahan Mengikut Kategori",
+                "meta": "Tag Meta",
+                "content": "Kandungan",
+                "technical": "Teknikal",
+                "noIssues": "Tiada isu"
+            },
+            "aifix": {
+                "title": "Baiki SEO dengan AI",
+                "description": "Jana tajuk & penerangan meta yang tiada secara automatik dengan AI",
+                "button": "Baiki Semua dengan AI",
+                "fixing": "Sedang Membaiki...",
+                "applySuccess": "{count} pembaikan berjaya digunakan",
+                "applyFailed": "Gagal menggunakan pembaikan. Sila cuba lagi.",
+                "fixResult": "Selesai {count} isu",
+                "undoLabel": "Batal (Ctrl+Z)",
+                "undoSuccess": "Pembaikan Batch telah dibatalkan",
+                "errorTimeout": "AI Fix All tamat masa. Sila cuba lagi.",
+                "errorFailed": "Tidak dapat melengkapkan AI Fix All, sila cuba lagi"
+            },
+            "keywordTracker": {
+                "title": "Penjejak Kata Kunci",
+                "description": "Jejaki kedudukan sehingga 5 kata kunci utama di Google.",
+                "placeholder": "Tambah kata kunci baharu...",
+                "add": "Tambah",
+                "empty": "Tiada kata kunci yang dijejaki lagi.",
+                "successAdd": "Kata kunci berjaya ditambah",
+                "errorAdd": "Ralat menambah kata kunci",
+                "errorConnect": "Ralat sambungan semasa menambah kata kunci",
+                "errorLoad": "Ralat memuatkan kata kunci",
+                "errorDelete": "Ralat memadam kata kunci",
+                "errorMaxKeywords": "Anda hanya boleh menjejaki maksimum 5 kata kunci.",
+                "errorKeywordExists": "Kata kunci ini sudah wujud dalam senarai.",
+                "notInTopResults": "Tiada dalam 30 teratas"
+            },
+            "pages": {
+                "title": "Analisis Setiap Halaman",
+                "allGood": "Semuanya baik",
+                "issue": "isu",
+                "issues": "isu"
+            },
+            "empty": {
+                "title": "Tiada laman untuk dianalisis",
+                "description": "Cipta laman terlebih dahulu untuk menggunakan Papan Pemuka SEO",
+                "cta": "Pergi ke Papan Pemuka"
+            },
+            "error": {
+                "failed": "Analisis SEO gagal",
+                "retry": "Cuba Lagi"
+            }
+        }
     }
 }

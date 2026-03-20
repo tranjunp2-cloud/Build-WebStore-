@@ -171,5 +171,141 @@
                 "description": "Your order has been cancelled. If you have any questions, please contact us."
             }
         }
+    },
+    "dashboard": {
+        "overview": {
+            "greeting": "Good",
+            "morning": "morning",
+            "afternoon": "afternoon",
+            "evening": "evening",
+            "customize": "Customize Dashboard",
+            "stats": {
+                "views": "Traffic / Views",
+                "leads": "Leads / Clicks",
+                "engagement": "Engagement",
+                "revenue": "Revenue",
+                "pendingOrders": "pending orders"
+            },
+            "actions": {
+                "title": "Action Required: Pending Orders",
+                "viewAll": "View all",
+                "fulfill": "Fulfill",
+                "empty": "No pending orders."
+            },
+            "seo": {
+                "title": "SEO Health",
+                "score": "Score:",
+                "statusGood": "Good",
+                "statusWarning": "Needs Improvement",
+                "fixAll": "✨ AI Fix All Issues"
+            },
+            "periods": {
+                "today": "Today",
+                "7d": "7 Days",
+                "30d": "30 Days"
+            },
+            "customizeModal": {
+                "title": "Customize Analytics",
+                "description": "Drag and drop to reorder or hide/show the metrics you care about.",
+                "cancel": "Cancel",
+                "saving": "Saving...",
+                "save": "Save Changes"
+            }
+        },
+        "sites": {
+            "title": "My Websites",
+            "viewAll": "View All →",
+            "openEditor": "Open Editor",
+            "published": "Published",
+            "draft": "Draft",
+            "lastEdited": "Last edited: ",
+            "edit": "Edit",
+            "preview": "Preview"
+        },
+        "analytics": {
+            "title": "Analytics",
+            "subtitle": "Detailed traffic and user behavior",
+            "empty": {
+                "title": "No analytical data available",
+                "description": "There is no tracked data in this time period. Check back later after receiving some traffic."
+            },
+            "error": "Cannot load analytics data",
+            "retry": "Try again",
+            "chart": "Traffic Overview",
+            "topPages": "Top Pages",
+            "topProducts": "Top Products",
+            "topBlogs": "Top Blogs",
+            "topReferrers": "Top Referrers",
+            "views": "Views",
+            "clicks": "Clicks"
+        },
+        "seo": {
+            "title": "SEO Dashboard",
+            "subtitle": "Analyse and optimise your site's search engine performance",
+            "reAnalyse": "Re-analyse",
+            "generateSitemap": "Generate Sitemap",
+            "sitemapSuccess": "Sitemap generated successfully",
+            "sitemapError": "Failed to generate sitemap",
+            "score": {
+                "good": "Good",
+                "needsWork": "Needs Work",
+                "poor": "Poor"
+            },
+            "stats": {
+                "totalIssues": "Total Issues",
+                "fixable": "Auto-Fixable by AI",
+                "pages": "Pages Analysed"
+            },
+            "breakdown": {
+                "title": "Category Breakdown",
+                "meta": "Meta Tags",
+                "content": "Content",
+                "technical": "Technical",
+                "noIssues": "No issues"
+            },
+            "aifix": {
+                "title": "AI SEO Fix",
+                "description": "Auto-generate missing meta titles & descriptions with AI",
+                "button": "Fix All with AI",
+                "fixing": "Fixing...",
+                "applySuccess": "Applied {count} fixes successfully",
+                "applyFailed": "Failed to apply fixes. Please try again.",
+                "fixResult": "Fixed {count} issues",
+                "undoLabel": "Undo (Ctrl+Z)",
+                "undoSuccess": "Batch Fix has been undone",
+                "errorTimeout": "AI Fix All timed out. Please try again.",
+                "errorFailed": "Cannot complete AI Fix All, please try again"
+            },
+            "keywordTracker": {
+                "title": "Keyword Tracker",
+                "description": "Track the ranking of up to 5 core keywords on Google.",
+                "placeholder": "Add new keyword...",
+                "add": "Add",
+                "empty": "No keywords are being tracked yet.",
+                "successAdd": "Keyword added successfully",
+                "errorAdd": "Error adding keyword",
+                "errorConnect": "Connection error when adding keyword",
+                "errorLoad": "Error loading keywords",
+                "errorDelete": "Error deleting keyword",
+                "errorMaxKeywords": "You can only track a maximum of 5 keywords.",
+                "errorKeywordExists": "This keyword already exists in the list.",
+                "notInTopResults": "Not in top 30 results"
+            },
+            "pages": {
+                "title": "Page-by-Page Analysis",
+                "allGood": "All good",
+                "issue": "issue",
+                "issues": "issues"
+            },
+            "empty": {
+                "title": "No sites to analyse",
+                "description": "Create a site first to use the SEO Dashboard",
+                "cta": "Go to Dashboard"
+            },
+            "error": {
+                "failed": "SEO analysis failed",
+                "retry": "Retry"
+            }
+        }
     }
 }

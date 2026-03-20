@@ -132,6 +132,11 @@ export const Tenants: CollectionConfig = {
                     type: 'number',
                     defaultValue: 524288000, // 500MB
                 },
+                {
+                    name: 'dashboardPreferences',
+                    type: 'json',
+                    admin: { description: 'User widget layout configuration for Dashboard' },
+                },
             ],
         },
         {

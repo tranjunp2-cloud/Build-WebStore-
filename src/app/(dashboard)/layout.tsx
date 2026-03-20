@@ -16,12 +16,12 @@ export default async function DashboardLayout({
 
     return (
         <AppShell>
-            <I18nProvider defaultLocale="en">
-                <CMSLayoutClient userName={userName} userInitial={userInitial}>
-                    {children}
-                </CMSLayoutClient>
-            </I18nProvider>
-        </AppShell>
+    <I18nProvider defaultLocale="en">
+        <CMSLayoutClient userName={userName} userInitial={userInitial}>
+            {children}
+        </CMSLayoutClient>
+        </I18nProvider>
+    </AppShell>
     )
 }
 
