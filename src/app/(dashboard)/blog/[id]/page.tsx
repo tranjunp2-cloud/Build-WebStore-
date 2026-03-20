@@ -201,7 +201,7 @@ export default function BlogEditorPage() {
                     setForm(prev => ({ ...prev, status: overrideStatus }))
                 }
                 setTimeout(() => {
-                    router.push('/dashboard/blog')
+                    router.push('/blog')
                 }, 1000)
             } else {
                 const data = await res.json()
@@ -389,7 +389,7 @@ export default function BlogEditorPage() {
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
                     <Link
-                        href="/dashboard/blog"
+                        href="/blog"
                         aria-label="Back to blog list"
                         className="flex-shrink-0 rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
                     >

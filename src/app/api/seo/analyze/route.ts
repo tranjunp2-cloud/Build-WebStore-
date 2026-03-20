@@ -116,6 +116,19 @@ export const POST = withAuth(async (_user, request) => {
             )
         }
 
+        // IDOR Protection: local API bypasses access control, so we must manually check tenant ownership
+        const userTenantIds = _user.tenants?.map((t: any) =>
+            t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        ).map(String) || []
+        const siteTenantId = site.tenant && typeof site.tenant === 'object' ? site.tenant.id : site.tenant
+
+        if (!_user.roles?.includes('super-admin') && !userTenantIds.includes(String(siteTenantId))) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Forbidden' } },
+                { status: 403 }
+            )
+        }
+
         // Get all pages for this site
         const pagesResult = await payload.find({
             collection: 'pages',
