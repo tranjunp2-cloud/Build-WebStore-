@@ -89,7 +89,12 @@ export const Products: CollectionConfig = {
         {
             name: 'description',
             type: 'richText',
-            admin: { description: 'Product description (supports rich text)' },
+            admin: { description: 'Product description in English (supports rich text)' },
+        },
+        {
+            name: 'descriptionBM',
+            type: 'richText',
+            admin: { description: 'Product description in Bahasa Melayu (supports rich text)' },
         },
         {
             name: 'shortDescription',
@@ -123,7 +128,7 @@ export const Products: CollectionConfig = {
         {
             name: 'images',
             type: 'array',
-            maxRows: 10,
+            maxRows: 5,
             fields: [
                 {
                     name: 'image',
@@ -137,6 +142,7 @@ export const Products: CollectionConfig = {
                     admin: { description: 'Alt text for accessibility and SEO' },
                 },
             ],
+            admin: { description: 'Product images (Max 5, <= 5MB each)' },
         },
         {
             name: 'category',
@@ -194,6 +200,25 @@ export const Products: CollectionConfig = {
             min: 0,
             defaultValue: 0,
             admin: { description: 'Product weight in grams (for shipping calculation)' },
+        },
+        {
+            name: 'dimensions',
+            type: 'group',
+            admin: { description: 'Package dimensions matching shipping logic in F14' },
+            fields: [
+                { name: 'length', type: 'number', min: 0, defaultValue: 0, admin: { description: 'Length (cm)' } },
+                { name: 'width', type: 'number', min: 0, defaultValue: 0, admin: { description: 'Width (cm)' } },
+                { name: 'height', type: 'number', min: 0, defaultValue: 0, admin: { description: 'Height (cm)' } },
+            ],
+        },
+        {
+            name: 'attributes',
+            type: 'array',
+            admin: { description: 'Dynamic key/value attributes for Storefront SEO/Rich Snippets' },
+            fields: [
+                { name: 'key', type: 'text', required: true, admin: { placeholder: 'e.g., Material' } },
+                { name: 'value', type: 'text', required: true, admin: { placeholder: 'e.g., 100% Cotton' } },
+            ],
         },
         {
             name: 'seo',
