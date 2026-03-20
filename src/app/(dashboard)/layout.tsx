@@ -1,6 +1,7 @@
 import { AppShell } from '@/components/AppShell'
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
 import { Toaster } from '@/components/ui/sonner'
+import { I18nProvider } from '@/i18n'
 import { getCurrentUser } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 
@@ -16,15 +17,17 @@ export default async function DashboardLayout({
 
     return (
         <AppShell>
-            <div className="min-h-screen bg-[#0F172A]">
-                <DashboardSidebar userName={userName} userInitial={userInitial} />
-                <main className="pt-14 md:pt-0 md:pl-[240px]">
-                    <div className="p-4 sm:p-6 md:p-8">
-                        {children}
-                    </div>
-                </main>
-                <Toaster position="bottom-right" />
-            </div>
+            <I18nProvider defaultLocale="en">
+                <div className="min-h-screen bg-[#0F172A]">
+                    <DashboardSidebar userName={userName} userInitial={userInitial} />
+                    <main className="pt-14 md:pt-0 md:pl-[260px]">
+                        <div className="p-4 sm:p-6 md:p-8">
+                            {children}
+                        </div>
+                    </main>
+                    <Toaster position="bottom-right" />
+                </div>
+            </I18nProvider>
         </AppShell>
     )
 }
