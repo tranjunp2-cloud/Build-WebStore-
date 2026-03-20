@@ -3,10 +3,13 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Plus, Search, MoreHorizontal, Package, RefreshCw } from 'lucide-react'
+import { Plus, Search, MoreHorizontal, AlertCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ProductsSkeleton } from '@/components/dashboard/ProductsSkeleton'
+import { ProductImageFallback } from '@/components/dashboard/ProductImageFallback'
+import { ProductsEmptyState } from '@/components/dashboard/ProductsEmptyState'
+import { useI18n } from '@/i18n'
 
 type ProductImage = {
     url?: string
@@ -17,6 +20,7 @@ type Product = {
     id: string
     name: string
     slug: string
+    sku?: string
     shortDescription?: string
     price: number
     compareAtPrice?: number
@@ -53,11 +57,13 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function ProductsPage() {
+    const { t } = useI18n()
     const [products, setProducts] = useState<Product[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [filterStatus, setFilterStatus] = useState<string>('all')
     const [searchQuery, setSearchQuery] = useState('')
+    const [sortBy, setSortBy] = useState<string>('date-desc')
 
     useEffect(() => {
         loadProducts()
@@ -82,11 +88,42 @@ export default function ProductsPage() {
         }
     }
 
-    const filtered = products.filter(p => {
-        if (filterStatus !== 'all' && p.status !== filterStatus) return false
-        if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
-        return true
-    })
+    const filteredAndSortedProducts = products
+        .filter(p => {
+            if (filterStatus === 'out_of_stock') {
+                if (p.inventory > 0) return false
+            } else if (filterStatus !== 'all' && p.status !== filterStatus) {
+                return false
+            }
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase()
+                const matchesName = p.name.toLowerCase().includes(query)
+                const matchesSku = p.sku?.toLowerCase().includes(query)
+                if (!matchesName && !matchesSku) return false
+            }
+            return true
+        })
+        .sort((a, b) => {
+            switch (sortBy) {
+                case 'name-asc': return a.name.localeCompare(b.name)
+                case 'name-desc': return b.name.localeCompare(a.name)
+                case 'price-asc': return a.price - b.price
+                case 'price-desc': return b.price - a.price
+                case 'stock-asc': return a.inventory - b.inventory
+                case 'stock-desc': return b.inventory - a.inventory
+                case 'date-desc':
+                default:
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            }
+        })
+
+    const statusCounts = {
+        all: products.length,
+        active: products.filter(p => p.status === 'active').length,
+        draft: products.filter(p => p.status === 'draft').length,
+        archived: products.filter(p => p.status === 'archived').length,
+        out_of_stock: products.filter(p => p.inventory <= 0).length,
+    }
 
     // Loading state — skeleton
     if (isLoading) {
@@ -98,7 +135,7 @@ export default function ProductsPage() {
         return (
             <div className="flex h-[60vh] items-center justify-center">
                 <div className="text-center">
-                    <Package className="mx-auto h-12 w-12 text-red-400/60" />
+                    <AlertCircle className="mx-auto h-12 w-12 text-red-400/60" />
                     <h2 className="mt-4 text-lg font-semibold text-white">Failed to load products</h2>
                     <p className="mt-1 text-sm text-gray-500">{error}</p>
                     <button onClick={loadProducts}
@@ -111,20 +148,8 @@ export default function ProductsPage() {
     }
 
     // Empty state
-    if (products.length === 0) {
-        return (
-            <div className="flex h-[60vh] items-center justify-center">
-                <div className="text-center">
-                    <Package className="mx-auto h-12 w-12 text-gray-600" />
-                    <h2 className="mt-4 text-lg font-semibold text-white">No products yet</h2>
-                    <p className="mt-1 text-sm text-gray-500">Start adding products to your store</p>
-                    <Link href="/products/new"
-                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/25">
-                        <Plus className="h-4 w-4" /> Add Product
-                    </Link>
-                </div>
-            </div>
-        )
+    if (products.length === 0 && !isLoading) {
+        return <ProductsEmptyState />
     }
 
     return (
@@ -132,29 +157,55 @@ export default function ProductsPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Products</h1>
-                    <p className="mt-1 text-sm text-gray-400">{products.length} product{products.length !== 1 ? 's' : ''}</p>
+                    <h1 className="text-2xl font-bold text-white">{t.dashboard.products.title}</h1>
+                    <p className="mt-1 text-sm text-gray-400">{products.length} {t.dashboard.products.list.product.toLowerCase()}{products.length !== 1 ? 's' : ''}</p>
                 </div>
                 <Link href="/products/new"
                     className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/25">
-                    <Plus className="h-4 w-4" /> Add Product
+                    <Plus className="h-4 w-4" /> {t.dashboard.products.addProduct}
                 </Link>
             </div>
 
             {/* Filters */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                    <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="Search products..."
-                        className="w-full rounded-lg border border-white/10 bg-[#1E293B] pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50" />
+            <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                        <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                            placeholder={t.dashboard.products.list.search}
+                            className="w-full rounded-lg border border-white/10 bg-[#1E293B] pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-blue-500/50" />
+                    </div>
+                    
+                    <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="rounded-lg border border-white/10 bg-[#1E293B] px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
+                    >
+                        <option value="date-desc">{t.dashboard.products.list.sortNewest}</option>
+                        <option value="name-asc">{t.dashboard.products.list.sortNameAsc}</option>
+                        <option value="name-desc">{t.dashboard.products.list.sortNameDesc}</option>
+                        <option value="price-asc">{t.dashboard.products.list.sortPriceAsc}</option>
+                        <option value="price-desc">{t.dashboard.products.list.sortPriceDesc}</option>
+                        <option value="stock-asc">{t.dashboard.products.list.sortStockAsc}</option>
+                        <option value="stock-desc">{t.dashboard.products.list.sortStockDesc}</option>
+                    </select>
                 </div>
-                <div className="flex gap-1 rounded-lg border border-white/10 bg-[#1E293B] p-0.5">
-                    {['all', 'active', 'draft', 'archived'].map(s => (
-                        <button key={s} onClick={() => setFilterStatus(s)}
-                            className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition-colors capitalize',
-                                filterStatus === s ? 'bg-blue-500/15 text-blue-400' : 'text-gray-500 hover:text-gray-300')}>
-                            {s}
+
+                <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-[#1E293B] p-0.5">
+                    {[
+                        { id: 'all', label: t.dashboard.products.list.filterAll },
+                        { id: 'active', label: 'Active' },
+                        { id: 'draft', label: 'Draft' },
+                        { id: 'archived', label: 'Archived' },
+                        { id: 'out_of_stock', label: t.dashboard.products.list.filterOutOfStock },
+                    ].map(tab => (
+                        <button key={tab.id} onClick={() => setFilterStatus(tab.id)}
+                            className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-2',
+                                filterStatus === tab.id ? 'bg-blue-500/15 text-blue-400' : 'text-gray-500 hover:text-gray-300')}>
+                            {tab.label}
+                            <span className="rounded-full bg-white/5 px-1.5 py-0.5 text-[10px]">
+                                {statusCounts[tab.id as keyof typeof statusCounts]}
+                            </span>
                         </button>
                     ))}
                 </div>
@@ -164,17 +215,18 @@ export default function ProductsPage() {
             <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 overflow-hidden">
                 {/* Table header — desktop only */}
                 <div className="hidden sm:grid grid-cols-[1fr_120px_100px_80px_60px] gap-4 border-b border-white/10 px-6 py-3 text-xs font-medium uppercase text-gray-500">
-                    <span>Product</span>
-                    <span>Price</span>
-                    <span>Status</span>
-                    <span>Stock</span>
+                    <span>{t.dashboard.products.list.product}</span>
+                    <span>{t.dashboard.products.list.price}</span>
+                    <span>{t.dashboard.products.list.status}</span>
+                    <span>{t.dashboard.products.list.stock}</span>
                     <span></span>
                 </div>
 
                 {/* Product rows */}
                 <div className="divide-y divide-white/5">
-                    {filtered.map(product => {
+                    {filteredAndSortedProducts.map(product => {
                         const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
+                        const isOutOfStock = product.inventory <= 0
 
                         return (
                             <Link key={product.id} href={`/products/${product.id}`}
@@ -186,47 +238,72 @@ export default function ProductsPage() {
                                             <Image src={imgUrl} alt={product.images?.[0]?.alt || product.name}
                                                 fill className="object-cover" sizes="40px" />
                                         ) : (
-                                            <div className="flex h-full w-full items-center justify-center">
-                                                <Package className="h-4 w-4 text-gray-600" />
-                                            </div>
+                                            <ProductImageFallback size="md" />
                                         )}
                                     </div>
-                                    <div className="min-w-0">
+                                    <div className="min-w-0 flex-1">
                                         <p className="truncate text-sm font-medium text-white">{product.name}</p>
-                                        {product.category && (
-                                            <p className="text-xs text-gray-500">{product.category}</p>
-                                        )}
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            {product.sku && (
+                                                <span className="text-xs text-gray-500 font-mono bg-white/5 px-1.5 py-0.5 rounded">
+                                                    {product.sku}
+                                                </span>
+                                            )}
+                                            {product.category && (
+                                                <span className="text-xs text-gray-500 truncate">{product.category}</span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Price + Status + Stock — stacked on mobile */}
-                                <div className="mt-2 sm:mt-0 flex items-center gap-3 sm:block">
+                                <div className="mt-3 sm:mt-0 flex items-center gap-3 sm:block">
                                     <p className="text-sm font-medium text-white">{formatPrice(product.price, product.currency)}</p>
                                     {product.compareAtPrice && product.compareAtPrice > product.price && (
                                         <p className="text-xs text-gray-500 line-through">{formatPrice(product.compareAtPrice, product.currency)}</p>
                                     )}
                                 </div>
+                                
                                 <div className="hidden sm:block"><StatusBadge status={product.status} /></div>
-                                <span className={cn('hidden sm:block text-sm', product.inventory <= 5 ? 'text-red-400' : 'text-gray-300')}>
-                                    {product.inventory}
-                                </span>
-                                <MoreHorizontal className="hidden sm:block h-4 w-4 text-gray-600" />
+                                
+                                <div className="hidden sm:flex items-center gap-1.5">
+                                    {isOutOfStock ? (
+                                        <AlertCircle className="h-4 w-4 text-red-500 animate-pulse" />
+                                    ) : (
+                                        <span className={cn('text-sm', product.inventory <= 5 ? 'text-orange-400' : 'text-gray-300')}>
+                                            {product.inventory}
+                                        </span>
+                                    )}
+                                </div>
+                                
+                                <div className="hidden sm:flex justify-end">
+                                    <MoreHorizontal className="h-4 w-4 text-gray-600 hover:text-white transition-colors" />
+                                </div>
 
                                 {/* Mobile: inline status + stock */}
-                                <div className="mt-2 flex items-center gap-2 sm:hidden">
+                                <div className="mt-2 flex items-center gap-3 sm:hidden border-t border-white/5 pt-2">
                                     <StatusBadge status={product.status} />
-                                    <span className={cn('text-xs', product.inventory <= 5 ? 'text-red-400' : 'text-gray-500')}>
-                                        {product.inventory} in stock
-                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        {isOutOfStock ? (
+                                            <>
+                                                <AlertCircle className="h-3.5 w-3.5 text-red-500" />
+                                                <span className="text-xs text-red-500 font-medium">{t.dashboard.products.list.outOfStock}</span>
+                                            </>
+                                        ) : (
+                                            <span className={cn('text-xs', product.inventory <= 5 ? 'text-orange-400' : 'text-gray-500')}>
+                                                {product.inventory} {t.dashboard.products.list.inStock}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </Link>
                         )
                     })}
                 </div>
 
-                {filtered.length === 0 && (
-                    <div className="py-12 text-center text-sm text-gray-500">
-                        No products match your filters
+                {filteredAndSortedProducts.length === 0 && (
+                    <div className="py-16 text-center text-sm text-gray-500">
+                        {t.dashboard.products.list.noResults}
                     </div>
                 )}
             </div>

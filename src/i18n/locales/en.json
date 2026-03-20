@@ -306,6 +306,66 @@
                 "failed": "SEO analysis failed",
                 "retry": "Retry"
             }
+        },
+        "products": {
+            "title": "Products",
+            "addProduct": "Add Product",
+            "empty": {
+                "title": "No products yet",
+                "description": "Start adding new products to sell. Manage categories, pricing, and inventory easily."
+            },
+            "list": {
+                "filterAll": "All",
+                "filterOutOfStock": "Out of Stock",
+                "sortNewest": "Newest",
+                "sortNameAsc": "Name (A-Z)",
+                "sortNameDesc": "Name (Z-A)",
+                "sortPriceAsc": "Price (Low to High)",
+                "sortPriceDesc": "Price (High to Low)",
+                "sortStockAsc": "Stock (Low to High)",
+                "sortStockDesc": "Stock (High to Low)",
+                "search": "Search by name or SKU...",
+                "noResults": "No products match the current filters.",
+                "inStock": "in stock",
+                "outOfStock": "Out of stock",
+                "product": "Product",
+                "price": "Price",
+                "status": "Status",
+                "stock": "Stock"
+            },
+            "form": {
+                "editTitle": "Edit Product",
+                "newTitle": "Add New Product",
+                "basicInfo": "Basic Information",
+                "pricing": "Pricing & Inventory",
+                "shipping": "Shipping",
+                "seo": "Content & SEO",
+                "images": "Product Images",
+                "halalCert": "Halal Certification",
+                "save": "Save",
+                "saveDraft": "Save as Draft",
+                "publish": "Publish",
+                "delete": "Delete",
+                "deleteConfirmTitle": "Delete this product?",
+                "deleteConfirmText": "Are you sure you want to delete the product",
+                "deleteConfirmRestorable": "This product can be restored later.",
+                "cancel": "Cancel",
+                "confirmDeleteBtn": "Confirm Delete",
+                "toastSaved": "Product saved successfully",
+                "toastDraft": "Saved as draft. Switch to Active to display on storefront.",
+                "toastDeleted": "Product deleted.",
+                "undo": "Undo",
+                "toastRestored": "Product restored!",
+                "deleteFailed": "Delete failed",
+                "networkError": "Network error",
+                "errors": {
+                    "nameMin": "Product name must be at least 3 characters",
+                    "priceRequired": "Valid price (≥ 0) is required",
+                    "skuRequired": "SKU is required",
+                    "categoryRequired": "Category is required",
+                    "checkErrors": "Please check the form for errors"
+                }
+            }
         }
     }
 }

@@ -306,6 +306,66 @@
                 "failed": "Analisis SEO gagal",
                 "retry": "Cuba Lagi"
             }
+        },
+        "products": {
+            "title": "Produk",
+            "addProduct": "Tambah Produk",
+            "empty": {
+                "title": "Belum ada produk",
+                "description": "Mula menambah produk baru untuk dijual. Urus kategori, harga, dan inventori dengan mudah."
+            },
+            "list": {
+                "filterAll": "Semua",
+                "filterOutOfStock": "Kehabisan Stok",
+                "sortNewest": "Terbaharu",
+                "sortNameAsc": "Nama (A-Z)",
+                "sortNameDesc": "Nama (Z-A)",
+                "sortPriceAsc": "Harga (Rendah ke Tinggi)",
+                "sortPriceDesc": "Harga (Tinggi ke Rendah)",
+                "sortStockAsc": "Stok (Rendah ke Tinggi)",
+                "sortStockDesc": "Stok (Tinggi ke Rendah)",
+                "search": "Cari mengikut nama atau SKU...",
+                "noResults": "Tiada produk sepadan dengan penapis semasa.",
+                "inStock": "dalam stok",
+                "outOfStock": "Kehabisan stok",
+                "product": "Produk",
+                "price": "Harga",
+                "status": "Status",
+                "stock": "Stok"
+            },
+            "form": {
+                "editTitle": "Sunting Produk",
+                "newTitle": "Tambah Produk Baru",
+                "basicInfo": "Maklumat Asas",
+                "pricing": "Harga & Inventori",
+                "shipping": "Penghantaran",
+                "seo": "Kandungan & SEO",
+                "images": "Gambar Produk",
+                "halalCert": "Pensijilan Halal",
+                "save": "Simpan",
+                "saveDraft": "Simpan sebagai Draf",
+                "publish": "Terbitkan",
+                "delete": "Sahkan Padam",
+                "deleteConfirmTitle": "Padam produk ini?",
+                "deleteConfirmText": "Adakah anda pasti mahu memadamkan produk",
+                "deleteConfirmRestorable": "Produk ini boleh dipulihkan kemudian.",
+                "cancel": "Batal",
+                "confirmDeleteBtn": "Sahkan Padam",
+                "toastSaved": "Produk berjaya disimpan",
+                "toastDraft": "Disimpan sebagai draf. Tukar kepada Aktif untuk dipaparkan di kedai.",
+                "toastDeleted": "Produk dipadamkan.",
+                "undo": "Batal",
+                "toastRestored": "Produk dipulihkan!",
+                "deleteFailed": "Gagal padam",
+                "networkError": "Ralat rangkaian",
+                "errors": {
+                    "nameMin": "Nama produk mestilah sekurang-kurangnya 3 aksara",
+                    "priceRequired": "Harga sah (≥ 0) diperlukan",
+                    "skuRequired": "SKU diperlukan",
+                    "categoryRequired": "Kategori diperlukan",
+                    "checkErrors": "Sila semak borang untuk ralat"
+                }
+            }
         }
     }
 }
