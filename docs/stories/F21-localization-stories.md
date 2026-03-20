@@ -140,3 +140,6 @@ THEN  the Language Switcher (🌐 EN / BM) is hidden from the main top bar to sa
 
 ### Definition of Done
 - [ ] 9-Point Checklist pass for mobile mode.
+
+
+

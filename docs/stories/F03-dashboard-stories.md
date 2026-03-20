@@ -399,3 +399,6 @@ THEN  instead of drag-and-drop, the user can reorder widgets using large native 
 - [ ] 9-Point Checklist pass
 - [ ] Responsive UI grid breaks down smoothly from 4-col (desktop) to 2-col (tablet/mobile).
 - [ ] Recharts/Chart.js mobile touch events verified.
+
+
+

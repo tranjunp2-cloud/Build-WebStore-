@@ -7,11 +7,11 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/auth', () => ({
     withAuth: vi.fn().mockImplementation((handler: any) => {
         return async (req: any, ctx: any) => {
-            const user = { id: 'user-1', email: 'admin@example.com' }
+            const user = { id: 'user-1', email: 'admin@example.com', roles: ['super-admin'] }
             return handler(user, req, ctx)
         }
     }),
-    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com', roles: ['super-admin'] }),
 }))
 
 // Giả lập OpenAI cho tính năng SEO Fix

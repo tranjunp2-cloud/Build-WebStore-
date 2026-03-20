@@ -15,6 +15,7 @@ import { Subscriptions } from './collections/Subscriptions'
 import { Products } from './collections/Products'
 import { Orders } from './collections/Orders'
 import { Analytics } from './collections/Analytics'
+import { SEOMetaJobs } from './collections/SEOMetaJobs'
 import { Blogs } from './collections/Blogs'
 import { BlogCategories } from './collections/BlogCategories'
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
@@ -80,6 +81,7 @@ export default buildConfig({
     Products,
     Orders,
     Analytics,
+    SEOMetaJobs,
     Blogs,
     BlogCategories,
   ],
