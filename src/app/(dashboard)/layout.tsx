@@ -1,9 +1,8 @@
 import { AppShell } from '@/components/AppShell'
-import { DashboardSidebar } from '@/components/dashboard/Sidebar'
-import { Toaster } from '@/components/ui/sonner'
 import { I18nProvider } from '@/i18n'
 import { getCurrentUser } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
+import { CMSLayoutClient } from './_components/CMSLayoutClient'
 
 export default async function DashboardLayout({
     children,
@@ -18,15 +17,9 @@ export default async function DashboardLayout({
     return (
         <AppShell>
             <I18nProvider defaultLocale="en">
-                <div className="min-h-screen bg-[#0F172A]">
-                    <DashboardSidebar userName={userName} userInitial={userInitial} />
-                    <main className="pt-14 md:pt-0 md:pl-[260px]">
-                        <div className="p-4 sm:p-6 md:p-8">
-                            {children}
-                        </div>
-                    </main>
-                    <Toaster position="bottom-right" />
-                </div>
+                <CMSLayoutClient userName={userName} userInitial={userInitial}>
+                    {children}
+                </CMSLayoutClient>
             </I18nProvider>
         </AppShell>
     )

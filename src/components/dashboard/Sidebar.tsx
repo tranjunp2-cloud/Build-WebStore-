@@ -98,14 +98,15 @@ const NAV_ITEMS: NavItemConfig[] = [
 type SidebarProps = {
     userName: string
     userInitial: string
+    mobileOpen: boolean
+    setMobileOpen: (open: boolean) => void
 }
 
 // ─── Component ───────────────────────────────────────────────────────────
 
-export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
+export function DashboardSidebar({ userName, userInitial, mobileOpen, setMobileOpen }: SidebarProps) {
     const pathname = usePathname()
     const { locale, toggleLocale } = useI18n()
-    const [mobileOpen, setMobileOpen] = useState(false)
     const [expandedGroups, setExpandedGroups] = useState<string[]>(() => {
         const expanded: string[] = []
         for (const item of NAV_ITEMS) {
@@ -328,17 +329,6 @@ export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
 
     return (
         <>
-            {/* TODO: Remove when F18/header is implemented — header's hamburger will control mobileOpen */}
-            <div className="fixed top-0 left-0 right-0 z-50 flex h-14 items-center gap-3 border-b border-white/[0.08] bg-[#0B1120]/95 backdrop-blur-md px-4 md:hidden">
-                <button
-                    onClick={() => setMobileOpen(!mobileOpen)}
-                    aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-                    className="rounded-lg p-2 bg-transparent border-none outline-none text-gray-400 hover:bg-white/5 hover:text-white transition-colors cursor-pointer"
-                >
-                    {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-                </button>
-                <span className="text-base font-bold text-white">PrimeWeb</span>
-            </div>
 
             {/* Mobile overlay + drawer — slides in BELOW the header (Figma 30737-17086) */}
             {mobileOpen && (
@@ -356,7 +346,7 @@ export function DashboardSidebar({ userName, userInitial }: SidebarProps) {
             )}
 
             {/* Figma: Desktop sidebar — 260px, bg #0B1120, border-right rgba(255,255,255,0.08) */}
-            <aside className="fixed left-0 top-0 z-40 hidden md:flex h-screen w-[260px] flex-col border-r border-white/[0.08] bg-[#0B1120]">
+            <aside className="fixed left-0 top-[56px] z-40 hidden md:flex h-[calc(100vh-56px)] w-[260px] flex-col border-r border-white/[0.08] bg-[#0B1120]">
                 {sidebarContent}
             </aside>
         </>
