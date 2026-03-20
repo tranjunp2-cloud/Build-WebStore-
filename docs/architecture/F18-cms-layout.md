@@ -20,9 +20,9 @@ app/(dashboard)/layout.tsx          ← CMS Root Layout (Server Component)
       │     ├── NotificationBell    ← Integrates F16
       │     └── UserAvatarMenu      ← Profile, Language, Workspace, Logout
       │
-      ├── Sidebar.tsx                ← Fixed left navigation
+      ├── Sidebar.tsx                ← Fixed left navigation (overflow-y: auto)
       │     ├── NavItem[] (Icon + Text)
-      │     └── SupportLink          ← WhatsApp link
+      │     └── SupportWidget            ← Floating panel for WhatsApp (Không redirect)
       │
       └── <main> (children)          ← Scrollable content area
             └── Breadcrumbs.tsx      ← Shows on depth > 1
@@ -53,7 +53,7 @@ app/(dashboard)/layout.tsx          ← CMS Root Layout (Server Component)
 │   │   ├── NavItem (Blog)
 │   │   ├── NavItem (SEO)
 │   │   ├── NavItem (Config)
-│   │   └── WhatsAppSupportLink
+│   │   └── WhatsAppSupportWidget [Floating panel, không phá vỡ route hiện tại]
 │   │
 │   └── <main className="cms-content">
 │       ├── Breadcrumbs           [Auto-generated from URL pathname]
@@ -70,8 +70,8 @@ app/(dashboard)/layout.tsx          ← CMS Root Layout (Server Component)
 | `TopHeader` | `app/(dashboard)/_components/TopHeader.tsx` | Fixed header bar |
 | `NotificationBell` | `app/(dashboard)/_components/NotificationBell.tsx` | Badge count + F16 dropdown |
 | `UserAvatarMenu` | `app/(dashboard)/_components/UserAvatarMenu.tsx` | Avatar dropdown |
-| `LanguageSwitcher` | `app/(dashboard)/_components/LanguageSwitcher.tsx` | BM/EN toggle |
-| `Sidebar` | `app/(dashboard)/_components/Sidebar.tsx` | Navigation menu |
+| `LanguageSwitcher` | `app/(dashboard)/_components/LanguageSwitcher.tsx` | BM/EN shallow toggle (Context) |
+| `Sidebar` | `app/(dashboard)/_components/Sidebar.tsx` | Navigation menu (Kèm `overflow-y-auto`) |
 | `NavItem` | `app/(dashboard)/_components/NavItem.tsx` | Single nav link with icon + text |
 | `Breadcrumbs` | `app/(dashboard)/_components/Breadcrumbs.tsx` | URL-aware breadcrumbs |
 | `MobileSidebarOverlay` | `app/(dashboard)/_components/MobileSidebarOverlay.tsx` | Backdrop for mobile drawer |
@@ -91,9 +91,10 @@ layout.tsx (Server):
       │
       ▼
 Client hydration (CMSLayoutClient):
-  → Reads `lang` from localStorage → apply i18n
-  → Sidebar: expand default (desktop) / collapse (mobile)
-  → NotificationBell: poll /api/notifications/unread-count every 30s
+  → Reads `lang` từ `localStorage` (Fallback: `cookie` hoặc mặc định `EN` nếu bị chặn)
+  → Sidebar: expand default (desktop) / Drawer ẩn (mobile)
+  → Trạng thái mở menu con (Expandable) được tách biệt, không trigger Sidebar close trên Mobile
+  → NotificationBell: poll /api/notifications/unread-count every 30s (Max UI limit: 99+)
 ```
 
 ---
@@ -152,7 +153,8 @@ export const SUPPORT_WHATSAPP_URL = 'https://wa.me/60XXXXXXXXX?text=Hi+PrimeWeb+
 // Sidebar slide-in via Tailwind + CSS transition
 // translate-x-0 (open) / -translate-x-full (closed)
 // Overlay: fixed inset-0 bg-black/40 z-40
-// Sidebar: fixed left-0 top-0 h-full w-64 z-50 transition-transform
+// Sidebar: fixed left-0 top-0 h-full w-64 z-50 overflow-y-auto transition-transform
+// Close logic: Only triggers close drawer on route change (leaf click), ignored on expandable menu toggle.
 ```
 
 ---
@@ -161,12 +163,14 @@ export const SUPPORT_WHATSAPP_URL = 'https://wa.me/60XXXXXXXXX?text=Hi+PrimeWeb+
 
 ```typescript
 // Language stored in localStorage: key = 'primeweb_lang'
+// Fallback logic: Nếu Security Setting của Browser block localStorage -> Dùng React Context transient state (Mặc định 'EN').
 // Context provider wraps CMSLayoutClient
 // NavItem reads labels from NAV_ITEMS[n].label[currentLang]
-// Switch triggers: localStorage.setItem() + router refresh (shallow)
+// Switch triggers: localStorage.setItem() + cập nhật Context State (React setState).
+// BẮT BUỘC: Cập nhật state runtime (Shallow update) -> Không được dùng window.location.reload() để tránh Data Loss ở các Form.
 ```
 
-> Translation scope for F18: Navigation labels only.
+> Translation scope for F18: Navigation labels and Header statics only.
 > Full page i18n is handled per-feature.
 
 ---
@@ -189,12 +193,15 @@ export const SUPPORT_WHATSAPP_URL = 'https://wa.me/60XXXXXXXXX?text=Hi+PrimeWeb+
 
 ---
 
-## 12. Performance Considerations
+## 12. Performance & Resilience Considerations
 
 - **TopHeader**: Server Component → pre-rendered, no client JS for static parts
-- **NotificationBell**: SWR polling every 30s (not websocket at this stage)
-- **Sidebar**: Static config-driven, no DB call needed
+- **NotificationBell**: SWR polling every 30s (Tránh dùng WebSockets ở Phase 1 để tiết kiệm socket connections).
+  - Có cơ chế **Exponential Backoff** khi API lỗi để chống DDoS tự thân.
+  - Xử lý UI giới hạn hiển thị Badge tối đa `99+` tránh vỡ layout.
+- **Sidebar**: Static config-driven, thêm CSS `overflow-y: auto` để tránh tràn viền khi menu item sinh sôi trong tương lai.
 - **Breadcrumbs**: Generated from `usePathname()` — zero extra API call
+- **Progress Bar**: Bổ sung `nprogress` listener vào Router Events để render vạch loading mỏng 2px ở top màn hình.
 
 ---
 

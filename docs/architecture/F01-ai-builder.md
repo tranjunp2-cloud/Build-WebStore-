@@ -13,7 +13,7 @@ Upgrade existing v1 rule-based builder to Phase 2 with **real OpenAI GPT-4o** in
 │                                                              │
 │  ┌─────────────────┐         ┌────────────────────────────┐  │
 │  │ BuilderFormPanel│  ───→  │ BuilderPreview (iframe)     │  │
-│  │ (3 inputs for   │         │ + Drag & Drop Reorder      │  │
+│  │ (4 inputs for   │         │ + Drag & Drop Reorder      │  │
 │  │  Business info) │         │  renders blocks via         │  │
 │  │                 │         │  blockRegistry.getComponent │  │
 │  │ useBuilderStore │         │                            │  │
@@ -28,7 +28,7 @@ Upgrade existing v1 rule-based builder to Phase 2 with **real OpenAI GPT-4o** in
 │                                                                │
 │  Generation Endpoint (/api/ai/generate-site - SSE)             │
 │     1. Auth & Rate limit check (free=1, pro=20)                │
-│     2. Extract Context (Name, Description, Services)           │
+│     2. Extract Context (Name, Industry, Description, Services) │
 │     3. Detect Language & Build system prompt                   │
 │     4. Call OpenAI GPT-4o with streaming                       │
 │     5. Parse JSON blocks (4 required: Hero, About, Products, Contact)
