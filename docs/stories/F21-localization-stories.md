@@ -101,11 +101,15 @@ THEN  the screen should load in BM by default
 GIVEN a logged-in user changes the language in the CMS to BM
 WHEN  they log out and log back in from another device
 THEN  their CMS dashboard should automatically load in BM based on their saved profile settings
+  AND hệ thống TƯỚC BỎ trạng thái LocalStorage cũ của thiết bị và lưu lại "BM" đè lên LocalStorage hiện hành
 ```
 
 ### Additional Criteria
 
-- [ ] Các định dạng ngày tháng (Date/Time), tiền tệ (Currency - RM) phải tự động adapt theo locale tương ứng hoặc standard của Malaysia.
+- [ ] Định dạng Ngày tháng luôn khoá cứng ở format `DD/MM/YYYY` (VD: 31/12/2026).
+- [ ] Định dạng Tiền tệ hiển thị text `RM` đứng trước giá trị, phân cách ngàn bằng dấu phẩy, phân cách thập phân bằng dấu chấm (VD: RM 1,200.50).
+- [ ] Cơ chế Fallback Lỗi: Nếu backend ném Uncaught Error tiếng Anh không xác định, hệ thống phải fallback tự động hiển thị thông báo lỗi chung chung đã được dịch trong i18n.
+- [ ] Máy có cơ chế Params riêng cho số đếm/số nhiều (Pluralization) đối chiếu khác biệt ngữ pháp giữa tiếng Anh vs tiếng Mã.
 - [ ] Tính năng localize phải wrap toàn bộ ứng dụng bằng một i18n provider giúp reactively update UI mà không cần reload iframe hay window.
 
 ### Definition of Done
@@ -135,8 +139,11 @@ So that the small top header doesn't become cluttered and hard to tap
 GIVEN the user is logged into the CMS on a mobile device
 WHEN  they look at the Top Header
 THEN  the Language Switcher (🌐 EN / BM) is hidden from the main top bar to save space
-  AND it is moved inside the Hamburger (☰) slide-in drawer or the Avatar dropdown menu, remaining clearly visible
+  AND it is moved inside the Hamburger (☰) slide-in drawer (giữ vị trí cố định ở phần trên cùng của Drawer), KHÔNG hiển thị trong Avatar.
 ```
 
 ### Definition of Done
 - [ ] 9-Point Checklist pass for mobile mode.
+
+
+

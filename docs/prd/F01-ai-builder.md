@@ -31,7 +31,7 @@
 
 ## 1. Problem Statement
 
-Hiện tại, các chủ doanh nghiệp SME thường mất từ 30-60 phút để cấu hình các website builder (chọn template → điền form dài → upload ảnh → cấu hình SEO). Họ cần một cách để **cung cấp thông tin cơ bản về doanh nghiệp** thông qua một form đơn giản, và có ngay một website hoàn chỉnh, đẹp mắt lập tức nhờ AI.
+Hiện tại, các chủ doanh nghiệp SME thường mất từ 30-60 phút để cấu hình các website builder (chọn template → điền form dài → upload ảnh → cấu hình SEO). Họ cần một cách để **cung cấp thông tin cơ bản về doanh nghiệp** thông qua một form đơn giản có chọn sẵn ngành nghề, và có ngay một website hoàn chỉnh, đẹp mắt lập tức nhờ AI.
 
 Phiên bản v1 chỉ có builder thủ công. Phiên bản v2 lấy AI làm trải nghiệm cốt lõi — đây là **#1 USP** (Unique Selling Proposition) của PrimeWeb. Cập nhật từ Chat-based sang Form-based (Structured Input) giúp thu thập dữ liệu chính xác và dự đoán được kết quả tốt hơn.
 
@@ -48,14 +48,14 @@ Phiên bản v1 chỉ có builder thủ công. Phiên bản v2 lấy AI làm tr�
 
 ## 3. Solution Overview
 
-Người dùng truy cập vào `/builder/new`, điền thông tin doanh nghiệp vào 3 trường nhập liệu cơ bản (Tên doanh nghiệp, Mô tả ngắn, Mặt hàng/Dịch vụ). AI sẽ phân tích input và stream phản hồi, xây dựng tự động một website đa trang hoàn chỉnh (block-by-block) với quyền live preview ở khung bên phải. Khi hoàn tất, người dùng có thể kéo thả thay đổi vị trí block, tinh chỉnh trong Editor hoặc publish ngay lập tức.
+Người dùng truy cập vào `/builder/new`, điền thông tin doanh nghiệp vào 4 trường nhập liệu cơ bản (Tên doanh nghiệp, Ngành nghề/Lĩnh vực, Mô tả ngắn, Mặt hàng/Dịch vụ). AI sẽ phân tích input và stream phản hồi, xây dựng tự động một website đa trang hoàn chỉnh (block-by-block) với quyền live preview ở khung bên phải. Khi hoàn tất, người dùng có thể kéo thả thay đổi vị trí block, tinh chỉnh trong Editor hoặc publish ngay lập tức.
 
 ---
 
 ## 4. Scope
 
 ### In Scope
-- Nhập thông tin qua form (Tên, Mô tả, Dịch vụ) → generate toàn bộ site thông qua SSE streaming (US-F01-01, US-F01-05)
+- Nhập thông tin qua form (Tên, Lĩnh vực, Mô tả, Dịch vụ) → generate toàn bộ site thông qua SSE streaming (US-F01-01, US-F01-05)
 - Validate form ngay tại chỗ trước khi gọi AI (US-F01-05)
 - Tự động generate ảnh (AI image generation) cho hero banner (US-F01-03)
 - Publish URL `{slug}.primeweb.app` chỉ với 1 click (US-F01-04)
@@ -90,7 +90,7 @@ Người dùng truy cập vào `/builder/new`, điền thông tin doanh nghiệp
 
 ```
 AS A   newly registered SME owner
-I WANT TO điền thông tin vào ô nhập liệu (Tên doanh nghiệp, Mô tả ngắn, Mặt hàng/Dịch vụ)
+I WANT TO điền thông tin vào ô nhập liệu (Tên doanh nghiệp, Ngành nghề/Lĩnh vực, Mô tả ngắn, Mặt hàng/Dịch vụ)
 SO THAT AI tạo đầy đủ website phù hợp và chính xác
 ```
 
@@ -105,7 +105,7 @@ SO THAT AI tạo đầy đủ website phù hợp và chính xác
 | FR-01 | AI must stream response within < 2 seconds of prompt submission | US-F01-01 | P0 | SSE streaming |
 | FR-02 | Complete site generation in < 60 seconds | US-F01-01 | P0 | Min 8 blocks |
 | FR-03 | Live preview updates block-by-block in realtime | US-F01-01 | P0 | iframe sandboxed |
-| FR-04 | User inputs data via a fixed Form (Name, Description, Services) | US-F01-05 | P0 | No multi-turn chat |
+| FR-04 | User inputs data via a fixed Form (Name, Industry, Description, Services) | US-F01-05 | P0 | No multi-turn chat |
 | FR-05 | Form validates required fields before hitting AI endpoint | US-F01-05 | P0 | Avoid incomplete prompts |
 | FR-06 | Auto-save draft to DB after generation | US-F01-01 | P0 | Payload CMS |
 | FR-07 | Session recovery: return to /builder/new shows draft | US-F01-01 | P0 | 24h validity |
@@ -150,7 +150,7 @@ SO THAT AI tạo đầy đủ website phù hợp và chính xác
 ```text
 /builder/new (đã xác thực - authenticated)
   ↓
-User điền thông tin vào Form (Tên doanh nghiệp, Mô tả, Dịch vụ)
+User điền thông tin vào Form (Tên doanh nghiệp, Lĩnh vực, Mô tả, Dịch vụ)
   ↓
 Hệ thống validate form input
   ↓
@@ -177,7 +177,7 @@ User click "Tạo Website"
 ### 10.1. Màn hình chính (Builder Screen)
 - **Mô tả:** Màn hình chính cho phép user nhập form để AI generate website và xem live preview.
 - **Components chính:**
-  - Form Panel (Left): [Các trường input Tên DN, Mô tả, Dịch vụ, Nút Generate]
+  - Form Panel (Left): [Các trường input Tên DN, Lĩnh vực, Mô tả, Dịch vụ, Nút Generate]
   - Live Preview (Right): [Hiển thị website được generate block-by-block dạng iframe, thao tác drag-and-drop]
 - **Wireframe:**
 ```text
@@ -186,9 +186,9 @@ User click "Tạo Website"
 │  │  FORM PANEL  │          │    LIVE PREVIEW       │    │
 │  │  (380px)     │          │    (remaining width)  │    │
 │  │ [Tên DN]     │          │  [skeleton loading]   │    │
-│  │ [Mô tả]      │  ──→     │  Nav → Hero → About   │    │
-│  │ [Dịch vụ]    │          │  → Contact → Footer   │    │
-│  │              │          │                       │    │
+│  │ [Lĩnh vực]   │  ──→     │  Nav → Hero → About   │    │
+│  │ [Mô tả]      │          │  → Contact → Footer   │    │
+│  │ [Dịch vụ]    │          │                       │    │
 │  │ [Generate]   │          │                       │    │
 │  │              │          │  Draft badge          │    │
 │  │              │          │                       │    │
@@ -202,14 +202,14 @@ User click "Tạo Website"
 │ ─────────────────────────── │  │          PrimeWeb           │
 │ Tên Doanh Nghiệp:           │  │                             │
 │ [ _______________________ ] │  │         [Features]          │
-│                             │  │       - Feature 1           │
-│ Mô tả ngắn:                 │  │       - Feature 2           │
+│ Ngành nghề / Lĩnh vực:      │  │       - Feature 1           │
+│ [F&B] [Retail] [Beauty] ▾ │  │       - Feature 2           │
+│ Mô tả ngắn:                 │  │                             │
 │ [                         ] │  │                             │
-│ [ _______________________ ] │  │                             │
-│                             │  │                             │
-│                             │  │      ╭────────────────╮     │
-│ ─────────────────────────── │  │      │ ⏳ Đang tạo...  │     │
-│        [✨ Tạo Website]      │  │      ╰────────────────╯     │
+│ [ _______________________ ] │  │      ╭────────────────╮     │
+│                             │  │      │ ⏳ Đang tạo...  │     │
+│ ─────────────────────────── │  │      ╰────────────────╯     │
+│        [✨ Tạo Website]      │  │                             │
 └─────────────────────────────┘  └─────────────────────────────┘
   (Nút bấm Sticky dưới cùng)      (Chỉ hiện Live Site + Progress)
 ```
@@ -259,10 +259,10 @@ User click "Tạo Website"
 > Note: All Chat ACs have been replaced with Form ACs mapped from `F01-ai-builder-stories.md`. Refer to the story file for detailed Gherkin ACs.
 
 ### AC-1: Generate Site từ Form Nhập Liệu
-Khi người dùng nhập đúng Tên doanh nghiệp, Mô tả ngắn, Mặt hàng/Dịch vụ và nhấn "Tạo Website", AI phải sinh ra website thông qua SSE realtime trong vòng < 60 giây và đầy đủ 4 trang. *(Source: US-F01-01)*
+Khi người dùng nhập đúng Tên doanh nghiệp, Chọn lĩnh vực, Mô tả ngắn, Mặt hàng/Dịch vụ và nhấn "Tạo Website", AI phải sinh ra website thông qua SSE realtime trong vòng < 60 giây và đầy đủ 4 trang. *(Source: US-F01-01)*
 
 ### AC-2: Field Validation
-Trường "Tên doanh nghiệp" và "Mặt hàng/Dịch vụ" bị bỏ trống sẽ báo lỗi và form không cho phép submit. Khóa input trong quá trình generate. *(Source: US-F01-05)*
+Trường "Tên doanh nghiệp", "Lĩnh vực" và "Mặt hàng/Dịch vụ" bị bỏ trống sẽ báo lỗi và form không cho phép submit. Khóa input trong quá trình generate. *(Source: US-F01-05)*
 
 ### AC-3: Drag-and-Drop Block Reorder
 Người dùng có thể kéo thả các sections trong live preview để thay đổi vị trí. Vị trí Footer và Navigation là cố định. *(Source: US-F01-08)*
@@ -313,7 +313,7 @@ Người dùng mobile có View Mode "Sắp xếp bố cục" biến màn hình p
 
 ```
 POST /api/ai/generate-site → text/event-stream (SSE)
-Request: { businessName: string, description: string, services: string, siteId: string }
+Request: { businessName: string, industry: string, description: string, services: string, siteId: string }
 Response: SSE stream (step | block_complete | theme_set | seo_generated | error | done)
 Auth: Bearer JWT (required)
 Rate Limit: Free=1 total, Starter=5/mo, Pro=20/mo, Business=unlimited
@@ -337,7 +337,7 @@ Rate Limit: Free=1 total, Starter=5/mo, Pro=20/mo, Business=unlimited
 - [ ] Loading State — Progress indicator block-by-block khi AI đang stream
 - [ ] Empty State — `/builder/new` hiển thị form clean với placeholders hướng dẫn
 - [ ] Error State — Toast đỏ + "Thử lại" khi AI generation fail; giữ nguyên form data
-- [ ] Form Validation — Tên doanh nghiệp và Mặt hàng/Dịch vụ là required fields
+- [ ] Form Validation — Tên doanh nghiệp, Lĩnh vực và Mặt hàng/Dịch vụ là required fields
 - [ ] Button States — "Tạo Website" disabled trong khi generating; enabled sau khi done
 - [ ] Toast Feedback — Toast xanh "Link copied! 🎉" khi copy domain; toast success post-publish
 - [ ] Auth Redirect — Route /builder/new yêu cầu auth → 401 redirect /login

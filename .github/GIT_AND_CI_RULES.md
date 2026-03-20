@@ -107,7 +107,7 @@ Repo dùng **Commitlint + Husky** để chặn commit không đúng format (ch�
 
 - **Title:** Theo Conventional Commits. Nên có story ID: `feat(F01): [US-F01-03] AI template selection`
 - **Description:** Điền đủ [template](.github/PULL_REQUEST_TEMPLATE.md) (Story, Changes, Checklist, Test steps).
-- **Issue link:** `Closes #<số>` trong PR description (**bắt buộc** cho feature/fix).
+- **Issue link:** `Relates to #<số>` trong PR description (**bắt buộc** cho feature/fix). ⚠️ KHÔNG dùng `Closes #`.
 - **Review:** ≥ 1 approval.
 - **CI:** Toàn bộ status check pass (lint, typecheck, test, build).
 - **Branch:** Cập nhật với base (rebase hoặc merge base vào branch).
@@ -124,7 +124,7 @@ Story-sync workflow tạo GitHub Issues từ `docs/stories/`. Mỗi PR feature/f
 ```
 PR title: "feat(F01): [US-F01-03] AI template selection"
 → Bot tìm issue có [US-F01-03] trong title
-→ Tìm thấy #59 → TỰ SỬA PR body: Closes #59
+→ Tìm thấy #59 → TỰ SỬA PR body: Relates to #59
 → Comment: "🔗 Auto-linked to #59"
 ```
 **Dev không cần làm gì** nếu title có `[US-FXXX-YY]`.
@@ -139,22 +139,67 @@ Branch: feature/F01-ai-builder (chỉ còn 1 open issue cho F01)
 ```
 Branch: feature/F01-ai-builder (5 open issues cho F01)
 → Bot comment gợi ý danh sách issues
-→ Dev chọn 1 → edit PR description thêm "Closes #<số>"
+→ Dev chọn 1 → edit PR description thêm "Relates to #<số>"
 ```
 
 **Skip:** Branches `chore/*`, `docs/*`, `refactor/*` — bot không check.
 
-**Khi issue được link:**
-- PR merged → GitHub **tự đóng** issue
-- Projects board: issue tự move sang **Done**
-- Milestone progress tự cập nhật
-
-**Keywords hợp lệ** (GitHub native):
+**Keywords:** Dùng `Relates to #N` (⚠️ KHÔNG dùng `Closes #N`):
 ```
-Closes #123     Fixes #123     Resolves #123
+Relates to #123     ← Đúng: issue KHÔNG tự close, chờ QC test
+Closes #123         ← SAI: issue tự close khi merge, skip QA
 ```
 
 > **Tip cho dev:** Cách nhanh nhất = đặt PR title theo format `type(FXX): [US-FXX-YY] mô tả` — bot lo phần còn lại.
+
+---
+
+#### 4.4 Issue Status Flow (6 columns)
+
+Projects board có 6 status. Issue tự chuyển status theo automation:
+
+```
+Backlog → Review (UIUX+BA) → In Progress → Code Review → QA Testing → Done
+              ↑                                              │
+              │                  ↑                           │
+              │                  └──── qa:failed ────────────┘
+              └── review:rejected
+```
+
+| Status | Ai | Trigger tự động |
+|--------|-----|-----------------|
+| **Backlog** | PM | Issue mới tạo |
+| **Review** | UIUX + BA | PM assign reviewer (thủ công) |
+| **In Progress** | Dev | Dev được assign / label `status:ready` / QA fail trả về |
+| **Code Review** | Reviewer | PR opened + linked issue |
+| **QA Testing** | QC | PR merged to staging |
+| **Done** | QC | QC close issue (thủ công) |
+
+**QA Fail flow:**
+1. QC test fail → thêm label `qa:failed` + comment mô tả lỗi
+2. Bot auto: status → "In Progress", assign lại dev, notify Lark
+3. Dev fix → tạo PR mới → Code Review → QA Testing → loop
+
+**UIUX/BA Reject flow:**
+1. Reviewer thêm label `review:rejected` + comment lý do
+2. Bot auto: status → "Backlog", notify PM
+
+**Milestone % = issues Done / Total.** Chỉ tăng khi QC close issue (không tăng khi PR merge).
+
+---
+
+#### 4.5 Labels quan trọng
+
+| Label | Ý nghĩa | Ai dùng |
+|-------|---------|---------|
+| `status:ready` | UIUX+BA đã duyệt, dev pick được | UIUX/BA |
+| `review:rejected` | UIUX/BA reject, trả về PM | UIUX/BA |
+| `qa:pending` | Chờ QC test (auto khi PR merge) | Bot |
+| `qa:passed` | QC test pass | QC |
+| `qa:failed` | QC test fail, trả về dev | QC |
+| `ready-to-merge` | PR approved + CI pass | Bot |
+| `approved` | PR đã được approve | Bot |
+| `wave:X` | Thuộc Wave nào (auto trên PR) | Bot |
 
 ---
 
@@ -209,8 +254,11 @@ Workflow file: [.github/workflows/ci.yml](.github/workflows/ci.yml). Chạy trê
 | Commit          | `type(FXX): mô tả` (Conventional Commits) |
 | Trước khi PR    | 9-Point Done, lint/typecheck/test pass |
 | PR title        | `feat(F01): [US-F01-03] mô tả` — bot tự link issue |
-| PR description  | Điền template + `Closes #<số>` (bot tự điền nếu title có story ID) |
-| Merge           | Squash hoặc rebase; merge khi approval + CI xanh |
+| PR description  | Điền template + `Relates to #<số>` (bot tự điền nếu title có story ID) |
+| Merge           | Squash hoặc rebase; merge khi approval + CI xanh + label `ready-to-merge` |
+| Sau merge       | Issue → QA Testing (auto). QC test → close issue khi pass |
+
+**⚠️ Lưu ý:** KHÔNG dùng `Closes #N` — issue chỉ close khi QC test pass.
 
 ---
 
@@ -313,8 +361,8 @@ git push -u origin feature/F01-ai-builder
 
 Trên GitHub: Compare & pull request:
 1. **Title:** `feat(F01): [US-F01-03] AI template selection` — có `[US-F01-03]` để bot auto-link
-2. **Description:** Điền template — bot tự điền `Closes #<số>` nếu match
-3. Assign reviewer → đợi CI + approval
+2. **Description:** Điền template — bot tự điền `Relates to #<số>` nếu match
+3. Assign reviewer → đợi CI + approval → merge khi có `ready-to-merge`
 
 > Bot sẽ auto-link issue nếu title có story ID. Nếu không match, bot comment gợi ý issues để chọn.
 
@@ -330,7 +378,7 @@ git push origin feature/F01-ai-builder
 
 **Bước 6 — Sau khi merge PR**
 
-Xóa branch (trên GitHub hoặc `git branch -d ...` và `git push origin --delete ...`).
+Issue tự chuyển **QA Testing**. QC test trên staging → pass thì close issue → **Done**. Xóa branch.
 
 ---
 
@@ -345,7 +393,18 @@ Xóa branch (trên GitHub hoặc `git branch -d ...` và `git push origin --dele
 | PR title | `feat(F01): [US-F01-03] mô tả` (bot tự link issue) |
 | PR | GitHub: New PR → staging, điền template, assign reviewer |
 | Cập nhật staging | `git rebase staging` hoặc `git merge staging` trên branch |
-| Sau merge | Xóa branch (local + remote). Issue tự đóng. |
+| Sau merge | Xóa branch. Issue chuyển QA Testing (auto). Chờ QC test. |
+
+**Flow hoàn chỉnh cho mỗi role:**
+
+| Role | Việc | Cách làm |
+|------|------|----------|
+| **PM** | Tạo issue | Tạo issue → Backlog → assign UIUX/BA review |
+| **UIUX** | Review design | Check issue → làm design → thêm label `status:ready` khi xong |
+| **BA** | Review spec | Check issue → verify requirements → thêm label `status:ready` |
+| **Dev** | Code | Pick issue "In Progress" → code → push → tạo PR |
+| **Reviewer** | Review code | Review PR → approve → bot gắn `ready-to-merge` |
+| **QC** | Test | Test trên staging → pass: close issue → fail: label `qa:failed` |
 
 ---
 
