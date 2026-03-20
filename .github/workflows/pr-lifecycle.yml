@@ -7,8 +7,9 @@ on:
   pull_request_review:
     types: [submitted]
   schedule:
-    # Every 4 hours, weekdays only (UTC) — stale/reminder checks
-    - cron: '0 */4 * * 1-5'
+    # 2x/day, weekdays only (UTC) — stale/reminder checks
+    # 9 AM MYT (1 UTC) + 5 PM MYT (9 UTC) — saves ~60% vs every 4h
+    - cron: '0 1,9 * * 1-5'
 
 env:
   PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
