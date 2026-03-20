@@ -104,6 +104,7 @@ SO THAT tôi có thể quản lý cửa hàng dễ dàng từ bất kỳ thiết
 - **BR-03:** Language switch (BM/EN) phải được lưu persistent theo user preference.
 - **BR-04:** Notification bell connect với real-time data từ F16 Notification Center.
 - **BR-05:** Các nhóm menu chính (như My Webstore) có thể được mở rộng (expand/collapse) để chứa sub-menu tương ứng. (Dashboard là menu đơn).
+- **BR-06:** Hiển thị Tên Webstore (Workspace hiện tại) rõ ràng trên Top Header/Sidebar để SME dễ nhận diện context đang thao tác (Multi-store Switcher visibility).
 
 ---
 
@@ -133,7 +134,7 @@ Sidebar: Expanded (Desktop) / Hamburger (Mobile)
    ↓
 Click Menu Item → Main Content area loads feature
    ↓ [Mobile only]
-Click ☰ → Sidebar Drawer slides in → Click item → Drawer closes
+Click ☰ → Sidebar Drawer slides in → Click Leaf-route → Drawer closes (KHÔNG đóng nếu click Expandable Menu)
    ↓
 Click Bell → F16 Notification Dropdown
    ↓
@@ -152,7 +153,7 @@ Click Avatar → Dropdown: Profile | Language BM/EN | Workspace | Logout
 - **Mô tả:** Bản vẽ bộ khung Layout chung chứa Header, Sidebar và Main Content.
 - **Components chính:**
   - Top Header: Nơi chứa Logo, Nút Menu Collapse/Hamburger, Icon Notification, Avatar/Profile dropdown.
-  - Left Sidebar Navigation: Thanh trượt chứa các Menu tính năng dạng nhóm (Dashboard, Store, Config). WhatsApp Hỗ Trợ ở chân.
+  - Left Sidebar Navigation: Thanh trượt chứa các Menu tính năng dạng nhóm (Dashboard, Store, Config). Được thiết lập `overflow-y: auto` để scroll độc lập nếu danh sách menu dài. WhatsApp Hỗ Trợ ở chân.
   - Main Content Box: Nơi chứa ruột các module F03, F08, F10... Phần này được gắn quyền scroll-y độc lập.
 - **Wireframe:**
 ```text
@@ -303,7 +304,9 @@ THEN  chỉ Main Content scroll
 |---|----------|-------|--------|
 | 1 | Sidebar có cần hỗ trợ mini mode (icon-only) trên tablet không, hay chỉ Expanded / Hidden? | Design | ⬜ Open |
 | 2 | Switch Workspace (multi-site) có trong Phase 1 không hay defer sang Wave 2+? | PO | ⬜ Open |
-| 3 | Link WhatsApp Business có được nhúng vĩnh viễn trong Help Center hay tùy biến? | Ops | ⬜ Open |
+| 3 | Link WhatsApp Business nên dùng Floating Widget/Slide-over hay bắt redirect hẳn sang trang F20? | UX/Ops | ⬜ Open |
+| 4 | Fallback cho Language Switch là BM hay EN nếu trình duyệt chặn localStorage? | Tech | ⬜ Open |
+| 5 | Giao thức đồng bộ Notification Badge với F16 dùng Polling hay WebSocket? Limit max (VD: 99+)? | Tech/F16 | ⬜ Open |
 
 ---
 
