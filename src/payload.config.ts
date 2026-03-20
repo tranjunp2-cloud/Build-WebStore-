@@ -15,16 +15,52 @@ import { Subscriptions } from './collections/Subscriptions'
 import { Products } from './collections/Products'
 import { Orders } from './collections/Orders'
 import { Analytics } from './collections/Analytics'
+import { Blogs } from './collections/Blogs'
+import { BlogCategories } from './collections/BlogCategories'
+import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
+/** Trả về connection string (bỏ sslmode để tránh parse ghi đè pool.ssl). */
+function getDatabaseConnectionString(): string {
+  const raw = process.env.DATABASE_URI || 'postgresql://localhost/primeweb'
+  const withoutSslmode = raw.replace(/[?&]sslmode=[^&]+/g, '').replace(/\?&/, '?').replace(/\?$/, '')
+  return withoutSslmode || raw
+}
+
+/** Có phải DB từ xa (cần SSL, có thể self-signed) không. */
+function isRemoteDatabase(): boolean {
+  const raw = process.env.DATABASE_URI || ''
+  return (
+    raw.length > 0 &&
+    !raw.includes('localhost') &&
+    !raw.includes('127.0.0.1') &&
+    !raw.includes('postgres:')
+  )
+}
+
 export default buildConfig({
+  serverURL: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
+  email: nodemailerAdapter({
+    defaultFromAddress: process.env.MAIL_FROM_ADDRESS || 'noreply@primeweb.app',
+    defaultFromName: process.env.MAIL_FROM_NAME || 'PrimeWeb',
+    transportOptions: {
+      host: process.env.MAIL_HOST,
+      port: parseInt(process.env.MAIL_PORT || '587'),
+      // Port 587 = STARTTLS (secure: false, nodemailer auto-upgrades)
+      // Port 465 = implicit SSL (secure: true)
+      secure: process.env.MAIL_PORT === '465',
+      auth: {
+        user: process.env.MAIL_USERNAME,
+        pass: process.env.MAIL_PASSWORD,
+      },
+    },
+  }),
   admin: {
     user: Users.slug,
     meta: {
       titleSuffix: '— Web Store Admin',
-      favicon: '/favicon.ico',
     },
     importMap: {
       baseDir: path.resolve(dirname),
@@ -44,6 +80,8 @@ export default buildConfig({
     Products,
     Orders,
     Analytics,
+    Blogs,
+    BlogCategories,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',
@@ -52,8 +90,14 @@ export default buildConfig({
   },
   db: postgresAdapter({
     pool: {
-      connectionString: process.env.DATABASE_URI || 'postgresql://localhost/primeweb',
+      connectionString: getDatabaseConnectionString(),
+      // DB từ xa (DO managed): ép chấp nhận cert để tránh SELF_SIGNED_CERT_IN_CHAIN.
+      // Truyền rõ ở đây vì parse(connectionString) có thể ghi đè nếu URL còn sslmode.
+      ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: false } } : {}),
     },
+    // push: true auto-creates tables when NODE_ENV !== 'production'.
+    // For staging (NODE_ENV=development via DO env var), this creates tables on first run.
+    push: true,
   }),
   sharp,
   plugins: [
