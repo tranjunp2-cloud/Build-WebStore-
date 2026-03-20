@@ -68,26 +68,50 @@ export async function POST(req: NextRequest) {
         let resolvedTenantId = typeof tenantId === 'object' ? tenantId.id : tenantId
 
         if (!resolvedTenantId) {
-            // Auto-create tenant for legacy users without one
-            const firstName = (user as any).firstName || (user as any).name || 'My'
-            const newTenant = await payload.create({
+            const fallbackSlug = `store-${user.id}`
+
+            // Recover an orphaned tenant first before creating a new one.
+            const existingTenantBySlug = await payload.find({
                 collection: 'tenants',
-                data: {
-                    name: `${firstName}'s Store`,
-                    slug: `store-${user.id}`,
-                    aiGenerationsCount: 0,
-                },
+                where: { slug: { equals: fallbackSlug } },
+                limit: 1,
             })
-            // Assign tenant to user
-            await payload.update({
-                collection: 'users',
-                id: user.id,
-                data: {
-                    tenants: [{ tenant: newTenant.id, role: 'owner' }],
-                } as any,
-            })
-            resolvedTenantId = newTenant.id
-            console.log(`[AI Generate] Auto-created tenant ${newTenant.id} for user ${user.id}`)
+
+            if (existingTenantBySlug.docs.length > 0) {
+                const recoveredTenant = existingTenantBySlug.docs[0]
+
+                await payload.update({
+                    collection: 'users',
+                    id: user.id,
+                    data: {
+                        tenants: [{ tenant: recoveredTenant.id, role: 'owner' }],
+                    } as any,
+                })
+
+                resolvedTenantId = recoveredTenant.id
+                console.log(`[AI Generate] Re-attached tenant ${recoveredTenant.id} to user ${user.id}`)
+            } else {
+                // Auto-create tenant for legacy users without one
+                const firstName = (user as any).firstName || (user as any).name || 'My'
+                const newTenant = await payload.create({
+                    collection: 'tenants',
+                    data: {
+                        name: `${firstName}'s Store`,
+                        slug: fallbackSlug,
+                        aiGenerationsCount: 0,
+                    },
+                })
+                // Assign tenant to user
+                await payload.update({
+                    collection: 'users',
+                    id: user.id,
+                    data: {
+                        tenants: [{ tenant: newTenant.id, role: 'owner' }],
+                    } as any,
+                })
+                resolvedTenantId = newTenant.id
+                console.log(`[AI Generate] Auto-created tenant ${newTenant.id} for user ${user.id}`)
+            }
         }
 
         // FR-15: Rate Limit - Free tier is limited to 1 AI generation
@@ -231,7 +255,7 @@ export async function POST(req: NextRequest) {
             collection: 'pages',
             data: {
                 title: 'Homepage',
-                slug: '/',
+                slug: 'home',
                 site: site.id,
                 isHomepage: true,
                 layout: sanitizedBlocks,
