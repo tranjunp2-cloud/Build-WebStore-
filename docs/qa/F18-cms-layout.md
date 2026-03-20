@@ -1,5 +1,5 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F18 - CMS Core Layout & Navigation
-> **Phiên bản:** 1.0 (15-Case Exhaustive Matrix AC-Mapped) | **Cập nhật:** 2026-03-20 | **Thực hiện:** QA Team
+> **Phiên bản:** 2.0 (20-Case Biên độ Sâu kết hợp AI QC Agent) | **Cập nhật:** 2026-03-20 | **Thực hiện:** QA Team (Antigravity QC)
 > **Nguồn Tham chiếu:** PRD (`F18-cms-layout.md`), User Stories (3 US chính)
 > **Kỹ năng ứng dụng (.agent):** UI/UX Boundary Check, Mobile Touch Validation, i18n Localization Testing, Performance SLA Metrics.
 
@@ -44,6 +44,12 @@ Bộ test đặc biệt nhấn mạnh vào **trải nghiệm Mobile (Hamburger D
 | **TC-F18.13** | `UX`   | `Route` | **[Positive]** Khôi phục Vị Trí Cuộn (Reset Scroll Top) | **1.** Kéo xuống cuối trang màn Products.<br>**2.** Click sang menu Orders. | Tại màn Orders mới load, Trục Scroll Bar Tự Động Rút Lên Đỉnh Y=0. Không bị kẹt ở đáy. | High | [ ] |
 | **TC-F18.14** | `AC-3` | `State` | **[Positive]** Trạng thái Rỗng (Empty State) & Layout Vững Chắc | **1.** Xóa sạch DB để trang `/blog` rỗng không.<br>**2.** F5 Web. | Lòng Main Content sinh component Empty (Vector ảnh, "Chưa có bài viết nào"). Không làm phình to hay bóp xéo tỷ lệ Header/Sidebar. Layout vững như thạch. | Medium | [ ] |
 | **TC-F18.15** | `SLA`  | `Perf` | **[Negative]** Render Performance Ngưỡng Dưới 1 giây | **1.** Reload trang F5 toàn khung CMS Layout. | Lớp Vỏ CMS (Shell) App Shell bật lên ngay lập tức dưới 100ms. Tiến trình Fetch Data Modules chạy Async không Block Màn Header. | Medium | [x] |
+| **[MISSING ACs PHÁT HIỆN TỪ PRD - CẬP NHẬT BỞI AI QC AGENT]** |
+| **TC-F18.16** | `QC-AI`| `Tablet` | **[Boundary]** Chế độ Mini-Sidebar (Collapsed Mode) trên Tablet | **1.** Kéo Window size xuống mức mốc `768px - 1024px`. | **THEN** Sidebar KHÔNG ẩn mất (như Mobile) cũng KHÔNG mở rộng (như Desktop) mà co thành cột hẹp (Width 60px) chỉ hiện Icon. Tooltip bật ra khi Hover. | Blocker | [ ] |
+| **TC-F18.17** | `i18n` | `Layout` | **[Boundary]** Vỡ Khung Do Độ Dài Ký Tự Bahasa Melayu Khi Đổi Ngôn Ngữ | **1.** Switch Language qua Mã Lai.<br>**2.** Chờ Sidebar text re-render. | Chữ tiếng Mã Lai thường dài hơn 30-40% so với tiếng Anh. **EXPECTED:** Element tự động thu gọt `Text Overflow: Ellipsis...` không đội Width của Sidebar để Main Content bị lép. | High | [ ] |
+| **TC-F18.18** | `Sec`  | `Header` | **[Negative]** XSS Injection vào Vùng Cảnh Báo Avatar Name | **1.** Cho User tên là dài có bọc `<script>alert('idor')</script>`. | **EXPECTED** Khung Avatar Header Ráp Hàm Sanitize Html Cắt Mã Nóng Độc Quyền, Chỉ Hiện Nguyên Bản Chữ PlainText. Thắt Nút Sập DOM CMS. | Blocker | [x] |
+| **TC-F18.19** | `Perf` | `Load`   | **[Negative]** Giới hạn Bơm Nhồi DOM (Sidebar React Rerender Load Testing) | **1.** Run Script k6 bắn Click liên thanh vào 5 Sidebar Menu Items (200 clicks/min). | Khung Giao Diện Được Sử Dụng `React.memo` Và Không Bị Bào Lấy RAM, Khóa Bug Lỏng State Gây Unmount Component Con Layout Áp Đảo Trình Duyệt. Trả mượt Web Vitals. | High | [ ] |
+| **TC-F18.20** | `UX`   | `A11y`   | **[Positive]** Phóng To Giao Diện Lên Cỡ Đại (Zoom 200%) | **1.** Nhấn `Ctrl +` zoom 200%. Tắt Thu Phóng. | Dính Khớp Cấp Khống UI Accessbility Màn WCAG Lõi: Không Vỡ Tràn Header Box, Cột Chữ Sidebar Chữ Mèo Co Túm Nhưng Quả Nút Kế Đăng Xuất Vẫn Hiện Dễ Thấy. | Medium | [ ] |
 
 ---
 
@@ -61,10 +67,11 @@ _Đánh giá hệ thống dựa trên thói quen điều hướng của tập Ng
 
 | Nhóm Kiểm thử (Criteria) | Trạng Thái (Status) | Ghi chú (Notes & Rules .Agent Trích Chọn) |
 |---|---|---|
-| **1. UI/UX Coverage** | [ ] Đã chạy 0/7 TC | Focus kỹ Form Grid, Z-Index Drawer Mobile, Touch Target >44px. |
+| **1. UI/UX Coverage** | [ ] Đã chạy 0/9 TC | Focus kỹ Form Grid, Z-Index Drawer Mobile, Widget Tablet, Touch Target >44px. Cấp `A11y` Zoom UI. |
 | **2. Logic Routing** | [ ] Đã chạy 0/3 TC | Logo Redirect, Side Menu Active Highlight state không kẹt màu. |
 | **3. Integration API** | [ ] Đã chạy 0/2 TC | Chuỗi Component Avatar + Data F16 Component Bell Dropdown Lấy Thông Chống Đứt Socket. |
-| **4. Performance SLA** | [ ] Not Run | CMS App Shell Chạy Lighthouse Cắm Mốc Chắc Chắn 90 Điểm, Lỗi CLS <= 0.1 |
-| **5. E2E UAT Approval** | [ ] Not Run | Kéo Auto Test Đánh Playwright Flow UAT-02 Mobile Drawer Đổ Ra Xác Định Xanh Toàn Tuyến Mạch. |
+| **4. Performance SLA** | [ ] Not Run | CMS App Shell Chạy Lighthouse Cắm Mốc Chắc Chắn 90 Điểm, Lỗi CLS <= 0.1 (`performance-test-engineer` k6 Stress) |
+| **5. E2E UAT Approval** | [ ] Not Run | Kéo Auto Test Đánh Playwright Flow UAT-02 Mobile Drawer Đổ Ra Xác Định Xanh Toàn Tuyến Mạch (`bdd-cucumber-expert` Gherkin) |
+| **6. Security Gate** | [ ] Not Run | Dò quét XSS Profile Input, Lỗi Avatar Header Ràng Khuôn Code. (`qc-ai-engineer` CISA Rules) |
 
 > **Khuyến Nghị Release:** Đây là Root Layout ốp toàn bộ Site. Các Bug P0 liên quan đến z-index đè Form Module bên trong Content Area (Ex: Z-index Drawer Sidebar Mobile phải bọc cẩn thận). Bắt buộc Pass 100% case Cảm Ứng Smartphone trước khi Merge Nhánh Dưới. Trang Shell Không Cho Phép Đứt CLS Dịch Layer Hình.
