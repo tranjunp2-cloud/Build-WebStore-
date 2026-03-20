@@ -5,6 +5,12 @@ Bao gồm Welcome Screen, AI Discovery Wizard (Carousel), và Mobile Web Experie
 
 ---
 
+## 🔗 Dữ liệu bổ sung (Figma Links)
+- **Figma Design:** [TM_Prime-Web-V2.0 (F06 Nodes)](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30771-16978&t=LYah6Dj6DIZGvwkH-1)
+- **Figma Prototype:** [Interactive Demo](https://www.figma.com/make/Y48xuOh2gMCid2UmqOAFys/F01-ai-chat-builder-demo?fullscreen=1&t=NRFN1ixKPwlhmDuP-1&preview-route=%2Fdashboard)
+
+---
+
 ## 🗺️ Tóm tắt User Flow
 
 ```text
@@ -56,7 +62,7 @@ Bao gồm Welcome Screen, AI Discovery Wizard (Carousel), và Mobile Web Experie
 │                           Bỏ qua & Đi tới Dashboard                        │
 │                                                                            │
 │                                                                            │
-│                          Step 1 of 2: Create Store                         │
+│                                        │
 │                                                                            │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
