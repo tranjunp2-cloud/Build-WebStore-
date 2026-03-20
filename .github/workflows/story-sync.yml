@@ -161,33 +161,39 @@ jobs:
                 ? `\n### Business Value\n${story.businessValue}\n`
                 : '';
 
-              const body = `## ${story.storyId}: ${story.title}
-
-| Wave | Priority | Size | Feature |
-|:----:|:--------:|:----:|:-------:|
-| ${story.wave} | ${story.priority} | ${story.size} | ${story.featureId} |
-
----
-
-### 📖 Story
-${storyFormatted}
-${bizValue}
-### ✅ Acceptance Criteria
-${acFormatted}
-${addCriteria}
-${story.marketNotes ? `### 🇲🇾 MY Market Notes\n${story.marketNotes}\n` : ''}
-### 🏁 Definition of Done
-${dodChecklist}
-
-### 📎 References
-| Doc | Link |
-|-----|------|
-| PRD | ${prdUrl ? `[${prdRelative}](${prdUrl})` : 'N/A'} |
-| Story source | [${sourceRelative}](${sourceUrl}) |
-| Spec | SPEC.md §6 |
-
----
-_Auto-synced by [Story Sync](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`;
+              // Build body via array join to avoid YAML parsing issues with | at column 0
+              const bodyParts = [
+                `## ${story.storyId}: ${story.title}`,
+                '',
+                '| Wave | Priority | Size | Feature |',
+                '|:----:|:--------:|:----:|:-------:|',
+                `| ${story.wave} | ${story.priority} | ${story.size} | ${story.featureId} |`,
+                '',
+                '---',
+                '',
+                '### 📖 Story',
+                storyFormatted,
+              ];
+              if (bizValue) bodyParts.push(bizValue);
+              bodyParts.push('### ✅ Acceptance Criteria', acFormatted);
+              if (addCriteria) bodyParts.push(addCriteria);
+              if (story.marketNotes) bodyParts.push(`### 🇲🇾 MY Market Notes`, story.marketNotes);
+              bodyParts.push(
+                '',
+                '### 🏁 Definition of Done',
+                dodChecklist,
+                '',
+                '### 📎 References',
+                '| Doc | Link |',
+                '|-----|------|',
+                `| PRD | ${prdUrl ? `[${prdRelative}](${prdUrl})` : 'N/A'} |`,
+                `| Story source | [${sourceRelative}](${sourceUrl}) |`,
+                '| Spec | SPEC.md §6 |',
+                '',
+                '---',
+                `_Auto-synced by [Story Sync](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`,
+              );
+              const body = bodyParts.join('\n');
 
               // Build labels
               const labels = ['user-story'];
