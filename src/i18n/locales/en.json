@@ -364,6 +364,25 @@
                     "skuRequired": "SKU is required",
                     "categoryRequired": "Category is required",
                     "checkErrors": "Please check the form for errors"
+                },
+                "variants": {
+                    "hasVariantsToggle": "Product has Variants",
+                    "tierConfig": "Variant Properties",
+                    "tierConfigDesc": "E.g. Size, Color, Material",
+                    "tierName": "Property Name",
+                    "tierNamePlaceholder": "E.g. Size",
+                    "options": "Options",
+                    "optionsPlaceholder": "Type and press Enter...",
+                    "addTier": "+ Add property",
+                    "matrixTitle": "Variant List",
+                    "price": "Price",
+                    "compareAtPrice": "Compare at Price",
+                    "stock": "Stock",
+                    "sku": "SKU",
+                    "errors": {
+                        "emptyMatrix": "Please create at least 1 variant or disable Variants.",
+                        "incompleteMatrix": "Please input Price and Stock for all variants."
+                    }
                 }
             }
         }

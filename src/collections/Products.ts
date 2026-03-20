@@ -180,6 +180,47 @@ export const Products: CollectionConfig = {
             admin: { description: 'Stock Keeping Unit (optional)' },
         },
         {
+            name: 'hasVariants',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: { description: 'Sản phẩm có nhiều phân loại (Variants)' },
+        },
+        {
+            name: 'variantConfigs',
+            type: 'array',
+            maxRows: 2,
+            admin: {
+                condition: (data) => Boolean(data?.hasVariants),
+                description: 'Cấu hình các phân loại (VD: Màu sắc, Kích cỡ)',
+            },
+            fields: [
+                { name: 'name', type: 'text', required: true, admin: { description: 'Tên phân loại (VD: Màu sắc)' } },
+                {
+                    name: 'options',
+                    type: 'array',
+                    minRows: 1,
+                    fields: [
+                        { name: 'value', type: 'text', required: true, admin: { description: 'Giá trị tùy chọn (VD: Đỏ, Xanh)' } }
+                    ]
+                }
+            ],
+        },
+        {
+            name: 'variants',
+            type: 'array',
+            admin: {
+                condition: (data) => Boolean(data?.hasVariants),
+                description: 'Ma trận SKU (Tự động sinh ra từ cấu hình ở trên)',
+            },
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'sku', type: 'text' },
+                { name: 'price', type: 'number', required: true, min: 0 },
+                { name: 'compareAtPrice', type: 'number', min: 0 },
+                { name: 'stock', type: 'number', required: true, min: 0, defaultValue: 0 },
+            ],
+        },
+        {
             name: 'halalCertified',
             type: 'checkbox',
             defaultValue: false,
