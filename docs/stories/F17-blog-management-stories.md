@@ -430,3 +430,4 @@ THEN  there is a "Back to Blogs" link or Breadcrumb to return to the list
 - [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
 - [ ] Responsive design ensures text is readable on mobile devices with proper padding.
 
+

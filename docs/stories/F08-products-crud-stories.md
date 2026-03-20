@@ -385,3 +385,4 @@ THEN  the wide matrix table is transformed into a vertical Accordion list
 - [ ] 9-Point Checklist pass.
 - [ ] Ensure that deeply nested inputs (like 3-level categories or variant inputs) do not cause horizontal scrolling on 320px screens.
 
+
