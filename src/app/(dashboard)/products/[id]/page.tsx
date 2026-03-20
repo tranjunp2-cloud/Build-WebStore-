@@ -110,7 +110,7 @@ export default function ProductEditPage() {
     const router = useRouter()
     const productId = params?.id as string
     const isNew = productId === 'new'
-    const { t } = useI18n()
+    const { t, locale } = useI18n()
 
     const [form, setForm] = useState<ProductForm>(initialForm)
     const [errors, setErrors] = useState<Record<string, string>>({})
@@ -119,6 +119,7 @@ export default function ProductEditPage() {
     const [isDeleting, setIsDeleting] = useState(false)
     const [isConfirmDelete, setIsConfirmDelete] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
+    const [isGeneratingSeo, setIsGeneratingSeo] = useState(false)
     const [descTab, setDescTab] = useState<'en'|'bm'>('en')
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState(false)
@@ -354,10 +355,8 @@ export default function ProductEditPage() {
                         description: data.data.descriptionEN || prev.description,
                         descriptionBM: data.data.descriptionBM || prev.descriptionBM,
                         shortDescription: data.data.shortDescription || prev.shortDescription,
-                        seoTitle: data.data.seoTitle || prev.seoTitle,
-                        seoDescription: data.data.seoDescription || prev.seoDescription,
                     }))
-                    toast.success('AI generation complete!')
+                    toast.success('AI description complete!')
                 }
             }
         } catch (err) {
@@ -365,6 +364,48 @@ export default function ProductEditPage() {
             toast.error('AI generation failed')
         } finally {
             setIsGenerating(false)
+        }
+    }
+
+    // US-F08-03: AI SEO Generation
+    // Separate function from AI Description — user can trigger independently.
+    // Per AC-2: manual edits are NOT overwritten unless user clicks this button again.
+    const handleAISeoGenerate = async () => {
+        if (!form.name.trim()) {
+            toast.error(t.dashboard.products.form.aiSeoNameRequired || 'Enter a product name first')
+            return
+        }
+        setIsGeneratingSeo(true)
+
+        try {
+            const res = await fetch('/api/ai/seo-generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    name: form.name,
+                    category: form.category,
+                    language: locale,
+                }),
+            })
+
+            const data = await res.json()
+            if (res.ok && data.success && data.data) {
+                setForm(prev => ({
+                    ...prev,
+                    seoTitle: data.data.title || prev.seoTitle,
+                    seoDescription: data.data.description || prev.seoDescription,
+                    // Only fill slug if it's still empty or auto-generated from name
+                    slug: data.data.slug || prev.slug,
+                }))
+                toast.success(t.dashboard.products.form.aiSeoToastSuccess || 'SEO fields filled by AI — review before saving')
+            } else {
+                throw new Error(data.error || 'Failed')
+            }
+        } catch (err) {
+            toast.error(t.dashboard.products.form.aiSeoToastError || 'AI SEO generation failed. Please try again.')
+        } finally {
+            setIsGeneratingSeo(false)
         }
     }
 
@@ -687,22 +728,92 @@ export default function ProductEditPage() {
                 </div>
             </div>
 
-            {/* SEO */}
+            {/* SEO — US-F08-03 */}
             <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
-                <h2 className="text-sm font-semibold uppercase text-gray-500">SEO</h2>
-                <div>
-                    <label className="text-xs font-medium text-gray-400">Meta Title</label>
-                    <input value={form.seoTitle} onChange={e => updateField('seoTitle', e.target.value)}
-                        maxLength={60}
-                        className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#0B1120] px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
-                    <p className="mt-1 text-[10px] text-gray-600">{form.seoTitle.length}/60</p>
+                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                    <h2 className="text-sm font-semibold uppercase text-gray-500">
+                        {t.dashboard.products.form.seo}
+                    </h2>
+                    {/* AI SEO button — US-F08-03 AC-1 */}
+                    <button
+                        id="ai-seo-generate-btn"
+                        onClick={handleAISeoGenerate}
+                        disabled={isGeneratingSeo || !form.name.trim()}
+                        className="flex items-center gap-1.5 rounded-lg bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-400 hover:bg-purple-500/20 border border-purple-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isGeneratingSeo
+                            ? <><Loader2 className="h-3 w-3 animate-spin" />{t.dashboard.products.form.aiSeoGenerating || 'Generating...'}</>
+                            : <><Sparkles className="h-3 w-3" />{t.dashboard.products.form.aiSeoButton || '✨ AI SEO'}</>}
+                    </button>
                 </div>
+
+                {/* Meta Title — max 70 chars per PRD */}
                 <div>
-                    <label className="text-xs font-medium text-gray-400">Meta Description</label>
-                    <textarea value={form.seoDescription} onChange={e => updateField('seoDescription', e.target.value)}
-                        rows={2} maxLength={155}
-                        className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#0B1120] px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500/50 resize-none" />
-                    <p className="mt-1 text-[10px] text-gray-600">{form.seoDescription.length}/155</p>
+                    <label className="text-xs font-medium text-gray-400">
+                        {t.dashboard.products.form.seoTitle || 'Meta Title'}
+                    </label>
+                    <input
+                        id="seo-title-input"
+                        value={form.seoTitle}
+                        onChange={e => updateField('seoTitle', e.target.value)}
+                        maxLength={70}
+                        placeholder="e.g. Baju Kurung Moden - Fesyen Terkini Wanita Malaysia"
+                        className={cn(
+                            "mt-1.5 w-full rounded-lg border bg-[#0B1120] px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none",
+                            form.seoTitle.length > 60 ? "border-orange-500/50 focus:border-orange-500" : "border-white/10 focus:border-blue-500/50"
+                        )}
+                    />
+                    <p className={cn(
+                        "mt-1 text-[10px]",
+                        form.seoTitle.length > 70 ? "text-red-500" :
+                        form.seoTitle.length > 60 ? "text-orange-400" : "text-gray-600"
+                    )}>
+                        {form.seoTitle.length}/70
+                        {form.seoTitle.length > 60 && form.seoTitle.length <= 70 && <span className="ml-1 text-orange-400">(ideal ≤ 60)</span>}
+                    </p>
+                </div>
+
+                {/* Meta Description — target 150-160 chars per PRD */}
+                <div>
+                    <label className="text-xs font-medium text-gray-400">
+                        {t.dashboard.products.form.seoDescription || 'Meta Description'}
+                    </label>
+                    <textarea
+                        id="seo-description-input"
+                        value={form.seoDescription}
+                        onChange={e => updateField('seoDescription', e.target.value)}
+                        rows={3}
+                        maxLength={160}
+                        placeholder="e.g. Beli Baju Kurung Moden terbaik dengan kualiti premium. Pilihan warna terlengkap, saiz S-XXL. Penghantaran pantas ke seluruh Malaysia."
+                        className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#0B1120] px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-blue-500/50 resize-none"
+                    />
+                    <p className={cn(
+                        "mt-1 text-[10px]",
+                        form.seoDescription.length >= 150 && form.seoDescription.length <= 160 ? "text-green-400" :
+                        form.seoDescription.length > 0 && form.seoDescription.length < 150 ? "text-orange-400" : "text-gray-600"
+                    )}>
+                        {form.seoDescription.length}/160
+                        {form.seoDescription.length >= 150 && form.seoDescription.length <= 160 && <span className="ml-1">✓ optimal</span>}
+                        {form.seoDescription.length > 0 && form.seoDescription.length < 150 && <span className="ml-1">(target: 150–160)</span>}
+                    </p>
+                </div>
+
+                {/* URL Slug — filled by AI, editable manually */}
+                <div>
+                    <label className="text-xs font-medium text-gray-400">
+                        {t.dashboard.products.form.seoSlug || 'URL Slug'}
+                    </label>
+                    <div className="mt-1.5 flex items-center rounded-lg border border-white/10 bg-[#0B1120] overflow-hidden focus-within:border-blue-500/50">
+                        <span className="shrink-0 px-3 py-2.5 text-xs text-gray-500 bg-white/5 border-r border-white/10 select-none">/</span>
+                        <input
+                            id="seo-slug-input"
+                            value={form.slug}
+                            onChange={e => updateField('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+                            placeholder="product-url-slug"
+                            className="flex-1 bg-transparent px-3 py-2.5 text-sm text-white placeholder-gray-600 outline-none font-mono"
+                        />
+                    </div>
+                    <p className="mt-1 text-[10px] text-gray-600">Auto-filled by AI · edit manually if needed</p>
                 </div>
             </div>
         </div>
