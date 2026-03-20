@@ -120,6 +120,85 @@ const MIGRATIONS = [
     name: 'products.weight',
     sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS weight numeric DEFAULT 0;`,
   },
+  // ── Orders: Stripe fields ──
+  {
+    name: 'orders.stripe_session_id',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id varchar;`,
+  },
+  {
+    name: 'orders.stripe_session_id_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS orders_stripe_session_id_idx ON orders (stripe_session_id);`,
+  },
+  {
+    name: 'orders.stripe_payment_intent_id',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_payment_intent_id varchar;`,
+  },
+  {
+    name: 'orders.stripe_payment_intent_id_idx',
+    sql: `CREATE INDEX IF NOT EXISTS orders_stripe_payment_intent_id_idx ON orders (stripe_payment_intent_id);`,
+  },
+  // ── Blog Categories table ──
+  {
+    name: 'blog_categories.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS blog_categories (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL,
+      name varchar NOT NULL,
+      slug varchar NOT NULL UNIQUE,
+      status varchar DEFAULT 'active',
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'blog_categories.tenant_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blog_categories_tenant_idx ON blog_categories (tenant_id);`,
+  },
+  {
+    name: 'blog_categories.slug_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blog_categories_slug_idx ON blog_categories (slug);`,
+  },
+  // ── Blogs table ──
+  {
+    name: 'blogs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS blogs (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL,
+      site_id integer NOT NULL,
+      title varchar NOT NULL,
+      slug varchar NOT NULL UNIQUE,
+      content jsonb,
+      status varchar DEFAULT 'draft',
+      category_id integer,
+      thumbnail_id integer,
+      author_id integer NOT NULL,
+      seo_meta_title varchar,
+      seo_meta_description varchar,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'blogs.tenant_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_tenant_idx ON blogs (tenant_id);`,
+  },
+  {
+    name: 'blogs.site_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_site_idx ON blogs (site_id);`,
+  },
+  {
+    name: 'blogs.slug_idx',
+    sql: `CREATE INDEX IF NOT EXISTS blogs_slug_idx ON blogs (slug);`,
+  },
+  // ── Payload locked documents rels: FK columns for new collections ──
+  {
+    name: 'payload_locked_documents_rels.blogs_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS blogs_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.blog_categories_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS blog_categories_id integer;`,
+  },
 ];
 
 async function runMigrations(pool) {
