@@ -1,9 +1,10 @@
 # Issue Lifecycle — Auto-manage GitHub Projects board + stale checks
+# Status flow: Backlog → Review → In Progress → Code Review → QA Testing → Done
 name: Issue Lifecycle
 
 on:
   issues:
-    types: [opened, assigned, unassigned, closed, labeled]
+    types: [opened, assigned, unassigned, closed, labeled, unlabeled]
   pull_request:
     types: [opened, closed]
   schedule:
@@ -11,12 +12,11 @@ on:
     - cron: '0 9 * * 1-5'
 
 env:
-  # Set PROJECT_NUMBER as a repository variable in GitHub Settings
   PROJECT_NUMBER: ${{ vars.PROJECT_NUMBER }}
 
 jobs:
   # ──────────────────────────────────────
-  # Auto-add to Projects board
+  # Auto-add to Projects board + status transitions
   # ──────────────────────────────────────
   auto-project:
     name: 'Board: Auto-manage'
@@ -125,17 +125,210 @@ jobs:
             console.log(`Issue #${issue.number} → ${targetStatus}`);
 
   # ──────────────────────────────────────
-  # PR linked to issue → move to Review
+  # Label-based transitions
+  # status:ready → In Progress (UIUX+BA approved)
+  # qa:failed → In Progress (QC trả về dev)
+  # review:rejected → Backlog (trả về PM)
+  # qa:passed → remove qa:pending
+  # ──────────────────────────────────────
+  label-transitions:
+    name: 'Board: Label transitions'
+    if: github.event_name == 'issues' && github.event.action == 'labeled'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      repository-projects: write
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Handle label-based status changes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = context.payload.label.name;
+            const issue = context.payload.issue;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Define label → status mapping
+            const labelMap = {
+              'status:ready': 'In Progress',
+              'qa:failed': 'In Progress',
+              'review:rejected': 'Backlog',
+            };
+
+            const targetStatus = labelMap[label];
+
+            // ── Handle qa:passed: remove qa:pending label ──
+            if (label === 'qa:passed') {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo,
+                  issue_number: issue.number,
+                  name: 'qa:pending',
+                });
+                console.log(`Removed qa:pending from #${issue.number}`);
+              } catch (e) {
+                console.log(`Could not remove qa:pending: ${e.message}`);
+              }
+
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: issue.number,
+                body: `✅ **QA Passed!** Issue sẵn sàng close → Done.`,
+              });
+              return;
+            }
+
+            if (!targetStatus) {
+              console.log(`Label "${label}" has no status mapping, skipping`);
+              return;
+            }
+
+            // ── Handle qa:failed: re-assign dev + comment ──
+            if (label === 'qa:failed') {
+              // Remove qa:pending if present
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo,
+                  issue_number: issue.number,
+                  name: 'qa:pending',
+                });
+              } catch (e) { /* label might not exist */ }
+
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: issue.number,
+                body: `🔴 **QA Failed** — trả về dev fix.\n\n> Dev: check comment của QC bên trên, fix rồi tạo PR mới.`,
+              });
+              console.log(`Issue #${issue.number} → QA Failed → re-assign dev`);
+            }
+
+            // ── Handle review:rejected: notify PM ──
+            if (label === 'review:rejected') {
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: issue.number,
+                body: `⛔ **Review rejected** — UIUX/BA yêu cầu chỉnh spec.\n\n> PM: check comment bên trên, chỉnh spec rồi gán lại reviewer.`,
+              });
+              console.log(`Issue #${issue.number} → Review rejected → back to Backlog`);
+            }
+
+            // ── Handle status:ready: UIUX+BA approved ──
+            if (label === 'status:ready') {
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: issue.number,
+                body: `✅ **UIUX + BA approved!** Issue sẵn sàng cho dev pick.`,
+              });
+              console.log(`Issue #${issue.number} → status:ready → In Progress`);
+            }
+
+            // ── Update Projects board status ──
+            const projectNumber = parseInt('${{ env.PROJECT_NUMBER }}');
+            if (!projectNumber) {
+              console.log('PROJECT_NUMBER not set, skipping board update');
+              return;
+            }
+
+            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
+              repository(owner: $owner, name: $repo) {
+                projectV2(number: $number) {
+                  id
+                  fields(first: 20) {
+                    nodes {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        name
+                        options { id name }
+                      }
+                    }
+                  }
+                }
+              }
+            }`;
+
+            let project;
+            try {
+              const result = await github.graphql(projectQuery, {
+                owner, repo, number: projectNumber,
+              });
+              project = result.repository.projectV2;
+            } catch (e) {
+              console.log(`Could not find project: ${e.message}`);
+              return;
+            }
+
+            const statusField = project.fields.nodes.find(f => f.name === 'Status');
+            if (!statusField) return;
+
+            const statusOption = statusField.options.find(o => o.name === targetStatus);
+            if (!statusOption) {
+              console.log(`Status "${targetStatus}" not found. Available: ${statusField.options.map(o => o.name).join(', ')}`);
+              return;
+            }
+
+            // Add to project + set status
+            const addMutation = `mutation($projectId: ID!, $contentId: ID!) {
+              addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+                item { id }
+              }
+            }`;
+
+            const { addProjectV2ItemById } = await github.graphql(addMutation, {
+              projectId: project.id,
+              contentId: issue.node_id,
+            });
+
+            const updateMutation = `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId, itemId: $itemId,
+                fieldId: $fieldId, value: { singleSelectOptionId: $value }
+              }) {
+                projectV2Item { id }
+              }
+            }`;
+
+            await github.graphql(updateMutation, {
+              projectId: project.id,
+              itemId: addProjectV2ItemById.item.id,
+              fieldId: statusField.id,
+              value: statusOption.id,
+            });
+
+            console.log(`Issue #${issue.number} board → ${targetStatus}`);
+
+      - name: Notify Lark (QA Failed)
+        if: github.event.label.name == 'qa:failed'
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "🔴 QA Failed — #${{ github.event.issue.number }}"
+          template: 'red'
+          meta-left-label: "📦 Issue"
+          meta-left-value: "#${{ github.event.issue.number }}"
+          meta-right-label: "👤 Assignee"
+          meta-right-value: "${{ github.event.issue.assignee.login || 'unassigned' }}"
+          content: |
+            📝 ${{ github.event.issue.title }}
+            🔴 QC test fail — trả về dev fix
+          buttons: '[{"text":"🔗 View Issue","url":"${{ github.event.issue.html_url }}","type":"primary"}]'
+
+  # ──────────────────────────────────────
+  # PR linked to issue → move to Code Review
   # ──────────────────────────────────────
   pr-link-review:
-    name: 'Board: PR → Review'
+    name: 'Board: PR → Code Review'
     if: github.event_name == 'pull_request' && github.event.action == 'opened'
     runs-on: ubuntu-latest
     permissions:
       issues: read
+      pull-requests: read
       repository-projects: write
     steps:
-      - name: Move linked issues to Review
+      - name: Move linked issues to Code Review
         uses: actions/github-script@v7
         with:
           script: |
@@ -145,9 +338,9 @@ jobs:
             const pr = context.payload.pull_request;
             const body = pr.body || '';
 
-            // Find linked issue numbers (Closes #N, Fixes #N, Resolves #N)
+            // Find linked issue numbers (Relates to #N or Closes #N for backward compat)
             const linkedIssues = [];
-            const re = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
+            const re = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|relates?\s+to)\s+#(\d+)/gi;
             let match;
             while ((match = re.exec(body)) !== null) {
               linkedIssues.push(parseInt(match[1]));
@@ -197,16 +390,16 @@ jobs:
               return;
             }
 
-            // Find "In Review" or "Review" status option
+            // Find "Code Review" status option
             const reviewOption = statusField.options.find(o =>
-              o.name === 'In Review' || o.name === 'Review' || o.name === 'In review'
+              o.name === 'Code Review' || o.name === 'In Review' || o.name === 'Review'
             );
             if (!reviewOption) {
-              console.log(`No Review status found. Available: ${statusField.options.map(o => o.name).join(', ')}`);
+              console.log(`No Code Review status found. Available: ${statusField.options.map(o => o.name).join(', ')}`);
               return;
             }
 
-            // Move each linked issue to Review
+            // Move each linked issue to Code Review
             for (const issueNumber of linkedIssues) {
               try {
                 const { data: issue } = await github.rest.issues.get({
@@ -215,7 +408,6 @@ jobs:
                   issue_number: issueNumber,
                 });
 
-                // Add to project
                 const addMutation = `mutation($projectId: ID!, $contentId: ID!) {
                   addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
                     item { id }
@@ -227,7 +419,6 @@ jobs:
                   contentId: issue.node_id,
                 });
 
-                // Set status to Review
                 const updateMutation = `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
                   updateProjectV2ItemFieldValue(input: {
                     projectId: $projectId, itemId: $itemId,
@@ -288,7 +479,6 @@ jobs:
             const unassigned = [];
 
             for (const issue of issues) {
-              // Filter out PRs (GitHub API returns PRs in issues endpoint)
               if (issue.pull_request) continue;
 
               const updatedAt = new Date(issue.updated_at);
@@ -301,7 +491,6 @@ jobs:
                 const assignees = issue.assignees.map(a => a.login).join(', ');
                 staleItems.push(`#${issue.number} "${issue.title}" — assigned to: ${assignees} (${Math.floor(timeSinceUpdate / ONE_DAY)} days)`);
 
-                // Add comment on the issue
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,

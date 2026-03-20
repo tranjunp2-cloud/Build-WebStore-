@@ -131,30 +131,69 @@ jobs:
                 ? story.definitionOfDone.map(d => `- [ ] ${d}`).join('\n')
                 : '- [ ] 9-Point Checklist pass\n- [ ] TypeScript clean (tsc --noEmit)';
 
-              const body = `## ${story.storyId}: ${story.title}
-            **Wave ${story.wave}** | **${story.priority}** | **${story.size}** | Feature: ${story.featureId}
+              // Build source link (relative to repo, not absolute CI path)
+              const sourceRelative = story.sourceFile.replace(/^.*?(docs\/stories\/)/, '$1');
+              const sourceUrl = `${{ github.server_url }}/${{ github.repository }}/blob/staging/${sourceRelative}`;
+              const prdRelative = story.prdLink ? story.prdLink.replace(/^\.\.\//, 'docs/') : '';
+              const prdUrl = prdRelative ? `${{ github.server_url }}/${{ github.repository }}/blob/staging/${prdRelative}` : '';
 
-            ### Story
-            \`\`\`
-            ${story.storyText || 'N/A'}
-            \`\`\`
+              // Build story as readable table
+              const storyLines = (story.storyText || '').split('\n').map(l => l.trim()).filter(Boolean);
+              let storyFormatted = '';
+              for (const line of storyLines) {
+                if (line.startsWith('As a')) storyFormatted += `> **${line}**\n`;
+                else if (line.startsWith('I want')) storyFormatted += `> ${line}\n`;
+                else if (line.startsWith('So that')) storyFormatted += `> _${line}_\n`;
+                else storyFormatted += `> ${line}\n`;
+              }
+              if (!storyFormatted) storyFormatted = '> N/A';
 
-            ### Acceptance Criteria
-            \`\`\`gherkin
-            ${story.acceptanceCriteria || 'N/A'}
-            \`\`\`
+              // Build AC section — preserve full markdown with sub-headings
+              let acFormatted = story.acceptanceCriteria || '_Chưa có AC — cần BA bổ sung._';
 
-            ${story.marketNotes ? `### MY Market Notes\n${story.marketNotes}\n` : ''}
-            ### Definition of Done
-            ${dodChecklist}
+              // Build additional criteria
+              const addCriteria = story.additionalCriteria
+                ? `\n### Additional Criteria\n${story.additionalCriteria}\n`
+                : '';
 
-            ### References
-            - PRD: ${story.prdLink || 'N/A'}
-            - Source: \`${story.sourceFile}\`
-            - SPEC.md §6
+              // Build business value
+              const bizValue = story.businessValue
+                ? `\n### Business Value\n${story.businessValue}\n`
+                : '';
 
-            ---
-            _Auto-synced by [Story Sync](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`;
+              // Build body via array join to avoid YAML parsing issues with | at column 0
+              const bodyParts = [
+                `## ${story.storyId}: ${story.title}`,
+                '',
+                '| Wave | Priority | Size | Feature |',
+                '|:----:|:--------:|:----:|:-------:|',
+                `| ${story.wave} | ${story.priority} | ${story.size} | ${story.featureId} |`,
+                '',
+                '---',
+                '',
+                '### 📖 Story',
+                storyFormatted,
+              ];
+              if (bizValue) bodyParts.push(bizValue);
+              bodyParts.push('### ✅ Acceptance Criteria', acFormatted);
+              if (addCriteria) bodyParts.push(addCriteria);
+              if (story.marketNotes) bodyParts.push(`### 🇲🇾 MY Market Notes`, story.marketNotes);
+              bodyParts.push(
+                '',
+                '### 🏁 Definition of Done',
+                dodChecklist,
+                '',
+                '### 📎 References',
+                '| Doc | Link |',
+                '|-----|------|',
+                `| PRD | ${prdUrl ? `[${prdRelative}](${prdUrl})` : 'N/A'} |`,
+                `| Story source | [${sourceRelative}](${sourceUrl}) |`,
+                '| Spec | SPEC.md §6 |',
+                '',
+                '---',
+                `_Auto-synced by [Story Sync](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`,
+              );
+              const body = bodyParts.join('\n');
 
               // Build labels
               const labels = ['user-story'];

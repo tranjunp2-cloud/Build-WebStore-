@@ -196,3 +196,6 @@ SO THAT tôi có thể xử lý các sự cố khẩn cấp (ban account, check 
 
 > **BƯỚC TIẾP THEO:**
 > Nếu PO/BA đồng ý với đề xuất và scope này, tôi sẽ tiến hành tạo file `F15-admin-management.md` chi tiết theo chuẩn `PRD_TEMPLATE`.
+
+
+

@@ -129,3 +129,6 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
    - **Given** I am viewing the DNS instructions
    - **When** I tap the "Copy" icon next to the CNAME or A Record
    - **Then** the value is copied instantly, and a success Toast confirms the action, optimized for easy pasting into my mobile registrar app.
+
+
+
