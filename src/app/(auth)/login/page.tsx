@@ -100,18 +100,29 @@ function LoginFormContent() {
                 return
             }
 
-            // Parse user data for role-based routing
-            const { user } = await res.json().catch(() => ({ user: null }))
-            const redirect = user
-                ? getRedirectByRole(user, returnUrl)
-                : returnUrl
+            // Parse user data — but DON'T set cookie yet (need OTP)
+            const responseData = await res.json().catch(() => ({ user: null }))
+            const user = responseData?.user
+            const userEmail = user?.email || data.email.trim()
 
-            toast.success('Welcome back!', {
-                description: 'Redirecting to your dashboard...',
+            // Trigger OTP send
+            try {
+                await fetch('/api/users/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: userEmail }),
+                })
+            } catch {
+                // Non-blocking — OTP may still arrive
+            }
+
+            toast.success('Verification code sent!', {
+                description: 'Check your email for the 6-digit code.',
             })
 
-            router.push(redirect)
-            router.refresh()
+            // Redirect to OTP verification page
+            const returnParam = returnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(returnUrl)}` : ''
+            router.push(`/verify-otp?email=${encodeURIComponent(userEmail)}${returnParam}`)
         } catch {
             setFormError('root', { message: 'Connection error. Please try again.' })
             toast.error('Connection error. Please try again.')

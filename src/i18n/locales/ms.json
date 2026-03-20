@@ -11,10 +11,9 @@
         "search": "Cari..."
     },
     "nav": {
-        "platform": "Nền tảng",
-        "solutions": "Giải pháp",
-        "features": "Tính năng",
-        "pricing": "Bảng giá"
+        "features": "Ciri-ciri",
+        "pricing": "Harga",
+        "templates": "Templat"
     },
     "hero": {
         "badge": "Pembina Laman Web Berkuasa AI",
@@ -145,6 +144,17 @@
             "expiry": "Pautan ini tamat tempoh dalam 1 jam. Jika anda tidak meminta ini, abaikan e-mel ini.",
             "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
             "ignore": "Jika anda tidak meminta tetapan semula kata laluan, tiada tindakan diperlukan."
+        },
+        "otp": {
+            "subject": "Kod pengesahan PrimeWeb anda 🔐",
+            "heading": "Pengesahan E-mel",
+            "subheading": "Sahkan identiti anda untuk meneruskan",
+            "greeting": "Hai",
+            "body": "Masukkan kod ini untuk mengesahkan identiti anda:",
+            "expiry": "Kod ini tamat tempoh dalam 5 minit",
+            "security": "Jika anda tidak meminta kod ini, sila abaikan e-mel ini. Seseorang mungkin telah memasukkan e-mel anda secara tidak sengaja.",
+            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
+            "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
         },
         "order": {
             "subject": "Pesanan Disahkan",
