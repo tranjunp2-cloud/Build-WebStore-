@@ -262,3 +262,4 @@ THEN  it transforms from a side-drawer into a Full-Screen View
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass.
+
