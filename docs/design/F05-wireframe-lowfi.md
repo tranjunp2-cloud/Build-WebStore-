@@ -223,3 +223,4 @@ Kéo lên sẽ hiện Bottom Sheet:
 - Preview chiếm trọn 90% không gian màn hình chính.
 - User tương tác chủ yếu bằng cách chạm để sửa chữ, hoặc vuốt thanh `Mở Chat AI & Tool` từ dưới chân màn hình lên lên để ra lệnh bằng giọng nói / chat AI.
 - Tab bên trong Bottom sheet chia làm `Chat`, `Cấu trúc Blocks`, và `Cài đặt Setting` để luân chuyển nội dung nhỏ gọn.
+

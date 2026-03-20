@@ -297,3 +297,4 @@ THEN  chỉ Main Content scroll
 - [ ] ARIA labels implemented cho Sidebar, Bell, Avatar
 - [ ] Non-Functional Requirements validated (Lighthouse ≥ 90 mobile)
 
+

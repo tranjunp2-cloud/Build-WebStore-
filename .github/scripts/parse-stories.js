@@ -88,12 +88,25 @@ function parseStoryFile(filePath) {
       storyText = codeMatch ? codeMatch[1].trim() : storySection[1].trim();
     }
 
-    // Extract Acceptance Criteria
+    // Extract Acceptance Criteria — keep FULL markdown content (all AC sub-sections)
     let acceptanceCriteria = '';
-    const acSection = block.match(/### Acceptance Criteria\s*\n([\s\S]*?)(?=###|$)/);
+    const acSection = block.match(/### Acceptance Criteria\s*\n([\s\S]*?)(?=### Definition of Done|### Business Value|### MY Market|### Additional Criteria|---\s*$|$)/);
     if (acSection) {
-      const codeMatch = acSection[1].match(CODE_BLOCK_RE);
-      acceptanceCriteria = codeMatch ? codeMatch[1].trim() : acSection[1].trim();
+      acceptanceCriteria = acSection[1].trim();
+    }
+
+    // Extract Additional Criteria (if present — separate section after AC)
+    let additionalCriteria = '';
+    const addSection = block.match(/### Additional Criteria\s*\n([\s\S]*?)(?=### Definition of Done|### MY Market|---\s*$|$)/);
+    if (addSection) {
+      additionalCriteria = addSection[1].trim();
+    }
+
+    // Extract Business Value (if present)
+    let businessValue = '';
+    const bvSection = block.match(/### Business Value\s*\n([\s\S]*?)(?=### Acceptance|### Definition|---\s*$|$)/);
+    if (bvSection) {
+      businessValue = bvSection[1].trim();
     }
 
     // Extract Definition of Done
@@ -125,6 +138,8 @@ function parseStoryFile(filePath) {
       status,
       storyText,
       acceptanceCriteria,
+      additionalCriteria,
+      businessValue,
       definitionOfDone: dodItems,
       marketNotes,
       prdLink,
