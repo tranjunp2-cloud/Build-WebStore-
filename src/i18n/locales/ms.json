@@ -364,6 +364,25 @@
                     "skuRequired": "SKU diperlukan",
                     "categoryRequired": "Kategori diperlukan",
                     "checkErrors": "Sila semak borang untuk ralat"
+                },
+                "variants": {
+                    "hasVariantsToggle": "Produk mempunyai Varian",
+                    "tierConfig": "Sifat Varian",
+                    "tierConfigDesc": "Contoh: Saiz, Warna, Bahan",
+                    "tierName": "Nama Sifat",
+                    "tierNamePlaceholder": "Contoh: Saiz",
+                    "options": "Pilihan",
+                    "optionsPlaceholder": "Taip dan tekan Enter...",
+                    "addTier": "+ Tambah sifat",
+                    "matrixTitle": "Senarai Varian",
+                    "price": "Harga",
+                    "compareAtPrice": "Harga Asal",
+                    "stock": "Stok",
+                    "sku": "SKU",
+                    "errors": {
+                        "emptyMatrix": "Sila cipta sekurang-kurangnya 1 varian atau matikan ciri Varian.",
+                        "incompleteMatrix": "Sila masukkan Harga dan Stok untuk semua varian."
+                    }
                 }
             }
         }

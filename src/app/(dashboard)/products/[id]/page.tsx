@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { ProductImageFallback } from '@/components/dashboard/ProductImageFallback'
 import { ImageUploader, type UploadedImage } from '@/components/dashboard/ImageUploader'
+import { VariantsEditor, type VariantConfig, type Variant } from '@/components/dashboard/VariantsEditor'
 import { useI18n } from '@/i18n'
 
 const lexicalToText = (data: any): string => {
@@ -68,6 +69,9 @@ type ProductForm = {
     images: UploadedImage[]
     halalCertified: boolean
     halalCertImage: UploadedImage | null
+    hasVariants: boolean
+    variantConfigs: VariantConfig[]
+    variants: Variant[]
 }
 
 const initialForm: ProductForm = {
@@ -92,6 +96,9 @@ const initialForm: ProductForm = {
     images: [],
     halalCertified: false,
     halalCertImage: null,
+    hasVariants: false,
+    variantConfigs: [],
+    variants: [],
 }
 
 function slugify(text: string) {
@@ -152,6 +159,9 @@ export default function ProductEditPage() {
                             id: typeof data.halalCertImage === 'string' ? data.halalCertImage : data.halalCertImage.id,
                             url: typeof data.halalCertImage === 'string' ? '' : (data.halalCertImage?.url || ''),
                         } : null,
+                        hasVariants: Boolean(data.hasVariants),
+                        variantConfigs: data.variantConfigs || [],
+                        variants: data.variants || [],
                     })
                 }
             } catch (err) {
@@ -184,14 +194,26 @@ export default function ProductEditPage() {
         if (!form.name.trim() || form.name.length < 3) {
             newErrors.name = t.dashboard.products.form.errors.nameMin
         }
-        if (!form.price || parseFloat(form.price) < 0) {
-            newErrors.price = t.dashboard.products.form.errors.priceRequired
-        }
-        if (!form.sku.trim()) {
-            newErrors.sku = t.dashboard.products.form.errors.skuRequired
-        }
         if (!form.category.trim()) {
             newErrors.category = t.dashboard.products.form.errors.categoryRequired
+        }
+
+        if (form.hasVariants) {
+             if (form.variants.length === 0) {
+                 toast.error(t.dashboard.products.form.variants.errors.emptyMatrix)
+                 return
+             }
+             if (form.variants.some(v => !v.price || !v.stock)) {
+                 toast.error(t.dashboard.products.form.variants.errors.incompleteMatrix)
+                 return
+             }
+        } else {
+            if (!form.price || parseFloat(form.price) < 0) {
+                newErrors.price = t.dashboard.products.form.errors.priceRequired
+            }
+            if (!form.sku.trim()) {
+                newErrors.sku = t.dashboard.products.form.errors.skuRequired
+            }
         }
         
         if (Object.keys(newErrors).length > 0) {
@@ -226,6 +248,9 @@ export default function ProductEditPage() {
                 images: form.images.map(img => ({ image: img.id, alt: form.name })),
                 halalCertified: form.halalCertified,
                 halalCertImage: form.halalCertImage ? form.halalCertImage.id : null,
+                hasVariants: form.hasVariants,
+                variantConfigs: form.hasVariants ? form.variantConfigs : [],
+                variants: form.hasVariants ? form.variants.map(v => ({ ...v, price: parseFloat(v.price), compareAtPrice: v.compareAtPrice ? parseFloat(v.compareAtPrice) : undefined, stock: parseInt(v.stock, 10) })) : [],
                 seo: {
                     title: form.seoTitle,
                     description: form.seoDescription,
@@ -542,8 +567,29 @@ export default function ProductEditPage() {
 
             {/* Pricing */}
             <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
-                <h2 className="text-sm font-semibold uppercase text-gray-500">Pricing & Inventory</h2>
+                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                    <h2 className="text-sm font-semibold uppercase text-gray-500">{t.dashboard.products.form.pricing}</h2>
+                    <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-white cursor-pointer select-none" htmlFor="hasVariantsToggle">{t.dashboard.products.form.variants.hasVariantsToggle}</label>
+                        <input id="hasVariantsToggle" type="checkbox" checked={form.hasVariants} onChange={e => updateField('hasVariants', e.target.checked)} className="h-4 w-4 rounded border-white/10 bg-transparent text-blue-600 focus:ring-blue-500/50 cursor-pointer" />
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="md:col-span-1">
+                        <label className="text-xs font-medium text-gray-400">Currency</label>
+                        <select value={form.currency} onChange={e => updateField('currency', e.target.value)}
+                            className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#0B1120] px-4 py-2.5 text-sm text-white outline-none">
+                            <option value="MYR">MYR (RM)</option>
+                            <option value="USD">USD ($)</option>
+                            <option value="SGD">SGD (S$)</option>
+                        </select>
+                    </div>
+                </div>
+
+                {!form.hasVariants ? (
+                <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="text-xs font-medium text-gray-400">Price *</label>
                         <div className={cn("mt-1.5 flex items-center rounded-lg border overflow-hidden",
@@ -564,15 +610,6 @@ export default function ProductEditPage() {
                                 className="flex-1 bg-transparent px-3 py-2.5 text-sm text-white outline-none" />
                         </div>
                     </div>
-                    <div>
-                        <label className="text-xs font-medium text-gray-400">Currency</label>
-                        <select value={form.currency} onChange={e => updateField('currency', e.target.value)}
-                            className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#0B1120] px-4 py-2.5 text-sm text-white outline-none">
-                            <option value="MYR">MYR (RM)</option>
-                            <option value="USD">USD ($)</option>
-                            <option value="SGD">SGD (S$)</option>
-                        </select>
-                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
@@ -591,6 +628,17 @@ export default function ProductEditPage() {
                         {errors.sku && <p className="mt-1 text-xs text-red-500">{errors.sku}</p>}
                     </div>
                 </div>
+                </>
+                ) : (
+                    <div className="pt-4 border-t border-white/5">
+                        <VariantsEditor configs={form.variantConfigs} variants={form.variants} 
+                            onChange={(configs, variants) => {
+                                updateField('variantConfigs', configs)
+                                updateField('variants', variants)
+                            }} 
+                            currencySymbol={form.currency === 'MYR' ? 'RM' : '$'} />
+                    </div>
+                )}
             </div>
 
             {/* Shipping Information */}
