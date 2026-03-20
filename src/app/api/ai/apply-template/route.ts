@@ -73,7 +73,7 @@ export const POST = withAuth(async (user, req) => {
             collection: 'pages',
             data: {
                 title: 'Home',
-                slug: '/',
+                slug: 'home',
                 site: site.id,
                 tenant: tenant.id,
                 isHomepage: true,

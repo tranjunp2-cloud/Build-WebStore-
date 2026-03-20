@@ -1,300 +1,295 @@
 'use client'
 
-import { useState } from 'react'
-import { Sparkles, ArrowRight, LayoutTemplate } from 'lucide-react'
+import type { FormEvent, ReactNode } from 'react'
+import { useEffect, useState } from 'react'
+import { BuilderField } from '@/components/builder/fields/BuilderField'
+import { BuilderOptionCard } from '@/components/builder/fields/BuilderOptionCard'
+import { BuilderOptionGrid } from '@/components/builder/fields/BuilderOptionGrid'
+import { BuilderSubmitButton } from '@/components/builder/fields/BuilderSubmitButton'
+import { BuilderTextInput } from '@/components/builder/fields/BuilderTextInput'
+import { BuilderTextarea } from '@/components/builder/fields/BuilderTextarea'
+import { BuilderPromoCard } from '@/components/builder/onboarding/BuilderPromoCard'
+import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
-import { cn } from '@/lib/utils'
 
-const INDUSTRY_OPTIONS = [
-    { value: 'restaurant', label: 'Restaurant / Cafe / F&B', icon: '🍕' },
-    { value: 'shop', label: 'Shop / Fashion / Ecommerce', icon: '🛍️' },
-    { value: 'tech', label: 'Tech / IT / SaaS', icon: '💻' },
-    { value: 'health', label: 'Health / Dental / Clinic', icon: '🏥' },
-    { value: 'realestate', label: 'Real Estate / Property', icon: '🏠' },
-    { value: 'portfolio', label: 'Portfolio / Freelancer / Agency', icon: '💼' },
-    { value: 'education', label: 'Education / Training', icon: '🎓' },
-    { value: 'fitness', label: 'Gym / Fitness / Yoga', icon: '🏋️' },
-    { value: 'other', label: 'Other', icon: '📦' },
-]
+type IndustryOption = {
+    value: string
+    label: string
+    icon?: string
+}
 
-const STYLE_OPTIONS = [
-    { value: 'modern', label: 'Modern & Clean' },
-    { value: 'classic', label: 'Classic & Elegant' },
-    { value: 'bold', label: 'Bold & Vibrant' },
-    { value: 'minimal', label: 'Minimal & Simple' },
-]
+const BUILDER_TEXTAREA_BADGE_URL = '/assets/builder/builder-textarea-badge.svg'
+const BUILDER_TEXTAREA_HINT_ICON_URL = '/assets/builder/builder-hint-icon.svg'
 
 interface BusinessInfoFormProps {
     onSubmit?: (info: BusinessInfo) => void
+    onPreviewNextStep?: (info: BusinessInfo) => void
     isGenerating?: boolean
+    floatingControls?: ReactNode
+    initialValues?: Partial<BusinessInfo> | null
 }
 
-export default function BusinessInfoForm({ onSubmit, isGenerating }: BusinessInfoFormProps) {
-    const setBusinessInfo = useBuilderStore(s => s.setBusinessInfo)
+const DEFAULT_FORM: BusinessInfo = {
+    businessName: '',
+    shortDescription: '',
+    industry: '',
+    products: '',
+    targetAudience: '',
+    style: 'modern',
+    language: 'auto',
+}
 
-    const [form, setForm] = useState({
-        businessName: '',
-        shortDescription: '', // kept for compatibility, but omitted visually
-        industry: '',
-        products: '',
-        targetAudience: '',
-        style: 'modern',
-        language: 'auto', // kept for compatibility
-    })
+export default function BusinessInfoForm({
+    onSubmit,
+    onPreviewNextStep,
+    isGenerating,
+    floatingControls,
+    initialValues,
+}: BusinessInfoFormProps) {
+    const setBusinessInfo = useBuilderStore((s) => s.setBusinessInfo)
+
+    const [form, setForm] = useState<BusinessInfo>({ ...DEFAULT_FORM, ...initialValues })
     const [errors, setErrors] = useState<Record<string, string>>({})
+    const [industryOptions, setIndustryOptions] = useState<IndustryOption[]>([])
+    const [isLoadingIndustries, setIsLoadingIndustries] = useState(true)
+
+    const isFormReady =
+        form.businessName.trim().length > 0 &&
+        form.industry.trim().length > 0 &&
+        form.products.trim().length > 0
+
+    useEffect(() => {
+        let isMounted = true
+
+        async function fetchIndustryOptions() {
+            try {
+                const response = await fetch('/api/templates/categories', {
+                    credentials: 'include',
+                })
+
+                if (!response.ok) {
+                    throw new Error('Failed to load industries')
+                }
+
+                const data = await response.json()
+                if (!isMounted) return
+
+                setIndustryOptions(Array.isArray(data.docs) ? data.docs : [])
+            } catch (error) {
+                console.error('Failed to fetch industry options:', error)
+                if (!isMounted) return
+                setIndustryOptions([])
+            } finally {
+                if (isMounted) {
+                    setIsLoadingIndustries(false)
+                }
+            }
+        }
+
+        fetchIndustryOptions()
+
+        return () => {
+            isMounted = false
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!initialValues) return
+
+        setForm({
+            ...DEFAULT_FORM,
+            ...initialValues,
+        })
+    }, [
+        initialValues?.businessName,
+        initialValues?.shortDescription,
+        initialValues?.industry,
+        initialValues?.products,
+        initialValues?.targetAudience,
+        initialValues?.style,
+        initialValues?.language,
+    ])
 
     const validate = (): boolean => {
-        const e: Record<string, string> = {}
-        if (!form.businessName.trim()) e.businessName = 'Please enter your business name'
-        if (!form.industry) e.industry = 'Please select an industry'
-        if (!form.products.trim()) e.products = 'Please describe your products / services'
-        setErrors(e)
-        return Object.keys(e).length === 0
+        const nextErrors: Record<string, string> = {}
+
+        if (!form.businessName.trim()) nextErrors.businessName = 'Please enter your business name'
+        if (!form.industry) nextErrors.industry = 'Please select an industry'
+        if (!form.products.trim()) nextErrors.products = 'Please describe your products / services'
+
+        setErrors(nextErrors)
+        return Object.keys(nextErrors).length === 0
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: FormEvent) => {
         e.preventDefault()
+        submitForm()
+    }
+
+    const submitForm = () => {
         if (!validate() || isGenerating) return
+
         if (onSubmit) {
             onSubmit(form as BusinessInfo)
-        } else {
-            setBusinessInfo(form as BusinessInfo)
+            return
         }
+
+        setBusinessInfo(form as BusinessInfo)
     }
 
+    const handlePreviewNextStep = () => {
+        const demoInfo: BusinessInfo = {
+            businessName: 'Duck Coffee',
+            shortDescription: 'We are a modern neighborhood cafe serving specialty coffee, fresh pastries, and a warm all-day atmosphere.',
+            industry: 'restaurant',
+            products: 'Specialty coffee, croissants, handmade pastries, bubble tea',
+            targetAudience: '',
+            style: 'modern',
+            language: 'auto',
+        }
+
+        if (onPreviewNextStep) {
+            onPreviewNextStep(demoInfo)
+            return
+        }
+
+        setBusinessInfo(demoInfo)
+    }
+
+    const leftBody = (
+        <form onSubmit={handleSubmit}>
+            <div className="flex flex-col gap-6">
+                <BuilderField
+                    error={errors.businessName}
+                    icon="📝"
+                    label="Business Name"
+                    required
+                >
+                    <BuilderTextInput
+                        invalid={!!errors.businessName}
+                        onChange={(e) => setForm((current) => ({ ...current, businessName: e.target.value }))}
+                        placeholder="e.g., The Cookie House, Beauty Spa Hana..."
+                        type="text"
+                        value={form.businessName}
+                    />
+                </BuilderField>
+
+                <BuilderField
+                    error={errors.industry}
+                    icon="🏢"
+                    label="Industry"
+                    required
+                >
+                    <BuilderOptionGrid>
+                        {industryOptions.map((option) => (
+                            <BuilderOptionCard
+                                icon={option.icon}
+                                key={option.value}
+                                label={option.label}
+                                onClick={() => setForm((current) => ({ ...current, industry: option.value }))}
+                                selected={form.industry === option.value}
+                            />
+                        ))}
+                    </BuilderOptionGrid>
+                    {isLoadingIndustries ? (
+                        <p className="text-xs text-[#94a3b8]">Loading industries...</p>
+                    ) : null}
+                </BuilderField>
+
+                <BuilderField
+                    hint={(
+                        <div className="flex items-center gap-2">
+                            <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
+                            <span>AI will use this to suggest product images and layout</span>
+                        </div>
+                    )}
+                    error={errors.products}
+                    icon="📦"
+                    label="Products / Services"
+                    required
+                >
+                    <BuilderTextarea
+                        adornment={(
+                            <div className="flex size-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
+                                <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
+                            </div>
+                        )}
+                        invalid={!!errors.products}
+                        onChange={(e) => setForm((current) => ({ ...current, products: e.target.value }))}
+                        placeholder="e.g., Specialty coffee, bubble tea, handmade pastries, croissants etc..."
+                        rows={3}
+                        value={form.products}
+                    />
+                </BuilderField>
+
+                <BuilderField
+                    hint={(
+                        <div className="flex items-center gap-2">
+                            <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
+                            <span>AI will use this to suggest content and tone</span>
+                        </div>
+                    )}
+                    icon="📝"
+                    label="Description"
+                    optionalLabel="(optional)"
+                >
+                    <BuilderTextarea
+                        adornment={(
+                            <div className="flex size-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
+                                <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
+                            </div>
+                        )}
+                        onChange={(e) => setForm((current) => ({ ...current, shortDescription: e.target.value }))}
+                        placeholder="e.g., We are a family-owned bakery that specializes in artisan breads and pastries..."
+                        rows={3}
+                        value={form.shortDescription}
+                    />
+                </BuilderField>
+            </div>
+        </form>
+    )
+
+    const leftFooter = (
+        <>
+            <BuilderSubmitButton
+                disabled={!isFormReady || isGenerating}
+                loading={isGenerating}
+                onClick={submitForm}
+                type="button"
+            >
+                Continue — AI will create your website
+            </BuilderSubmitButton>
+            <button
+                className="mt-3 w-full text-center text-xs font-medium text-[#94a3b8] transition-colors hover:text-white"
+                onClick={handlePreviewNextStep}
+                type="button"
+            >
+                Use demo data to preview next step
+            </button>
+        </>
+    )
+
+    const rightPane = (
+        <BuilderPromoCard
+            description="Just 3 simple steps, AI will create a professional website in minutes."
+            steps={[
+                { id: 1, label: 'Enter business information', active: true },
+                { id: 2, label: 'AI creates content & design' },
+                { id: 3, label: 'Preview & Publish' },
+            ]}
+            title="AI Website Builder"
+        />
+    )
+
     return (
-        <div className="flex h-screen w-full bg-[#0B1120] text-white overflow-hidden font-['Inter']">
-            {/* ─── Left Panel: Form ─────────────────────────────────────── */}
-            <div className="flex w-full flex-col overflow-y-auto lg:w-1/2 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10">
-                {/* Form Container imitating layout_TAPY5V (width ~775.5 inside 50%) */}
-                <div className="w-full max-w-[695px] px-8 py-10 md:px-[40px] md:py-[40px] mx-auto lg:ml-auto lg:mr-0 flex flex-col gap-[44px]">
-                    
-                    {/* Header */}
-                    <div className="flex items-center gap-[12px] h-[44px]">
-                        <div className="flex h-[40px] w-[40px] items-center justify-center rounded-[16px] bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] shadow-[0_0_40px_rgba(45,212,191,0.3),0_0_24px_rgba(59,130,246,0.6)] shrink-0">
-                            <Sparkles className="h-[20px] w-[20px] text-white" />
-                        </div>
-                        <div className="flex flex-col justify-center h-[44px]">
-                            <h1 className="text-[20px] font-semibold text-transparent bg-clip-text bg-gradient-to-br from-[#F8FAFC] to-[#F8FAFC] leading-[1.4em]">
-                                Create Website with AI
-                            </h1>
-                            <p className="text-[12px] text-[#94A3B8] leading-[1.333em]">
-                                Step 1/3 — Business Information
-                            </p>
-                        </div>
-                    </div>
-
-                    <p className="text-[14px] leading-[1.428em] text-[#94A3B8] max-w-[466px] -mt-[30px]">
-                        Provide basic information so AI can create the perfect website for you.
-                    </p>
-
-                    {/* Form Fields container layout_X1XR1C */}
-                    <form onSubmit={handleSubmit} className="flex flex-col gap-[24px] pr-0 md:pr-[19px]">
-                        
-                        {/* 1. Business Name */}
-                        <div className="flex flex-col gap-[8px]">
-                            <label className="flex items-center text-[14px] font-medium text-[#F8FAFC] h-[24px]">
-                                <span className="w-[20px] leading-none text-center transform -translate-y-px">📝</span>
-                                <span className="ml-[8px]">Business Name </span>
-                                <span className="ml-[1px] text-[#EF4444]">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={form.businessName}
-                                onChange={e => setForm(f => ({ ...f, businessName: e.target.value }))}
-                                placeholder="Business Name"
-                                className={cn(
-                                    'w-full rounded-[16px] border bg-[rgba(30,41,59,0.6)] px-[12px] py-[12px] text-[14px] text-white placeholder:text-[#94A3B8] outline-none transition-all duration-200 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)]',
-                                    errors.businessName
-                                        ? 'border-red-500/40 focus:border-red-500/60 focus:ring-1 focus:ring-red-500/10'
-                                        : 'border-[rgba(59,130,246,0.15)] focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/10'
-                                )}
-                            />
-                            {errors.businessName && <span className="text-xs text-red-400">{errors.businessName}</span>}
-                        </div>
-
-                        {/* 2. Industry */}
-                        <div className="flex flex-col gap-[8px]">
-                            <label className="flex items-center text-[14px] font-medium text-[#F8FAFC] h-[24px]">
-                                <span className="w-[20px] leading-none text-center transform -translate-y-px">🏢</span>
-                                <span className="ml-[8px]">Industry </span>
-                                <span className="ml-[1px] text-[#EF4444]">*</span>
-                            </label>
-                            <div className="grid grid-cols-2 gap-x-[12px] gap-y-[10px]">
-                                {INDUSTRY_OPTIONS.map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        type="button"
-                                        onClick={() => {
-                                            setForm(f => ({ ...f, industry: opt.value }))
-                                            setErrors(e => ({ ...e, industry: '' }))
-                                        }}
-                                        className={cn(
-                                            'flex items-center gap-[8px] rounded-[16px] border px-[10px] py-[10px] text-left transition-all duration-200 min-h-[40px]',
-                                            form.industry === opt.value
-                                                ? 'border-[#3B82F6] bg-gradient-to-r from-[rgba(59,130,246,0.2)] to-[rgba(45,212,191,0.2)] text-[#F8FAFC] shadow-[0_4px_6px_-4px_rgba(59,130,246,0.25),0_10px_15px_-3px_rgba(59,130,246,0.25)]'
-                                                : 'border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] text-[#94A3B8] shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] hover:border-blue-500/30'
-                                        )}
-                                    >
-                                        <span className="w-[20px] leading-[24px] text-center shrink-0">{opt.icon}</span>
-                                        <span className={cn('text-[12px] leading-[1.333em]', form.industry === opt.value ? 'font-semibold text-[#03V6UO]' : 'font-medium text-[#94A3B8]')}>
-                                            {opt.label}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                            {errors.industry && <span className="text-xs text-red-400">{errors.industry}</span>}
-                        </div>
-
-                        {/* 3. Products / Services */}
-                        <div className="flex flex-col gap-[8px]">
-                            <label className="flex items-center text-[14px] font-medium text-[#F8FAFC] h-[24px]">
-                                <span className="w-[20px] leading-none text-center transform -translate-y-px">📦</span>
-                                <span className="ml-[8px]">Products / Services </span>
-                                <span className="ml-[1px] text-[#EF4444]">*</span>
-                            </label>
-                            <div className="relative">
-                                <textarea
-                                    value={form.products}
-                                    onChange={e => setForm(f => ({ ...f, products: e.target.value }))}
-                                    placeholder="e.g., Specialty coffee, bubble tea, handmade pastries, croissants etc..."
-                                    rows={3}
-                                    className={cn(
-                                        'w-full resize-none rounded-[16px] border bg-[rgba(30,41,59,0.6)] pl-[12px] pr-[40px] py-[12px] text-[14px] text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.5)] outline-none transition-all duration-200 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)]',
-                                        errors.products
-                                            ? 'border-red-500/40 focus:border-red-500/60 focus:ring-1 focus:ring-red-500/10'
-                                            : 'border-[rgba(59,130,246,0.15)] focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/10'
-                                    )}
-                                />
-                                <div className="absolute right-[12px] top-[12px] flex h-[24px] w-[24px] items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
-                                    <Sparkles className="h-[12px] w-[12px] text-[#3B82F6]" />
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-[8px] text-[12px] text-[#94A3B8] pl-[2px]">
-                                <span>AI will use this to suggest product images and layout</span>
-                            </div>
-                            {errors.products && <span className="text-xs text-red-400">{errors.products}</span>}
-                        </div>
-
-                        {/* 4. Target Audience */}
-                        <div className="flex flex-col gap-[8px]">
-                            <label className="flex items-center text-[14px] font-medium text-[#F8FAFC] h-[24px]">
-                                <span className="w-[20px] leading-none text-center transform -translate-y-px">🎯</span>
-                                <span className="ml-[8px]">Target Audience </span>
-                                <span className="ml-[4px] text-[12px] text-[#94A3B8] font-medium">(optional)</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={form.targetAudience}
-                                onChange={e => setForm(f => ({ ...f, targetAudience: e.target.value }))}
-                                placeholder="Enter target audience..."
-                                className="w-full rounded-[16px] border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[12px] py-[12px] text-[14px] text-white placeholder:text-[#94A3B8] outline-none transition-all duration-200 shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/10"
-                            />
-                        </div>
-
-                        {/* 5. Style */}
-                        <div className="flex flex-col gap-[8px]">
-                            <label className="flex items-center text-[14px] font-medium text-[#F8FAFC] h-[24px]">
-                                <span className="w-[20px] leading-none text-center transform -translate-y-px">🎨</span>
-                                <span className="ml-[8px]">Style</span>
-                            </label>
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-[4px]">
-                                {STYLE_OPTIONS.map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        type="button"
-                                        onClick={() => setForm(f => ({ ...f, style: opt.value }))}
-                                        className={cn(
-                                            'flex w-full items-center justify-center rounded-[16px] border px-[8px] h-[44px] text-[12px] transition-all duration-200',
-                                            form.style === opt.value
-                                                ? 'border-[#3B82F6] bg-gradient-to-r from-[rgba(59,130,246,0.2)] to-[rgba(45,212,191,0.2)] text-[#03V6UO] font-semibold shadow-[0_4px_6px_-4px_rgba(59,130,246,0.25),0_10px_15px_-3px_rgba(59,130,246,0.25)]'
-                                                : 'border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] text-[#94A3B8] font-medium shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] hover:border-blue-500/30'
-                                        )}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Submit Button */}
-                        <div className="pt-[24px]">
-                            <button
-                                type="submit"
-                                disabled={isGenerating}
-                                className="flex w-full items-center justify-center gap-[6px] rounded-[16px] bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] h-[48px] text-[14px] font-semibold text-white transition-all duration-300 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)]"
-                            >
-                                {isGenerating ? (
-                                    <>
-                                        <span className="h-[16px] w-[16px] animate-spin rounded-full border-[2px] border-white/20 border-t-white" />
-                                        <span>Initializing...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <span className="leading-[20px]">Continue — AI will create your website</span>
-                                        <ArrowRight className="h-[16px] w-[16px] text-white opacity-80" />
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            {/* ─── Right Panel: AI Website Builder Promo ────────────────── */}
-            <div className="hidden lg:flex w-1/2 h-full items-center justify-center bg-gradient-to-br from-[rgba(59,130,246,0.1)] via-[rgba(45,212,191,0.1)] to-transparent relative">
-                {/* Promo Card layout_DLRHEE */}
-                <div className="relative z-10 w-[448px] h-[419.5px] rounded-[16px] border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] backdrop-blur-xl shrink-0 p-8 flex flex-col justify-center">
-                    
-                    {/* Header icon */}
-                    <div className="h-[64px] w-[64px] rounded-[16px] bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] shadow-[0_0_40px_rgba(45,212,191,0.3),0_0_24px_rgba(59,130,246,0.6)] flex items-center justify-center mb-[24px]">
-                        <LayoutTemplate className="h-[32px] w-[32px] text-white" />
-                    </div>
-
-                    {/* Header text */}
-                    <div className="mb-[32px]">
-                        <h2 className="text-[24px] font-semibold text-[#F8FAFC] leading-[1.333em] mb-[8px]">
-                            AI Website Builder
-                        </h2>
-                        <p className="text-[14px] text-[#94A3B8] leading-[1.625em] max-w-[373px]">
-                            Just 3 simple steps, AI will create a professional website in minutes.
-                        </p>
-                    </div>
-
-                    {/* Steps List layout_KS5UKP */}
-                    <div className="flex flex-col gap-[16px]">
-                        {/* Step 1 */}
-                        <div className="flex items-center gap-[16px]">
-                            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] text-white font-semibold text-[16px]">
-                                1
-                            </div>
-                            <span className="text-[14px] font-medium text-[#F8FAFC]">
-                                Enter business information
-                            </span>
-                        </div>
-                        
-                        {/* Step 2 */}
-                        <div className="flex items-center gap-[16px]">
-                            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-[rgba(30,41,59,0.6)] border border-[rgba(59,130,246,0.15)] shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] text-[#94A3B8] font-semibold text-[16px]">
-                                2
-                            </div>
-                            <span className="text-[14px] font-medium text-[#94A3B8]">
-                                AI creates content & design
-                            </span>
-                        </div>
-                        
-                        {/* Step 3 */}
-                        <div className="flex items-center gap-[16px]">
-                            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full bg-[rgba(30,41,59,0.6)] border border-[rgba(59,130,246,0.15)] shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_rgba(255,255,255,0.05)] text-[#94A3B8] font-semibold text-[16px]">
-                                3
-                            </div>
-                            <span className="text-[14px] font-medium text-[#94A3B8]">
-                                Preview & Publish
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <BuilderStepScreen
+            description="Provide basic information so AI can create the perfect website for you."
+            floatingControls={floatingControls}
+            leftBody={leftBody}
+            leftFooter={leftFooter}
+            right={rightPane}
+            subtitle="Business Information"
+            title="Create Website with AI"
+        />
     )
 }
