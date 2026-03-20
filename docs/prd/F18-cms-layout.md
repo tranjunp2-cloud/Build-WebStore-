@@ -38,7 +38,7 @@ CMS cần một khung bố cục (layout) nhất quán và thân thiện cho t�
 ## 3. Solution Overview
 
 Thiết kế layout CMS 3-phần chuẩn:
-1. **Top Header**: Fixed — Logo, Notification Bell, Avatar (Language + Profile).
+1. **Top Header**: Fixed — Logo, Language Switcher (BM/EN), Notification Bell, Avatar (Profile).
 2. **Side Menu**: Fixed trái — Navigation với Icon + Text. Mobile → Slide-in Drawer.
 3. **Main Content Area**: Scroll độc lập, Spacing mobile-friendly.
 
@@ -51,7 +51,7 @@ Thiết kế layout CMS 3-phần chuẩn:
 - Top Header: Logo, Notification Bell (tích hợp F16), Avatar dropdown (Profile, Language, Workspace, Logout) (US-F18-02).
 - Main Content Area: Independent scrolling (US-F18-03).
 - Mobile responsive: Hamburger → Slide-in drawer.
-- Language toggle: BM / EN trong Avatar dropdown.
+- Language toggle: BM / EN cố định trên Top Header.
 
 ### Out of Scope
 - Thiết kế nội dung của từng module riêng lẻ (Products, Orders...).
@@ -92,7 +92,7 @@ SO THAT tôi có thể quản lý cửa hàng dễ dàng từ bất kỳ thiết
 | FR-03 | Sidebar footer: Help Center link, mở nội bộ CMS | US-F18-01 | P0 | Link dến màn hình F20 |
 | FR-04 | Top Header: Logo PrimeWeb → click → /dashboard | US-F18-02 | P0 | Fixed, always visible |
 | FR-05 | Top Header: Notification Bell + Red dot badge + số lượng | US-F18-02 | P0 | Link đến F16 |
-| FR-06 | Top Header: Avatar dropdown (Profile, Language BM/EN, Workspace switch, Logout) | US-F18-02 | P0 | |
+| FR-06 | Top Header: Avatar dropdown (Profile, Workspace switch, Logout) | US-F18-02 | P0 | |
 | FR-07 | Main Content: Scroll độc lập, Header + Sidebar fixed | US-F18-03 | P0 | |
 
 ---
@@ -104,6 +104,7 @@ SO THAT tôi có thể quản lý cửa hàng dễ dàng từ bất kỳ thiết
 - **BR-03:** Language switch (BM/EN) phải được lưu persistent theo user preference.
 - **BR-04:** Notification bell connect với real-time data từ F16 Notification Center.
 - **BR-05:** Các nhóm menu chính (như My Webstore) có thể được mở rộng (expand/collapse) để chứa sub-menu tương ứng. (Dashboard là menu đơn).
+- **BR-06:** Hiển thị Tên Webstore (Workspace hiện tại) rõ ràng trên Top Header/Sidebar để SME dễ nhận diện context đang thao tác (Multi-store Switcher visibility).
 
 ---
 
@@ -133,11 +134,11 @@ Sidebar: Expanded (Desktop) / Hamburger (Mobile)
    ↓
 Click Menu Item → Main Content area loads feature
    ↓ [Mobile only]
-Click ☰ → Sidebar Drawer slides in → Click item → Drawer closes
+Click ☰ → Sidebar Drawer slides in → Click Leaf-route → Drawer closes (KHÔNG đóng nếu click Expandable Menu)
    ↓
 Click Bell → F16 Notification Dropdown
    ↓
-Click Avatar → Dropdown: Profile | Language BM/EN | Workspace | Logout
+Click Avatar → Dropdown: Profile | Workspace | Logout
 ```
 
 ---
@@ -152,7 +153,7 @@ Click Avatar → Dropdown: Profile | Language BM/EN | Workspace | Logout
 - **Mô tả:** Bản vẽ bộ khung Layout chung chứa Header, Sidebar và Main Content.
 - **Components chính:**
   - Top Header: Nơi chứa Logo, Nút Menu Collapse/Hamburger, Icon Notification, Avatar/Profile dropdown.
-  - Left Sidebar Navigation: Thanh trượt chứa các Menu tính năng dạng nhóm (Dashboard, Store, Config). WhatsApp Hỗ Trợ ở chân.
+  - Left Sidebar Navigation: Thanh trượt chứa các Menu tính năng dạng nhóm (Dashboard, Store, Config). Được thiết lập `overflow-y: auto` để scroll độc lập nếu danh sách menu dài. WhatsApp Hỗ Trợ ở chân.
   - Main Content Box: Nơi chứa ruột các module F03, F08, F10... Phần này được gắn quyền scroll-y độc lập.
 - **Wireframe:**
 ```text
@@ -181,7 +182,7 @@ Mobile: Sidebar hides → ☰ at Header top-left
 - **Sidebar State:** 1) Expanded Mode: Chứa cả Icon + Text (Desktop mặc định). 2) Collapsed Mode: Thu gọn chỉ hiện Icon (Khi người dùng đóng hẹp thanh bar hoặc thiết bị Tablet). 3) Drawer Mode: Dành riêng cho Mobile dưới 768px, được gọi ẩn chứa bên ngoài màn hình và trượt vào khi click Hamburger.
 - **Loading State:** Khi Router chuyển hướng giữa các module, Progress Bar chạy trên mép Top Header.
 ### 10.3. Màn hình phụ & Modals
-- **Avatar Dropdown Popover:** Chứa Language Switcher (BM/EN), Workspace Switch, Nút Đăng Xuất.
+- **Avatar Dropdown Popover:** Chứa Profile, Workspace Switch, Nút Đăng Xuất.
 - **Wireframe (Avatar Dropdown):**
 ```text
 ┌────────────────────────┐
@@ -190,10 +191,6 @@ Mobile: Sidebar hides → ☰ at Header top-left
 │  ────────────────────  │
 │  ⚙️ Profile            │
 │  🌐 Workspace: MY      │
-│  ────────────────────  │
-│  🗣 Language:          │
-│    (•) English         │
-│    ( ) B. Melayu       │
 │  ────────────────────  │
 │  🚪 Logout             │
 └────────────────────────┘
@@ -241,7 +238,7 @@ THEN  mở F16 Notification Dropdown
 
 ```gherkin
 GIVEN user click Avatar ở Header phải
-THEN  dropdown hiển thị: Profile | Language (BM/EN) | Workspace | Logout
+THEN  dropdown hiển thị: Profile | Workspace | Logout
 ```
 
 ### AC-5: Main Content Independent Scroll
@@ -303,7 +300,9 @@ THEN  chỉ Main Content scroll
 |---|----------|-------|--------|
 | 1 | Sidebar có cần hỗ trợ mini mode (icon-only) trên tablet không, hay chỉ Expanded / Hidden? | Design | ⬜ Open |
 | 2 | Switch Workspace (multi-site) có trong Phase 1 không hay defer sang Wave 2+? | PO | ⬜ Open |
-| 3 | Link WhatsApp Business có được nhúng vĩnh viễn trong Help Center hay tùy biến? | Ops | ⬜ Open |
+| 3 | Link WhatsApp Business nên dùng Floating Widget/Slide-over hay bắt redirect hẳn sang trang F20? | UX/Ops | ⬜ Open |
+| 4 | Fallback cho Language Switch là BM hay EN nếu trình duyệt chặn localStorage? | Tech | ⬜ Open |
+| 5 | Giao thức đồng bộ Notification Badge với F16 dùng Polling hay WebSocket? Limit max (VD: 99+)? | Tech/F16 | ⬜ Open |
 
 ---
 

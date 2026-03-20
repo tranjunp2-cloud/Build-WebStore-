@@ -125,7 +125,7 @@ export default function BlogCategoriesPage() {
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
                     <Link
-                        href="/dashboard/blog"
+                        href="/blog"
                         className="flex-shrink-0 rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
                     >
                         <ArrowLeft className="h-4 w-4" />

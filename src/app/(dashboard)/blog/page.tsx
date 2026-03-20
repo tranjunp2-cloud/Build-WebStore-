@@ -286,7 +286,7 @@ export default function BlogListPage() {
                     <h3 className="text-lg font-semibold text-white">No blog posts yet</h3>
                     <p className="text-sm text-gray-400">Create your first blog post to engage customers</p>
                     <button
-                        onClick={() => router.push('/dashboard/blog/new')}
+                        onClick={() => router.push('/blog/new')}
                         className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-400 transition-colors"
                     >
                         <Plus className="h-4 w-4" />
@@ -309,14 +309,14 @@ export default function BlogListPage() {
                 </div>
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => router.push('/dashboard/blog/categories')}
+                        onClick={() => router.push('/blog/categories')}
                         className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
                     >
                         <Tag className="h-4 w-4" />
                         Categories
                     </button>
                     <button
-                        onClick={() => router.push('/dashboard/blog/new')}
+                        onClick={() => router.push('/blog/new')}
                         className="flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-cyan-500/25 hover:bg-cyan-500 transition-colors"
                     >
                         <Plus className="h-4 w-4" />
@@ -432,7 +432,7 @@ export default function BlogListPage() {
                             <tr
                                 key={post.id}
                                 className="group cursor-pointer hover:bg-white/[0.02] transition-colors"
-                                onClick={() => router.push(`/dashboard/blog/${post.id}`)}
+                                onClick={() => router.push(`/blog/${post.id}`)}
                             >
                                 <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                     <input

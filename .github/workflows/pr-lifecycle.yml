@@ -25,7 +25,7 @@ jobs:
       - name: Checkout (for composite action)
         uses: actions/checkout@v4
 
-      - name: Auto-assign author + label + detect type
+      - name: Auto-assign author + label + detect type + check issue link
         uses: actions/github-script@v7
         id: size
         with:
@@ -84,10 +84,126 @@ jobs:
               labels,
             });
 
+            // ── 5. Auto-link PR → Issue ──
+            let body = pr.body || '';
+            const linkRe = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)/gi;
+            const linkedIssues = [];
+            let match;
+            while ((match = linkRe.exec(body)) !== null) {
+              linkedIssues.push(parseInt(match[1]));
+            }
+
+            // Skip for chore/docs/refactor branches
+            const skipTypes = ['chore/', 'docs/', 'refactor/'];
+            const shouldCheck = !skipTypes.some(t => branch.startsWith(t));
+
+            if (shouldCheck && linkedIssues.length === 0) {
+              const title = pr.title || '';
+
+              // Strategy 1: Exact match from PR title — [US-F01-03] pattern
+              const storyMatch = title.match(/\[?(US-F\d{2}-\d{2})\]?/i);
+              let autoLinked = false;
+
+              if (storyMatch) {
+                const storyId = storyMatch[1].toUpperCase();
+                // Search issues whose title starts with [US-F01-03]
+                const { data: exactMatches } = await github.rest.issues.listForRepo({
+                  owner, repo, state: 'open', per_page: 5,
+                });
+                const exactIssue = exactMatches.find(i =>
+                  !i.pull_request && i.title.toUpperCase().includes(`[${storyId}]`)
+                );
+
+                if (exactIssue) {
+                  // Auto-inject Closes #N into PR body
+                  const updatedBody = body.replace(
+                    /- \*\*Closes:\*\* #(?:<!--.*?-->)?/,
+                    `- **Closes:** #${exactIssue.number}`
+                  );
+                  // Fallback: prepend if template pattern not found
+                  const finalBody = updatedBody !== body
+                    ? updatedBody
+                    : `Closes #${exactIssue.number}\n\n${body}`;
+
+                  await github.rest.pulls.update({
+                    owner, repo, pull_number: prNumber,
+                    body: finalBody,
+                  });
+
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: prNumber,
+                    body: `🔗 Auto-linked to **#${exactIssue.number}** (${exactIssue.title}).\nIssue will auto-close when this PR is merged.`,
+                  });
+                  linkedIssues.push(exactIssue.number);
+                  autoLinked = true;
+                }
+              }
+
+              // Strategy 2: Feature code from branch — feature/F01-xxx
+              if (!autoLinked) {
+                const featureMatch = branch.match(/\b(F\d{2})\b/i);
+                if (featureMatch) {
+                  const featureCode = featureMatch[1].toUpperCase();
+                  const { data: candidates } = await github.rest.issues.listForRepo({
+                    owner, repo, state: 'open',
+                    labels: `feature:${featureCode}`,
+                    per_page: 10,
+                  });
+                  const issues = candidates.filter(i => !i.pull_request);
+
+                  if (issues.length === 1) {
+                    // Single match → auto-link
+                    const issue = issues[0];
+                    const updatedBody = body.replace(
+                      /- \*\*Closes:\*\* #(?:<!--.*?-->)?/,
+                      `- **Closes:** #${issue.number}`
+                    );
+                    const finalBody = updatedBody !== body
+                      ? updatedBody
+                      : `Closes #${issue.number}\n\n${body}`;
+
+                    await github.rest.pulls.update({
+                      owner, repo, pull_number: prNumber,
+                      body: finalBody,
+                    });
+
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNumber,
+                      body: `🔗 Auto-linked to **#${issue.number}** (${issue.title}) — only open issue for \`${featureCode}\`.\nIssue will auto-close when this PR is merged.`,
+                    });
+                    linkedIssues.push(issue.number);
+                  } else if (issues.length > 1) {
+                    // Multiple matches → suggest
+                    const list = issues
+                      .map(i => `- \`Closes #${i.number}\` — ${i.title}`)
+                      .slice(0, 5)
+                      .join('\n');
+
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNumber,
+                      body: `⚠️ **Chưa link issue.** Tìm thấy ${issues.length} issues cho \`${featureCode}\`:\n\n${list}\n\n👉 Edit PR description → thêm \`Closes #<số>\` vào dòng **Closes:** ở trên.`,
+                    });
+                  } else {
+                    await github.rest.issues.createComment({
+                      owner, repo, issue_number: prNumber,
+                      body: `⚠️ **Chưa link issue.** Không tìm thấy issue nào cho \`${featureCode}\`.\n\n👉 Tìm issue phù hợp trong tab Issues → thêm \`Closes #<số>\` vào PR description.`,
+                    });
+                  }
+                } else {
+                  // No feature code in branch name
+                  await github.rest.issues.createComment({
+                    owner, repo, issue_number: prNumber,
+                    body: `⚠️ **Chưa link issue.** Thêm \`Closes #<số>\` vào PR description để link với user story.\n\n> _Tab Issues → tìm story → copy số → điền vào PR._`,
+                  });
+                }
+              }
+            }
+
             core.setOutput('size_label', sizeLabel);
             core.setOutput('changes', changes);
             core.setOutput('file_count', files.length);
             core.setOutput('labels', labels.join(', '));
+            core.setOutput('linked_issues', linkedIssues.join(', ') || 'none');
 
       - name: Notify Lark (PR Opened)
         uses: ./.github/actions/lark-notify

@@ -1,5 +1,5 @@
-import type { Block, CollectionConfig } from 'payload'
-
+import type { Block, CollectionConfig, CollectionAfterChangeHook } from 'payload'
+import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
 // Block definitions — each block is a section of a page
 const HeroBlock = {
     slug: 'hero',
@@ -277,6 +277,25 @@ const GalleryBlock = {
     ],
 }
 
+
+const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation }) => {
+    const isPublishingUpdate = operation === 'update' && doc._status === 'published' && previousDoc?._status !== 'published'
+    const isPublishingCreate = operation === 'create' && doc._status === 'published'
+
+    // Wait until it becomes published and seo title is empty
+    if ((isPublishingUpdate || isPublishingCreate) && !doc.seo?.title) {
+        // Collect text content for context (very basic extraction)
+        let textContext = ''
+        if (Array.isArray(doc.layout)) {
+            const texts = doc.layout.map((block: any) => block.headline || block.sectionLabel || '').filter(Boolean)
+            textContext = texts.join('. ')
+        }
+        
+        // Trigger background generation
+        queueSEOAutoGeneration('pages', doc.id, typeof doc.site === 'object' ? doc.site.id : doc.site, doc.title, textContext)
+    }
+}
+
 const StatsBlock = {
     slug: 'stats',
     labels: { singular: 'Stats Section', plural: 'Stats Sections' },
@@ -355,10 +374,14 @@ const TeamBlock = {
             ],
         },
     ],
+
 }
 
 export const Pages: CollectionConfig = {
     slug: 'pages',
+    hooks: {
+        afterChange: [afterChangeHook],
+    },
     admin: {
         useAsTitle: 'title',
         description: 'Pages belong to a site and contain ordered blocks.',

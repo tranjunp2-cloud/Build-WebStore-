@@ -13,7 +13,7 @@
 
 ```
 As a   SME owner mới đăng ký
-I want điền thông tin vào ô nhập liệu (Tên doanh nghiệp, Mô tả ngắn, Mặt hàng/Dịch vụ)
+I want điền thông tin vào ô nhập liệu (Tên doanh nghiệp, Ngành nghề / Lĩnh vực, Mô tả ngắn, Mặt hàng/Dịch vụ)
 So that AI tạo đầy đủ website phù hợp và chính xác
 ```
 
@@ -23,7 +23,7 @@ So that AI tạo đầy đủ website phù hợp và chính xác
 
 ```gherkin
 GIVEN user ở /builder/new có form nhập liệu
-WHEN  user điền đủ thông tin: Tên doanh nghiệp, Mô tả ngắn, Mặt hàng/Dịch vụ
+WHEN  user điền đủ thông tin: Tên doanh nghiệp, Ngành nghề/Lĩnh vực, Mô tả ngắn, Mặt hàng/Dịch vụ
   AND click "Tạo Website"
 THEN  hệ thống kiểm tra thông tin đầu vào
   AND AI bắt đầu sinh Media (Banner, Image Carousel) và Content (About Us, Vision, Mission)
@@ -36,7 +36,7 @@ THEN  hệ thống kiểm tra thông tin đầu vào
 
 ```gherkin
 GIVEN user submit form tạo website
-WHEN  các trường Tên doanh nghiệp hoặc Bổ sung thông tin bị trống
+WHEN  các trường Tên doanh nghiệp, Ngành nghề/Lĩnh vực, hoặc Bổ sung thông tin bị trống
 THEN  hiển thị báo lỗi đỏ tại ô nhập liệu
   AND KHÔNG bắt đầu quá trình generate cho tới khi đủ điều kiện
 ```
@@ -136,6 +136,7 @@ GIVEN user ở /onboarding chọn "Tạo bằng AI"
 WHEN  redirect sang /builder/new
 THEN  hệ thống hiển thị form nhập liệu, bao gồm các ô: 
         - [Tên doanh nghiệp]
+        - [Ngành nghề / Lĩnh vực] (Select buttons / Chips)
         - [Mô tả ngắn về doanh nghiệp]
         - [Mặt hàng/Dịch vụ doanh nghiệp kinh doanh]
   AND thông tin này tự động lưu vào site.aiContext trong DB
@@ -302,6 +303,7 @@ GIVEN người dùng truy cập /builder/new lần đầu
 WHEN  trang tải (load) xong
 THEN  giao diện chính hiển thị một thẻ Card có 3 trường nhập liệu:
         - Tên doanh nghiệp (Input text)
+        - Ngành nghề / Lĩnh vực (Select buttons / Chips dạng UI nổi bật)
         - Mô tả ngắn về doanh nghiệp (Textarea lớn)
         - Mặt hàng / Dịch vụ kinh doanh (Input text hoặc Tags check)
   AND  có phần ví dụ (placeholder) cho "Mô tả ngắn": "VD: Tiệm bánh handmade hoạt động từ 2020..."
@@ -312,7 +314,7 @@ THEN  giao diện chính hiển thị một thẻ Card có 3 trường nhập li
 ```gherkin
 GIVEN user vừa điền form
 WHEN  click nút "Generate Website"
-THEN  xác thực (validation) các trường bắt buộc (Tên doanh nghiệp, Mặt hàng/Dịch vụ)
+THEN  xác thực (validation) các trường bắt buộc (Tên doanh nghiệp, Ngành nghề/Lĩnh vực, Mặt hàng/Dịch vụ)
   AND  nếu thiếu, hiển thị lỗi ngay tại ô text tương ứng
 ```
 
@@ -329,7 +331,7 @@ THEN  hệ thống khoá (disable) form và nút bấm
 ### Definition of Done
 
 - [ ] 9-Point Checklist pass (ref: `SPEC.md §13`)
-- [ ] Render đầy đủ 3 form inputs với placeholders
+- [ ] Render đầy đủ 4 form inputs với placeholders
 - [ ] Submit button có validation
 - [ ] Chuyển trạng thái processing đúng khi đủ info
 
@@ -583,7 +585,7 @@ So that I can easily type my details and get the "wow" factor of seeing my site 
 ```gherkin
 GIVEN the user accesses /builder/new on a smartphone (width < 768px)
 WHEN  the page loads
-THEN  the 3 form inputs (Name, Description, Services) are stacked vertically taking full width
+THEN  the 4 form inputs (Name, Industry, Description, Services) are stacked vertically taking full width
   AND labels are positioned above the inputs to maximize tap area
   AND input font size is exactly 16px to prevent iOS Safari auto-zooming
   AND the "✨ Tạo Website" button remains sticky at the bottom of the screen to prevent being hidden by the virtual keyboard
