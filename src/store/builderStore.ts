@@ -25,10 +25,12 @@ export type ProgressStep = {
 
 export type BusinessInfo = {
     businessName: string
+    shortDescription: string
     industry: string
     products: string
     targetAudience: string
     style: string
+    language?: 'en' | 'ms' | 'vi' | 'auto'
 }
 
 type BuilderState = {
@@ -66,6 +68,8 @@ type BuilderActions = {
     setProgress: (progress: ProgressStep) => void
     setSiteId: (siteId: string) => void
     setSiteName: (name: string) => void
+    setBlocks: (blocks: any[]) => void
+
 
     // Error
     setError: (error: BuilderState['error']) => void
@@ -94,38 +98,26 @@ export const useBuilderStore = create<BuilderState & BuilderActions>((set) => ({
         set({
             businessInfo: info,
             step: 'chat',
-            messages: [
-                {
-                    id: 'welcome',
-                    role: 'assistant',
-                    content:
-                        `Great! I have received the info for **${info.businessName}** (${info.industry}).` +
-                        `\n\nBased on your information, I will create a website with:` +
-                        `\n📄 **Homepage** with complete sections` +
-                        `\n🧩 **8-14 Sections:** Navigation, Hero, About, Features, Testimonials, Contact, Footer...` +
-                        `\n🎨 **Theme:** Auto-selected by AI based on your industry` +
-                        `\n📱 **Responsive:** Optimised for all devices` +
-                        `\n\nType **"Create now"** or describe any special requirements! 🚀`,
-                    timestamp: new Date(),
-                },
-            ],
+            messages: [],
         }),
 
     setStep: (step) => set({ step }),
 
-    addMessage: (msg) =>
+    addMessage: (msg) => {
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
         set((state) => ({
             messages: [
                 ...state.messages,
-                { ...msg, id: Date.now().toString(), timestamp: new Date() },
+                { ...msg, id, timestamp: new Date() },
             ],
-        })),
+        }))
+    },
 
     setStatus: (status) => set({ status }),
 
     addBlock: (block) =>
         set((state) => ({
-            blocks: [...state.blocks, block],
+            blocks: [...state.blocks, { ...block, _id: block._id || `${block.blockType}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }],
         })),
 
     setTheme: (theme) => set({ theme }),
@@ -135,6 +127,8 @@ export const useBuilderStore = create<BuilderState & BuilderActions>((set) => ({
     setSiteId: (siteId) => set({ siteId }),
 
     setSiteName: (name) => set({ siteName: name }),
+
+    setBlocks: (blocks) => set({ blocks }),
 
     setError: (error) => set({ error, status: 'error' }),
 

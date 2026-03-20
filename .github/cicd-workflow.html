@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI/CD Workflow với Cursor Automations</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c14;
+    --surface: #0d1520;
+    --surface2: #111d2e;
+    --border: #1e3a5f;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --accent4: #f59e0b;
+    --accent5: #ef4444;
+    --lark: #1456f5;
+    --cursor: #5b4cf5;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --glow: rgba(0,212,255,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: auto;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    padding: 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 50px;
+  }
+
+  .header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(91,76,245,0.15);
+    border: 1px solid rgba(91,76,245,0.4);
+    border-radius: 100px;
+    padding: 6px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #a78bfa;
+    letter-spacing: 0.1em;
+    margin-bottom: 20px;
+  }
+
+  .header-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #a78bfa;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .title {
+    font-size: 36px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #00d4ff, #7c3aed, #10b981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.2;
+    margin-bottom: 12px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 300;
+  }
+
+  /* Phases row */
+  .phases {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .phase-tag {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid;
+  }
+
+  .phase-tag.dev { background: rgba(0,212,255,0.08); border-color: rgba(0,212,255,0.3); color: var(--accent); }
+  .phase-tag.ci { background: rgba(124,58,237,0.08); border-color: rgba(124,58,237,0.3); color: #a78bfa; }
+  .phase-tag.cd { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.3); color: var(--accent3); }
+  .phase-tag.monitor { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.3); color: var(--accent4); }
+
+  /* Main flow */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Phase sections */
+  .phase-section {
+    margin-bottom: 8px;
+  }
+
+  .phase-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .phase-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Row of steps */
+  .step-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    position: relative;
+    margin-bottom: 4px;
+  }
+
+  /* Individual step */
+  .step {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+    transition: all 0.3s ease;
+    cursor: default;
+  }
+
+  .step:hover {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px var(--glow);
+    transform: translateY(-2px);
+  }
+
+  .step.cursor-step { border-color: rgba(91,76,245,0.4); background: rgba(91,76,245,0.06); }
+  .step.cursor-step:hover { border-color: var(--cursor); box-shadow: 0 0 20px rgba(91,76,245,0.2); }
+
+  .step.lark-step { border-color: rgba(20,86,245,0.4); background: rgba(20,86,245,0.06); }
+  .step.lark-step:hover { border-color: var(--lark); box-shadow: 0 0 20px rgba(20,86,245,0.2); }
+
+  .step.success-step { border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.06); }
+  .step.danger-step { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.06); }
+  .step.warn-step { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.06); }
+
+  .step-icon {
+    font-size: 22px;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .step-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 5px;
+    color: var(--text);
+  }
+
+  .step-desc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .step-tag {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .tag-cursor { background: rgba(91,76,245,0.2); color: #a78bfa; }
+  .tag-lark { background: rgba(20,86,245,0.2); color: #60a5fa; }
+  .tag-auto { background: rgba(16,185,129,0.2); color: #34d399; }
+  .tag-github { background: rgba(100,116,139,0.2); color: #94a3b8; }
+  .tag-manual { background: rgba(245,158,11,0.2); color: #fbbf24; }
+  .tag-block { background: rgba(239,68,68,0.2); color: #f87171; }
+
+  /* Arrow connectors between steps */
+  .arrow-h {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: 14px;
+    position: relative;
+  }
+
+  .arrow-h::before {
+    content: '→';
+    color: var(--border);
+    font-size: 18px;
+  }
+
+  /* Vertical arrows between rows */
+  .arrow-v {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 32px;
+    color: var(--muted);
+    font-size: 18px;
+    position: relative;
+  }
+
+  .arrow-v::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--border), var(--accent), var(--border));
+  }
+
+  .arrow-v-icon {
+    position: relative;
+    z-index: 1;
+    background: var(--bg);
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+  }
+
+  /* Cursor automation banner */
+  .automation-banner {
+    background: linear-gradient(135deg, rgba(91,76,245,0.12), rgba(0,212,255,0.08));
+    border: 1px solid rgba(91,76,245,0.35);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 16px 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .automation-banner::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: linear-gradient(to bottom, var(--cursor), var(--accent));
+  }
+
+  .banner-icon {
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+
+  .banner-content { flex: 1; }
+
+  .banner-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #a78bfa;
+    margin-bottom: 4px;
+  }
+
+  .banner-desc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .banner-triggers {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .trigger-chip {
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border: 1px solid;
+  }
+
+  .chip-push { background: rgba(0,212,255,0.1); border-color: rgba(0,212,255,0.3); color: var(--accent); }
+  .chip-pr { background: rgba(124,58,237,0.1); border-color: rgba(124,58,237,0.3); color: #a78bfa; }
+  .chip-merge { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: var(--accent3); }
+  .chip-incident { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #f87171; }
+  .chip-cron { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); color: var(--accent4); }
+
+  /* Lark notification panel */
+  .lark-panel {
+    background: linear-gradient(135deg, rgba(20,86,245,0.1), rgba(20,86,245,0.05));
+    border: 1px solid rgba(20,86,245,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .lark-panel::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--lark);
+  }
+
+  .lark-panel-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #60a5fa;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lark-notifications {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+  }
+
+  .lark-notif {
+    background: rgba(20,86,245,0.08);
+    border: 1px solid rgba(20,86,245,0.2);
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+
+  .lark-notif-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .lark-notif-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  .lark-notif-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .lark-notif-desc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* Decision diamond */
+  .decision-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 8px 0;
+  }
+
+  .diamond {
+    width: 120px;
+    height: 60px;
+    background: var(--surface2);
+    border: 1px solid var(--accent4);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent4);
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .decision-path {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .path-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .path-yes { background: rgba(16,185,129,0.2); color: var(--accent3); }
+  .path-no { background: rgba(239,68,68,0.2); color: var(--accent5); }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 40px;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .legend-color {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-size: 24px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Animate on load */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .step, .automation-banner, .lark-panel, .stat-card {
+    animation: fadeUp 0.5s ease forwards;
+    opacity: 0;
+  }
+
+  .step:nth-child(1) { animation-delay: 0.05s; }
+  .step:nth-child(2) { animation-delay: 0.1s; }
+  .step:nth-child(3) { animation-delay: 0.15s; }
+  .step:nth-child(4) { animation-delay: 0.2s; }
+  .step:nth-child(5) { animation-delay: 0.25s; }
+
+  .stat-card:nth-child(1) { animation-delay: 0.1s; }
+  .stat-card:nth-child(2) { animation-delay: 0.2s; }
+  .stat-card:nth-child(3) { animation-delay: 0.3s; }
+  .stat-card:nth-child(4) { animation-delay: 0.4s; }
+
+  /* Glow pulse animation for active elements */
+  @keyframes glowPulse {
+    0%, 100% { box-shadow: 0 0 10px var(--glow); }
+    50% { box-shadow: 0 0 25px var(--glow), 0 0 50px rgba(0,212,255,0.08); }
+  }
+
+  .cursor-step { animation: fadeUp 0.5s ease forwards, glowPulse 3s ease infinite; }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-title.blue { color: var(--accent); }
+  .section-title.purple { color: #a78bfa; }
+  .section-title.green { color: var(--accent3); }
+  .section-title.yellow { color: var(--accent4); }
+  .section-title.red { color: var(--accent5); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-badge">⚡ CI/CD Modern Workflow 2026</div>
+    <div class="title">Full CI/CD Pipeline<br>với Cursor Automations + Lark</div>
+    <div class="subtitle">// Từ code commit → production deployment → monitoring</div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-value">~15'</div>
+      <div class="stat-label">Commit → Production</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">0</div>
+      <div class="stat-label">Manual review steps</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">24/7</div>
+      <div class="stat-label">Cursor agents online</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">100%</div>
+      <div class="stat-label">Lark visibility</div>
+    </div>
+  </div>
+
+  <!-- Phase 1: Dev -->
+  <div class="phase-section">
+    <div class="section-title blue">① Phase 1 — Local Development</div>
+    <div class="step-row">
+      <div class="step">
+        <span class="step-icon">💻</span>
+        <div class="step-title">Developer Code</div>
+        <div class="step-desc">Dev viết code trên<br>Cursor IDE<br>AI tab-complete, agent suggest</div>
+        <span class="step-tag tag-manual">local</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step cursor-step">
+        <span class="step-icon">🤖</span>
+        <div class="step-title">Cursor Agent (local)</div>
+        <div class="step-desc">Plan Mode → viết code<br>Tự chạy test local<br>Fix lỗi tự động</div>
+        <span class="step-tag tag-cursor">cursor ai</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step">
+        <span class="step-icon">🌿</span>
+        <div class="step-title">Feature Branch</div>
+        <div class="step-desc">git checkout -b feature/xxx<br>Commit với message<br>tự động từ Cursor</div>
+        <span class="step-tag tag-github">git</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step">
+        <span class="step-icon">⬆️</span>
+        <div class="step-title">Push to GitHub</div>
+        <div class="step-desc">git push origin<br>feature/xxx<br>→ Trigger CI/CD</div>
+        <span class="step-tag tag-github">github</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Arrow down -->
+  <div class="arrow-v"><div class="arrow-v-icon">↓ push event triggers automation</div></div>
+
+  <!-- Cursor Automation banner 1 -->
+  <div class="automation-banner">
+    <div class="banner-icon">⚡</div>
+    <div class="banner-content">
+      <div class="banner-title">Cursor Automation #1 — Security Review (triggered on every push)</div>
+      <div class="banner-desc">Agent spin up cloud sandbox → đọc diff → audit security vulnerabilities → skip issues đã discuss → post PR comment + alert Lark nếu high-risk</div>
+      <div class="banner-triggers">
+        <span class="trigger-chip chip-push">on: push</span>
+        <span class="trigger-chip chip-pr">on: PR opened</span>
+        <span class="trigger-chip chip-pr">async — không block dev</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase 2: CI -->
+  <div class="phase-section">
+    <div class="section-title purple">② Phase 2 — Continuous Integration (GitHub Actions)</div>
+    <div class="step-row">
+      <div class="step">
+        <span class="step-icon">🔍</span>
+        <div class="step-title">Lint + Type Check</div>
+        <div class="step-desc">ESLint / Prettier<br>TypeScript tsc<br>Code style enforced</div>
+        <span class="step-tag tag-auto">auto</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step">
+        <span class="step-icon">🧪</span>
+        <div class="step-title">Unit Tests</div>
+        <div class="step-desc">Jest / Vitest<br>Coverage report<br>Min 80% coverage</div>
+        <span class="step-tag tag-auto">auto</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step">
+        <span class="step-icon">🏗️</span>
+        <div class="step-title">Build & Compile</div>
+        <div class="step-desc">Docker image build<br>Optimize bundle<br>Generate artifacts</div>
+        <span class="step-tag tag-auto">auto</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step cursor-step">
+        <span class="step-icon">🔐</span>
+        <div class="step-title">Cursor BugBot Review</div>
+        <div class="step-desc">Auto-review PR<br>Suggest fixes inline<br>"Fix with Cursor" button</div>
+        <span class="step-tag tag-cursor">cursor ai</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-v"><div class="arrow-v-icon">↓ CI passed</div></div>
+
+  <!-- Cursor Automation banner 2 -->
+  <div class="automation-banner">
+    <div class="banner-icon">🎯</div>
+    <div class="banner-content">
+      <div class="banner-title">Cursor Automation #2 — Auto Assign PR Reviewers</div>
+      <div class="banner-desc">Phân tích blast radius + complexity + infra impact → Low risk: auto-approve → High risk: assign 1-2 reviewer dựa trên contribution history → Log vào Lark</div>
+      <div class="banner-triggers">
+        <span class="trigger-chip chip-pr">on: PR opened</span>
+        <span class="trigger-chip chip-merge">low-risk: auto-approve</span>
+        <span class="trigger-chip chip-pr">high-risk: assign reviewer</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Code Review gate -->
+  <div class="phase-section">
+    <div class="section-title yellow">③ Phase 3 — Code Review Gate</div>
+    <div class="step-row">
+      <div class="step warn-step">
+        <span class="step-icon">👀</span>
+        <div class="step-title">PR Review (nếu cần)</div>
+        <div class="step-desc">Chỉ high-risk PRs<br>cần human review<br>Low-risk đã auto-approve</div>
+        <span class="step-tag tag-manual">human</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step success-step">
+        <span class="step-icon">✅</span>
+        <div class="step-title">Approved → Merge</div>
+        <div class="step-desc">Squash & merge<br>vào main branch<br>Delete feature branch</div>
+        <span class="step-tag tag-github">github</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step danger-step">
+        <span class="step-icon">❌</span>
+        <div class="step-title">Rejected → Fix</div>
+        <div class="step-desc">Comment feedback<br>Dev fix với Cursor<br>Re-push → CI lại</div>
+        <span class="step-tag tag-block">blocked</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step lark-step">
+        <span class="step-icon">🔔</span>
+        <div class="step-title">Lark Notification</div>
+        <div class="step-desc">Thông báo status PR<br>vào group dev team<br>Mention người liên quan</div>
+        <span class="step-tag tag-lark">lark</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-v"><div class="arrow-v-icon">↓ merged to main → trigger CD</div></div>
+
+  <!-- Phase 4: CD -->
+  <div class="phase-section">
+    <div class="section-title green">④ Phase 4 — Continuous Deployment</div>
+    <div class="step-row">
+      <div class="step">
+        <span class="step-icon">🧩</span>
+        <div class="step-title">Integration Tests</div>
+        <div class="step-desc">E2E tests (Playwright)<br>API tests<br>Staging environment</div>
+        <span class="step-tag tag-auto">auto</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step">
+        <span class="step-icon">🌐</span>
+        <div class="step-title">Deploy Staging</div>
+        <div class="step-desc">Auto deploy lên staging<br>Smoke tests chạy<br>Preview URL tạo</div>
+        <span class="step-tag tag-auto">auto</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step warn-step">
+        <span class="step-icon">🚦</span>
+        <div class="step-title">Manual Gate (opt)</div>
+        <div class="step-desc">QA verify trên staging<br>PM sign-off nếu cần<br>1-click approve</div>
+        <span class="step-tag tag-manual">human</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step success-step">
+        <span class="step-icon">🚀</span>
+        <div class="step-title">Deploy Production</div>
+        <div class="step-desc">Canary → Rolling deploy<br>Zero downtime<br>Auto rollback nếu fail</div>
+        <span class="step-tag tag-auto">auto</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-v"><div class="arrow-v-icon">↓ deployed → monitoring begins</div></div>
+
+  <!-- Phase 5: Monitor -->
+  <div class="phase-section">
+    <div class="section-title yellow">⑤ Phase 5 — Monitoring & Feedback Loop</div>
+    <div class="step-row">
+      <div class="step cursor-step">
+        <span class="step-icon">🧪</span>
+        <div class="step-title">Cursor: Daily Test Coverage</div>
+        <div class="step-desc">Mỗi sáng review merged code<br>Thêm test còn thiếu<br>Submit PR tự động</div>
+        <span class="step-tag tag-cursor">cursor ai</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step cursor-step">
+        <span class="step-icon">🚨</span>
+        <div class="step-title">Cursor: Incident Response</div>
+        <div class="step-desc">Incident → agent điều tra logs<br>Tìm root cause trong code<br>Tạo fix PR + báo Lark</div>
+        <span class="step-tag tag-cursor">cursor ai</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step cursor-step">
+        <span class="step-icon">📊</span>
+        <div class="step-title">Cursor: Weekly Digest</div>
+        <div class="step-desc">Tổng hợp 7 ngày qua<br>Major PRs, bugs, tech debt<br>Post vào Lark mỗi thứ 2</div>
+        <span class="step-tag tag-cursor">cursor ai</span>
+      </div>
+      <div class="arrow-h"></div>
+      <div class="step lark-step">
+        <span class="step-icon">📱</span>
+        <div class="step-title">Lark Hub</div>
+        <div class="step-desc">Tất cả alerts tập trung<br>1 group cho tech team<br>Thread theo từng issue</div>
+        <span class="step-tag tag-lark">lark</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lark Notifications Panel -->
+  <div class="lark-panel">
+    <div class="lark-panel-title">📱 Lark — Tất cả thông báo team nhận được (theo real-time)</div>
+    <div class="lark-notifications">
+      <div class="lark-notif">
+        <div class="lark-notif-header">
+          <div class="lark-notif-dot" style="background:#ef4444"></div>
+          <div class="lark-notif-title">🔴 Security Alert</div>
+        </div>
+        <div class="lark-notif-desc">⚠️ PR #45 — SQL injection risk<br>file: user.service.ts:L82<br>→ Cursor đã comment trên PR</div>
+      </div>
+      <div class="lark-notif">
+        <div class="lark-notif-header">
+          <div class="lark-notif-dot" style="background:#10b981"></div>
+          <div class="lark-notif-title">✅ Deploy Success</div>
+        </div>
+        <div class="lark-notif-desc">🚀 v2.4.1 deployed to production<br>by @dev-a · 2 min ago<br>All health checks passed</div>
+      </div>
+      <div class="lark-notif">
+        <div class="lark-notif-header">
+          <div class="lark-notif-dot" style="background:#f59e0b"></div>
+          <div class="lark-notif-title">👀 PR cần review</div>
+        </div>
+        <div class="lark-notif-desc">PR #46 assigned to @lead-dev<br>High complexity — blast radius: high<br>Deadline: 2 hours</div>
+      </div>
+      <div class="lark-notif">
+        <div class="lark-notif-header">
+          <div class="lark-notif-dot" style="background:#3b82f6"></div>
+          <div class="lark-notif-title">📊 Weekly Digest</div>
+        </div>
+        <div class="lark-notif-desc">Thứ 2 · 8:00 AM<br>12 PRs merged · 3 bugs fixed<br>Tech debt: -15% · Coverage: 84%</div>
+      </div>
+      <div class="lark-notif">
+        <div class="lark-notif-header">
+          <div class="lark-notif-dot" style="background:#ef4444"></div>
+          <div class="lark-notif-title">🚨 Incident Alert</div>
+        </div>
+        <div class="lark-notif-desc">API latency spike on /checkout<br>Cursor đang điều tra logs...<br>Proposed fix: PR #47 ready</div>
+      </div>
+      <div class="lark-notif">
+        <div class="lark-notif-header">
+          <div class="lark-notif-dot" style="background:#10b981"></div>
+          <div class="lark-notif-title">🧪 Test Coverage PR</div>
+        </div>
+        <div class="lark-notif-desc">Cursor added 14 tests<br>Coverage: 78% → 84%<br>PR #48 ready to merge</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-color" style="background:rgba(91,76,245,0.5)"></div>
+      Cursor Automation (AI agent)
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background:rgba(20,86,245,0.5)"></div>
+      Lark notification
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background:rgba(16,185,129,0.5)"></div>
+      Tự động hoàn toàn
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background:rgba(245,158,11,0.5)"></div>
+      Cần human decision
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background:rgba(239,68,68,0.5)"></div>
+      Blocked / fail
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background:rgba(100,116,139,0.5)"></div>
+      GitHub / Git action
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

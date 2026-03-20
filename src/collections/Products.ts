@@ -159,6 +159,28 @@ export const Products: CollectionConfig = {
             admin: { description: 'Stock Keeping Unit (optional)' },
         },
         {
+            name: 'halalCertified',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: { description: 'Toggle to mark product as Halal Certified (JAKIM)' },
+        },
+        {
+            name: 'halalCertImage',
+            type: 'upload',
+            relationTo: 'media',
+            admin: {
+                condition: (data) => data.halalCertified,
+                description: 'Upload JAKIM Halal certificate image',
+            },
+        },
+        {
+            name: 'weight',
+            type: 'number',
+            min: 0,
+            defaultValue: 0,
+            admin: { description: 'Product weight in grams (for shipping calculation)' },
+        },
+        {
             name: 'seo',
             type: 'group',
             label: 'SEO Settings',

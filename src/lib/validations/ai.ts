@@ -1,0 +1,35 @@
+import { z } from 'zod'
+
+export const generateSiteSchema = z.object({
+    businessInfo: z.object({
+        businessName: z.string().min(1),
+        industry: z.string().min(1),
+        products: z.string().min(1),
+        shortDescription: z.string().optional(),
+        targetAudience: z.string().optional(),
+        style: z.string().optional(),
+    }),
+    extraInstructions: z.string().optional(),
+    language: z.enum(['en', 'ms', 'vi', 'auto']).optional(),
+})
+
+export const editBlockSchema = z.object({
+    instruction: z.string().min(1),
+    block: z.record(z.unknown()).optional(),
+    blockIndex: z.number().optional(),
+    allBlocks: z.array(z.record(z.unknown())).optional(),
+    theme: z.record(z.unknown()).optional(),
+    siteName: z.string().optional(),
+})
+
+export const rewriteTextSchema = z.object({
+    text: z.string().min(1),
+    instruction: z.string().min(1),
+    context: z.string().optional(),
+    language: z.string().optional(),
+})
+
+export const applyTemplateSchema = z.object({
+    templateId: z.string().min(1),
+    siteId: z.string().optional(),
+})

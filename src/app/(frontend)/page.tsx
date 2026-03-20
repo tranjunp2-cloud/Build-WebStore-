@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import {
   Sparkles,
@@ -11,6 +12,8 @@ import {
   LayoutGrid,
   Type,
   Minus,
+  Menu,
+  X,
   Image,
   Star,
   Layers,
@@ -60,8 +63,16 @@ function SectionHeader({
   )
 }
 
+const NAV_ITEMS = [
+  { key: 'platform' as const, href: '#nen-tang' },
+  { key: 'solutions' as const, href: '#giai-phap' },
+  { key: 'features' as const, href: '#tinh-nang' },
+  { key: 'pricing' as const, href: '#pricing' },
+]
+
 export default function HomePage() {
   const { t } = useI18n()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const featureItems = [
     { icon: '🤖', ...t.features.items.aiGeneration },
     { icon: '🧩', ...t.features.items.dragDrop },
@@ -76,40 +87,88 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-white text-zinc-900">
-      {/* Navigation: main structure (i18n + LanguageSwitcher) + LadiPage light style + PrimeWeb */}
+      {/* ═══ Navigation ═══ */}
       <nav
-        className="fixed top-0 w-full z-50 border-b border-zinc-200 bg-white/95 backdrop-blur-md"
+        className="fixed top-0 w-full z-50 border-b border-zinc-200/80 bg-white/80 backdrop-blur-xl backdrop-saturate-150"
         aria-label="Menu chính"
       >
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-md shadow-sky-500/20 group-hover:shadow-lg group-hover:shadow-sky-500/30 transition-shadow">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="font-heading font-bold text-xl text-zinc-900">
               PrimeWeb
             </span>
           </Link>
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#nen-tang" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">Nền tảng</a>
-            <a href="#san-pham" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">Sản phẩm</a>
-            <a href="#giai-phap" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">Giải pháp</a>
-            <a href="#tai-sao" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">Tại sao chọn</a>
-            <a href="#tinh-nang" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">Tính năng</a>
-            <a href="#features" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">{t.nav.features}</a>
-            <a href="#pricing" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">{t.nav.pricing}</a>
-            <a href="#templates" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors">{t.nav.templates}</a>
+
+          {/* Desktop nav links */}
+          <div className="hidden md:flex items-center gap-1">
+            {NAV_ITEMS.map((item) => (
+              <a
+                key={item.key}
+                href={item.href}
+                className="relative text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors px-4 py-2 rounded-lg hover:bg-zinc-100/80"
+              >
+                {t.nav[item.key]}
+              </a>
+            ))}
           </div>
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher variant="pill" />
-            <Link href="/login" className="text-sm text-zinc-600 hover:text-zinc-900 transition-colors px-4 py-2">
+
+          {/* Right side: globe + sign in + CTA + hamburger */}
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher variant="globe" />
+            <Link href="/login" className="hidden md:inline-flex text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors px-3 py-2 rounded-lg hover:bg-zinc-100/80">
               {t.common.signIn}
             </Link>
-            <Link href="/signup" className="rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm px-5 py-2.5 transition-colors">
+            <Link href="/signup" className="hidden sm:inline-flex rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm px-5 py-2.5 transition-all shadow-md shadow-sky-500/20 hover:shadow-lg hover:shadow-sky-500/30">
               {t.common.getStartedFree}
             </Link>
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile menu panel */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-zinc-200/80 bg-white/95 backdrop-blur-xl">
+            <div className="max-w-7xl mx-auto px-6 py-4 space-y-1">
+              {NAV_ITEMS.map((item) => (
+                <a
+                  key={item.key}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 px-4 py-3 rounded-xl transition-colors"
+                >
+                  {t.nav[item.key]}
+                </a>
+              ))}
+              <div className="pt-3 mt-3 border-t border-zinc-100 flex flex-col gap-2">
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-sm font-medium text-zinc-600 hover:text-zinc-900 px-4 py-3 rounded-xl hover:bg-zinc-50 transition-colors"
+                >
+                  {t.common.signIn}
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm px-5 py-3 text-center transition-all"
+                >
+                  {t.common.getStartedFree}
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* ═══════════════════════════════════════════════════════════════════
@@ -633,14 +692,13 @@ export default function HomePage() {
                 className={`group relative p-8 rounded-2xl border-2 border-zinc-100 bg-gradient-to-b from-white to-zinc-50/80 hover:border-sky-200 hover:shadow-xl hover:shadow-sky-500/10 hover:-translate-y-1 transition-all duration-300 animate-fade-in-up ${['animate-fade-in-up-1', 'animate-fade-in-up-2', 'animate-fade-in-up-3', 'animate-fade-in-up-4', 'animate-fade-in-up-5', 'animate-fade-in-up-6'][i]}`}
               >
                 <div
-                  className={`inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110 ${
-                    f.accent === 'sky' ? 'bg-sky-100 text-sky-600' :
-                    f.accent === 'emerald' ? 'bg-emerald-100 text-emerald-600' :
-                    f.accent === 'violet' ? 'bg-violet-100 text-violet-600' :
-                    f.accent === 'amber' ? 'bg-amber-100 text-amber-600' :
-                    f.accent === 'blue' ? 'bg-blue-100 text-blue-600' :
-                    'bg-rose-100 text-rose-600'
-                  }`}
+                  className={`inline-flex w-14 h-14 rounded-2xl items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-110 ${f.accent === 'sky' ? 'bg-sky-100 text-sky-600' :
+                      f.accent === 'emerald' ? 'bg-emerald-100 text-emerald-600' :
+                        f.accent === 'violet' ? 'bg-violet-100 text-violet-600' :
+                          f.accent === 'amber' ? 'bg-amber-100 text-amber-600' :
+                            f.accent === 'blue' ? 'bg-blue-100 text-blue-600' :
+                              'bg-rose-100 text-rose-600'
+                    }`}
                 >
                   <f.Icon className="w-7 h-7" strokeWidth={2} />
                 </div>
@@ -738,29 +796,19 @@ export default function HomePage() {
               </span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-zinc-600">
-              <a href="#nen-tang" className="hover:text-zinc-900 transition-colors">
-                Nền tảng
-              </a>
-              <a href="#san-pham" className="hover:text-zinc-900 transition-colors">
-                Sản phẩm
-              </a>
-              <a href="#giai-phap" className="hover:text-zinc-900 transition-colors">
-                Giải pháp
-              </a>
-              <a href="#tai-sao" className="hover:text-zinc-900 transition-colors">
-                Tại sao chọn
-              </a>
-              <a href="#tinh-nang" className="hover:text-zinc-900 transition-colors">
-                Tính năng
-              </a>
+              {NAV_ITEMS.map((item) => (
+                <a key={item.key} href={item.href} className="hover:text-zinc-900 transition-colors">
+                  {t.nav[item.key]}
+                </a>
+              ))}
               <Link href="/login" className="hover:text-zinc-900 transition-colors">
-                Đăng nhập
+                {t.common.signIn}
               </Link>
               <Link
                 href="/signup"
                 className="text-sky-600 hover:text-sky-700 font-medium transition-colors"
               >
-                Đăng ký
+                {t.common.getStartedFree}
               </Link>
             </div>
           </div>

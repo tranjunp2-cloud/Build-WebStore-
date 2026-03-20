@@ -1,19 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { withAuth } from '@/lib/auth'
 
 /**
  * GET /api/sites/[siteId]/editor-data
  * Returns site + homepage data for the editor.
  * Uses Payload's Local API (no REST auth issues).
  */
-export async function GET(
-    req: NextRequest,
-    { params }: { params: Promise<{ siteId: string }> }
-) {
+export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_user, _req, ctx) => {
     try {
         const payload = await getPayload({ config })
-        const { siteId } = await params
+        const { siteId } = await ctx.params
         const numericSiteId = Number(siteId)
 
         // Fetch site
@@ -54,6 +52,8 @@ export async function GET(
                 status: site.status || 'draft',
                 theme: site.theme || {},
                 siteType: site.siteType || 'business',
+                locale: site.locale || 'ms',
+                shippingConfig: site.shippingConfig || {},
             },
             page: page ? {
                 id: page.id,
@@ -69,4 +69,4 @@ export async function GET(
             { status: 500 },
         )
     }
-}
+})

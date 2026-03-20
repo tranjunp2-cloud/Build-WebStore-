@@ -1,0 +1,223 @@
+# Story Sync — Parse docs/stories/*.md → auto-create/update GitHub Issues
+name: Story Sync
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - 'docs/stories/**'
+  workflow_dispatch: # Manual trigger for initial sync
+
+jobs:
+  sync-stories:
+    name: 'Sync: Stories → Issues'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Detect changed story files
+        id: detect
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual trigger — process all story files
+            FILES=$(ls docs/stories/F*-stories.md 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+          else
+            # Push trigger — only changed files
+            FILES=$(git diff --name-only HEAD~1 HEAD -- docs/stories/ 2>/dev/null \
+              | grep 'F.*-stories\.md$' \
+              | tr '\n' ',' | sed 's/,$//')
+          fi
+
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
+          echo "has_files=$([ -n '$FILES' ] && echo 'true' || echo 'false')" >> "$GITHUB_OUTPUT"
+          echo "Detected story files: $FILES"
+
+      - name: Parse stories
+        if: steps.detect.outputs.files != ''
+        id: parse
+        run: |
+          RESULT=$(node .github/scripts/parse-stories.js --files "${{ steps.detect.outputs.files }}")
+          echo "$RESULT" > parsed-stories.json
+          COUNT=$(echo "$RESULT" | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8');console.log(JSON.parse(d).length)")
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Parsed $COUNT stories"
+
+      - name: Create/Update GitHub Issues
+        if: steps.detect.outputs.files != ''
+        uses: actions/github-script@v7
+        id: sync
+        with:
+          script: |
+            const fs = require('fs');
+            const stories = JSON.parse(fs.readFileSync('parsed-stories.json', 'utf8'));
+
+            let created = 0;
+            let updated = 0;
+            const results = [];
+
+            // Ensure labels exist
+            const requiredLabels = new Set();
+            for (const s of stories) {
+              requiredLabels.add('user-story');
+              if (s.wave) requiredLabels.add(`wave:${s.wave}`);
+              if (s.priority) requiredLabels.add(s.priority);
+              if (s.size) requiredLabels.add(`size:${s.size}`);
+              if (s.featureId) requiredLabels.add(`feature:${s.featureId}`);
+            }
+
+            // Get existing labels
+            const { data: existingLabels } = await github.rest.issues.listLabelsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            const labelNames = new Set(existingLabels.map(l => l.name));
+
+            // Color map for auto-created labels
+            const colorMap = {
+              'user-story': '0075ca',
+              'wave:': '5319e7',
+              'P0': 'b60205',
+              'P1': 'd93f0b',
+              'P2': 'fbca04',
+              'size:S': 'c5def5',
+              'size:M': '0e8a16',
+              'size:L': 'd93f0b',
+              'size:XL': 'b60205',
+              'feature:': '1d76db',
+            };
+
+            function getLabelColor(name) {
+              for (const [prefix, color] of Object.entries(colorMap)) {
+                if (name === prefix || name.startsWith(prefix)) return color;
+              }
+              return 'ededed';
+            }
+
+            for (const label of requiredLabels) {
+              if (!labelNames.has(label)) {
+                try {
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label,
+                    color: getLabelColor(label),
+                  });
+                  console.log(`Created label: ${label}`);
+                } catch (e) {
+                  console.log(`Label already exists or error: ${label}`);
+                }
+              }
+            }
+
+            // Process each story
+            for (const story of stories) {
+              const titlePrefix = `[${story.storyId}]`;
+              const issueTitle = `${titlePrefix} ${story.title}`;
+
+              // Build issue body
+              const dodChecklist = story.definitionOfDone.length > 0
+                ? story.definitionOfDone.map(d => `- [ ] ${d}`).join('\n')
+                : '- [ ] 9-Point Checklist pass\n- [ ] TypeScript clean (tsc --noEmit)';
+
+              const body = `## ${story.storyId}: ${story.title}
+            **Wave ${story.wave}** | **${story.priority}** | **${story.size}** | Feature: ${story.featureId}
+
+            ### Story
+            \`\`\`
+            ${story.storyText || 'N/A'}
+            \`\`\`
+
+            ### Acceptance Criteria
+            \`\`\`gherkin
+            ${story.acceptanceCriteria || 'N/A'}
+            \`\`\`
+
+            ${story.marketNotes ? `### MY Market Notes\n${story.marketNotes}\n` : ''}
+            ### Definition of Done
+            ${dodChecklist}
+
+            ### References
+            - PRD: ${story.prdLink || 'N/A'}
+            - Source: \`${story.sourceFile}\`
+            - SPEC.md §6
+
+            ---
+            _Auto-synced by [Story Sync](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`;
+
+              // Build labels
+              const labels = ['user-story'];
+              if (story.wave) labels.push(`wave:${story.wave}`);
+              if (story.priority) labels.push(story.priority);
+              if (story.size) labels.push(`size:${story.size}`);
+              if (story.featureId) labels.push(`feature:${story.featureId}`);
+
+              // Search for existing issue
+              const { data: searchResults } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'all',
+                labels: 'user-story',
+                per_page: 100,
+              });
+
+              const existing = searchResults.find(i => i.title.startsWith(titlePrefix));
+
+              if (existing) {
+                // Update existing issue
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existing.number,
+                  body,
+                  labels,
+                });
+                updated++;
+                results.push(`Updated #${existing.number}: ${story.storyId}`);
+              } else {
+                // Create new issue
+                const { data: newIssue } = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: issueTitle,
+                  body,
+                  labels,
+                });
+                created++;
+                results.push(`Created #${newIssue.number}: ${story.storyId}`);
+              }
+            }
+
+            core.setOutput('created', created);
+            core.setOutput('updated', updated);
+            core.setOutput('summary', results.join('\n'));
+            console.log(`Done: ${created} created, ${updated} updated`);
+
+      - name: Notify Lark
+        if: steps.detect.outputs.files != ''
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "📝 Stories Synced — ${{ steps.parse.outputs.count }} stories"
+          template: 'blue'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.ref_name }}"
+          content: |
+            **Created:** ${{ steps.sync.outputs.created }} | **Updated:** ${{ steps.sync.outputs.updated }}
+
+            ${{ steps.sync.outputs.summary }}
+          buttons: '[{"text":"📋 View Issues","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=label%3Auser-story","type":"primary"}]'

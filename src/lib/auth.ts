@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { NextResponse } from 'next/server'
+import type { User } from 'payload'
 
 /**
  * Get the currently authenticated user from Payload CMS session.
@@ -17,15 +19,46 @@ export async function getCurrentUser() {
     try {
         const payload = await getPayload({ config })
 
-        const { user } = await payload.auth({
+        const authResult = await payload.auth({
             headers: new Headers({
                 Authorization: `JWT ${token}`,
             }),
         })
 
-        return user || null
-    } catch {
+        return authResult?.user || null
+    } catch (error) {
+        console.error('getCurrentUser error:', error)
         return null
+    }
+}
+
+/**
+ * Higher-Order Function (HOC) that wraps a route handler with auth check.
+ * Eliminates the need to repeat getCurrentUser() + 401 check in every route.
+ *
+ * @example
+ * // Simple handler (POST, GET without params):
+ * export const POST = withAuth(async (user, req) => {
+ *     // `user` is guaranteed to be authenticated here
+ *     return NextResponse.json({ ok: true })
+ * })
+ *
+ * @example
+ * // Handler with route params (e.g. [siteId]):
+ * export const GET = withAuth(async (user, req, ctx) => {
+ *     const { siteId } = await ctx.params
+ *     return NextResponse.json({ siteId })
+ * })
+ */
+export function withAuth<TContext extends { params: Promise<any> } = never>(
+    handler: (user: User, req: Request, ctx: TContext) => Promise<NextResponse>,
+) {
+    return async (req: Request, ctx: TContext): Promise<NextResponse> => {
+        const user = await getCurrentUser()
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+        return handler(user as User, req, ctx)
     }
 }
 

@@ -11,10 +11,9 @@
         "search": "Cari..."
     },
     "nav": {
-        "platform": "Nền tảng",
-        "solutions": "Giải pháp",
-        "features": "Tính năng",
-        "pricing": "Bảng giá"
+        "features": "Ciri-ciri",
+        "pricing": "Harga",
+        "templates": "Templat"
     },
     "hero": {
         "badge": "Pembina Laman Web Berkuasa AI",

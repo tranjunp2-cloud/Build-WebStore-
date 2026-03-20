@@ -1,0 +1,36 @@
+# Dependabot — Auto dependency update PRs
+# Targets staging branch (per team workflow: feature/fix PRs → staging)
+version: 2
+
+updates:
+  # npm dependencies
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    open-pull-requests-limit: 5
+    target-branch: 'staging'
+    labels:
+      - 'dependencies'
+      - 'chore'
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      minor-and-patch:
+        update-types:
+          - 'minor'
+          - 'patch'
+
+  # GitHub Actions versions
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+    target-branch: 'staging'
+    labels:
+      - 'ci'
+      - 'dependencies'
+    commit-message:
+      prefix: 'ci(actions)'

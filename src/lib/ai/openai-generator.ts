@@ -9,9 +9,11 @@ import { blockRegistry } from '@/blocks/registry'
 import { buildSystemPrompt, buildUserPrompt, type BusinessInfoInput } from './system-prompt'
 import { generateBlocks, type GenerationResult } from './generate-blocks'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
+function getOpenAI(): OpenAI | null {
+    const key = process.env.OPENAI_API_KEY
+    if (!key) return null
+    return new OpenAI({ apiKey: key })
+}
 
 export type SSEEvent = {
     event: 'step' | 'theme_set' | 'block_complete' | 'seo_generated' | 'error' | 'done'
@@ -25,13 +27,13 @@ export type SSEEvent = {
 export async function generateSiteWithAI(
     businessInfo: BusinessInfoInput,
     extraInstructions?: string,
-    language: 'vi' | 'en' = 'vi',
+    language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     const events: SSEEvent[] = []
     const promptText = `${businessInfo.businessName} - ${businessInfo.industry}`
 
-    // Fallback if no API key
-    if (!process.env.OPENAI_API_KEY) {
+    const openai = getOpenAI()
+    if (!openai) {
         console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
         return generateWithFallback(promptText, events)
     }
@@ -127,6 +129,7 @@ export async function generateSiteWithAI(
             siteType: parsed.category || 'business',
             blocks: validBlocks,
             seo,
+            language: ['en', 'ms', 'vi'].includes(parsed.language) ? parsed.language : 'en',
             theme,
         }
 
@@ -143,7 +146,10 @@ export async function generateSiteWithAI(
 function generateWithFallback(prompt: string, events: SSEEvent[]): { result: GenerationResult; events: SSEEvent[] } {
     events.push({ event: 'step', data: { step: 'fallback', label: 'Creating from smart templates...', progress: 50 } })
 
-    const result = generateBlocks(prompt)
+    const result = {
+        ...generateBlocks(prompt),
+        language: 'en' as const
+    }
 
     events.push({ event: 'theme_set', data: { theme: result.theme } })
 

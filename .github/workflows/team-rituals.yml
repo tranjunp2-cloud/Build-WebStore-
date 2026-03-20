@@ -1,0 +1,211 @@
+# Team Rituals — Sprint start, daily standup, sprint review reminders
+name: Team Rituals
+
+on:
+  schedule:
+    # Monday 1 AM UTC (9 AM MYT) — Sprint start
+    - cron: '0 1 * * 1'
+    # Tuesday-Friday 2 AM UTC (10 AM MYT) — Daily standup
+    - cron: '0 2 * * 2-5'
+    # Friday 8 AM UTC (4 PM MYT) — Sprint review
+    - cron: '0 8 * * 5'
+  workflow_dispatch: # Manual trigger for testing
+
+jobs:
+  # ──────────────────────────────────────
+  # Monday — Sprint Start
+  # ──────────────────────────────────────
+  sprint-start:
+    name: 'Ritual: Sprint Start'
+    if: github.event.schedule == '0 1 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: read
+      contents: read
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Gather sprint overview
+        uses: actions/github-script@v7
+        id: overview
+        with:
+          script: |
+            // Open issues
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'user-story',
+              per_page: 100,
+            });
+            const stories = openIssues.filter(i => !i.pull_request);
+
+            // Categorize
+            const unassigned = stories.filter(i => i.assignees.length === 0);
+            const assigned = stories.filter(i => i.assignees.length > 0);
+
+            // Open PRs
+            const { data: openPRs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 20,
+            });
+
+            const reviewPRs = openPRs.filter(pr => pr.requested_reviewers.length > 0);
+
+            // Build content
+            let content = `**Open Stories:** ${stories.length}\n`;
+            content += `**Assigned:** ${assigned.length} | **Unassigned:** ${unassigned.length}\n`;
+            content += `**Open PRs:** ${openPRs.length} | **Awaiting Review:** ${reviewPRs.length}\n\n`;
+
+            if (unassigned.length > 0) {
+              content += `**Unassigned Stories:**\n`;
+              for (const i of unassigned.slice(0, 5)) {
+                const labels = i.labels.map(l => l.name).filter(n => n.startsWith('wave:') || n.startsWith('P')).join(', ');
+                content += `- #${i.number} ${i.title} (${labels})\n`;
+              }
+              if (unassigned.length > 5) content += `- ...and ${unassigned.length - 5} more\n`;
+            }
+
+            core.setOutput('content', content);
+
+      - name: Send sprint start to Lark
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || '' }}
+          title: "🏁 Sprint Start — Monday"
+          template: 'blue'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "📅 Sprint"
+          meta-right-value: "Week start"
+          content: |
+            <at id=all></at>
+
+            ${{ steps.overview.outputs.content }}
+          buttons: '[{"text":"📋 View Board","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Auser-story","type":"primary"}]'
+
+  # ──────────────────────────────────────
+  # Tue-Fri — Daily Standup Reminder
+  # ──────────────────────────────────────
+  daily-standup:
+    name: 'Ritual: Daily Standup'
+    if: github.event.schedule == '0 2 * * 2-5'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Send standup reminder
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || '' }}
+          title: "☀️ Daily Standup"
+          template: 'blue'
+          content: |
+            <at id=all></at>
+
+            Time for standup! Update your progress:
+
+            **Yesterday:** What did you complete?
+            **Today:** What will you work on?
+            **Blockers:** Anything blocking you?
+
+  # ──────────────────────────────────────
+  # Friday — Sprint Review Summary
+  # ──────────────────────────────────────
+  sprint-review:
+    name: 'Ritual: Sprint Review'
+    if: github.event.schedule == '0 8 * * 5'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: read
+      contents: read
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
+      - name: Gather week summary
+        uses: actions/github-script@v7
+        id: summary
+        with:
+          script: |
+            const since = new Date();
+            since.setDate(since.getDate() - 5); // Last 5 days (Mon-Fri)
+            const sinceISO = since.toISOString();
+
+            // Closed issues this week
+            const { data: closedIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              labels: 'user-story',
+              since: sinceISO,
+              per_page: 50,
+            });
+            const closedStories = closedIssues.filter(i => !i.pull_request);
+
+            // Merged PRs this week
+            const { data: allPRs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              sort: 'updated',
+              direction: 'desc',
+              per_page: 30,
+            });
+            const mergedPRs = allPRs.filter(pr =>
+              pr.merged_at && new Date(pr.merged_at) >= since
+            );
+
+            // Remaining open stories
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'user-story',
+              per_page: 100,
+            });
+            const openStories = openIssues.filter(i => !i.pull_request);
+
+            // Build content
+            let content = `**This Week:**\n`;
+            content += `Stories Completed: ${closedStories.length}\n`;
+            content += `PRs Merged: ${mergedPRs.length}\n`;
+            content += `Stories Remaining: ${openStories.length}\n\n`;
+
+            if (closedStories.length > 0) {
+              content += `**Completed:**\n`;
+              for (const i of closedStories.slice(0, 5)) {
+                content += `- #${i.number} ${i.title}\n`;
+              }
+            }
+
+            if (mergedPRs.length > 0) {
+              content += `\n**Merged PRs:**\n`;
+              for (const pr of mergedPRs.slice(0, 5)) {
+                content += `- #${pr.number} ${pr.title} by ${pr.user.login}\n`;
+              }
+            }
+
+            core.setOutput('content', content);
+
+      - name: Send sprint review to Lark
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_REPORT || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_REPORT || '' }}
+          title: "📋 Sprint Review — Friday"
+          template: 'purple'
+          meta-left-label: "📦 Repo"
+          meta-left-value: "PrimeWeb"
+          meta-right-label: "📅 Sprint"
+          meta-right-value: "Week review"
+          content: ${{ steps.summary.outputs.content }}
+          buttons: '[{"text":"📈 View This Week","url":"${{ github.server_url }}/${{ github.repository }}/pulse","type":"primary"}]'

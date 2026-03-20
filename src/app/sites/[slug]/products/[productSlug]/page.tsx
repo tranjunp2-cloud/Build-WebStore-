@@ -3,6 +3,11 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { AddToCartButton } from '@/components/storefront/AddToCartButton'
+import { CartDrawer } from '@/components/storefront/CartDrawer'
+
+// Force dynamic — uses getPayload() for product data at runtime
+export const dynamic = 'force-dynamic'
 
 type Props = {
     params: Promise<{ slug: string; productSlug: string }>
@@ -217,14 +222,20 @@ export default async function ProductDetailPage({ params }: Props) {
                         </p>
 
                         {/* Add to Cart */}
-                        <button style={{
-                            background: primaryColor, color: 'white', border: 'none', borderRadius: '12px',
-                            padding: '14px 32px', fontSize: '16px', fontWeight: 600, cursor: 'pointer',
-                            width: '100%', marginBottom: '24px',
-                            opacity: p.inventory > 0 ? 1 : 0.5,
-                        }} disabled={p.inventory <= 0}>
-                            {p.inventory > 0 ? '🛒 Add to Cart' : 'Out of Stock'}
-                        </button>
+                        <AddToCartButton
+                            product={{
+                                id: String(p.id),
+                                slug: p.slug,
+                                name: p.name,
+                                price: p.price,
+                                compareAtPrice: p.compareAtPrice,
+                                currency: p.currency || 'MYR',
+                                imageUrl: images[0]?.image?.url,
+                                inventory: p.inventory ?? 0,
+                            }}
+                            primaryColor={primaryColor}
+                            siteSlug={slug}
+                        />
 
                         {/* Description */}
                         {p.shortDescription && (
@@ -241,6 +252,9 @@ export default async function ProductDetailPage({ params }: Props) {
                     </div>
                 </div>
             </div>
+
+            {/* Cart Drawer */}
+            <CartDrawer siteSlug={slug} />
         </>
     )
 }

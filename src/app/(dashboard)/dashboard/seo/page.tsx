@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, AlertTriangle, CheckCircle, Info, Sparkles, Loader2, RefreshCcw, ExternalLink } from 'lucide-react'
+import { Search, AlertTriangle, CheckCircle, Info, Sparkles, Loader2, RefreshCcw } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 type SEOIssue = {
@@ -75,7 +76,7 @@ export default function SEODashboardPage() {
                 const res = await fetch('/api/sites', { credentials: 'include' })
                 if (res.ok) {
                     const data = await res.json()
-                    const siteList = (data.docs || []).map((s: any) => ({ id: String(s.id), name: s.name }))
+                    const siteList = (data.docs || []).map((s: { id: string | number; name: string }) => ({ id: String(s.id), name: s.name }))
                     setSites(siteList)
                     if (siteList.length > 0) {
                         setSelectedSiteId(siteList[0].id)
@@ -83,8 +84,8 @@ export default function SEODashboardPage() {
                         setIsLoading(false)
                     }
                 }
-            } catch (err) {
-                console.error('Failed to load sites', err)
+            } catch {
+                toast.error('Failed to load sites')
                 setIsLoading(false)
             }
         }
@@ -111,8 +112,10 @@ export default function SEODashboardPage() {
                 const data = await res.json()
                 if (data.success) setSeoData(data.data)
             }
-        } catch (err) {
-            console.error('SEO analysis failed', err)
+        } catch {
+            toast.error('SEO analysis failed', {
+                action: { label: 'Retry', onClick: () => analyseSite(siteId) },
+            })
         } finally {
             setIsLoading(false)
         }
@@ -132,13 +135,15 @@ export default function SEODashboardPage() {
             if (res.ok) {
                 const data = await res.json()
                 if (data.success) {
-                    setFixResult(`✅ Fixed ${data.data.fixedPages} of ${data.data.totalPages} pages`)
+                    setFixResult(`Fixed ${data.data.fixedPages} of ${data.data.totalPages} pages`)
+                    toast.success(`Fixed ${data.data.fixedPages} pages with AI`)
                     // Re-analyse
                     setTimeout(() => analyseSite(selectedSiteId), 1000)
                 }
             }
-        } catch (err) {
-            setFixResult('❌ Fix failed — please try again')
+        } catch {
+            setFixResult('Fix failed — please try again')
+            toast.error('AI fix failed')
         } finally {
             setIsFixing(false)
         }
@@ -147,11 +152,15 @@ export default function SEODashboardPage() {
     // Empty state
     if (!isLoading && sites.length === 0) {
         return (
-            <div className="flex h-full items-center justify-center">
+            <div className="flex h-[60vh] items-center justify-center">
                 <div className="text-center">
                     <Search className="mx-auto h-12 w-12 text-gray-600" />
                     <h2 className="mt-4 text-lg font-semibold text-white">No sites to analyse</h2>
                     <p className="mt-1 text-sm text-gray-500">Create a site first to use the SEO Dashboard</p>
+                    <a href="/dashboard"
+                        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors">
+                        Go to Dashboard
+                    </a>
                 </div>
             </div>
         )
@@ -163,12 +172,13 @@ export default function SEODashboardPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-white">SEO Dashboard</h1>
-                    <p className="mt-1 text-sm text-gray-400">Analyse and optimise your site's search engine performance</p>
+                    <p className="mt-1 text-sm text-gray-400">Analyse and optimise your site&apos;s search engine performance</p>
                 </div>
                 <div className="flex items-center gap-3">
                     {/* Site selector */}
                     {sites.length > 1 && (
                         <select value={selectedSiteId || ''} onChange={e => setSelectedSiteId(e.target.value)}
+                            aria-label="Select site"
                             className="rounded-lg border border-white/10 bg-[#1E293B] px-3 py-2 text-sm text-white outline-none">
                             {sites.map(s => (
                                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -184,10 +194,37 @@ export default function SEODashboardPage() {
             </div>
 
             {isLoading ? (
-                <div className="flex h-64 items-center justify-center">
-                    <div className="text-center">
-                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-400" />
-                        <p className="mt-3 text-sm text-gray-400">Analysing your site...</p>
+                <div className="animate-pulse space-y-6">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                        <div className="rounded-2xl bg-[#1E293B]/50 p-8 flex flex-col items-center">
+                            <div className="h-32 w-32 rounded-full bg-white/5" />
+                            <div className="mt-3 h-4 w-16 rounded bg-white/5" />
+                        </div>
+                        <div className="rounded-2xl bg-[#1E293B]/50 p-6 space-y-4">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <div key={i}>
+                                    <div className="h-8 w-12 rounded bg-white/5" />
+                                    <div className="mt-1 h-3 w-20 rounded bg-white/5" />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="rounded-2xl border border-dashed border-white/10 p-6 flex flex-col items-center justify-center">
+                            <div className="h-8 w-8 rounded bg-white/5" />
+                            <div className="mt-3 h-4 w-20 rounded bg-white/5" />
+                            <div className="mt-4 h-10 w-36 rounded-lg bg-white/5" />
+                        </div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6">
+                        <div className="h-5 w-40 rounded bg-white/5 mb-4" />
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <div key={i} className="flex items-center gap-3 py-3 border-b border-white/5">
+                                <div className="h-8 w-8 rounded-lg bg-white/5" />
+                                <div className="space-y-1.5 flex-1">
+                                    <div className="h-4 w-40 rounded bg-white/5" />
+                                    <div className="h-3 w-24 rounded bg-white/5" />
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             ) : seoData ? (
@@ -228,7 +265,13 @@ export default function SEODashboardPage() {
                                 )}
                             </button>
                             {fixResult && (
-                                <p className="mt-3 text-xs text-green-400">{fixResult}</p>
+                                <div className="mt-3 flex items-center gap-1.5 text-xs">
+                                    {fixResult.startsWith('Fix failed') ? (
+                                        <><AlertTriangle className="h-3 w-3 text-red-400" /><span className="text-red-400">{fixResult}</span></>
+                                    ) : (
+                                        <><CheckCircle className="h-3 w-3 text-green-400" /><span className="text-green-400">{fixResult}</span></>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>

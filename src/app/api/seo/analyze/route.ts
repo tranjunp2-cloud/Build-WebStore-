@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-
+import { seoAnalyzeSchema } from '@/lib/validations/seo'
+import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
 /**
  * POST /api/seo/analyze
  * Analyses all pages of a site and returns an SEO score with issues.
@@ -96,15 +98,12 @@ function analysePage(page: any, siteSEO: any): PageAnalysis {
     }
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
-        const { siteId } = await request.json()
-        if (!siteId) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'siteId is required' } },
-                { status: 422 }
-            )
-        }
+        const { data, errorResponse } = await parseRequest(request, seoAnalyzeSchema)
+        if (errorResponse) return errorResponse
+        
+        const { siteId } = data!
 
         const payload = await getPayload({ config })
 
@@ -156,4 +155,4 @@ export async function POST(request: NextRequest) {
             { status: 500 }
         )
     }
-}
+})

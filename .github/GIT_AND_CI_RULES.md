@@ -1,6 +1,6 @@
 # Git & CI/CD Rules — Chuẩn cho team SaaS
 
-> **Nguồn sự thật duy nhất** cho quy tắc Git, CI/CD và setup. Mọi môi trường (Cursor, Antigravity, CI, dev local) **bắt buộc dùng chung** file này và [CONTRIBUTING.md](.github/CONTRIBUTING.md).
+> **Nguồn sự thật duy nhất** cho quy tắc Git, CI/CD và setup. Mọi môi trường (Cursor, Antigravity, CI, dev local) **bắt buộc dùng chung** file này và [CONTRIBUTING.md](.github/CONTRIBUTING.md). **Tổng quan code/project rules:** [.github/OVERVIEW.md](.github/OVERVIEW.md).
 
 ---
 
@@ -8,21 +8,24 @@
 
 ### 1. Git workflow (branch strategy)
 
-Áp dụng **GitHub Flow** (phù hợp SaaS, deploy liên tục):
+Áp dụng **GitHub Flow** với **staging bắt buộc** (team chỉ vào staging trước; main chỉ qua hotfix hoặc release):
 
 ```
-main          ← production (protected)
-staging       ← pre-production (optional, auto-deploy)
-feature/*     ← tính năng mới (tạo từ main)
-fix/*         ← sửa bug (từ main)
-hotfix/*      ← sửa gấp production (từ main → merge main)
+main          ← production (protected). Chỉ nhận PR từ staging (release) hoặc hotfix/*
+staging       ← pre-production. Nhận PR từ feature/*, fix/*. Deploy staging khi push.
+feature/*     ← tính năng mới (tạo từ main hoặc staging). PR vào staging only.
+fix/*         ← sửa bug. PR vào staging only.
+hotfix/*      ← sửa gấp production. Tạo từ main → PR vào main. Sau đó merge main → staging.
 chore/*       ← deps, config, refactor (không đổi logic)
 docs/*        ← chỉ tài liệu
 ```
 
-- **main**: luôn deployable; merge qua PR + approval + CI pass.
-- **staging** (nếu có): deploy tự động khi push; dùng cho QA/demo.
-- **feature/fix/hotfix**: branch ngắn hạn, merge xong có thể xóa.
+- **main**: chỉ cập nhật qua (1) PR **staging → main** (khi release) hoặc (2) PR **hotfix/* → main**. Không merge feature/fix trực tiếp vào main.
+- **staging**: nhánh team merge hàng ngày. Feature/fix → PR vào **staging** → QA/demo → khi ổn định mới tạo PR staging → main.
+- **feature/fix**: luôn tạo PR với **base = staging** (không PR vào main).
+- **hotfix**: ngoại lệ — PR vào main, merge xong nên merge main vào staging để đồng bộ.
+
+Chi tiết luồng deploy: [.github/DEPLOY.md](.github/DEPLOY.md). Đánh giá triển khai CI/CD (so workflow + analysis): [.github/CICD_IMPLEMENTATION_ASSESSMENT.md](.github/CICD_IMPLEMENTATION_ASSESSMENT.md).
 
 **Không dùng:** GitFlow (develop/release) trừ khi cần hỗ trợ nhiều phiên bản production.
 
@@ -30,19 +33,22 @@ docs/*        ← chỉ tài liệu
 
 ### 2. Branch naming
 
-**Chuẩn:** `type/[ticket-id-]mô-tả-ngắn`  
-- Chữ thường, từ cách nhau bằng dấu gạch ngang `-`.  
+**Chuẩn:** `type/FXX-mô-tả-ngắn`
+- `FXX` = Feature code (F01, F02, ...) — **quan trọng** để bot auto-link PR → Issue.
+- Chữ thường, từ cách nhau bằng dấu gạch ngang `-`.
 - Không dấu cách, ký tự đặc biệt (trừ `-`).
 
 | Type     | Ví dụ |
 |----------|--------|
-| feature  | `feature/PROJ-123-user-onboarding` |
-| fix      | `fix/PROJ-456-login-redirect` |
-| hotfix   | `hotfix/PROJ-789-payment-timeout` |
+| feature  | `feature/F01-ai-builder` |
+| feat     | `feat/F07-template-gallery` |
+| fix      | `fix/F01-login-redirect` |
+| hotfix   | `hotfix/F13-payment-timeout` |
 | chore    | `chore/deps-upgrade-nextjs` |
 | docs     | `docs/api-spec-auth` |
 
-**CI/CD:** Pipeline có thể trigger job theo prefix (`feature/*` → test + build, `main` → deploy production).
+**CI/CD:** Pipeline trigger theo prefix (`feature/*` → test + build, `main` → deploy production).
+**Bot:** Branch có `FXX` → bot tự tìm issues matching để auto-link (xem §4.3).
 
 ---
 
@@ -99,15 +105,56 @@ Repo dùng **Commitlint + Husky** để chặn commit không đúng format (ch�
 
 #### 4.1 Yêu cầu trước khi merge
 
-- **Title:** Theo Conventional Commits (type(scope): description).  
-- **Description:** Điền đủ [template](.github/PULL_REQUEST_TEMPLATE.md) (Story, Changes, Checklist, Test steps).  
-- **Review:** ≥ 1 approval.  
-- **CI:** Toàn bộ status check pass (lint, typecheck, test, build).  
+- **Title:** Theo Conventional Commits. Nên có story ID: `feat(F01): [US-F01-03] AI template selection`
+- **Description:** Điền đủ [template](.github/PULL_REQUEST_TEMPLATE.md) (Story, Changes, Checklist, Test steps).
+- **Issue link:** `Closes #<số>` trong PR description (**bắt buộc** cho feature/fix).
+- **Review:** ≥ 1 approval.
+- **CI:** Toàn bộ status check pass (lint, typecheck, test, build).
 - **Branch:** Cập nhật với base (rebase hoặc merge base vào branch).
 
 #### 4.2 PR template
 
 Template nằm tại [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md). Mỗi PR phải điền đủ Story, Changes, Checklist, Test Steps.
+
+#### 4.3 PR → Issue auto-link (bot tự làm)
+
+Story-sync workflow tạo GitHub Issues từ `docs/stories/`. Mỗi PR feature/fix **phải** link với issue tương ứng. Bot sẽ **tự động xử lý** theo thứ tự ưu tiên:
+
+**Ưu tiên 1 — Từ PR title (chính xác nhất, zero effort):**
+```
+PR title: "feat(F01): [US-F01-03] AI template selection"
+→ Bot tìm issue có [US-F01-03] trong title
+→ Tìm thấy #59 → TỰ SỬA PR body: Closes #59
+→ Comment: "🔗 Auto-linked to #59"
+```
+**Dev không cần làm gì** nếu title có `[US-FXXX-YY]`.
+
+**Ưu tiên 2 — Từ branch name (1 issue match):**
+```
+Branch: feature/F01-ai-builder (chỉ còn 1 open issue cho F01)
+→ Bot tự link issue đó
+```
+
+**Ưu tiên 3 — Từ branch name (nhiều issues):**
+```
+Branch: feature/F01-ai-builder (5 open issues cho F01)
+→ Bot comment gợi ý danh sách issues
+→ Dev chọn 1 → edit PR description thêm "Closes #<số>"
+```
+
+**Skip:** Branches `chore/*`, `docs/*`, `refactor/*` — bot không check.
+
+**Khi issue được link:**
+- PR merged → GitHub **tự đóng** issue
+- Projects board: issue tự move sang **Done**
+- Milestone progress tự cập nhật
+
+**Keywords hợp lệ** (GitHub native):
+```
+Closes #123     Fixes #123     Resolves #123
+```
+
+> **Tip cho dev:** Cách nhanh nhất = đặt PR title theo format `type(FXX): [US-FXX-YY] mô tả` — bot lo phần còn lại.
 
 ---
 
@@ -124,15 +171,31 @@ Template nằm tại [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEM
 
 **CI status checks cần có:** `lint`, `typecheck`, `test`, `build`.
 
+#### 5.1 CI flow — thứ tự bước và giữ CI xanh
+
+Workflow file: [.github/workflows/ci.yml](.github/workflows/ci.yml). Chạy trên mọi **push** và **pull_request** vào nhánh `main`, `staging`.
+
+| Bước | Lệnh | Ghi chú |
+|------|------|--------|
+| 1 | `npm run lint` | ESLint (next lint) — chỉ **errors** fail; warnings in ra nhưng không fail. |
+| 2 | `npm run typecheck` | `tsc --noEmit` — kiểm tra type toàn bộ `src/`. |
+| 3 | `npm run test` | `vitest run` — unit test. |
+| 4 | `npm run build` | Next.js build (script đã gắn `NODE_OPTIONS='--require ./node-polyfill.js'` để tránh lỗi khi collect page data). |
+
+**Giữ CI xanh:** Trước khi push hoặc tạo PR, chạy local lần lượt: `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`. Chỉ push khi cả 4 bước pass. Nếu CI fail, sửa trên branch (fix lint/type/test/build) rồi push lại.
+
 ---
 
 ### 6. CI/CD pipeline (gợi ý)
 
 | Event / Branch   | Chạy gì |
 |------------------|---------|
-| Push / PR vào `feature/*`, `fix/*`, … | Lint, typecheck, test, build |
-| Push `main`      | Cùng bộ check → deploy production |
-| Push `staging`   | Build → deploy staging (nếu có) |
+| PR vào `staging` (từ feature/*, fix/*) | Lint, typecheck, test, build |
+| Push `staging`   | Build → deploy staging |
+| PR vào `main` (từ staging hoặc hotfix/*) | Lint, typecheck, test, build |
+| Push `main`      | Build → deploy production |
+
+**Quy ước:** Feature/fix chỉ merge vào **staging**. Main chỉ nhận merge từ **staging** (release) hoặc **hotfix/***. Chi tiết: [.github/DEPLOY.md](.github/DEPLOY.md).
 
 **Version (semantic-release):** Chạy trên `main`; đọc commit → `feat` = MINOR, `fix` = PATCH, `BREAKING CHANGE` = MAJOR → tag, changelog, GitHub Release.
 
@@ -142,11 +205,12 @@ Template nằm tại [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEM
 
 | Việc            | Chuẩn |
 |-----------------|--------|
-| Tạo branch      | `feature/PROJ-123-mô-tả` hoặc `fix/...`, `chore/...` |
-| Commit          | `type(scope): mô tả` (Conventional Commits) |
+| Tạo branch      | `feature/F01-mô-tả` hoặc `fix/F01-...`, `chore/...` |
+| Commit          | `type(FXX): mô tả` (Conventional Commits) |
 | Trước khi PR    | 9-Point Done, lint/typecheck/test pass |
-| PR              | Title đúng convention, description đủ template, đợi approval + CI xanh |
-| Merge           | Squash hoặc rebase tùy quy định; merge khi đủ điều kiện |
+| PR title        | `feat(F01): [US-F01-03] mô tả` — bot tự link issue |
+| PR description  | Điền template + `Closes #<số>` (bot tự điền nếu title có story ID) |
+| Merge           | Squash hoặc rebase; merge khi approval + CI xanh |
 
 ---
 
@@ -227,15 +291,16 @@ git pull origin main
 **Bước 2 — Tạo branch**
 
 ```bash
-git checkout -b feature/PROJ-123-user-onboarding
-# hoặc fix/..., hotfix/..., chore/...
+git checkout -b feature/F01-ai-builder
+# hoặc feat/F07-template-gallery, fix/F01-login-bug, chore/deps-upgrade
 ```
+Branch name **nên có FXX** (feature code) — bot dùng để auto-link issue.
 
 **Bước 3 — Code và commit**
 
 ```bash
 git add .
-git commit -m "feat(auth): add Google OAuth login (PROJ-123)"
+git commit -m "feat(F01): add AI template selection"
 ```
 
 Nếu message sai format, Commitlint báo lỗi. Không dùng `--no-verify` trừ khi lead đồng ý.
@@ -243,19 +308,24 @@ Nếu message sai format, Commitlint báo lỗi. Không dùng `--no-verify` tr�
 **Bước 4 — Push và tạo PR**
 
 ```bash
-git push -u origin feature/PROJ-123-user-onboarding
+git push -u origin feature/F01-ai-builder
 ```
 
-Trên GitHub: Compare & pull request → điền template → assign reviewer.
+Trên GitHub: Compare & pull request:
+1. **Title:** `feat(F01): [US-F01-03] AI template selection` — có `[US-F01-03]` để bot auto-link
+2. **Description:** Điền template — bot tự điền `Closes #<số>` nếu match
+3. Assign reviewer → đợi CI + approval
 
-**Bước 5 — Cập nhật branch với main (khi main có commit mới)**
+> Bot sẽ auto-link issue nếu title có story ID. Nếu không match, bot comment gợi ý issues để chọn.
+
+**Bước 5 — Cập nhật branch với staging (khi staging có commit mới)**
 
 ```bash
-git checkout main && git pull origin main
-git checkout feature/PROJ-123-landing-page
-git rebase main
-# hoặc git merge main
-git push origin feature/PROJ-123-landing-page
+git checkout staging && git pull origin staging
+git checkout feature/F01-ai-builder
+git rebase staging
+# hoặc git merge staging
+git push origin feature/F01-ai-builder
 ```
 
 **Bước 6 — Sau khi merge PR**
@@ -268,13 +338,14 @@ Xóa branch (trên GitHub hoặc `git branch -d ...` và `git push origin --dele
 
 | Bước | Lệnh / Việc |
 |------|-------------|
-| Lấy code mới | `git checkout main` → `git pull origin main` |
-| Tạo branch | `git checkout -b feature/PROJ-xxx-mô-tả` |
-| Commit | `git add .` → `git commit -m "type(scope): mô tả"` |
+| Lấy code mới | `git checkout staging` → `git pull origin staging` |
+| Tạo branch | `git checkout -b feature/F01-mô-tả` (có FXX!) |
+| Commit | `git add .` → `git commit -m "feat(F01): mô tả"` |
 | Push | `git push -u origin <branch>` |
-| PR | GitHub: New PR, điền template, assign reviewer |
-| Cập nhật main | `git rebase main` hoặc `git merge main` trên branch |
-| Sau merge | Xóa branch (local + remote) |
+| PR title | `feat(F01): [US-F01-03] mô tả` (bot tự link issue) |
+| PR | GitHub: New PR → staging, điền template, assign reviewer |
+| Cập nhật staging | `git rebase staging` hoặc `git merge staging` trên branch |
+| Sau merge | Xóa branch (local + remote). Issue tự đóng. |
 
 ---
 

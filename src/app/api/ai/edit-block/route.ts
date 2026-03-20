@@ -4,21 +4,35 @@
  * and applies changes to a specific block or the entire site.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
+import { editBlockSchema } from '@/lib/validations/ai'
+import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
+function getOpenAI(): OpenAI | null {
+    const key = process.env.OPENAI_API_KEY
+    if (!key) return null
+    return new OpenAI({ apiKey: key })
+}
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (user, req) => {
     try {
-        const { instruction, block, blockIndex, allBlocks, theme, siteName } = await req.json()
-
-        if (!instruction) {
-            return NextResponse.json({ error: 'Instruction is required' }, { status: 400 })
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
         }
+
+        const { data, errorResponse } = await parseRequest(req, editBlockSchema)
+        if (errorResponse) return errorResponse
+        
+        const { instruction, block, blockIndex = 0, allBlocks, theme, siteName } = data!
 
         // Build context-aware system prompt
         const blockMetas = blockRegistry.getAllMeta()
@@ -80,8 +94,8 @@ For rewriting text content:
 5. blockType in new blocks MUST be one of the available types
 6. If the user asks to add a section, use add_block with appropriate content`
 
-        // No API key → simple rule-based response
-        if (!process.env.OPENAI_API_KEY) {
+        const openai = getOpenAI()
+        if (!openai) {
             return NextResponse.json({
                 action: 'update_block',
                 blockIndex: blockIndex ?? 0,
@@ -124,4 +138,4 @@ For rewriting text content:
             { status: 500 },
         )
     }
-}
+})
