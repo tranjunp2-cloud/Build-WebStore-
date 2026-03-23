@@ -29,8 +29,6 @@ export type BusinessInfo = {
     shortDescription: string
     industry: string
     products: string
-    targetAudience: string
-    style: string
     language?: 'en' | 'ms' | 'vi' | 'auto'
 }
 
@@ -144,14 +142,15 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             partialize: (state) => ({
                 businessInfo: state.businessInfo,
                 step: state.step,
-                status: state.status === 'streaming' ? 'idle' : state.status, // Prevent getting stuck in streaming
+                status: state.status,
                 messages: state.messages,
                 blocks: state.blocks,
                 theme: state.theme,
                 siteId: state.siteId,
                 siteName: state.siteName,
+                progress: state.progress,
+                error: state.error,
             }),
         }
     )
 )
-
