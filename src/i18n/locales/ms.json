@@ -11,9 +11,10 @@
         "search": "Cari..."
     },
     "nav": {
+        "platform": "Platform",
+        "solutions": "Penyelesaian",
         "features": "Ciri-ciri",
-        "pricing": "Harga",
-        "templates": "Templat"
+        "pricing": "Harga"
     },
     "hero": {
         "badge": "Pembina Laman Web Berkuasa AI",
