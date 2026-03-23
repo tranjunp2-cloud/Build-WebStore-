@@ -62,7 +62,11 @@ export function CategorySelect({ categories, selectedIds, onChange, error }: Cat
     )
 
     // Lấy tên các category đã chọn để hiển thị trên nút select
+<<<<<<< HEAD
     const selectedCats = enrichedCategories.filter(c => selectedIds.includes(c.id))
+=======
+    const selectedCats = categories.filter(c => selectedIds.includes(c.id))
+>>>>>>> e52acd5 (feat(f08): [US-F08-05] 3-level categories & i18n)
 
     return (
         <div className="relative" ref={dropdownRef}>

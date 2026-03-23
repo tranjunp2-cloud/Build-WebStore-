@@ -30,7 +30,7 @@ interface BulkCreateModalProps {
 }
 
 export function slugify(text: string) {
-    return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
 
 export function buildSavePayload(prod: ParsedProduct) {
@@ -39,7 +39,7 @@ export function buildSavePayload(prod: ParsedProduct) {
         slug: slugify(prod.name) + '-' + Math.random().toString(36).substr(2, 5),
         price: prod.price,
         status: 'draft',
-        category: prod.category?.trim() || undefined,
+        category: prod.category?.trim() ? [prod.category.trim()] : undefined,
         variants: prod.variants?.length ? prod.variants : undefined,
         stock: prod.variants?.length ? 0 : 10,
         weight: 1, // Fallback for F14 dimension requirements
