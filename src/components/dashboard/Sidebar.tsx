@@ -33,10 +33,12 @@ import {
     Settings,
     Headphones,
     LogOut,
+
     Menu,
     X,
     ChevronDown,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
@@ -300,6 +302,7 @@ export function DashboardSidebar({ userName, userInitial, mobileOpen, setMobileO
                             EN
                         </button>
                     </div>
+
                 </div>
 
                 {/* Figma: Logout — layout_3Q8UJX — row, center, self-stretch, gap 12, pl-16, border, radius 16, NO fill */}

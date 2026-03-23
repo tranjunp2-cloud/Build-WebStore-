@@ -11,10 +11,10 @@
         "search": "Cari..."
     },
     "nav": {
-        "platform": "Nền tảng",
-        "solutions": "Giải pháp",
-        "features": "Tính năng",
-        "pricing": "Bảng giá"
+        "platform": "Platform",
+        "solutions": "Penyelesaian",
+        "features": "Ciri-ciri",
+        "pricing": "Harga"
     },
     "hero": {
         "badge": "Pembina Laman Web Berkuasa AI",
@@ -133,6 +133,29 @@
             "step3": "Terbitkan dan kongsi!",
             "cta": "Mula Sekarang →",
             "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia"
+        },
+        "forgotPassword": {
+            "subject": "Tetapkan semula kata laluan PrimeWeb anda 🔐",
+            "heading": "Tetapan Semula Kata Laluan",
+            "subheading": "Kami menerima permintaan tetapan semula anda",
+            "greeting": "Hai",
+            "body": "Kami menerima permintaan untuk menetapkan semula kata laluan akaun PrimeWeb anda. Klik butang di bawah untuk menetapkan kata laluan baharu. Pautan ini akan tamat tempoh dalam 1 jam.",
+            "cta": "Tetapkan Semula Kata Laluan →",
+            "fallback": "Jika butang tidak berfungsi, salin dan tampal pautan ini ke pelayar anda:",
+            "expiry": "Pautan ini tamat tempoh dalam 1 jam. Jika anda tidak meminta ini, abaikan e-mel ini.",
+            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
+            "ignore": "Jika anda tidak meminta tetapan semula kata laluan, tiada tindakan diperlukan."
+        },
+        "otp": {
+            "subject": "Kod pengesahan PrimeWeb anda 🔐",
+            "heading": "Pengesahan E-mel",
+            "subheading": "Sahkan identiti anda untuk meneruskan",
+            "greeting": "Hai",
+            "body": "Masukkan kod ini untuk mengesahkan identiti anda:",
+            "expiry": "Kod ini tamat tempoh dalam 5 minit",
+            "security": "Jika anda tidak meminta kod ini, sila abaikan e-mel ini. Seseorang mungkin telah memasukkan e-mel anda secara tidak sengaja.",
+            "footer": "Dikuasakan oleh PrimeWeb — Pembina Laman Web AI untuk SME Malaysia",
+            "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
         },
         "order": {
             "subject": "Pesanan Disahkan",
@@ -433,5 +456,71 @@
                 "saveError": "Ralat menyimpan produk"
             }
         }
+    },
+    "auth": {
+        "welcomeBack": "Selamat kembali",
+        "signInSubtitle": "Log masuk untuk terus membina",
+        "email": "E-mel",
+        "password": "Kata laluan",
+        "forgotPassword": "Lupa kata laluan?",
+        "signIn": "Log masuk",
+        "signingIn": "Log masuk...",
+        "or": "atau",
+        "noAccount": "Tiada akaun?",
+        "createOneFree": "Buat akaun percuma →",
+        "errors": {
+            "emailRequired": "E-mel diperlukan",
+            "invalidEmail": "Sila masukkan e-mel yang sah",
+            "passwordMinLength": "Kata laluan mestilah sekurang-kurangnya 8 aksara",
+            "timeout": "Masa tamat. Sila cuba lagi.",
+            "incorrect": "E-mel atau kata laluan tidak betul",
+            "connection": "Ralat sambungan. Sila cuba lagi."
+        },
+        "success": {
+            "welcomeBackTitle": "Selamat kembali!",
+            "redirecting": "Mengalihkan ke papan pemuka anda..."
+        },
+        "register": {
+            "title": "Cipta akaun anda",
+            "subtitle": "Mula membina laman web anda dalam beberapa minit",
+            "firstName": "Nama pertama",
+            "lastName": "Nama akhir",
+            "confirmPassword": "Sahkan kata laluan",
+            "reqLength": "Sekurang-kurangnya 8 aksara",
+            "reqUpper": "Satu huruf besar",
+            "reqNumber": "Satu nombor",
+            "submit": "Cipta akaun",
+            "submitting": "Mencipta akaun...",
+            "termsPrefix": "Dengan mendaftar, anda bersetuju menerima",
+            "terms": "Terma",
+            "and": "dan",
+            "privacy": "Dasar Privasi",
+            "alreadyAccount": "Sudah mempunyai akaun?",
+            "signInLink": "Log masuk →"
+        },
+        "forgot": {
+            "title": "Lupa kata laluan?",
+            "subtitle": "Jangan risau, kami akan hantar pautan tetapan semula",
+            "submit": "Hantar pautan",
+            "submitting": "Menghantar pautan...",
+            "backLogin": "Kembali ke log masuk",
+            "checkEmail": "Semak e-mel anda",
+            "sentTo": "Kami telah menghantar pautan tetapan semula ke",
+            "notReceive": "Tidak menerima e-mel? Semak folder spam atau",
+            "tryAgain": "cuba lagi"
+        }
+    },
+    "cms": {
+        "profile": "Profil",
+        "logout": "Log Keluar"
+    },
+    "plural": {
+        "issue":   { "one": "{count} isu",          "other": "{count} isu" },
+        "order":   { "one": "{count} pesanan",       "other": "{count} pesanan" },
+        "keyword": { "one": "{count} kata kunci",    "other": "{count} kata kunci" },
+        "page":    { "one": "{count} halaman",       "other": "{count} halaman" },
+        "product": { "one": "{count} produk",        "other": "{count} produk" },
+        "fix":     { "one": "{count} pembaikan digunakan", "other": "{count} pembaikan digunakan" },
+        "result":  { "one": "{count} keputusan",     "other": "{count} keputusan" }
     }
 }
