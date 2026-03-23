@@ -78,6 +78,7 @@ type ProductForm = {
     hasVariants: boolean
     variantConfigs: VariantConfig[]
     variants: Variant[]
+    attributes: { key: string; value: string }[]
 }
 
 const initialForm: ProductForm = {
@@ -105,6 +106,7 @@ const initialForm: ProductForm = {
     hasVariants: false,
     variantConfigs: [],
     variants: [],
+    attributes: [],
 }
 
 function slugify(text: string) {
@@ -172,6 +174,7 @@ export default function ProductEditPage() {
                         hasVariants: Boolean(data.hasVariants),
                         variantConfigs: data.variantConfigs || [],
                         variants: data.variants || [],
+                        attributes: data.attributes || [],
                     })
                 }
             } catch (err) {
@@ -239,6 +242,21 @@ export default function ProductEditPage() {
                 newErrors.sku = t.dashboard.products.form.errors.skuRequired
             }
         }
+
+        // Feature US-F08-06: Attributes Validation
+        if (form.attributes.length > 20) {
+            toast.error(t.dashboard.products.form.attributes?.errorMax || "Maximum 20 attributes allowed.");
+            return;
+        }
+        if (form.attributes.some(a => !a.key.trim() || !a.value.trim())) {
+            toast.error(t.dashboard.products.form.attributes?.errorEmpty || "Attribute property names and values cannot be empty.");
+            return;
+        }
+        const attributeKeys = form.attributes.map(a => a.key.trim().toLowerCase());
+        if (new Set(attributeKeys).size !== attributeKeys.length) {
+            toast.error(t.dashboard.products.form.attributes?.errorDuplicate || "Duplicate attribute property names are not allowed.");
+            return;
+        }
         
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors)
@@ -275,6 +293,7 @@ export default function ProductEditPage() {
                 hasVariants: form.hasVariants,
                 variantConfigs: form.hasVariants ? form.variantConfigs : [],
                 variants: form.hasVariants ? form.variants.map(v => ({ ...v, price: parseFloat(v.price), compareAtPrice: v.compareAtPrice ? parseFloat(v.compareAtPrice) : undefined, stock: parseInt(v.stock, 10) })) : [],
+                attributes: form.attributes,
                 seo: {
                     title: form.seoTitle,
                     description: form.seoDescription,
@@ -733,6 +752,84 @@ export default function ProductEditPage() {
                             className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#0B1120] px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
                     </div>
                 </div>
+            </div>
+
+            {/* Specifications & Attributes — US-F08-06 */}
+            <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 p-6 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                    <div>
+                        <h2 className="text-sm font-semibold uppercase text-gray-500">
+                            {t.dashboard.products.form.attributes.label}
+                        </h2>
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                            {t.dashboard.products.form.attributes.description}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => updateField('attributes', [...form.attributes, { key: '', value: '' }])}
+                        className="flex items-center gap-1.5 rounded-lg bg-blue-500/10 px-3 py-1.5 text-xs font-medium text-blue-400 hover:bg-blue-500/20 border border-blue-500/20 transition-colors"
+                    >
+                        <Plus className="h-3.5 w-3.5" />
+                        {t.dashboard.products.form.attributes.addBtn}
+                    </button>
+                </div>
+
+                {form.attributes.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 rounded-lg border border-dashed border-white/5 bg-white/[0.02]">
+                        <Package className="h-8 w-8 text-gray-600 mb-2 opacity-20" />
+                        <p className="text-sm text-gray-500 italic">
+                            {t.dashboard.products.form.attributes.empty}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {form.attributes.map((attr, index) => (
+                            <div key={index} className="group relative grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg border border-white/5 bg-[#0B1120] hover:border-white/10 transition-colors">
+                                <div>
+                                    <label className="text-[10px] font-medium text-gray-500 mb-1 block uppercase tracking-wider">
+                                        {t.dashboard.products.form.attributes.propertyName}
+                                    </label>
+                                    <input
+                                        value={attr.key}
+                                        onChange={(e) => {
+                                            const newAttrs = [...form.attributes]
+                                            newAttrs[index].key = e.target.value
+                                            updateField('attributes', newAttrs)
+                                        }}
+                                        placeholder={t.dashboard.products.form.attributes.keyPlaceholder}
+                                        className="w-full bg-transparent text-sm text-white placeholder-gray-600 outline-none"
+                                    />
+                                </div>
+                                <div className="pr-8">
+                                    <label className="text-[10px] font-medium text-gray-500 mb-1 block uppercase tracking-wider">
+                                        {t.dashboard.products.form.attributes.propertyValue}
+                                    </label>
+                                    <input
+                                        value={attr.value}
+                                        onChange={(e) => {
+                                            const newAttrs = [...form.attributes]
+                                            newAttrs[index].value = e.target.value
+                                            updateField('attributes', newAttrs)
+                                        }}
+                                        placeholder={t.dashboard.products.form.attributes.valuePlaceholder}
+                                        className="w-full bg-transparent text-sm text-white placeholder-gray-600 outline-none"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newAttrs = form.attributes.filter((_, i) => i !== index)
+                                        updateField('attributes', newAttrs)
+                                    }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Status */}

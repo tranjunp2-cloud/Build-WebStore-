@@ -406,6 +406,19 @@
                     "empty": "No categories matched.",
                     "label": "Categories *"
                 },
+                "attributes": {
+                    "label": "Specifications & Attributes",
+                    "description": "Add dynamic key/value properties (e.g., Material: Cotton, Brand: Nike) for SEO and PDP table.",
+                    "addBtn": "+ Add Attribute",
+                    "keyPlaceholder": "e.g. Material",
+                    "valuePlaceholder": "e.g. 100% Cotton",
+                    "propertyName": "Property Name",
+                    "propertyValue": "Value",
+                    "empty": "No attributes added yet.",
+                    "errorMax": "Maximum 20 attributes allowed.",
+                    "errorEmpty": "Attribute names and values cannot be empty.",
+                    "errorDuplicate": "Duplicate attribute names are not allowed."
+                },
                 "variants": {
                     "hasVariantsToggle": "Product has Variants",
                     "tierConfig": "Variant Properties",
