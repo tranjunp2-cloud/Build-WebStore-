@@ -329,6 +329,70 @@
                 "failed": "SEO analysis failed",
                 "retry": "Retry"
             }
+        },
+        "orders": {
+            "title": "Orders Management",
+            "subtitle": "Auto-sync every 60s",
+            "trackOrders": "Track and process your orders",
+            "confirm": "Confirm",
+            "orders": "orders",
+            "changeTo": "Change to",
+            "search": "Search order ID, customer name...",
+            "noOrdersFound": "No orders found matching the filters",
+            "noOrdersYet": "No orders yet",
+            "noOrdersDesc": "New orders will appear here when customers complete checkout.",
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "confirmed": "Confirmed",
+                "readyToShip": "Ready to Ship",
+                "shipped": "Shipped",
+                "completed": "Completed",
+                "cancelled": "Cancelled",
+                "refunded": "Refunded"
+            },
+            "table": {
+                "orderId": "Order ID / Customer",
+                "items": "Items",
+                "total": "Total",
+                "status": "Status",
+                "date": "Date",
+                "item": "item",
+                "itemPlural": "items"
+            },
+            "drawer": {
+                "timeline": "Status Timeline",
+                "customer": "Customer",
+                "noPhone": "No phone provided",
+                "payment": "Payment",
+                "viewReceipt": "View Receipt",
+                "lineItems": "Line Items",
+                "subtotal": "Subtotal",
+                "shipping": "Shipping",
+                "tax": "Tax (6%)",
+                "total": "Total",
+                "orderCancelled": "Order cancelled",
+                "orderRefunded": "Order refunded",
+                "reason": "Reason"
+            },
+            "status": {
+                "pending": "Pending",
+                "confirmed": "Confirmed",
+                "readyToShip": "Ready to Ship",
+                "shipped": "Shipped",
+                "completed": "Completed",
+                "cancelled": "Cancelled",
+                "refunded": "Refunded",
+                "processing": "Processing",
+                "paid": "Paid"
+            },
+            "toast": {
+                "updated": "Order status updated",
+                "loadFailed": "Failed to load orders",
+                "bulkSuccess": "Successfully confirmed {count} orders",
+                "bulkFailed": "{count} orders failed (invalid workflow)",
+                "updateFailed": "Error: {message}"
+            }
         }
     }
 }
