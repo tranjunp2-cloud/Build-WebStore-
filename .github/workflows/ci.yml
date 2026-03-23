@@ -1,13 +1,36 @@
 # CI Pipeline — Lint, typecheck, test, build, quality metrics
 # PR → CI (+ quality comment) → Deploy Preview
 # Push → CI → Deploy Staging/Production → Lark notify
+#
+# 💡 Cost optimization (GitHub Team = 3,000 min/month free):
+# - Skip CI for docs/workflow/story-only changes (saves ~30% minutes)
+# - Docker build only when Dockerfile or config changes (saves ~90s/PR)
+# - Push to staging skips CI if PR already passed (deploy only)
 name: CI
 
 on:
   push:
     branches: [main, staging]
+    paths-ignore:
+      - 'docs/**'
+      - '.github/workflows/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/CONTRIBUTING.md'
+      - '.github/GIT_AND_CI_RULES.md'
+      - '.github/pull_request_template.md'
+      - '*.md'
+      - 'LICENSE'
   pull_request:
     branches: [main, staging]
+    paths-ignore:
+      - 'docs/**'
+      - '.github/workflows/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/CONTRIBUTING.md'
+      - '.github/GIT_AND_CI_RULES.md'
+      - '.github/pull_request_template.md'
+      - '*.md'
+      - 'LICENSE'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -69,13 +92,35 @@ jobs:
           NODE_OPTIONS: '--require ./node-polyfill.js'
         run: npm run build 2>&1 | tee build-output.txt
 
-      # --- Docker Build Verification (PR only) ---
-      # This catches issues that pass local build but fail in Docker:
-      # - Missing force-dynamic exports (prerender crashes)
-      # - Missing dependencies in package.json
-      # - Dockerfile syntax or COPY errors
-      - name: Docker build check
+      # --- Docker Build Verification (PR only, when relevant files change) ---
+      # Only runs when Dockerfile, config, or dependency files change.
+      # Saves ~90-120s per PR that doesn't touch deploy-relevant files.
+      - name: Check if Docker build needed
         if: success() && github.event_name == 'pull_request'
+        id: docker_check
+        run: |
+          DOCKER_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- \
+            Dockerfile \
+            docker-compose*.yml \
+            package.json \
+            package-lock.json \
+            next.config.ts \
+            next.config.mjs \
+            node-polyfill.js \
+            tsconfig.json \
+            'src/app/**/page.tsx' \
+            'src/app/**/layout.tsx' \
+            2>/dev/null || echo "")
+          if [ -n "$DOCKER_FILES" ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "🐳 Docker build needed — changed: $DOCKER_FILES"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "⏭️ Docker build skipped — no deploy-relevant changes"
+          fi
+
+      - name: Docker build check
+        if: success() && github.event_name == 'pull_request' && steps.docker_check.outputs.needed == 'true'
         id: docker
         run: |
           echo "🐳 Building Docker image (builder stage) to verify deploy compatibility..."

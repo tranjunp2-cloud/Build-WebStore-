@@ -81,6 +81,7 @@ Tính năng **F21 Localization** cho phép người dùng thay đổi ngôn ng�
 | FR-05 | Lưu tuỳ chọn ngôn ngữ vào User Database qua API | US-F21-03 | P0 | Kích hoạt khi có Auth Token |
 | FR-06 | UI Component text tự động fallback sang English nếu key BM bị thiếu | N/A | P1 | Safe fallback mechanisms |
 | FR-07 | **[Mobile]** Thu gọn hoặc di chuyển nút Language Switcher vào trong Hamburger menu trên màn hình mobile để tiết kiệm diện tích Header. | US-F21-04 | P1 | Mobile UX |
+| FR-08 | Máy chủ i18n phải hỗ trợ cơ chế truyền params cho Pluralization (số nhiều) để xử lý ngữ pháp khác biệt giữa tiếng Anh và tiếng Mã Lai. | N/A | P0 | Language Accuracy |
 
 ---
 
@@ -88,7 +89,9 @@ Tính năng **F21 Localization** cho phép người dùng thay đổi ngôn ng�
 
 - **BR-01:** Ngôn ngữ mặc định (Default language) của hệ thống khi user truy cập lần đầu là **English**.
 - **BR-02:** User Data (ví dụ tên Item, mô tả sản phẩm user gõ) sẽ giữ nguyên ngôn ngữ gốc do user nhập, hệ thống chỉ can thiệp dịch (translate) các Navigation/UI strings.
-- **BR-03:** Khi đổi ngôn ngữ, format của Currency cũng phải fix thành `RM XXX.XX` theo format chuẩn của Ringgit, không được dùng ký tự lạ.
+- **BR-03:** Khi đổi ngôn ngữ, định dạng Ngày tháng khóa cứng format `DD/MM/YYYY`. Định dạng Tiền tệ fix thành `RM 1,200.50` (có tiền tố RM, phân cách ngàn bằng dấu phẩy, phân cách thập phân bằng dấu chấm).
+- **BR-04:** Sync Priority: Khi user đăng nhập thành công, hệ thống ưu tiên lấy trạng thái ngôn ngữ từ User Database Profile để hiển thị, và tự động ghi đè (override) lên giá trị `prefer_lang` dưới LocalStorage của thiết bị truy cập.
+- **BR-05:** Error Fallback: Nếu API backend trả về Text mã lỗi không tồn tại trong i18n dictionary (uncaught error tiếng Anh dư thừa), frontend phải tự động fallback sang thông báo lỗi chung chung đã được dịch (VD: Lỗi kết nối hệ thống) để bảo vệ trải nghiệm.
 
 ---
 
