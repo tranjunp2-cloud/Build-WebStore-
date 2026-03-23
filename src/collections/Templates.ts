@@ -1,5 +1,18 @@
 import type { CollectionConfig } from 'payload'
 
+export const TEMPLATE_CATEGORY_OPTIONS = [
+    { label: '🍽️ Restaurant / Cafe / F&B', value: 'restaurant' },
+    { label: '🛍️ Shop / Fashion / E-commerce', value: 'ecommerce' },
+    { label: '💄 Beauty / Spa / Wellness', value: 'beauty' },
+    { label: '💻 Tech / IT / SaaS', value: 'tech' },
+    { label: '🏥 Health / Dental / Clinic', value: 'health' },
+    { label: '📚 Education / Training', value: 'education' },
+    { label: '🏠 Real Estate / Property', value: 'realestate' },
+    { label: '💪 Gym / Fitness / Yoga', value: 'fitness' },
+    { label: '🎨 Portfolio / Freelancer / Agency', value: 'creative' },
+    { label: '🏢 Business / Corporate', value: 'business' },
+]
+
 export const Templates: CollectionConfig = {
     slug: 'templates',
     admin: {
@@ -20,18 +33,7 @@ export const Templates: CollectionConfig = {
             type: 'select',
             required: true,
             hasMany: true,
-            options: [
-                { label: '🍽️ Restaurant / Cafe / F&B', value: 'restaurant' },
-                { label: '🛍️ Shop / Fashion / E-commerce', value: 'ecommerce' },
-                { label: '💄 Beauty / Spa / Wellness', value: 'beauty' },
-                { label: '💻 Tech / IT / SaaS', value: 'tech' },
-                { label: '🏥 Health / Dental / Clinic', value: 'health' },
-                { label: '📚 Education / Training', value: 'education' },
-                { label: '🏠 Real Estate / Property', value: 'realestate' },
-                { label: '💪 Gym / Fitness / Yoga', value: 'fitness' },
-                { label: '🎨 Portfolio / Freelancer / Agency', value: 'creative' },
-                { label: '🏢 Business / Corporate', value: 'business' },
-            ],
+            options: TEMPLATE_CATEGORY_OPTIONS,
         },
         {
             name: 'thumbnail',
