@@ -2,6 +2,9 @@
 
 > **Epic:** Store Setup & Configuration
 > **Feature Code:** F19
+> **Links:** 
+> - [Prototype](https://www.figma.com/make/Y48xuOh2gMCid2UmqOAFys/F01-ai-chat-builder-demo?fullscreen=1&t=TooWbqYJWABdfznd-1&preview-route=%2Fsettings%2Fdomains)
+> - [Figma Design](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30877-2416&t=Q1NlQt72Nc8vZn0f-4)
 
 Tài liệu này tổng hợp lại các luồng tính năng và bổ sung các bản vẽ Wireframe minh họa rõ ràng hơn để team có thể nắm bắt và triển khai UI components hoàn chỉnh, tuân thủ hoàn toàn **F18 CMS Global Layout** (Sidebar trái + Topbar giữ nguyên, mọi thứ render trong Main Content).
 
