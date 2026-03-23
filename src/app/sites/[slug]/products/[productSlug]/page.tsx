@@ -97,6 +97,15 @@ export default async function ProductDetailPage({ params }: Props) {
     const discountPercent = hasDiscount ? Math.round((1 - p.price / p.compareAtPrice) * 100) : 0
 
     // JSON-LD Product schema
+    const attributes = p.attributes || []
+    
+    // Convert attributes to Schema.org additionalProperty
+    const additionalProperty = attributes.map((attr: any) => ({
+        '@type': 'PropertyValue',
+        name: attr.key,
+        value: attr.value,
+    }))
+
     const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'Product',
@@ -110,6 +119,7 @@ export default async function ProductDetailPage({ params }: Props) {
             priceCurrency: p.currency || 'MYR',
             availability: p.inventory > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
         },
+        ...(additionalProperty.length > 0 && { additionalProperty }),
     }
 
     return (
@@ -135,10 +145,20 @@ export default async function ProductDetailPage({ params }: Props) {
                 </nav>
 
                 {/* Breadcrumb */}
-                <div style={{ padding: '16px 32px', fontSize: '13px', color: '#999', maxWidth: '1200px', margin: '0 auto' }}>
+                <div style={{ padding: '16px 32px', fontSize: '13px', color: '#999', maxWidth: '1200px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
                     <Link href={`/sites/${slug}/products`} style={{ color: primaryColor, textDecoration: 'none' }}>Products</Link>
-                    <span style={{ margin: '0 8px' }}>/</span>
-                    <span>{p.name}</span>
+                    <span style={{ margin: '0 4px' }}>/</span>
+                    {p.category && typeof p.category === 'object' && p.category.breadcrumbs && (
+                        <>
+                            {p.category.breadcrumbs.split(' > ').map((crumb: string, i: number) => (
+                                <span key={i} style={{ display: 'flex', alignItems: 'center' }}>
+                                    <span style={{ color: '#666' }}>{crumb}</span>
+                                    <span style={{ margin: '0 8px' }}>/</span>
+                                </span>
+                            ))}
+                        </>
+                    )}
+                    <span style={{ color: '#111', fontWeight: 500 }}>{p.name}</span>
                 </div>
 
                 {/* Product Detail */}
@@ -180,9 +200,9 @@ export default async function ProductDetailPage({ params }: Props) {
 
                     {/* Product Info */}
                     <div>
-                        {p.category && (
-                            <p style={{ fontSize: '13px', color: primaryColor, fontWeight: 500, marginBottom: '8px' }}>
-                                {p.category}
+                        {p.category && typeof p.category === 'object' && (
+                            <p style={{ fontSize: '13px', color: primaryColor, fontWeight: 600, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                {p.category.name}
                             </p>
                         )}
 
@@ -236,6 +256,31 @@ export default async function ProductDetailPage({ params }: Props) {
                             primaryColor={primaryColor}
                             siteSlug={slug}
                         />
+
+                        {/* Extended Attributes Grid (US-F08-06) */}
+                        {attributes && attributes.length > 0 && (
+                            <div style={{ marginTop: '32px' }}>
+                                <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#111', marginBottom: '12px' }}>Specifications</h3>
+                                <div style={{ 
+                                    display: 'grid', gridTemplateColumns: '1fr', gap: '1px', 
+                                    background: '#eee', border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden' 
+                                }}>
+                                    {attributes.map((attr: any, idx: number) => (
+                                        <div key={idx} style={{ 
+                                            display: 'grid', gridTemplateColumns: '120px 1fr', 
+                                            background: '#fff', fontSize: '14px' 
+                                        }}>
+                                            <div style={{ padding: '12px 16px', background: '#fafafa', color: '#666', fontWeight: 500 }}>
+                                                {attr.key}
+                                            </div>
+                                            <div style={{ padding: '12px 16px', color: '#111' }}>
+                                                {attr.value}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Description */}
                         {p.shortDescription && (

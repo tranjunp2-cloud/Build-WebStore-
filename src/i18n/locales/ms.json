@@ -406,6 +406,19 @@
                     "empty": "Tiada kategori yang sepadan.",
                     "label": "Kategori *"
                 },
+                "attributes": {
+                    "label": "Spesifikasi & Atribut",
+                    "description": "Tambah sifat kunci/nilai dinamik (cth., Bahan: Kapas, Jenama: Nike) untuk SEO và jadual PDP.",
+                    "addBtn": "+ Tambah Atribut",
+                    "keyPlaceholder": "cth. Bahan",
+                    "valuePlaceholder": "cth. 100% Kapas",
+                    "propertyName": "Nama Sifat",
+                    "propertyValue": "Nilai",
+                    "empty": "Tiada atribut ditambah lagi.",
+                    "errorMax": "Maksimum 20 atribut dibenarkan.",
+                    "errorEmpty": "Nama dan nilai atribut tidak boleh kosong.",
+                    "errorDuplicate": "Nama atribut berulang tidak dibenarkan."
+                },
                 "variants": {
                     "hasVariantsToggle": "Produk mempunyai Varian",
                     "tierConfig": "Sifat Varian",
