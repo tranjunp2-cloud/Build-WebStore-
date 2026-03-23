@@ -27,12 +27,17 @@ vi.mock('next/headers', () => ({
 // Mock Database (PayloadCMS)
 let mockSiteDB: any[] = []
 let mockPageDB: any[] = []
+let mockTenant: any = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
 
 vi.mock('payload', () => {
     return {
         getPayload: vi.fn().mockResolvedValue({
             auth: vi.fn().mockResolvedValue({
                 user: { id: 'user-xyz', tenants: [{ tenant: 'tenant-1' }] }
+            }),
+            findByID: vi.fn().mockImplementation(async ({ collection, id }) => {
+                if (collection === 'tenants' && id === mockTenant.id) return mockTenant
+                return null
             }),
             find: vi.fn().mockImplementation(async ({ collection }) => {
                 if (collection === 'sites') return { docs: mockSiteDB }
@@ -79,6 +84,7 @@ describe('AI Streaming APIs', () => {
         vi.clearAllMocks()
         mockSiteDB = []
         mockPageDB = []
+        mockTenant = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
     })
 
     describe('POST /api/ai/generate-site', () => {
@@ -110,6 +116,7 @@ describe('AI Streaming APIs', () => {
              expect(mockSiteDB.length).toBe(1) // A site was created
              expect(mockPageDB.length).toBe(4) // Homepage, About, Products, Contact
              expect(result.totalPages).toBe(4)
+             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', '/products', '/contact'])
         })
 
         it('returns text/event-stream response for SSE mode when stream=true', async () => {
@@ -139,6 +146,52 @@ describe('AI Streaming APIs', () => {
                  const { done } = await reader!.read()
                  if (done) break
              }
+        })
+
+        it('returns 402 when a free-plan tenant has already used the AI generation quota', async () => {
+             mockTenant = { id: 'tenant-1', plan: 'free', aiGenerationsCount: 1 }
+
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: {
+                         businessName: 'Bakery',
+                         industry: 'Food',
+                         products: 'Bread',
+                         shortDescription: 'Fresh artisan bakery'
+                     }
+                 })
+             })
+
+             const res = await GenerateSitePOST(req)
+             const body = await res.json()
+
+             expect(res.status).toBe(402)
+             expect(body.code).toBe('PAYMENT_REQUIRED')
+             expect(mockSiteDB).toHaveLength(0)
+             expect(mockPageDB).toHaveLength(0)
+        })
+
+        it('returns 400 when business info contains restricted content', async () => {
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: {
+                         businessName: 'Underground Store',
+                         industry: 'Retail',
+                         products: 'gun for sale',
+                         shortDescription: 'restricted catalog'
+                     }
+                 })
+             })
+
+             const res = await GenerateSitePOST(req)
+             const body = await res.json()
+
+             expect(res.status).toBe(400)
+             expect(body.code).toBe('CONTENT_UNSAFE')
+             expect(mockSiteDB).toHaveLength(0)
+             expect(mockPageDB).toHaveLength(0)
         })
     })
 
