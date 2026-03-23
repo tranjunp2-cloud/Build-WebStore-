@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
+import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
@@ -22,6 +23,11 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
 
     try {
+        // Parse request body early so validation errors return before auth/db side effects.
+        const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
+        if (errorResponse) return errorResponse
+
+        const { businessInfo, extraInstructions, language = 'en' } = data!
         const payload = await getPayload({ config })
 
         // Authenticate user
@@ -68,32 +74,79 @@ export async function POST(req: NextRequest) {
         let resolvedTenantId = typeof tenantId === 'object' ? tenantId.id : tenantId
 
         if (!resolvedTenantId) {
-            // Auto-create tenant for legacy users without one
-            const firstName = (user as any).firstName || (user as any).name || 'My'
-            const newTenant = await payload.create({
+            const fallbackSlug = `store-${user.id}`
+
+            // Recover an orphaned tenant first before creating a new one.
+            const existingTenantBySlug = await payload.find({
                 collection: 'tenants',
-                data: {
-                    name: `${firstName}'s Store`,
-                    slug: `store-${user.id}`,
-                },
+                where: { slug: { equals: fallbackSlug } },
+                limit: 1,
             })
-            // Assign tenant to user
-            await payload.update({
-                collection: 'users',
-                id: user.id,
-                data: {
-                    tenants: [{ tenant: newTenant.id, role: 'owner' }],
-                } as any,
-            })
-            resolvedTenantId = newTenant.id
-            console.log(`[AI Generate] Auto-created tenant ${newTenant.id} for user ${user.id}`)
+
+            if (existingTenantBySlug.docs.length > 0) {
+                const recoveredTenant = existingTenantBySlug.docs[0]
+
+                await payload.update({
+                    collection: 'users',
+                    id: user.id,
+                    data: {
+                        tenants: [{ tenant: recoveredTenant.id, role: 'owner' }],
+                    } as any,
+                })
+
+                resolvedTenantId = recoveredTenant.id
+                console.log(`[AI Generate] Re-attached tenant ${recoveredTenant.id} to user ${user.id}`)
+            } else {
+                // Auto-create tenant for legacy users without one
+                const firstName = (user as any).firstName || (user as any).name || 'My'
+                const newTenant = await payload.create({
+                    collection: 'tenants',
+                    data: {
+                        name: `${firstName}'s Store`,
+                        slug: fallbackSlug,
+                        aiGenerationsCount: 0,
+                    },
+                })
+                // Assign tenant to user
+                await payload.update({
+                    collection: 'users',
+                    id: user.id,
+                    data: {
+                        tenants: [{ tenant: newTenant.id, role: 'owner' }],
+                    } as any,
+                })
+                resolvedTenantId = newTenant.id
+                console.log(`[AI Generate] Auto-created tenant ${newTenant.id} for user ${user.id}`)
+            }
         }
 
-        // Parse request body — structured business info
-        const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
-        if (errorResponse) return errorResponse
-        
-        const { businessInfo, extraInstructions, language = 'en' } = data!
+        // FR-15: Rate Limit - Free tier is limited to 1 AI generation
+        const tenant = typeof payload.findByID === 'function'
+            ? await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
+            : { plan: 'pro', aiGenerationsCount: 0 }
+        if (tenant.plan === 'free') {
+            const currentCount = tenant.aiGenerationsCount || 0
+            if (currentCount >= 1) {
+                return NextResponse.json(
+                    { 
+                        error: 'Tài khoản Free chỉ được tạo website bằng AI 1 lần duy nhất. Vui lòng nâng cấp gói cước để tiếp tục.',
+                        code: 'PAYMENT_REQUIRED'
+                    },
+                    { status: 402 }
+                )
+            }
+        }
+
+        const safetyCheck = checkBusinessInfoSafety(businessInfo)
+        if (!safetyCheck.safe) {
+            return NextResponse.json(
+                {
+                    error: safetyCheck.message,
+                    code: 'CONTENT_UNSAFE',
+                },
+                { status: 400 },
+            )
+        }
 
         // Check SSE mode
         const isStreaming = req.nextUrl.searchParams.get('stream') === 'true'
@@ -194,7 +247,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Sanitize blocks for Payload CMS compatibility
-        const sanitizedBlocks = sanitizeBlocksForPayload(result.blocks)
+        const sanitizedBlocks = applyGeneratedSiteNavigation(
+            sanitizeBlocksForPayload(result.blocks),
+            result.siteName,
+        )
 
         // Inject generated Hero Image into the hero block
         if (heroMedia) {
@@ -211,19 +267,38 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Create Homepage with generated blocks
-        const page = await payload.create({
-            collection: 'pages',
-            data: {
-                title: 'Homepage',
-                slug: '/',
-                site: site.id,
-                isHomepage: true,
-                layout: sanitizedBlocks,
-                seo: {
-                    title: result.seo.title,
-                    description: result.seo.description,
+        const pageDefinitions = buildGeneratedPages({
+            blocks: sanitizedBlocks,
+            businessInfo,
+            result,
+        })
+
+        const createdPages: any[] = []
+
+        for (const pageDefinition of pageDefinitions) {
+            const createdPage = await payload.create({
+                collection: 'pages',
+                data: {
+                    title: pageDefinition.title,
+                    slug: pageDefinition.slug,
+                    site: site.id,
+                    isHomepage: pageDefinition.isHomepage,
+                    layout: pageDefinition.layout,
+                    seo: pageDefinition.seo,
                 },
+            })
+
+            createdPages.push(createdPage)
+        }
+
+        const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
+
+        // FR-15: Increment AI generation count
+        await payload.update({
+            collection: 'tenants',
+            id: resolvedTenantId,
+            data: {
+                aiGenerationsCount: (tenant.aiGenerationsCount || 0) + 1,
             },
         })
 
@@ -247,10 +322,11 @@ export async function POST(req: NextRequest) {
                         // Final done event with siteId
                         const doneData = `event: done\ndata: ${JSON.stringify({
                             siteId: site.id,
-                            pageId: page.id,
+                            pageId: homepagePage.id,
                             siteName: result.siteName,
                             siteLanguage: result.language || language,
                             totalBlocks: result.blocks.length,
+                            totalPages: createdPages.length,
                             timeMs,
                         })}\n\n`
                         controller.enqueue(encoder.encode(doneData))
@@ -274,11 +350,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             success: true,
             siteId: site.id,
-            pageId: page.id,
+            pageId: homepagePage.id,
             siteName: result.siteName,
             siteLanguage: result.language || language,
             siteType: result.siteType,
             blockCount: result.blocks.length,
+            totalPages: createdPages.length,
             theme: result.theme,
             timeMs,
         })
@@ -290,6 +367,219 @@ export async function POST(req: NextRequest) {
             { status: 500 },
         )
     }
+}
+
+function cloneBlockData<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value))
+}
+
+function normalizeInternalUrl(url: unknown): string {
+    if (typeof url !== 'string') return '#'
+    if (url === '#' || url === '#home' || url === '/home' || url === 'home') return '/'
+    if (url === '#about' || url === 'about') return '/about'
+    if (url === '#features' || url === '#services' || url === '#products' || url === 'products') return '/products'
+    if (url === '#contact' || url === 'contact') return '/contact'
+    return url
+}
+
+function applyGeneratedSiteNavigation(blocks: any[], businessName: string): any[] {
+    const normalizedBlocks = cloneBlockData(blocks)
+    const pageLinks = [
+        { label: 'Home', url: '/' },
+        { label: 'About', url: '/about' },
+        { label: 'Products', url: '/products' },
+        { label: 'Contact', url: '/contact' },
+    ]
+
+    return normalizedBlocks.map((block) => {
+        if (block.blockType === 'navigation') {
+            return {
+                ...block,
+                logoText: block.logoText || businessName,
+                links: pageLinks,
+                ctaButton: block.ctaButton
+                    ? {
+                        ...block.ctaButton,
+                        url: normalizeInternalUrl(block.ctaButton.url),
+                    }
+                    : block.ctaButton,
+            }
+        }
+
+        if (block.blockType === 'hero' && Array.isArray(block.ctaButtons)) {
+            return {
+                ...block,
+                ctaButtons: block.ctaButtons.map((button: any) => ({
+                    ...button,
+                    url: normalizeInternalUrl(button.url),
+                })),
+            }
+        }
+
+        if (block.blockType === 'footer' && Array.isArray(block.columns)) {
+            return {
+                ...block,
+                logoText: block.logoText || businessName,
+                columns: block.columns.map((column: any) => ({
+                    ...column,
+                    links: Array.isArray(column.links)
+                        ? column.links.map((link: any) => ({
+                            ...link,
+                            url: normalizeInternalUrl(link.url),
+                        }))
+                        : column.links,
+                })),
+            }
+        }
+
+        return block
+    })
+}
+
+function createPageHero(baseHero: any, options: {
+    headline: string
+    subheadline: string
+    primaryLabel?: string
+    primaryUrl?: string
+    secondaryLabel?: string
+    secondaryUrl?: string
+    badgeText?: string
+}): any {
+    const hero = cloneBlockData(baseHero || {
+        blockType: 'hero',
+        variant: 'centered',
+    })
+
+    hero.blockType = 'hero'
+    hero.variant = hero.variant || 'centered'
+    hero.headline = options.headline
+    hero.subheadline = options.subheadline
+    hero.badge = options.badgeText
+        ? { show: true, text: options.badgeText }
+        : hero.badge
+
+    hero.ctaButtons = [
+        {
+            label: options.primaryLabel || 'Get in touch',
+            url: options.primaryUrl || '/contact',
+            style: 'primary',
+        },
+    ]
+
+    if (options.secondaryLabel && options.secondaryUrl) {
+        hero.ctaButtons.push({
+            label: options.secondaryLabel,
+            url: options.secondaryUrl,
+            style: 'outline',
+        })
+    }
+
+    return hero
+}
+
+function buildGeneratedPages({
+    blocks,
+    businessInfo,
+    result,
+}: {
+    blocks: any[]
+    businessInfo: { businessName: string; shortDescription: string; products: string }
+    result: any
+}) {
+    const navigation = blocks.find((block) => block.blockType === 'navigation') || null
+    const hero = blocks.find((block) => block.blockType === 'hero') || null
+    const about = blocks.find((block) => block.blockType === 'about') || null
+    const features = blocks.find((block) => block.blockType === 'features') || null
+    const testimonials = blocks.find((block) => block.blockType === 'testimonials') || null
+    const contact = blocks.find((block) => block.blockType === 'contact') || null
+    const footer = blocks.find((block) => block.blockType === 'footer') || null
+
+    const compact = (pageBlocks: Array<any | null>) =>
+        pageBlocks.filter(Boolean).map((block) => cloneBlockData(block))
+
+    return [
+        {
+            title: 'Homepage',
+            slug: '/',
+            isHomepage: true,
+            layout: cloneBlockData(blocks),
+            seo: {
+                title: result.seo.title,
+                description: result.seo.description,
+            },
+        },
+        {
+            title: 'About',
+            slug: '/about',
+            isHomepage: false,
+            layout: compact([
+                navigation,
+                createPageHero(hero, {
+                    headline: `About ${businessInfo.businessName}`,
+                    subheadline: businessInfo.shortDescription,
+                    primaryLabel: 'Contact us',
+                    primaryUrl: '/contact',
+                    secondaryLabel: 'View services',
+                    secondaryUrl: '/products',
+                    badgeText: 'About Us',
+                }),
+                about,
+                testimonials,
+                footer,
+            ]),
+            seo: {
+                title: `About ${businessInfo.businessName}`,
+                description: businessInfo.shortDescription,
+            },
+        },
+        {
+            title: 'Products',
+            slug: '/products',
+            isHomepage: false,
+            layout: compact([
+                navigation,
+                createPageHero(hero, {
+                    headline: `${businessInfo.businessName} Products & Services`,
+                    subheadline: businessInfo.products,
+                    primaryLabel: 'Contact us',
+                    primaryUrl: '/contact',
+                    secondaryLabel: 'About us',
+                    secondaryUrl: '/about',
+                    badgeText: 'Products & Services',
+                }),
+                features,
+                testimonials,
+                footer,
+            ]),
+            seo: {
+                title: `${businessInfo.businessName} Products & Services`,
+                description: businessInfo.products,
+            },
+        },
+        {
+            title: 'Contact',
+            slug: '/contact',
+            isHomepage: false,
+            layout: compact([
+                navigation,
+                createPageHero(hero, {
+                    headline: `Contact ${businessInfo.businessName}`,
+                    subheadline: 'Reach out to discuss your business needs, request a quote, or ask any questions.',
+                    primaryLabel: 'Back to home',
+                    primaryUrl: '/',
+                    secondaryLabel: 'View services',
+                    secondaryUrl: '/products',
+                    badgeText: 'Contact Us',
+                }),
+                contact,
+                footer,
+            ]),
+            seo: {
+                title: `Contact ${businessInfo.businessName}`,
+                description: `Get in touch with ${businessInfo.businessName}.`,
+            },
+        },
+    ]
 }
 
 /**

@@ -11,6 +11,8 @@ import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useI18n, syncLocaleFromDB } from '@/i18n'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 const loginSchema = z.object({
     email: z.string().min(1, 'Email is required').email('Please enter a valid email'),
@@ -19,11 +21,38 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>
 
+/**
+ * Determine post-login redirect based on user role (BR-02, AC-5).
+ * - Owner without tenant/site → /onboarding
+ * - Owner with tenant → /dashboard (or returnUrl)
+ * - Staff → /admin (Payload CMS workspace)
+ */
+function getRedirectByRole(
+    user: { roles?: string[]; tenants?: { tenant: unknown }[] },
+    returnUrl: string,
+): string {
+    const roles = user.roles || []
+
+    // Staff → always Payload admin
+    if (roles.includes('editor') || roles.includes('viewer')) {
+        return '/admin'
+    }
+
+    // Owner without any tenant → onboarding
+    if (roles.includes('tenant-owner') && (!user.tenants || user.tenants.length === 0)) {
+        return '/onboarding'
+    }
+
+    // Owner with tenant → returnUrl or dashboard
+    return returnUrl
+}
+
 function LoginFormContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const redirectUrl = searchParams.get('returnUrl') || '/dashboard'
+    const returnUrl = searchParams.get('returnUrl') || '/dashboard'
     const [showPassword, setShowPassword] = useState(false)
+    const { t, setLocale } = useI18n()
 
     const {
         register,
@@ -46,14 +75,17 @@ function LoginFormContent() {
                 res = await fetch('/api/users/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data),
+                    body: JSON.stringify({
+                        email: data.email.trim(),
+                        password: data.password.trim(),
+                    }),
                     credentials: 'include',
                     signal: controller.signal,
                 })
             } catch (err) {
                 if (err instanceof DOMException && err.name === 'AbortError') {
-                    setFormError('root', { message: 'Request timed out. Please try again.' })
-                    toast.error('Request timed out. Please try again.')
+                    setFormError('root', { message: t.auth.errors.timeout })
+                    toast.error(t.auth.errors.timeout)
                     return
                 }
                 throw err
@@ -63,7 +95,7 @@ function LoginFormContent() {
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => null)
-                const message = errorData?.errors?.[0]?.message || 'Incorrect email or password'
+                const message = errorData?.errors?.[0]?.message || t.auth.errors.incorrect
 
                 setFormError('root', { message })
                 resetField('password')
@@ -71,15 +103,32 @@ function LoginFormContent() {
                 return
             }
 
-            toast.success('Welcome back!', {
-                description: 'Redirecting to your dashboard...',
+            // Parse user data — but DON'T set cookie yet (need OTP)
+            const responseData = await res.json().catch(() => ({ user: null }))
+            const user = responseData?.user
+            const userEmail = user?.email || data.email.trim()
+
+            // Trigger OTP send
+            try {
+                await fetch('/api/users/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: userEmail }),
+                })
+            } catch {
+                // Non-blocking — OTP may still arrive
+            }
+
+            toast.success('Verification code sent!', {
+                description: 'Check your email for the 6-digit code.',
             })
 
-            router.push(redirectUrl)
-            router.refresh()
+            // Redirect to OTP verification page
+            const returnParam = returnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(returnUrl)}` : ''
+            router.push(`/verify-otp?email=${encodeURIComponent(userEmail)}${returnParam}`)
         } catch {
-            setFormError('root', { message: 'Connection error. Please try again.' })
-            toast.error('Connection error. Please try again.')
+            setFormError('root', { message: t.auth.errors.connection })
+            toast.error(t.auth.errors.connection)
         }
     }
 
@@ -87,8 +136,8 @@ function LoginFormContent() {
         <div className="animate-in fade-in duration-500">
             {/* Header */}
             <div className="mb-6 text-center">
-                <h1 className="text-2xl font-bold text-white">Welcome back</h1>
-                <p className="mt-1.5 text-sm text-gray-400">Sign in to continue building</p>
+                <h1 className="text-2xl font-bold text-white">{t.auth.welcomeBack}</h1>
+                <p className="mt-1.5 text-sm text-gray-400">{t.auth.signInSubtitle}</p>
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -104,7 +153,7 @@ function LoginFormContent() {
 
                 {/* Email */}
                 <div>
-                    <Label htmlFor="email" className="text-gray-300">Email</Label>
+                    <Label htmlFor="email" className="text-gray-300">{t.auth.email}</Label>
                     <div className="relative mt-1.5">
                         <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                         <Input
@@ -123,12 +172,12 @@ function LoginFormContent() {
                 {/* Password */}
                 <div>
                     <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-gray-300">Password</Label>
+                        <Label htmlFor="password" className="text-gray-300">{t.auth.password}</Label>
                         <Link
                             href="/forgot-password"
                             className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors"
                         >
-                            Forgot password?
+                            {t.auth.forgotPassword}
                         </Link>
                     </div>
                     <div className="relative mt-1.5">
@@ -136,7 +185,7 @@ function LoginFormContent() {
                         <Input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
-                            placeholder="••••••••"
+                            placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
                             className={`pl-10 pr-10 bg-white/[0.06] border-white/[0.08] text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors ${errors.password ? 'border-red-500/50' : ''}`}
                             {...register('password')}
                         />
@@ -163,15 +212,20 @@ function LoginFormContent() {
                     {isSubmitting ? (
                         <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Signing in...
+                            {t.auth.signingIn}
                         </>
                     ) : (
                         <>
-                            Sign in
+                            {t.auth.signIn}
                             <ArrowRight className="ml-2 h-4 w-4" />
                         </>
                     )}
                 </Button>
+
+                {/* Inline Language Switcher */}
+                <div className="pt-2">
+                    <LanguageSwitcher variant="segmented" />
+                </div>
             </form>
 
             {/* Divider */}
@@ -180,18 +234,18 @@ function LoginFormContent() {
                     <div className="w-full border-t border-white/[0.06]" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                    <span className="bg-transparent px-3 text-gray-500">or</span>
+                    <span className="bg-[#101726] px-3 text-gray-400">{t.auth.or}</span>
                 </div>
             </div>
 
             {/* Register link */}
             <p className="text-center text-sm text-gray-400">
-                Don&apos;t have an account?{' '}
+                {t.auth.noAccount}{' '}
                 <Link
                     href="/register"
                     className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
                 >
-                    Create one free →
+                    {t.auth.createOneFree}
                 </Link>
             </p>
         </div>

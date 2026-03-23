@@ -172,6 +172,9 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Products Data Grid / List)
 - **Mô tả:** Danh sách quản lý tất cả các sản phẩm thuộc tài khoản cửa hàng.
 - **Components chính:**
@@ -179,29 +182,8 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
   - Tabs Header: Active, Draft, Archived có kèm badged counter.
   - Search & Filters: Search bar (theo tên/SKU), bộ lọc Dropdowns (Category, Sort by Price).
   - Data Table: Cột Ảnh đại diện, Tên Sản Phẩm (kèm Tên Biến thể nhỏ bên trong hàng Expandable), Phân loại, Giá, Stock quantity.
-- **Wireframe:**
-```text
-┌─ /products ─────────────────────────────────┐
-│  Products                          [+ Add Product]     │
-│  [✨ Chat: Tạo "Móc khóa cute giá 5k, màu xanh đỏ"...] │
-│  ───────────────────────────────────────────────────── │
-│  [✅ Active (45)] [📝 Draft (2)] [📦 Archvied (5)]    │
-│  ───────────────────────────────────────────────────── │
-│  [🔍 Bắt đầu nhập tên SP hoặc mã SKU để tìm nhanh... ] │ 
-│  [Category ▼] [Sort: Giá ▼] [⚠️ Lọc Kho Cạn]           │
-│                                                         │
-│  IMG │ Name          │ Category │  Price  │ Stock      │
-│  ──  │ ────────────  │ ──────── │ ─────── │ ─────      │
-│  📦  │ Baju Kurung   │ Fashion  │ RM 89   │ 25         │
-│      │ ├── Đỏ - S    │   (SKU: BJ-RED-S)  │ 10         │
-│      │ └── Đỏ - M    │   (SKU: BJ-RED-M)  │ 15         │
-│  📷  │ Kuih Raya     │ F&B      │ RM 29   │ 100        │
-│  📦  │ Lip Gloss     │ Beauty   │ RM 39   │ 0 🔴        │
-│                                                         │
-│ * Ghi chú ảnh: 📦 là Thùng Carton mặc định, 📷 là User Up  │
-│ Mobile: cards with expanding accordion for variants    │
-└────────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Chi tiết (Create / Edit Product Form)
 - **Mô tả:** Trang Form nhập đa lớp để khởi tạo 1 sản phẩm mới.
@@ -212,65 +194,13 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
   - Vận chuyển: Các NumberInputs nhập khối lượng và chu vi.
   - Content & SEO: Hộp soạn thảo Rich Text + Nút gọi API AI Viết Mô Tả; Khối chỉnh tùy biến JSON KV Custom Attributes.
   - Header Navbar Actions: Nút "Save as Draft", Nút "Publish/Active", Nút Delete.
-- **Wireframe:**
-```text
-┌─ 📝 Thêm Sản Phẩm Mới ─────────────────[Save Draft] [Publish] ┐
-│                                                                 │
-│ ┌─ THÔNG TIN CHUNG ───────────┐ ┌─ HÌNH ẢNH ──────────────────┐ │
-│ │ Tên: [ Áo khoác da ]        │ │ ┌─────┐ ┌───┐ ┌───┐         │ │
-│ │ Ngành: [ Fashion ▼ ]        │ │ │ 🖼️  │ │ 🖼️ │ │ + │         │ │
-│ │                             │ │ └─────┘ └───┘ └───┘         │ │
-│ │ MÔ TẢ (AI Supported)     ✨ │ │ Max 5 images, <5MB          │ │
-│ │ [ B  I  U  H1  =  Ξ ]       │ └─────────────────────────────┘ │
-│ │ Áo khoác da bò thật 100%... │ ┌─ TỒN KHO & BIẾN THỂ ────────┐ │
-│ │                             │ │ 🔲 Sản phẩm có nhiều Opts   │ │
-│ └─────────────────────────────┘ │ Giá Bán: [ RM 500  ]        │ │
-│                                 │ SKU:     [ AKD-001 ]        │ │
-│ ┌─ CATEGORY & SEO ────────────┐ │ Stock:   [ 15      ]        │ │
-│ │ [ Fashion ▼ ] [ Áo Nam ▼]   │ └─────────────────────────────┘ │
-│ │ Meta: [ Áo khoác da... ]  ✨│                                 │
-│ └─────────────────────────────┘                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Mobile View (Products List & Stacked Form)
 - **Mô tả:** Danh sách sản phẩm thu gọn cột dư thừa thành các Card hoặc Swipeable Rows. Form tạo sản phẩm đổ dọc (Stack) với Accordion cho phần hiển thị biến thể.
-- **Wireframe:**
-```text
-┌─ Mobile Products ───────────────────────────┐
-│ [≡] Products               [+ Add] [✨ AI] │
-│ ─────────────────────────────────────────── │
-│ [ 🔍 Search by Name/SKU...               ]  │
-│ [ Filters ▼ ] [ Sort ▼ ]                    │
-│                                             │
-│ ┌─ 📦 Baju Kurung ────────────────────────┐ │
-│ │ Fashion • RM 89 • Stock: 25   [Edit][⋮]│ │
-│ │ ├ Đỏ - S (Qty: 10)                      │ │
-│ │ └ Đỏ - M (Qty: 15)                      │ │
-│ └─────────────────────────────────────────┘ │
-│                                             │
-│ ┌─ 📦 Lip Gloss ──────────────────────────┐ │
-│ │ Beauty • RM 39 • Stock: 0 🔴  [Edit][⋮]│ │
-│ └─────────────────────────────────────────┘ │
-└─────────────────────────────────────────────┘
-
-┌─ Mobile Edit Form ──────────────────────────┐
-│ [←] Back                     [Save][Publish]│
-│ ─────────────────────────────────────────── │
-│ 🖼 HÌNH ẢNH                                 │
-│ [ + Add Photo ] (Max 5)                     │
-│                                             │
-│ 📄 THÔNG TIN                                │
-│ Name: [Baju Kurung]                         │
-│ Price: [RM 89]                              │
-│                                             │
-│ 🛍 TỒN KHO & BIẾN THỂ  [+] Thêm Option      │
-│ [ Màu sắc ▼ ] : Đỏ, Xanh                    │
-│ [ Kích cỡ ▼ ] : S, M                        │
-│                                             │
-│ ⚙ CÀI ĐẶT NÂNG CAO (Shipping, SEO...)  ▼    │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.4. Các trạng thái UI (UI States) & Modals
 - **Empty State:** Icon khay hàng trống + CTA "Hãy tạo sản phẩm đầu tiên".
@@ -284,6 +214,7 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
 > 📌 **Lưu ý:** Giao diện hiển thị phía End-user (Storefront) đã được chuyển giao cho **PRD: F09-storefront-commerce.md**. Vui lòng sang tài liệu F09 để xem mockups chi tiết cho màn hình Danh sách Sản phẩm (Shop) và Chi tiết Sản phẩm (Product View).
 
 ---
+
 
 ## 11. Acceptance Criteria
 

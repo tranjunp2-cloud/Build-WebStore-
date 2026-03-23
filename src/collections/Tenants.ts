@@ -145,6 +145,15 @@ export const Tenants: CollectionConfig = {
             defaultValue: false,
         },
         {
+            name: 'aiGenerationsCount',
+            type: 'number',
+            defaultValue: 0,
+            admin: {
+                description: 'Number of times this tenant has used the AI Site Builder',
+                readOnly: true,
+            },
+        },
+        {
             name: 'whatsappNumber',
             type: 'text',
             admin: {

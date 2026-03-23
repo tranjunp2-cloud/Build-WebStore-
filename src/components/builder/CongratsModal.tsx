@@ -14,9 +14,21 @@ interface CongratsModalProps {
     siteUrl: string
     siteName: string
     siteId: string
+    dashboardHref?: string
+    dashboardLabel?: string
+    onNavigate?: () => void
 }
 
-export function CongratsModal({ isOpen, onOpenChange, siteUrl, siteName, siteId }: CongratsModalProps) {
+export function CongratsModal({
+    isOpen,
+    onOpenChange,
+    siteUrl,
+    siteName,
+    siteId,
+    dashboardHref = '/dashboard',
+    dashboardLabel = 'Go to Dashboard',
+    onNavigate,
+}: CongratsModalProps) {
     const [copied, setCopied] = useState(false)
 
     const handleCopy = async () => {
@@ -104,6 +116,7 @@ export function CongratsModal({ isOpen, onOpenChange, siteUrl, siteName, siteId 
                                     <div className="flex w-full flex-col gap-3">
                                         <a
                                             href={siteUrl}
+                                            onClick={onNavigate}
                                             target="_blank"
                                             rel="noreferrer"
                                             className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-sm font-medium text-white hover:from-blue-500 hover:to-purple-500 transition-all shadow-lg shadow-purple-500/25"
@@ -112,14 +125,16 @@ export function CongratsModal({ isOpen, onOpenChange, siteUrl, siteName, siteId 
                                         </a>
                                         
                                         <Link
-                                            href="/admin"
+                                            href={dashboardHref}
+                                            onClick={onNavigate}
                                             className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white hover:bg-white/10 transition-colors"
                                         >
-                                            <LayoutDashboard className="h-4 w-4" /> Go to Admin Dashboard
+                                            <LayoutDashboard className="h-4 w-4" /> {dashboardLabel}
                                         </Link>
 
                                         <Link
                                             href={`/editor/${siteId}`}
+                                            onClick={onNavigate}
                                             className="mt-2 text-xs font-medium text-gray-400 hover:text-white transition-colors"
                                         >
                                             Continue Editing

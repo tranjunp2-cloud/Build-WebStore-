@@ -253,6 +253,7 @@ jobs:
       pull-requests: write
       issues: write
       contents: read
+      checks: read
     steps:
       - name: Checkout (for composite action)
         uses: actions/checkout@v4
