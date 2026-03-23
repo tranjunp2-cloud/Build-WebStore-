@@ -132,6 +132,7 @@ SO THAT hệ thống ngầm khởi tạo không gian dữ liệu của riêng t�
 - **BR-05 (Data Format):** Validation tự động trim khoảng trắng (trailing space) cho Email và Password. Password đủ 8 ký tự, mix chữ hoa, chữ thường, số, đặc biệt.
 - **BR-06 (Security):** Tích hợp Email Verification code (OTP) sau user credential step lúc Login. Authentication Token chỉ set sau khi hoàn thành OTP nếu 2FA được bật.
 - **BR-07 (Security):** Luôn hiện success state cho forgot-password (không reveal email có tồn tại hay không). Mọi protected route phải check auth (0 exposed routes). Token reset password expire sau 24h.
+- **BR-08 (Localization Sync):** Sau khi xác thực thành công (Login / OTP verify), hệ thống phải đọc ngôn ngữ ưu tiên từ Database của user và ghi đè (override) lên giá trị LocalStorage của thiết bị truy cập để đồng bộ trải nghiệm cá nhân.
 
 ---
 
@@ -153,6 +154,7 @@ SO THAT hệ thống ngầm khởi tạo không gian dữ liệu của riêng t�
    `/login` → Điền Form & trim space → POST `/api/users/login` 
    ├── (Nếu bật 2FA) → Bypass Token → Gửi OTP qua Resend → Mở màn hình OTP → Nhập đúng OTP 6 số → Set Cookie
    └── (Nếu không bật 2FA) → Set Cookie ngay
+       ├── Sync i18n ưu tiên: Đọc `prefer_lang` từ Database và override lại `prefer_lang` dưới LocalStorage
        ├── (Nếu Role = Owner) → `/dashboard` (hoặc redirect `/onboarding`)
        └── (Nếu Role = Staff) → Giao diện CMS Admin (Workspace)
 

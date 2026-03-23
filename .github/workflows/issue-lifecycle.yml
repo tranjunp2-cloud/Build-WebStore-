@@ -373,7 +373,15 @@ jobs:
 
             console.log(`Issue #${issue.number} board → ${targetStatus}`);
 
-      - name: Notify Lark (QA Failed)
+      - name: Prepare QA fail info
+        if: github.event.label.name == 'qa:failed'
+        id: qa_fail
+        run: |
+          # Get all assignees for the notification
+          ASSIGNEES=$(echo '${{ toJSON(github.event.issue.assignees) }}' | jq -r '.[].login' 2>/dev/null | tr '\n' ', ' | sed 's/,$//' || echo 'unassigned')
+          echo "assignees=${ASSIGNEES:-unassigned}" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Lark (QA Failed → Dev fix)
         if: github.event.label.name == 'qa:failed'
         uses: ./.github/actions/lark-notify
         with:
@@ -381,14 +389,20 @@ jobs:
           sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
           title: "🔴 QA Failed — #${{ github.event.issue.number }}"
           template: 'red'
-          meta-left-label: "📦 Issue"
+          meta-left-label: "🐛 Issue"
           meta-left-value: "#${{ github.event.issue.number }}"
-          meta-right-label: "👤 Assignee"
-          meta-right-value: "${{ github.event.issue.assignee.login || 'unassigned' }}"
+          meta-right-label: "👨‍💻 Dev"
+          meta-right-value: "${{ steps.qa_fail.outputs.assignees }}"
+          meta2-left-label: "🏷️ QC"
+          meta2-left-value: "${{ github.actor }}"
+          meta2-right-label: "📊 Status"
+          meta2-right-value: "→ In Progress (trả về dev)"
           content: |
-            📝 ${{ github.event.issue.title }}
-            🔴 QC test fail — trả về dev fix
-          buttons: '[{"text":"🔗 View Issue","url":"${{ github.event.issue.html_url }}","type":"primary"}]'
+            📝 **${{ github.event.issue.title }}**
+
+            🔴 QC test **FAIL** — issue trả về dev fix
+            👨‍💻 Dev: check comment bug report trong issue → fix → tạo PR mới
+          buttons: '[{"text":"🔗 View Issue + Bug Report","url":"${{ github.event.issue.html_url }}","type":"primary"}]'
 
   # ──────────────────────────────────────
   # PR linked to issue → move to Code Review
