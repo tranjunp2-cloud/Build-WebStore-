@@ -98,7 +98,7 @@ function CompletionStatusCard({
             <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]" />
             <div className="relative flex flex-col items-start gap-4">
                 <p className="text-sm font-medium leading-5 text-[#f8fafc]">
-                    Website <span className="bg-[linear-gradient(158.2deg,#3b82f6_0%,#2dd4bf_100%)] bg-clip-text font-semibold text-transparent">"{siteName}"</span> has been created successfully!
+                    Website <span className="bg-[linear-gradient(158.2deg,#3b82f6_0%,#2dd4bf_100%)] bg-clip-text font-semibold text-transparent">&quot;{siteName}&quot;</span> has been created successfully!
                 </p>
 
                 <div className="flex h-12 w-full flex-col items-start gap-2">
