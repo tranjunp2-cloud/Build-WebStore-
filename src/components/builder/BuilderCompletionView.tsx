@@ -1,33 +1,56 @@
 import type { ReactNode } from 'react'
-import { Check, Clock3, ExternalLink, LayoutDashboard } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Clock3, ExternalLink, LayoutDashboard, Loader2, Upload } from 'lucide-react'
 import { BuilderPreviewMode, BuilderPreviewModeToggle, BuilderPreviewSurface } from '@/components/builder/BuilderPreviewPrimitives'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 
 interface BuilderCompletionViewProps {
     siteName: string
     totalBlocks: number
+    blocks?: Array<{ _id?: string; blockType?: string; headline?: string; sectionLabel?: string; logoText?: string; title?: string }>
     generationTimeLabel?: string
     onDashboard: () => void
     onOpenEditor: () => void
     onOpenPreview: () => void
+    onPublish: () => void
+    onMoveBlock?: (blockId: string, direction: 'up' | 'down') => void
     previewContent: ReactNode
     floatingControls?: ReactNode
     previewMode: BuilderPreviewMode
     onPreviewModeChange: (mode: BuilderPreviewMode) => void
+    isPublishing?: boolean
+}
+
+function getBlockDisplayLabel(block: {
+    blockType?: string
+    headline?: string
+    sectionLabel?: string
+    logoText?: string
+    title?: string
+}) {
+    return (
+        block.sectionLabel ||
+        block.headline ||
+        block.title ||
+        block.logoText ||
+        (block.blockType ? `${block.blockType.charAt(0).toUpperCase()}${block.blockType.slice(1)}` : 'Section')
+    )
 }
 
 function CompletionPrimaryButton({
     icon,
     label,
     onClick,
+    disabled = false,
 }: {
     icon: ReactNode
     label: string
     onClick: () => void
+    disabled?: boolean
 }) {
     return (
         <button
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-4 text-sm font-semibold text-white shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),0px_4px_6px_0px_rgba(0,0,0,0.1)] transition-all duration-300 hover:brightness-110"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-4 text-sm font-semibold text-white shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),0px_4px_6px_0px_rgba(0,0,0,0.1)] transition-all duration-300 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled}
             onClick={onClick}
             type="button"
         >
@@ -41,14 +64,17 @@ function CompletionSecondaryButton({
     icon,
     label,
     onClick,
+    disabled = false,
 }: {
     icon: ReactNode
     label: string
     onClick: () => void
+    disabled?: boolean
 }) {
     return (
         <button
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-[rgba(59,130,246,0.15)] bg-transparent px-4 text-sm font-medium text-[#f8fafc] transition-colors hover:border-[rgba(59,130,246,0.3)] hover:bg-white/[0.02]"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-[rgba(59,130,246,0.15)] bg-transparent px-4 text-sm font-medium text-[#f8fafc] transition-colors hover:border-[rgba(59,130,246,0.3)] hover:bg-white/[0.02] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={disabled}
             onClick={onClick}
             type="button"
         >
@@ -156,15 +182,23 @@ function CompletionPreviewPanel({
 export default function BuilderCompletionView({
     siteName,
     totalBlocks,
+    blocks = [],
     generationTimeLabel = '0s',
     onDashboard,
     onOpenEditor,
     onOpenPreview,
+    onPublish,
+    onMoveBlock,
     previewContent,
     floatingControls,
     previewMode,
     onPreviewModeChange,
+    isPublishing = false,
 }: BuilderCompletionViewProps) {
+    const movableBlocks = blocks.filter(
+        (block) => block._id && block.blockType !== 'navigation' && block.blockType !== 'footer',
+    )
+
     const leftBody = (
         <div className="flex flex-col gap-4">
             <div className="flex items-start gap-3">
@@ -189,6 +223,72 @@ export default function BuilderCompletionView({
                     totalBlocks={totalBlocks}
                 />
             </div>
+
+            <div className="rounded-2xl border border-[rgba(59,130,246,0.12)] bg-[rgba(15,23,42,0.55)] p-4 lg:hidden">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <p className="text-sm font-semibold text-[#f8fafc]">Mobile preview</p>
+                        <p className="mt-1 text-xs leading-5 text-[#94a3b8]">
+                            Open the immersive preview to review the generated site on mobile.
+                        </p>
+                    </div>
+                    <button
+                        className="shrink-0 rounded-xl border border-[rgba(59,130,246,0.18)] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/[0.03]"
+                        onClick={onOpenPreview}
+                        type="button"
+                    >
+                        Open Preview
+                    </button>
+                </div>
+            </div>
+
+            {movableBlocks.length > 0 && onMoveBlock ? (
+                <div className="rounded-2xl border border-[rgba(59,130,246,0.12)] bg-[rgba(15,23,42,0.55)] p-4 lg:hidden">
+                    <div className="mb-3">
+                        <p className="text-sm font-semibold text-[#f8fafc]">Arrange sections</p>
+                        <p className="mt-1 text-xs leading-5 text-[#94a3b8]">
+                            Use list mode on mobile to move sections up or down safely.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        {movableBlocks.map((block, index) => (
+                            <div
+                                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3"
+                                key={block._id}
+                            >
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-medium text-[#f8fafc]">
+                                        {getBlockDisplayLabel(block)}
+                                    </p>
+                                    <p className="mt-1 text-[11px] uppercase tracking-[0.08em] text-[#64748b]">
+                                        {block.blockType}
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        className="rounded-xl border border-white/10 p-2 text-white/80 transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-40"
+                                        disabled={index === 0}
+                                        onClick={() => onMoveBlock(block._id!, 'up')}
+                                        type="button"
+                                    >
+                                        <ArrowUp className="size-4" />
+                                    </button>
+                                    <button
+                                        className="rounded-xl border border-white/10 p-2 text-white/80 transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-40"
+                                        disabled={index === movableBlocks.length - 1}
+                                        onClick={() => onMoveBlock(block._id!, 'down')}
+                                        type="button"
+                                    >
+                                        <ArrowDown className="size-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
         </div>
     )
 
@@ -196,10 +296,18 @@ export default function BuilderCompletionView({
         <div className="flex flex-col gap-3">
             <CompletionPrimaryButton
                 icon={<LayoutDashboard className="size-4" />}
+                disabled={isPublishing}
                 label="Dashboard"
                 onClick={onDashboard}
             />
+            <CompletionPrimaryButton
+                disabled={isPublishing}
+                icon={isPublishing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                label={isPublishing ? 'Publishing...' : 'Publish Website'}
+                onClick={onPublish}
+            />
             <CompletionSecondaryButton
+                disabled={isPublishing}
                 icon={<ExternalLink className="size-4" />}
                 label="Open Editor"
                 onClick={onOpenEditor}

@@ -91,9 +91,7 @@ export type BusinessInfoInput = {
   businessName: string
   industry: string
   products: string
-  shortDescription?: string
-  targetAudience?: string
-  style?: string
+  shortDescription: string
 }
 
 export function buildUserPrompt(
@@ -105,17 +103,8 @@ export function buildUserPrompt(
     `Create a complete website for: "${info.businessName}"`,
     `Industry: ${info.industry}`,
     `Main products/services: ${info.products}`,
+    `Business description: ${info.shortDescription}`,
   ]
-
-  if (info.shortDescription) {
-    parts.push(`Short description: ${info.shortDescription}`)
-  }
-  if (info.targetAudience) {
-    parts.push(`Target audience: ${info.targetAudience}`)
-  }
-  if (info.style) {
-    parts.push(`Design style: ${info.style}`)
-  }
   if (extraInstructions) {
     parts.push(`Additional instructions: ${extraInstructions}`)
   }
@@ -128,4 +117,3 @@ export function buildUserPrompt(
 
   return parts.join('\n')
 }
-
