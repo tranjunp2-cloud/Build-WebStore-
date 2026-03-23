@@ -154,35 +154,150 @@ Closes #123         ← SAI: issue tự close khi merge, skip QA
 
 ---
 
-#### 4.4 Issue Status Flow (6 columns)
+#### 4.4 Issue Lifecycle — Quy trình chi tiết từ tạo đến Done
 
-Projects board có 6 status. Issue tự chuyển status theo automation:
+> **6 trạng thái trên Board.** Bot tự chuyển status theo automation. Team chỉ cần thao tác đúng role.
+
+**Tổng quan flow:**
 
 ```
-Backlog → Review (UIUX+BA) → In Progress → Code Review → QA Testing → Done
-              ↑                                              │
-              │                  ↑                           │
-              │                  └──── qa:failed ────────────┘
-              └── review:rejected
+📋 Backlog → 🔍 Review → 🔨 In Progress → 👀 Code Review → 🧪 QA Testing → ✅ Done
+      ↑          │                ↑                                │
+      │          │                │                                │
+      └── rejected               └──────── qa:failed ─────────────┘
 ```
 
-| Status | Ai | Trigger tự động |
-|--------|-----|-----------------|
-| **Backlog** | PM | Issue mới tạo |
-| **Review** | UIUX + BA | PM assign reviewer (thủ công) |
-| **In Progress** | Dev | Dev được assign / label `status:ready` / QA fail trả về |
-| **Code Review** | Reviewer | PR opened + linked issue |
-| **QA Testing** | QC | PR merged to staging |
-| **Done** | QC | QC close issue (thủ công) |
+| Status | Ai | Trigger | Hành động |
+|--------|-----|---------|-----------|
+| **📋 Backlog** | PM | Issue mới tạo (auto) | PM viết story → Bot tạo issue → PM assign UIUX+BA |
+| **🔍 Review** | UIUX + BA | PM assign (thủ công) | UIUX design, BA verify AC. Approve → `status:ready` |
+| **🔨 In Progress** | Dev | Label `status:ready` / QA fail trả về (auto) | Dev tạo branch, code theo AC + design |
+| **👀 Code Review** | Reviewer | PR opened + linked issue (auto) | Review code → approve hoặc request changes |
+| **🧪 QA Testing** | QC | PR merged to staging (auto) | QC test trên staging theo AC |
+| **✅ Done** | QC | QC close issue (thủ công) | Milestone % tăng |
 
-**QA Fail flow:**
-1. QC test fail → thêm label `qa:failed` + comment mô tả lỗi
-2. Bot auto: status → "In Progress", assign lại dev, notify Lark
-3. Dev fix → tạo PR mới → Code Review → QA Testing → loop
+---
 
-**UIUX/BA Reject flow:**
-1. Reviewer thêm label `review:rejected` + comment lý do
-2. Bot auto: status → "Backlog", notify PM
+##### Bước 1 → 2: PM tạo issue, UIUX+BA review
+
+```
+PM viết story (docs/stories/*.md)
+  ↓
+Push lên staging → Story Sync tạo Issue → Backlog
+  ↓
+PM assign UIUX + BA để review
+  ↓
+  ├── ✅ Approve → thêm label `status:ready` → issue tự chuyển In Progress
+  └── ❌ Reject → thêm label `review:rejected` + comment lý do → issue về Backlog
+```
+
+---
+
+##### Bước 3 → 4: Dev code → PR → Code Review → Merge
+
+```
+Dev pick issue (In Progress, có label status:ready)
+  ↓
+Tạo branch: feature/FXX-mô-tả
+  ↓
+Code theo AC + design trong issue
+  ↓
+Chạy local: npm run lint && npm run typecheck && npm run test && npm run build
+  ↓
+Push + tạo PR vào staging (title: feat(FXX): [US-FXX-YY] mô tả)
+  ↓
+Bot auto-link PR → Issue, issue status → Code Review
+  ↓
+CI chạy: Lint → Typecheck → Test → Build
+  ↓
+  ├── ✅ CI pass + Reviewer approve → bot gắn `ready-to-merge` → Merge PR
+  └── ❌ CI fail / Changes requested → Dev fix → push lại → chạy lại CI
+```
+
+---
+
+##### Bước 5: QA Testing → Done hoặc trả về Dev
+
+```
+PR merged → staging auto-deploy
+  ↓
+Bot tự: gắn label `qa:pending` + chuyển board "QA Testing"
+  ↓
+🔔 Lark thông báo QC: "🧪 QA Ready — Issue #98 chờ test"
+  ↓
+QC mở Issue #98 → đọc AC → test trên staging
+  ↓
+  ├── ✅ Pass → QC close issue → Done ✅ (milestone % tăng)
+  │
+  └── ❌ Fail → QC gắn label `qa:failed` + comment mô tả bug
+        ↓
+      Bot tự: tạo bug report template + chuyển board "In Progress" + assign dev
+        ↓
+      🔔 Lark thông báo Dev: "🔴 QA Failed — #98 — @dev fix"
+        ↓
+      Dev fix → tạo PR mới → merge → lại vào QA Testing → loop
+```
+
+---
+
+##### QC report bug ở đâu? Issue cũ hay tạo mới?
+
+**🅰️ Bug liên quan AC (phần lớn trường hợp) → Report trên ISSUE CŨ:**
+
+```
+Issue #98 đang ở QA Testing
+  ↓
+QC gắn label `qa:failed` trên issue #98
+  ↓
+Bot tự tạo comment bug report template (pre-filled issue info, dev name, AC)
+  ↓
+QC điền thêm: mô tả lỗi, steps to reproduce, screenshot
+  ↓
+Dev nhận Lark thông báo → mở issue #98 → đọc bug comment → fix → PR mới
+  ↓
+PR merge → issue #98 tự về QA Testing → QC test lại
+```
+
+> **Ưu điểm:** 1 issue = 1 feature, track history xuyên suốt, đếm bounce rate chính xác.
+
+**🅱️ Bug hoàn toàn khác scope AC → Tạo ISSUE MỚI:**
+
+```
+QC tạo issue mới từ template "Bug Report (QA)"
+  ↓
+Ghi rõ: Related to #98 (link issue gốc)
+  ↓
+Issue mới vào Backlog → assign dev → In Progress → ...flow bình thường
+```
+
+> **Dùng khi nào:** Bug không nằm trong AC gốc (ví dụ: phát hiện lỗi page khác khi test).
+
+**⚡ Tóm tắt:** Bug thuộc AC → `qa:failed` trên issue cũ. Bug ngoài AC → tạo issue mới.
+
+---
+
+##### UIUX/BA Reject → PM chỉnh spec
+
+```
+UIUX/BA thêm label `review:rejected` + comment lý do
+  ↓
+Bot auto: status → "Backlog", notify PM qua Lark
+  ↓
+PM chỉnh spec → assign lại UIUX+BA → review lại
+```
+
+---
+
+##### Lark Notifications (tự động)
+
+| Khi nào | Ai nhận | Nội dung |
+|---------|---------|----------|
+| PR merged → staging | **QC** | 🧪 QA Ready — Issue #N chờ test (link QA board) |
+| QA failed | **Dev** | 🔴 QA Failed — #N — @dev fix (link issue + bug report) |
+| PR approved | **Dev** | ✅ Ready to merge (link PR) |
+| Changes requested | **Dev** | ⚠️ Review feedback (link PR) |
+| Stale issue >3 ngày | **Team** | ⏰ Nhắc update progress |
+| CI fail | **Team** | ❌ CI failed (link run) |
 
 **Milestone % = issues Done / Total.** Chỉ tăng khi QC close issue (không tăng khi PR merge).
 
@@ -190,16 +305,46 @@ Backlog → Review (UIUX+BA) → In Progress → Code Review → QA Testing → 
 
 #### 4.5 Labels quan trọng
 
-| Label | Ý nghĩa | Ai dùng |
-|-------|---------|---------|
-| `status:ready` | UIUX+BA đã duyệt, dev pick được | UIUX/BA |
-| `review:rejected` | UIUX/BA reject, trả về PM | UIUX/BA |
-| `qa:pending` | Chờ QC test (auto khi PR merge) | Bot |
-| `qa:passed` | QC test pass | QC |
-| `qa:failed` | QC test fail, trả về dev | QC |
-| `ready-to-merge` | PR approved + CI pass | Bot |
-| `approved` | PR đã được approve | Bot |
-| `wave:X` | Thuộc Wave nào (auto trên PR) | Bot |
+| Label | Màu | Ai dùng | Ý nghĩa |
+|-------|-----|---------|---------|
+| `status:ready` | 🟢 | UIUX/BA | Spec + design approved, dev pick được |
+| `review:rejected` | 🔴 | UIUX/BA | Spec chưa OK, trả về PM chỉnh |
+| `qa:pending` | 🟡 | Bot | Chờ QC test (auto khi PR merge) |
+| `qa:passed` | 🟢 | QC | QC test pass |
+| `qa:failed` | 🔴 | QC | QC test fail, trả về dev fix |
+| `ready-to-merge` | 🟣 | Bot | PR approved + CI pass |
+| `approved` | 🟢 | Bot | PR đã được reviewer approve |
+| `wave:X` | 🔵 | Bot | Thuộc Wave nào (auto trên PR) |
+
+---
+
+#### 4.6 Automation tổng kết
+
+| Trigger | Bot tự làm | Workflow |
+|---------|-----------|----------|
+| Story file thay đổi | Tạo/update GitHub Issues | story-sync.yml |
+| Issue mới tạo | Gắn vào Board → Backlog | issue-lifecycle.yml |
+| Label `status:ready` | Status → In Progress | issue-lifecycle.yml |
+| Label `review:rejected` | Status → Backlog, notify PM | issue-lifecycle.yml |
+| PR opened + linked issue | Status → Code Review | issue-lifecycle.yml |
+| PR approved + CI pass | Gắn `approved` + `ready-to-merge` | pr-lifecycle.yml |
+| PR merged | Status → QA Testing, label `qa:pending`, **Lark → QC** | pr-lifecycle.yml |
+| PR merged → staging | Auto-deploy staging | ci.yml |
+| Label `qa:failed` | Status → In Progress, assign dev, bug template, **Lark → Dev** | issue-lifecycle.yml |
+| Issue closed | Status → Done | issue-lifecycle.yml |
+
+---
+
+#### 4.7 Checklist nhanh theo Role
+
+| Role | Việc chính | Thao tác |
+|------|-----------|----------|
+| **PM** | Tạo issue | Viết story → push → assign UIUX+BA review |
+| **UIUX** | Review design | Check Backlog → design → label `status:ready` hoặc `review:rejected` |
+| **BA** | Review spec | Check Backlog → verify AC → label `status:ready` hoặc `review:rejected` |
+| **Dev** | Code feature | Pick In Progress → branch `feature/FXX-*` → PR → fix nếu `qa:failed` |
+| **Reviewer** | Review code | Review PR → approve → bot gắn `ready-to-merge` |
+| **QC** | Test trên staging | Check QA Testing → test theo AC → close (pass) hoặc `qa:failed` + comment (fail) |
 
 ---
 

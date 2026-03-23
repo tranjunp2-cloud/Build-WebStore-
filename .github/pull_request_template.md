@@ -1,16 +1,8 @@
 ## Story
 
-- **Issue:** #<!-- Bot sẽ tự tìm và link issue. Hoặc điền thủ công: Relates to #123 -->
+- **Closes:** #
+- **Ticket / Story ID (nếu có):** e.g. PROJ-123, US-456
 - **Mô tả ngắn:** [1–2 câu: feature/fix này làm gì, cho ai]
-
-<!-- 💡 Cách tìm issue number:
-     1. Vào tab Issues → tìm user story liên quan
-     2. Copy số issue (VD: #123)
-     3. Điền ở trên: Relates to #123
-     ⚠️ KHÔNG dùng "Closes #N" — Issue chỉ close khi QC test pass.
-     Bot sẽ tự link nếu PR title có [US-F01-03] hoặc branch có F01.
-     Nếu PR không liên quan issue nào (chore/docs), bỏ trống — bot sẽ skip check.
--->
 
 ---
 
