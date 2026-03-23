@@ -23,9 +23,9 @@ const BUILDER_TEXTAREA_HINT_ICON_URL = '/assets/builder/builder-hint-icon.svg'
 
 interface BusinessInfoFormProps {
     onSubmit?: (info: BusinessInfo) => void
-    onPreviewNextStep?: (info: BusinessInfo) => void
+    onRetry?: (info: BusinessInfo) => void
+    errorMessage?: string | null
     isGenerating?: boolean
-    floatingControls?: ReactNode
     initialValues?: Partial<BusinessInfo> | null
 }
 
@@ -34,16 +34,14 @@ const DEFAULT_FORM: BusinessInfo = {
     shortDescription: '',
     industry: '',
     products: '',
-    targetAudience: '',
-    style: 'modern',
     language: 'auto',
 }
 
 export default function BusinessInfoForm({
     onSubmit,
-    onPreviewNextStep,
+    onRetry,
+    errorMessage,
     isGenerating,
-    floatingControls,
     initialValues,
 }: BusinessInfoFormProps) {
     const setBusinessInfo = useBuilderStore((s) => s.setBusinessInfo)
@@ -56,6 +54,7 @@ export default function BusinessInfoForm({
     const isFormReady =
         form.businessName.trim().length > 0 &&
         form.industry.trim().length > 0 &&
+        form.shortDescription.trim().length > 0 &&
         form.products.trim().length > 0
 
     useEffect(() => {
@@ -105,8 +104,6 @@ export default function BusinessInfoForm({
         initialValues?.shortDescription,
         initialValues?.industry,
         initialValues?.products,
-        initialValues?.targetAudience,
-        initialValues?.style,
         initialValues?.language,
     ])
 
@@ -115,6 +112,7 @@ export default function BusinessInfoForm({
 
         if (!form.businessName.trim()) nextErrors.businessName = 'Please enter your business name'
         if (!form.industry) nextErrors.industry = 'Please select an industry'
+        if (!form.shortDescription.trim()) nextErrors.shortDescription = 'Please describe your business'
         if (!form.products.trim()) nextErrors.products = 'Please describe your products / services'
 
         setErrors(nextErrors)
@@ -137,28 +135,24 @@ export default function BusinessInfoForm({
         setBusinessInfo(form as BusinessInfo)
     }
 
-    const handlePreviewNextStep = () => {
-        const demoInfo: BusinessInfo = {
-            businessName: 'Duck Coffee',
-            shortDescription: 'We are a modern neighborhood cafe serving specialty coffee, fresh pastries, and a warm all-day atmosphere.',
-            industry: 'restaurant',
-            products: 'Specialty coffee, croissants, handmade pastries, bubble tea',
-            targetAudience: '',
-            style: 'modern',
-            language: 'auto',
-        }
-
-        if (onPreviewNextStep) {
-            onPreviewNextStep(demoInfo)
-            return
-        }
-
-        setBusinessInfo(demoInfo)
-    }
-
     const leftBody = (
         <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
+                {errorMessage ? (
+                    <div className="rounded-2xl border border-[rgba(248,113,113,0.35)] bg-[rgba(127,29,29,0.18)] px-4 py-3 text-sm text-[#fecaca]">
+                        <p>{errorMessage}</p>
+                        {onRetry ? (
+                            <button
+                                className="mt-3 text-sm font-semibold text-white transition-colors hover:text-[#bfdbfe]"
+                                onClick={() => onRetry(form)}
+                                type="button"
+                            >
+                                Retry with current information
+                            </button>
+                        ) : null}
+                    </div>
+                ) : null}
+
                 <BuilderField
                     error={errors.businessName}
                     icon="📝"
@@ -229,9 +223,10 @@ export default function BusinessInfoForm({
                             <span>AI will use this to suggest content and tone</span>
                         </div>
                     )}
+                    error={errors.shortDescription}
                     icon="📝"
                     label="Description"
-                    optionalLabel="(optional)"
+                    required
                 >
                     <BuilderTextarea
                         adornment={(
@@ -239,6 +234,7 @@ export default function BusinessInfoForm({
                                 <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
                             </div>
                         )}
+                        invalid={!!errors.shortDescription}
                         onChange={(e) => setForm((current) => ({ ...current, shortDescription: e.target.value }))}
                         placeholder="e.g., We are a family-owned bakery that specializes in artisan breads and pastries..."
                         rows={3}
@@ -250,23 +246,14 @@ export default function BusinessInfoForm({
     )
 
     const leftFooter = (
-        <>
-            <BuilderSubmitButton
-                disabled={!isFormReady || isGenerating}
-                loading={isGenerating}
-                onClick={submitForm}
-                type="button"
-            >
-                Continue — AI will create your website
-            </BuilderSubmitButton>
-            <button
-                className="mt-3 w-full text-center text-xs font-medium text-[#94a3b8] transition-colors hover:text-white"
-                onClick={handlePreviewNextStep}
-                type="button"
-            >
-                Use demo data to preview next step
-            </button>
-        </>
+        <BuilderSubmitButton
+            disabled={!isFormReady || isGenerating}
+            loading={isGenerating}
+            onClick={submitForm}
+            type="button"
+        >
+            Continue — AI will create your website
+        </BuilderSubmitButton>
     )
 
     const rightPane = (
@@ -284,7 +271,6 @@ export default function BusinessInfoForm({
     return (
         <BuilderStepScreen
             description="Provide basic information so AI can create the perfect website for you."
-            floatingControls={floatingControls}
             leftBody={leftBody}
             leftFooter={leftFooter}
             right={rightPane}
