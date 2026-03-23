@@ -24,6 +24,12 @@ services:
       - S3_SECRET_ACCESS_KEY=minioadmin
       - S3_REGION=us-east-1
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME}
     volumes:
       - ./src:/app/src # Hot reload for source code
       - ./public:/app/public # Static assets
