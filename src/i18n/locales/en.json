@@ -337,6 +337,8 @@
                 "editTitle": "Edit Product",
                 "newTitle": "Add New Product",
                 "basicInfo": "Basic Information",
+                "nameLabel": "Product Name *",
+                "slugLabel": "Slug",
                 "pricing": "Pricing & Inventory",
                 "shipping": "Shipping",
                 "seo": "Content & SEO",
@@ -374,6 +376,12 @@
                     "skuRequired": "SKU is required",
                     "categoryRequired": "Category is required",
                     "checkErrors": "Please check the form for errors"
+                },
+                "categories": {
+                    "select": "Select categories...",
+                    "search": "Search categories...",
+                    "empty": "No categories matched.",
+                    "label": "Categories *"
                 },
                 "variants": {
                     "hasVariantsToggle": "Product has Variants",

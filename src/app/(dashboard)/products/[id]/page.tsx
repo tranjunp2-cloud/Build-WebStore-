@@ -9,9 +9,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { ProductImageFallback } from '@/components/dashboard/ProductImageFallback'
 import { ImageUploader, type UploadedImage } from '@/components/dashboard/ImageUploader'
 import { VariantsEditor, type VariantConfig, type Variant } from '@/components/dashboard/VariantsEditor'
+import { CategorySelect } from '@/components/dashboard/CategorySelect'
 import { useI18n } from '@/i18n'
 
 const lexicalToText = (data: any): string => {
@@ -47,6 +47,12 @@ const textToLexical = (text: string) => {
     };
 }
 
+type Category = {
+    id: string
+    name: string
+    breadcrumbs?: string
+}
+
 type ProductForm = {
     name: string
     slug: string
@@ -56,7 +62,7 @@ type ProductForm = {
     price: string
     compareAtPrice: string
     currency: string
-    category: string
+    category: string[]
     status: 'draft' | 'active' | 'archived'
     inventory: string
     sku: string
@@ -83,7 +89,7 @@ const initialForm: ProductForm = {
     price: '',
     compareAtPrice: '',
     currency: 'MYR',
-    category: '',
+    category: [],
     status: 'draft',
     inventory: '0',
     sku: '',
@@ -114,6 +120,7 @@ export default function ProductEditPage() {
 
     const [form, setForm] = useState<ProductForm>(initialForm)
     const [errors, setErrors] = useState<Record<string, string>>({})
+    const [availableCategories, setAvailableCategories] = useState<{id: string, name: string, breadcrumbs?: string}[]>([])
     const [isLoading, setIsLoading] = useState(!isNew)
     const [isSaving, setIsSaving] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
@@ -141,7 +148,9 @@ export default function ProductEditPage() {
                         price: String(data.price || ''),
                         compareAtPrice: String(data.compareAtPrice || ''),
                         currency: data.currency || 'MYR',
-                        category: data.category || '',
+                        category: Array.isArray(data.category) 
+                            ? data.category.map((c: Category | string) => typeof c === 'string' ? c : c.id) 
+                            : [],
                         status: data.status || 'draft',
                         inventory: String(data.inventory || 0),
                         sku: data.sku || '',
@@ -172,6 +181,20 @@ export default function ProductEditPage() {
                 setIsLoading(false)
             }
         }
+        
+        async function loadCategories() {
+            try {
+                const res = await fetch('/api/categories?limit=100', { credentials: 'include' })
+                if (res.ok) {
+                    const data = await res.json()
+                    setAvailableCategories(data.docs || [])
+                }
+            } catch (err) {
+                console.error('Failed to load categories', err)
+            }
+        }
+        
+        loadCategories()
         loadProduct()
     }, [productId, isNew])
 
@@ -195,7 +218,7 @@ export default function ProductEditPage() {
         if (!form.name.trim() || form.name.length < 3) {
             newErrors.name = t.dashboard.products.form.errors.nameMin
         }
-        if (!form.category.trim()) {
+        if (form.category.length === 0) {
             newErrors.category = t.dashboard.products.form.errors.categoryRequired
         }
 
@@ -513,7 +536,7 @@ export default function ProductEditPage() {
                 <h2 className="text-sm font-semibold uppercase text-gray-500">{t.dashboard.products.form.basicInfo}</h2>
 
                 <div>
-                    <label className="text-xs font-medium text-gray-400">Product Name *</label>
+                    <label className="text-xs font-medium text-gray-400">{t.dashboard.products.form.nameLabel}</label>
                     <input value={form.name} onChange={e => updateField('name', e.target.value)}
                         placeholder="e.g. Premium Nasi Lemak Set"
                         className={cn("mt-1.5 w-full rounded-lg border bg-[#0B1120] px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none",
@@ -523,16 +546,18 @@ export default function ProductEditPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label className="text-xs font-medium text-gray-400">Slug</label>
+                        <label className="text-xs font-medium text-gray-400">{t.dashboard.products.form.slugLabel}</label>
                         <input value={form.slug} onChange={e => updateField('slug', e.target.value)}
                             className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#0B1120] px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
                     </div>
                     <div>
-                        <label className="text-xs font-medium text-gray-400">Category *</label>
-                        <input value={form.category} onChange={e => updateField('category', e.target.value)}
-                            placeholder="e.g. Food, Electronics"
-                            className={cn("mt-1.5 w-full rounded-lg border bg-[#0B1120] px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none",
-                                errors.category ? "border-red-500 focus:border-red-500" : "border-white/10 focus:border-blue-500/50")} />
+                        <label className="text-xs font-medium text-gray-400">{t.dashboard.products.form.categories.label}</label>
+                        <CategorySelect 
+                            categories={availableCategories}
+                            selectedIds={form.category}
+                            onChange={(ids) => updateField('category', ids)}
+                            error={errors.category}
+                        />
                         {errors.category && <p className="mt-1 text-xs text-red-500">{errors.category}</p>}
                     </div>
                 </div>

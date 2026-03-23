@@ -172,8 +172,10 @@ export const Products: CollectionConfig = {
         },
         {
             name: 'category',
-            type: 'text',
-            admin: { description: 'Product category' },
+            type: 'relationship',
+            relationTo: 'categories',
+            hasMany: true,
+            admin: { description: 'Danh mục sản phẩm (Hỗ trợ Multi-select)' },
         },
         {
             name: 'tags',

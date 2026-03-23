@@ -337,6 +337,8 @@
                 "editTitle": "Sunting Produk",
                 "newTitle": "Tambah Produk Baru",
                 "basicInfo": "Maklumat Asas",
+                "nameLabel": "Nama Produk *",
+                "slugLabel": "Slug",
                 "pricing": "Harga & Inventori",
                 "shipping": "Penghantaran",
                 "seo": "Kandungan & SEO",
@@ -374,6 +376,12 @@
                     "skuRequired": "SKU diperlukan",
                     "categoryRequired": "Kategori diperlukan",
                     "checkErrors": "Sila semak borang untuk ralat"
+                },
+                "categories": {
+                    "select": "Pilih kategori...",
+                    "search": "Cari kategori...",
+                    "empty": "Tiada kategori yang sepadan.",
+                    "label": "Kategori *"
                 },
                 "variants": {
                     "hasVariantsToggle": "Produk mempunyai Varian",

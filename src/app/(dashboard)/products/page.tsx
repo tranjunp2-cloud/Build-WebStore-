@@ -17,6 +17,12 @@ type ProductImage = {
     thumbnailURL?: string
 }
 
+type Category = {
+    id: string
+    name: string
+    breadcrumbs?: string
+}
+
 type Product = {
     id: string
     name: string
@@ -28,7 +34,7 @@ type Product = {
     currency: string
     status: 'draft' | 'active' | 'archived'
     inventory: number
-    category?: string
+    category?: (Category | string)[]
     images?: Array<{ image: ProductImage | string | null; alt?: string }>
     createdAt: string
 }
@@ -259,8 +265,10 @@ export default function ProductsPage() {
                                                     {product.sku}
                                                 </span>
                                             )}
-                                            {product.category && (
-                                                <span className="text-xs text-gray-500 truncate">{product.category}</span>
+                                            {product.category && product.category.length > 0 && (
+                                                <span className="text-xs text-gray-500 truncate" title={product.category.map((c) => typeof c === 'string' ? c : (c.breadcrumbs || c.name)).filter(Boolean).join(', ')}>
+                                                    {product.category.map((c) => typeof c === 'string' ? c : c.name).filter(Boolean).join(', ')}
+                                                </span>
                                             )}
                                         </div>
                                     </div>

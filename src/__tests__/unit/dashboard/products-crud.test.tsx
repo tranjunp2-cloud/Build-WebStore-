@@ -90,11 +90,11 @@ describe('Product Price Formatting', () => {
 
 describe('US-F08-04 — slugify utility', () => {
     it('converts Vietnamese text to slug with hyphens', () => {
-        expect(slugify('Áo thun Cotton')).toBe('o-thun-cotton')
+        expect(slugify('Áo thun Cotton')).toBe('ao-thun-cotton')
     })
 
     it('converts lowercase and removes special chars', () => {
-        expect(slugify('Móc Khóa Capybara')).toBe('mc-kha-capybara')
+        expect(slugify('Móc Khóa Capybara')).toBe('moc-khoa-capybara')
     })
 
     it('strips leading and trailing hyphens', () => {
@@ -122,7 +122,7 @@ describe('US-F08-04 — buildSavePayload (AC-2: category included)', () => {
 
     it('includes category in payload — AC-2 fix', () => {
         const payload = buildSavePayload(baseProduct)
-        expect(payload.category).toBe('Footwear')
+        expect(payload.category).toEqual(['Footwear'])
     })
 
     it('sets status to draft by default — AC-2', () => {
@@ -132,7 +132,7 @@ describe('US-F08-04 — buildSavePayload (AC-2: category included)', () => {
 
     it('generates a slug from product name', () => {
         const payload = buildSavePayload(baseProduct)
-        expect(payload.slug).toMatch(/^dp-t-ong-[a-z0-9]{5}$/)
+        expect(payload.slug).toMatch(/^dep-to-ong-[a-z0-9]{5}$/)
     })
 
     it('sets default stock=10 when no variants', () => {
