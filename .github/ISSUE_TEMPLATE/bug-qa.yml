@@ -1,0 +1,73 @@
+name: "🐛 Bug Report (QA)"
+description: "QC báo bug phát hiện trong QA Testing"
+labels: ["bug", "qa:failed"]
+body:
+  - type: input
+    id: original-issue
+    attributes:
+      label: "Issue gốc"
+      description: "Link đến issue/story gốc"
+      placeholder: "#123"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: "Môi trường"
+      description: "Staging / Production / Local"
+      placeholder: "Staging"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Mô tả lỗi"
+      description: "Mô tả ngắn gọn lỗi gì, ở đâu"
+      placeholder: "Khi bấm nút Save trên trang Products, hiển thị lỗi 500"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to Reproduce"
+      description: "Các bước tái hiện lỗi"
+      value: |
+        1. Vào trang ...
+        2. Bấm nút ...
+        3. Lỗi xuất hiện
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected vs Actual"
+      description: "Mong đợi gì vs thực tế xảy ra gì"
+      value: |
+        **Expected:** ...
+        **Actual:** ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: "Screenshot / Recording"
+      description: "Đính kèm ảnh hoặc video (nếu có)"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "Mức độ nghiêm trọng"
+      options:
+        - "🔴 Critical — Không dùng được feature"
+        - "🟠 Major — Feature hoạt động sai"
+        - "🟡 Minor — Lỗi nhỏ, không ảnh hưởng flow chính"
+        - "⚪ Cosmetic — UI/text sai nhưng không ảnh hưởng chức năng"
+    validations:
+      required: true
