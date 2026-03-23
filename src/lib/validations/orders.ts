@@ -2,9 +2,9 @@ import { z } from 'zod'
 
 // --- Create Order (manual: COD/QR Banking) ---
 export const orderCreateSchema = z.object({
-    siteId: z.string().min(1),
+    siteId: z.union([z.string(), z.number()]),
     items: z.array(z.object({
-        productId: z.string().min(1),
+        productId: z.union([z.string(), z.number()]),
         quantity: z.number().min(1),
         variant: z.string().optional(),
     })).min(1),
@@ -22,6 +22,7 @@ export const orderCreateSchema = z.object({
         }).optional(),
     }),
     paymentMethod: z.enum(['cod', 'qr_banking']),
+    paymentProofImage: z.string().optional(), // Media ID from upload
 })
 
 // --- Update Order Status ---

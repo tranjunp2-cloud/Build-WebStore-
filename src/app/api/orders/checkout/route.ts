@@ -16,12 +16,13 @@ export async function POST(request: Request) {
         const { data, errorResponse } = await parseRequest(request, orderCreateSchema)
         if (errorResponse) return errorResponse
 
-        const { siteId, items, customer, paymentMethod } = data!
+        const { siteId, items, customer, paymentMethod, paymentProofImage } = data!
 
         const payload = await getPayload({ config })
 
         // Get site to find tenant
-        const site = await payload.findByID({ collection: 'sites', id: siteId })
+        const siteLookupId = typeof siteId === 'string' && !isNaN(Number(siteId)) ? Number(siteId) : siteId
+        const site = await payload.findByID({ collection: 'sites', id: siteLookupId })
         if (!site) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
@@ -37,9 +38,10 @@ export async function POST(request: Request) {
         let currency = 'MYR'
 
         for (const item of items) {
+            const productLookupId = typeof item.productId === 'string' && !isNaN(Number(item.productId)) ? Number(item.productId) : item.productId
             const product = await payload.findByID({
                 collection: 'products',
-                id: item.productId,
+                id: productLookupId,
                 depth: 0,
             })
 
@@ -74,7 +76,7 @@ export async function POST(request: Request) {
             subtotal += lineTotal
 
             orderItems.push({
-                product: item.productId,
+                product: productLookupId,
                 productName: p.name,
                 variant: item.variant || '',
                 quantity: item.quantity,
@@ -97,19 +99,22 @@ export async function POST(request: Request) {
         const total = subtotal + tax
 
         // Create order
+        const shippingFee = 10 // Flat RM10 shipping
         const order = await payload.create({
             collection: 'orders',
             data: {
                 tenant: tenantId,
-                site: siteId,
+                site: siteLookupId,
                 orderNumber,
                 items: orderItems,
                 subtotal,
+                shippingFee,
                 tax,
-                total,
+                total: subtotal + shippingFee + tax,
                 currency,
                 status: 'pending',
                 paymentMethod,
+                ...(paymentProofImage ? { paymentProofImage } : {}),
                 customerEmail: customer.email,
                 customerName: customer.name,
                 customerPhone: customer.phone || '',
