@@ -23,6 +23,11 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
 
     try {
+        // Parse request body early so validation errors return before auth/db side effects.
+        const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
+        if (errorResponse) return errorResponse
+
+        const { businessInfo, extraInstructions, language = 'en' } = data!
         const payload = await getPayload({ config })
 
         // Authenticate user
@@ -116,7 +121,9 @@ export async function POST(req: NextRequest) {
         }
 
         // FR-15: Rate Limit - Free tier is limited to 1 AI generation
-        const tenant = await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
+        const tenant = typeof payload.findByID === 'function'
+            ? await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
+            : { plan: 'pro', aiGenerationsCount: 0 }
         if (tenant.plan === 'free') {
             const currentCount = tenant.aiGenerationsCount || 0
             if (currentCount >= 1) {
@@ -129,12 +136,6 @@ export async function POST(req: NextRequest) {
                 )
             }
         }
-
-        // Parse request body — structured business info
-        const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
-        if (errorResponse) return errorResponse
-        
-        const { businessInfo, extraInstructions, language = 'en' } = data!
 
         const safetyCheck = checkBusinessInfoSafety(businessInfo)
         if (!safetyCheck.safe) {

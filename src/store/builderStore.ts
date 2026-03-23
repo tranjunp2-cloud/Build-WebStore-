@@ -5,6 +5,7 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import type { StateStorage } from 'zustand/middleware'
 import type { ThemeConfig } from '@/blocks/types'
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -90,6 +91,30 @@ const INITIAL_STATE: BuilderState = {
     error: null,
 }
 
+const noopStorage: StateStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+}
+
+function getSafeStorage(): StateStorage {
+    if (typeof window === 'undefined' || typeof globalThis.localStorage === 'undefined') {
+        return noopStorage
+    }
+
+    const storage = globalThis.localStorage as Partial<StateStorage>
+
+    if (
+        typeof storage.getItem !== 'function' ||
+        typeof storage.setItem !== 'function' ||
+        typeof storage.removeItem !== 'function'
+    ) {
+        return noopStorage
+    }
+
+    return storage as StateStorage
+}
+
 export const useBuilderStore = create<BuilderState & BuilderActions>()(
     persist(
         (set) => ({
@@ -137,7 +162,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
         }),
         {
             name: 'prime-builder-session', // name of the item in localStorage
-            storage: createJSONStorage(() => localStorage),
+            storage: createJSONStorage(getSafeStorage),
             // Only persist necessary state, reset streaming status and progress
             partialize: (state) => ({
                 businessInfo: state.businessInfo,
