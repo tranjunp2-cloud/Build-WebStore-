@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Plus, Search, MoreHorizontal, AlertCircle, RefreshCw } from 'lucide-react'
+import { Plus, Search, MoreHorizontal, AlertCircle, RefreshCw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ProductsSkeleton } from '@/components/dashboard/ProductsSkeleton'
 import { ProductImageFallback } from '@/components/dashboard/ProductImageFallback'
 import { ProductsEmptyState } from '@/components/dashboard/ProductsEmptyState'
+import { BulkCreateModal } from '@/components/dashboard/BulkCreateModal'
 import { useI18n } from '@/i18n'
 
 type ProductImage = {
@@ -64,6 +65,7 @@ export default function ProductsPage() {
     const [filterStatus, setFilterStatus] = useState<string>('all')
     const [searchQuery, setSearchQuery] = useState('')
     const [sortBy, setSortBy] = useState<string>('date-desc')
+    const [showBulkCreate, setShowBulkCreate] = useState(false)
 
     useEffect(() => {
         loadProducts()
@@ -160,10 +162,18 @@ export default function ProductsPage() {
                     <h1 className="text-2xl font-bold text-white">{t.dashboard.products.title}</h1>
                     <p className="mt-1 text-sm text-gray-400">{products.length} {t.dashboard.products.list.product.toLowerCase()}{products.length !== 1 ? 's' : ''}</p>
                 </div>
-                <Link href="/products/new"
-                    className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/25">
-                    <Plus className="h-4 w-4" /> {t.dashboard.products.addProduct}
-                </Link>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <button 
+                        onClick={() => setShowBulkCreate(true)}
+                        className="flex items-center gap-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 px-4 py-2 text-sm font-medium text-indigo-400 hover:bg-indigo-500/20 transition-colors"
+                    >
+                        <Sparkles className="h-4 w-4" /> Tạo bằng AI
+                    </button>
+                    <Link href="/products/new"
+                        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors shadow-lg shadow-blue-500/25">
+                        <Plus className="h-4 w-4" /> {t.dashboard.products.addProduct}
+                    </Link>
+                </div>
             </div>
 
             {/* Filters */}
@@ -307,6 +317,13 @@ export default function ProductsPage() {
                     </div>
                 )}
             </div>
+
+            {showBulkCreate && (
+                <BulkCreateModal 
+                    onClose={() => setShowBulkCreate(false)}
+                    onSuccess={() => loadProducts()}
+                />
+            )}
         </div>
     )
 }

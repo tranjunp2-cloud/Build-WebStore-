@@ -12,9 +12,35 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
     }
 }
 
+// Auto-inject tenant and site from logged-in user if not provided by client
+const beforeChangeHook = async ({ data, req, operation }: any) => {
+    if (operation === 'create' && req.user) {
+        // If client didn't specify tenant, try to grab the first active tenant from user
+        if (!data.tenant && req.user.tenants?.length > 0) {
+            data.tenant = typeof req.user.tenants[0].tenant === 'object' 
+                ? req.user.tenants[0].tenant?.id 
+                : req.user.tenants[0].tenant
+        }
+
+        // If client didn't specify site, try to fetch the first site for this tenant
+        if (!data.site && data.tenant && req.payload) {
+            const siteRes = await req.payload.find({
+                collection: 'sites',
+                where: { tenant: { equals: data.tenant } },
+                limit: 1
+            })
+            if (siteRes.docs.length > 0) {
+                data.site = siteRes.docs[0].id
+            }
+        }
+    }
+    return data
+}
+
 export const Products: CollectionConfig = {
     slug: 'products',
     hooks: {
+        beforeChange: [beforeChangeHook],
         afterChange: [afterChangeHook],
     },
     admin: {
