@@ -10,8 +10,7 @@ import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
 import type { EmailLocale } from './welcome'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const locales = { en: en.email, ms: ms.email } as any
+const locales = { en: en.email, ms: ms.email } as Record<string, typeof en.email>
 
 interface ForgotPasswordEmailData {
     userName: string

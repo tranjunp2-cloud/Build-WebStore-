@@ -10,34 +10,33 @@ import en from '@/i18n/locales/en.json'
 import ms from '@/i18n/locales/ms.json'
 import type { EmailLocale } from './welcome'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const locales = { en: en.email, ms: ms.email } as any
+const locales = { en: en.email, ms: ms.email } as Record<string, typeof en.email>
 
 interface OTPEmailOptions {
-  userName: string
-  otpCode: string
-  locale?: EmailLocale
+    userName: string
+    otpCode: string
+    locale?: EmailLocale
 }
 
 export function otpVerificationEmail({ userName, otpCode, locale = 'en' }: OTPEmailOptions) {
-  const t = (locales[locale] || locales.en).otp || {
-    subject: 'Your PrimeWeb verification code 🔐',
-    heading: 'Email Verification',
-    subheading: 'Verify your identity to continue',
-    greeting: 'Hi',
-    body: 'Enter this code to verify your identity:',
-    expiry: 'This code expires in 5 minutes',
-    security: "If you didn't request this code, please ignore this email. Someone may have entered your email by mistake.",
-    footer: 'Powered by PrimeWeb — AI Website Builder for Malaysian SMEs',
-    copyright: `© ${new Date().getFullYear()} PrimeWeb · Kuala Lumpur, Malaysia`,
-  }
+    const t = (locales[locale] || locales.en).otp || {
+        subject: 'Your PrimeWeb verification code 🔐',
+        heading: 'Email Verification',
+        subheading: 'Verify your identity to continue',
+        greeting: 'Hi',
+        body: 'Enter this code to verify your identity:',
+        expiry: 'This code expires in 5 minutes',
+        security: "If you didn't request this code, please ignore this email. Someone may have entered your email by mistake.",
+        footer: 'Powered by PrimeWeb — AI Website Builder for Malaysian SMEs',
+        copyright: `© ${new Date().getFullYear()} PrimeWeb · Kuala Lumpur, Malaysia`,
+    }
 
-  const subject = t.subject || 'Your PrimeWeb verification code 🔐'
+    const subject = t.subject || 'Your PrimeWeb verification code 🔐'
 
-  // Format OTP code with letter spacing for readability
-  const formattedOtp = otpCode.split('').join('  ')
+    // Format OTP code with letter spacing for readability
+    const formattedOtp = otpCode.split('').join('  ')
 
-  const html = `
+    const html = `
 <!DOCTYPE html>
 <html lang="${locale}">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
@@ -82,5 +81,5 @@ export function otpVerificationEmail({ userName, otpCode, locale = 'en' }: OTPEm
 </body>
 </html>`
 
-  return { subject, html }
+    return { subject, html }
 }
