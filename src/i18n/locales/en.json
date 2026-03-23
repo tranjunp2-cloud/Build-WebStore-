@@ -394,6 +394,35 @@
                         "incompleteMatrix": "Please input Price and Stock for all variants."
                     }
                 }
+            },
+            "bulkCreate": {
+                "title": "Fast AI Bulk Create",
+                "subtitle": "Paste a list of items for AI to process automatically",
+                "promptLabel": "Prompt / Item List",
+                "promptPlaceholder": "Example: 2 brown capybara keychains $15, 1 red slippers size M $5...",
+                "parseEmptyError": "Please enter a product list description",
+                "parseButton": "Analyze NLP",
+                "parsing": "Parsing...",
+                "parseSuccess": "Successfully extracted {count} products",
+                "parseInvalidData": "AI returned invalid data",
+                "parseError": "Processing error",
+                "previewTitle": "Preview Grid (AI Processed)",
+                "previewSubtitle": "Empty images will use a default carton icon when saved",
+                "colImage": "Image",
+                "colName": "Product Name",
+                "colPrice": "Price",
+                "colCategory": "Category",
+                "colVariants": "Variants",
+                "colStatus": "Status",
+                "variantsCount": "{count} variants",
+                "editorHint": "💡 Click directly on Name, Price, or Category cells to edit before saving.",
+                "footerCount": "{selected} / {total} products selected",
+                "cancel": "Cancel",
+                "saveButton": "Save {count} Products",
+                "saveEmptyError": "Please select at least 1 product to save",
+                "saveSuccess": "Created {count} draft products. Please add images before publishing.",
+                "saveFailed": "Failed to create products",
+                "saveError": "Error saving products"
             }
         }
     }

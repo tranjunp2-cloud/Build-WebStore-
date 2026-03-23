@@ -394,6 +394,35 @@
                         "incompleteMatrix": "Sila masukkan Harga dan Stok untuk semua varian."
                     }
                 }
+            },
+            "bulkCreate": {
+                "title": "Cipta Sekaligus Pantas AI",
+                "subtitle": "Tampal senarai item untuk diproses oleh AI secara automatik",
+                "promptLabel": "Arahan / Senarai Item",
+                "promptPlaceholder": "Contoh: 2 rantai kunci capybara coklat RM15, 1 selipar merah saiz M RM5...",
+                "parseEmptyError": "Sila masukkan penerangan senarai produk",
+                "parseButton": "Analisis NLP",
+                "parsing": "Menganalisis...",
+                "parseSuccess": "Berjaya mengekstrak {count} produk",
+                "parseInvalidData": "AI mengembalikan data tidak sah",
+                "parseError": "Ralat pemprosesan",
+                "previewTitle": "Jadual Pratonton (Diproses AI)",
+                "previewSubtitle": "Imej kosong akan menggunakan ikon kotak lalai apabila disimpan",
+                "colImage": "Imej",
+                "colName": "Nama Produk",
+                "colPrice": "Harga",
+                "colCategory": "Kategori",
+                "colVariants": "Varian",
+                "colStatus": "Status",
+                "variantsCount": "{count} varian",
+                "editorHint": "💡 Klik terus pada sel Nama, Harga, atau Kategori untuk mengedit sebelum menyimpan.",
+                "footerCount": "{selected} / {total} produk dipilih",
+                "cancel": "Batal",
+                "saveButton": "Simpan {count} Produk",
+                "saveEmptyError": "Sila pilih sekurang-kurangnya 1 produk untuk disimpan",
+                "saveSuccess": "Mencipta {count} produk draf. Sila tambah imej sebelum diterbitkan.",
+                "saveFailed": "Gagal mencipta produk",
+                "saveError": "Ralat menyimpan produk"
             }
         }
     }
