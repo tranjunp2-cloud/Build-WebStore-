@@ -223,7 +223,7 @@ export function VariantsEditor({ configs, variants, onChange, currencySymbol }: 
                                     </button>
                                     
                                     {isExpanded && (
-                                        <div className="border-t border-white/5 p-4 space-y-4 bg-white/[0.02]">
+                                        <div className="border-t border-white/5 p-3 sm:p-4 space-y-4 bg-white/[0.02]">
                                             <div>
                                                 <label className="text-xs text-gray-400 mb-1.5 block">{vt.price} ({currencySymbol}) *</label>
                                                 <input type="number" min="0" step="0.01" value={variant.price} onChange={e => updateVariant(vIdx, 'price', e.target.value)}
