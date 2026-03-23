@@ -330,5 +330,71 @@
                 "retry": "Cuba Lagi"
             }
         }
+    },
+    "auth": {
+        "welcomeBack": "Selamat kembali",
+        "signInSubtitle": "Log masuk untuk terus membina",
+        "email": "E-mel",
+        "password": "Kata laluan",
+        "forgotPassword": "Lupa kata laluan?",
+        "signIn": "Log masuk",
+        "signingIn": "Log masuk...",
+        "or": "atau",
+        "noAccount": "Tiada akaun?",
+        "createOneFree": "Buat akaun percuma →",
+        "errors": {
+            "emailRequired": "E-mel diperlukan",
+            "invalidEmail": "Sila masukkan e-mel yang sah",
+            "passwordMinLength": "Kata laluan mestilah sekurang-kurangnya 8 aksara",
+            "timeout": "Masa tamat. Sila cuba lagi.",
+            "incorrect": "E-mel atau kata laluan tidak betul",
+            "connection": "Ralat sambungan. Sila cuba lagi."
+        },
+        "success": {
+            "welcomeBackTitle": "Selamat kembali!",
+            "redirecting": "Mengalihkan ke papan pemuka anda..."
+        },
+        "register": {
+            "title": "Cipta akaun anda",
+            "subtitle": "Mula membina laman web anda dalam beberapa minit",
+            "firstName": "Nama pertama",
+            "lastName": "Nama akhir",
+            "confirmPassword": "Sahkan kata laluan",
+            "reqLength": "Sekurang-kurangnya 8 aksara",
+            "reqUpper": "Satu huruf besar",
+            "reqNumber": "Satu nombor",
+            "submit": "Cipta akaun",
+            "submitting": "Mencipta akaun...",
+            "termsPrefix": "Dengan mendaftar, anda bersetuju menerima",
+            "terms": "Terma",
+            "and": "dan",
+            "privacy": "Dasar Privasi",
+            "alreadyAccount": "Sudah mempunyai akaun?",
+            "signInLink": "Log masuk →"
+        },
+        "forgot": {
+            "title": "Lupa kata laluan?",
+            "subtitle": "Jangan risau, kami akan hantar pautan tetapan semula",
+            "submit": "Hantar pautan",
+            "submitting": "Menghantar pautan...",
+            "backLogin": "Kembali ke log masuk",
+            "checkEmail": "Semak e-mel anda",
+            "sentTo": "Kami telah menghantar pautan tetapan semula ke",
+            "notReceive": "Tidak menerima e-mel? Semak folder spam atau",
+            "tryAgain": "cuba lagi"
+        }
+    },
+    "cms": {
+        "profile": "Profil",
+        "logout": "Log Keluar"
+    },
+    "plural": {
+        "issue":   { "one": "{count} isu",          "other": "{count} isu" },
+        "order":   { "one": "{count} pesanan",       "other": "{count} pesanan" },
+        "keyword": { "one": "{count} kata kunci",    "other": "{count} kata kunci" },
+        "page":    { "one": "{count} halaman",       "other": "{count} halaman" },
+        "product": { "one": "{count} produk",        "other": "{count} produk" },
+        "fix":     { "one": "{count} pembaikan digunakan", "other": "{count} pembaikan digunakan" },
+        "result":  { "one": "{count} keputusan",     "other": "{count} keputusan" }
     }
 }

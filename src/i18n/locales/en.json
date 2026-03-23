@@ -330,5 +330,71 @@
                 "retry": "Retry"
             }
         }
+    },
+    "auth": {
+        "welcomeBack": "Welcome back",
+        "signInSubtitle": "Sign in to continue building",
+        "email": "Email",
+        "password": "Password",
+        "forgotPassword": "Forgot password?",
+        "signIn": "Sign in",
+        "signingIn": "Signing in...",
+        "or": "or",
+        "noAccount": "Don't have an account?",
+        "createOneFree": "Create one free →",
+        "errors": {
+            "emailRequired": "Email is required",
+            "invalidEmail": "Please enter a valid email",
+            "passwordMinLength": "Password must be at least 8 characters",
+            "timeout": "Request timed out. Please try again.",
+            "incorrect": "Incorrect email or password",
+            "connection": "Connection error. Please try again."
+        },
+        "success": {
+            "welcomeBackTitle": "Welcome back!",
+            "redirecting": "Redirecting to your dashboard..."
+        },
+        "register": {
+            "title": "Create your account",
+            "subtitle": "Start building your website in minutes",
+            "firstName": "First name",
+            "lastName": "Last name",
+            "confirmPassword": "Confirm password",
+            "reqLength": "At least 8 characters",
+            "reqUpper": "One uppercase letter",
+            "reqNumber": "One number",
+            "submit": "Create account",
+            "submitting": "Creating account...",
+            "termsPrefix": "By signing up, you agree to our",
+            "terms": "Terms",
+            "and": "and",
+            "privacy": "Privacy Policy",
+            "alreadyAccount": "Already have an account?",
+            "signInLink": "Sign in →"
+        },
+        "forgot": {
+            "title": "Forgot password?",
+            "subtitle": "No worries, we'll send you a reset link",
+            "submit": "Send reset link",
+            "submitting": "Sending reset link...",
+            "backLogin": "Back to sign in",
+            "checkEmail": "Check your email",
+            "sentTo": "We've sent a password reset link to",
+            "notReceive": "Didn't receive the email? Check your spam folder or",
+            "tryAgain": "try again"
+        }
+    },
+    "cms": {
+        "profile": "Profile",
+        "logout": "Logout"
+    },
+    "plural": {
+        "issue":   { "one": "{count} issue",    "other": "{count} issues" },
+        "order":   { "one": "{count} order",    "other": "{count} orders" },
+        "keyword": { "one": "{count} keyword",  "other": "{count} keywords" },
+        "page":    { "one": "{count} page",     "other": "{count} pages" },
+        "product": { "one": "{count} product",  "other": "{count} products" },
+        "fix":     { "one": "{count} fix applied", "other": "{count} fixes applied" },
+        "result":  { "one": "{count} result",   "other": "{count} results" }
     }
 }
