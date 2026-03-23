@@ -77,6 +77,10 @@ const MIGRATIONS = [
     name: 'tenants.business_address',
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS business_address varchar;`,
   },
+  {
+    name: 'tenants.ai_generations_count',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ai_generations_count numeric DEFAULT 0;`,
+  },
   // ── Tenants: ECH Integration ──
   {
     name: 'tenants.ech_integration_enabled',
