@@ -329,6 +329,70 @@
                 "failed": "Analisis SEO gagal",
                 "retry": "Cuba Lagi"
             }
+        },
+        "orders": {
+            "title": "Pengurusan Pesanan",
+            "subtitle": "Segerak automatik setiap 60s",
+            "trackOrders": "Jejaki dan proses pesanan anda",
+            "confirm": "Sahkan",
+            "orders": "pesanan",
+            "changeTo": "Tukar kepada",
+            "search": "Cari ID pesanan, nama pelanggan...",
+            "noOrdersFound": "Tiada pesanan dijumpai mengikut penapis",
+            "noOrdersYet": "Tiada pesanan lagi",
+            "noOrdersDesc": "Pesanan baharu akan muncul di sini apabila pelanggan melengkapkan daftar keluar.",
+            "filters": {
+                "all": "Semua",
+                "pending": "Menunggu",
+                "confirmed": "Disahkan",
+                "readyToShip": "Sedia untuk Dihantar",
+                "shipped": "Telah Dihantar",
+                "completed": "Selesai",
+                "cancelled": "Dibatalkan",
+                "refunded": "Dikembalikan"
+            },
+            "table": {
+                "orderId": "ID Pesanan / Pelanggan",
+                "items": "Barangan",
+                "total": "Jumlah",
+                "status": "Status",
+                "date": "Tarikh",
+                "item": "barangan",
+                "itemPlural": "barangan"
+            },
+            "drawer": {
+                "timeline": "Garis Masa Status",
+                "customer": "Pelanggan",
+                "noPhone": "Tiada nombor telefon",
+                "payment": "Pembayaran",
+                "viewReceipt": "Lihat Resit",
+                "lineItems": "Senarai Barangan",
+                "subtotal": "Jumlah Kecil",
+                "shipping": "Penghantaran",
+                "tax": "Cukai (6%)",
+                "total": "Jumlah Besar",
+                "orderCancelled": "Pesanan dibatalkan",
+                "orderRefunded": "Pesanan dikembalikan",
+                "reason": "Sebab"
+            },
+            "status": {
+                "pending": "Menunggu",
+                "confirmed": "Disahkan",
+                "readyToShip": "Sedia untuk Dihantar",
+                "shipped": "Telah Dihantar",
+                "completed": "Selesai",
+                "cancelled": "Dibatalkan",
+                "refunded": "Dikembalikan",
+                "processing": "Sedang Diproses",
+                "paid": "Telah Dibayar"
+            },
+            "toast": {
+                "updated": "Status pesanan dikemaskini",
+                "loadFailed": "Gagal memuatkan pesanan",
+                "bulkSuccess": "Berjaya mengesahkan {count} pesanan",
+                "bulkFailed": "{count} pesanan gagal (aliran kerja tidak sah)",
+                "updateFailed": "Ralat: {message}"
+            }
         }
     }
 }
