@@ -41,6 +41,8 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
 | US-F19-02 | Set Primary Domain | Draft | P1 |
 | US-F19-03 | Configure Payment Methods | Draft | P0 |
 | US-F19-04 | Mobile Web UX — Camera Roll & Tap-to-Copy | Ready | P1 |
+| US-F19-05 | Invite Staff & Role Assignment | Draft | P0 |
+| US-F19-06 | Manage Staff Directory & Removal | Draft | P0 |
 
 ---
 
@@ -129,3 +131,53 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
    - **Given** I am viewing the DNS instructions
    - **When** I tap the "Copy" icon next to the CNAME or A Record
    - **Then** the value is copied instantly, and a success Toast confirms the action, optimized for easy pasting into my mobile registrar app.
+
+---
+
+### US-F19-05: Invite Staff & Role Assignment
+**As a** Store Owner (Seller)
+**I want to** invite my staff members and assign them specific roles
+**So that** I can securely delegate tasks without sharing my master credentials.
+
+#### Acceptance Criteria
+1. **Invite Staff:**
+   - **Given** I am in the Store Configuration > Staff Management tab
+   - **When** I click "Invite New Staff" and enter a valid email address
+   - **Then** the system checks if the email is already in the Tenant. If not, it creates a "Pending" invitation and sends a Welcome Email.
+2. **Assign Full Access Role:**
+   - **Given** I am inviting or editing a Staff member
+   - **When** I select the "Full Access" role
+   - **Then** that staff member is granted Workspace Admin privileges (access to all modules except billing and workspace deletion).
+3. **Assign Custom Role:**
+   - **Given** I am inviting or editing a Staff member
+   - **When** I select the "Custom" role
+   - **Then** a list of checkboxes appears (e.g., Products, Orders, Blog, Builder). I MUST check at least one.
+   - **And** the staff member will only be able to view and interact with the selected modules when they log in.
+
+#### Edge Cases
+- Email address is already active on another Tenant (Support multi-tenant if architecture allows, otherwise error).
+- Unchecking all features when using the "Custom" role (Should disable the Save button).
+
+---
+
+### US-F19-06: Manage Staff Directory & Removal
+**As a** Store Owner
+**I want to** view all my invited staff and remove their access if necessary
+**So that** I maintain complete control over who can access my store's backend.
+
+#### Acceptance Criteria
+1. **View Directory:**
+   - **Given** I am on the Staff Management tab
+   - **When** the page loads
+   - **Then** I see a list of my staff displaying their Avatar, Email, Role (Full Access or Custom [Feature List]), and Status (Pending or Active).
+2. **Remove Access (Revoke):**
+   - **Given** a Staff member is in the list
+   - **When** I click the "Remove" button and confirm the destructive action modal
+   - **Then** their access to the current Workspace is immediately revoked (Soft Deleted or Unlinked).
+   - **And** they are forced to log out if they are currently active.
+3. **Owner Protection:**
+   - **Given** I am the original Creator/Owner of the Workspace
+   - **Then** my account cannot be removed from the Staff Directory by anyone.
+
+#### Edge Cases
+- Revoking a Pending invite (cancels the invitation token).

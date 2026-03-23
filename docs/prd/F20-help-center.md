@@ -122,12 +122,15 @@ Step 2: User selects a tab / menu item:
 
 > **[Global CMS Constraint]** Render bên trong Main Content Area của F18 CMS Layout.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Help Center Main Screen
 - **Mô tả:** Màn hình chính chứa Table of Contents (hoặc Sidebar phụ) và nội dung chính.
 - **Components chính:**
   - Sidebar phụ (hoặc Tabs): Guideline, Q&A, Modules (Products, Orders, v.v.).
   - Main Area: Nội dung dạng văn bản giàu định dạng (Rich text), Headings, Lists.
-- **Wireframe:**
+- **Design / Wireframe:**
   ```text
   +-----------------------------------------------------------+
   | [H1] Help Center / Hướng dẫn sử dụng                        |
@@ -147,7 +150,7 @@ Step 2: User selects a tab / menu item:
 - **Components chính:**
   - Content Text: Các text hướng dẫn từng bước.
   - Image blocks: Screenshot chèn giữa các text.
-- **Wireframe:**
+- **Design / Wireframe:**
   ```text
   +-----------------------------------------------------------+
   | [H2] Hướng dẫn sử dụng module: Products                     |
@@ -166,32 +169,14 @@ Step 2: User selects a tab / menu item:
 
 ### 10.4. Mobile View (Pinch-to-zoom Lightbox)
 - **Mô tả:** Do screenshot trên mobile khá bé và khó đọc text, Lightbox mở ra phải chiếm full-screen và cho phép user chụm 2 ngón tay lại để Zoom chữ (Pinch-to-zoom) để đọc detail dễ dàng. Sidebar navigation chuyển thành sticky top dropdown.
-- **Wireframe:**
+- **Design / Wireframe:**
 ```text
-┌─ Mobile Help Center ──────────┐
-│ [☰]      [ Module: Orders ▼ ] │
-│ ───────────────────────────── │
-│ Bước 1: Vào mục Orders...     │
-│ ┌───────────────────────────┐ │
-│ │ (Thumbnail Image)         │ │
-│ │ 👆 Nhấp để phóng to        │ │
-│ └───────────────────────────┘ │
-└───────────────────────────────┘
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
-┌─ Lightbox Zoom ───────────────┐
-│                           [X] │
-│                               │
-│       ┌─────────┐             │
-│   ↔️  │(zoomed) │  ↔️        │
-│ Pinch │         │  to         │
-│  <=>  │  Image  │  <=>        │
-│  Zoom │         │ Zoom        │
-│       └─────────┘             │
-│                               │
-└───────────────────────────────┘
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ---
+
 
 ## 11. Acceptance Criteria
 

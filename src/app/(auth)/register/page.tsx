@@ -11,6 +11,8 @@ import { User, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Check } from 'lucid
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useI18n } from '@/i18n'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 const registerSchema = z
     .object({
@@ -57,6 +59,7 @@ export default function RegisterPage() {
     const router = useRouter()
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
+    const { t } = useI18n()
 
     const {
         register,
@@ -173,8 +176,8 @@ export default function RegisterPage() {
         <div className="animate-in fade-in duration-500">
             {/* Header */}
             <div className="mb-6 text-center">
-                <h1 className="text-2xl font-bold text-white">Create your account</h1>
-                <p className="mt-1.5 text-sm text-gray-400">Start building your website in minutes</p>
+                <h1 className="text-2xl font-bold text-white">{t.auth.register.title}</h1>
+                <p className="mt-1.5 text-sm text-gray-400">{t.auth.register.subtitle}</p>
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -191,7 +194,7 @@ export default function RegisterPage() {
                 {/* Name row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <Label htmlFor="firstName" className="text-gray-300">First name</Label>
+                        <Label htmlFor="firstName" className="text-gray-300">{t.auth.register.firstName}</Label>
                         <div className="relative mt-1.5">
                             <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                             <Input
@@ -206,7 +209,7 @@ export default function RegisterPage() {
                         )}
                     </div>
                     <div>
-                        <Label htmlFor="lastName" className="text-gray-300">Last name</Label>
+                        <Label htmlFor="lastName" className="text-gray-300">{t.auth.register.lastName}</Label>
                         <div className="relative mt-1.5">
                             <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                             <Input
@@ -224,7 +227,7 @@ export default function RegisterPage() {
 
                 {/* Email */}
                 <div>
-                    <Label htmlFor="email" className="text-gray-300">Email</Label>
+                    <Label htmlFor="email" className="text-gray-300">{t.auth.email}</Label>
                     <div className="relative mt-1.5">
                         <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                         <Input
@@ -242,7 +245,7 @@ export default function RegisterPage() {
 
                 {/* Password */}
                 <div>
-                    <Label htmlFor="password" className="text-gray-300">Password</Label>
+                    <Label htmlFor="password" className="text-gray-300">{t.auth.password}</Label>
                     <div className="relative mt-1.5">
                         <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                         <Input
@@ -284,7 +287,7 @@ export default function RegisterPage() {
 
                 {/* Confirm password */}
                 <div>
-                    <Label htmlFor="confirmPassword" className="text-gray-300">Confirm password</Label>
+                    <Label htmlFor="confirmPassword" className="text-gray-300">{t.auth.register.confirmPassword}</Label>
                     <div className="relative mt-1.5">
                         <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                         <Input
@@ -311,9 +314,9 @@ export default function RegisterPage() {
                 {/* Password requirements */}
                 <div className="space-y-1">
                     {[
-                        { test: watchPassword.length >= 8, label: 'At least 8 characters' },
-                        { test: /[A-Z]/.test(watchPassword), label: 'One uppercase letter' },
-                        { test: /[0-9]/.test(watchPassword), label: 'One number' },
+                        { test: watchPassword.length >= 8, label: t.auth.register.reqLength },
+                        { test: /[A-Z]/.test(watchPassword), label: t.auth.register.reqUpper },
+                        { test: /[0-9]/.test(watchPassword), label: t.auth.register.reqNumber },
                     ].map(({ test, label }) => (
                         <div key={label} className="flex items-center gap-2 text-xs">
                             <Check className={`h-3 w-3 transition-colors ${test ? 'text-emerald-400' : 'text-gray-600'}`} />
@@ -322,7 +325,6 @@ export default function RegisterPage() {
                     ))}
                 </div>
 
-                {/* Submit */}
                 <Button
                     type="submit"
                     disabled={isSubmitting}
@@ -331,21 +333,26 @@ export default function RegisterPage() {
                     {isSubmitting ? (
                         <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Creating account...
+                            {t.auth.register.submitting}
                         </>
                     ) : (
                         <>
-                            Create account
+                            {t.auth.register.submit}
                             <ArrowRight className="ml-2 h-4 w-4" />
                         </>
                     )}
                 </Button>
 
+                {/* Inline Language Switcher */}
+                <div className="pt-2">
+                    <LanguageSwitcher variant="segmented" />
+                </div>
+
                 <p className="text-xs text-center text-gray-500">
-                    By signing up, you agree to our{' '}
-                    <Link href="/terms" className="text-gray-400 underline hover:text-gray-300">Terms</Link>{' '}
-                    and{' '}
-                    <Link href="/privacy" className="text-gray-400 underline hover:text-gray-300">Privacy Policy</Link>
+                    {t.auth.register.termsPrefix}{' '}
+                    <Link href="/terms" className="text-gray-400 underline hover:text-gray-300">{t.auth.register.terms}</Link>{' '}
+                    {t.auth.register.and}{' '}
+                    <Link href="/privacy" className="text-gray-400 underline hover:text-gray-300">{t.auth.register.privacy}</Link>
                 </p>
             </form>
 
@@ -355,18 +362,18 @@ export default function RegisterPage() {
                     <div className="w-full border-t border-white/[0.06]" />
                 </div>
                 <div className="relative flex justify-center text-xs">
-                    <span className="bg-transparent px-3 text-gray-500">or</span>
+                    <span className="bg-[#101726] px-3 text-gray-400">{t.auth.or}</span>
                 </div>
             </div>
 
             {/* Login link */}
             <p className="text-center text-sm text-gray-400">
-                Already have an account?{' '}
+                {t.auth.register.alreadyAccount}{' '}
                 <Link
                     href="/login"
                     className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
                 >
-                    Sign in →
+                    {t.auth.register.signInLink}
                 </Link>
             </p>
         </div>

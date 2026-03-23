@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { AppShell } from '@/components/AppShell'
 import { AuthToaster } from './AuthToaster'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { I18nProvider } from '@/i18n'
 
 export default function AuthLayout({
     children,
@@ -9,7 +11,9 @@ export default function AuthLayout({
 }) {
     return (
         <AppShell>
-            <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0A0E1A] px-4 py-8">
+            <I18nProvider defaultLocale="en">
+                <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0A0E1A] px-4 py-8">
+
                 {/* Animated gradient orbs */}
                 <div className="pointer-events-none fixed inset-0 overflow-hidden">
                     <div className="absolute -left-20 -top-20 h-[500px] w-[500px] rounded-full bg-gradient-to-br from-blue-600/20 to-cyan-500/10 blur-[120px]" />
@@ -56,6 +60,7 @@ export default function AuthLayout({
 
                 <AuthToaster />
             </div>
+            </I18nProvider>
         </AppShell>
     )
 }
