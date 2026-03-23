@@ -246,36 +246,58 @@ export default function ProductsPage() {
 
                         return (
                             <Link key={product.id} href={`/products/${product.id}`}
-                                className="block sm:grid sm:grid-cols-[1fr_120px_100px_80px_60px] gap-4 px-4 sm:px-6 py-4 hover:bg-white/5 transition-colors sm:items-center">
-                                {/* Product info */}
-                                <div className="flex items-center gap-3">
-                                    <div className="relative h-10 w-10 shrink-0 rounded-lg bg-white/5 border border-white/10 overflow-hidden">
+                                className="block sm:grid sm:grid-cols-[1fr_120px_100px_80px_60px] gap-4 px-4 sm:px-6 py-4 hover:bg-white/5 transition-colors sm:items-center relative">
+                                
+                                {/* Mobile Red Badge for Stock */}
+                                {(isOutOfStock || product.inventory <= 5) && (
+                                    <div className="sm:hidden absolute top-4 right-4 flex flex-col items-end gap-1">
+                                        {isOutOfStock ? (
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20 uppercase tracking-wider">{t.dashboard.products.list.outOfStock}</span>
+                                        ) : (
+                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 uppercase tracking-wider">Low Stock</span>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Product info container */}
+                                <div className="flex items-start sm:items-center gap-3">
+                                    <div className="relative h-14 w-14 sm:h-10 sm:w-10 shrink-0 rounded-lg bg-white/5 border border-white/10 overflow-hidden mt-0.5 sm:mt-0">
                                         {imgUrl ? (
                                             <Image src={imgUrl} alt={product.images?.[0]?.alt || product.name}
-                                                fill className="object-cover" sizes="40px" />
+                                                fill className="object-cover" sizes="(max-width: 640px) 56px, 40px" />
                                         ) : (
                                             <ProductImageFallback size="md" />
                                         )}
                                     </div>
-                                    <div className="min-w-0 flex-1">
+                                    <div className="min-w-0 flex-1 pr-16 sm:pr-0">
                                         <p className="truncate text-sm font-medium text-white">{product.name}</p>
-                                        <div className="flex items-center gap-2 mt-0.5">
+                                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                             {product.sku && (
-                                                <span className="text-xs text-gray-500 font-mono bg-white/5 px-1.5 py-0.5 rounded">
+                                                <span className="text-[10px] sm:text-xs text-gray-500 font-mono bg-white/5 px-1.5 py-0.5 rounded text-ellipsis overflow-hidden max-w-[100px] sm:max-w-none">
                                                     {product.sku}
                                                 </span>
                                             )}
                                             {product.category && product.category.length > 0 && (
-                                                <span className="text-xs text-gray-500 truncate" title={product.category.map((c) => typeof c === 'string' ? c : (c.breadcrumbs || c.name)).filter(Boolean).join(', ')}>
+                                                <span className="text-[10px] sm:text-xs text-gray-500 truncate max-w-[120px] sm:max-w-none" title={product.category.map((c) => typeof c === 'string' ? c : (c.breadcrumbs || c.name)).filter(Boolean).join(', ')}>
                                                     {product.category.map((c) => typeof c === 'string' ? c : c.name).filter(Boolean).join(', ')}
                                                 </span>
                                             )}
                                         </div>
+                                        {/* Mobile Price & Status (Details Right) */}
+                                        <div className="mt-2 flex flex-wrap items-center gap-2 sm:hidden">
+                                            <p className="text-sm font-bold text-white leading-none">{formatPrice(product.price, product.currency)}</p>
+                                            {product.compareAtPrice && product.compareAtPrice > product.price && (
+                                                <p className="text-[10px] text-gray-500 line-through leading-none">{formatPrice(product.compareAtPrice, product.currency)}</p>
+                                            )}
+                                            <div className="ml-auto">
+                                                <StatusBadge status={product.status} />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Price + Status + Stock — stacked on mobile */}
-                                <div className="mt-3 sm:mt-0 flex items-center gap-3 sm:block">
+                                {/* Desktop Price */}
+                                <div className="hidden sm:block">
                                     <p className="text-sm font-medium text-white">{formatPrice(product.price, product.currency)}</p>
                                     {product.compareAtPrice && product.compareAtPrice > product.price && (
                                         <p className="text-xs text-gray-500 line-through">{formatPrice(product.compareAtPrice, product.currency)}</p>
@@ -296,23 +318,6 @@ export default function ProductsPage() {
                                 
                                 <div className="hidden sm:flex justify-end">
                                     <MoreHorizontal className="h-4 w-4 text-gray-600 hover:text-white transition-colors" />
-                                </div>
-
-                                {/* Mobile: inline status + stock */}
-                                <div className="mt-2 flex items-center gap-3 sm:hidden border-t border-white/5 pt-2">
-                                    <StatusBadge status={product.status} />
-                                    <div className="flex items-center gap-1.5">
-                                        {isOutOfStock ? (
-                                            <>
-                                                <AlertCircle className="h-3.5 w-3.5 text-red-500" />
-                                                <span className="text-xs text-red-500 font-medium">{t.dashboard.products.list.outOfStock}</span>
-                                            </>
-                                        ) : (
-                                            <span className={cn('text-xs', product.inventory <= 5 ? 'text-orange-400' : 'text-gray-500')}>
-                                                {product.inventory} {t.dashboard.products.list.inStock}
-                                            </span>
-                                        )}
-                                    </div>
                                 </div>
                             </Link>
                         )
