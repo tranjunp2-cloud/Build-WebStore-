@@ -4,6 +4,34 @@ const ADMIN_PATHS = ['/admin', '/api']
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
 
 /**
+ * Protected routes that require authentication (SPEC §11, US-F02-03).
+ *
+ * Using startsWith matching, these 6 prefixes cover all 12+ protected routes:
+ *   1. /dashboard          — Dashboard overview
+ *   2. /dashboard/media    — Media Library
+ *   3. /dashboard/sites/*  — Site Settings
+ *   4. /dashboard/products — Products CRUD
+ *   5. /dashboard/seo      — SEO Dashboard
+ *   6. /dashboard/analytics— Analytics
+ *   7. /dashboard/billing  — Billing
+ *   8. /dashboard/blog     — Blog Management
+ *   9. /builder            — AI Chat Builder
+ *  10. /editor             — AI Editor
+ *  11. /onboarding         — Onboarding flow
+ *  12. /settings           — Account Settings
+ */
+const protectedPaths = [
+    '/dashboard',
+    '/builder',
+    '/editor',
+    '/onboarding',
+    '/settings',
+    '/account',
+]
+
+const authPaths = ['/login', '/register']
+
+/**
  * Multi-tenant middleware
  *
  * Routing logic:
@@ -32,12 +60,12 @@ export function middleware(req: NextRequest) {
         return NextResponse.rewrite(url)
     }
 
-    // ── API and admin routes: pass through ─────────────────────────────────
+    // ── API and admin routes: pass through ─────────────────────────────
     if (pathname.startsWith('/api/') || pathname.startsWith('/admin')) {
         return NextResponse.next()
     }
 
-    // ── Tenant subdomain: {slug}.primeweb.app ───────────────────────────────
+    // ── Tenant subdomain: {slug}.primeweb.app ───────────────────────────
     const isSubdomain =
         hostname.endsWith(`.${PLATFORM_DOMAIN}`) &&
         hostname !== `www.${PLATFORM_DOMAIN}` &&
@@ -52,7 +80,7 @@ export function middleware(req: NextRequest) {
         return response
     }
 
-    // ── Custom domain: anything that's not the platform domain ───────────────
+    // ── Custom domain: anything that's not the platform domain ─────────────
     // Note: Docker sets HOSTNAME=0.0.0.0, so standalone server may resolve
     // req.nextUrl.hostname as '0.0.0.0' — treat as platform domain.
     if (
@@ -71,9 +99,7 @@ export function middleware(req: NextRequest) {
         return response
     }
 
-    // ── Auth Guard — Protected routes ─────────────────────────────────────────
-    const protectedPaths = ['/dashboard', '/builder', '/editor', '/onboarding']
-    const authPaths = ['/login', '/register']
+    // ── Auth Guard — Protected routes (US-F02-03, SPEC §11) ───────────────
     const isProtectedRoute = protectedPaths.some((p) => pathname.startsWith(p))
     const isAuthRoute = authPaths.some((p) => pathname.startsWith(p))
     const hasToken = req.cookies.has('payload-token')
@@ -91,7 +117,7 @@ export function middleware(req: NextRequest) {
         return NextResponse.redirect(url)
     }
 
-    // ── Main platform (primeweb.app) — Dashboard & marketing ─────────────────
+    // ── Main platform (primeweb.app) — Dashboard & marketing ───────────────
     return NextResponse.next()
 }
 

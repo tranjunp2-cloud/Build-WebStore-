@@ -41,7 +41,6 @@ export const GET = withAuth(async (user, req) => {
 
         const where: any = {
             tenant: { equals: resolvedTenantId },
-            status: { not_equals: 'deleted' },
         }
 
         if (search) {
