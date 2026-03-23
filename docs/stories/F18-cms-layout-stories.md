@@ -61,6 +61,28 @@ WHEN  click vào item "Help Center"
 THEN  hệ thống điều hướng sang trang Help Center (F20)
 ```
 
+#### AC-4: Hành vi đóng Menu trên Mobile (Slide-out)
+
+```gherkin
+GIVEN user đang sử dụng chức năng CMS trên Mobile với Side Menu Drawer đang mở trượt từ trái ra
+WHEN  user nhấn Touch/Click ra vùng bóng mờ (Overlay) bên ngoài 
+  OR  user thực hiện lệnh Swipe (Vuốt) trực tiếp từ nửa bên phải màn hình sang tay trái
+  OR  user click vào một đường Link trực tiếp dẫn thẳng sang module khác (Route Leaf)
+THEN  Side Menu phải tự động cuộn (Slide out) trượt khỏi màn hình
+  AND Overlay bóng mờ đóng lại, không cản trở khu vực nội dung chính
+```
+
+#### AC-5: Thao tác mở cụm Menu Nhóm (Expandable Accordion)
+
+```gherkin
+GIVEN user click / hover (nếu là Desktop) vào cụm Menu hệ sinh thái phân tầng (VD: My Webstore) đang ở chế độ Đóng
+THEN  Menu tự thiết lập xuống trạng thái Expanded liệt kê danh sách Menu con (`Blog`, `Editor`...)
+  AND Icon mũi tên điều hướng đổ gập xuống (Arrow Down)
+  AND Drawer Menu (nếu là Mobile) không bị gập lại
+WHEN  user click lần thứ 2 vào cụm Menu Nhóm hiện tại
+THEN  Menu xếp gập lại trọn vẹn (Collapsed), toàn bộ Menu con thụt giấu
+```
+
 ### Additional Criteria
 
 - [ ] Active state của menu item phải cập nhật đúng khi navigate giữa các route mà không cần reload trang.
@@ -128,6 +150,25 @@ THEN  hiển thị Dropdown menu gồm các action:
       - Logout
 ```
 
+#### AC-4: Đóng Dropdown/Popup (Accessibility)
+
+```gherkin
+GIVEN Dropdown Avatar / Chuông Notification F16 đang hiện rõ 
+WHEN  user click chuột vào môi trường trống (Click outside)
+  OR  user gõ lệnh phím [ESC]
+THEN  Dropdown Popup tự động đóng lại lập tức
+```
+
+#### AC-5: Hành vi Runtime Language Switch
+
+```gherkin
+GIVEN user đang mở Dropdown Avatar
+WHEN  user chọn một loại ngôn ngữ khác ngôn ngữ hiện tại (VD: Đang EN chọn BM)
+THEN  Hệ thống lưu giá trị ưu tiên BM vào localStorage ngay lập tức
+  AND Text tĩnh của Header, Sidebar Menu tự động thay đổi ngôn ngữ ngay tức khắc
+  AND KHÔNG Refresh/Reload lại toàn bộ trang web nhằm giữ nguyên dữ liệu form đang làm dang dở
+```
+
 ### Additional Criteria
 
 - [ ] Language toggle phải persist qua sessions (localStorage hoặc user preference trong DB).
@@ -181,6 +222,16 @@ THEN  hiển thị shared Empty State component (illustration + message + CTA bu
   AND Header và Sidebar vẫn cố định, không bị ảnh hưởng
 ```
 
+#### AC-4: Kích hoạt Route Loading Transition State
+
+```gherkin
+GIVEN user click vào một đường link điều hướng trên Sidebar (VD: Từ Dashboard qua Orders)
+WHEN  hệ thống Browser thực thi fetch data và logic UI mới 
+THEN  xuất hiện thanh progress loading bar 2px trôi ngang cạnh dưới của Header
+WHEN  dữ liệu truy xuất API và load xong module 
+THEN  Thanh Progress Bar đi đến mút 100% và ẩn đi (Disappear)
+```
+
 ### Additional Criteria
 
 - [ ] Tuân thủ Spacing và Grid system của Design System.
@@ -198,3 +249,6 @@ THEN  hiển thị shared Empty State component (illustration + message + CTA bu
 ### Definition of Done
 
 - [ ] Tuân thủ Spacing và Grid system của Design System.
+
+
+

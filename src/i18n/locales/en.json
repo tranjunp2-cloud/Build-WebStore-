@@ -364,5 +364,14 @@
     "cms": {
         "profile": "Profile",
         "logout": "Logout"
+    },
+    "plural": {
+        "issue":   { "one": "{count} issue",    "other": "{count} issues" },
+        "order":   { "one": "{count} order",    "other": "{count} orders" },
+        "keyword": { "one": "{count} keyword",  "other": "{count} keywords" },
+        "page":    { "one": "{count} page",     "other": "{count} pages" },
+        "product": { "one": "{count} product",  "other": "{count} products" },
+        "fix":     { "one": "{count} fix applied", "other": "{count} fixes applied" },
+        "result":  { "one": "{count} result",   "other": "{count} results" }
     }
 }

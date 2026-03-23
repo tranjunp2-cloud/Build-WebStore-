@@ -83,6 +83,18 @@ export const Users: CollectionConfig = {
             relationTo: 'media',
         },
         {
+            name: 'prefer_lang',
+            type: 'select',
+            defaultValue: 'en',
+            admin: {
+                description: 'Preferred display language for the CMS interface.',
+            },
+            options: [
+                { label: 'English', value: 'en' },
+                { label: 'Bahasa Melayu', value: 'ms' },
+            ],
+        },
+        {
             name: 'lastLoginAt',
             type: 'date',
             admin: { readOnly: true },

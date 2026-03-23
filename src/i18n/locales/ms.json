@@ -364,5 +364,14 @@
     "cms": {
         "profile": "Profil",
         "logout": "Log Keluar"
+    },
+    "plural": {
+        "issue":   { "one": "{count} isu",          "other": "{count} isu" },
+        "order":   { "one": "{count} pesanan",       "other": "{count} pesanan" },
+        "keyword": { "one": "{count} kata kunci",    "other": "{count} kata kunci" },
+        "page":    { "one": "{count} halaman",       "other": "{count} halaman" },
+        "product": { "one": "{count} produk",        "other": "{count} produk" },
+        "fix":     { "one": "{count} pembaikan digunakan", "other": "{count} pembaikan digunakan" },
+        "result":  { "one": "{count} keputusan",     "other": "{count} keputusan" }
     }
 }

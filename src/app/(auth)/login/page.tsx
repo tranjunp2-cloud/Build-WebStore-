@@ -11,7 +11,7 @@ import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useI18n } from '@/i18n'
+import { useI18n, syncLocaleFromDB } from '@/i18n'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 const loginSchema = z.object({
@@ -26,7 +26,7 @@ function LoginFormContent() {
     const searchParams = useSearchParams()
     const redirectUrl = searchParams.get('returnUrl') || '/dashboard'
     const [showPassword, setShowPassword] = useState(false)
-    const { t } = useI18n()
+    const { t, setLocale } = useI18n()
 
     const {
         register,
@@ -77,6 +77,9 @@ function LoginFormContent() {
             toast.success(t.auth.success.welcomeBackTitle, {
                 description: t.auth.success.redirecting,
             })
+
+            // BR-04: Override localStorage with DB preference after login
+            await syncLocaleFromDB(setLocale)
 
             router.push(redirectUrl)
             router.refresh()
