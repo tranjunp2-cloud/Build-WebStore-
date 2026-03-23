@@ -128,71 +128,27 @@ Checkout → "Choose payment method"
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình Checkout Payment Selection (Storefront)
 - **Mô tả:** Màn hình thanh toán bên phí khách hàng (Buyer).
 - **Components chính:**
   - Khối Phương thức thanh toán (Radio group): "FPX (Online Banking)", "Credit/Debit Card", "E-wallet".
   - Khi chọn FPX: Hiển thị Bank Selection Dropdown.
   - Khối Order Summary (Bên phải/Dưới): Phân rã Total (Subtotal, Shipping, SST). Bấm [Pay Now].
-- **Wireframe:**
-```text
-┌─ Payment Method ──────────────────────┐
-│  ⦿ 🏦 FPX (Online Banking)           │
-│     Select your bank: [Maybank ▼]     │
-│  ○ 💳 Credit/Debit Card              │
-│  ○ 📱 E-wallet (Wave 7)              │
-│                                        │
-│  Subtotal: RM 189.00                  │
-│  Shipping: RM 8.00                    │
-│  SST (6%): RM 11.82                  │
-│  Total:    RM 208.82                  │
-│                                        │
-│  [Pay Now — RM 208.82]                │
-└────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Seller Payment Settings (CMS Dashboard)
 - **Mô tả:** Nơi chủ shop bật tắt phương thức thanh toán cho Storefront.
-- **Wireframe:**
-```text
-┌─ Payment Settings ──────────────────────────┐
-│  Configure how you receive money:           │
-│                                             │
-│  [✓] 💳 Credit/Debit Card (Stripe)         │
-│      Allow Visa, Mastercard.                │
-│                                             │
-│  [✓] 🏦 Online Banking (FPX)               │
-│      Allow Maybank, CIMB, RHB, etc.         │
-│                                             │
-│  [ ] 💵 Cash on Delivery (COD)             │
-│      Pay when item arrives.                 │
-│                                             │
-│  [ Save Settings ]                          │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Mobile View (Checkout Payment & Config)
 - **Mô tả:** Màn hình Checkout Payment cho khách mua hàng trên giao diện dọc điện thoại, và trang Settings bật/tắt Payment cho chủ shop.
-- **Wireframe (Storefront Mobile):**
-```text
-┌─ Mobile Checkout: Payment ──────────────────┐
-│ [←] Back         [🔒 Secure]                │
-│ ─────────────────────────────────────────── │
-│ Phương thức thanh toán:                     │
-│ ┌────────────────────────────────────────┐  │
-│ │ ⦿ 🏦 FPX (Online Banking)              │  │
-│ │   [ Chọn Ngân hàng ▼ ]                   │  │
-│ ├────────────────────────────────────────┤  │
-│ │ ○ 💳 Thẻ Tín dụng/Ghi nợ               │  │
-│ ├────────────────────────────────────────┤  │
-│ │ ○ 📱 E-wallet (Wave 7)                 │  │
-│ └────────────────────────────────────────┘  │
-│                                             │
-│ ─────────────────────────────────────────── │
-│ Tổng thanh toán: RM 208.82                  │
-│ [ THÀNH TOÁN NGAY ]                         │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe (Storefront Mobile):**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.4. Các trạng thái UI (UI States) & Modals
 - **Loading State:** Nút "Pay Now" hiển thị Spinner và text "Processing...". Khi submit thành công có thể hiện một màng mờ overlay toàn trang "Redirecting to your bank...".
@@ -200,6 +156,7 @@ Checkout → "Choose payment method"
 - **Success State:** Redirect tự động về Order Confirmation Page.
 
 ---
+
 
 ## 11. Acceptance Criteria
 

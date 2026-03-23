@@ -299,6 +299,10 @@ export type BlockMeta = {
 > Tính năng này là infrastructure rendering blocks, không có màn hình UI riêng. 
 > Block rendering sẽ phụ thuộc vào layout của F01 (Builder), F05 (Editor) và F09 (Storefront).
 
+
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ## 11. 9-Point Done Checklist
 
 - [ ] Loading State — Block skeleton while rendering (n/a for SSR)

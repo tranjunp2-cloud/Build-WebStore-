@@ -176,6 +176,9 @@ User action:
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Split-Screen Editor)
 - **Mô tả:** Màn hình làm việc chính khi chỉnh sửa trang web.
 - **Components chính:**
@@ -183,99 +186,27 @@ User action:
   - Left Panel (Chat & Blocks): Tab quản lý library blocks và chat AI thao tác.
   - Center Panel (Live Preview): Iframe sandbox hiển thị nội dung website đang chỉnh sửa.
   - Right Panel (Contextual Settings): Global Settings hoặc Settings riêng của block đang click.
-- **Wireframe:**
-```text
-┌─ /editor/:siteId ──────────────────────────────────────────┐
-│ ┌─ Toolbar ────────────────────────────────────────────────────────────┐ │
-│ │ [Pages ▼] [Templates 🎨] [Undo] [Redo] [Màn hình 💻▼] [👁] [🚀 Publish] │ │
-│ └──────────────────────────────────────────────────────────────────────┘ │
-│ ┌────────────┐ ┌─────────────────────────┐ ┌──────────────┐│
-│ │ 🛠 BLOCKS / │ │  LIVE PREVIEW (iframe)  │ │ ⚙️ SETTINGS  ││
-│ │ 🤖 CHAT    │ │                         │ │ (Contextual) ││
-│ │ -----------│ │  [Global Header]        │ │--------------││
-│ │ ├ Navbar   │ │  [Hero] ← Click!        │ │ *If Hero:*   ││
-│ │ ├ Banner   │ │       ┌─────────────┐   │ │ - Background ││
-│ │ ├ Carousel │ │       │ ✨ Edit with│   │ │ - Colors     ││
-│ │ ├ Product  │ │       │    AI       │   │ │--------------││
-│ │ ├ Form     │ │       └─────────────┘   │ │ *If None:*   ││
-│ │ (Drag ⠿)   │ │  [Features] [About]     │ │ - Store Name ││
-│ │            │ │  [Global Footer]        │ │ - Phone/Email││
-│ │            │ │                         │ │ - Social URL ││
-│ │            │ │                         │ │ - SEO Data   ││
-│ └────────────┘ └─────────────────────────┘ └──────────────┘│
-└────────────────────────────────────────────────────────────┘
-
-**Wireframe Mobile (< 768px): Overlay Floating Chat & Bottom Sheet**
-```text
-┌─ 📱 Mobile Browser ─────────────────────────┐
-│ [≡] My Webstore          [👁] [🚀 Publish] │
-│ ─────────────────────────────────────────── │
-│                                             │
-│  [Hero Block]                               │
-│  Let us help you build...                   │
-│                                             │
-│  [Features Block]                           │
-│  ...                                        │
-│                                             │
-│                  ─────────────              │
-│                  [✨ AI Chat ] (FAB button) │
-│                  ─────────────              │
-└─────────────────────────────────────────────┘
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]text
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 Khi Tap vào một Element (Ví dụ: Hero Text), Bottom Sheet mở lên:
-┌─ 📱 Mobile Browser ─────────────────────────┐
-│  Let us help you build... (Text being edite │
-│                                             │
-│ ╭─────────────────────────────────────────╮ │
-│ │ ⚙️ Text Options                  [X]    │ │
-│ │ ─────────────────────────────────────── │ │
-│ │  [✨ Edit with AI]                      │ │
-│ │  [ B ] [ I ] [ U ] [ H1 ▼ ] [ ≡ ]       │ │
-│ │  [ Khóa thay đổi ]                      │ │
-│ ╰─────────────────────────────────────────╯ │
-└─────────────────────────────────────────────┘
-```
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Các màn hình phụ & Modals (Sub-screens & Modals)
 
-- **Wireframe (Page Manager Modal):**
+- **Design / Wireframe (Page Manager Modal):**
 ```text
-┌─ 📄 Page Manager ─────────────────────────[X]┐
-│                                              │
-│  [+ Thêm trang mới]                          │
-│                                              │
-│  Tên Trang          Trạng thái     Hành động │
-│  ------------------------------------------- │
-│  🏠 Homepage        [Published]    [Edit]    │
-│  ℹ️ About Us        [Draft]        [Edit][🗑]│
-│  🛍️ Products        [Published]    [Edit][🗑]│
-│  📞 Contact         [Published]    [Edit][🗑]│
-│                                              │
-└──────────────────────────────────────────────┘
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
-- **Wireframe (Inline Edit & Context Settings):**
+- **Design / Wireframe (Inline Edit & Context Settings):**
 ```text
 [Trên Live Preview - Khi Hover/Click vào Text]
 
- ┌─────────────────────────────────┐
- │ B  I  U  [H1 ▼]  ≡  =  Ξ  [🔗]  │  (Floating Formatting Toolbar)
- └─────────────────────────────────┘
-  Let us help you build...
-                                    [✨ Edit with AI] (Nút góc phải của Block)
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 [Right Sidebar - Cấu hình Component / Global]
-┌─ ⚙️ Settings ─────────────────────┐
-│ 📍 Global Settings                │
-│ --------------------------------- │
-│ Tên Website: [ PrimeWeb ]         │
-│ Logo: [ Upload Image 🖼️ ]         │
-│ Facebook URL: [ https://... ]     │
-│ SEO Meta Title:                   │
-│ [ _________________ ]  [✨ Auto ] │
-└───────────────────────────────────┘
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Các trạng thái UI (UI States)
 - **Loading State:** Thấy Skeleton frame cho preview khi mở Editor; typing indicator khi AI chat response.
@@ -283,6 +214,7 @@ Khi Tap vào một Element (Ví dụ: Hero Text), Bottom Sheet mở lên:
 - **Success State:** Toast màu xanh báo Apply thay đổi thành công, hiển thị nút "Undo" nổi bật.
 
 ---
+
 
 ## 11. Acceptance Criteria
 

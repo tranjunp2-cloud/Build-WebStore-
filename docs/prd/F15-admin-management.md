@@ -115,99 +115,37 @@ Xây dựng module **Admin Management** tập trung, hoạt động độc lập
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình Dashboard (Overview Metrics)
 - **Mô tả:** Màn hình chào ngay khi Admin đăng nhập, theo dõi KPI SaaS.
 - **Components chính:**
   - Khu vực Overview Cards: MRR, Active Workspaces, Churn Rate (Của tháng này so với tháng trước).
   - Biểu đồ Bar/Line Chart (doanh thu theo kế hoạch).
   - Nút thao tác nhanh (Quick Actions): "Broadcast message", "Add Promotion".
-- **Wireframe:**
-```text
-┌─ Super Admin ───────────────────────────────────────────┐
-│ ┌─ Sidebar ────────┐ ┌─ Dashboard ─────────────────────┐│
-│ │ 📊 Overview      │ │ [MRR: $12K ↑] [Users: 15K ↑]    ││
-│ │ 🏢 Workspaces    │ │                                 ││
-│ │ 💳 Subscriptions │ │ ( ) MTD Revenue Chart          ││
-│ │ 🎟️ Promotions    │ │                                 ││
-│ │ 📢 Broadcasts    │ │ Recent Signups Table:           ││
-│ │ 🛡️ Audit Logs    │ │ 1. Kopi Shop (Standard)         ││
-│ └──────────────────┘ └─────────────────────────────────┘│
-└─────────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Data List (Các danh sách quản lý)
 - **Mô tả:** Format chung cho các màn hình Workspaces / Promotions / Subscriptions ...
 - **Components chính:**
   - Header with Actions: Nút [+ Thêm Mới Khuyến Mãi] hoặc Search Box.
   - Data Grid / Table: Hiển thị đầy đủ cột trạng thái, phân trang, có cột Action (Edit/Impersonate/Delete).
-- **Wireframe (Ví dụ màn Workspaces):**
-```text
-┌─ Workspaces Management ─────────────────────────────┐
-│  🔍 Search by ID/Email [Filter by Tier ▼]           │
-│  ────────────────────────────────────────────────── │
-│  ID │ Tenant Name │ Owner Email  │ Tier   │ Action  │
-│  1  │ Kopi Shop   │ owner@...    │ Pro    │ [👁] [🔑]│
-│  2  │ Fashion MY  │ fah@...      │ Starter│ [👁] [🔑]│
-│ * Lệnh 🔑 (Impersonate) đòi Pass Admin               │
-└─────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe (Ví dụ màn Workspaces):**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Các trạng thái UI (UI States) & Modals
 - **Impersonating State:** Khi Admin mượn quyền user (Ấn nút 🔑), Top Global Header của ứng dụng sẽ đổi sang HỒNG RỰC hoặc CÓ BANNER ĐỎ "You are impersonating [Tenant Name] - X Tắt", để Admin ý thức được mình đang thao tác dữ liệu khách.
 - **Modals:** Form tạo/sửa Subscription Tier là Sidebar Drawer lớn; Form tạo Promo Code hiển thị dạng Center Modal nhỏ; Modal Re-Authenticate Yêu cầu nhập mật khẩu bảo vệ ở những action cực nhạy cảm (Sửa giá Tier).
 
 ### 10.4. Màn hình phụ & Chuyên sâu (Sub-screens)
-- **Wireframe (SaaS Subscription Tier Config Modal):**
-```text
-┌─ Configure Tier: [Professional] ────────────[X]┐
-│                                                │
-│  Biểu phí (Pricing)                            │
-│  Monthly: [ $49.00 ]     Yearly: [ $490.00 ]   │
-│                                                │
-│  Giới hạn tĩnh (Limits)                        │
-│  Max Products: [ Unlimited ]                   │
-│  Max Staff Accounts: [ 10 ]                    │
-│  Storage (GB): [ 50 ]                          │
-│                                                │
-│  Tính năng (Features Toggle)                   │
-│  [✓] Priority Support                          │
-│  [✓] Custom Domain                             │
-│  [✓] Advanced Analytics                        │
-│                                                │
-│  [ Bỏ qua ]                       [ Lưu Data ] │
-└────────────────────────────────────────────────┘
-
-### 10.5. Mobile View (SaaS Dashboard & Support)
-- **Mô tả:** Giao diện tối ưu cho Admin thao tác trên màn hình điện thoại (VD: Khi đi ra ngoài cần cấp quyền, support gấp).
-- **Wireframe:**
-```text
-┌─ Super Admin (Mobile) ────────┐
-│ [☰] [Logo]             [🔔] │
-│ ─────────────────────────── │
-│ Dashboard                   │
-│ ┌─────────────────────────┐ │
-│ │ MRR: $12K ↑             │ │
-│ └─────────────────────────┘ │
-│ ┌─────────────────────────┐ │
-│ │ Active Users: 15K ↑     │ │
-│ └─────────────────────────┘ │
-│                             │
-│ Recent Workspaces           │
-│ ┌─────────────────────────┐ │
-│ │ #1 Kopi Shop (Pro)      │ │
-│ │ owner@kopi.com          │ │
-│ │ [👁 View] [🔑 Impersonate]│ │
-│ └─────────────────────────┘ │
-│ ┌─────────────────────────┐ │
-│ │ #2 Fashion MY (Starter) │ │
-│ │ fah@fashion.com.my      │ │
-│ │ [👁 View] [🔑 Impersonate]│ │
-│ └─────────────────────────┘ │
-└─────────────────────────────┘
-```
-```
+- **Design / Wireframe (SaaS Subscription Tier Config Modal):**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]text
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ---
+
 
 ## 11. Open Questions (For Review)
 
