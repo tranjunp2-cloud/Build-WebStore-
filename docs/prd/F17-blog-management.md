@@ -144,12 +144,15 @@ Step 2: Visitor clicks on a Post -> Reads full article at /sites/[slug]/blogs/[p
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Blog List Dashboard)
 - **Mô tả:** Danh sách các bài đăng Blog của cửa hàng.
 - **Components chính:**
   - Toolbar: Nút [+ Create Post]. Search, Filter, Bulk Actions.
   - Data Grid: Cột Title, Status, Date, Action (Edit/Delete).
-- **Wireframe:**
+- **Design / Wireframe:**
 ```text
 [Blog List]
 +---------------------------------------------------+
@@ -168,7 +171,7 @@ Step 2: Visitor clicks on a Post -> Reads full article at /sites/[slug]/blogs/[p
   - Category Select, Slug input.
   - Vùng Rich Text. Cụm nút Magic ✨ "Generate with AI".
   - Khu vực SEO Metadata & Thumbnail Upload bên phải hoặc dưới cùng.
-- **Wireframe:**
+- **Design / Wireframe:**
 ```text
 [Blog Editor]
 +---------------------------------------------------+
@@ -197,22 +200,8 @@ Step 2: Visitor clicks on a Post -> Reads full article at /sites/[slug]/blogs/[p
 - **Loading State:** Dashboard List hiện Skeleton Rows. Editor hiện Skeleton Form Elements khi mở bài cũ.
 - **Error State / Edge Cases:** Validate Title trống (viền đỏ, toast error).
 - **Modals:** Modal Delete Confirmation "Có chắc muốn xóa bài đăng này không?". Modal Category Quản lý (Thêm/Sửa/Xóa category).
-- **Wireframe (AI Text Assistant Modal/Popover):**
-```text
-┌─ ✨ Generate Content ────────────────────────[X]┐
-│  Topic Prompt:                                  │
-│  [ Write a catchy intro for my new coffee... ]  │
-│                                                 │
-│  Tone: [ Professional ▼ ]   Length: [ Short ▼ ] │
-│                                                 │
-│  [ ✨ Generate ]                                │
-│  ────────────────────────────────────────────── │
-│  Result:                                        │
-│  "Welcome to the ultimate coffee experience..." │
-│                                                 │
-│  [ ↻ Regenerate ]             [ Insert to Post ]│
-└─────────────────────────────────────────────────┘
-```
+- **Design / Wireframe (AI Text Assistant Modal/Popover):**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.4. Màn hình Public Blog List (Storefront)
 - **Mô tả:** Danh sách bài viết blog dành cho khách hàng truy cập từ Storefront.
@@ -221,27 +210,8 @@ Step 2: Visitor clicks on a Post -> Reads full article at /sites/[slug]/blogs/[p
   - List/Grid layout các bài đã Publish. Mỗi card gồm Thumbnail, Title, Date, Category.
   - Sidebar hoặc Tags chứa danh sách Categories để lọc.
   - Phân trang (Pagination) hoặc Load More.
-- **Wireframe:**
-```text
-┌─ /sites/[slug]/blogs ──────────────────────────────┐
-│ [ Storefront Header & Menu ]                       │
-│ ────────────────────────────────────────────────── │
-│ ┌─ CATEGORIES ──┐ ┌─ LATEST ARTICLES ────────────┐ │
-│ │ ├ All Posts   │ │ ┌─────────┐ ┌─────────┐      │ │
-│ │ ├ Promosi     │ │ │ [Image] │ │ [Image] │      │ │
-│ │ ├ Berita      │ │ │ Title A │ │ Title B │      │ │
-│ │ └ Tips        │ │ │ Oct 12  │ │ Oct 10  │      │ │
-│ │               │ │ └─────────┘ └─────────┘      │ │
-│ │               │ │ ┌─────────┐ ┌─────────┐      │ │
-│ │               │ │ │ [Image] │ │ [Image] │      │ │
-│ │               │ │ │ Title C │ │ Title D │      │ │
-│ │               │ │ │ Oct 05  │ │ Oct 01  │      │ │
-│ │               │ │ └─────────┘ └─────────┘      │ │
-│ │               │ │  < [1] [2] [3] >             │ │
-│ └───────────────┘ └──────────────────────────────┘ │
-│ [ Storefront Footer ]                              │
-└────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.5. Màn hình Public Blog Detail (Storefront)
 - **Mô tả:** Màn hình đọc bài viết chi tiết dành cho khách hàng (End-user).
@@ -250,66 +220,16 @@ Step 2: Visitor clicks on a Post -> Reads full article at /sites/[slug]/blogs/[p
   - Post Title, Publish Date, Category tag.
   - Rich Text Content (Bài viết được định dạng theo HTML từ CMS).
   - Nút Back to Blogs, và "Share" buttons (nếu có).
-- **Wireframe:**
-```text
-┌─ /sites/[slug]/blogs/[post-slug] ──────────────────┐
-│ [ Storefront Header & Menu ]                       │
-│ ────────────────────────────────────────────────── │
-│ < Back to Blogs        [Category: Tips]            │
-│ ────────────────────────────────────────────────── │
-│                                                    │
-│  Làm thế nào để pha cà phê ngon tại nhà?           │
-│  Published: Oct 12, 2023                           │
-│                                                    │
-│  [       L A R G E   T H U M B N A I L       ]     │
-│                                                    │
-│  Pha cà phê ngon không chỉ cần nguyên liệu tốt...  │
-│                                                    │
-│  1. Chọn hạt cà phê                                │
-│  Hạt cà phê Arabica thường có vị chua thanh...     │
-│  ...                                               │
-│ ────────────────────────────────────────────────── │
-│ [ Storefront Footer ]                              │
-└────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.4. Mobile View (On-the-go Blog Editor)
 - **Mô tả:** Khi user sửa bài blog bằng điện thoại, toolbar định dạng văn bản (B, I, U, Link) sẽ trượt xuống "sticky" dính ngay trên mép bàn phím ảo. AI Generator hiển thị dạng Bottom Sheet thay cho Modal popover.
-- **Wireframe:**
-```text
-┌─ Mobile Blog Editor ──────────┐
-│ [←] Edit    [Unpublish][Save] │
-│ ───────────────────────────── │
-│ Title: Welcome to my store    │
-│                               │
-│ Content:                      │
-│ We are very excited to ...    │
-│ |(Cursor)                     │
-│                               │
-│                               │
-│ ───────────────────────────── │
-│ [B] [I] [U] [Link] [✨ AI]    │ (Sticky Toolbar)
-│ ┌───────────────────────────┐ │
-│ │ 1 2 3 4 5 6 7 8 9 0       │ │
-│ │ Q W E R T Y U I O P       │ │ (Virtual Keyboard)
-│ │  A S D F G H J K L        │ │
-│ │   Z X C V B N M           │ │
-│ └───────────────────────────┘ │
-└───────────────────────────────┘
-
-┌─ AI Assist (Bottom Sheet) ────┐
-│ ✨ Generate Content       [X] │
-│ ───────────────────────────── │
-│ Topic: [ Catchy intro... ]    │
-│ [ ✨ Generate ]               │
-│                               │
-│ Result: "Welcome to..."       │
-│                               │
-│ [Insert] [Regenerate]         │
-└─────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ---
+
 
 ## 11. Acceptance Criteria
 

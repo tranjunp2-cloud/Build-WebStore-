@@ -92,27 +92,20 @@ Auto-save debounce 3s, manual save (Ctrl+S), save status indicator (Saved Xs ago
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Save Status Indicator)
 - **Mô tả:** Khu vực nhỏ hiển thị trạng thái lưu trữ đám mây.
 - **Components chính:**
   - Status Text / Icon Box: Dạng một Text Label nằm cạnh nút [Publish], kèm theo Icon cloud/check.
-- **Wireframe:**
-```text
-┌────────────────────────────────────────────────────────┬─────┐
-│ Editor Toolbar ...             [☁️ Saving...]          │ [🚀]│
-└────────────────────────────────────────────────────────┴─────┘
-                            hoặc [✅ Saved 2 mins ago]
-                            hoặc [⚠️ Nút Thử Lại] (Chữ đỏ)
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Mobile View (Tiny Cloud Status)
 - **Mô tả:** Indicator siêu nhỏ gọn trên thanh menu bar của Mobile Editor. Thay vì hiện chữ "Saved", chỉ hiện 1 icon mây đánh dấu tick xanh.
-- **Wireframe:**
-```text
-┌─ Mobile AI Editor ──────────────────────────┐
-│ [≡] Website      [☁️✔]  [Preview][Publish]  │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Các trạng thái UI (UI States) & Modals
 - **Idle/Saved (Success State):** Biểu tượng Checkmark Cloud, text màu xám dịu ghi rõ timestamp: "Saved 2 mins ago" hoặc "Saved just now".
@@ -169,3 +162,4 @@ const RETRY_DELAYS = [5000, 10000, 20000]
 - [ ] Retry with backoff: 3 attempts
 - [ ] Draft recovery works
 - [ ] Mobile status bar visible
+

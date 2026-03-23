@@ -30,7 +30,12 @@ export async function generateSiteWithAI(
     language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     const events: SSEEvent[] = []
-    const promptText = `${businessInfo.businessName} - ${businessInfo.industry}`
+    const promptText = [
+        businessInfo.businessName,
+        businessInfo.industry,
+        businessInfo.shortDescription,
+        businessInfo.products,
+    ].join(' | ')
 
     const openai = getOpenAI()
     if (!openai) {
@@ -381,5 +386,4 @@ function sanitizeBlockData(block: any): any {
 
     return s
 }
-
 

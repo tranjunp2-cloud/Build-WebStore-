@@ -135,6 +135,8 @@ Step 2: [User inputs / selects ...]
 > **[Global CMS Constraint]** Đối với các tính năng quản trị, yêu cầu bắt buộc phải render bên trong Main Content Area của F18 CMS Layout (ngoại trừ các tính năng đặc thù cần Full-screen Editor).
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
 
 ### 10.1. Màn hình chính (Main Screen: List / Overview / Homepage)
 - **Mô tả:** [Mục đích của màn hình, ví dụ: Hiển thị danh sách items]
@@ -143,20 +145,16 @@ Step 2: [User inputs / selects ...]
   - Filter/Search bar: [Các fields filter, tìm kiếm]
   - Data Table / Grid / View: [Các columns, data hiển thị]
   - Pagination / CTA: [Phân trang hoặc action chính]
-- **Wireframe:**
-  ```text
-  [ASCII wireframe for Main Screen]
-  ```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Chi tiết / Tạo mới (Detail / Create / Edit Screen)
 - **Mô tả:** [Mục đích của màn hình]
 - **Components chính:**
   - Form fields: [Các trường nhập liệu, validation]
   - CTAs: [Save, Cancel, Delete, Stepper]
-- **Wireframe:**
-  ```text
-  [ASCII wireframe for Detail Screen]
-  ```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Các trạng thái UI (UI States) & Modals
 - **Empty State:** [Nội dung, Icon, Action Call-to-action khi không có dữ liệu]
