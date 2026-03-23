@@ -98,7 +98,7 @@ describe('AI Streaming APIs', () => {
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
                  method: 'POST',
                  body: JSON.stringify({ 
-                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread' }
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
                  })
              })
              const res = await GenerateSitePOST(req)
@@ -108,14 +108,15 @@ describe('AI Streaming APIs', () => {
              expect(result.success).toBe(true)
              expect(result.siteName).toBe('AI Bakery')
              expect(mockSiteDB.length).toBe(1) // A site was created
-             expect(mockPageDB.length).toBe(1) // A homepage was created
+             expect(mockPageDB.length).toBe(4) // Homepage, About, Products, Contact
+             expect(result.totalPages).toBe(4)
         })
 
         it('returns text/event-stream response for SSE mode when stream=true', async () => {
              const req = new NextRequest('http://localhost:3000/api/ai/generate-site?stream=true', {
                  method: 'POST',
                  body: JSON.stringify({ 
-                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread' }
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
                  })
              })
              const res = await GenerateSitePOST(req)
