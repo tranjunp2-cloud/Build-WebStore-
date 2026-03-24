@@ -2,8 +2,8 @@
 
 > **Epic:** Orders Management
 > **Feature Code:** F10
-> **Figma Design:** [Link] (Updating)
-> **Figma Prototype:** [Link] (Updating)
+> **Figma Design:** [\[Link\] (Updating)](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30955-193&t=uZzasU8b0pQAt0lH-4)
+> **Figma Prototype:** [\[Link\] (Updating)](https://www.figma.com/make/Y48xuOh2gMCid2UmqOAFys/F01-ai-chat-builder-demo?fullscreen=1&t=lSTYBLQUIJcW42vr-1&preview-route=%2Forders)
 
 Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng Quản lý Đơn hàng (F10), bám sát các luồng đã định nghĩa trong PRD và User Stories. Tất cả giao diện tuân thủ **F18 CMS Global Layout** (Sidebar trái và Topbar giữ nguyên).
 
