@@ -144,7 +144,26 @@ SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 - **BR-05:** **[System Pages]** Bắt buộc vô hiệu hóa (Disable) tính năng Ẩn (Hide) và Xóa (Delete) đối với Trang Chủ (Homepage), kèm Tooltip giải thích.
 - **BR-06:** **[System Pages]** Trang 404 (Not Found) chỉ cấp quyền Edit nội dung, KHÔNG cho phép Ẩn, Xóa hoặc thay đổi URL Slug.
 - **BR-07:** **[Offline Fallback]** Tiến trình Auto-save nếu gặp lỗi Mạng (Network Failed) thì phải lưu payload vào LocalStorage (Offline queue), hiển thị trạng thái cảnh báo trên UI và chặn hành vi đóng Tab (window.onbeforeunload).
-- **BR-08:** **[Feature Fallback]** Mọi nút có chức năng "Checkout" hoặc "Thanh Toán" (trong Cart widget / Product block) chỉ hiển thị Toast Message: "Tính năng Checkout đang được phát triển". Không thực hiện trigger redirect gây lỗi 404.
+- **BR-08:** **[Editor Sandbox Protection]** Mọi nút có chức năng "Checkout" hoặc hướng người dùng ra khỏi trang hiện hành (external links, Cart checkout) sẽ bị chặn redirect (Prevent default) khi đang thao tác trong Editor để tránh làm gián đoạn phiên làm việc.
+
+### 8.1. Data Validation & System Limits
+
+Để đảm bảo an toàn hệ thống, tránh UI break và lãng phí token, Editor tuân thủ các quy tắc xác thực dữ liệu (Client-side & Server-side):
+
+| Form Area | Field | Validation Rules | Error / Warning Message |
+|-----------|-------|------------------|-------------------------|
+| **Page Manager** | Page Name | `Required`, `Max limit: 60 chars` | "Page name is required and cannot exceed 60 characters." |
+| | URL Slug | `Required`, `Unique` (trong cùng siteId), `Regex: /^[a-z0-9-]+$/` (Kebab-case) | "Invalid or duplicate URL slug." |
+| | Page Count | `Hard limit:` Tối đa 100 trang / 1 Website (bao gồm cả trang hiển thị và trang ẩn) | "You have reached the maximum limit of 100 pages." |
+| **Global Settings** | Store Name | `Required`, `Max limit: 100 chars` | "Store name is required." |
+| | Email | `Regex:` Định dạng Email hợp lệ | "Invalid email format." |
+| | Hotline | `Regex:` Số điện thoại hợp lệ (Chỉ số, +, khoảng trắng) | "Invalid phone number format." |
+| | Social Links | `Regex:` Bắt buộc bắt đầu bằng `http://` hoặc `https://` | "URL must start with http:// or https://" |
+| **SEO Settings** | Meta Title | `Soft limit:` Cảnh báo vàng khi > 60 chars | *(Warning)* "Title may be truncated on Google Search." |
+| | Meta Description| `Soft limit:` Cảnh báo vàng khi > 160 chars | *(Warning)* "Description may be truncated on Google Search." |
+| **Multimedia Content**| Image Upload | `Hard limit:` Tối đa 10MB/file. `Allow:` .jpg, .png, .webp, .svg, .gif | "File is too large or invalid format. Max 10MB allowed." |
+| **Header Menu** | Sub-Menu Depth | `Hard limit:` Menu lồng nhau tối đa 2 cấp (1 parent, 1 child) | "Only 1 level of nested submenu is supported." |
+| **AI Chat** | Prompt Input | `Hard limit:` Max 500 chars/request. `Rate limit:` 5 request/phút. | "Prompt exceeds 500 characters. Please shorten it." |
 
 ---
 
@@ -174,39 +193,18 @@ User action:
 
 > **[Global CMS Constraint]** Tính năng Editor là một ngoại lệ do cần không gian tối ưu cho live preview, màn hình này chiếm toàn bộ diện tích trình duyệt.
 
-> **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
+### 10.1. Nguồn Design Files
+Toàn bộ UI Component và Layout chi tiết cho Editor được định nghĩa chung trong các tài liệu thiết kế sau:
+- [F05 Base Wireframes](../design/F05-wireframe-lowfi.md)
+- [F05 AI Editor High-Fidelity Design](../design/F05-ai-editor-design.md)
 
-> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
-> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
-
-### 10.1. Màn hình chính (Split-Screen Editor)
+### 10.2. Màn hình chính (Split-Screen Editor)
 - **Mô tả:** Màn hình làm việc chính khi chỉnh sửa trang web.
 - **Components chính:**
   - Header Toolbar: Nút điều hướng Pages, Templates, Undo/Redo, Viewport Toggle, Publish.
   - Left Panel (Chat & Blocks): Tab quản lý library blocks và chat AI thao tác.
   - Center Panel (Live Preview): Iframe sandbox hiển thị nội dung website đang chỉnh sửa.
   - Right Panel (Contextual Settings): Global Settings hoặc Settings riêng của block đang click.
-- **Design / Wireframe:**
-  - [Link tới file wireframe/design trong thư mục docs/design/...]text
-  - [Link tới file wireframe/design trong thư mục docs/design/...]
-
-Khi Tap vào một Element (Ví dụ: Hero Text), Bottom Sheet mở lên:
-  - [Link tới file wireframe/design trong thư mục docs/design/...]
-
-### 10.2. Các màn hình phụ & Modals (Sub-screens & Modals)
-
-- **Design / Wireframe (Page Manager Modal):**
-```text
-  - [Link tới file wireframe/design trong thư mục docs/design/...]
-
-- **Design / Wireframe (Inline Edit & Context Settings):**
-```text
-[Trên Live Preview - Khi Hover/Click vào Text]
-
-  - [Link tới file wireframe/design trong thư mục docs/design/...]
-
-[Right Sidebar - Cấu hình Component / Global]
-  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Các trạng thái UI (UI States)
 - **Loading State:** Thấy Skeleton frame cho preview khi mở Editor; typing indicator khi AI chat response.
@@ -300,10 +298,10 @@ THEN  trạng thái Saving (Icon góc trên) đổi màu đỏ báo lỗi
   AND dữ liệu tạm được queue vào bộ nhớ LocalStorage
   AND kích hoạt popup cảnh báo của trình duyệt nếu user nhấn nút Close Tab (window.onbeforeunload)
 
-GIVEN user đang trải nghiệm Widget Giỏ hàng (Cart)
-WHEN  bấm vào nút chức năng "Checkout / Mua hàng"
-THEN  hệ thống hiển thị Toast báo: "Tính năng thanh toán đang được phát triển cho bản sau"
-  AND ngăn chặn (Prevent default) mọi hành vi Redirect ra khỏi Editor gây lỗi 404
+GIVEN user click vào external link hoặc nút Checkout bên trong Editor Preview
+WHEN  bấm vào nút chức năng đó
+THEN  ngăn chặn hành vi Redirect (Prevent default) để tránh làm mất trạng thái phiên làm việc hiện tại
+  AND hệ thống hiển thị Toast báo: "Navigation is disabled inside the Editor."
 ```
 
 ---
@@ -368,7 +366,7 @@ iframe → Parent: BLOCK_CLICKED, BLOCK_HOVERED (with rect position)
 - [ ] Loading State — Skeleton preview, typing indicator chat
 - [ ] Empty State — Welcome + suggestion prompts in chat
 - [ ] Error State — Toast + retry cho AI failures
-- [ ] Form Validation — N/A (chat input)
+- [ ] Form Validation — Áp dụng toàn bộ rules tại mục `8.1. Data Validation`.
 - [ ] Button States — Send disabled during streaming, Undo/Redo greyed khi empty
 - [ ] Toast Feedback — Success/Error cho all actions
 - [ ] Auth Redirect — 401 → /login
