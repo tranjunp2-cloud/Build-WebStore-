@@ -2,6 +2,8 @@
 
 > **Epic:** Product Management
 > **Feature Code:** F08
+> **Figma Design:** [Link](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30882-5801&t=nJsYvzayVPDFNauW-1)
+> **Figma Prototype:** [Link](https://www.figma.com/make/Y48xuOh2gMCid2UmqOAFys/F01-ai-chat-builder-demo?fullscreen=1&t=H2flt0KzPPelcSG7-1&preview-route=%2Fproducts)
 
 Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng Quản lý Sản phẩm (F08), bám sát các luồng đã định nghĩa trong PRD và User Stories. Tất cả giao diện tuân thủ **F18 CMS Global Layout** (Sidebar trái và Topbar giữ nguyên).
 
