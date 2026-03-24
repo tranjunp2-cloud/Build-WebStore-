@@ -99,7 +99,8 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 │              │ │ 🔲 Sản phẩm có nhiều Tuỳ chọn/Biến thể│ │
 │              │ │                                      │ │
 │              │ │ (Nếu KHÔNG Tích checkbox trên)       │ │
-│              │ │ Giá bán  : [ RM 0.00 ]               │ │
+│              │ │ Giá bán thực : [ RM 0.00 ]           │ │
+│              │ │ Giá KM (C.a.P):[ RM 0.00 ]           │ │
 │              │ │ Tồn Kho  : [ 0       ]               │ │
 │              │ │ SKU Code : [         ]               │ │
 │              │ │                                      │ │
@@ -111,6 +112,11 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 │              │ │ | Variant  | SKU Code | Price | Stock| │
 │              │ │ | Đỏ - M   | [      ] | [   ] | [  ] | │
 │              │ │ | Đỏ - L   | [      ] | [   ] | [  ] | │
+│              │ └──────────────────────────────────────┘ │
+│              │                                          │
+│              │ ┌─ 2.5. VẬN CHUYỂN & ĐÓNG GÓI ─────────┐ │
+│              │ │ Cân nặng (kg) : [        ]           │ │
+│              │ │ Kích thước (DxRxC cm): [ ]x[ ]x[ ]   │ │
 │              │ └──────────────────────────────────────┘ │
 │              │                                          │
 │              │ ┌─ 3. MÔ TẢ & THUỘC TÍNH MỞ RỘNG (SEO) ┐ │
@@ -177,6 +183,7 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 ---
 
 ## 5. UI States & Cảnh Báo
-1. **Low Stock / Out of Stock (🔴):** Nếu tồn kho (Stock) = 0, ô text sẽ highlight chói (Đỏ) trên Dashboard quản trị để thu hút cự chú ý. *Lưu ý: Không tự động chuyển SP thành Draft.*
-2. **Missing Validations:** Nếu bấm lưu mà thiếu Tên, Giá, Stock hoặc SKU của Biến thể, Input sẽ viền Đỏ kèm dòng chữ: `Trường này là bắt buộc`.
-3. **Draft Fallback:** Tất cả các hành động Create (Thủ công hoặc Bulk AI) sẽ mặc định sinh ra trạng thái **[📝 Draft]**. Nút *Publish* ở Form Edit phải do thao tác ấn chủ động để bật SP lên F09 Storefront.
+1. **Empty State:** Dùng component "No Data" chung cho list Products. Hiển thị Illustration khay hàng trống, dòng text "Chưa có sản phẩm nào" và nút CTA "Tạo Sản Phẩm" để mời gọi user.
+2. **Low Stock / Out of Stock (🔴):** Nếu tồn kho (Stock) = 0, ô text sẽ highlight chói (Đỏ) trên Dashboard quản trị để thu hút cự chú ý. *Lưu ý: Không tự động chuyển SP thành Draft.*
+3. **Missing Validations:** Nếu bấm lưu mà thiếu Tên, Giá, Stock hoặc SKU của Biến thể, Input sẽ viền Đỏ kèm dòng chữ: `Trường này là bắt buộc`.
+4. **Draft Fallback:** Tất cả các hành động Create (Thủ công hoặc Bulk AI) sẽ mặc định sinh ra trạng thái **[📝 Draft]**. Nút *Publish* ở Form Edit phải do thao tác ấn chủ động để bật SP lên F09 Storefront.
