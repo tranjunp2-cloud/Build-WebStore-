@@ -10,8 +10,10 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     container_name: primeweb-app
+    env_file:
+      - .env
     ports:
-      - "3005:3000"
+      - '3005:3000'
     environment:
       - DATABASE_URI=postgresql://primeweb:primeweb_secret@postgres:5432/primeweb
       - PAYLOAD_SECRET=primeweb-dev-secret-2026
@@ -23,7 +25,6 @@ services:
       - S3_ACCESS_KEY_ID=minioadmin
       - S3_SECRET_ACCESS_KEY=minioadmin
       - S3_REGION=us-east-1
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
       - MAIL_USERNAME=${MAIL_USERNAME}
@@ -46,7 +47,7 @@ services:
     image: postgres:16-alpine
     container_name: primeweb-db
     ports:
-      - "5433:5432"
+      - '5433:5432'
     environment:
       POSTGRES_DB: primeweb
       POSTGRES_USER: primeweb
@@ -54,7 +55,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U primeweb" ]
+      test: ['CMD-SHELL', 'pg_isready -U primeweb']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -67,8 +68,8 @@ services:
     image: minio/minio:latest
     container_name: primeweb-storage
     ports:
-      - "9000:9000" # API
-      - "9001:9001" # Console UI
+      - '9000:9000' # API
+      - '9001:9001' # Console UI
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -100,7 +101,6 @@ volumes:
   postgres_data:
   minio_data:
   node_modules:
-
 
 networks:
   primeweb-net:

@@ -16,12 +16,26 @@ type EditorSnapshot = {
     timestamp: number
 }
 
+export type PageData = {
+    id: string
+    title: string
+    slug: string
+    status: 'published' | 'draft'
+    isVisible: boolean
+    deletedAt?: string | null
+    updatedAt: string
+}
+
 type EditorState = {
     // Data
     siteId: string | null
     blocks: BlockData[]
     theme: any
     siteName: string
+
+    // Pages (F-05-02)
+    pages: PageData[]
+    currentPageId: string | null
 
     // History (F-06)
     history: EditorSnapshot[]
@@ -39,6 +53,13 @@ type EditorState = {
 type EditorActions = {
     // Init
     init: (siteId: string, blocks: BlockData[], theme: any, siteName: string) => void
+
+    // Pages (F-05-02)
+    setPages: (pages: PageData[]) => void
+    setCurrentPageId: (pageId: string) => void
+    addPageToState: (page: PageData) => void
+    updatePageInState: (id: string, data: Partial<PageData>) => void
+    removePageFromState: (id: string) => void
 
     // Block operations (push to history)
     updateBlock: (index: number, changes: Record<string, any>) => void
@@ -80,6 +101,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     blocks: [],
     theme: {},
     siteName: '',
+    pages: [],
+    currentPageId: null,
     history: [],
     historyIndex: -1,
     maxHistory: MAX_HISTORY,
@@ -99,6 +122,18 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             lastSavedAt: null,
         })
     },
+
+    // ── Pages Operations ──────────────────────────────────────────────────
+
+    setPages: (pages) => set({ pages }),
+    setCurrentPageId: (currentPageId) => set({ currentPageId }),
+    addPageToState: (page) => set((state) => ({ pages: [...state.pages, page] })),
+    updatePageInState: (id, data) => set((state) => ({
+        pages: state.pages.map((p) => p.id === id ? { ...p, ...data } : p)
+    })),
+    removePageFromState: (id) => set((state) => ({
+        pages: state.pages.filter((p) => p.id !== id)
+    })),
 
     // ── Block Operations ─────────────────────────────────────────────────
 
@@ -250,6 +285,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     reset: () => set({
         siteId: null, blocks: [], theme: {}, siteName: '',
+        pages: [], currentPageId: null,
         history: [], historyIndex: -1,
         hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
         autoSaveEnabled: true, autoSaveIntervalMs: 3000,
