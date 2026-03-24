@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 
 const WIZARD_STEPS = [
   {
@@ -53,13 +54,14 @@ export function AIDiscoveryWizard() {
           <button 
             onClick={() => setIsOpen(false)}
             className="flex-shrink-0 hover:opacity-80 transition-opacity bg-transparent border-none p-0 m-0 cursor-pointer"
+            aria-label="Close"
           >
-            <img src="/images/f06/wizard/close-btn.svg" alt="Close" className="w-8 h-8" />
+            <Image src="/images/f06/wizard/close-btn.svg" alt="Close" width={32} height={32} className="w-8 h-8" />
           </button>
         </div>
 
         {/* Header Divider Line */}
-        <div className="w-full h-[1px] bg-white/[0.08]" />
+        <hr className="w-full border-t border-white/[0.08]" />
 
         {/* Content Area */}
         <div className="flex flex-col items-center pt-10 px-8 pb-0">
@@ -67,7 +69,7 @@ export function AIDiscoveryWizard() {
           {/* Top: Media Showcase */}
           <div className={`w-full h-[320px] rounded-[16px] bg-gradient-to-br ${stepData.gradient} flex flex-col items-center justify-center p-6 text-center shadow-inner mb-8`}>
              <div className="w-[64px] h-[64px] rounded-[16px] bg-slate-800/80 flex items-center justify-center mb-5 border border-solid border-white/5">
-                <img src={stepData.icon} alt="Feature Illustration" className="w-[32px] h-[32px]" />
+                <Image src={stepData.icon} alt="Feature Illustration" width={32} height={32} className="w-[32px] h-[32px]" />
              </div>
              <p className="text-slate-300 text-[12px] font-mono mb-1 tracking-wide opacity-40">[GIF/Video Illustration]</p>
              <p className="text-slate-300 text-[12px] font-mono opacity-30">Max 500KB</p>
@@ -99,7 +101,7 @@ export function AIDiscoveryWizard() {
         </div>
 
         {/* Footer Divider Line */}
-        <div className="w-full h-[1px] bg-white/[0.08]" />
+        <hr className="w-full border-t border-white/[0.08]" />
 
         {/* Footer */}
         <div className="flex items-center justify-between px-8 py-6">
@@ -125,7 +127,7 @@ export function AIDiscoveryWizard() {
             >
               <span className="flex items-center gap-2">
                 {isLastStep ? "Explore the CMS now" : "Continue"}
-                {!isLastStep && <img src="/images/f06/wizard/continue-icon.svg" alt="Arrow Right" className="w-[14px] h-[14px]" />}
+                {!isLastStep && <Image src="/images/f06/wizard/continue-icon.svg" alt="Arrow Right" width={14} height={14} className="w-[14px] h-[14px]" />}
               </span>
             </button>
           </div>
