@@ -458,6 +458,25 @@ async function main() {
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS current_rank
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS previous_rank
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS last_checked_at
+
+  -- F08 Array/Nested Bypass
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS description_b_m
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS has_variants
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_configs
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS name
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS options
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS value
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS variants
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS sku
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS price
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS compare_at_price
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS stock
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS length
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS width
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS height
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS attributes
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS key
 */
 
 main().catch((e) => {
