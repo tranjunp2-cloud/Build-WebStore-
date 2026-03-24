@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth'
 import OpenAI from 'openai'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -22,8 +23,17 @@ function getOpenAI(): OpenAI | null {
  *   - description: 150–160 characters
  *   - slug: kebab-case, URL-safe
  */
-export const POST = withAuth(async (_user, req) => {
+export const POST = withAuth(async (user, req) => {
     try {
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { success: false, error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
+        }
+
         const body = await req.json()
         const { name, category, language = 'en' } = body
 

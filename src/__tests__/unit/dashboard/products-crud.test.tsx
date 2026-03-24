@@ -31,12 +31,26 @@ describe('ProductImageFallback Component', () => {
 describe('Products CRUD Form Validation Logic', () => {
     
     // Abstracted logic matching the component's handleSave
-    const validateForm = (formName: string, formPrice: string, formSku: string, formCategory: string) => {
+    const validateForm = (formName: string, formPrice: string, formSku: string, formCategory: string, formCompareAt?: string, formWeight?: string) => {
         const errors: Record<string, string> = {}
         if (!formName.trim() || formName.length < 3) errors.name = 'Tên sản phẩm phải có ít nhất 3 ký tự'
         if (!formPrice || parseFloat(formPrice) < 0) errors.price = 'Giá hợp lệ (≥ 0) là bắt buộc'
+        
+        // TC-F08.08c: Compare At < Price validation
+        if (formCompareAt && parseFloat(formCompareAt) < parseFloat(formPrice)) {
+            errors.compareAt = 'Giá Khuyến mãi (Compare At) phải LỚN HƠN Giá Thực Bán'
+        }
+
         if (!formSku.trim()) errors.sku = 'SKU là bắt buộc'
-        if (!formCategory.trim()) errors.category = 'Danh mục là bắt buộc'
+        
+        // TC-F08.03e: Category array empty
+        if (!formCategory.trim() || formCategory === '[]') errors.category = 'Sản phẩm phải thuộc tối thiểu 1 Danh Mục phân loại'
+        
+        // TC-F08.03d: Weight validation (<= 0)
+        if (formWeight !== undefined && parseFloat(formWeight) <= 0) {
+            errors.weight = 'Cân nặng phải lớn hơn 0 để làm mốc tính cước phí Vận Chuyển F14'
+        }
+
         return errors
     }
 
@@ -61,6 +75,25 @@ describe('Products CRUD Form Validation Logic', () => {
     it('passes validation when all fields are valid', () => {
         const errors = validateForm('Valid Product Name', '0', 'SKU-123', 'Category')
         expect(Object.keys(errors).length).toBe(0)
+    })
+
+    // --- New TC Implementations --- //
+    it('returns error when category is omitted (TC-F08.03e)', () => {
+        const errors = validateForm('Valid Name', '10', 'SKU-1', '[]')
+        expect(errors.category).toBe('Sản phẩm phải thuộc tối thiểu 1 Danh Mục phân loại')
+    })
+
+    it('returns error when compare at price is less than regular price (TC-F08.08c)', () => {
+        const errors = validateForm('Valid Name', '50', 'SKU-1', 'Category', '30')
+        expect(errors.compareAt).toBe('Giá Khuyến mãi (Compare At) phải LỚN HƠN Giá Thực Bán')
+    })
+
+    it('returns error when weight is zero or negative (TC-F08.03d)', () => {
+        const errorsZero = validateForm('Valid Name', '50', 'SKU-1', 'Category', undefined, '0')
+        expect(errorsZero.weight).toBe('Cân nặng phải lớn hơn 0 để làm mốc tính cước phí Vận Chuyển F14')
+
+        const errorsNegative = validateForm('Valid Name', '50', 'SKU-1', 'Category', undefined, '-1.5')
+        expect(errorsNegative.weight).toBe('Cân nặng phải lớn hơn 0 để làm mốc tính cước phí Vận Chuyển F14')
     })
 })
 

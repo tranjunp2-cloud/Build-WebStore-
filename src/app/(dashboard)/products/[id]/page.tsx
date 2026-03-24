@@ -234,13 +234,23 @@ export default function ProductEditPage() {
                  toast.error(t.dashboard.products.form.variants.errors.incompleteMatrix)
                  return
              }
+             if (form.variants.some(v => v.compareAtPrice && parseFloat(v.compareAtPrice) <= parseFloat(v.price))) {
+                 toast.error((t.dashboard.products.form.errors as any)?.comparePriceInvalid || "Compare price must be greater than regular price.")
+                 return
+             }
         } else {
             if (!form.price || parseFloat(form.price) < 0) {
                 newErrors.price = t.dashboard.products.form.errors.priceRequired
+            } else if (form.compareAtPrice && parseFloat(form.compareAtPrice) <= parseFloat(form.price)) {
+                newErrors.compareAtPrice = (t.dashboard.products.form.errors as any)?.comparePriceInvalid || "Compare price must be greater than regular price."
             }
             if (!form.sku.trim()) {
                 newErrors.sku = t.dashboard.products.form.errors.skuRequired
             }
+        }
+
+        if (parseFloat(form.weight) <= 0) {
+            newErrors.weight = (t.dashboard.products.form.errors as any)?.weightInvalid || "Weight must be greater than 0."
         }
 
         // Feature US-F08-06: Attributes Validation
@@ -688,12 +698,14 @@ export default function ProductEditPage() {
                     </div>
                     <div>
                         <label className="text-xs font-medium text-gray-400">Compare Price</label>
-                        <div className="mt-1.5 flex items-center rounded-lg border border-white/10 bg-[#0B1120] overflow-hidden focus-within:border-blue-500/50">
+                        <div className={cn("mt-1.5 flex items-center rounded-lg border overflow-hidden",
+                            errors.compareAtPrice ? "border-red-500 focus-within:border-red-500" : "border-white/10 bg-[#0B1120] focus-within:border-blue-500/50")}>
                             <span className="px-3 text-xs text-gray-500 bg-white/5">{form.currency === 'MYR' ? 'RM' : '$'}</span>
                             <input type="number" step="0.01" min="0" value={form.compareAtPrice}
                                 onChange={e => updateField('compareAtPrice', e.target.value)}
                                 className="flex-1 bg-transparent px-3 py-2.5 text-sm text-white outline-none" />
                         </div>
+                        {errors.compareAtPrice && <p className="mt-1 text-xs text-red-500">{errors.compareAtPrice}</p>}
                     </div>
                 </div>
 
@@ -734,7 +746,9 @@ export default function ProductEditPage() {
                     <div>
                         <label className="text-xs font-medium text-gray-400">Weight (grams)</label>
                         <input type="number" min="0" value={form.weight} onChange={e => updateField('weight', e.target.value)}
-                            className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#0B1120] px-4 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
+                            className={cn("mt-1.5 w-full rounded-lg border bg-[#0B1120] px-4 py-2.5 text-sm text-white outline-none",
+                                errors.weight ? "border-red-500 focus:border-red-500" : "border-white/10 focus:border-blue-500/50")} />
+                        {errors.weight && <p className="mt-1 text-xs text-red-500">{errors.weight}</p>}
                     </div>
                     <div>
                         <label className="text-xs font-medium text-gray-400">Length (cm)</label>

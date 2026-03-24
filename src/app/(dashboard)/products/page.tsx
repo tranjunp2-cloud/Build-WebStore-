@@ -81,7 +81,7 @@ export default function ProductsPage() {
         setIsLoading(true)
         setError(null)
         try {
-            const res = await fetch('/api/products', { credentials: 'include' })
+            const res = await fetch('/api/products?limit=100&where[deletedAt][exists]=false', { credentials: 'include' })
             if (!res.ok) throw new Error(`Server returned ${res.status}`)
             const data = await res.json()
             setProducts(data.docs || [])

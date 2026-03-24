@@ -396,6 +396,8 @@
                 "errors": {
                     "nameMin": "Nama produk mestilah sekurang-kurangnya 3 aksara",
                     "priceRequired": "Harga sah (≥ 0) diperlukan",
+                    "comparePriceInvalid": "Harga perbandingan mesti lebih besar daripada harga biasa",
+                    "weightInvalid": "Berat mesti lebih besar daripada 0",
                     "skuRequired": "SKU diperlukan",
                     "categoryRequired": "Kategori diperlukan",
                     "checkErrors": "Sila semak borang untuk ralat"

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -7,8 +9,17 @@ function getOpenAI(): OpenAI | null {
     return new OpenAI({ apiKey: key })
 }
 
-export async function POST(req: Request) {
+export const POST = withAuth(async (user, req) => {
     try {
+        // Rate limit: 5 bulk AI tasks per hour (heavy resource usage)
+        const rateLimit = checkRateLimit(String(user.id), 5)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
+        }
+
         const { promptText } = await req.json()
         if (!promptText) {
             return NextResponse.json({ error: 'promptText is required' }, { status: 400 })
@@ -74,9 +85,21 @@ Rules:
 
         const parsed = JSON.parse(content)
         return NextResponse.json(parsed)
-    } catch (error: unknown) {
+    } catch (error: any) {
         console.error('[AI Bulk Parse Error]', error)
-        const message = error instanceof Error ? error.message : 'Internal Server Error'
+        
+        // Cải thiện UX (QA & FE friendly error message)
+        let message = 'Hệ thống AI tạm thời không tĩnh được, vui lòng thử lại sau.'
+        if (error?.message) {
+            if (error.message.includes('429') || error.message.includes('quota') || error.message.includes('insufficient_quota')) {
+                message = 'Hệ thống AI đang quá tải hoặc hết hạn ngạch (Quota Exceeded), vui lòng thử lại sau hoặc báo admin.'
+            } else if (error.message.includes('timeout')) {
+                message = 'Hệ thống AI phản hồi quá chậm (Timeout), vui lòng nhập ít văn bản hơn hoặc thử lại sau.'
+            } else {
+                message = error.message
+            }
+        }
+        
         return NextResponse.json({ error: message }, { status: 500 })
     }
-}
+})
