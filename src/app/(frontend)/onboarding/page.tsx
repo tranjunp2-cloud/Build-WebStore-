@@ -71,7 +71,7 @@ export default async function WelcomeScreen() {
                 </div>
 
                 {/* Desktop & Mobile Actions (Thumb zone on mobile) */}
-                <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center bg-gradient-to-t from-[#0B1120] via-[#0B1120] to-transparent pt-12 pb-6 px-6 sm:static sm:bg-none sm:p-0 w-full mt-auto sm:mt-0">
+                <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center bg-gradient-to-t from-[#0B1120] via-[#0B1120] to-[#0B1120] sm:bg-none pt-12 pb-6 px-0 sm:static sm:p-0 w-full mt-auto sm:mt-0">
                     
                     {/* Mobile Progress Text (from mobile wireframe) */}
                     <div className="mb-4 text-sm font-medium text-slate-400 sm:hidden">
@@ -81,10 +81,10 @@ export default async function WelcomeScreen() {
                     <Link 
                         href="/builder/new" 
                         prefetch={true}
-                        className="group flex h-[56px] w-full max-w-[448px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-teal-400 text-lg font-semibold text-white shadow-[0_0_24px_rgba(59,130,246,0.4)] transition-all hover:scale-[1.02] hover:shadow-[0_0_32px_rgba(45,212,191,0.5)] active:scale-[0.98]"
+                        className="group flex h-[64px] sm:h-[56px] w-full sm:max-w-[448px] items-center justify-center gap-2 rounded-none sm:rounded-2xl bg-gradient-to-r from-blue-500 to-teal-400 text-lg font-semibold text-white shadow-[0_0_24px_rgba(59,130,246,0.4)] transition-all hover:scale-[1.02] hover:shadow-[0_0_32px_rgba(45,212,191,0.5)] active:scale-[0.98]"
                     >
                         <span>🚀 Create My Store with AI</span>
-                        <ArrowRight className="h-5 w-5 opacity-70 group-hover:translate-x-1 group-hover:opacity-100 transition-transform" />
+                        <ArrowRight className="h-5 w-5 opacity-70 group-hover:translate-x-1 group-hover:opacity-100 transition-transform hidden sm:block" />
                     </Link>
 
                     <Link 

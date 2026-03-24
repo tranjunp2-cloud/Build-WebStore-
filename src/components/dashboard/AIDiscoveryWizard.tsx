@@ -24,27 +24,77 @@ const WIZARD_STEPS = [
   }
 ]
 
-export function AIDiscoveryWizard() {
+export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
   const [isOpen, setIsOpen] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
+
+  // Swipe handling logic
+  const [touchStart, setTouchStart] = useState<number | null>(null)
+  const [touchEnd, setTouchEnd] = useState<number | null>(null)
 
   if (!isOpen) return null
 
   const stepData = WIZARD_STEPS[currentStep]
   const isLastStep = currentStep === WIZARD_STEPS.length - 1
 
+  const dismissWizard = async () => {
+    setIsOpen(false)
+    if (userId) {
+      try {
+        await fetch(`/api/users/${userId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ has_seen_ai_wizard: true })
+        })
+      } catch (error) {
+        console.error('Failed to update wizard state', error)
+      }
+    }
+  }
+
   const handleNext = () => {
     if (!isLastStep) {
       setCurrentStep(prev => prev + 1)
     } else {
-      setIsOpen(false)
+      dismissWizard()
+    }
+  }
+
+  const minSwipeDistance = 50
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null)
+    setTouchStart(e.targetTouches[0].clientX)
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+  }
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return
+    const distance = touchStart - touchEnd
+    const isLeftSwipe = distance > minSwipeDistance
+    const isRightSwipe = distance < -minSwipeDistance
+
+    if (isLeftSwipe) {
+      handleNext()
+    } else if (isRightSwipe) {
+      if (currentStep > 0) {
+        setCurrentStep(prev => prev - 1)
+      }
     }
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#000000]/60 backdrop-blur-[2px] p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#000000]/60 backdrop-blur-[2px] sm:p-4">
       {/* Modal Container */}
-      <div className="relative w-full max-w-[672px] bg-[#0B1120] border border-solid border-white/[0.08] rounded-[24px] shadow-2xl flex flex-col overflow-hidden">
+      <div 
+        className="relative w-full h-full sm:h-auto max-w-[672px] bg-[#0B1120] sm:border border-solid border-white/[0.08] rounded-none sm:rounded-[24px] shadow-2xl flex flex-col overflow-y-auto sm:overflow-hidden touch-pan-y"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
         
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-6">
@@ -52,7 +102,7 @@ export function AIDiscoveryWizard() {
             ✨ Discover the Power of AI
           </h2>
           <button 
-            onClick={() => setIsOpen(false)}
+            onClick={dismissWizard}
             className="flex-shrink-0 hover:opacity-80 transition-opacity bg-transparent border-none p-0 m-0 cursor-pointer"
             aria-label="Close"
           >
@@ -104,30 +154,37 @@ export function AIDiscoveryWizard() {
         <hr className="w-full border-t border-white/[0.08]" />
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-8 py-6">
+        <div className="flex items-center justify-between px-6 sm:px-8 py-6 mt-auto sm:mt-0 pb-10 sm:pb-6">
           <button 
-            onClick={() => setIsOpen(false)}
-            className="text-[14px] font-medium text-[#F8FAFC]/60 hover:text-white transition-colors bg-transparent border-none p-0 m-0 cursor-pointer"
+            onClick={dismissWizard}
+            className="text-[14px] font-medium text-[#F8FAFC]/60 hover:text-white transition-colors bg-transparent border-none p-0 m-0 cursor-pointer hidden sm:block"
           >
             {isLastStep ? "Skip the guide" : "Skip instructions"}
           </button>
           
-          <div className="flex items-center gap-3">
+          <button 
+            onClick={dismissWizard}
+            className="text-[14px] font-medium text-[#F8FAFC]/60 hover:text-white transition-colors bg-transparent border-none p-0 m-0 cursor-pointer sm:hidden"
+          >
+            Skip
+          </button>
+          
+          <div className="flex items-center gap-2 sm:gap-3">
             {currentStep > 0 && (
               <button 
                 onClick={() => setCurrentStep(prev => prev - 1)}
-                className="px-4 py-2 text-[14px] font-medium text-[#F8FAFC] rounded-[10px] border border-solid border-white/[0.08] hover:bg-white/[0.04] transition-colors bg-transparent cursor-pointer"
+                className="px-3 sm:px-4 py-3 sm:py-2 text-[14px] font-medium text-[#F8FAFC] rounded-[10px] sm:border border-solid border-white/[0.08] hover:bg-white/[0.04] transition-colors bg-white/5 sm:bg-transparent cursor-pointer hidden sm:block"
               >
                 ← Go back
               </button>
             )}
             <button 
               onClick={handleNext}
-              className="flex items-center justify-center rounded-[10px] bg-gradient-to-r from-blue-500 to-teal-400 px-5 py-2 min-h-[36px] text-white text-[14px] font-semibold hover:brightness-110 shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),_0_10px_15px_-3px_rgba(0,0,0,0.1)] transition-all border-none cursor-pointer"
+              className="flex items-center justify-center rounded-[12px] sm:rounded-[10px] bg-gradient-to-r from-blue-500 to-teal-400 px-6 sm:px-5 py-3 sm:py-2 min-h-[44px] sm:min-h-[36px] text-white text-[15px] sm:text-[14px] font-semibold hover:brightness-110 shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),_0_10px_15px_-3px_rgba(0,0,0,0.1)] transition-all border-none cursor-pointer"
             >
               <span className="flex items-center gap-2">
-                {isLastStep ? "Explore the CMS now" : "Continue"}
-                {!isLastStep && <Image src="/images/f06/wizard/continue-icon.svg" alt="Arrow Right" width={14} height={14} className="w-[14px] h-[14px]" />}
+                {isLastStep ? "Explore CMS" : "Continue"}
+                {!isLastStep && <Image src="/images/f06/wizard/continue-icon.svg" alt="Arrow Right" width={14} height={14} className="w-[14px] h-[14px] hidden sm:block" />}
               </span>
             </button>
           </div>

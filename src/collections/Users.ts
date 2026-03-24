@@ -319,6 +319,15 @@ export const Users: CollectionConfig = {
             ],
         },
         {
+            name: 'has_seen_ai_wizard',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: {
+                position: 'sidebar',
+                description: 'Whether the user has completed the initial CMS AI Wizard.',
+            },
+        },
+        {
             name: 'lastLoginAt',
             type: 'date',
             admin: { readOnly: true },

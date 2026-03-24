@@ -13,4 +13,5 @@ export type PlatformUser = {
     lastLoginAt?: string
     createdAt: string
     updatedAt: string
+    has_seen_ai_wizard?: boolean
 }
