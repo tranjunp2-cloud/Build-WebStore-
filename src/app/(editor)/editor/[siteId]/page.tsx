@@ -53,6 +53,7 @@ export default function EditorPage() {
     const [activeSidebarTab, setActiveSidebarTab] = useState<EditorSidebarTabId>('chat')
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
+    const [isCompactLayout, setIsCompactLayout] = useState(false)
 
     const blocks = useEditorStore(state => state.blocks)
     const theme = useEditorStore(state => state.theme)
@@ -97,6 +98,18 @@ export default function EditorPage() {
         const currentPage = pages.find(item => item.id === currentPageId)
         return currentPage?.title || 'Homepage'
     }, [currentPageId, page?.title, pages])
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(max-width: 767px)')
+        const applyLayoutMode = (matches: boolean) => setIsCompactLayout(matches)
+
+        applyLayoutMode(mediaQuery.matches)
+
+        const handleChange = (event: MediaQueryListEvent) => applyLayoutMode(event.matches)
+        mediaQuery.addEventListener('change', handleChange)
+
+        return () => mediaQuery.removeEventListener('change', handleChange)
+    }, [])
 
     useEffect(() => {
         if (!siteId) return
@@ -378,8 +391,42 @@ export default function EditorPage() {
         { id: 'pages' as const, label: 'Pages', icon: <FileText className="h-3.5 w-3.5" /> },
     ]
 
+    const sidebarContent = (
+        <>
+            {activeSidebarTab === 'chat' ? (
+                <AIChatPanel
+                    blocks={blocks}
+                    selectedBlock={selectedBlock}
+                    onAIAction={handleAIAction}
+                    onUndoLastAction={handleUndo}
+                    siteName={siteName || site?.name || ''}
+                    theme={theme}
+                    externalActivity={chatActivity}
+                    compact={isCompactLayout}
+                />
+            ) : null}
+
+            {activeSidebarTab === 'components' ? (
+                <BlockLibraryPanel
+                    blocks={blocks}
+                    selectedBlock={selectedBlock}
+                    onBlockSelect={setSelectedBlock}
+                    onAIAction={handleAIAction}
+                />
+            ) : null}
+
+            {activeSidebarTab === 'pages' ? (
+                <PageManagerPanel
+                    siteId={siteId}
+                    currentPageId={currentPageId}
+                    onPageSelected={handlePageSelected}
+                />
+            ) : null}
+        </>
+    )
+
     return (
-        <div className="flex h-screen flex-col bg-[#0B1120]">
+        <div className="flex h-[100dvh] flex-col bg-[#0B1120]">
             <EditorMenuDrawer
                 siteId={siteId}
                 open={isMenuOpen}
@@ -400,7 +447,9 @@ export default function EditorPage() {
                 canUndo={canUndo()}
                 canRedo={canRedo()}
                 viewport={viewport}
+                compact={isCompactLayout}
                 onOpenMenu={() => setIsMenuOpen(true)}
+                onOpenTemplates={() => toast.info('Template gallery will be connected in the next step.')}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onSave={() => void handleSave()}
@@ -408,79 +457,67 @@ export default function EditorPage() {
                 onViewportChange={setViewport}
             />
 
-            <div className="flex flex-1 overflow-hidden">
-                <EditorSidebar
-                    tabs={sidebarTabs}
-                    activeTab={activeSidebarTab}
-                    onTabChange={setActiveSidebarTab}
-                >
-                    {activeSidebarTab === 'chat' ? (
-                        <AIChatPanel
-                            blocks={blocks}
-                            selectedBlock={selectedBlock}
-                            onAIAction={handleAIAction}
-                            onUndoLastAction={handleUndo}
-                            siteName={siteName || site?.name || ''}
-                            theme={theme}
-                            externalActivity={chatActivity}
-                        />
-                    ) : null}
-
-                    {activeSidebarTab === 'components' ? (
-                        <BlockLibraryPanel
-                            blocks={blocks}
-                            selectedBlock={selectedBlock}
-                            onBlockSelect={setSelectedBlock}
-                            onAIAction={handleAIAction}
-                        />
-                    ) : null}
-
-                    {activeSidebarTab === 'pages' ? (
-                        <PageManagerPanel
-                            siteId={siteId}
-                            currentPageId={currentPageId}
-                            onPageSelected={handlePageSelected}
-                        />
-                    ) : null}
-                </EditorSidebar>
-
-                <div className="flex flex-1 flex-col">
-                    <PreviewFrame
-                        siteId={siteId}
-                        pageId={currentPageId}
-                        iframeKey={iframeKey}
-                        isLoading={isLoading}
-                        viewport={viewport}
-                        onInlineEditApplied={(content, blockIndex) => {
-                            setSelectedBlock(blockIndex)
-                            setActiveSidebarTab('chat')
-                            setChatActivity({
-                                id: `inline-${Date.now()}`,
-                                content,
-                            })
-                        }}
-                    />
+            {isCompactLayout ? (
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                    <EditorSidebar
+                        tabs={sidebarTabs}
+                        activeTab={activeSidebarTab}
+                        onTabChange={setActiveSidebarTab}
+                        compact
+                    >
+                        {sidebarContent}
+                    </EditorSidebar>
                 </div>
+            ) : (
+                <>
+                    <div className="flex flex-1 overflow-hidden">
+                        <EditorSidebar
+                            tabs={sidebarTabs}
+                            activeTab={activeSidebarTab}
+                            onTabChange={setActiveSidebarTab}
+                        >
+                            {sidebarContent}
+                        </EditorSidebar>
 
-                <SettingsPanel
-                    block={currentBlock}
-                    blockIndex={selectedBlock}
-                    theme={theme}
-                    siteName={siteName || site?.name || ''}
-                    siteStatus={site?.status || 'draft'}
-                    onThemeChange={handleThemeChange}
-                    onDeleteBlock={handleDeleteBlock}
-                    onDuplicateBlock={handleDuplicateBlock}
-                    onBlockFieldChange={handleBlockFieldChange}
-                    onBlockUpdate={handleBlockUpdate}
-                />
-            </div>
+                        <div className="flex flex-1 flex-col">
+                            <PreviewFrame
+                                siteId={siteId}
+                                pageId={currentPageId}
+                                iframeKey={iframeKey}
+                                isLoading={isLoading}
+                                viewport={viewport}
+                                onInlineEditApplied={(content, blockIndex) => {
+                                    setSelectedBlock(blockIndex)
+                                    setActiveSidebarTab('chat')
+                                    setChatActivity({
+                                        id: `inline-${Date.now()}`,
+                                        content,
+                                    })
+                                }}
+                            />
+                        </div>
 
-            <EditorStatusBar
-                statusText={statusText}
-                currentPageTitle={currentPageTitle}
-                blockCount={blocks.length}
-            />
+                        <SettingsPanel
+                            block={currentBlock}
+                            blockIndex={selectedBlock}
+                            theme={theme}
+                            siteName={siteName || site?.name || ''}
+                            siteStatus={site?.status || 'draft'}
+                            onThemeChange={handleThemeChange}
+                            onDeleteBlock={handleDeleteBlock}
+                            onDuplicateBlock={handleDuplicateBlock}
+                            onBlockFieldChange={handleBlockFieldChange}
+                            onBlockUpdate={handleBlockUpdate}
+                        />
+                    </div>
+
+                    <EditorStatusBar
+                        statusText={statusText}
+                        currentPageTitle={currentPageTitle}
+                        blockCount={blocks.length}
+                    />
+                </>
+            )}
         </div>
     )
 }

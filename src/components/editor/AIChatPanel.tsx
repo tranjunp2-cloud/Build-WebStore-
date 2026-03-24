@@ -1,7 +1,7 @@
 'use client'
 
 import React, { memo, useEffect, useRef, useState } from 'react'
-import { Send, Sparkles } from 'lucide-react'
+import { Send, Sparkles, WandSparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData, ThemeData } from '@/types/editor'
@@ -10,6 +10,7 @@ type ChatMessage = {
     id: string
     role: 'user' | 'assistant'
     content: string
+    createdAt?: string
     undoable?: boolean
     isStreaming?: boolean
 }
@@ -25,6 +26,14 @@ interface AIChatPanelProps {
         id: string
         content: string
     } | null
+    compact?: boolean
+}
+
+function formatChatTime(date = new Date()) {
+    return date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+    })
 }
 
 function AIChatPanelInner({
@@ -35,6 +44,7 @@ function AIChatPanelInner({
     siteName,
     theme,
     externalActivity,
+    compact = false,
 }: AIChatPanelProps) {
     const [input, setInput] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
@@ -43,6 +53,7 @@ function AIChatPanelInner({
             id: 'welcome',
             role: 'assistant',
             content: 'Hello! What would you like to edit?',
+            createdAt: formatChatTime(),
         },
     ])
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -65,6 +76,7 @@ function AIChatPanelInner({
                     id: externalActivity.id,
                     role: 'assistant',
                     content: externalActivity.content,
+                    createdAt: formatChatTime(),
                     undoable: true,
                 },
             ]
@@ -174,6 +186,7 @@ function AIChatPanelInner({
                 id: assistantMessageId,
                 role: 'assistant',
                 content: 'AI dang doc yeu cau cua ban...',
+                createdAt: formatChatTime(),
                 isStreaming: true,
             },
         ])
@@ -224,25 +237,34 @@ function AIChatPanelInner({
     }
 
     return (
-        <div className="flex h-full flex-col">
-            <div className="border-b border-white/10 px-4 py-4">
-                <div className="flex items-center justify-between gap-3">
-                    <div>
-                        <p className="text-sm font-semibold text-white">AI Chat</p>
-                        <p className="mt-1 text-xs text-gray-500">
-                            Ask AI to update layout, content, and theme in realtime.
-                        </p>
+        <div className={cn('flex h-full flex-col', compact && 'bg-[#0F172A]')}>
+            {!compact ? (
+                <div className="border-b border-white/10 px-4 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-semibold text-white">AI Chat</p>
+                            <p className="mt-1 text-xs text-gray-500">
+                                Ask AI to update layout, content, and theme in realtime.
+                            </p>
+                        </div>
+                        <Sparkles className="h-4 w-4 text-cyan-400" />
                     </div>
-                    <Sparkles className="h-4 w-4 text-cyan-400" />
                 </div>
-            </div>
+            ) : null}
 
             <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
-                <div className="flex-1 overflow-y-auto p-4" role="log" aria-label="AI chat messages">
+                <div
+                    className={cn(
+                        'flex-1 overflow-y-auto',
+                        compact ? 'px-4 pb-5 pt-6' : 'p-4',
+                    )}
+                    role="log"
+                    aria-label="AI chat messages"
+                >
                     <div className="space-y-3">
                         {messages.map(msg => (
                             <div key={msg.id} className={cn('flex gap-2', msg.role === 'user' ? 'flex-row-reverse' : '')}>
-                                {msg.role === 'assistant' ? (
+                                {msg.role === 'assistant' && !compact ? (
                                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-500">
                                         <Sparkles className="h-3.5 w-3.5 text-white" />
                                     </div>
@@ -253,10 +275,16 @@ function AIChatPanelInner({
                                         'max-w-[88%] rounded-2xl px-3 py-3 text-sm leading-relaxed',
                                         msg.role === 'user'
                                             ? 'rounded-br-md bg-blue-600 text-white'
-                                            : 'rounded-bl-md border border-white/5 bg-[#1E293B] text-gray-300',
+                                            : compact
+                                                ? 'rounded-[18px] border border-white/[0.04] bg-[#1E293B] text-[#F8FAFC] shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'
+                                                : 'rounded-bl-md border border-white/5 bg-[#1E293B] text-gray-300',
+                                        compact && msg.role === 'assistant' && 'max-w-[260px] px-4 py-3.5',
                                     )}
                                 >
                                     <p className="whitespace-pre-wrap">{msg.content}</p>
+                                    {compact && msg.role === 'assistant' && msg.createdAt ? (
+                                        <p className="mt-2 text-xs text-slate-400">{msg.createdAt}</p>
+                                    ) : null}
                                     {msg.undoable && msg.role === 'assistant' ? (
                                         <Button
                                             type="button"
@@ -291,25 +319,34 @@ function AIChatPanelInner({
                     </div>
                 </div>
 
-                <div className="border-t border-white/10 p-4">
-                    <div className="mb-3 flex flex-wrap gap-2">
+                <div className={cn('border-t border-white/10', compact ? 'bg-[rgba(11,17,32,0.5)] px-4 pb-4 pt-4' : 'p-4')}>
+                    <div className={cn('mb-3 flex gap-2', compact ? 'overflow-x-auto pb-1' : 'flex-wrap')}>
                         <button
                             type="button"
                             onClick={() => setInput('Change web color to mint green')}
-                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300 transition-colors hover:bg-white/10"
+                            className={cn(
+                                'rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300 transition-colors hover:bg-white/10',
+                                compact && 'shrink-0 border-white/[0.04] bg-[#1E293B] text-slate-400',
+                            )}
                         >
-                            Change web color
+                            {compact ? '💡 Change website color' : 'Change web color'}
                         </button>
                         <button
                             type="button"
                             onClick={() => setInput('Add a new section with testimonials')}
-                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300 transition-colors hover:bg-white/10"
+                            className={cn(
+                                'rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300 transition-colors hover:bg-white/10',
+                                compact && 'shrink-0 border-white/[0.04] bg-[#1E293B] text-slate-400',
+                            )}
                         >
-                            Add section
+                            {compact ? '➕ Add section' : 'Add section'}
                         </button>
                     </div>
 
-                    <div className="rounded-2xl border border-white/10 bg-[#111827] p-3 transition-colors focus-within:border-cyan-500/40">
+                    <div className={cn(
+                        'rounded-2xl border border-white/10 bg-[#111827] p-3 transition-colors focus-within:border-cyan-500/40',
+                        compact && 'border-white/[0.04] bg-[#1E293B] px-4 py-3.5',
+                    )}>
                         <div className="flex items-end gap-2">
                             <textarea
                                 value={input}
@@ -320,9 +357,12 @@ function AIChatPanelInner({
                                         void handleSendChat()
                                     }
                                 }}
-                                placeholder="Enter command... (For example: 'Change the hero heading')"
+                                placeholder={compact ? "Enter command... (e.g., 'Change website color')" : "Enter command... (For example: 'Change the hero heading')"}
                                 aria-label="Chat message"
-                                className="min-h-[84px] flex-1 resize-none bg-transparent text-sm text-white placeholder:text-gray-600 outline-none"
+                                className={cn(
+                                    'min-h-[84px] flex-1 resize-none bg-transparent text-sm text-white placeholder:text-gray-600 outline-none',
+                                    compact && 'min-h-[38px] text-[14px] leading-6 text-slate-200 placeholder:text-slate-500',
+                                )}
                                 disabled={isProcessing}
                             />
                             <Button
@@ -330,15 +370,19 @@ function AIChatPanelInner({
                                 size="icon"
                                 onClick={() => void handleSendChat()}
                                 disabled={!input.trim() || isProcessing}
-                                className="shrink-0 rounded-xl"
+                                className={cn(
+                                    'shrink-0 rounded-xl',
+                                    compact && 'h-9 w-9 rounded-[14px] border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-none hover:opacity-95',
+                                )}
                             >
                                 <Send className="h-4 w-4" />
                             </Button>
                         </div>
                     </div>
 
-                    <p className="mt-3 text-[11px] text-gray-500">
-                        Press Enter to send, Shift+Enter to go to the next line
+                    <p className={cn('mt-3 text-[11px] text-gray-500', compact && 'flex items-center gap-1.5 text-slate-400')}>
+                        {compact ? <WandSparkles className="h-3 w-3" /> : null}
+                        Press Enter to send, Shift+Enter for a new line
                     </p>
                 </div>
             </div>

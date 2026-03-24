@@ -5,10 +5,11 @@ import {
     Check,
     ExternalLink,
     FileText,
-    Laptop,
     Loader2,
     Menu,
     Monitor,
+    Palette,
+    PanelLeft,
     Redo2,
     Save,
     Sparkles,
@@ -33,7 +34,9 @@ interface EditorToolbarProps {
     canUndo: boolean
     canRedo: boolean
     viewport: 'desktop' | 'mobile'
+    compact?: boolean
     onOpenMenu: () => void
+    onOpenTemplates?: () => void
     onUndo: () => void
     onRedo: () => void
     onSave: () => void
@@ -55,13 +58,82 @@ export function EditorToolbar({
     canUndo,
     canRedo,
     viewport,
+    compact = false,
     onOpenMenu,
+    onOpenTemplates,
     onUndo,
     onRedo,
     onSave,
     onPublish,
     onViewportChange,
 }: EditorToolbarProps) {
+    if (compact) {
+        return (
+            <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[rgba(30,41,59,0.3)] px-2.5">
+                <div className="flex min-w-0 items-center gap-1">
+                    <button
+                        type="button"
+                        onClick={onOpenMenu}
+                        className="inline-flex h-9 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-slate-100 transition-colors hover:bg-white/5"
+                    >
+                        <Menu className="h-4 w-4 text-slate-300" />
+                        <span>Menu</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onOpenTemplates}
+                        className="inline-flex h-9 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-slate-100 transition-colors hover:bg-white/5"
+                    >
+                        <Palette className="h-4 w-4 text-amber-300" />
+                        <span>Templates</span>
+                    </button>
+                </div>
+
+                <div className="flex items-center gap-1">
+                    <Button
+                        type="button"
+                        size="sm"
+                        onClick={onPublish}
+                        disabled={isPublishing || publishSuccess}
+                        className={cn(
+                            'h-9 rounded-full border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-4 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(45,212,191,0.18)] hover:opacity-95',
+                            publishSuccess && 'from-emerald-500 to-emerald-400',
+                        )}
+                    >
+                        {isPublishing ? (
+                            <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Publishing
+                            </>
+                        ) : publishSuccess ? (
+                            <>
+                                <Check className="h-3.5 w-3.5" />
+                                Published
+                            </>
+                        ) : (
+                            <>
+                                <Upload className="h-3.5 w-3.5" />
+                                Publish
+                            </>
+                        )}
+                    </Button>
+
+                    <Button variant="ghost" size="icon" asChild className="h-9 w-9 rounded-xl text-slate-300 hover:bg-white/5 hover:text-white">
+                        <a
+                            href={currentPageId ? `/api/preview/${siteId}?pageId=${currentPageId}` : `/api/preview/${siteId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Open preview"
+                        >
+                            <PanelLeft className="h-4 w-4" />
+                        </a>
+                    </Button>
+                </div>
+            </header>
+        )
+    }
+
     return (
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#0B1120] px-4">
             <div className="flex min-w-0 items-center gap-3">
@@ -145,7 +217,7 @@ export function EditorToolbar({
                                 : 'text-gray-400 hover:text-white',
                         )}
                     >
-                        <Laptop className="h-3.5 w-3.5" />
+                        <Monitor className="h-3.5 w-3.5" />
                         Mobile
                     </button>
                 </div>

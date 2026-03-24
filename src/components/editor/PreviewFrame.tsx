@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useEffect, useState, useCallback } from 'react'
+import React, { memo, useEffect, useState, useCallback, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { InlineEditPopover } from './InlineEditPopover'
 import { useEditorStore } from '@/store/editorStore'
@@ -101,11 +101,20 @@ function PreviewFrameInner({
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [frameElement, setFrameElement] = useState<HTMLIFrameElement | null>(null)
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
+    const clearHoverTimerRef = useRef<number | null>(null)
+
+    const cancelPendingHoverClear = useCallback(() => {
+        if (clearHoverTimerRef.current !== null) {
+            window.clearTimeout(clearHoverTimerRef.current)
+            clearHoverTimerRef.current = null
+        }
+    }, [])
 
     useEffect(() => {
         const handleMessage = (e: MessageEvent) => {
             if (e.data?.type === 'BLOCK_HOVERED') {
                 if (isEditing) return
+                cancelPendingHoverClear()
 
                 const nextData = e.data as Omit<HoveredElementData, 'fieldPath'> & { rect: HoverRect | null }
                 const block = blocks[nextData.blockIndex]
@@ -116,7 +125,13 @@ function PreviewFrameInner({
                     fieldPath,
                 })
             } else if (e.data?.type === 'BLOCK_MOUSEOUT') {
-                if (!isEditing) setHoverData(null)
+                if (!isEditing) {
+                    cancelPendingHoverClear()
+                    clearHoverTimerRef.current = window.setTimeout(() => {
+                        setHoverData(null)
+                        clearHoverTimerRef.current = null
+                    }, 180)
+                }
             } else if (e.data?.type === 'PREVIEW_POINTER_DOWN') {
                 if (isEditing) {
                     setIsEditing(false)
@@ -124,8 +139,11 @@ function PreviewFrameInner({
             }
         }
         window.addEventListener('message', handleMessage)
-        return () => window.removeEventListener('message', handleMessage)
-    }, [blocks, isEditing])
+        return () => {
+            cancelPendingHoverClear()
+            window.removeEventListener('message', handleMessage)
+        }
+    }, [blocks, cancelPendingHoverClear, isEditing])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -151,10 +169,11 @@ function PreviewFrameInner({
     }, [])
 
     useEffect(() => {
+        cancelPendingHoverClear()
         setHoverData(null)
         setIsEditing(false)
         setIsSubmitting(false)
-    }, [iframeKey, pageId, viewport])
+    }, [cancelPendingHoverClear, iframeKey, pageId, viewport])
 
     const handleInlineRewrite = useCallback(async (instruction: string) => {
         if (!hoverData) return
@@ -262,6 +281,12 @@ function PreviewFrameInner({
             {hoverData && hoverData.rect && frameElement && containerElement ? (
                 <div 
                     className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10 rounded transition-all duration-200"
+                    onMouseEnter={cancelPendingHoverClear}
+                    onMouseLeave={() => {
+                        if (!isEditing) {
+                            setHoverData(null)
+                        }
+                    }}
                     style={{
                         top:
                             frameElement.getBoundingClientRect().top -
@@ -282,6 +307,7 @@ function PreviewFrameInner({
                         <div
                             data-inline-edit-trigger
                             className="absolute -top-8 right-0 flex cursor-pointer items-center gap-1 rounded-full bg-blue-600 px-3 py-1.5 text-[10px] font-bold uppercase text-white shadow-lg transition-colors hover:bg-blue-500 pointer-events-auto"
+                            onMouseEnter={cancelPendingHoverClear}
                             onClick={() => setIsEditing(true)}
                         >
                             ✨ Edit with AI
@@ -291,6 +317,7 @@ function PreviewFrameInner({
                         <div
                             data-inline-edit-popover
                             className="absolute left-0 top-0 z-50 pointer-events-auto -translate-y-[calc(100%+12px)]"
+                            onMouseEnter={cancelPendingHoverClear}
                         >
                             <InlineEditPopover
                                 blockType={hoverData.blockType}

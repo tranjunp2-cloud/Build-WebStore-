@@ -4,6 +4,29 @@ import { useEffect, useRef, useState } from 'react'
 import { Loader2, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+function normalizeInstructionValue(nextValue: string, previousValue: string): string {
+    const isWrappedInStraightQuotes =
+        nextValue.length >= 2 &&
+        nextValue.startsWith('"') &&
+        nextValue.endsWith('"')
+
+    const isWrappedInCurlyQuotes =
+        nextValue.length >= 2 &&
+        nextValue.startsWith('“') &&
+        nextValue.endsWith('”')
+
+    if (!isWrappedInStraightQuotes && !isWrappedInCurlyQuotes) {
+        return nextValue
+    }
+
+    const unwrappedValue = nextValue.slice(1, -1)
+    if (unwrappedValue === previousValue || unwrappedValue.startsWith(previousValue)) {
+        return unwrappedValue
+    }
+
+    return nextValue
+}
+
 interface InlineEditPopoverProps {
     blockType: string
     currentText: string
@@ -76,7 +99,13 @@ export function InlineEditPopover({
                 <textarea
                     ref={inputRef}
                     value={instruction}
-                    onChange={event => setInstruction(event.target.value)}
+                    onChange={event =>
+                        setInstruction(prev => normalizeInstructionValue(event.target.value, prev))
+                    }
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     onKeyDown={event => {
                         if (event.key === 'Enter' && !event.shiftKey) {
                             event.preventDefault()
