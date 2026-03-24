@@ -32,12 +32,17 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
   setSectionCategory(cat)
 
   // Separate nav/hero from other sections for semantic HTML
-  const navHtml = blocks.filter(b => b.blockType === 'navigation').map(b => renderNav(b, t)).join('\n')
-  const heroHtml = blocks.filter(b => b.blockType === 'hero').map(b => renderHero(b, t, cat)).join('\n')
-  const footerHtml = blocks.filter(b => b.blockType === 'footer').map(b => renderSections(b, t, cat)).join('\n')
+  const addDataAttr = (html: string, index: number, type: string) => {
+    return html.replace(/^<([a-z0-9]+)\s/i, `<$1 data-block-index="${index}" data-block-type="${type}" `)
+  }
+
+  const navHtml = blocks.map((b, i) => b.blockType === 'navigation' ? addDataAttr(renderNav(b, t), i, b.blockType) : '').filter(Boolean).join('\n')
+  const heroHtml = blocks.map((b, i) => b.blockType === 'hero' ? addDataAttr(renderHero(b, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
+  const footerHtml = blocks.map((b, i) => b.blockType === 'footer' ? addDataAttr(renderSections(b, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
   const mainHtml = blocks
-    .filter(b => !['navigation', 'hero', 'footer'].includes(b.blockType))
-    .map(b => renderSections(b, t, cat)).join('\n')
+    .map((b, i) => !['navigation', 'hero', 'footer'].includes(b.blockType) ? addDataAttr(renderSections(b, t, cat), i, b.blockType) : '')
+    .filter(Boolean)
+    .join('\n')
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -69,6 +74,47 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
     ${mainHtml}
   </main>
   ${footerHtml}
+
+  <script>
+    (function() {
+      const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
+      let hoveredEl = null;
+
+      document.addEventListener('mouseover', (e) => {
+        let target = e.target
+        let blockContainer = target.closest('[data-block-index]')
+        if (!blockContainer) {
+          window.parent.postMessage({ type: 'BLOCK_MOUSEOUT' }, '*')
+          return
+        }
+        
+        if (!validTags.includes(target.tagName) || target.children.length > 1) {
+          return
+        }
+        
+        const text = target.innerText?.trim()
+        if (!text || text.length < 2) return
+
+        hoveredEl = target
+        const rect = target.getBoundingClientRect()
+        
+        window.parent.postMessage({
+          type: 'BLOCK_HOVERED',
+          rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+          text: text,
+          blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+          blockType: blockContainer.getAttribute('data-block-type')
+        }, '*')
+      })
+
+      document.addEventListener('dblclick', (e) => {
+        if (hoveredEl && hoveredEl === e.target) {
+          window.parent.postMessage({ type: 'BLOCK_CLICKED' }, '*')
+          e.preventDefault()
+        }
+      })
+    })();
+  </script>
 </body>
 </html>`
 }
