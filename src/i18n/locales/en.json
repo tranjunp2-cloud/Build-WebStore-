@@ -351,6 +351,17 @@
                 "cancelled": "Cancelled",
                 "refunded": "Refunded"
             },
+            "sort": {
+                "dateNewest": "Date: Newest first",
+                "dateOldest": "Date: Oldest first",
+                "totalHigh": "Total: High → Low",
+                "totalLow": "Total: Low → High"
+            },
+            "paymentFilter": {
+                "all": "All Pay",
+                "cod": "COD",
+                "qrBanking": "QR Banking"
+            },
             "table": {
                 "orderId": "Order ID / Customer",
                 "items": "Items",

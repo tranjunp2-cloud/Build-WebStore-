@@ -351,6 +351,17 @@
                 "cancelled": "Dibatalkan",
                 "refunded": "Dikembalikan"
             },
+            "sort": {
+                "dateNewest": "Tarikh: Terbaharu dahulu",
+                "dateOldest": "Tarikh: Terlama dahulu",
+                "totalHigh": "Jumlah: Tinggi → Rendah",
+                "totalLow": "Jumlah: Rendah → Tinggi"
+            },
+            "paymentFilter": {
+                "all": "Semua Bayaran",
+                "cod": "COD",
+                "qrBanking": "QR Banking"
+            },
             "table": {
                 "orderId": "ID Pesanan / Pelanggan",
                 "items": "Barangan",
