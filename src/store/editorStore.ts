@@ -87,7 +87,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     lastSavedAt: null,
     isSaving: false,
     autoSaveEnabled: true,
-    autoSaveIntervalMs: 30000, // 30s
+    autoSaveIntervalMs: 3000, // 3s
 
     init: (siteId, blocks, theme, siteName) => {
         const snapshot = createSnapshot(blocks, theme)
@@ -96,6 +96,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             history: [snapshot],
             historyIndex: 0,
             hasUnsavedChanges: false,
+            lastSavedAt: null,
         })
     },
 
@@ -251,5 +252,6 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         siteId: null, blocks: [], theme: {}, siteName: '',
         history: [], historyIndex: -1,
         hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
+        autoSaveEnabled: true, autoSaveIntervalMs: 3000,
     }),
 }))

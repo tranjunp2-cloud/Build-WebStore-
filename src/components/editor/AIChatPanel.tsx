@@ -10,7 +10,13 @@ import { blockRegistry } from '@/blocks/registry'
 import type { BlockData, AIAction, ThemeData } from '@/types/editor'
 
 // ─── Types ──────────────────────────────────────────────────────────────
-type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
+type ChatMessage = {
+    id: string
+    role: 'user' | 'assistant'
+    content: string
+    undoable?: boolean
+    isStreaming?: boolean
+}
 
 function getBlockInfo(blockType: string) {
     const meta = blockRegistry.getBlockMeta(blockType)
@@ -23,8 +29,9 @@ interface AIChatPanelProps {
     onToggle: () => void
     blocks: BlockData[]
     onBlockSelect: (idx: number) => void
-    selectedBlock: number
-    onAIAction: (action: AIAction) => void
+    selectedBlock: number | null
+    onAIAction: (action: AIAction) => Promise<void> | void
+    onUndoLastAction: () => void
     siteName: string
     theme: ThemeData | undefined
 }
@@ -32,7 +39,7 @@ interface AIChatPanelProps {
 // ─── Component ──────────────────────────────────────────────────────────
 function AIChatPanelInner({
     isOpen, onToggle, blocks, onBlockSelect, selectedBlock,
-    onAIAction, siteName, theme,
+    onAIAction, onUndoLastAction, siteName, theme,
 }: AIChatPanelProps) {
     const [tab, setTab] = useState<'chat' | 'blocks'>('blocks')
     const [input, setInput] = useState('')
@@ -47,22 +54,122 @@ function AIChatPanelInner({
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
 
+    const updateAssistantMessage = (messageId: string, next: Partial<ChatMessage>) => {
+        setMessages(prev => prev.map(message => {
+            if (message.id !== messageId) return message
+            return { ...message, ...next }
+        }))
+    }
+
+    const handleAIError = (messageId: string, message: string) => {
+        updateAssistantMessage(messageId, {
+            content: `❌ ${message}`,
+            isStreaming: false,
+            undoable: false,
+        })
+    }
+
+    const readSSEStream = async (response: Response, messageId: string) => {
+        if (!response.body) {
+            throw new Error('Empty stream body')
+        }
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        const flushChunk = async (chunk: string) => {
+            const rawEvent = chunk.trim()
+            if (!rawEvent) return
+
+            let eventName = 'message'
+            const dataLines: string[] = []
+
+            for (const line of rawEvent.split('\n')) {
+                if (line.startsWith('event:')) {
+                    eventName = line.slice(6).trim()
+                    continue
+                }
+
+                if (line.startsWith('data:')) {
+                    dataLines.push(line.slice(5).trim())
+                }
+            }
+
+            if (dataLines.length === 0) return
+
+            const payload = JSON.parse(dataLines.join('\n'))
+
+            if (eventName === 'status') {
+                updateAssistantMessage(messageId, { content: payload.message || 'AI dang xu ly...' })
+                return
+            }
+
+            if (eventName === 'action') {
+                await onAIAction(payload as AIAction)
+                return
+            }
+
+            if (eventName === 'done') {
+                updateAssistantMessage(messageId, {
+                    content: payload.message || 'Da ap dung thay doi cho website.',
+                    isStreaming: false,
+                    undoable: true,
+                })
+                return
+            }
+
+            if (eventName === 'error') {
+                handleAIError(messageId, payload.error || 'AI editing failed')
+            }
+        }
+
+        while (true) {
+            const { done, value } = await reader.read()
+            buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+
+            const chunks = buffer.split('\n\n')
+            buffer = chunks.pop() || ''
+
+            for (const chunk of chunks) {
+                await flushChunk(chunk)
+            }
+
+            if (done) {
+                if (buffer.trim()) {
+                    await flushChunk(buffer)
+                }
+                break
+            }
+        }
+    }
+
     const handleSendChat = async () => {
         if (!input.trim() || isProcessing) return
         const userMsg = input.trim()
+        const assistantMessageId = `${Date.now()}-assistant`
         setInput('')
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', content: userMsg }])
+        setMessages(prev => [
+            ...prev,
+            { id: Date.now().toString(), role: 'user', content: userMsg },
+            {
+                id: assistantMessageId,
+                role: 'assistant',
+                content: 'AI dang doc yeu cau cua ban...',
+                isStreaming: true,
+            },
+        ])
         setIsProcessing(true)
 
         try {
-            const currentBlock = blocks[selectedBlock] || null
-            const res = await fetch('/api/ai/edit-block', {
+            const currentBlock = selectedBlock !== null ? (blocks[selectedBlock] || null) : null
+            const res = await fetch('/api/ai/edit-block?stream=true', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     instruction: userMsg,
                     block: currentBlock,
-                    blockIndex: selectedBlock,
+                    blockIndex: selectedBlock ?? undefined,
                     allBlocks: blocks,
                     theme,
                     siteName,
@@ -70,29 +177,29 @@ function AIChatPanelInner({
                 credentials: 'include',
             })
 
-            const data = await res.json()
-
             if (!res.ok) {
-                setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `❌ ${data.error || 'Failed'}` }])
+                const data = await res.json().catch(() => ({}))
+                handleAIError(assistantMessageId, data.error || 'Failed to edit website')
                 return
             }
 
-            // Apply the AI action
-            onAIAction(data as AIAction)
+            const isStream = res.headers.get('content-type')?.includes('text/event-stream')
 
-            const actionDesc = data.action === 'update_block' ? '✅ Block updated'
-                : data.action === 'update_theme' ? '🎨 Theme updated'
-                    : data.action === 'add_block' ? '➕ New block added'
-                        : data.action === 'delete_block' ? '🗑️ Block deleted'
-                            : '✅ Done'
+            if (isStream) {
+                await readSSEStream(res, assistantMessageId)
+                return
+            }
 
-            setMessages(prev => [...prev, {
-                id: (Date.now() + 1).toString(), role: 'assistant',
-                content: `${actionDesc}\n${data.message || ''}`,
-            }])
+            const data = await res.json()
+            await onAIAction(data as AIAction)
+            updateAssistantMessage(assistantMessageId, {
+                content: data.message || 'Da ap dung thay doi cho website.',
+                isStreaming: false,
+                undoable: true,
+            })
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Unknown error'
-            setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', content: `❌ Error: ${message}` }])
+            handleAIError(assistantMessageId, message)
         } finally {
             setIsProcessing(false)
         }
@@ -148,7 +255,8 @@ function AIChatPanelInner({
                             {allBlockTypes.map(meta => (
                                 <button key={meta.type}
                                     onClick={() => {
-                                        onAIAction({ action: 'add_block', afterIndex: selectedBlock, block: { blockType: meta.type, variant: meta.variants[0] } })
+                                        const afterIndex = selectedBlock ?? (blocks.length - 1)
+                                        onAIAction({ action: 'add_block', afterIndex, block: { blockType: meta.type, variant: meta.variants[0] } })
                                         setShowAddBlock(false)
                                     }}
                                     className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 transition-colors">
@@ -187,6 +295,15 @@ function AIChatPanelInner({
                                 <div className={cn('max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed',
                                     msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-[#1E293B] text-gray-300 rounded-bl-sm border border-white/5')}>
                                     <p className="whitespace-pre-wrap">{msg.content}</p>
+                                    {msg.undoable && msg.role === 'assistant' ? (
+                                        <button
+                                            type="button"
+                                            onClick={onUndoLastAction}
+                                            className="mt-2 inline-flex items-center rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-white/10"
+                                        >
+                                            Hoan tac
+                                        </button>
+                                    ) : null}
                                 </div>
                             </div>
                         ))}
