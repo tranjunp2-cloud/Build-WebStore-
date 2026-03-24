@@ -21,7 +21,10 @@ export default async function DashboardLayout({
                 <CMSLayoutClient userName={userName} userInitial={userInitial}>
                     {children}
                 </CMSLayoutClient>
-                <AIDiscoveryWizard />
+                {/* Only evaluate and render if the user hasn't seen the wizard yet */}
+                {!typedUser?.has_seen_ai_wizard && (
+                    <AIDiscoveryWizard userId={typedUser?.id} />
+                )}
             </I18nProvider>
         </AppShell>
     )
