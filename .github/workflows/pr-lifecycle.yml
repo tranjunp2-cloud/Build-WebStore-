@@ -418,8 +418,8 @@ jobs:
               return;
             }
 
-            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
-              repository(owner: $owner, name: $repo) {
+            const projectQuery = `query($org: String!, $number: Int!) {
+              organization(login: $org) {
                 projectV2(number: $number) {
                   id
                   fields(first: 20) {
@@ -438,9 +438,9 @@ jobs:
             let project;
             try {
               const result = await github.graphql(projectQuery, {
-                owner, repo, number: projectNumber,
+                org: owner, number: projectNumber,
               });
-              project = result.repository.projectV2;
+              project = result.organization.projectV2;
             } catch (e) {
               console.log(`Could not find project: ${e.message}`);
               return;
