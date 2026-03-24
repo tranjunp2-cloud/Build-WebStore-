@@ -457,6 +457,22 @@ export const Pages: CollectionConfig = {
             name: 'publishedAt',
             type: 'date',
         },
+        {
+            name: 'isVisible',
+            type: 'checkbox',
+            defaultValue: true,
+            admin: {
+                description: 'Show this page on live site and in navigation.',
+            },
+        },
+        {
+            name: 'deletedAt',
+            type: 'date',
+            admin: {
+                position: 'sidebar',
+                description: 'Soft delete timestamp. If set, the page is considered deleted.',
+            },
+        },
     ],
     timestamps: true,
 }

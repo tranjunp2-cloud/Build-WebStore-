@@ -1,8 +1,15 @@
 ## Story
 
-- **Closes:** #
-- **Ticket / Story ID (nếu có):** e.g. PROJ-123, US-456
+- **Closes:** #<!-- ⚠️ BẮT BUỘC: Điền issue number! VD: Closes #123. Bot sẽ warn nếu thiếu. -->
 - **Mô tả ngắn:** [1–2 câu: feature/fix này làm gì, cho ai]
+
+<!-- 💡 Cách tìm issue number:
+     1. Vào tab Issues → tìm user story liên quan
+     2. Copy số issue (VD: #123)
+     3. Điền ở trên: Closes #123
+     Keyword hợp lệ: Closes, Fixes, Resolves (GitHub tự đóng issue khi PR merged)
+     Nếu PR không liên quan issue nào (chore/docs), bỏ trống — bot sẽ skip check.
+-->
 
 ---
 

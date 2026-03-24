@@ -19,6 +19,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
+import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
 import type { AIAction } from '@/types/editor'
 
 type SiteData = {
@@ -44,6 +45,7 @@ export default function EditorPage() {
     const siteId = params?.siteId as string
 
     const [isChatOpen, setIsChatOpen] = useState(true)
+    const [isPagesOpen, setIsPagesOpen] = useState(false)
     const [selectedBlock, setSelectedBlock] = useState<number | null>(null)
     const [site, setSite] = useState<SiteData | null>(null)
     const [page, setPage] = useState<PageData | null>(null)
@@ -64,6 +66,8 @@ export default function EditorPage() {
     const autoSaveEnabled = useEditorStore(state => state.autoSaveEnabled)
     const autoSaveIntervalMs = useEditorStore(state => state.autoSaveIntervalMs)
     const init = useEditorStore(state => state.init)
+    const setPages = useEditorStore(state => state.setPages)
+    const setCurrentPageId = useEditorStore(state => state.setCurrentPageId)
     const updateBlock = useEditorStore(state => state.updateBlock)
     const addBlock = useEditorStore(state => state.addBlock)
     const deleteBlock = useEditorStore(state => state.deleteBlock)
@@ -108,9 +112,22 @@ export default function EditorPage() {
                 }
                 if (data.page) {
                     setPage({ id: data.page.id, title: data.page.title })
+                    setCurrentPageId(data.page.id)
                 }
 
                 init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '')
+                
+                // Fetch all pages for this site
+                try {
+                    const pagesRes = await fetch(`/api/sites/${siteId}/pages`, { credentials: 'include' })
+                    if (pagesRes.ok) {
+                        const pagesData = await pagesRes.json()
+                        setPages(pagesData.pages || [])
+                    }
+                } catch (e) {
+                    console.error('Failed to load pages list', e)
+                }
+
                 setSelectedBlock(null)
             } catch (err) {
                 const message = err instanceof Error ? err.message : 'Failed to load site data'
@@ -450,9 +467,21 @@ export default function EditorPage() {
             </div>
 
             <div className="flex flex-1 overflow-hidden">
+                <PageManagerPanel 
+                    isOpen={isPagesOpen}
+                    onToggle={() => {
+                        setIsPagesOpen(prev => !prev)
+                        if (!isPagesOpen) setIsChatOpen(false)
+                    }}
+                    siteId={siteId}
+                />
+
                 <AIChatPanel
                     isOpen={isChatOpen}
-                    onToggle={() => setIsChatOpen(prev => !prev)}
+                    onToggle={() => {
+                        setIsChatOpen(prev => !prev)
+                        if (!isChatOpen) setIsPagesOpen(false)
+                    }}
                     blocks={blocks}
                     onBlockSelect={setSelectedBlock}
                     selectedBlock={selectedBlock}
