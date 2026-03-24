@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Truck, CheckCircle, Search, SlidersHorizontal, PackageOpen, ArrowUpDown, Banknote, QrCode } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Truck, CheckCircle, Search, SlidersHorizontal, PackageOpen, ArrowUpDown, Banknote, QrCode, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -140,7 +140,7 @@ export default function OrdersPage() {
         }
     }
 
-    const filtered = orders
+    const filtered = useMemo(() => orders
         .filter(order =>
             (filterStatus === 'all' || order.status === filterStatus) &&
             (filterPayment === 'all' || order.paymentMethod === filterPayment) &&
@@ -161,6 +161,7 @@ export default function OrdersPage() {
                     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             }
         })
+    , [orders, filterStatus, filterPayment, searchQuery, sortBy])
 
     const pendingCount = filtered.filter(order => order.status === 'pending').length
     const canBulkConfirm = selectedIds.size > 0 && Array.from(selectedIds).every(id =>
@@ -237,15 +238,16 @@ export default function OrdersPage() {
                     {/* Sort Dropdown */}
                     <div className="relative">
                         <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                         <select
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
                             className="appearance-none rounded-lg border border-white/10 bg-[#1E293B]/60 pl-9 pr-8 py-2 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors cursor-pointer"
                         >
-                            <option value="date_desc">Date: Newest first</option>
-                            <option value="date_asc">Date: Oldest first</option>
-                            <option value="total_desc">Total: High → Low</option>
-                            <option value="total_asc">Total: Low → High</option>
+                            <option value="date_desc">{o.sort.dateNewest}</option>
+                            <option value="date_asc">{o.sort.dateOldest}</option>
+                            <option value="total_desc">{o.sort.totalHigh}</option>
+                            <option value="total_asc">{o.sort.totalLow}</option>
                         </select>
                     </div>
                 </div>
@@ -266,18 +268,18 @@ export default function OrdersPage() {
                     <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-[#1E293B] p-0.5">
                         <button onClick={() => setFilterPayment('all')}
                             className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                                filterPayment === 'all' ? 'bg-emerald-500/15 text-emerald-400' : 'text-gray-500 hover:text-gray-300')}>
-                            All Pay
+                                filterPayment === 'all' ? 'bg-blue-500/15 text-blue-400' : 'text-gray-500 hover:text-gray-300')}>
+                            {o.paymentFilter.all}
                         </button>
                         <button onClick={() => setFilterPayment('cod')}
                             className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5',
-                                filterPayment === 'cod' ? 'bg-emerald-500/15 text-emerald-400' : 'text-gray-500 hover:text-gray-300')}>
-                            <Banknote className="h-3 w-3" /> COD
+                                filterPayment === 'cod' ? 'bg-blue-500/15 text-blue-400' : 'text-gray-500 hover:text-gray-300')}>
+                            <Banknote className="h-3 w-3" /> {o.paymentFilter.cod}
                         </button>
                         <button onClick={() => setFilterPayment('qr_banking')}
                             className={cn('rounded-md px-3 py-1.5 text-xs font-medium transition-colors inline-flex items-center gap-1.5',
-                                filterPayment === 'qr_banking' ? 'bg-emerald-500/15 text-emerald-400' : 'text-gray-500 hover:text-gray-300')}>
-                            <QrCode className="h-3 w-3" /> QR Banking
+                                filterPayment === 'qr_banking' ? 'bg-blue-500/15 text-blue-400' : 'text-gray-500 hover:text-gray-300')}>
+                            <QrCode className="h-3 w-3" /> {o.paymentFilter.qrBanking}
                         </button>
                     </div>
                 </div>
