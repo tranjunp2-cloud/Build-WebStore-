@@ -79,12 +79,23 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
     (function() {
       const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
       let hoveredEl = null;
+      let hoverTimer = null;
+
+      const clearHoverState = () => {
+        if (hoverTimer) {
+          clearTimeout(hoverTimer)
+          hoverTimer = null
+        }
+
+        hoveredEl = null
+        window.parent.postMessage({ type: 'BLOCK_MOUSEOUT' }, '*')
+      }
 
       document.addEventListener('mouseover', (e) => {
         let target = e.target
         let blockContainer = target.closest('[data-block-index]')
         if (!blockContainer) {
-          window.parent.postMessage({ type: 'BLOCK_MOUSEOUT' }, '*')
+          clearHoverState()
           return
         }
         
@@ -95,23 +106,35 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
         const text = target.innerText?.trim()
         if (!text || text.length < 2) return
 
+        if (hoveredEl === target) return
+
+        if (hoverTimer) {
+          clearTimeout(hoverTimer)
+        }
+
         hoveredEl = target
-        const rect = target.getBoundingClientRect()
-        
-        window.parent.postMessage({
-          type: 'BLOCK_HOVERED',
-          rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-          text: text,
-          blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
-          blockType: blockContainer.getAttribute('data-block-type')
-        }, '*')
+        hoverTimer = window.setTimeout(() => {
+          const rect = target.getBoundingClientRect()
+
+          window.parent.postMessage({
+            type: 'BLOCK_HOVERED',
+            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+            text: text,
+            blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+            blockType: blockContainer.getAttribute('data-block-type')
+          }, '*')
+        }, 200)
       })
 
-      document.addEventListener('dblclick', (e) => {
-        if (hoveredEl && hoveredEl === e.target) {
-          window.parent.postMessage({ type: 'BLOCK_CLICKED' }, '*')
-          e.preventDefault()
+      document.addEventListener('mouseout', (e) => {
+        if (!hoveredEl) return
+        if (e.target === hoveredEl) {
+          clearHoverState()
         }
+      })
+
+      document.addEventListener('pointerdown', () => {
+        window.parent.postMessage({ type: 'PREVIEW_POINTER_DOWN' }, '*')
       })
     })();
   </script>

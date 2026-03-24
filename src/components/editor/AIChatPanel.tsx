@@ -21,6 +21,10 @@ interface AIChatPanelProps {
     onUndoLastAction: () => void
     siteName: string
     theme: ThemeData | undefined
+    externalActivity?: {
+        id: string
+        content: string
+    } | null
 }
 
 function AIChatPanelInner({
@@ -30,6 +34,7 @@ function AIChatPanelInner({
     onUndoLastAction,
     siteName,
     theme,
+    externalActivity,
 }: AIChatPanelProps) {
     const [input, setInput] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
@@ -45,6 +50,26 @@ function AIChatPanelInner({
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
+
+    useEffect(() => {
+        if (!externalActivity) return
+
+        setMessages(prev => {
+            if (prev.some(message => message.id === externalActivity.id)) {
+                return prev
+            }
+
+            return [
+                ...prev,
+                {
+                    id: externalActivity.id,
+                    role: 'assistant',
+                    content: externalActivity.content,
+                    undoable: true,
+                },
+            ]
+        })
+    }, [externalActivity])
 
     const updateAssistantMessage = (messageId: string, next: Partial<ChatMessage>) => {
         setMessages(prev =>

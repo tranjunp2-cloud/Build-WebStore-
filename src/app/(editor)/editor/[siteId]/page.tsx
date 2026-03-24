@@ -52,6 +52,7 @@ export default function EditorPage() {
     const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop')
     const [activeSidebarTab, setActiveSidebarTab] = useState<EditorSidebarTabId>('chat')
     const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
 
     const blocks = useEditorStore(state => state.blocks)
     const theme = useEditorStore(state => state.theme)
@@ -421,6 +422,7 @@ export default function EditorPage() {
                             onUndoLastAction={handleUndo}
                             siteName={siteName || site?.name || ''}
                             theme={theme}
+                            externalActivity={chatActivity}
                         />
                     ) : null}
 
@@ -449,6 +451,14 @@ export default function EditorPage() {
                         iframeKey={iframeKey}
                         isLoading={isLoading}
                         viewport={viewport}
+                        onInlineEditApplied={(content, blockIndex) => {
+                            setSelectedBlock(blockIndex)
+                            setActiveSidebarTab('chat')
+                            setChatActivity({
+                                id: `inline-${Date.now()}`,
+                                content,
+                            })
+                        }}
                     />
                 </div>
 

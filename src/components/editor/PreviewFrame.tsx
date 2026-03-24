@@ -2,8 +2,9 @@
 
 import React, { memo, useEffect, useState, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
-import { InlineEdit } from './InlineEdit'
+import { InlineEditPopover } from './InlineEditPopover'
 import { useEditorStore } from '@/store/editorStore'
+import { toast } from 'sonner'
 
 interface PreviewFrameProps {
     siteId: string
@@ -11,100 +12,209 @@ interface PreviewFrameProps {
     iframeKey: number
     isLoading: boolean
     viewport: 'desktop' | 'mobile'
+    onInlineEditApplied?: (content: string, blockIndex: number) => void
+}
+
+type HoverRect = {
+    top: number
+    left: number
+    width: number
+    height: number
 }
 
 type HoveredElementData = {
-    rect: DOMRect | null
+    rect: HoverRect | null
     text: string
     blockIndex: number
     blockType: string
+    fieldPath: Array<string | number> | null
 }
 
-function PreviewFrameInner({ siteId, pageId, iframeKey, isLoading, viewport }: PreviewFrameProps) {
+function findStringFieldPath(
+    value: unknown,
+    targetText: string,
+    currentPath: Array<string | number> = [],
+): Array<string | number> | null {
+    if (typeof value === 'string') {
+        if (value === targetText) return currentPath
+        if (value.includes(targetText)) return currentPath
+        return null
+    }
+
+    if (Array.isArray(value)) {
+        for (let index = 0; index < value.length; index += 1) {
+            const result = findStringFieldPath(value[index], targetText, [...currentPath, index])
+            if (result) return result
+        }
+        return null
+    }
+
+    if (value && typeof value === 'object') {
+        for (const [key, child] of Object.entries(value)) {
+            const result = findStringFieldPath(child, targetText, [...currentPath, key])
+            if (result) return result
+        }
+    }
+
+    return null
+}
+
+function updateValueAtPath(
+    source: Record<string, unknown>,
+    path: Array<string | number>,
+    nextValue: string,
+): Record<string, unknown> {
+    const clone: any = JSON.parse(JSON.stringify(source))
+    let cursor: any = clone
+
+    for (let index = 0; index < path.length - 1; index += 1) {
+        cursor = cursor[path[index]]
+    }
+
+    const finalKey = path[path.length - 1]
+    cursor[finalKey] = nextValue
+
+    return clone
+}
+
+function getValueAtPath(source: Record<string, unknown>, path: Array<string | number>): unknown {
+    let cursor: any = source
+
+    for (const segment of path) {
+        cursor = cursor?.[segment]
+    }
+
+    return cursor
+}
+
+function PreviewFrameInner({
+    siteId,
+    pageId,
+    iframeKey,
+    isLoading,
+    viewport,
+    onInlineEditApplied,
+}: PreviewFrameProps) {
     const { blocks, updateBlock } = useEditorStore()
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [isEditing, setIsEditing] = useState(false)
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [frameElement, setFrameElement] = useState<HTMLIFrameElement | null>(null)
+    const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
 
     useEffect(() => {
         const handleMessage = (e: MessageEvent) => {
             if (e.data?.type === 'BLOCK_HOVERED') {
                 if (isEditing) return
-                setHoverData(e.data)
+
+                const nextData = e.data as Omit<HoveredElementData, 'fieldPath'> & { rect: HoverRect | null }
+                const block = blocks[nextData.blockIndex]
+                const fieldPath = block ? findStringFieldPath(block, nextData.text) : null
+
+                setHoverData({
+                    ...nextData,
+                    fieldPath,
+                })
             } else if (e.data?.type === 'BLOCK_MOUSEOUT') {
                 if (!isEditing) setHoverData(null)
-            } else if (e.data?.type === 'BLOCK_CLICKED') {
-                if (hoverData) setIsEditing(true)
+            } else if (e.data?.type === 'PREVIEW_POINTER_DOWN') {
+                if (isEditing) {
+                    setIsEditing(false)
+                }
             }
         }
         window.addEventListener('message', handleMessage)
         return () => window.removeEventListener('message', handleMessage)
-    }, [isEditing, hoverData])
+    }, [blocks, isEditing])
 
-    const handleSave = useCallback((newValue: string) => {
-        if (!hoverData) return
-        const { blockIndex, text } = hoverData
-        const block = blocks[blockIndex]
-        if (!block) return
-        
-        let foundField = ''
-        for (const [key, val] of Object.entries(block)) {
-            if (typeof val === 'string' && val.includes(text)) {
-                foundField = key
-                break
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsEditing(false)
             }
         }
-        
-        let newBlock = { ...block }
-        if (!foundField) {
-            let updated = false
-            for (const [key, val] of Object.entries(block)) {
-                if (Array.isArray(val)) {
-                    const newArr = val.map(item => {
-                        if (typeof item === 'object' && item !== null) {
-                            let itemUpdated = false
-                            const newItem = { ...item } as any
-                            for (const [k, v] of Object.entries(item)) {
-                                if (typeof v === 'string' && v.includes(text)) {
-                                    newItem[k] = v.replace(text, newValue)
-                                    itemUpdated = true
-                                    updated = true
-                                }
-                            }
-                            return itemUpdated ? newItem : item
-                        }
-                        return item
-                    })
-                    if (updated) {
-                        newBlock[key] = newArr
-                        break
-                    }
-                } else if (typeof val === 'object' && val !== null) {
-                    // check nested objects like ctaButton
-                    const newItem = { ...val } as any
-                    let itemUpdated = false
-                    for (const [k, v] of Object.entries(val)) {
-                        if (typeof v === 'string' && v.includes(text)) {
-                            newItem[k] = v.replace(text, newValue)
-                            itemUpdated = true
-                            updated = true
-                        }
-                    }
-                    if (itemUpdated) {
-                        newBlock[key] = newItem
-                        break
-                    }
-                }
-            }
-            if (updated) {
-                updateBlock(blockIndex, newBlock)
-            }
-        } else {
-            updateBlock(blockIndex, { [foundField]: (block[foundField] as string).replace(text, newValue) })
+
+        const handlePointerDown = (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null
+            if (!target) return
+            if (target.closest('[data-inline-edit-popover]')) return
+            if (target.closest('[data-inline-edit-trigger]')) return
+            setIsEditing(false)
         }
 
-        setIsEditing(false)
+        document.addEventListener('keydown', handleKeyDown)
+        document.addEventListener('mousedown', handlePointerDown)
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown)
+            document.removeEventListener('mousedown', handlePointerDown)
+        }
+    }, [])
+
+    useEffect(() => {
         setHoverData(null)
-    }, [hoverData, blocks, updateBlock])
+        setIsEditing(false)
+        setIsSubmitting(false)
+    }, [iframeKey, pageId, viewport])
+
+    const handleInlineRewrite = useCallback(async (instruction: string) => {
+        if (!hoverData) return
+
+        const { blockIndex, blockType, text, fieldPath } = hoverData
+        const block = blocks[blockIndex]
+        if (!block || !fieldPath) {
+            return
+        }
+
+        setIsSubmitting(true)
+
+        try {
+            const response = await fetch('/api/ai/rewrite-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    text,
+                    instruction,
+                    context: `${blockType} section`,
+                }),
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to rewrite text')
+            }
+
+            const data = await response.json()
+            const rewritten = typeof data.rewritten === 'string' ? data.rewritten.trim() : ''
+
+            if (!rewritten) {
+                throw new Error('AI returned empty content')
+            }
+
+            const currentValue = getValueAtPath(block as Record<string, unknown>, fieldPath)
+            const nextValue =
+                typeof currentValue === 'string' && currentValue.includes(text)
+                    ? currentValue.replace(text, rewritten)
+                    : rewritten
+
+            const nextBlock = updateValueAtPath(block as Record<string, unknown>, fieldPath, nextValue)
+            updateBlock(blockIndex, nextBlock)
+
+            onInlineEditApplied?.(
+                `Updated ${blockType} text: "${text}" → "${rewritten}"`,
+                blockIndex,
+            )
+
+            setIsEditing(false)
+            setHoverData(prev => prev ? { ...prev, text: rewritten } : prev)
+        } catch (error) {
+            console.error('Inline rewrite failed', error)
+            toast.error('Inline edit failed', {
+                description: error instanceof Error ? error.message : 'Please try again.',
+            })
+        } finally {
+            setIsSubmitting(false)
+        }
+    }, [blocks, hoverData, onInlineEditApplied, updateBlock])
 
     if (isLoading) {
         return (
@@ -123,8 +233,13 @@ function PreviewFrameInner({ siteId, pageId, iframeKey, isLoading, viewport }: P
         previewUrl.searchParams.set('pageId', pageId)
     }
 
+    const canInlineEdit = Boolean(hoverData?.fieldPath)
+
     return (
-        <div className="relative flex-1 overflow-hidden bg-[#111827] p-6">
+        <div
+            ref={setContainerElement}
+            className="relative flex-1 overflow-hidden bg-[#111827] p-6"
+        >
             <div className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4">
                 <div
                     className="relative h-full overflow-hidden rounded-[24px] border border-white/10 bg-white shadow-2xl transition-all"
@@ -134,6 +249,7 @@ function PreviewFrameInner({ siteId, pageId, iframeKey, isLoading, viewport }: P
                     }}
                 >
                     <iframe
+                        ref={setFrameElement}
                         key={iframeKey}
                         src={previewUrl.pathname + previewUrl.search}
                         className="h-full w-full border-0"
@@ -143,39 +259,50 @@ function PreviewFrameInner({ siteId, pageId, iframeKey, isLoading, viewport }: P
                 </div>
             </div>
 
-            {hoverData && hoverData.rect && (
+            {hoverData && hoverData.rect && frameElement && containerElement ? (
                 <div 
                     className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10 rounded transition-all duration-200"
                     style={{
-                        top: hoverData.rect.top - 4,
-                        left: hoverData.rect.left - 4,
+                        top:
+                            frameElement.getBoundingClientRect().top -
+                            containerElement.getBoundingClientRect().top +
+                            hoverData.rect.top -
+                            4,
+                        left:
+                            frameElement.getBoundingClientRect().left -
+                            containerElement.getBoundingClientRect().left +
+                            hoverData.rect.left -
+                            4,
                         width: hoverData.rect.width + 8,
                         height: hoverData.rect.height + 8,
-                        zIndex: 40
+                        zIndex: 40,
                     }}
                 >
-                    {!isEditing && (
-                        <div className="absolute -top-7 right-0 bg-blue-600 hover:bg-blue-500 text-white text-[10px] uppercase font-bold px-2 py-1.5 rounded shadow-lg pointer-events-auto cursor-pointer flex items-center gap-1 transition-colors"
-                             onClick={() => setIsEditing(true)}>
+                    {!isEditing && canInlineEdit && (
+                        <div
+                            data-inline-edit-trigger
+                            className="absolute -top-8 right-0 flex cursor-pointer items-center gap-1 rounded-full bg-blue-600 px-3 py-1.5 text-[10px] font-bold uppercase text-white shadow-lg transition-colors hover:bg-blue-500 pointer-events-auto"
+                            onClick={() => setIsEditing(true)}
+                        >
                             ✨ Edit with AI
                         </div>
                     )}
-                    {isEditing && (
-                        <div className="absolute top-0 left-0 pointer-events-auto bg-[#1E293B] border border-blue-500/50 rounded-lg shadow-2xl p-2 z-50 transform -translate-y-1/2" style={{ width: Math.max(hoverData.rect.width, 320), minWidth: 320 }}>
-                            <div className="text-[10px] uppercase font-bold text-gray-400 mb-2 border-b border-white/10 pb-1 flex justify-between">
-                                <span>Edit {hoverData.blockType}</span>
-                                <span className="text-blue-400 cursor-pointer" onClick={() => setIsEditing(false)}>Close</span>
-                            </div>
-                            <InlineEdit 
-                                value={hoverData.text} 
-                                onSave={handleSave} 
+                    {isEditing && canInlineEdit && (
+                        <div
+                            data-inline-edit-popover
+                            className="absolute left-0 top-0 z-50 pointer-events-auto -translate-y-[calc(100%+12px)]"
+                        >
+                            <InlineEditPopover
                                 blockType={hoverData.blockType}
-                                multiline={hoverData.text.length > 50}
+                                currentText={hoverData.text}
+                                isSubmitting={isSubmitting}
+                                onClose={() => setIsEditing(false)}
+                                onSubmit={handleInlineRewrite}
                             />
                         </div>
                     )}
                 </div>
-            )}
+            ) : null}
         </div>
     )
 }
