@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
-import { getPayloadClient } from '@/lib/payload'
+import { getPayload } from 'payload'
+import config from '@payload-config'
 
 export async function PATCH(
     request: Request,
     { params }: { params: { siteId: string; pageId: string } }
 ) {
     try {
-        const payload = await getPayloadClient()
+        const payload = await getPayload({ config })
         const resolvedParams = await Promise.resolve(params)
         const { siteId, pageId } = resolvedParams
         const body = await request.json()

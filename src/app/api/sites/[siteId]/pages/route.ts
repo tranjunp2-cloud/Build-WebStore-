@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
-import { getPayloadClient } from '@/lib/payload'
+import { getPayload } from 'payload'
+import config from '@payload-config'
 
 export async function GET(
     request: Request,
     { params }: { params: { siteId: string } }
 ) {
     try {
-        const payload = await getPayloadClient()
+        const payload = await getPayload({ config })
         const resolvedParams = await Promise.resolve(params)
         const siteId = resolvedParams.siteId
 
@@ -23,7 +24,7 @@ export async function GET(
             sort: '-updatedAt',
         })
 
-        const formattedPages = pages.map(p => ({
+        const formattedPages = pages.map((p: any) => ({
             id: p.id,
             title: p.title,
             slug: p.slug,
@@ -44,7 +45,7 @@ export async function POST(
     { params }: { params: { siteId: string } }
 ) {
     try {
-        const payload = await getPayloadClient()
+        const payload = await getPayload({ config })
         const resolvedParams = await Promise.resolve(params)
         const siteId = resolvedParams.siteId
         const body = await request.json()

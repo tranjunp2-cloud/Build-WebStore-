@@ -119,36 +119,53 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
 </html>`
 }
 
-export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_user, _req, ctx) => {
+export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_user, req, ctx) => {
   try {
     const { siteId } = await ctx.params
     const payload = await getPayload({ config })
     const numericSiteId = Number(siteId)
+    const pageId = new URL(req.url).searchParams.get('pageId')
 
     // Fetch site info
     const site: any = await payload.findByID({ collection: 'sites', id: numericSiteId })
     if (!site) return new NextResponse('Not found', { status: 404 })
 
-    // Fetch blocks from pages collection (homepage or first page)
-    let pagesResult = await payload.find({
-      collection: 'pages',
-      where: {
-        site: { equals: numericSiteId },
-        isHomepage: { equals: true },
-      },
-      limit: 1,
-    })
+    let page: any = null
 
-    // Fallback: get first page for this site
-    if (pagesResult.docs.length === 0) {
-      pagesResult = await payload.find({
+    if (pageId) {
+      const requestedPage = await payload.findByID({
         collection: 'pages',
-        where: { site: { equals: numericSiteId } },
-        limit: 1,
+        id: pageId,
       })
+      const requestedPageSiteId =
+        typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
+
+      if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
+        page = requestedPage
+      }
     }
 
-    const page: any = pagesResult.docs[0]
+    if (!page) {
+      let pagesResult = await payload.find({
+        collection: 'pages',
+        where: {
+          site: { equals: numericSiteId },
+          isHomepage: { equals: true },
+        },
+        limit: 1,
+      })
+
+      if (pagesResult.docs.length === 0) {
+        pagesResult = await payload.find({
+          collection: 'pages',
+          where: { site: { equals: numericSiteId } },
+          limit: 1,
+        })
+      }
+
+      page = pagesResult.docs[0]
+    }
+
     const blocks = page?.layout || []
 
     const cat = detectCategory(blocks, site.name || '')
