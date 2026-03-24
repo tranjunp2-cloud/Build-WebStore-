@@ -37,10 +37,13 @@ export default async function WelcomeScreen() {
                 {/* Logo & Brand Intro */}
                 <div className="flex flex-col items-center gap-6">
                     <div className="flex items-center gap-3">
-                        <img 
+                        <Image 
                             src="/assets/builder/builder-logo.png" 
                             alt="PrimeWeb Logo" 
-                            className="w-[48px] h-[48px] object-contain drop-shadow-[0px_0px_24px_rgba(6,182,212,0.6)]"
+                            width={48}
+                            height={48}
+                            priority
+                            className="w-[48px] h-[48px] object-contain drop-shadow-[0px_0px_24px_rgba(6,182,212,0.6)] !p-0 !m-0"
                         />
                         <span className="text-2xl font-bold tracking-tight">
                             <span className="text-[#F8FAFC]">Prime</span>
