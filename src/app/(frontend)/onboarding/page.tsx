@@ -1,136 +1,100 @@
-'use client'
-
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Zap, Sparkles, LayoutTemplate, FileText, ArrowRight, CheckCircle2, MousePointerClick } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import Image from 'next/image'
+import { Sparkles, ArrowRight } from 'lucide-react'
+import { getPayload } from 'payload'
+import config from '@payload-config'
+import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
 
-export default function OnboardingPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function WelcomeScreen() {
+    const user = await getCurrentUser()
+    if (!user) {
+        redirect('/login')
+    }
+
+    const tenantId = await getCurrentTenantId()
+    
+    // Check if user already has a site (BR-01: Redirect đã có site → /dashboard)
+    if (tenantId) {
+        const payload = await getPayload({ config })
+        const sitesResult = await payload.find({ 
+            collection: 'sites', 
+            where: { tenant: { equals: tenantId } }, 
+            limit: 1 
+        })
+        
+        if (sitesResult.totalDocs > 0) {
+            redirect('/dashboard')
+        }
+    }
+
     return (
-        <div className="flex min-h-screen flex-col bg-[#0F172A]">
-            {/* Top Bar — matching reference design */}
-            <header className="flex h-14 items-center justify-between border-b border-slate-800 bg-[#0B1120] px-6">
-                <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
-                        <Zap className="h-4 w-4 text-white" />
+        <div className="flex min-h-screen flex-col items-center justify-center bg-[#0B1120] relative">
+            <main className="flex flex-1 w-full max-w-2xl flex-col justify-center items-center px-6 text-center pb-32 sm:pb-0">
+                
+                {/* Logo & Brand Intro */}
+                <div className="flex flex-col items-center gap-6">
+                    <div className="flex items-center gap-3">
+                        <Image 
+                            src="/assets/builder/builder-logo.png" 
+                            alt="PrimeWeb Logo" 
+                            width={48}
+                            height={48}
+                            priority
+                            className="w-[48px] h-[48px] object-contain drop-shadow-[0px_0px_24px_rgba(6,182,212,0.6)] !p-0 !m-0"
+                        />
+                        <span className="text-2xl font-bold tracking-tight">
+                            <span className="text-[#F8FAFC]">Prime</span>
+                            <span className="text-[#06B6D4]">Web</span>
+                        </span>
                     </div>
-                    <span className="text-lg font-semibold text-white">PrimeWeb</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5">
-                        <div className="h-2 w-2 rounded-full bg-blue-500" />
-                        <div className="h-2 w-2 rounded-full bg-slate-600" />
-                        <div className="h-2 w-2 rounded-full bg-slate-600" />
-                    </div>
-                    <span className="ml-2 text-sm font-medium text-slate-400">Step 1/3</span>
-                </div>
-            </header>
 
-            {/* Main Content */}
-            <main className="flex flex-1 items-center justify-center px-4 py-12">
-                <div className="w-full max-w-2xl">
-                    {/* Welcome header */}
-                    <div className="text-center">
-                        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 shadow-lg shadow-blue-500/25">
-                            <Sparkles className="h-8 w-8 text-white" />
-                        </div>
-                        <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                            Welcome to PrimeWeb!
+                    <div className="space-y-4 mt-4">
+                        <h1 className="text-4xl sm:text-5xl font-bold text-slate-50 leading-tight">
+                            Welcome to PrimeWeb
                         </h1>
-                        <p className="mt-3 text-base text-slate-400">
-                            Let&apos;s build your professional website. Choose how you want to start.
+                        <p className="text-lg text-slate-500 max-w-xl mx-auto leading-relaxed">
+                            Start building your store. Complete it in just 5 minutes with our AI.
                         </p>
                     </div>
+                </div>
 
-                    {/* Options */}
-                    <div className="mt-10 space-y-4">
-                        {/* Option 1: Build with AI — Primary CTA */}
-                        <Link
-                            href="/builder/new"
-                            className="group relative flex items-center gap-5 rounded-xl border-2 border-blue-500/30 bg-blue-500/5 p-5 text-left transition-all hover:border-blue-400/50 hover:bg-blue-500/10 hover:shadow-lg hover:shadow-blue-500/10"
-                        >
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/20">
-                                <Sparkles className="h-7 w-7 text-white" />
-                            </div>
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-lg font-semibold text-white group-hover:text-blue-300 transition-colors">
-                                        Build with AI
-                                    </h3>
-                                    <span className="rounded-full bg-blue-500/20 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-blue-400">
-                                        Recommended
-                                    </span>
-                                </div>
-                                <p className="mt-1 text-sm leading-relaxed text-slate-400">
-                                    Chat with AI to create a professional website in 5 minutes. Just describe your business.
-                                </p>
-                                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                                    {['No coding needed', 'AI-powered content', '5-min setup'].map((item) => (
-                                        <div key={item} className="flex items-center gap-1">
-                                            <CheckCircle2 className="h-3 w-3 text-blue-400/60" />
-                                            <span>{item}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            <ArrowRight className="h-5 w-5 text-slate-600 group-hover:text-blue-400 transition-colors" />
-                        </Link>
+                {/* Progress Sparkle Line */}
+                <div className="flex items-center justify-center w-full max-w-sm gap-4 mt-12 mb-12 sm:mt-16 sm:mb-16">
+                    <div className="h-1 flex-1 rounded-full bg-gradient-to-r from-transparent via-blue-500/30 to-blue-500/50"></div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800/40">
+                        <Image src="/assets/builder/sparkle.svg" alt="Sparkle" width={24} height={24} />
+                    </div>
+                    <div className="h-1 flex-1 rounded-full bg-gradient-to-l from-transparent via-teal-400/30 to-teal-400/50"></div>
+                </div>
 
-                        {/* Option 2: Choose Template */}
-                        <Link
-                            href="/templates"
-                            className="group flex items-center gap-5 rounded-xl border border-slate-700/50 bg-[#1E293B] p-5 text-left transition-all hover:border-slate-600 hover:bg-[#243044]"
-                        >
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-700/50">
-                                <LayoutTemplate className="h-7 w-7 text-slate-400 group-hover:text-white transition-colors" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-white">Choose a Template</h3>
-                                <p className="mt-1 text-sm text-slate-400">
-                                    Browse 100+ ready-made templates. Pick one, customize it, and go live.
-                                </p>
-                            </div>
-                            <ArrowRight className="h-5 w-5 text-slate-600 group-hover:text-slate-400 transition-colors" />
-                        </Link>
-
-                        {/* Option 3: Start from Scratch */}
-                        <Link
-                            href="/editor/new"
-                            className="group flex items-center gap-5 rounded-xl border border-slate-700/50 bg-[#1E293B] p-5 text-left transition-all hover:border-slate-600 hover:bg-[#243044]"
-                        >
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-slate-700/50">
-                                <FileText className="h-7 w-7 text-slate-400 group-hover:text-white transition-colors" />
-                            </div>
-                            <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-white">Start from Scratch</h3>
-                                <p className="mt-1 text-sm text-slate-400">
-                                    Build freely with drag-and-drop blocks. Full control over every detail.
-                                </p>
-                            </div>
-                            <ArrowRight className="h-5 w-5 text-slate-600 group-hover:text-slate-400 transition-colors" />
-                        </Link>
+                {/* Desktop & Mobile Actions (Thumb zone on mobile) */}
+                <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center bg-gradient-to-t from-[#0B1120] via-[#0B1120] to-transparent pt-12 pb-6 px-6 sm:static sm:bg-none sm:p-0 w-full mt-auto sm:mt-0">
+                    
+                    {/* Mobile Progress Text (from mobile wireframe) */}
+                    <div className="mb-4 text-sm font-medium text-slate-400 sm:hidden">
+                        Step 1 of 2: Create Store
                     </div>
 
-                    {/* Skip to dashboard */}
-                    <div className="mt-8 text-center">
-                        <p className="text-xs text-slate-600">
-                            You can always create more websites from the Dashboard.
-                        </p>
-                        <Link href="/dashboard">
-                            <Button
-                                variant="ghost"
-                                className="mt-2 h-8 text-xs text-slate-500 hover:text-slate-300 hover:bg-transparent"
-                            >
-                                Skip → Go to Dashboard
-                            </Button>
-                        </Link>
-                    </div>
+                    <Link 
+                        href="/builder/new" 
+                        prefetch={true}
+                        className="group flex h-[56px] w-full max-w-[448px] items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-500 to-teal-400 text-lg font-semibold text-white shadow-[0_0_24px_rgba(59,130,246,0.4)] transition-all hover:scale-[1.02] hover:shadow-[0_0_32px_rgba(45,212,191,0.5)] active:scale-[0.98]"
+                    >
+                        <span>🚀 Create My Store with AI</span>
+                        <ArrowRight className="h-5 w-5 opacity-70 group-hover:translate-x-1 group-hover:opacity-100 transition-transform" />
+                    </Link>
+
+                    <Link 
+                        href="/dashboard"
+                        className="mt-6 text-sm font-medium text-slate-500 transition-colors hover:text-slate-300"
+                    >
+                        Skip &amp; Go to Dashboard
+                    </Link>
                 </div>
             </main>
-
-            {/* Footer */}
-            <footer className="border-t border-slate-800 py-4 text-center text-xs text-slate-600">
-                © 2026 PrimeWeb. AI-powered website builder for Malaysian SMEs.
-            </footer>
         </div>
     )
 }
