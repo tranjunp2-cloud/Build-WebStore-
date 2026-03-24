@@ -86,6 +86,10 @@ const NAV_ITEMS: NavItemConfig[] = [
         label: { en: 'Store Config', ms: 'Tetapan Kedai' },
         icon: Settings,
         href: '/settings',
+        children: [
+            { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains' },
+            { label: { en: 'Payments', ms: 'Pembayaran' }, href: '/settings/payments' },
+        ],
     },
     {
         label: { en: 'Help Center', ms: 'Pusat Bantuan' },
