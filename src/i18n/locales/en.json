@@ -1,1 +1,409 @@
-{\n    \"common\": {\n        \"appName\": \"PrimeWeb\",\n        \"tagline\": \"Build Beautiful Websites in Minutes\",\n        \"login\": \"Log In\",\n        \"register\": \"Register\",\n        \"logout\": \"Logout\",\n        \"dashboard\": \"Dashboard\",\n        \"save\": \"Save\",\n        \"cancel\": \"Cancel\",\n        \"delete\": \"Delete\",\n        \"edit\": \"Edit\",\n        \"add\": \"Add\",\n        \"search\": \"Search\",\n        \"loading\": \"Loading...\",\n        \"error\": \"Something went wrong\",\n        \"success\": \"Success\",\n        \"confirm\": \"Confirm\",\n        \"back\": \"Back\",\n        \"next\": \"Next\",\n        \"submit\": \"Submit\",\n        \"close\": \"Close\",\n        \"yes\": \"Yes\",\n        \"no\": \"No\",\n        \"settings\": \"Settings\",\n        \"profile\": \"Profile\",\n        \"helpCenter\": \"Help Center\",\n        \"helpCenterDesc\": \"View tutorials, FAQ, and more\"\n    }
+{
+    "common": {
+        "signIn": "Sign In",
+        "signUp": "Sign Up",
+        "getStartedFree": "Get Started Free",
+        "startBuilding": "Start Building — Free",
+        "watchDemo": "Watch Demo",
+        "learnMore": "Learn More",
+        "copyright": "© 2026 Web Store. All rights reserved.",
+        "language": "Language",
+        "search": "Search..."
+    },
+    "nav": {
+        "platform": "Platform",
+        "solutions": "Solutions",
+        "features": "Features",
+        "pricing": "Pricing"
+    },
+    "hero": {
+        "badge": "AI-Powered Website Builder",
+        "title1": "Build Stunning",
+        "title2": "Websites",
+        "title3": "in Minutes",
+        "subtitle": "Describe your business and let AI create a beautiful, SEO-optimized website for you. Customize with drag & drop. Publish instantly.",
+        "noCreditCard": "No credit card required",
+        "seoOptimized": "SEO-optimized from day one",
+        "customDomain": "Custom domain support"
+    },
+    "features": {
+        "label": "Features",
+        "title": "Everything You Need to",
+        "titleHighlight": "Build & Scale",
+        "subtitle": "From AI generation to drag & drop editing — all in one platform.",
+        "items": {
+            "aiGeneration": {
+                "title": "AI Website Generation",
+                "desc": "Describe your business in plain text and get a complete website generated in seconds."
+            },
+            "dragDrop": {
+                "title": "Drag & Drop Editor",
+                "desc": "Customize any section by dragging blocks — Hero, Features, Testimonials, Contact and more."
+            },
+            "seo": {
+                "title": "SEO-First Architecture",
+                "desc": "Server-side rendered pages. Google indexes every page. Structured data out of the box."
+            },
+            "templates": {
+                "title": "Beautiful Templates",
+                "desc": "Dozens of premium templates for every industry — restaurants, e-commerce, portfolios, blogs."
+            },
+            "domains": {
+                "title": "Custom Domains",
+                "desc": "Connect your own domain in minutes. Free SSL certificate included automatically."
+            },
+            "ecommerce": {
+                "title": "E-commerce Ready",
+                "desc": "Product management, cart, checkout, and payment processing — all built in."
+            },
+            "analytics": {
+                "title": "Analytics Dashboard",
+                "desc": "Track visitors, page views, conversions and sources in a beautiful dashboard."
+            },
+            "integration": {
+                "title": "ECH Integration",
+                "desc": "Sync with Centralised Distribution for real-time inventory and order management."
+            },
+            "performance": {
+                "title": "Lightning Fast",
+                "desc": "Global CDN, image optimization, and smart caching keep your site blazing fast."
+            }
+        }
+    },
+    "cta": {
+        "title": "Ready to Build Your",
+        "titleHighlight": "Dream Website",
+        "subtitle": "Join thousands of SMEs who trust Web Store to power their online presence.",
+        "button": "Get Started — It's Free"
+    },
+    "gallery": {
+        "title": "Template Gallery",
+        "subtitle": "Choose a template that fits your industry — preview before you select",
+        "searchPlaceholder": "Search templates...",
+        "noTemplates": "No templates available",
+        "createWithAI": "Create with AI",
+        "preview": "Preview",
+        "useTemplate": "Use this template",
+        "usingTemplate": "Applying...",
+        "desktop": "Desktop",
+        "mobile": "Mobile",
+        "featured": "Featured",
+        "premium": "Premium",
+        "categories": {
+            "all": "All",
+            "restaurant": "🍽️ Restaurant",
+            "ecommerce": "🛍️ Shop",
+            "beauty": "💄 Beauty",
+            "tech": "💻 Tech",
+            "health": "🏥 Health",
+            "education": "📚 Education",
+            "realestate": "🏠 Property",
+            "fitness": "💪 Fitness",
+            "creative": "🎨 Portfolio",
+            "business": "🏢 Business"
+        },
+        "sort": "Sort by",
+        "sortNewest": "Newest",
+        "sortFeatured": "Featured",
+        "sortName": "A-Z"
+    },
+    "onboarding": {
+        "stepLabel": "Step",
+        "of": "of",
+        "next": "Next",
+        "back": "Back",
+        "finish": "Create My Website",
+        "step1Title": "What's your business about?",
+        "step1Subtitle": "Tell us about your business so we can create the perfect website.",
+        "step2Title": "Choose a template",
+        "step2Subtitle": "Pick a starting point — you can customize everything later.",
+        "step3Title": "Customize your site",
+        "step3Subtitle": "Add your brand details to make it yours."
+    },
+    "email": {
+        "welcome": {
+            "subject": "Welcome to PrimeWeb! 🎉",
+            "heading": "Welcome! 🎉",
+            "subheading": "Welcome to PrimeWeb",
+            "greeting": "Hi",
+            "body": "You're ready to create your first website with PrimeWeb! Just describe your idea, and AI will help you build a professional website in minutes.",
+            "stepsTitle": "Get started in 3 steps",
+            "step1": "Describe the website you want to create",
+            "step2": "Customize the content and design",
+            "step3": "Publish and share!",
+            "cta": "Get Started →",
+            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs"
+        },
+        "forgotPassword": {
+            "subject": "Reset your PrimeWeb password 🔐",
+            "heading": "Password Reset",
+            "subheading": "We received your reset request",
+            "greeting": "Hi",
+            "body": "We received a request to reset the password for your PrimeWeb account. Click the button below to set a new password. This link will expire in 1 hour.",
+            "cta": "Reset Password →",
+            "fallback": "If the button doesn't work, copy and paste this link into your browser:",
+            "expiry": "This link expires in 1 hour. If you didn't request this, you can safely ignore this email.",
+            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
+            "ignore": "If you didn't request a password reset, no action is needed."
+        },
+        "otp": {
+            "subject": "Your PrimeWeb verification code 🔐",
+            "heading": "Email Verification",
+            "subheading": "Verify your identity to continue",
+            "greeting": "Hi",
+            "body": "Enter this code to verify your identity:",
+            "expiry": "This code expires in 5 minutes",
+            "security": "If you didn't request this code, please ignore this email. Someone may have entered your email by mistake.",
+            "footer": "Powered by PrimeWeb — AI Website Builder for Malaysian SMEs",
+            "copyright": "© 2026 PrimeWeb · Kuala Lumpur, Malaysia"
+        },
+        "order": {
+            "subject": "Order Confirmed",
+            "heading": "Order Confirmed ✓",
+            "subheading": "Thank you for your purchase!",
+            "greeting": "Hi",
+            "body": "Your order has been placed successfully.",
+            "orderNumber": "Order Number",
+            "item": "Item",
+            "qty": "Qty",
+            "amount": "Amount",
+            "subtotal": "Subtotal",
+            "sst": "SST (6%)",
+            "total": "Total",
+            "shippingAddress": "Shipping Address",
+            "footer": "Powered by PrimeWeb"
+        },
+        "status": {
+            "greeting": "Hi",
+            "orderNumber": "Order Number",
+            "tracking": "Tracking",
+            "processing": {
+                "title": "Order is Processing",
+                "description": "Your order is being prepared. We will notify you when it has been shipped."
+            },
+            "shipped": {
+                "title": "Order Shipped",
+                "description": "Your order is on its way. You can track your shipment below."
+            },
+            "delivered": {
+                "title": "Order Delivered",
+                "description": "Your order has been delivered. Thank you for your purchase!"
+            },
+            "cancelled": {
+                "title": "Order Cancelled",
+                "description": "Your order has been cancelled. If you have any questions, please contact us."
+            }
+        }
+    },
+    "dashboard": {
+        "overview": {
+            "greeting": "Good",
+            "morning": "morning",
+            "afternoon": "afternoon",
+            "evening": "evening",
+            "customize": "Customize Dashboard",
+            "stats": {
+                "views": "Traffic / Views",
+                "leads": "Leads / Clicks",
+                "engagement": "Engagement",
+                "revenue": "Revenue",
+                "pendingOrders": "pending orders"
+            },
+            "actions": {
+                "title": "Action Required: Pending Orders",
+                "viewAll": "View all",
+                "fulfill": "Fulfill",
+                "empty": "No pending orders."
+            },
+            "seo": {
+                "title": "SEO Health",
+                "score": "Score:",
+                "statusGood": "Good",
+                "statusWarning": "Needs Improvement",
+                "fixAll": "✨ AI Fix All Issues"
+            },
+            "periods": {
+                "today": "Today",
+                "7d": "7 Days",
+                "30d": "30 Days"
+            },
+            "customizeModal": {
+                "title": "Customize Analytics",
+                "description": "Drag and drop to reorder or hide/show the metrics you care about.",
+                "cancel": "Cancel",
+                "saving": "Saving...",
+                "save": "Save Changes"
+            }
+        },
+        "sites": {
+            "title": "My Websites",
+            "viewAll": "View All →",
+            "openEditor": "Open Editor",
+            "published": "Published",
+            "draft": "Draft",
+            "lastEdited": "Last edited: ",
+            "edit": "Edit",
+            "preview": "Preview"
+        },
+        "analytics": {
+            "title": "Analytics",
+            "subtitle": "Detailed traffic and user behavior",
+            "empty": {
+                "title": "No analytical data available",
+                "description": "There is no tracked data in this time period. Check back later after receiving some traffic."
+            },
+            "error": "Cannot load analytics data",
+            "retry": "Try again",
+            "chart": "Traffic Overview",
+            "topPages": "Top Pages",
+            "topProducts": "Top Products",
+            "topBlogs": "Top Blogs",
+            "topReferrers": "Top Referrers",
+            "views": "Views",
+            "clicks": "Clicks"
+        },
+        "seo": {
+            "title": "SEO Dashboard",
+            "subtitle": "Analyse and optimise your site's search engine performance",
+            "reAnalyse": "Re-analyse",
+            "generateSitemap": "Generate Sitemap",
+            "sitemapSuccess": "Sitemap generated successfully",
+            "sitemapError": "Failed to generate sitemap",
+            "score": {
+                "good": "Good",
+                "needsWork": "Needs Work",
+                "poor": "Poor"
+            },
+            "stats": {
+                "totalIssues": "Total Issues",
+                "fixable": "Auto-Fixable by AI",
+                "pages": "Pages Analysed"
+            },
+            "breakdown": {
+                "title": "Category Breakdown",
+                "meta": "Meta Tags",
+                "content": "Content",
+                "technical": "Technical",
+                "noIssues": "No issues"
+            },
+            "aifix": {
+                "title": "AI SEO Fix",
+                "description": "Auto-generate missing meta titles & descriptions with AI",
+                "button": "Fix All with AI",
+                "fixing": "Fixing...",
+                "applySuccess": "Applied {count} fixes successfully",
+                "applyFailed": "Failed to apply fixes. Please try again.",
+                "fixResult": "Fixed {count} issues",
+                "undoLabel": "Undo (Ctrl+Z)",
+                "undoSuccess": "Batch Fix has been undone",
+                "errorTimeout": "AI Fix All timed out. Please try again.",
+                "errorFailed": "Cannot complete AI Fix All, please try again"
+            },
+            "keywordTracker": {
+                "title": "Keyword Tracker",
+                "description": "Track the ranking of up to 5 core keywords on Google.",
+                "placeholder": "Add new keyword...",
+                "add": "Add",
+                "empty": "No keywords are being tracked yet.",
+                "successAdd": "Keyword added successfully",
+                "errorAdd": "Error adding keyword",
+                "errorConnect": "Connection error when adding keyword",
+                "errorLoad": "Error loading keywords",
+                "errorDelete": "Error deleting keyword",
+                "errorMaxKeywords": "You can only track a maximum of 5 keywords.",
+                "errorKeywordExists": "This keyword already exists in the list.",
+                "notInTopResults": "Not in top 30 results"
+            },
+            "pages": {
+                "title": "Page-by-Page Analysis",
+                "allGood": "All good",
+                "issue": "issue",
+                "issues": "issues"
+            },
+            "empty": {
+                "title": "No sites to analyse",
+                "description": "Create a site first to use the SEO Dashboard",
+                "cta": "Go to Dashboard"
+            },
+            "error": {
+                "failed": "SEO analysis failed",
+                "retry": "Retry"
+            }
+        },
+        "orders": {
+            "title": "Orders Management",
+            "subtitle": "Auto-sync every 60s",
+            "trackOrders": "Track and process your orders",
+            "confirm": "Confirm",
+            "orders": "orders",
+            "changeTo": "Change to",
+            "search": "Search order ID, customer name...",
+            "noOrdersFound": "No orders found matching the filters",
+            "noOrdersYet": "No orders yet",
+            "noOrdersDesc": "New orders will appear here when customers complete checkout.",
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "confirmed": "Confirmed",
+                "readyToShip": "Ready to Ship",
+                "shipped": "Shipped",
+                "completed": "Completed",
+                "cancelled": "Cancelled",
+                "refunded": "Refunded"
+            },
+            "sort": {
+                "dateNewest": "Date: Newest first",
+                "dateOldest": "Date: Oldest first",
+                "totalHigh": "Total: High → Low",
+                "totalLow": "Total: Low → High"
+            },
+            "paymentFilter": {
+                "all": "All Pay",
+                "cod": "COD",
+                "qrBanking": "QR Banking"
+            },
+            "table": {
+                "orderId": "Order ID / Customer",
+                "items": "Items",
+                "total": "Total",
+                "status": "Status",
+                "date": "Date",
+                "item": "item",
+                "itemPlural": "items"
+            },
+            "drawer": {
+                "timeline": "Status Timeline",
+                "customer": "Customer",
+                "noPhone": "No phone provided",
+                "payment": "Payment",
+                "viewReceipt": "View Receipt",
+                "lineItems": "Line Items",
+                "subtotal": "Subtotal",
+                "shipping": "Shipping",
+                "tax": "Tax (6%)",
+                "total": "Total",
+                "orderCancelled": "Order cancelled",
+                "orderRefunded": "Order refunded",
+                "reason": "Reason"
+            },
+            "status": {
+                "pending": "Pending",
+                "confirmed": "Confirmed",
+                "readyToShip": "Ready to Ship",
+                "shipped": "Shipped",
+                "completed": "Completed",
+                "cancelled": "Cancelled",
+                "refunded": "Refunded",
+                "processing": "Processing",
+                "paid": "Paid"
+            },
+            "toast": {
+                "updated": "Order status updated",
+                "loadFailed": "Failed to load orders",
+                "bulkSuccess": "Successfully confirmed {count} orders",
+                "bulkFailed": "{count} orders failed (invalid workflow)",
+                "updateFailed": "Error: {message}"
+            }
+        }
+    }
+}
