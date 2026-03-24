@@ -3,30 +3,33 @@
 import { useState } from 'react'
 import Image from 'next/image'
 
-const WIZARD_STEPS = [
-  {
-    title: "AI Editor",
-    description: "Edit website interfaces through chat - no coding required. AI understands your requests and automatically updates the design in real-time.",
-    icon: "/images/f06/wizard/placeholder-icon.svg",
-    gradient: "from-blue-500/20 to-teal-400/20"
-  },
-  {
-    title: "AI Content",
-    description: "Create product descriptions, automatically generate SEO blog posts. AI writes professional content that attracts customers and is optimized for search engines.",
-    icon: "/images/f06/wizard/placeholder-icon-2.svg",
-    gradient: "from-teal-400/20 to-blue-500/20"
-  },
-  {
-    title: "AI SEO",
-    description: "Automatically optimize your website to improve search rankings. AI analyzes and enhances SEO, making your website easier to find on Google.",
-    icon: "/images/f06/wizard/placeholder-icon-3.svg",
-    gradient: "from-blue-500/20 via-teal-400/20 to-blue-500/20"
-  }
-]
+import { useI18n } from '@/i18n'
 
 export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
+  const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
+
+  const WIZARD_STEPS = [
+    {
+      title: t.onboarding.wizard.slides.editor.title,
+      description: t.onboarding.wizard.slides.editor.description,
+      icon: "/images/f06/wizard/placeholder-icon.svg",
+      gradient: "from-blue-500/20 to-teal-400/20"
+    },
+    {
+      title: t.onboarding.wizard.slides.content.title,
+      description: t.onboarding.wizard.slides.content.description,
+      icon: "/images/f06/wizard/placeholder-icon-2.svg",
+      gradient: "from-teal-400/20 to-blue-500/20"
+    },
+    {
+      title: t.onboarding.wizard.slides.seo.title,
+      description: t.onboarding.wizard.slides.seo.description,
+      icon: "/images/f06/wizard/placeholder-icon-3.svg",
+      gradient: "from-blue-500/20 via-teal-400/20 to-blue-500/20"
+    }
+  ]
 
   // Swipe handling logic
   const [touchStart, setTouchStart] = useState<number | null>(null)
@@ -99,7 +102,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-6">
           <h2 className="text-2xl font-bold text-[#F8FAFC] flex items-center gap-2 tracking-tight">
-            ✨ Discover the Power of AI
+            {t.onboarding.wizard.title}
           </h2>
           <button 
             onClick={dismissWizard}
@@ -159,14 +162,14 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
             onClick={dismissWizard}
             className="text-[14px] font-medium text-[#F8FAFC]/60 hover:text-white transition-colors bg-transparent border-none p-0 m-0 cursor-pointer hidden sm:block"
           >
-            {isLastStep ? "Skip the guide" : "Skip instructions"}
+            {isLastStep ? t.onboarding.wizard.footer.explore : t.onboarding.wizard.footer.skipInstructions}
           </button>
           
           <button 
             onClick={dismissWizard}
             className="text-[14px] font-medium text-[#F8FAFC]/60 hover:text-white transition-colors bg-transparent border-none p-0 m-0 cursor-pointer sm:hidden"
           >
-            Skip
+            {t.onboarding.wizard.footer.skip}
           </button>
           
           <div className="flex items-center gap-2 sm:gap-3">
@@ -175,7 +178,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
                 onClick={() => setCurrentStep(prev => prev - 1)}
                 className="px-3 sm:px-4 py-3 sm:py-2 text-[14px] font-medium text-[#F8FAFC] rounded-[10px] sm:border border-solid border-white/[0.08] hover:bg-white/[0.04] transition-colors bg-white/5 sm:bg-transparent cursor-pointer hidden sm:block"
               >
-                ← Go back
+                {t.onboarding.wizard.footer.goBack}
               </button>
             )}
             <button 
@@ -183,7 +186,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
               className="flex items-center justify-center rounded-[12px] sm:rounded-[10px] bg-gradient-to-r from-blue-500 to-teal-400 px-6 sm:px-5 py-3 sm:py-2 min-h-[44px] sm:min-h-[36px] text-white text-[15px] sm:text-[14px] font-semibold hover:brightness-110 shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),_0_10px_15px_-3px_rgba(0,0,0,0.1)] transition-all border-none cursor-pointer"
             >
               <span className="flex items-center gap-2">
-                {isLastStep ? "Explore CMS" : "Continue"}
+                {isLastStep ? t.onboarding.wizard.footer.explore : t.onboarding.wizard.footer.continue}
                 {!isLastStep && <Image src="/images/f06/wizard/continue-icon.svg" alt="Arrow Right" width={14} height={14} className="w-[14px] h-[14px] hidden sm:block" />}
               </span>
             </button>
