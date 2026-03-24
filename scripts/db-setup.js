@@ -77,6 +77,10 @@ const MIGRATIONS = [
     name: 'tenants.business_address',
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS business_address varchar;`,
   },
+  {
+    name: 'tenants.ai_generations_count',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ai_generations_count numeric DEFAULT 0;`,
+  },
   // ── Tenants: ECH Integration ──
   {
     name: 'tenants.ech_integration_enabled',
@@ -189,6 +193,24 @@ const MIGRATIONS = [
   {
     name: 'blogs.slug_idx',
     sql: `CREATE INDEX IF NOT EXISTS blogs_slug_idx ON blogs (slug);`,
+  },
+  // ── Users: Language preference ──
+  {
+    name: 'users.prefer_lang',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS prefer_lang varchar DEFAULT 'en';`,
+  },
+  // ── Users: OTP 2FA fields ──
+  {
+    name: 'users.otp_hash',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_hash varchar;`,
+  },
+  {
+    name: 'users.otp_expires_at',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_expires_at timestamptz;`,
+  },
+  {
+    name: 'users.otp_attempts',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_attempts numeric DEFAULT 0;`,
   },
   // ── Payload locked documents rels: FK columns for new collections ──
   {
