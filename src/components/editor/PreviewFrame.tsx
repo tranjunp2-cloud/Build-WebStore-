@@ -7,8 +7,10 @@ import { useEditorStore } from '@/store/editorStore'
 
 interface PreviewFrameProps {
     siteId: string
+    pageId: string | null
     iframeKey: number
     isLoading: boolean
+    viewport: 'desktop' | 'mobile'
 }
 
 type HoveredElementData = {
@@ -18,7 +20,7 @@ type HoveredElementData = {
     blockType: string
 }
 
-function PreviewFrameInner({ siteId, iframeKey, isLoading }: PreviewFrameProps) {
+function PreviewFrameInner({ siteId, pageId, iframeKey, isLoading, viewport }: PreviewFrameProps) {
     const { blocks, updateBlock } = useEditorStore()
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [isEditing, setIsEditing] = useState(false)
@@ -115,15 +117,32 @@ function PreviewFrameInner({ siteId, iframeKey, isLoading }: PreviewFrameProps) 
         )
     }
 
+    const previewUrl = new URL(`/api/preview/${siteId}`, 'http://localhost')
+    previewUrl.searchParams.set('v', String(iframeKey))
+    if (pageId) {
+        previewUrl.searchParams.set('pageId', pageId)
+    }
+
     return (
-        <div className="flex-1 bg-white relative overflow-hidden">
-            <iframe
-                key={iframeKey}
-                src={`/api/preview/${siteId}?v=${iframeKey}`}
-                className="h-full w-full border-0"
-                title="Site Preview"
-                sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            />
+        <div className="relative flex-1 overflow-hidden bg-[#111827] p-6">
+            <div className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4">
+                <div
+                    className="relative h-full overflow-hidden rounded-[24px] border border-white/10 bg-white shadow-2xl transition-all"
+                    style={{
+                        width: viewport === 'mobile' ? 390 : '100%',
+                        maxWidth: viewport === 'mobile' ? 390 : 1280,
+                    }}
+                >
+                    <iframe
+                        key={iframeKey}
+                        src={previewUrl.pathname + previewUrl.search}
+                        className="h-full w-full border-0"
+                        title="Site Preview"
+                        sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                    />
+                </div>
+            </div>
+
             {hoverData && hoverData.rect && (
                 <div 
                     className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10 rounded transition-all duration-200"

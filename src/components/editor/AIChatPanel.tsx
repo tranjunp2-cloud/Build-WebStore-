@@ -1,15 +1,11 @@
 'use client'
 
-import React, { memo, useState, useEffect, useRef } from 'react'
-import {
-    Sparkles, LayoutGrid, Send, GripVertical,
-    PanelLeftClose, PanelLeftOpen, Plus
-} from 'lucide-react'
+import React, { memo, useEffect, useRef, useState } from 'react'
+import { Send, Sparkles } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { blockRegistry } from '@/blocks/registry'
-import type { BlockData, AIAction, ThemeData } from '@/types/editor'
+import type { AIAction, BlockData, ThemeData } from '@/types/editor'
 
-// ─── Types ──────────────────────────────────────────────────────────────
 type ChatMessage = {
     id: string
     role: 'user' | 'assistant'
@@ -18,17 +14,8 @@ type ChatMessage = {
     isStreaming?: boolean
 }
 
-function getBlockInfo(blockType: string) {
-    const meta = blockRegistry.getBlockMeta(blockType)
-    return { label: meta?.name || blockType, icon: meta?.icon || '🧩', variants: meta?.variants || [] }
-}
-
-// ─── Props ──────────────────────────────────────────────────────────────
 interface AIChatPanelProps {
-    isOpen: boolean
-    onToggle: () => void
     blocks: BlockData[]
-    onBlockSelect: (idx: number) => void
     selectedBlock: number | null
     onAIAction: (action: AIAction) => Promise<void> | void
     onUndoLastAction: () => void
@@ -36,18 +23,23 @@ interface AIChatPanelProps {
     theme: ThemeData | undefined
 }
 
-// ─── Component ──────────────────────────────────────────────────────────
 function AIChatPanelInner({
-    isOpen, onToggle, blocks, onBlockSelect, selectedBlock,
-    onAIAction, onUndoLastAction, siteName, theme,
+    blocks,
+    selectedBlock,
+    onAIAction,
+    onUndoLastAction,
+    siteName,
+    theme,
 }: AIChatPanelProps) {
-    const [tab, setTab] = useState<'chat' | 'blocks'>('blocks')
     const [input, setInput] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
     const [messages, setMessages] = useState<ChatMessage[]>([
-        { id: 'welcome', role: 'assistant', content: 'I can help you edit your website. For example:\n• "Change primary colour to green"\n• "Rewrite the About section shorter"\n• "Add a FAQ section"\n• "Change heading font to Playfair Display"' },
+        {
+            id: 'welcome',
+            role: 'assistant',
+            content: 'Hello! What would you like to edit?',
+        },
     ])
-    const [showAddBlock, setShowAddBlock] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -55,10 +47,9 @@ function AIChatPanelInner({
     }, [messages])
 
     const updateAssistantMessage = (messageId: string, next: Partial<ChatMessage>) => {
-        setMessages(prev => prev.map(message => {
-            if (message.id !== messageId) return message
-            return { ...message, ...next }
-        }))
+        setMessages(prev =>
+            prev.map(message => (message.id === messageId ? { ...message, ...next } : message)),
+        )
     }
 
     const handleAIError = (messageId: string, message: string) => {
@@ -146,8 +137,10 @@ function AIChatPanelInner({
 
     const handleSendChat = async () => {
         if (!input.trim() || isProcessing) return
+
         const userMsg = input.trim()
         const assistantMessageId = `${Date.now()}-assistant`
+
         setInput('')
         setMessages(prev => [
             ...prev,
@@ -166,6 +159,7 @@ function AIChatPanelInner({
             const res = await fetch('/api/ai/edit-block?stream=true', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({
                     instruction: userMsg,
                     block: currentBlock,
@@ -174,7 +168,6 @@ function AIChatPanelInner({
                     theme,
                     siteName,
                 }),
-                credentials: 'include',
             })
 
             if (!res.ok) {
@@ -205,114 +198,61 @@ function AIChatPanelInner({
         }
     }
 
-    if (!isOpen) {
-        return (
-            <button onClick={onToggle}
-                aria-label="Open editor panel"
-                className="fixed left-0 top-14 z-30 rounded-r-lg bg-[#1E293B] p-2 text-gray-400 hover:text-white transition-colors border border-l-0 border-white/10"
-                title="Open Panel">
-                <PanelLeftOpen className="h-4 w-4" />
-            </button>
-        )
-    }
-
-    const allBlockTypes = blockRegistry.getAllMeta()
-
     return (
-        <div className="flex h-full w-[380px] shrink-0 flex-col border-r border-white/10 bg-[#0B1120]">
-            {/* Panel header with tabs */}
-            <div className="flex h-12 items-center justify-between border-b border-white/10 px-3">
-                <div className="flex gap-1" role="tablist" aria-label="Editor panel tabs">
-                    <button onClick={() => setTab('blocks')} role="tab" aria-selected={tab === 'blocks'}
-                        className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-                            tab === 'blocks' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300')}>
-                        <LayoutGrid className="h-3 w-3" /> Blocks
-                    </button>
-                    <button onClick={() => setTab('chat')} role="tab" aria-selected={tab === 'chat'}
-                        className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-                            tab === 'chat' ? 'bg-purple-500/10 text-purple-400' : 'text-gray-500 hover:bg-white/5 hover:text-gray-300')}>
-                        <Sparkles className="h-3 w-3" /> AI Chat
-                    </button>
+        <div className="flex h-full flex-col">
+            <div className="border-b border-white/10 px-4 py-4">
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <p className="text-sm font-semibold text-white">AI Chat</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                            Ask AI to update layout, content, and theme in realtime.
+                        </p>
+                    </div>
+                    <Sparkles className="h-4 w-4 text-cyan-400" />
                 </div>
-                <button onClick={onToggle} aria-label="Close editor panel" className="rounded-lg p-1 text-gray-500 hover:bg-white/5 hover:text-white transition-colors">
-                    <PanelLeftClose className="h-4 w-4" />
-                </button>
             </div>
 
-            {tab === 'blocks' ? (
-                <div className="flex-1 overflow-y-auto p-3 space-y-1" role="tabpanel">
-                    <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs text-gray-500">{blocks.length} blocks</p>
-                        <button onClick={() => setShowAddBlock(!showAddBlock)}
-                            className="flex items-center gap-1 rounded-lg bg-blue-500/10 px-2 py-1 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">
-                            <Plus className="h-3 w-3" /> Add
-                        </button>
-                    </div>
-
-                    {/* Add Block Picker */}
-                    {showAddBlock && (
-                        <div className="mb-3 rounded-lg border border-blue-500/20 bg-blue-500/5 p-2 space-y-1 max-h-40 overflow-y-auto">
-                            {allBlockTypes.map(meta => (
-                                <button key={meta.type}
-                                    onClick={() => {
-                                        const afterIndex = selectedBlock ?? (blocks.length - 1)
-                                        onAIAction({ action: 'add_block', afterIndex, block: { blockType: meta.type, variant: meta.variants[0] } })
-                                        setShowAddBlock(false)
-                                    }}
-                                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-gray-300 hover:bg-white/5 transition-colors">
-                                    <span>{meta.icon}</span> {meta.name}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {blocks.map((block, i) => {
-                        const info = getBlockInfo(block.blockType)
-                        return (
-                            <button key={i} onClick={() => onBlockSelect(i)}
-                                aria-current={selectedBlock === i ? 'true' : undefined}
-                                className={cn('flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
-                                    selectedBlock === i ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'text-gray-300 hover:bg-white/5 border border-transparent')}>
-                                <GripVertical className="h-3 w-3 text-gray-600" />
-                                <span className="mr-1">{info.icon}</span>
-                                <span className="font-medium">{info.label}</span>
-                                {block.variant ? <span className="ml-auto text-[10px] text-gray-600">{String(block.variant)}</span> : null}
-                            </button>
-                        )
-                    })}
-                </div>
-            ) : (
-                <div role="tabpanel" className="flex flex-1 flex-col">
-                    {/* AI Chat Messages */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-3" role="log" aria-label="AI chat messages">
+            <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
+                <div className="flex-1 overflow-y-auto p-4" role="log" aria-label="AI chat messages">
+                    <div className="space-y-3">
                         {messages.map(msg => (
                             <div key={msg.id} className={cn('flex gap-2', msg.role === 'user' ? 'flex-row-reverse' : '')}>
-                                {msg.role === 'assistant' && (
-                                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
-                                        <Sparkles className="h-3 w-3 text-white" />
+                                {msg.role === 'assistant' ? (
+                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-500">
+                                        <Sparkles className="h-3.5 w-3.5 text-white" />
                                     </div>
-                                )}
-                                <div className={cn('max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed',
-                                    msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-[#1E293B] text-gray-300 rounded-bl-sm border border-white/5')}>
+                                ) : null}
+
+                                <div
+                                    className={cn(
+                                        'max-w-[88%] rounded-2xl px-3 py-3 text-sm leading-relaxed',
+                                        msg.role === 'user'
+                                            ? 'rounded-br-md bg-blue-600 text-white'
+                                            : 'rounded-bl-md border border-white/5 bg-[#1E293B] text-gray-300',
+                                    )}
+                                >
                                     <p className="whitespace-pre-wrap">{msg.content}</p>
                                     {msg.undoable && msg.role === 'assistant' ? (
-                                        <button
+                                        <Button
                                             type="button"
+                                            variant="secondary"
+                                            size="sm"
                                             onClick={onUndoLastAction}
-                                            className="mt-2 inline-flex items-center rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-white/10"
+                                            className="mt-3 h-7 rounded-full px-3 text-[11px]"
                                         >
-                                            Hoan tac
-                                        </button>
+                                            Undo change
+                                        </Button>
                                     ) : null}
                                 </div>
                             </div>
                         ))}
-                        {isProcessing && (
+
+                        {isProcessing ? (
                             <div className="flex gap-2" role="status" aria-label="AI is thinking">
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
-                                    <Sparkles className="h-3 w-3 text-white" />
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-blue-500">
+                                    <Sparkles className="h-3.5 w-3.5 text-white" />
                                 </div>
-                                <div className="rounded-xl rounded-bl-sm border border-white/5 bg-[#1E293B] px-3 py-2">
+                                <div className="rounded-2xl rounded-bl-md border border-white/5 bg-[#1E293B] px-3 py-3">
                                     <div className="flex gap-1">
                                         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-500" style={{ animationDelay: '0ms' }} />
                                         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-500" style={{ animationDelay: '150ms' }} />
@@ -320,30 +260,63 @@ function AIChatPanelInner({
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        ) : null}
+
                         <div ref={messagesEndRef} />
                     </div>
+                </div>
 
-                    {/* AI Chat Input */}
-                    <div className="border-t border-white/10 p-3">
-                        <div className="flex items-center gap-2 rounded-lg bg-[#1E293B] pr-2 border border-white/10 focus-within:border-purple-500/50 transition-colors">
-                            <input value={input}
+                <div className="border-t border-white/10 p-4">
+                    <div className="mb-3 flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setInput('Change web color to mint green')}
+                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300 transition-colors hover:bg-white/10"
+                        >
+                            Change web color
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setInput('Add a new section with testimonials')}
+                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300 transition-colors hover:bg-white/10"
+                        >
+                            Add section
+                        </button>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-[#111827] p-3 transition-colors focus-within:border-cyan-500/40">
+                        <div className="flex items-end gap-2">
+                            <textarea
+                                value={input}
                                 onChange={e => setInput(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat() } }}
-                                placeholder="Ask AI to make changes..."
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        void handleSendChat()
+                                    }
+                                }}
+                                placeholder="Enter command... (For example: 'Change the hero heading')"
                                 aria-label="Chat message"
-                                className="flex-1 bg-transparent px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none"
+                                className="min-h-[84px] flex-1 resize-none bg-transparent text-sm text-white placeholder:text-gray-600 outline-none"
                                 disabled={isProcessing}
                             />
-                            <button onClick={handleSendChat} disabled={!input.trim() || isProcessing}
-                                aria-label="Send message"
-                                className="rounded-md bg-purple-600 p-1.5 text-white disabled:opacity-30 hover:bg-purple-500 transition-colors">
-                                <Send className="h-3.5 w-3.5" />
-                            </button>
+                            <Button
+                                type="button"
+                                size="icon"
+                                onClick={() => void handleSendChat()}
+                                disabled={!input.trim() || isProcessing}
+                                className="shrink-0 rounded-xl"
+                            >
+                                <Send className="h-4 w-4" />
+                            </Button>
                         </div>
                     </div>
+
+                    <p className="mt-3 text-[11px] text-gray-500">
+                        Press Enter to send, Shift+Enter to go to the next line
+                    </p>
                 </div>
-            )}
+            </div>
         </div>
     )
 }
