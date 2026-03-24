@@ -51,11 +51,11 @@ export const Tenants: CollectionConfig = {
             },
         },
         {
-            name: 'customDomain',
-            type: 'text',
-            unique: true,
+            name: 'customDomains',
+            type: 'json',
+            defaultValue: [],
             admin: {
-                description: 'Custom domain (e.g. www.mybakery.com). Leave blank to use subdomain.',
+                description: 'Array of custom domains: [{ domain: string, status: "pending" | "active" }]',
             },
         },
         {
