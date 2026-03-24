@@ -11,6 +11,7 @@ import { EmptyState } from './components/OrdersEmptyState'
 import { OrdersStatsBar } from './components/OrdersStatsBar'
 import { OrderDrawer } from './components/OrderDrawer'
 import { OrderStatusBadge } from './components/OrderStatusBadge'
+import { CancelOrderModal } from './components/CancelOrderModal'
 
 export default function OrdersPage() {
     const { t } = useI18n()
@@ -20,6 +21,10 @@ export default function OrdersPage() {
     const [filterStatus, setFilterStatus] = useState<string>('all')
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+
+    // Cancel state
+    const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null)
+    const [isCancelling, setIsCancelling] = useState(false)
 
     // Bulk action state
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -49,6 +54,11 @@ export default function OrdersPage() {
     }, [])
 
     const handleStatusChange = async (id: string, newStatus: string) => {
+        if (newStatus === 'cancelled') {
+            setCancellingOrderId(id)
+            return
+        }
+
         setUpdatingId(id)
         try {
             const res = await fetch(`/api/orders/${id}`, {
@@ -70,6 +80,33 @@ export default function OrdersPage() {
             toast.error(o.toast.updateFailed.replace('{message}', error.message))
         } finally {
             setUpdatingId(null)
+        }
+    }
+
+    const confirmCancelOrder = async (reason: string) => {
+        if (!cancellingOrderId) return
+        setIsCancelling(true)
+        try {
+            const res = await fetch(`/api/orders/${cancellingOrderId}/cancel`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason }),
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error?.message || 'Cancel failed')
+
+            toast.success('Order cancelled successfully')
+
+            // Sync local state
+            setOrders(prev => prev.map(order => order.id === cancellingOrderId ? { ...order, status: 'cancelled', cancelReason: reason } : order))
+            if (selectedOrder?.id === cancellingOrderId) {
+                setSelectedOrder(prev => prev ? { ...prev, status: 'cancelled', cancelReason: reason } : null)
+            }
+            setCancellingOrderId(null)
+        } catch (error: any) {
+            toast.error(error.message)
+        } finally {
+            setIsCancelling(false)
         }
     }
 
@@ -281,6 +318,13 @@ export default function OrdersPage() {
                     />
                 </>
             )}
+
+            <CancelOrderModal
+                isOpen={cancellingOrderId !== null}
+                onClose={() => setCancellingOrderId(null)}
+                onConfirm={confirmCancelOrder}
+                isSubmitting={isCancelling}
+            />
         </div>
     )
 }
