@@ -94,6 +94,23 @@ const MIGRATIONS = [
     name: 'tenants.ech_integration_merchant_id',
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ech_integration_merchant_id varchar;`,
   },
+  // ── Tenants: Settings group ──
+  {
+    name: 'tenants.settings_allowed_websites',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_allowed_websites numeric DEFAULT 1;`,
+  },
+  {
+    name: 'tenants.settings_storage_used',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_storage_used numeric DEFAULT 0;`,
+  },
+  {
+    name: 'tenants.settings_storage_limit_bytes',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_storage_limit_bytes numeric DEFAULT 524288000;`,
+  },
+  {
+    name: 'tenants.settings_dashboard_preferences',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_dashboard_preferences jsonb;`,
+  },
   // ── Sites: Locale + Shipping ──
   {
     name: 'sites.locale',
