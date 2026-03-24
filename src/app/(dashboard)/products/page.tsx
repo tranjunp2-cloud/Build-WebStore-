@@ -156,7 +156,7 @@ export default function ProductsPage() {
     }
 
     // Empty state
-    if (products.length === 0 && !isLoading) {
+    if (products.length === 0) {
         return <ProductsEmptyState />
     }
 
