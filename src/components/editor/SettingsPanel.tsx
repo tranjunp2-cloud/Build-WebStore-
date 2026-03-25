@@ -4,6 +4,8 @@ import React, { memo, useEffect, useState } from 'react'
 import { CircleDot, Copy, Globe2, MenuSquare, Search, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
+import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
+import { LogoEditor } from './LogoEditor'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 
 // ─── Constants ──────────────────────────────────────────────────────────
@@ -28,16 +30,24 @@ interface SettingsPanelProps {
     theme: ThemeData | undefined
     siteName: string
     siteStatus: string
+    headerBlock?: BlockData | null
+    footerBlock?: BlockData | null
+    pages?: { id: string; title: string; slug: string }[]
     onThemeChange: (key: string, value: string) => void
     onDeleteBlock: (idx: number) => void
     onDuplicateBlock: (idx: number) => void
     onBlockFieldChange: (idx: number, field: string, value: string) => void
     onBlockUpdate: (idx: number, changes: Record<string, unknown>) => void
+    onHeaderUpdate?: (changes: Record<string, unknown>) => void
+    onFooterUpdate?: (changes: Record<string, unknown>) => void
+    onLogoChange?: (logoUrl: string, faviconUrl?: string) => void
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
 function SettingsPanelInner({
-    block, blockIndex, theme, siteName, siteStatus, onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
+    block, blockIndex, theme, siteName, siteStatus, headerBlock, footerBlock, pages,
+    onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
+    onHeaderUpdate, onFooterUpdate, onLogoChange,
 }: SettingsPanelProps) {
     const [activeTab, setActiveTab] = useState<SettingsTab>(block ? 'block' : 'global')
 
@@ -155,20 +165,43 @@ function SettingsPanelInner({
 
     const renderMenuContent = () => (
         <div className="space-y-5">
-            <div>
+            {/* Logo Editor (AC-2) */}
+            <LogoEditor
+                currentLogo={(headerBlock as any)?.logo || null}
+                onLogoChange={(logoUrl, faviconUrl) => {
+                    onHeaderUpdate?.({ logo: logoUrl })
+                    if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
+                }}
+            />
+
+            <div className={sectionCls}>
                 <label className={labelCls}>Navigation Style</label>
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                    <button type="button" className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-300">Standard</button>
-                    <button type="button" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-400">Centered</button>
-                </div>
-            </div>
-            <div className={sectionCls}>
-                <label className="text-xs font-medium uppercase text-gray-500">Menu Items</label>
-                <div className="mt-3 space-y-2">
-                    {['Home', 'About', 'Products', 'Contact'].map(item => (
-                        <div key={item} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">{item}</div>
+                    {['standard', 'centered'].map(style => (
+                        <button
+                            key={style}
+                            type="button"
+                            onClick={() => onHeaderUpdate?.({ navStyle: style })}
+                            className={cn(
+                                'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
+                                (headerBlock as any)?.navStyle === style || (!((headerBlock as any)?.navStyle) && style === 'standard')
+                                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
+                            )}
+                        >
+                            {style}
+                        </button>
                     ))}
                 </div>
+            </div>
+
+            {/* Navigation Editor (AC-1) */}
+            <div className={sectionCls}>
+                <NavigationEditor
+                    links={((headerBlock as any)?.links as NavLinkItem[]) || []}
+                    onUpdate={(links) => onHeaderUpdate?.({ links })}
+                    pages={pages}
+                />
             </div>
         </div>
     )
@@ -438,23 +471,17 @@ function SettingsPanelInner({
                 {/* ─── Navigation Links ───────────────────────── */}
                 {bt === 'navigation' && (
                     <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">Navigation Links</label>
-                        {((block.links || []) as NavLink[]).map((link, i) => (
-                            <div key={`link-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-gray-500">Link {i + 1}</span>
-                                    <button onClick={() => removeArrayItem('links', i)} aria-label={`Remove link ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
-                                </div>
-                                <input defaultValue={link.label || ''} placeholder="Label"
-                                    onBlur={(e: FieldBlurEvent) => updateArrayItem('links', i, 'label', e.target.value)}
-                                    className={inputCls} />
-                                <input defaultValue={link.url || ''} placeholder="URL"
-                                    onBlur={(e: FieldBlurEvent) => updateArrayItem('links', i, 'url', e.target.value)}
-                                    className={inputCls} />
-                            </div>
-                        ))}
-                        <button onClick={() => addArrayItem('links', { label: 'New Link', url: '#' })}
-                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">+ Add Link</button>
+                        <NavigationEditor
+                            links={((block.links || []) as NavLinkItem[]).map((link: any, i: number) => ({
+                                id: link.id || `legacy_${i}`,
+                                label: link.label || '',
+                                url: link.url || '#',
+                                type: link.type || 'external' as const,
+                                children: link.children || [],
+                            }))}
+                            onUpdate={(links) => onBlockUpdate(currentBlockIndex, { links })}
+                            pages={pages}
+                        />
                         {/* Nav CTA */}
                         {!!block.ctaButton && (
                             <div className="mt-3">

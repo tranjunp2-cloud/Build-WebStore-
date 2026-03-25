@@ -349,10 +349,22 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
     }
 
     const blocks = page?.layout || []
+    
+    // Inject global header/footer from site level
+    // Remove existing page-level navigation and footer to avoid duplicates, but keep them as fallback
+    const oldNav = blocks.find((b: any) => b.blockType === 'navigation')
+    const oldFooter = blocks.find((b: any) => b.blockType === 'footer')
+    const combinedBlocks = blocks.filter((b: any) => b.blockType !== 'navigation' && b.blockType !== 'footer')
+    
+    const finalHeader = site.headerBlock || oldNav
+    const finalFooter = site.footerBlock || oldFooter
+    
+    if (finalHeader) combinedBlocks.unshift(finalHeader)
+    if (finalFooter) combinedBlocks.push(finalFooter)
 
-    const cat = detectCategory(blocks, site.name || '')
+    const cat = detectCategory(combinedBlocks, site.name || '')
     const t = THEMES[cat] || THEMES.business
-    const html = buildFullHTML(blocks, t, cat, {
+    const html = buildFullHTML(combinedBlocks, t, cat, {
       name: site.name,
       description: site.description,
     })

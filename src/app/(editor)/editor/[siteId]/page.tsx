@@ -73,6 +73,10 @@ export default function EditorPage() {
     const duplicateBlock = useEditorStore(state => state.duplicateBlock)
     const reorderBlocks = useEditorStore(state => state.reorderBlocks)
     const updateTheme = useEditorStore(state => state.updateTheme)
+    const headerBlock = useEditorStore(state => state.headerBlock)
+    const footerBlock = useEditorStore(state => state.footerBlock)
+    const updateHeaderBlock = useEditorStore(state => state.updateHeaderBlock)
+    const updateFooterBlock = useEditorStore(state => state.updateFooterBlock)
     const undo = useEditorStore(state => state.undo)
     const redo = useEditorStore(state => state.redo)
     const canUndo = useEditorStore(state => state.canUndo)
@@ -147,7 +151,7 @@ export default function EditorPage() {
                     setCurrentPageId('')
                 }
 
-                init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '')
+                init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '', data.site?.headerBlock || null, data.site?.footerBlock || null)
 
                 if (pagesRes.ok) {
                     const pagesData = await pagesRes.json()
@@ -187,7 +191,12 @@ export default function EditorPage() {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ blocks: currentBlocks, theme: currentTheme }),
+                body: JSON.stringify({
+                    blocks: currentBlocks,
+                    theme: currentTheme,
+                    headerBlock: snapshot.headerBlock,
+                    footerBlock: snapshot.footerBlock,
+                }),
             })
 
             if (!res.ok) {
@@ -528,11 +537,16 @@ export default function EditorPage() {
                         theme={theme}
                         siteName={siteName || site?.name || ''}
                         siteStatus={site?.status || 'draft'}
+                        headerBlock={headerBlock}
+                        footerBlock={footerBlock}
+                        pages={pages as any}
                         onThemeChange={handleThemeChange}
                         onDeleteBlock={handleDeleteBlock}
                         onDuplicateBlock={handleDuplicateBlock}
                         onBlockFieldChange={handleBlockFieldChange}
                         onBlockUpdate={handleBlockUpdate}
+                        onHeaderUpdate={(changes) => updateHeaderBlock(changes)}
+                        onFooterUpdate={(changes) => updateFooterBlock(changes)}
                     />
                 </div>
             )}
