@@ -272,6 +272,16 @@ export const Sites: CollectionConfig = {
                 },
             ],
         },
+        {
+            name: 'headerBlock',
+            type: 'json',
+            admin: { description: 'Global header/navigation block for all pages' },
+        },
+        {
+            name: 'footerBlock',
+            type: 'json',
+            admin: { description: 'Global footer block for all pages' },
+        },
     ],
     timestamps: true,
 }

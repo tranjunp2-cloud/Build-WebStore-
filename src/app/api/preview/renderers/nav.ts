@@ -7,13 +7,15 @@ export function renderNav(block: any, t: TemplateTheme): string {
     const links = (block.links || []).map((l: any) => `<a href="${l.url || '#'}">${l.label}</a>`).join('')
     const cta = block.ctaButton?.show !== false ? `<a href="${block.ctaButton?.url || '#'}" class="nav-cta">${block.ctaButton?.label || 'Contact'}</a>` : ''
 
+    const logoText = block.logoText || 'Logo'
+
     switch (t.navStyle) {
-        case 'transparent': return navTransparent(block.logoText, links, cta, t)
-        case 'sticky-dark': return navStickyDark(block.logoText, links, cta, t)
-        case 'centered-logo': return navCenteredLogo(block.logoText, links, cta, t)
-        case 'minimal': return navMinimal(block.logoText, links, cta, t)
-        case 'classic': return navClassic(block.logoText, links, cta, t)
-        default: return navClassic(block.logoText, links, cta, t)
+        case 'transparent': return navTransparent(logoText, links, cta, t)
+        case 'sticky-dark': return navStickyDark(logoText, links, cta, t)
+        case 'centered-logo': return navCenteredLogo(logoText, links, cta, t)
+        case 'minimal': return navMinimal(logoText, links, cta, t)
+        case 'classic': return navClassic(logoText, links, cta, t)
+        default: return navClassic(logoText, links, cta, t)
     }
 }
 
