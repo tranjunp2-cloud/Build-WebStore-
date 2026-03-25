@@ -11,6 +11,7 @@ import { EmptyState } from './components/OrdersEmptyState'
 import { OrdersStatsBar } from './components/OrdersStatsBar'
 import { OrderDrawer } from './components/OrderDrawer'
 import { OrderStatusBadge } from './components/OrderStatusBadge'
+import { OrderMobileCard } from './components/OrderMobileCard'
 import { CancelOrderModal } from './components/CancelOrderModal'
 
 export default function OrdersPage() {
@@ -285,9 +286,34 @@ export default function OrdersPage() {
                 </div>
             </div>
 
-            {/* List / Table */}
-            <div className="rounded-xl border border-white/10 bg-[#1E293B]/30 overflow-hidden">
-                <div className="hidden sm:grid grid-cols-[40px_1fr_140px_100px_140px_100px] gap-4 border-b border-white/10 px-6 py-3 text-xs font-medium uppercase text-gray-500">
+            {/* Mobile Cards (< md) */}
+            <div className="md:hidden space-y-3">
+                {filtered.map(order => (
+                    <OrderMobileCard
+                        key={order.id}
+                        order={order}
+                        onSelect={setSelectedOrder}
+                        onStatusChange={handleStatusChange}
+                        isUpdating={updatingId}
+                        isSelected={selectedIds.has(order.id)}
+                        onToggleSelect={(id, checked) => {
+                            const newSet = new Set(selectedIds)
+                            if (checked) newSet.add(id)
+                            else newSet.delete(id)
+                            setSelectedIds(newSet)
+                        }}
+                    />
+                ))}
+                {filtered.length === 0 && (
+                    <div className="py-12 text-center text-sm text-gray-500">
+                        {o.noOrdersFound}
+                    </div>
+                )}
+            </div>
+
+            {/* Desktop Table (≥ md) */}
+            <div className="hidden md:block rounded-xl border border-white/10 bg-[#1E293B]/30 overflow-hidden">
+                <div className="grid grid-cols-[40px_1fr_140px_100px_140px_100px] gap-4 border-b border-white/10 px-6 py-3 text-xs font-medium uppercase text-gray-500">
                     <div className="flex items-center">
                         <input
                             type="checkbox"
@@ -308,10 +334,8 @@ export default function OrdersPage() {
 
                 <div className="divide-y divide-white/5">
                     {filtered.map(order => (
-                        <div key={order.id} className="relative block w-full sm:grid sm:grid-cols-[40px_1fr_140px_100px_140px_100px] gap-2 sm:gap-4 px-4 sm:px-6 py-4 hover:bg-white/5 transition-colors sm:items-center">
-
-                            {/* Checkbox */}
-                            <div className="absolute top-4 right-4 sm:static sm:flex sm:items-center -mt-0.5">
+                        <div key={order.id} className="grid grid-cols-[40px_1fr_140px_100px_140px_100px] gap-4 px-6 py-4 hover:bg-white/5 transition-colors items-center">
+                            <div className="flex items-center">
                                 <input
                                     type="checkbox"
                                     className="rounded border-white/20 bg-white/5"
@@ -324,34 +348,24 @@ export default function OrdersPage() {
                                     }}
                                 />
                             </div>
-
-                            {/* Info */}
-                            <div className="cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                            <div className="cursor-pointer" role="button" tabIndex={0} onClick={() => setSelectedOrder(order)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedOrder(order) } }}>
                                 <p className="text-sm font-medium text-white">#{order.orderNumber}</p>
                                 <p className="text-sm text-gray-400 mt-0.5 truncate">{order.customerName}</p>
                             </div>
-
-                            {/* Items count */}
-                            <div className="text-sm text-gray-500 cursor-pointer hidden sm:block" onClick={() => setSelectedOrder(order)}>
+                            <div className="text-sm text-gray-500 cursor-pointer" role="button" tabIndex={0} onClick={() => setSelectedOrder(order)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedOrder(order) } }}>
                                 {order.items.length} {order.items.length !== 1 ? o.table.itemPlural : o.table.item}
                             </div>
-
-                            {/* Total */}
-                            <div className="text-sm font-medium text-white cursor-pointer mt-2 sm:mt-0" onClick={() => setSelectedOrder(order)}>
+                            <div className="text-sm font-medium text-white cursor-pointer" role="button" tabIndex={0} onClick={() => setSelectedOrder(order)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedOrder(order) } }}>
                                 {formatPrice(order.total, order.currency)}
                             </div>
-
-                            {/* Status */}
-                            <div className="mt-2 sm:mt-0 flex items-center">
+                            <div className="flex items-center">
                                 <OrderStatusBadge
                                     order={order}
                                     onStatusChange={handleStatusChange}
                                     isUpdating={updatingId}
                                 />
                             </div>
-
-                            {/* Date */}
-                            <div className="text-xs text-gray-500 mt-2 sm:mt-0 cursor-pointer hidden sm:block" onClick={() => setSelectedOrder(order)}>
+                            <div className="text-xs text-gray-500 cursor-pointer" role="button" tabIndex={0} onClick={() => setSelectedOrder(order)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedOrder(order) } }}>
                                 {new Date(order.createdAt).toLocaleDateString('en-MY')}
                             </div>
                         </div>

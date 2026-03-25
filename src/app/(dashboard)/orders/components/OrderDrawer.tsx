@@ -1,8 +1,29 @@
-import { X, ExternalLink, ImageIcon } from 'lucide-react'
+import { X, ExternalLink, ImageIcon, ChevronLeft } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { Order } from '../types'
-import { formatPrice } from '../types'
+import { STATUS_CONFIG, formatPrice } from '../types'
 import { OrderStatusBadge } from './OrderStatusBadge'
+
+// Status action buttons for mobile sticky bar
+const STATUS_ACTIONS: Record<string, { next: string; labelKey: string; color: string }[]> = {
+    pending: [
+        { next: 'confirmed', labelKey: 'confirmed', color: 'bg-blue-600 hover:bg-blue-500' },
+        { next: 'cancelled', labelKey: 'cancelled', color: 'bg-red-600 hover:bg-red-500' },
+    ],
+    confirmed: [
+        { next: 'ready_to_ship', labelKey: 'readyToShip', color: 'bg-indigo-600 hover:bg-indigo-500' },
+        { next: 'cancelled', labelKey: 'cancelled', color: 'bg-red-600 hover:bg-red-500' },
+    ],
+    ready_to_ship: [
+        { next: 'shipped', labelKey: 'shipped', color: 'bg-cyan-600 hover:bg-cyan-500' },
+    ],
+    shipped: [
+        { next: 'completed', labelKey: 'completed', color: 'bg-green-600 hover:bg-green-500' },
+    ],
+    completed: [],
+    cancelled: [],
+    refunded: [],
+}
 
 export function OrderDrawer({
     order,
@@ -20,6 +41,8 @@ export function OrderDrawer({
 
     if (!order) return null
 
+    const loading = isUpdating === true || isUpdating === order.id
+
     // Status Timeline rendering
     const timelineSteps = ['pending', 'confirmed', 'shipped', 'completed']
     const timelineLabels: Record<string, string> = {
@@ -33,23 +56,36 @@ export function OrderDrawer({
 
     const isCancelled = order.status === 'cancelled'
     const isRefunded = order.status === 'refunded'
+    const mobileActions = STATUS_ACTIONS[order.status] || []
 
     return (
         <div className="fixed inset-y-0 right-0 z-50 w-full md:w-[480px] border-l border-white/10 bg-[#0F172A] shadow-2xl transition-transform duration-300 transform flex flex-col">
+            {/* Header */}
             <div className="flex items-center justify-between border-b border-white/10 p-4 md:p-6">
-                <div>
-                    <h2 className="text-lg font-bold text-white">Order #{order.orderNumber}</h2>
-                    <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleString('en-MY')}</p>
+                <div className="flex items-center gap-3">
+                    {/* Mobile back button */}
+                    <button
+                        onClick={onClose}
+                        className="md:hidden rounded-full p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                    >
+                        <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <div>
+                        <h2 className="text-lg font-bold text-white">Order #{order.orderNumber}</h2>
+                        <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleString('en-MY')}</p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <OrderStatusBadge order={order} onStatusChange={onStatusChange} isUpdating={isUpdating} />
-                    <button onClick={onClose} className="rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
+                    {/* Desktop close button */}
+                    <button onClick={onClose} className="hidden md:block rounded-full p-2 text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-8">
+            {/* Scrollable Content */}
+            <div className={`flex-1 overflow-y-auto p-4 md:p-6 space-y-8 ${mobileActions.length > 0 ? 'pb-24 md:pb-6' : ''}`}>
                 {/* Timeline */}
                 <div>
                     <h3 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider text-gray-400">{o.drawer.timeline}</h3>
@@ -66,7 +102,6 @@ export function OrderDrawer({
                             <div className="space-y-6">
                                 {timelineSteps.map((step, idx) => {
                                     const isActive = currentIndex >= idx
-                                    const isCurrent = (currentIndex === idx) || (order.status === 'ready_to_ship' && step === 'confirmed')
                                     return (
                                         <div key={step} className="relative flex items-center gap-4">
                                             <div className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 bg-[#0F172A] ${isActive ? 'border-blue-500' : 'border-white/20'}`}>
@@ -156,6 +191,24 @@ export function OrderDrawer({
                     </div>
                 </div>
             </div>
+
+            {/* Mobile Sticky Bottom Bar — Action Buttons (AC-2) */}
+            {mobileActions.length > 0 && (
+                <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#0F172A]/95 backdrop-blur-lg px-4 py-3 safe-area-pb">
+                    <div className="flex gap-3">
+                        {mobileActions.map(action => (
+                            <button
+                                key={action.next}
+                                disabled={loading}
+                                onClick={() => onStatusChange(order.id, action.next)}
+                                className={`flex-1 rounded-xl py-3 text-sm font-semibold text-white transition-colors disabled:opacity-50 ${action.color}`}
+                            >
+                                {o.changeTo} {o.status[action.labelKey as keyof typeof o.status]}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
