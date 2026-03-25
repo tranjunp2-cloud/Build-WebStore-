@@ -18,6 +18,8 @@ import { Analytics } from './collections/Analytics'
 import { SEOMetaJobs } from './collections/SEOMetaJobs'
 import { Blogs } from './collections/Blogs'
 import { BlogCategories } from './collections/BlogCategories'
+import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
+import { Categories } from './collections/Categories'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -42,6 +44,21 @@ function isRemoteDatabase(): boolean {
 
 export default buildConfig({
   serverURL: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
+  email: nodemailerAdapter({
+    defaultFromAddress: process.env.MAIL_FROM_ADDRESS || 'noreply@primeweb.app',
+    defaultFromName: process.env.MAIL_FROM_NAME || 'PrimeWeb',
+    transportOptions: {
+      host: process.env.MAIL_HOST,
+      port: parseInt(process.env.MAIL_PORT || '587'),
+      // Port 587 = STARTTLS (secure: false, nodemailer auto-upgrades)
+      // Port 465 = implicit SSL (secure: true)
+      secure: process.env.MAIL_PORT === '465',
+      auth: {
+        user: process.env.MAIL_USERNAME,
+        pass: process.env.MAIL_PASSWORD,
+      },
+    },
+  }),
   admin: {
     user: Users.slug,
     meta: {
@@ -68,6 +85,7 @@ export default buildConfig({
     SEOMetaJobs,
     Blogs,
     BlogCategories,
+    Categories,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

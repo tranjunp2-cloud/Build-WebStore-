@@ -125,32 +125,21 @@ Ctrl+Y
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Undo/Redo Toolbar Buttons)
 - **Mô tả:** Cụm nút thao tác (Ctrl+Z/Ctrl+Y) nằm sát nhau trên Editor Toolbar.
 - **Components chính:**
   - Undo Button: Biểu tượng mũi tên vòng trái ↩. Nếu có stack, kèm theo con số badge nhỏ: "Undo (3)". Khi di chuột qua, hiển thị tooltip Text Title của action gần nhất.
   - Redo Button: Biểu tượng mũi tên vòng phải ↪. Nếu có stack redo, kèm theo badge số lượng.
-- **Wireframe:**
-```text
-┌────────────────────────────────────────────────────────┐
-│ [≡ Menu]  [ Pages ▼ ]  [ Theme 🎨 ]     [↩ Undo (3)] [↪]│
-└────────────────────────────────────────────────────────┘
-  *Tooltip khi hover ↩:* "Undo: Đổi màu nền thành Xanh"
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Mobile View (Undo/Redo Stack)
 - **Mô tả:** Nút Undo/Redo trên Mobile Editor được thu lại thành Icon và nhét khéo vào Toolbar phụ phía dưới cùng màn hình (dưới cả content preview).
-- **Wireframe:**
-```text
-┌─ Mobile AI Editor ──────────────────────────┐
-│ [≡] Website             [Preview][Publish]  │
-│ ─────────────────────────────────────────── │
-│ [ Preview Nội dung web đang edit... ]       │
-│                                             │
-│ ─────────────────────────────────────────── │
-│ [↩ Undo]   [↪ Redo]   [+] Add Block   [⚙]  │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Các trạng thái UI (UI States) & Modals
 - **Empty State:** Khi không có lịch sử (Mới mở site, hoặc vừa Save), Nút Undo/Redo bị đổi sang màu Xám nhạt (Disabled), không có con trỏ pointer, và ẩn badge số đi.
@@ -158,6 +147,7 @@ Ctrl+Y
 - **Modals:** (Không có Modal).
 
 ---
+
 
 ## 11. Acceptance Criteria
 

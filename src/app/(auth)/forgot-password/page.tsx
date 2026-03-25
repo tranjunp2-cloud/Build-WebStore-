@@ -1,15 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Mail, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { Mail, Loader2, ArrowLeft, CheckCircle2, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useI18n } from '@/i18n'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
+
+const RESEND_COOLDOWN_SECONDS = 60
 
 const forgotSchema = z.object({
     email: z.string().min(1, 'Email is required').email('Please enter a valid email'),
@@ -19,6 +23,8 @@ type ForgotForm = z.infer<typeof forgotSchema>
 
 export default function ForgotPasswordPage() {
     const [submitted, setSubmitted] = useState(false)
+    const [cooldown, setCooldown] = useState(0)
+    const [resending, setResending] = useState(false)
 
     const {
         register,
@@ -30,18 +36,40 @@ export default function ForgotPasswordPage() {
         resolver: zodResolver(forgotSchema),
         defaultValues: { email: '' },
     })
+    const { t } = useI18n()
+
+    // Cooldown countdown timer
+    useEffect(() => {
+        if (cooldown <= 0) return
+        const timer = setInterval(() => {
+            setCooldown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timer)
+                    return 0
+                }
+                return prev - 1
+            })
+        }, 1000)
+        return () => clearInterval(timer)
+    }, [cooldown])
+
+    const sendResetLink = useCallback(async (email: string) => {
+        const res = await fetch('/api/users/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        })
+        // Always show success — don't reveal if email exists (security)
+        return res.ok || res.status === 404
+    }, [])
 
     const onSubmit = async (data: ForgotForm) => {
         try {
-            const res = await fetch('/api/users/forgot-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: data.email }),
-            })
+            const success = await sendResetLink(data.email)
 
-            // Always show success — don't reveal if email exists (security)
-            if (res.ok || res.status === 404) {
+            if (success) {
                 setSubmitted(true)
+                setCooldown(RESEND_COOLDOWN_SECONDS)
                 toast.success('Reset link sent!', {
                     description: 'Check your email inbox.',
                 })
@@ -55,6 +83,29 @@ export default function ForgotPasswordPage() {
         }
     }
 
+    const handleResend = async () => {
+        if (cooldown > 0 || resending) return
+        const email = getValues('email')
+        if (!email) return
+
+        setResending(true)
+        try {
+            const success = await sendResetLink(email)
+            if (success) {
+                setCooldown(RESEND_COOLDOWN_SECONDS)
+                toast.success('Reset link resent!', {
+                    description: 'Check your email inbox again.',
+                })
+            } else {
+                toast.error('Failed to resend. Please try again later.')
+            }
+        } catch {
+            toast.error('Connection error. Please try again.')
+        } finally {
+            setResending(false)
+        }
+    }
+
     // Success state
     if (submitted) {
         return (
@@ -62,28 +113,51 @@ export default function ForgotPasswordPage() {
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
                     <CheckCircle2 className="h-8 w-8 text-emerald-400" />
                 </div>
-                <h2 className="text-xl font-bold text-white">Check your email</h2>
+                <h2 className="text-xl font-bold text-white">{t.auth.forgot.checkEmail}</h2>
                 <p className="mt-2 text-sm text-gray-400">
-                    We&apos;ve sent a password reset link to{' '}
+                    {t.auth.forgot.sentTo}{' '}
                     <span className="text-gray-300 font-medium">{getValues('email')}</span>
                 </p>
                 <div className="mt-6 space-y-3">
-                    <p className="text-xs text-gray-500">
-                        Didn&apos;t receive the email? Check your spam folder or{' '}
+                    {/* Resend button with cooldown */}
+                    <div className="flex flex-col items-center gap-2">
+                        <p className="text-xs text-gray-500">
+                            {t.auth.forgot.notReceive}
+                        </p>
                         <button
                             type="button"
-                            onClick={() => setSubmitted(false)}
-                            className="text-blue-400 hover:text-blue-300 underline transition-colors"
+                            onClick={handleResend}
+                            disabled={cooldown > 0 || resending}
+                            className={`inline-flex items-center gap-1.5 text-sm font-medium transition-colors ${cooldown > 0 || resending
+                                    ? 'text-gray-600 cursor-not-allowed'
+                                    : 'text-blue-400 hover:text-blue-300'
+                                }`}
                         >
-                            try again
+                            {resending ? (
+                                <>
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    Sending...
+                                </>
+                            ) : cooldown > 0 ? (
+                                <>
+                                    <RefreshCw className="h-3.5 w-3.5" />
+                                    Resend email ({cooldown}s)
+                                </>
+                            ) : (
+                                <>
+                                    <RefreshCw className="h-3.5 w-3.5" />
+                                    Resend email
+                                </>
+                            )}
                         </button>
-                    </p>
+                    </div>
+
                     <Link
                         href="/login"
                         className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" />
-                        Back to sign in
+                        {t.auth.forgot.backLogin}
                     </Link>
                 </div>
             </div>
@@ -97,9 +171,9 @@ export default function ForgotPasswordPage() {
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 ring-1 ring-blue-500/20">
                     <Mail className="h-6 w-6 text-blue-400" />
                 </div>
-                <h1 className="text-2xl font-bold text-white">Forgot password?</h1>
+                <h1 className="text-2xl font-bold text-white">{t.auth.forgot.title}</h1>
                 <p className="mt-1.5 text-sm text-gray-400">
-                    No worries, we&apos;ll send you a reset link
+                    {t.auth.forgot.subtitle}
                 </p>
             </div>
 
@@ -116,7 +190,7 @@ export default function ForgotPasswordPage() {
 
                 {/* Email */}
                 <div>
-                    <Label htmlFor="email" className="text-gray-300">Email</Label>
+                    <Label htmlFor="email" className="text-gray-300">{t.auth.email}</Label>
                     <div className="relative mt-1.5">
                         <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                         <Input
@@ -133,7 +207,6 @@ export default function ForgotPasswordPage() {
                     )}
                 </div>
 
-                {/* Submit */}
                 <Button
                     type="submit"
                     disabled={isSubmitting}
@@ -142,12 +215,17 @@ export default function ForgotPasswordPage() {
                     {isSubmitting ? (
                         <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Sending reset link...
+                            {t.auth.forgot.submitting}
                         </>
                     ) : (
-                        'Send reset link'
+                        t.auth.forgot.submit
                     )}
                 </Button>
+
+                {/* Inline Language Switcher */}
+                <div className="pt-2">
+                    <LanguageSwitcher variant="segmented" />
+                </div>
             </form>
 
             {/* Back to login */}
@@ -157,7 +235,7 @@ export default function ForgotPasswordPage() {
                     className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-300 transition-colors"
                 >
                     <ArrowLeft className="h-3.5 w-3.5" />
-                    Back to sign in
+                    {t.auth.forgot.backLogin}
                 </Link>
             </div>
         </div>

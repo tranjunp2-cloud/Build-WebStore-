@@ -4,6 +4,8 @@
  */
 
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import type { StateStorage } from 'zustand/middleware'
 import type { ThemeConfig } from '@/blocks/types'
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -28,8 +30,6 @@ export type BusinessInfo = {
     shortDescription: string
     industry: string
     products: string
-    targetAudience: string
-    style: string
     language?: 'en' | 'ms' | 'vi' | 'auto'
 }
 
@@ -91,47 +91,91 @@ const INITIAL_STATE: BuilderState = {
     error: null,
 }
 
-export const useBuilderStore = create<BuilderState & BuilderActions>((set) => ({
-    ...INITIAL_STATE,
+const noopStorage: StateStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+}
 
-    setBusinessInfo: (info) =>
-        set({
-            businessInfo: info,
-            step: 'chat',
-            messages: [],
+function getSafeStorage(): StateStorage {
+    if (typeof window === 'undefined' || typeof globalThis.localStorage === 'undefined') {
+        return noopStorage
+    }
+
+    const storage = globalThis.localStorage as Partial<StateStorage>
+
+    if (
+        typeof storage.getItem !== 'function' ||
+        typeof storage.setItem !== 'function' ||
+        typeof storage.removeItem !== 'function'
+    ) {
+        return noopStorage
+    }
+
+    return storage as StateStorage
+}
+
+export const useBuilderStore = create<BuilderState & BuilderActions>()(
+    persist(
+        (set) => ({
+            ...INITIAL_STATE,
+
+            setBusinessInfo: (info) =>
+                set({
+                    businessInfo: info,
+                    step: 'chat',
+                    messages: [],
+                }),
+
+            setStep: (step) => set({ step }),
+
+            addMessage: (msg) => {
+                const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+                set((state) => ({
+                    messages: [
+                        ...state.messages,
+                        { ...msg, id, timestamp: new Date() },
+                    ],
+                }))
+            },
+
+            setStatus: (status) => set({ status }),
+
+            addBlock: (block) =>
+                set((state) => ({
+                    blocks: [...state.blocks, { ...block, _id: block._id || `${block.blockType}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }],
+                })),
+
+            setTheme: (theme) => set({ theme }),
+
+            setProgress: (progress) => set({ progress }),
+
+            setSiteId: (siteId) => set({ siteId }),
+
+            setSiteName: (name) => set({ siteName: name }),
+
+            setBlocks: (blocks) => set({ blocks }),
+
+            setError: (error) => set({ error, status: 'error' }),
+
+            reset: () => set(INITIAL_STATE),
         }),
-
-    setStep: (step) => set({ step }),
-
-    addMessage: (msg) => {
-        const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-        set((state) => ({
-            messages: [
-                ...state.messages,
-                { ...msg, id, timestamp: new Date() },
-            ],
-        }))
-    },
-
-    setStatus: (status) => set({ status }),
-
-    addBlock: (block) =>
-        set((state) => ({
-            blocks: [...state.blocks, { ...block, _id: block._id || `${block.blockType}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }],
-        })),
-
-    setTheme: (theme) => set({ theme }),
-
-    setProgress: (progress) => set({ progress }),
-
-    setSiteId: (siteId) => set({ siteId }),
-
-    setSiteName: (name) => set({ siteName: name }),
-
-    setBlocks: (blocks) => set({ blocks }),
-
-    setError: (error) => set({ error, status: 'error' }),
-
-    reset: () => set(INITIAL_STATE),
-}))
-
+        {
+            name: 'prime-builder-session', // name of the item in localStorage
+            storage: createJSONStorage(getSafeStorage),
+            // Only persist necessary state, reset streaming status and progress
+            partialize: (state) => ({
+                businessInfo: state.businessInfo,
+                step: state.step,
+                status: state.status,
+                messages: state.messages,
+                blocks: state.blocks,
+                theme: state.theme,
+                siteId: state.siteId,
+                siteName: state.siteName,
+                progress: state.progress,
+                error: state.error,
+            }),
+        }
+    )
+)

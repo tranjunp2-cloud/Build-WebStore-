@@ -253,6 +253,7 @@ jobs:
       pull-requests: write
       issues: write
       contents: read
+      checks: read
     steps:
       - name: Checkout (for composite action)
         uses: actions/checkout@v4
@@ -345,6 +346,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Move linked issues to QA Testing
+        id: qa_issues
         uses: actions/github-script@v7
         with:
           script: |
@@ -363,14 +365,23 @@ jobs:
 
             if (linkedIssues.length === 0) {
               console.log('No linked issues found');
+              core.setOutput('issues', '');
+              core.setOutput('issues_text', '');
               return;
             }
 
             console.log(`Found linked issues: ${linkedIssues.join(', ')}`);
 
+            // Collect issue info for Lark notification
+            const issueInfos = [];
+
             // Label each linked issue as qa:pending
             for (const issueNumber of linkedIssues) {
               try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner, repo, issue_number: issueNumber,
+                });
+
                 await github.rest.issues.addLabels({
                   owner, repo,
                   issue_number: issueNumber,
@@ -384,11 +395,21 @@ jobs:
                   body: `🧪 PR #${pr.number} đã merge → staging. Chờ **QC test**.\n\n> QC: test xong thì close issue (pass) hoặc thêm label \`qa:failed\` (fail).`,
                 });
 
+                issueInfos.push({
+                  number: issueNumber,
+                  title: issue.title,
+                  url: issue.html_url,
+                });
+
                 console.log(`Issue #${issueNumber} → qa:pending`);
               } catch (e) {
                 console.log(`Failed to label issue #${issueNumber}: ${e.message}`);
               }
             }
+
+            // Output for Lark notification
+            core.setOutput('issues', linkedIssues.map(n => `#${n}`).join(', '));
+            core.setOutput('issues_text', issueInfos.map(i => `• #${i.number} ${i.title}`).join('\n'));
 
             // Update Projects board → QA Testing
             const projectNumber = parseInt('${{ env.PROJECT_NUMBER }}');
@@ -397,8 +418,8 @@ jobs:
               return;
             }
 
-            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
-              repository(owner: $owner, name: $repo) {
+            const projectQuery = `query($org: String!, $number: Int!) {
+              organization(login: $org) {
                 projectV2(number: $number) {
                   id
                   fields(first: 20) {
@@ -417,9 +438,9 @@ jobs:
             let project;
             try {
               const result = await github.graphql(projectQuery, {
-                owner, repo, number: projectNumber,
+                org: owner, number: projectNumber,
               });
-              project = result.repository.projectV2;
+              project = result.organization.projectV2;
             } catch (e) {
               console.log(`Could not find project: ${e.message}`);
               return;
@@ -473,21 +494,39 @@ jobs:
               }
             }
 
-      - name: Notify Lark (Merged)
+      - name: Notify Lark (QA Ready)
+        if: steps.qa_issues.outputs.issues != ''
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
+          title: "🧪 QA Ready — ${{ steps.qa_issues.outputs.issues }}"
+          template: 'orange'
+          meta-left-label: "👤 Dev"
+          meta-left-value: "${{ github.event.pull_request.user.login }}"
+          meta-right-label: "🌿 Branch"
+          meta-right-value: "${{ github.event.pull_request.base.ref }}"
+          content: |
+            **PR #${{ github.event.pull_request.number }}** đã merge → staging
+
+            **Issues chờ QC test:**
+            ${{ steps.qa_issues.outputs.issues_text }}
+
+            ⚡ QC: test trên staging → **pass** thì close issue, **fail** thì gắn label `qa:failed`
+          buttons: '[{"text":"📋 QA Board","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Aqa%3Apending","type":"primary"},{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"default"}]'
+
+      - name: Notify Lark (Merged — no issues)
+        if: steps.qa_issues.outputs.issues == ''
         uses: ./.github/actions/lark-notify
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_TASK || secrets.LARK_WEBHOOK_URL }}
           sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
           title: "🎉 PR Merged #${{ github.event.pull_request.number }}"
           template: 'green'
-          meta-left-label: "📦 Repo"
-          meta-left-value: "PrimeWeb"
-          meta-right-label: "🎯 Target"
+          meta-left-label: "👤 Author"
+          meta-left-value: "${{ github.event.pull_request.user.login }}"
+          meta-right-label: "🌿 Branch"
           meta-right-value: "${{ github.event.pull_request.base.ref }}"
-          meta2-left-label: "🔖 Merge"
-          meta2-left-value: "${{ github.event.pull_request.merge_commit_sha }}"
-          meta2-right-label: "👤 Author"
-          meta2-right-value: "${{ github.event.pull_request.user.login }}"
           content: |
             📝 ${{ github.event.pull_request.title }}
           buttons: '[{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'

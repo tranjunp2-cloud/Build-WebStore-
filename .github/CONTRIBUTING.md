@@ -53,6 +53,8 @@ Closes #123         ← SAI: issue tự close, skip QA gate
 
 ### Issue Status Flow
 
+> **Chi tiết đầy đủ + sơ đồ visual:** xem [GIT_AND_CI_RULES.md §4.4](GIT_AND_CI_RULES.md#44-issue-lifecycle--quy-trình-chi-tiết-từ-tạo-đến-done)
+
 ```
 Backlog → Review (UIUX+BA) → In Progress → Code Review → QA Testing → Done
               ↑                                              │

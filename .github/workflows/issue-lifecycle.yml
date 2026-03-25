@@ -41,9 +41,9 @@ jobs:
             const issue = context.payload.issue;
             const action = context.payload.action;
 
-            // Get project ID via GraphQL
-            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
-              repository(owner: $owner, name: $repo) {
+            // Get project ID via GraphQL (org-level project)
+            const projectQuery = `query($org: String!, $number: Int!) {
+              organization(login: $org) {
                 projectV2(number: $number) {
                   id
                   fields(first: 20) {
@@ -62,11 +62,10 @@ jobs:
             let project;
             try {
               const result = await github.graphql(projectQuery, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+                org: context.repo.owner,
                 number: projectNumber,
               });
-              project = result.repository.projectV2;
+              project = result.organization.projectV2;
             } catch (e) {
               console.log(`Could not find project #${projectNumber}: ${e.message}`);
               return;
@@ -186,7 +185,7 @@ jobs:
               return;
             }
 
-            // ── Handle qa:failed: re-assign dev + comment ──
+            // ── Handle qa:failed: re-assign dev + auto bug report template ──
             if (label === 'qa:failed') {
               // Remove qa:pending if present
               try {
@@ -197,12 +196,86 @@ jobs:
                 });
               } catch (e) { /* label might not exist */ }
 
+              // Find linked PRs for context
+              const timeline = await github.rest.issues.listEventsForTimeline({
+                owner, repo,
+                issue_number: issue.number,
+                per_page: 50,
+              });
+              const linkedPRs = timeline.data
+                .filter(e => e.event === 'cross-referenced' && e.source?.issue?.pull_request)
+                .map(e => `#${e.source.issue.number}`)
+                .slice(-3);
+              const prContext = linkedPRs.length > 0
+                ? `PRs liên quan: ${linkedPRs.join(', ')}`
+                : 'Không tìm thấy PR liên quan';
+
+              // Find dev assignee
+              const devAssignee = issue.assignees?.length > 0
+                ? issue.assignees.map(a => `@${a.login}`).join(', ')
+                : '_chưa assign_';
+
+              // Extract AC summary from issue body (first 3 GIVEN/WHEN/THEN)
+              const bodyText = issue.body || '';
+              const acMatch = bodyText.match(/```gherkin\n([\s\S]*?)```/);
+              const acPreview = acMatch
+                ? acMatch[1].trim().split('\n').slice(0, 4).join('\n')
+                : '_không tìm thấy AC_';
+
+              // Build structured bug report template
+              const bugTemplate = [
+                '## 🔴 QA Failed — Bug Report',
+                '',
+                `**Issue:** #${issue.number} — ${issue.title}`,
+                `**Dev:** ${devAssignee}`,
+                `**${prContext}**`,
+                '',
+                '---',
+                '',
+                '### Mô tả lỗi',
+                '<!-- QC: Mô tả ngắn gọn bug ở đây -->',
+                '',
+                '',
+                '',
+                '### Steps to Reproduce',
+                '1. Vào trang: `https://staging.echprime.com/...`',
+                '2. Thao tác: ...',
+                '3. Kết quả lỗi: ...',
+                '',
+                '### Expected vs Actual',
+                '| | Mô tả |',
+                '|---|---|',
+                '| **Expected** | <!-- Mong đợi gì --> |',
+                '| **Actual** | <!-- Thực tế xảy ra gì --> |',
+                '',
+                '### Mức độ',
+                '- [ ] 🔴 Critical — Không dùng được feature',
+                '- [ ] 🟠 Major — Feature hoạt động sai',
+                '- [ ] 🟡 Minor — Lỗi nhỏ, không ảnh hưởng flow chính',
+                '- [ ] ⚪ Cosmetic — UI/text sai',
+                '',
+                '### Screenshot / Video',
+                '<!-- Kéo thả ảnh/video vào đây -->',
+                '',
+                '---',
+                '',
+                '<details><summary>📋 AC liên quan (reference)</summary>',
+                '',
+                '```gherkin',
+                acPreview,
+                '```',
+                '',
+                '</details>',
+                '',
+                '> 💡 **Dev:** fix xong tạo PR mới → merge → issue tự chuyển lại QA Testing.',
+              ].join('\n');
+
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,
-                body: `🔴 **QA Failed** — trả về dev fix.\n\n> Dev: check comment của QC bên trên, fix rồi tạo PR mới.`,
+                body: bugTemplate,
               });
-              console.log(`Issue #${issue.number} → QA Failed → re-assign dev`);
+              console.log(`Issue #${issue.number} → QA Failed → bug report template posted`);
             }
 
             // ── Handle review:rejected: notify PM ──
@@ -232,8 +305,8 @@ jobs:
               return;
             }
 
-            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
-              repository(owner: $owner, name: $repo) {
+            const projectQuery = `query($org: String!, $number: Int!) {
+              organization(login: $org) {
                 projectV2(number: $number) {
                   id
                   fields(first: 20) {
@@ -252,9 +325,9 @@ jobs:
             let project;
             try {
               const result = await github.graphql(projectQuery, {
-                owner, repo, number: projectNumber,
+                org: owner, number: projectNumber,
               });
-              project = result.repository.projectV2;
+              project = result.organization.projectV2;
             } catch (e) {
               console.log(`Could not find project: ${e.message}`);
               return;
@@ -299,7 +372,15 @@ jobs:
 
             console.log(`Issue #${issue.number} board → ${targetStatus}`);
 
-      - name: Notify Lark (QA Failed)
+      - name: Prepare QA fail info
+        if: github.event.label.name == 'qa:failed'
+        id: qa_fail
+        run: |
+          # Get all assignees for the notification
+          ASSIGNEES=$(echo '${{ toJSON(github.event.issue.assignees) }}' | jq -r '.[].login' 2>/dev/null | tr '\n' ', ' | sed 's/,$//' || echo 'unassigned')
+          echo "assignees=${ASSIGNEES:-unassigned}" >> "$GITHUB_OUTPUT"
+
+      - name: Notify Lark (QA Failed → Dev fix)
         if: github.event.label.name == 'qa:failed'
         uses: ./.github/actions/lark-notify
         with:
@@ -307,14 +388,20 @@ jobs:
           sign-key: ${{ secrets.LARK_SIGN_KEY_TASK || '' }}
           title: "🔴 QA Failed — #${{ github.event.issue.number }}"
           template: 'red'
-          meta-left-label: "📦 Issue"
+          meta-left-label: "🐛 Issue"
           meta-left-value: "#${{ github.event.issue.number }}"
-          meta-right-label: "👤 Assignee"
-          meta-right-value: "${{ github.event.issue.assignee.login || 'unassigned' }}"
+          meta-right-label: "👨‍💻 Dev"
+          meta-right-value: "${{ steps.qa_fail.outputs.assignees }}"
+          meta2-left-label: "🏷️ QC"
+          meta2-left-value: "${{ github.actor }}"
+          meta2-right-label: "📊 Status"
+          meta2-right-value: "→ In Progress (trả về dev)"
           content: |
-            📝 ${{ github.event.issue.title }}
-            🔴 QC test fail — trả về dev fix
-          buttons: '[{"text":"🔗 View Issue","url":"${{ github.event.issue.html_url }}","type":"primary"}]'
+            📝 **${{ github.event.issue.title }}**
+
+            🔴 QC test **FAIL** — issue trả về dev fix
+            👨‍💻 Dev: check comment bug report trong issue → fix → tạo PR mới
+          buttons: '[{"text":"🔗 View Issue + Bug Report","url":"${{ github.event.issue.html_url }}","type":"primary"}]'
 
   # ──────────────────────────────────────
   # PR linked to issue → move to Code Review
@@ -353,9 +440,9 @@ jobs:
 
             console.log(`Found linked issues: ${linkedIssues.join(', ')}`);
 
-            // Get project and Status field
-            const projectQuery = `query($owner: String!, $repo: String!, $number: Int!) {
-              repository(owner: $owner, name: $repo) {
+            // Get project and Status field (org-level project)
+            const projectQuery = `query($org: String!, $number: Int!) {
+              organization(login: $org) {
                 projectV2(number: $number) {
                   id
                   fields(first: 20) {
@@ -374,11 +461,10 @@ jobs:
             let project;
             try {
               const result = await github.graphql(projectQuery, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+                org: context.repo.owner,
                 number: projectNumber,
               });
-              project = result.repository.projectV2;
+              project = result.organization.projectV2;
             } catch (e) {
               console.log(`Could not find project #${projectNumber}: ${e.message}`);
               return;
