@@ -1,6 +1,7 @@
 import type { CollectionConfig, CollectionAfterChangeHook } from 'payload'
 import { sendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
+import { staffInvitationEmail } from '@/lib/email/templates/staff-invitation'
 import { forgotPasswordEmail } from '@/lib/email/templates/forgot-password'
 import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
@@ -49,6 +50,353 @@ export const Users: CollectionConfig = {
         afterChange: [sendWelcomeEmailHook],
     },
     endpoints: [
+        {
+            path: '/invite-staff',
+            method: 'post',
+            handler: async (req) => {
+                const body = await req.json?.() ?? {}
+                const { email, name, tenantId, role, permissions } = body as { email?: string; name?: string; tenantId?: string; role?: string; permissions?: string[] }
+
+                if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
+                if (!email || !name || !tenantId || !role) return Response.json({ errors: [{ message: 'Missing required fields' }] }, { status: 400 })
+
+                // Check permissions of requester
+                const requesterTenant = req.user.tenants?.find((t: any) =>
+                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                )
+                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
+                    return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
+                }
+
+                try {
+                    // Check if user exists
+                    const users = await req.payload.find({ collection: 'users', where: { email: { equals: email } } })
+                    let targetUser = users.docs[0]
+
+                    if (targetUser) {
+                        // Check if already in tenant
+                        const alreadyInTenant = targetUser.tenants?.find((t: any) =>
+                            (t.tenant?.id === tenantId || t.tenant === tenantId)
+                        )
+                        if (alreadyInTenant) {
+                            return Response.json({ errors: [{ message: 'User is already a member of this workspace' }] }, { status: 400 })
+                        }
+
+                        // Add to tenant
+                        await req.payload.update({
+                            collection: 'users',
+                            id: targetUser.id,
+                            data: {
+                                tenants: [
+                                    ...(targetUser.tenants || []),
+                                    { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? permissions : undefined }
+                                ]
+                            }
+                        })
+                    } else {
+                        // Generate a strong random password since they will login via OTP anyway
+                        const randomPassword = require('crypto').randomBytes(16).toString('hex')
+                        
+                        targetUser = await req.payload.create({
+                            collection: 'users',
+                            data: {
+                                email,
+                                firstName: name,
+                                password: randomPassword,
+                                roles: ['tenant-owner'], // Default platform role
+                                tenants: [
+                                    { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? permissions : undefined }
+                                ]
+                            }
+                        })
+                    }
+                    
+                    // Fetch tenant details for email
+                    const tenant = await req.payload.findByID({ collection: 'tenants', id: tenantId })
+                    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
+                    const loginUrl = `${serverUrl}/login`
+                    
+                    const { subject, html } = staffInvitationEmail({ 
+                        userName: name || targetUser.firstName || email.split('@')[0], 
+                        workspaceName: tenant.name as string,
+                        loginUrl 
+                    })
+                    
+                    req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
+                        console.error(`[StaffInvite] Failed to send email to ${email}:`, err)
+                    })
+                    
+                    return Response.json({ message: 'Invitation sent successfully' })
+                } catch (error: any) {
+                    console.error('[StaffInvite]', error)
+                    return Response.json({ errors: [{ message: error.message || 'Server error' }] }, { status: 500 })
+                }
+            }
+        },
+        {
+            path: '/remove-staff',
+            method: 'post',
+            handler: async (req) => {
+                const body = await req.json?.() ?? {}
+                const { userId, tenantId } = body as { userId?: string; tenantId?: string }
+
+                if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
+                if (!userId || !tenantId) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
+
+                // Check requester permission
+                const requesterTenant = req.user.tenants?.find((t: any) =>
+                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                )
+                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
+                    return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
+                }
+
+                // Check target user
+                const targetUser = await req.payload.findByID({ collection: 'users', id: userId })
+                if (!targetUser) return Response.json({ errors: [{ message: 'User not found' }] }, { status: 404 })
+
+                const targetTenantIndex = targetUser.tenants?.findIndex((t: any) =>
+                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                ) ?? -1
+
+                if (targetTenantIndex === -1) {
+                    return Response.json({ errors: [{ message: 'User is not in this workspace' }] }, { status: 400 })
+                }
+
+                // Security: Prevent removing if they are the last active owner
+                const targetTenantRole = targetUser.tenants![targetTenantIndex].role
+                if (targetTenantRole === 'owner') {
+                    // Check if there are other owners
+                    const allStaff = await req.payload.find({
+                         collection: 'users',
+                         where: {
+                             'tenants.tenant': { equals: tenantId }
+                         }
+                    })
+                    const activeOwners = allStaff.docs.filter((u: any) => 
+                         u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                    )
+                    
+                    if (activeOwners.length <= 1) {
+                        return Response.json({ errors: [{ message: 'Cannot remove the last workspace owner' }] }, { status: 400 })
+                    }
+                }
+
+                // Remove the tenant from the user's tenants array
+                const updatedTenants = [...(targetUser.tenants || [])]
+                updatedTenants.splice(targetTenantIndex, 1)
+
+                await req.payload.update({
+                    collection: 'users',
+                    id: userId,
+                    data: { tenants: updatedTenants }
+                })
+
+                return Response.json({ message: 'User removed from workspace successfully' })
+            }
+        },
+        {
+            path: '/update-staff',
+            method: 'post',
+            handler: async (req) => {
+                const body = await req.json?.() ?? {}
+                const { userId, tenantId, name, role, permissions } = body as { userId?: string; tenantId?: string; name?: string; role?: string; permissions?: string[] }
+
+                if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
+                if (!userId || !tenantId || !role || !name) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
+
+                const requesterTenant = req.user.tenants?.find((t: any) =>
+                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                )
+                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
+                    return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
+                }
+
+                const targetUser = await req.payload.findByID({ collection: 'users', id: userId })
+                if (!targetUser) return Response.json({ errors: [{ message: 'User not found' }] }, { status: 404 })
+
+                const targetTenantIndex = targetUser.tenants?.findIndex((t: any) =>
+                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                ) ?? -1
+
+                if (targetTenantIndex === -1) {
+                    return Response.json({ errors: [{ message: 'User is not in this workspace' }] }, { status: 400 })
+                }
+
+                const targetTenantRole = targetUser.tenants![targetTenantIndex].role
+                if (targetTenantRole === 'owner' && role !== 'owner') {
+                    const allStaff = await req.payload.find({
+                         collection: 'users',
+                         where: { 'tenants.tenant': { equals: tenantId } }
+                    })
+                    const activeOwners = allStaff.docs.filter((u: any) => 
+                         u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                    )
+                    if (activeOwners.length <= 1) {
+                        return Response.json({ errors: [{ message: 'Cannot demote the last workspace owner' }] }, { status: 400 })
+                    }
+                }
+
+                const updatedTenants = [...(targetUser.tenants || [])]
+                updatedTenants[targetTenantIndex].role = role as any
+                updatedTenants[targetTenantIndex].permissions = role === 'custom' ? permissions : undefined
+
+                await req.payload.update({
+                    collection: 'users',
+                    id: userId,
+                    data: { 
+                        firstName: name, // Overwrite name along with access rights
+                        tenants: updatedTenants 
+                    }
+                })
+
+                return Response.json({ message: 'User updated successfully' })
+            }
+        },
+        {
+            path: '/update-staff-status',
+            method: 'post',
+            handler: async (req) => {
+                const body = await req.json?.() ?? {}
+                const { userId, tenantId, status } = body as { userId?: string; tenantId?: string; status?: string }
+
+                if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
+                if (!userId || !tenantId || !status) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
+
+                const requesterTenant = req.user.tenants?.find((t: any) =>
+                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                )
+                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
+                    return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
+                }
+
+                const targetUser = await req.payload.findByID({ collection: 'users', id: userId })
+                if (!targetUser) return Response.json({ errors: [{ message: 'User not found' }] }, { status: 404 })
+
+                const targetTenantIndex = targetUser.tenants?.findIndex((t: any) =>
+                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                ) ?? -1
+
+                if (targetTenantIndex === -1) {
+                    return Response.json({ errors: [{ message: 'User is not in this workspace' }] }, { status: 400 })
+                }
+
+                const targetTenantRole = targetUser.tenants![targetTenantIndex].role
+                if (targetTenantRole === 'owner') {
+                    const allStaff = await req.payload.find({
+                         collection: 'users',
+                         where: { 'tenants.tenant': { equals: tenantId } }
+                    })
+                    const activeOwners = allStaff.docs.filter((u: any) => 
+                         u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                    )
+                    if (activeOwners.length <= 1 && status !== 'active') {
+                        return Response.json({ errors: [{ message: 'Cannot deactivate the last workspace owner' }] }, { status: 400 })
+                    }
+                }
+
+                const updatedTenants = [...(targetUser.tenants || [])]
+                updatedTenants[targetTenantIndex].status = status as any
+
+                await req.payload.update({
+                    collection: 'users',
+                    id: userId,
+                    data: { tenants: updatedTenants }
+                })
+
+                return Response.json({ message: 'User status updated successfully' })
+            }
+        },
+        {
+            path: '/resend-invite',
+            method: 'post',
+            handler: async (req) => {
+                const body = await req.json?.() ?? {}
+                const { userId, tenantId } = body as { userId?: string; tenantId?: string }
+
+                if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
+                if (!userId || !tenantId) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
+
+                const requesterTenant = req.user.tenants?.find((t: any) =>
+                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                )
+                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
+                    return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
+                }
+
+                const targetUser = await req.payload.findByID({ collection: 'users', id: userId })
+                if (!targetUser) return Response.json({ errors: [{ message: 'User not found' }] }, { status: 404 })
+
+                const tenant = await req.payload.findByID({ collection: 'tenants', id: tenantId })
+                const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
+                const loginUrl = `${serverUrl}/login`
+                
+                const { subject, html } = staffInvitationEmail({ 
+                    userName: targetUser.firstName || targetUser.email.split('@')[0], 
+                    workspaceName: tenant.name as string,
+                    loginUrl 
+                })
+                
+                req.payload.sendEmail({ to: targetUser.email, subject, html }).catch((err: unknown) => {
+                    console.error(`[StaffInvite] Failed to resend email to ${targetUser.email}:`, err)
+                })
+
+                return Response.json({ message: 'Invitation resent successfully' })
+            }
+        },
+        {
+            path: '/bulk-remove-staff',
+            method: 'post',
+            handler: async (req) => {
+                const body = await req.json?.() ?? {}
+                const { userIds, tenantId } = body as { userIds?: string[]; tenantId?: string }
+
+                if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
+                if (!userIds || !tenantId || !Array.isArray(userIds)) return Response.json({ errors: [{ message: 'Missing or invalid fields' }] }, { status: 400 })
+
+                const requesterTenant = req.user.tenants?.find((t: any) =>
+                    (t.tenant?.id === tenantId || t.tenant === tenantId)
+                )
+                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
+                    return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
+                }
+
+                let removedCount = 0;
+                let errorCount = 0;
+
+                for (const userId of userIds) {
+                    try {
+                        const targetUser = await req.payload.findByID({ collection: 'users', id: userId })
+                        if (!targetUser) continue;
+
+                        const targetTenantIndex = targetUser.tenants?.findIndex((t: any) =>
+                            (t.tenant?.id === tenantId || t.tenant === tenantId)
+                        ) ?? -1
+                        if (targetTenantIndex === -1) continue;
+
+                        const targetTenantRole = targetUser.tenants![targetTenantIndex].role
+                        if (targetTenantRole === 'owner') {
+                            const allStaff = await req.payload.find({ collection: 'users', where: { 'tenants.tenant': { equals: tenantId } } })
+                            const activeOwners = allStaff.docs.filter((u: any) => u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active'))
+                            if (activeOwners.length <= 1) {
+                                errorCount++;
+                                continue;
+                            }
+                        }
+
+                        const updatedTenants = [...(targetUser.tenants || [])]
+                        updatedTenants.splice(targetTenantIndex, 1)
+
+                        await req.payload.update({ collection: 'users', id: userId, data: { tenants: updatedTenants } })
+                        removedCount++;
+                    } catch (e) {
+                        errorCount++;
+                    }
+                }
+
+                return Response.json({ message: `Removed ${removedCount} users. ${errorCount ? `${errorCount} errors.` : ''}` })
+            }
+        },
         {
             path: '/send-otp',
             method: 'post',
@@ -289,6 +637,16 @@ export const Users: CollectionConfig = {
                     required: true,
                 },
                 {
+                    name: 'status',
+                    type: 'select',
+                    defaultValue: 'active',
+                    options: [
+                        { label: 'Pending', value: 'pending' },
+                        { label: 'Active', value: 'active' },
+                        { label: 'Suspended', value: 'suspended' },
+                    ],
+                },
+                {
                     name: 'role',
                     type: 'select',
                     required: true,
@@ -297,6 +655,22 @@ export const Users: CollectionConfig = {
                         { label: 'Admin', value: 'admin' },
                         { label: 'Editor', value: 'editor' },
                         { label: 'Viewer', value: 'viewer' },
+                        { label: 'Custom', value: 'custom' },
+                    ],
+                },
+                {
+                    name: 'permissions',
+                    type: 'select',
+                    hasMany: true,
+                    admin: {
+                        condition: (_, siblingData) => siblingData.role === 'custom',
+                        description: 'Select custom features this user can access',
+                    },
+                    options: [
+                        { label: 'Web Builder', value: 'web-builder' },
+                        { label: 'Content Manager', value: 'content-manager' },
+                        { label: 'Sales Operation', value: 'sales-operation' },
+                        { label: 'Settings', value: 'settings' },
                     ],
                 },
             ],
