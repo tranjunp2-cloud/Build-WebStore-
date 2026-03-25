@@ -142,6 +142,22 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
           }, '*')
         }
         
+        if (target.tagName === 'IMG') {
+          // Send IMAGE_HOVERED
+          if (hoverTimer) clearTimeout(hoverTimer)
+          hoverTimer = window.setTimeout(() => {
+            const rect = target.getBoundingClientRect()
+            window.parent.postMessage({
+              type: 'IMAGE_HOVERED',
+              rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+              src: target.src,
+              blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+              blockType: blockContainer.getAttribute('data-block-type')
+            }, '*')
+          }, 200)
+          return
+        }
+
         if (!validTags.includes(target.tagName) || target.children.length > 1) {
           return
         }
@@ -178,6 +194,93 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
 
       document.addEventListener('pointerdown', () => {
         window.parent.postMessage({ type: 'PREVIEW_POINTER_DOWN' }, '*')
+      })
+
+      // US-F05-06: WYSIWYG Text Editing
+      let currentEditingEl = null
+      let originalText = ''
+
+      const cleanUpEditing = () => {
+        if (!currentEditingEl) return
+        currentEditingEl.removeAttribute('contenteditable')
+        const newText = currentEditingEl.innerText?.trim()
+        window.parent.postMessage({
+          type: 'TEXT_EDITED',
+          blockIndex: parseInt(currentEditingEl.closest('[data-block-index]')?.getAttribute('data-block-index')),
+          oldText: originalText,
+          newText: newText
+        }, '*')
+        currentEditingEl = null
+        window.parent.postMessage({ type: 'TEXT_EDITING_STOPPED' }, '*')
+      }
+
+      document.addEventListener('dblclick', (e) => {
+        let target = e.target
+        let blockContainer = target.closest('[data-block-index]')
+        if (!blockContainer || excludedBlockTypes.includes(blockContainer.getAttribute('data-block-type'))) return
+
+        if (validTags.includes(target.tagName) && target.children.length <= 1) {
+          e.preventDefault()
+          e.stopPropagation()
+          if (currentEditingEl && currentEditingEl !== target) {
+            cleanUpEditing()
+          }
+          currentEditingEl = target
+          currentEditingEl.setAttribute('contenteditable', 'true')
+          currentEditingEl.focus()
+          originalText = currentEditingEl.innerText?.trim()
+          
+          const rect = target.getBoundingClientRect()
+          window.parent.postMessage({
+            type: 'TEXT_EDITING_STARTED',
+            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+            blockIndex: parseInt(blockContainer.getAttribute('data-block-index'))
+          }, '*')
+        }
+      })
+
+      document.addEventListener('blur', (e) => {
+        if (currentEditingEl === e.target) {
+          cleanUpEditing()
+        }
+      }, true)
+
+      document.addEventListener('keydown', (e) => {
+        if (currentEditingEl && (e.key === 'Enter' || e.key === 'Escape')) {
+          e.preventDefault()
+          cleanUpEditing()
+          window.getSelection()?.removeAllRanges() // Remove selection
+        }
+      })
+
+      // Image click handling
+      document.addEventListener('click', (e) => {
+        let target = e.target
+        if (target.tagName === 'IMG') {
+          let blockContainer = target.closest('[data-block-index]')
+          if (!blockContainer || excludedBlockTypes.includes(blockContainer.getAttribute('data-block-type'))) return
+          
+          const rect = target.getBoundingClientRect()
+          window.parent.postMessage({
+            type: 'IMAGE_CLICKED',
+            src: target.src,
+            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+            blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+            blockType: blockContainer.getAttribute('data-block-type')
+          }, '*')
+        } else if (currentEditingEl && target !== currentEditingEl) {
+           // Clicking outside while editing will blur
+        } else {
+           window.parent.postMessage({ type: 'PREVIEW_CANVAS_CLICKED' }, '*')
+        }
+      })
+
+      // Parent command execution (for bold, italic etc from RichTextToolbar)
+      window.addEventListener('message', (e) => {
+        if (e.data?.type === 'EXEC_COMMAND') {
+          document.execCommand(e.data.command, false, e.data.value)
+          currentEditingEl?.focus() // keep focus on the element
+        }
       })
 
       window.addEventListener('load', postLayouts)
