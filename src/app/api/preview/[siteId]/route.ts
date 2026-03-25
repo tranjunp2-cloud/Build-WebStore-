@@ -190,6 +190,13 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
         if (e.target === hoveredEl) {
           clearHoverState()
         }
+        // Fix: Clear IMAGE_HOVERED timer when mouse leaves an img
+        if (e.target && e.target.tagName === 'IMG') {
+          if (hoverTimer) {
+            clearTimeout(hoverTimer)
+            hoverTimer = null
+          }
+        }
       })
 
       document.addEventListener('pointerdown', () => {

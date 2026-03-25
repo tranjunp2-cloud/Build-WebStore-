@@ -34,7 +34,7 @@ export function ImageToolbar({ onImageSelect, onAiGenerate, isProcessing }: Imag
     return (
         <div className="flex items-center gap-1 bg-[#1E293B] border border-white/10 shadow-2xl rounded-lg p-1.5 pointer-events-auto">
             <input 
-                type="document" 
+                type="file" 
                 className="hidden" 
                 ref={fileInputRef}
                 accept="image/*"

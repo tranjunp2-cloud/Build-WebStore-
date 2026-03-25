@@ -280,7 +280,7 @@ function PreviewFrameInner({
             formData.append('file', file)
             formData.append('alt', 'Uploaded image')
 
-            const uploadRes = await fetch('http://localhost:3000/api/media', {
+            const uploadRes = await fetch('/api/media', {
                 method: 'POST',
                 body: formData
             })
@@ -318,7 +318,7 @@ function PreviewFrameInner({
                     }
                     return null
                 }
-                const partialPath = findPartialPath(clone[blockIndex], src.replace('http://localhost:3000', ''))
+                const partialPath = findPartialPath(clone[blockIndex], new URL(src, window.location.origin).pathname)
                 if (partialPath) {
                     const nextBlock = updateValueAtPath(clone[blockIndex], partialPath, newUrl)
                     updateBlock(blockIndex, nextBlock)
