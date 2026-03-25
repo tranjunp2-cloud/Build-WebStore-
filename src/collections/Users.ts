@@ -260,6 +260,13 @@ export const Users: CollectionConfig = {
             type: 'text',
         },
         {
+            name: 'phone',
+            type: 'text',
+            admin: {
+                description: 'Phone number with country code (e.g. 60123456789)',
+            },
+        },
+        {
             name: 'roles',
             type: 'select',
             hasMany: true,
