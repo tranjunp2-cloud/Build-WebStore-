@@ -14,7 +14,16 @@ async function getTenantDomains(payload: Awaited<ReturnType<typeof getPayloadHMR
     return raw as DomainEntry[];
 }
 
-export async function addCustomDomain(tenantId: string, domain: string) {
+export async function addCustomDomain(tenantId: string, rawDomain: string) {
+    // 1) Sanitize and validate domain format
+    const domain = rawDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    
+    // Simple but robust domain regex (letters, numbers, hyphens, and dots)
+    const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+    if (!domainRegex.test(domain)) {
+        return { success: false, error: 'Invalid domain format. Please enter a valid custom domain (e.g., store.example.com).' };
+    }
+
     const payload = await getPayloadHMR({ config: configPromise });
 
     const current = await getTenantDomains(payload, tenantId);

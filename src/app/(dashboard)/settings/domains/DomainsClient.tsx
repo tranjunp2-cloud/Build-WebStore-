@@ -145,11 +145,13 @@ export function DomainsClient({
     const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null);
 
     const handleAddDomain = () => {
-        if (!newDomainInput.trim() || !newDomainInput.includes('.')) {
-            toast.error('Please enter a valid domain name');
+        const domainValue = newDomainInput.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+        
+        if (!domainRegex.test(domainValue)) {
+            toast.error('Invalid domain format. Please enter a valid domain (e.g., store.example.com)');
             return;
         }
-        const domainValue = newDomainInput.trim().toLowerCase();
         startTransition(async () => {
             const res = await addCustomDomain(tenantId, domainValue);
             if (res.success) {
