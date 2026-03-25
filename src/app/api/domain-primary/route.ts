@@ -19,23 +19,26 @@ export async function GET(req: NextRequest) {
         // Find the tenant that has this custom domain
         const result = await payload.find({
             collection: 'tenants',
-            limit: 1000,
-            where: {},
+            where: {
+                'customDomains.domain': {
+                    equals: host
+                }
+            },
+            limit: 1,
         })
 
-        // Search through all tenants for the domain
-        for (const tenant of result.docs) {
-            const domains = Array.isArray(tenant.customDomains) ? (tenant.customDomains as Array<{ domain: string; status: string; isPrimary?: boolean }>) : []
+        if (result.docs.length > 0) {
+            const tenant = result.docs[0]
+            const domains = (tenant.customDomains as Array<{ domain: string; status: string; isPrimary?: boolean }>) || []
             const match = domains.find(d => d.domain === host && d.status === 'active')
-            if (!match) continue
-
-            // Found the tenant — check if this domain is primary
-            const isPrimary = match.isPrimary === true
-            // Find primary domain: the one with isPrimary:true
-            const primaryEntry = domains.find(d => d.status === 'active' && d.isPrimary)
-            const primaryDomain = primaryEntry?.domain ?? null
-
-            return NextResponse.json({ isPrimary, primaryDomain })
+            
+            if (match) {
+                const isPrimary = match.isPrimary === true
+                const primaryEntry = domains.find(d => d.status === 'active' && d.isPrimary)
+                const primaryDomain = primaryEntry?.domain ?? null
+                
+                return NextResponse.json({ isPrimary, primaryDomain })
+            }
         }
 
         // Domain not found in any tenant — serve normally

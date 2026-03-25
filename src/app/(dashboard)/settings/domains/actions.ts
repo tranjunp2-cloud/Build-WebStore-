@@ -29,15 +29,18 @@ export async function addCustomDomain(tenantId: string, rawDomain: string) {
     const current = await getTenantDomains(payload, tenantId);
 
     // Check domain not already registered by any tenant
-    const all = await payload.find({
+    const existing = await payload.find({
         collection: 'tenants',
-        limit: 1000,
+        where: {
+            'customDomains.domain': {
+                equals: domain
+            }
+        },
+        limit: 1,
     });
-    for (const t of all.docs) {
-        const domains = (t.customDomains as DomainEntry[]) ?? [];
-        if (Array.isArray(domains) && domains.some(d => d.domain === domain)) {
-            return { success: false, error: 'Domain is already registered by another store.' };
-        }
+    
+    if (existing.docs.length > 0) {
+        return { success: false, error: 'Domain is already registered by another store.' };
     }
 
     // Check not already in current tenant
