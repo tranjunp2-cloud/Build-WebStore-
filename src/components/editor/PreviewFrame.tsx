@@ -3,6 +3,8 @@
 import React, { memo, useEffect, useState, useCallback, useRef } from 'react'
 import { GripVertical, Loader2 } from 'lucide-react'
 import { InlineEditPopover } from './InlineEditPopover'
+import { RichTextToolbar } from './RichTextToolbar'
+import { ImageToolbar } from './ImageToolbar'
 import { useEditorStore } from '@/store/editorStore'
 import { toast } from 'sonner'
 
@@ -141,6 +143,9 @@ function PreviewFrameInner({
     const [dropIndex, setDropIndex] = useState<number | null>(null)
     const [isEditing, setIsEditing] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number } | null>(null)
+    const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string } | null>(null)
+    const [isImageProcessing, setIsImageProcessing] = useState(false)
     const [frameElement, setFrameElement] = useState<HTMLIFrameElement | null>(null)
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
     const clearHoverTimerRef = useRef<number | null>(null)
@@ -184,6 +189,34 @@ function PreviewFrameInner({
                 if (isEditing) {
                     setIsEditing(false)
                 }
+            } else if (e.data?.type === 'TEXT_EDITING_STARTED') {
+                setTextEditingData({ rect: e.data.rect, blockIndex: e.data.blockIndex })
+                setImageClickData(null)
+            } else if (e.data?.type === 'TEXT_EDITING_STOPPED') {
+                setTextEditingData(null)
+            } else if (e.data?.type === 'TEXT_EDITED') {
+                const { oldText, newText, blockIndex } = e.data
+                if (oldText !== newText && newText !== undefined) {
+                    const block = blocks[blockIndex]
+                    const fieldPath = block ? findStringFieldPath(block, oldText) : null
+                    if (fieldPath && block) {
+                        const currentValue = getValueAtPath(block as Record<string, unknown>, fieldPath)
+                        const nextValue = typeof currentValue === 'string' && currentValue.includes(oldText)
+                            ? currentValue.replace(oldText, newText)
+                            : newText
+                        
+                        const clone = JSON.parse(JSON.stringify(blocks))
+                        const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, nextValue)
+                        updateBlock(blockIndex, nextBlock)
+                    }
+                }
+            } else if (e.data?.type === 'IMAGE_CLICKED') {
+                setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType })
+                setTextEditingData(null)
+            } else if (e.data?.type === 'IMAGE_HOVERED') {
+                // Ignore hover if clicked
+            } else if (e.data?.type === 'PREVIEW_CANVAS_CLICKED') {
+                setImageClickData(null)
             }
         }
         window.addEventListener('message', handleMessage)
@@ -225,7 +258,84 @@ function PreviewFrameInner({
         setDropIndex(null)
         setIsEditing(false)
         setIsSubmitting(false)
+        setTextEditingData(null)
+        setImageClickData(null)
     }, [cancelPendingHoverClear, iframeKey, pageId, viewport])
+
+    const handleExecCommand = useCallback((command: string, value?: string) => {
+        if (!frameElement) return
+        frameElement.contentWindow?.postMessage({
+            type: 'EXEC_COMMAND',
+            command,
+            value
+        }, '*')
+    }, [frameElement])
+
+    const handleImageReplace = useCallback(async (file: File) => {
+        if (!imageClickData) return
+        setIsImageProcessing(true)
+        
+        try {
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('alt', 'Uploaded image')
+
+            const uploadRes = await fetch('/api/media', {
+                method: 'POST',
+                body: formData
+            })
+
+            if (!uploadRes.ok) throw new Error('Upload failed')
+            
+            const uploadedMedia = await uploadRes.json()
+            const newUrl = uploadedMedia.doc.url
+
+            const { blockIndex, src } = imageClickData
+            const block = blocks[blockIndex]
+            const fieldPath = block ? findStringFieldPath(block, src) : null
+
+            if (block && fieldPath) {
+                const clone = JSON.parse(JSON.stringify(blocks))
+                const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, newUrl)
+                updateBlock(blockIndex, nextBlock)
+            } else {
+                // Fallback image swapping logic if exact src fieldPath didn't match absolute vs relative URL
+                const clone = JSON.parse(JSON.stringify(blocks))
+                // Try finding with partial match
+                let foundPath = null
+                const findPartialPath = (obj: any, target: string, path: any[] = []): any[] | null => {
+                    if (typeof obj === 'string' && (target.includes(obj) || obj.includes(target))) return path
+                    if (Array.isArray(obj)) {
+                        for (let i=0; i<obj.length; i++) {
+                            const p = findPartialPath(obj[i], target, [...path, i])
+                            if (p) return p
+                        }
+                    } else if (obj && typeof obj === 'object') {
+                        for (const k in obj) {
+                            const p = findPartialPath(obj[k], target, [...path, k])
+                            if (p) return p
+                        }
+                    }
+                    return null
+                }
+                const partialPath = findPartialPath(clone[blockIndex], new URL(src, window.location.origin).pathname)
+                if (partialPath) {
+                    const nextBlock = updateValueAtPath(clone[blockIndex], partialPath, newUrl)
+                    updateBlock(blockIndex, nextBlock)
+                } else {
+                    toast.error('Could not map image to block field')
+                }
+            }
+
+            toast.success('Image replaced successfully')
+            setImageClickData(null)
+        } catch (error) {
+            console.error('Image replace error:', error)
+            toast.error('Failed to replace image')
+        } finally {
+            setIsImageProcessing(false)
+        }
+    }, [blocks, imageClickData, updateBlock])
 
     useEffect(() => {
         if (!dragState || !containerElement || !frameElement) return
@@ -538,6 +648,36 @@ function PreviewFrameInner({
                     )}
                 </div>
             ) : null}
+
+            {/* US-F05-06 AC-1: Rich Text Toolbar */}
+            {textEditingData && overlayOffset && (
+                <div
+                    className="absolute z-[100]"
+                    style={{
+                        top: overlayOffset.top + textEditingData.rect.top - 48,
+                        left: overlayOffset.left + textEditingData.rect.left + (textEditingData.rect.width / 2) - 150,
+                    }}
+                >
+                    <RichTextToolbar onCommand={handleExecCommand} />
+                </div>
+            )}
+
+            {/* US-F05-06 AC-2: Image Toolbar */}
+            {imageClickData && overlayOffset && (
+                <div
+                    className="absolute z-[100]"
+                    style={{
+                        top: overlayOffset.top + imageClickData.rect.top + 8,
+                        left: overlayOffset.left + imageClickData.rect.left + 8,
+                    }}
+                >
+                    <ImageToolbar 
+                        onImageSelect={handleImageReplace} 
+                        isProcessing={isImageProcessing}
+                        onAiGenerate={() => { toast.info('AI Generation context locked to: ' + imageClickData.blockType) }} 
+                    />
+                </div>
+            )}
         </div>
     )
 }
