@@ -16,6 +16,7 @@ interface PreviewFrameProps {
     viewport: 'desktop' | 'mobile'
     onInlineEditApplied?: (content: string, blockIndex: number) => void
     onReorderBlocks?: (fromIndex: number, toIndex: number) => void
+    onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
 }
 
 type HoverRect = {
@@ -134,6 +135,7 @@ function PreviewFrameInner({
     viewport,
     onInlineEditApplied,
     onReorderBlocks,
+    onBlockDrop,
 }: PreviewFrameProps) {
     const { blocks, updateBlock } = useEditorStore()
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
@@ -214,9 +216,9 @@ function PreviewFrameInner({
                 setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType })
                 setTextEditingData(null)
             } else if (e.data?.type === 'IMAGE_HOVERED') {
-                // Ignore hover if clicked
-            } else if (e.data?.type === 'PREVIEW_CANVAS_CLICKED') {
-                setImageClickData(null)
+            } else if (e.data?.type === 'EDITOR_BLOCK_DROP') {
+                const { index, blockData } = e.data.payload
+                onBlockDrop?.(index, blockData)
             }
         }
         window.addEventListener('message', handleMessage)
@@ -224,7 +226,7 @@ function PreviewFrameInner({
             cancelPendingHoverClear()
             window.removeEventListener('message', handleMessage)
         }
-    }, [blocks, cancelPendingHoverClear, dragState, isEditing])
+    }, [blocks, cancelPendingHoverClear, dragState, isEditing, onBlockDrop])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {

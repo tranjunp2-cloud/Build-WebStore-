@@ -302,6 +302,28 @@ export default function EditorPage() {
         })
     }, [reorderBlocks])
 
+    const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
+        const nextBlock = normalizeAddSectionBlock(
+            {
+                instruction: `Add ${blockData.blockType} block`,
+                siteName: siteName || site?.name || '',
+                theme,
+                requestedType: blockData.blockType,
+            },
+            blockData as Record<string, unknown>
+        )
+        
+        const safeBlock = nextBlock || { blockType: blockData.blockType || 'hero', variant: blockData.variant || 'default' } as any
+
+        addBlock(index - 1, safeBlock)
+        setSelectedBlock(index)
+        setIframeKey(key => key + 1)
+        setChatActivity({
+            id: `drop-${Date.now()}`,
+            content: `Added ${blockData.blockType} block`,
+        })
+    }, [addBlock, theme])
+
     const handleAIAction = useCallback(async (action: AIAction) => {
         switch (action.action) {
             case 'update_block': {
@@ -528,6 +550,7 @@ export default function EditorPage() {
                                 })
                             }}
                             onReorderBlocks={handleReorderBlocks}
+                            onBlockDrop={handleBlockDrop}
                         />
                     </div>
 
