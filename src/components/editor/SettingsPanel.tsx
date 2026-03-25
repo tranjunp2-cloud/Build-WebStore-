@@ -169,7 +169,9 @@ function SettingsPanelInner({
             <LogoEditor
                 currentLogo={(headerBlock as any)?.logo || null}
                 onLogoChange={(logoUrl, faviconUrl) => {
-                    onHeaderUpdate?.({ logo: logoUrl })
+                    const changes: any = { logo: logoUrl }
+                    if (faviconUrl) changes.favicon = faviconUrl
+                    onHeaderUpdate?.(changes)
                     if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
                 }}
             />
