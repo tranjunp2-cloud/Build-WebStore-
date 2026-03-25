@@ -2,6 +2,7 @@
 
 import React, { memo, useEffect, useRef, useState } from 'react'
 import { Send, Sparkles, WandSparkles } from 'lucide-react'
+import { AddSectionPromptChips } from './AddSectionPromptChips'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData, ThemeData } from '@/types/editor'
@@ -331,17 +332,12 @@ function AIChatPanelInner({
                         >
                             {compact ? '💡 Change website color' : 'Change web color'}
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => setInput('Add a new section with testimonials')}
-                            className={cn(
-                                'rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-gray-300 transition-colors hover:bg-white/10',
-                                compact && 'shrink-0 border-white/[0.04] bg-[#1E293B] text-slate-400',
-                            )}
-                        >
-                            {compact ? '➕ Add section' : 'Add section'}
-                        </button>
                     </div>
+
+                    <AddSectionPromptChips
+                        compact={compact}
+                        onPromptSelect={prompt => setInput(prompt)}
+                    />
 
                     <div className={cn(
                         'rounded-2xl border border-white/10 bg-[#111827] p-3 transition-colors focus-within:border-cyan-500/40',

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FileText, LayoutGrid, MessageCircle } from 'lucide-react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { BlockLibraryPanel } from '@/components/editor/BlockLibraryPanel'
 import { EditorMenuDrawer } from '@/components/editor/EditorMenuDrawer'
@@ -296,10 +297,22 @@ export default function EditorPage() {
                 break
 
             case 'add_block': {
-                const afterIndex = action.afterIndex ?? selectedBlock ?? (blocks.length - 1)
-                if (action.block) {
-                    addBlock(afterIndex, action.block)
+                const afterIndex = action.afterIndex ?? (blocks.length - 1)
+                const nextBlock = normalizeAddSectionBlock(
+                    {
+                        instruction: action.message || 'Add a new section',
+                        requestedType: String(action.block?.blockType || ''),
+                        siteName: siteName || site?.name || '',
+                        theme,
+                    },
+                    action.block,
+                )
+
+                if (nextBlock) {
+                    addBlock(afterIndex, nextBlock)
                     setSelectedBlock(Math.max(0, afterIndex + 1))
+                } else {
+                    toast.error('Unable to add this section yet')
                 }
                 break
             }
@@ -318,7 +331,7 @@ export default function EditorPage() {
         }
 
         await handleSave({ showToast: false, refreshPreview: true })
-    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, updateBlock, updateTheme])
+    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme])
 
     const handleUndo = useCallback(() => {
         if (!canUndo()) return

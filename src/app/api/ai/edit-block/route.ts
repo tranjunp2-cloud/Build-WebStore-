@@ -7,6 +7,13 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
+import {
+    createAddSectionBlock,
+    getAddSectionLabel,
+    inferAddSectionType,
+    isAddSectionInstruction,
+    normalizeAddSectionBlock,
+} from '@/lib/ai/add-section'
 import { editBlockSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
@@ -14,8 +21,8 @@ import { checkRateLimit } from '@/lib/rateLimit'
 
 type AIEditPayload = {
     instruction: string
-    block?: Record<string, unknown>
-    blockIndex?: number
+    block?: Record<string, unknown> | null
+    blockIndex?: number | null
     allBlocks?: Record<string, unknown>[]
     theme?: Record<string, unknown>
     siteName?: string
@@ -42,8 +49,10 @@ function describeAction(result: AIEditResult): string {
     switch (result.action) {
         case 'update_theme':
             return 'Da cap nhat giao dien va mau sac cho website.'
-        case 'add_block':
-            return 'Da them mot section moi vao trang hien tai.'
+        case 'add_block': {
+            const sectionType = inferAddSectionType('', String(result.block?.blockType || ''))
+            return `Da them section ${getAddSectionLabel(sectionType)} vao cuoi trang.`
+        }
         case 'delete_block':
             return 'Da xoa section duoc chon khoi trang.'
         case 'update_block':
@@ -53,7 +62,10 @@ function describeAction(result: AIEditResult): string {
 }
 
 async function generateEditResult(data: AIEditPayload): Promise<AIEditResult> {
-    const { instruction, block, blockIndex = 0, allBlocks, theme, siteName } = data
+    const { instruction, block, allBlocks, theme, siteName } = data
+    const blockIndex = data.blockIndex ?? 0
+    const inferredSectionType = inferAddSectionType(instruction)
+    const defaultAfterIndex = Math.max(-1, (allBlocks?.length || 0) - 1)
 
     const blockMetas = blockRegistry.getAllMeta()
     const availableTypes = blockMetas.map(m => `${m.type} (${m.name}): variants=[${m.variants.join(',')}]`).join('\n')
@@ -110,10 +122,30 @@ For deleting a block:
 4. For text changes, generate professional, natural content
 5. For theme changes, use tasteful colors that work together
 6. blockType in new blocks MUST be one of the available types
-7. If the user asks to add a section, use add_block with appropriate content`
+7. If the user asks to add a section, use add_block with appropriate content
+8. Supported add-section types: testimonials, faq, gallery, features, team, newsletter, banner, cta
+9. New sections should be appended to the bottom by default unless the user explicitly asks otherwise`
 
     const openai = getOpenAI()
     if (!openai) {
+        if (isAddSectionInstruction(instruction) && inferredSectionType) {
+            const fallbackBlock = createAddSectionBlock({
+                instruction,
+                requestedType: inferredSectionType,
+                siteName,
+                theme,
+            })
+
+            if (fallbackBlock) {
+                return {
+                    action: 'add_block',
+                    afterIndex: defaultAfterIndex,
+                    block: fallbackBlock,
+                    message: `Da them section ${getAddSectionLabel(inferredSectionType)} vao cuoi trang.`,
+                }
+            }
+        }
+
         return {
             action: 'update_block',
             blockIndex: blockIndex ?? 0,
@@ -140,9 +172,38 @@ For deleting a block:
 
     const result = JSON.parse(content) as AIEditResult
 
-    if (result.action === 'add_block' && result.block?.blockType) {
-        if (!blockRegistry.has(String(result.block.blockType))) {
-            throw new Error(`Unknown block type: ${String(result.block.blockType)}`)
+    if (result.action === 'add_block') {
+        const normalizedBlock = normalizeAddSectionBlock(
+            {
+                instruction,
+                requestedType: String(result.block?.blockType || inferredSectionType || ''),
+                siteName,
+                theme,
+            },
+            result.block,
+        )
+
+        if (!normalizedBlock?.blockType || !blockRegistry.has(String(normalizedBlock.blockType))) {
+            throw new Error(`Unknown block type: ${String(normalizedBlock?.blockType || result.block?.blockType || 'unknown')}`)
+        }
+
+        result.block = normalizedBlock
+        result.afterIndex = typeof result.afterIndex === 'number' ? result.afterIndex : defaultAfterIndex
+
+        const validation = blockRegistry.validate(String(result.block.blockType), result.block)
+        if (!validation.success) {
+            const fallbackBlock = createAddSectionBlock({
+                instruction,
+                requestedType: String(result.block.blockType),
+                siteName,
+                theme,
+            })
+
+            if (!fallbackBlock) {
+                throw new Error(validation.error || 'Invalid block generated by AI')
+            }
+
+            result.block = fallbackBlock
         }
     }
 
