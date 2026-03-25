@@ -220,6 +220,7 @@ function VerifyOTPContent() {
                         ref={(el) => { inputRefs.current[i] = el }}
                         type="text"
                         inputMode="numeric"
+                        pattern="[0-9]*"
                         maxLength={1}
                         value={digit}
                         onChange={(e) => handleInputChange(i, e.target.value)}
