@@ -27,6 +27,7 @@ Merchants creating their stores on PrimeWeb need to establish their own brand id
 - Gửi lời mời qua Email, Xem danh sách Staff, Hủy/Xóa quyền Staff.
 
 **Out of Scope:**
+- **Cấu hình Tracking & Analytics:** (GA4, Facebook Pixel, TikTok Pixel) được tách thành một module độc lập **F22**.
 - Buying/Registering domains directly within PrimeWeb.
 - Email hosting configuration (MX records).
 - Managing subdomains of the custom domain (unless added explicitly as a separate domain).
