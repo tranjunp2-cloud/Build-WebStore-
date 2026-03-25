@@ -147,7 +147,7 @@ export function DomainsClient({
     const handleAddDomain = () => {
         const domainValue = newDomainInput.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
         const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
-        
+
         if (!domainRegex.test(domainValue)) {
             toast.error('Invalid domain format. Please enter a valid domain (e.g., store.example.com)');
             return;
@@ -236,28 +236,29 @@ export function DomainsClient({
             </div>
 
             <div className="space-y-[16px]">
-                {/* Banner — Figma 30963:10681, height 102, padding 25 25 1 */}
-                <div className="flex flex-col gap-4 pt-[25px] px-[25px] pb-[1px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-col gap-[4px]">
+                {/* Banner — Figma 30872:1455, height: 102px, padding: 25px 25px 1px */}
+                <div className="flex flex-row items-center justify-between py-[25px] px-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60" style={{ minHeight: '102px' }}>
+                    {/* Text — Figma layout_T77324: column, gap 4px — self-center to prevent stretch */}
+                    <div className="self-center">
                         <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.556em] font-['Inter']">Add a Domain to your store</h2>
-                        <p className="text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.429em] font-['Inter']">Connect your custom domain to make your store accessible</p>
+                        <p className="mt-[4px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.429em] font-['Inter']">Connect your custom domain to make your store accessible</p>
                     </div>
-                    {/* Buttons row — Figma: gap 24px, justify-end */}
-                    <div className="flex flex-col sm:flex-row items-center gap-[24px] pb-[25px] sm:pb-0">
-                        {/* Ghost: "Select primary domain" */}
+                    {/* Buttons — Figma layout_04AXA2: row, center, gap 24px */}
+                    <div className="flex flex-row items-center gap-[24px] shrink-0">
+                        {/* Ghost — Figma layout_AVBJW5: padding 12px 68px, hug height */}
                         <button
                             type="button"
                             onClick={() => setIsSelectPrimaryOpen(true)}
-                            className="w-full sm:w-auto flex items-center justify-center h-[48px] px-[28px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium hover:bg-white/5 transition-colors whitespace-nowrap font-['Inter']"
+                            className="hidden sm:flex items-center justify-center py-[12px] px-[68px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors whitespace-nowrap font-['Inter']"
                         >
                             Select primary domain
                         </button>
-                        {/* Gradient: "Add Custom Domain" */}
+                        {/* Gradient — Figma layout_2HUKSP: w~236, h 48 */}
                         <button
                             type="button"
                             onClick={() => setIsAddModalOpen(true)}
                             style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
-                            className="w-full sm:w-auto flex items-center justify-center gap-2 h-[48px] px-6 rounded-[16px] text-white font-semibold shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
+                            className="flex items-center justify-center gap-2 h-[48px] px-6 rounded-[16px] text-white text-[16px] font-semibold shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
                         >
                             <Plus className="h-5 w-5" />
                             <span>Add Custom Domain</span>
@@ -412,15 +413,19 @@ export function DomainsClient({
             {/* ── Add Domain Modal ──────────────────────────────────────────── */}
             {isAddModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0B1120]/80 p-4 animate-in fade-in duration-200">
-                    <div className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] bg-[#1E293B] border border-white/[0.08] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200 gap-[24px]">
-                        <div className="flex flex-col gap-[8px]">
-                            <h3 className="text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter']">
+                    <div className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] bg-[#1E293B] border border-white/[0.08] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200">
+                        {/* Heading + Note — Figma: heading y=25 h=28, note y=61 h=20 → gap=8px */}
+                        <div className="flex flex-col">
+                            {/* Dùng div + m-0 để triệt tiêu mọi margin mặc định từ global CSS (h3 thường tự có margin-bottom) */}
+                            <div className="m-0 p-0 text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter']">
                                 Enter the domain name you own
-                            </h3>
-                            <p className="text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.429em] font-['Inter']">
-                                Note: Make sure you have access to your registrar to update DNS records.
-                            </p>
+                            </div>
+                            {/* Dùng div + mt-[2px] m-0 để triệt tiêu mọi margin từ thẻ p (p thường có margin-top) */}
+                            <div className="m-0 p-0 mt-[2px] text-[14px] font-bold text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter']">
+                                Note: Make sure you have access to your registrar
+                            </div>
                         </div>
+                        {/* Input — Figma: y=105, note bottom=81 → gap=24px */}
                         <input
                             type="text"
                             value={newDomainInput}
@@ -428,22 +433,24 @@ export function DomainsClient({
                             onKeyDown={(e) => e.key === 'Enter' && !isPending && handleAddDomain()}
                             placeholder="example.com"
                             autoFocus
-                            className="w-full h-[50px] px-[16px] rounded-[16px] bg-[#0B1120] border border-white/[0.08] text-[16px] font-normal text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.4)] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-['Inter']"
+                            className="mt-[24px] w-full h-[50px] py-[12px] px-[16px] rounded-[16px] bg-[#0B1120] border border-white/[0.08] text-[16px] font-normal text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.4)] focus:outline-none transition-all font-['Inter']"
                         />
-                        <div className="flex items-center gap-[12px]">
+                        {/* Buttons — Figma: y=179, input bottom=155 → gap=24px */}
+                        <div className="mt-[24px] flex items-center gap-[12px]">
                             <button
                                 type="button"
                                 onClick={() => { setIsAddModalOpen(false); setNewDomainInput(''); }}
-                                className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium hover:bg-white/5 transition-colors font-['Inter']"
+                                className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors font-['Inter']"
                             >
                                 Cancel
                             </button>
+                            {/* Figma: dim gradient when empty, full gradient when input has value */}
                             <button
                                 type="button"
                                 onClick={handleAddDomain}
                                 disabled={isPending}
-                                style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
-                                className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] font-['Inter'] disabled:opacity-50"
+                                style={{ background: 'linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)' }}
+                                className={`flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] text-white text-[16px] font-semibold leading-[1.5em] transition-all shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] font-['Inter'] ${newDomainInput.trim() ? 'opacity-100 hover:opacity-90' : 'opacity-50'} ${isPending ? 'opacity-50' : ''}`}
                             >
                                 {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
                                 Add Domain
