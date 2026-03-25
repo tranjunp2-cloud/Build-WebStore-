@@ -78,8 +78,33 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
   <script>
     (function() {
       const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
+      const excludedBlockTypes = ['navigation', 'footer']
       let hoveredEl = null;
       let hoverTimer = null;
+      let hoveredBlock = null;
+
+      const getEditableLayouts = () => {
+        return Array.from(document.querySelectorAll('[data-block-index]'))
+          .map((node) => {
+            const rect = node.getBoundingClientRect()
+            return {
+              top: rect.top,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+              blockIndex: parseInt(node.getAttribute('data-block-index')),
+              blockType: node.getAttribute('data-block-type')
+            }
+          })
+          .filter((layout) => !excludedBlockTypes.includes(layout.blockType))
+      }
+
+      const postLayouts = () => {
+        window.parent.postMessage({
+          type: 'BLOCK_LAYOUT',
+          layouts: getEditableLayouts()
+        }, '*')
+      }
 
       const clearHoverState = () => {
         if (hoverTimer) {
@@ -88,6 +113,7 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
         }
 
         hoveredEl = null
+        hoveredBlock = null
         window.parent.postMessage({ type: 'BLOCK_MOUSEOUT' }, '*')
       }
 
@@ -97,6 +123,23 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
         if (!blockContainer) {
           clearHoverState()
           return
+        }
+
+        const blockType = blockContainer.getAttribute('data-block-type')
+        if (!excludedBlockTypes.includes(blockType) && hoveredBlock !== blockContainer) {
+          hoveredBlock = blockContainer
+          const rect = blockContainer.getBoundingClientRect()
+          window.parent.postMessage({
+            type: 'BLOCK_CONTAINER_HOVERED',
+            layout: {
+              top: rect.top,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+              blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+              blockType
+            }
+          }, '*')
         }
         
         if (!validTags.includes(target.tagName) || target.children.length > 1) {
@@ -136,6 +179,12 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
       document.addEventListener('pointerdown', () => {
         window.parent.postMessage({ type: 'PREVIEW_POINTER_DOWN' }, '*')
       })
+
+      window.addEventListener('load', postLayouts)
+      window.addEventListener('resize', postLayouts)
+      window.addEventListener('scroll', postLayouts, { passive: true })
+      document.addEventListener('DOMContentLoaded', postLayouts)
+      setTimeout(postLayouts, 50)
     })();
   </script>
 </body>

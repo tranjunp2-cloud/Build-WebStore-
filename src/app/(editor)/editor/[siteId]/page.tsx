@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FileText, LayoutGrid, MessageCircle } from 'lucide-react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { normalizeAddSectionBlock } from '@/lib/ai/add-section'
@@ -72,6 +71,7 @@ export default function EditorPage() {
     const addBlock = useEditorStore(state => state.addBlock)
     const deleteBlock = useEditorStore(state => state.deleteBlock)
     const duplicateBlock = useEditorStore(state => state.duplicateBlock)
+    const reorderBlocks = useEditorStore(state => state.reorderBlocks)
     const updateTheme = useEditorStore(state => state.updateTheme)
     const undo = useEditorStore(state => state.undo)
     const redo = useEditorStore(state => state.redo)
@@ -282,6 +282,17 @@ export default function EditorPage() {
         updateBlock(index, changes)
     }, [updateBlock])
 
+    const handleReorderBlocks = useCallback((fromIndex: number, toIndex: number) => {
+        if (fromIndex === toIndex) return
+        reorderBlocks(fromIndex, toIndex)
+        setSelectedBlock(toIndex)
+        setIframeKey(key => key + 1)
+        setChatActivity({
+            id: `reorder-${Date.now()}`,
+            content: `Moved block #${fromIndex + 1} to position #${toIndex + 1}`,
+        })
+    }, [reorderBlocks])
+
     const handleAIAction = useCallback(async (action: AIAction) => {
         switch (action.action) {
             case 'update_block': {
@@ -327,10 +338,20 @@ export default function EditorPage() {
                 })
                 break
             }
+
+            case 'undo': {
+                if (canUndo()) {
+                    undo()
+                    setIframeKey(key => key + 1)
+                } else {
+                    toast.error('Nothing to undo')
+                }
+                break
+            }
         }
 
         await handleSave({ showToast: false, refreshPreview: true })
-    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme])
+    }, [addBlock, blocks.length, deleteBlock, handleSave, selectedBlock, site?.name, siteName, theme, updateBlock, updateTheme, canUndo, undo])
 
     const handleUndo = useCallback(() => {
         if (!canUndo()) return
@@ -497,6 +518,7 @@ export default function EditorPage() {
                                     content,
                                 })
                             }}
+                            onReorderBlocks={handleReorderBlocks}
                         />
                     </div>
 

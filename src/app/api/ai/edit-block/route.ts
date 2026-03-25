@@ -29,7 +29,7 @@ type AIEditPayload = {
 }
 
 type AIEditResult = {
-    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block'
+    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block'
     changes?: Record<string, unknown>
     blockIndex?: number
     afterIndex?: number
@@ -115,6 +115,12 @@ For deleting a block:
   "message": "A short explanation of what was changed."
 }
 
+For undoing the previous action:
+{
+  "action": "undo",
+  "message": "A short explanation of what was changed."
+}
+
 ## RULES
 1. Respond ONLY with the JSON object
 2. Always include a concise "message" explaining the applied change
@@ -124,7 +130,8 @@ For deleting a block:
 6. blockType in new blocks MUST be one of the available types
 7. If the user asks to add a section, use add_block with appropriate content
 8. Supported add-section types: testimonials, faq, gallery, features, team, newsletter, banner, cta
-9. New sections should be appended to the bottom by default unless the user explicitly asks otherwise`
+9. New sections should be appended to the bottom by default unless the user explicitly asks otherwise
+10. If the user asks to undo, revert, or go back to the previous state, use the "undo" action with a polite message.`
 
     const openai = getOpenAI()
     if (!openai) {
