@@ -171,7 +171,8 @@ export const Users: CollectionConfig = {
                          collection: 'users',
                          where: {
                              'tenants.tenant': { equals: tenantId }
-                         }
+                         },
+                         limit: 1000
                     })
                     const activeOwners = allStaff.docs.filter((u: any) => 
                          u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
@@ -227,7 +228,8 @@ export const Users: CollectionConfig = {
                 if (targetTenantRole === 'owner' && role !== 'owner') {
                     const allStaff = await req.payload.find({
                          collection: 'users',
-                         where: { 'tenants.tenant': { equals: tenantId } }
+                         where: { 'tenants.tenant': { equals: tenantId } },
+                         limit: 1000
                     })
                     const activeOwners = allStaff.docs.filter((u: any) => 
                          u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
@@ -285,7 +287,8 @@ export const Users: CollectionConfig = {
                 if (targetTenantRole === 'owner') {
                     const allStaff = await req.payload.find({
                          collection: 'users',
-                         where: { 'tenants.tenant': { equals: tenantId } }
+                         where: { 'tenants.tenant': { equals: tenantId } },
+                         limit: 1000
                     })
                     const activeOwners = allStaff.docs.filter((u: any) => 
                          u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
@@ -376,7 +379,7 @@ export const Users: CollectionConfig = {
 
                         const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                         if (targetTenantRole === 'owner') {
-                            const allStaff = await req.payload.find({ collection: 'users', where: { 'tenants.tenant': { equals: tenantId } } })
+                            const allStaff = await req.payload.find({ collection: 'users', where: { 'tenants.tenant': { equals: tenantId } }, limit: 1000 })
                             const activeOwners = allStaff.docs.filter((u: any) => u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active'))
                             if (activeOwners.length <= 1) {
                                 errorCount++;
