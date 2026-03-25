@@ -9,7 +9,6 @@ import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { BlockLibraryPanel } from '@/components/editor/BlockLibraryPanel'
 import { EditorMenuDrawer } from '@/components/editor/EditorMenuDrawer'
 import { EditorSidebar, type EditorSidebarTabId } from '@/components/editor/EditorSidebar'
-import { EditorStatusBar } from '@/components/editor/EditorStatusBar'
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
@@ -390,18 +389,10 @@ export default function EditorPage() {
         router.replace(`/editor/${siteId}?${nextParams.toString()}`)
     }, [router, searchParams, siteId])
 
-    const statusText = isSaving
-        ? 'Saving draft...'
-        : hasUnsavedChanges
-            ? `Autosave ON - ${Math.round(autoSaveIntervalMs / 1000)}s debounce`
-            : lastSavedLabel
-                ? `Autosave ON - Saved at ${lastSavedLabel}`
-                : 'Autosave ON'
-
     const sidebarTabs = [
-        { id: 'chat' as const, label: 'AI Chat', icon: <MessageCircle className="h-3.5 w-3.5" /> },
-        { id: 'components' as const, label: 'Components', icon: <LayoutGrid className="h-3.5 w-3.5" /> },
-        { id: 'pages' as const, label: 'Pages', icon: <FileText className="h-3.5 w-3.5" /> },
+        { id: 'chat' as const, label: 'AI Chat', icon: <span aria-hidden="true">💬</span> },
+        { id: 'components' as const, label: 'Components', icon: <span aria-hidden="true">⚡</span> },
+        { id: 'pages' as const, label: 'Pages', icon: <span aria-hidden="true">📄</span> },
     ]
 
     const sidebarContent = (
@@ -482,54 +473,46 @@ export default function EditorPage() {
                     </EditorSidebar>
                 </div>
             ) : (
-                <>
-                    <div className="flex flex-1 overflow-hidden">
-                        <EditorSidebar
-                            tabs={sidebarTabs}
-                            activeTab={activeSidebarTab}
-                            onTabChange={setActiveSidebarTab}
-                        >
-                            {sidebarContent}
-                        </EditorSidebar>
+                <div className="flex flex-1 overflow-hidden">
+                    <EditorSidebar
+                        tabs={sidebarTabs}
+                        activeTab={activeSidebarTab}
+                        onTabChange={setActiveSidebarTab}
+                    >
+                        {sidebarContent}
+                    </EditorSidebar>
 
-                        <div className="flex flex-1 flex-col">
-                            <PreviewFrame
-                                siteId={siteId}
-                                pageId={currentPageId}
-                                iframeKey={iframeKey}
-                                isLoading={isLoading}
-                                viewport={viewport}
-                                onInlineEditApplied={(content, blockIndex) => {
-                                    setSelectedBlock(blockIndex)
-                                    setActiveSidebarTab('chat')
-                                    setChatActivity({
-                                        id: `inline-${Date.now()}`,
-                                        content,
-                                    })
-                                }}
-                            />
-                        </div>
-
-                        <SettingsPanel
-                            block={currentBlock}
-                            blockIndex={selectedBlock}
-                            theme={theme}
-                            siteName={siteName || site?.name || ''}
-                            siteStatus={site?.status || 'draft'}
-                            onThemeChange={handleThemeChange}
-                            onDeleteBlock={handleDeleteBlock}
-                            onDuplicateBlock={handleDuplicateBlock}
-                            onBlockFieldChange={handleBlockFieldChange}
-                            onBlockUpdate={handleBlockUpdate}
+                    <div className="flex flex-1 flex-col">
+                        <PreviewFrame
+                            siteId={siteId}
+                            pageId={currentPageId}
+                            iframeKey={iframeKey}
+                            isLoading={isLoading}
+                            viewport={viewport}
+                            onInlineEditApplied={(content, blockIndex) => {
+                                setSelectedBlock(blockIndex)
+                                setActiveSidebarTab('chat')
+                                setChatActivity({
+                                    id: `inline-${Date.now()}`,
+                                    content,
+                                })
+                            }}
                         />
                     </div>
 
-                    <EditorStatusBar
-                        statusText={statusText}
-                        currentPageTitle={currentPageTitle}
-                        blockCount={blocks.length}
+                    <SettingsPanel
+                        block={currentBlock}
+                        blockIndex={selectedBlock}
+                        theme={theme}
+                        siteName={siteName || site?.name || ''}
+                        siteStatus={site?.status || 'draft'}
+                        onThemeChange={handleThemeChange}
+                        onDeleteBlock={handleDeleteBlock}
+                        onDuplicateBlock={handleDuplicateBlock}
+                        onBlockFieldChange={handleBlockFieldChange}
+                        onBlockUpdate={handleBlockUpdate}
                     />
-                </>
+                </div>
             )}
         </div>
     )

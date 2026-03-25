@@ -1,22 +1,19 @@
 'use client'
 
-import Link from 'next/link'
 import {
     Check,
     ExternalLink,
-    FileText,
+    Home,
     Loader2,
     Menu,
     Monitor,
+    Smartphone,
     Palette,
     PanelLeft,
     Redo2,
-    Save,
-    Sparkles,
+    Rocket,
     Undo2,
-    Upload,
 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -113,7 +110,7 @@ export function EditorToolbar({
                             </>
                         ) : (
                             <>
-                                <Upload className="h-3.5 w-3.5" />
+                                <Rocket className="h-3.5 w-3.5" />
                                 Publish
                             </>
                         )}
@@ -135,73 +132,70 @@ export function EditorToolbar({
     }
 
     return (
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[#0B1120] px-4">
+        <header className="flex h-11 shrink-0 items-center justify-between border-b border-white/5 bg-[#111827] px-3">
             <div className="flex min-w-0 items-center gap-3">
                 <button
                     type="button"
                     onClick={onOpenMenu}
-                    className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
                     title="Open menu"
                 >
-                    <Menu className="h-4 w-4" />
+                    <Menu className="h-3.5 w-3.5" />
                     Menu
                 </button>
 
-                <div className="h-5 w-px bg-white/10" />
+                <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+                >
+                    <Home className="h-3.5 w-3.5" />
+                    <span className="truncate">{currentPageTitle}</span>
+                </button>
 
-                <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-white">
-                        {siteName || 'Untitled Site'}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className="inline-flex items-center gap-1">
-                            <FileText className="h-3 w-3" />
-                            {currentPageTitle}
-                        </span>
-                        <Badge
-                            variant={isPublished ? 'success' : 'warning'}
-                            className="h-5 rounded-full px-2 text-[10px] uppercase tracking-[0.16em]"
-                        >
-                            {isPublished ? 'Live' : 'Draft'}
-                        </Badge>
-                    </div>
-                </div>
+                <button
+                    type="button"
+                    onClick={onOpenTemplates}
+                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+                >
+                    <Palette className="h-3.5 w-3.5 text-amber-300" />
+                    Templates
+                </button>
+
+                <div className="mx-1 h-3.5 w-px bg-white/10" />
+
+                <button
+                    type="button"
+                    onClick={onUndo}
+                    disabled={!canUndo}
+                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Undo (Cmd/Ctrl+Z)"
+                >
+                    <Undo2 className="h-3.5 w-3.5" />
+                    Undo
+                </button>
+
+                <button
+                    type="button"
+                    onClick={onRedo}
+                    disabled={!canRedo}
+                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Redo (Cmd/Ctrl+Shift+Z)"
+                >
+                    <Redo2 className="h-3.5 w-3.5" />
+                    Redo
+                </button>
             </div>
 
             <div className="flex items-center gap-2">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={onUndo}
-                    disabled={!canUndo}
-                    title="Undo (Cmd/Ctrl+Z)"
-                >
-                    <Undo2 className="h-4 w-4" />
-                </Button>
-
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={onRedo}
-                    disabled={!canRedo}
-                    title="Redo (Cmd/Ctrl+Shift+Z)"
-                >
-                    <Redo2 className="h-4 w-4" />
-                </Button>
-
-                <div className="mx-1 h-5 w-px bg-white/10" />
-
-                <div className="flex items-center rounded-full border border-white/10 bg-white/5 p-1">
+                <div className="flex items-center rounded-full bg-white/[0.04] p-0.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
                     <button
                         type="button"
                         onClick={() => onViewportChange('desktop')}
                         className={cn(
-                            'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                            'inline-flex min-w-[76px] items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors',
                             viewport === 'desktop'
-                                ? 'bg-blue-500 text-white'
-                                : 'text-gray-400 hover:text-white',
+                                ? 'bg-[#3B82F6] text-white'
+                                : 'text-slate-500 hover:text-white',
                         )}
                     >
                         <Monitor className="h-3.5 w-3.5" />
@@ -211,46 +205,27 @@ export function EditorToolbar({
                         type="button"
                         onClick={() => onViewportChange('mobile')}
                         className={cn(
-                            'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                            'inline-flex min-w-[76px] items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors',
                             viewport === 'mobile'
-                                ? 'bg-blue-500 text-white'
-                                : 'text-gray-400 hover:text-white',
+                                ? 'bg-[#3B82F6] text-white'
+                                : 'text-slate-500 hover:text-white',
                         )}
                     >
-                        <Monitor className="h-3.5 w-3.5" />
+                        <Smartphone className="h-3.5 w-3.5" />
                         Mobile
                     </button>
                 </div>
 
-                <div className="mx-1 h-5 w-px bg-white/10" />
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+                    <span className={cn('h-1.5 w-1.5 rounded-full', isSaving ? 'bg-amber-400' : 'bg-emerald-400')} />
+                    <span>{isSaving ? 'Saving' : saveSuccess || !hasUnsavedChanges ? 'Saved' : 'Draft changes'}</span>
+                </div>
 
-                <Button
-                    type="button"
-                    variant={saveSuccess ? 'secondary' : 'outline'}
-                    size="sm"
-                    onClick={onSave}
-                    disabled={isSaving || saveSuccess || !hasUnsavedChanges}
-                    className={cn(saveSuccess && 'border-emerald-500/30 bg-emerald-500/15 text-emerald-300')}
-                >
-                    {isSaving ? (
-                        <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Saving
-                        </>
-                    ) : saveSuccess ? (
-                        <>
-                            <Check className="h-3.5 w-3.5" />
-                            Saved
-                        </>
-                    ) : (
-                        <>
-                            <Save className="h-3.5 w-3.5" />
-                            Save
-                        </>
-                    )}
-                </Button>
+                <div className="inline-flex items-center rounded-full bg-white/[0.04] px-2.5 py-1 text-[11px] font-semibold text-slate-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+                    {isPublished ? 'Live' : 'Draft'}
+                </div>
 
-                <Button variant="outline" size="sm" asChild>
+                <Button variant="ghost" size="sm" asChild className="h-8 rounded-full px-3 text-[11px] font-medium text-slate-300 hover:bg-white/5 hover:text-white">
                     <a
                         href={currentPageId ? `/api/preview/${siteId}?pageId=${currentPageId}` : `/api/preview/${siteId}`}
                         target="_blank"
@@ -267,8 +242,8 @@ export function EditorToolbar({
                     onClick={onPublish}
                     disabled={isPublishing || publishSuccess}
                     className={cn(
-                        isPublished && !publishSuccess && 'bg-emerald-600 hover:bg-emerald-500',
-                        publishSuccess && 'bg-emerald-600 hover:bg-emerald-600',
+                        'h-7 rounded-full border border-[#60A5FA]/20 bg-gradient-to-r from-[#3B82F6] to-[#22C55E] px-3.5 text-[11px] font-semibold text-white shadow-[0_10px_20px_rgba(59,130,246,0.18)] hover:opacity-95',
+                        publishSuccess && 'from-emerald-500 to-emerald-400',
                     )}
                 >
                     {isPublishing ? (
@@ -283,8 +258,8 @@ export function EditorToolbar({
                         </>
                     ) : (
                         <>
-                            {isPublished ? <Sparkles className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
-                            {isPublished ? 'Republish' : 'Publish'}
+                            <Rocket className="h-3.5 w-3.5" />
+                            Publish
                         </>
                     )}
                 </Button>

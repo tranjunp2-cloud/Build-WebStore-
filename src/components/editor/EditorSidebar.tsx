@@ -65,9 +65,9 @@ export function EditorSidebar({
     }
 
     return (
-        <aside className="flex h-full w-[380px] shrink-0 flex-col border-r border-white/10 bg-[#0B1120]">
-            <div className="border-b border-white/10 px-1.5 pt-3">
-                <div className="flex items-center gap-1">
+        <aside className="flex h-full w-[380px] shrink-0 flex-col border-r border-[rgba(59,130,246,0.07)] bg-[#0F172A]">
+            <div className="border-b border-[rgba(59,130,246,0.07)] bg-[rgba(11,17,32,0.5)]">
+                <div className="flex items-stretch">
                     {tabs.map(tab => {
                         const isActive = tab.id === activeTab
 
@@ -77,21 +77,26 @@ export function EditorSidebar({
                                 type="button"
                                 onClick={() => onTabChange(tab.id)}
                                 className={cn(
-                                    'flex min-w-0 items-center gap-2 rounded-t-xl border border-transparent px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] transition-colors',
+                                    'relative flex h-16 min-w-0 items-center justify-center gap-2 px-4 text-sm font-medium uppercase tracking-[0.02em] transition-colors',
                                     isActive
-                                        ? 'border-white/10 border-b-[#0B1120] bg-[#111827] text-white'
-                                        : 'text-gray-500 hover:bg-white/5 hover:text-gray-200',
+                                        ? 'bg-[rgba(30,41,59,0.3)] text-[#2DD4BF]'
+                                        : 'text-slate-400 hover:bg-white/5 hover:text-white',
                                 )}
                             >
-                                <span className="shrink-0">{tab.icon}</span>
-                                <span className="truncate">{tab.label}</span>
+                                <span className="shrink-0 text-base leading-none">{tab.icon}</span>
+                                <span className={cn('truncate', tab.id === 'chat' && 'max-w-[44px] leading-5 text-left')}>
+                                    {tab.id === 'chat' ? 'AI CHAT' : tab.label.toUpperCase()}
+                                </span>
+                                {isActive ? (
+                                    <span className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF]" />
+                                ) : null}
                             </button>
                         )
                     })}
                 </div>
             </div>
 
-            <div className="min-h-0 flex-1">{children}</div>
+            <div className="min-h-0 flex-1 bg-[#0F172A]">{children}</div>
         </aside>
     )
 }

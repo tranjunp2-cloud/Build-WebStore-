@@ -231,7 +231,11 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         return {
             ...mergedBlock,
             variant: safeVariant,
-            testimonials: rawTestimonials.map((t: any) => ({ ...t, avatar: null })),
+            testimonials: rawTestimonials.map((t: any) => {
+                const newT = { ...t }
+                delete newT.avatar
+                return newT
+            }),
         }
     }
 
@@ -257,10 +261,11 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         if (!['masonry', 'grid', 'carousel', 'lightbox'].includes(String(safeLayout))) safeLayout = 'grid'
 
         const rawImages = Array.isArray((block as any).images) ? (block as any).images : fallbackBlock.images
-        const cleanedImages = rawImages.map((item: any) => ({
-            ...item,
-            image: null,
-        }))
+        const cleanedImages = rawImages.map((item: any) => {
+            const newItem = { ...item }
+            delete newItem.image
+            return newItem
+        })
         return {
             ...mergedBlock,
             layout: safeLayout,
@@ -273,7 +278,11 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         const rawMembers = Array.isArray((block as any).members) ? (block as any).members : fallbackBlock.members
         return {
             ...mergedBlock,
-            members: rawMembers.map((m: any) => ({ ...m, image: null })),
+            members: rawMembers.map((m: any) => {
+                const newM = { ...m }
+                delete newM.image
+                return newM
+            }),
         }
     }
 
