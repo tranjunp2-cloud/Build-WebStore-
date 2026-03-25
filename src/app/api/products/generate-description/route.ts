@@ -44,8 +44,9 @@ export const POST = withAuth(async (user, request) => {
                     role: 'system',
                     content: `You are a professional e-commerce copywriter for Malaysian businesses. Generate compelling product copy. Output JSON only:
 {
-  "description": "2-3 paragraph rich description (HTML with <p>, <strong>, <ul> tags allowed)",
-  "shortDescription": "One-liner for product cards (max 150 chars)",
+  "descriptionEN": "2-3 paragraph rich description in English",
+  "descriptionBM": "2-3 paragraph rich description in Bahasa Melayu",
+  "shortDescription": "One-liner for product cards in English (max 150 chars)",
   "seoTitle": "SEO meta title (max 60 chars)",
   "seoDescription": "SEO meta description (max 155 chars)"
 }`,

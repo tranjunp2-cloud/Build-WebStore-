@@ -12,9 +12,35 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
     }
 }
 
+// Auto-inject tenant and site from logged-in user if not provided by client
+const beforeChangeHook = async ({ data, req, operation }: any) => {
+    if (operation === 'create' && req.user) {
+        // If client didn't specify tenant, try to grab the first active tenant from user
+        if (!data.tenant && req.user.tenants?.length > 0) {
+            data.tenant = typeof req.user.tenants[0].tenant === 'object' 
+                ? req.user.tenants[0].tenant?.id 
+                : req.user.tenants[0].tenant
+        }
+
+        // If client didn't specify site, try to fetch the first site for this tenant
+        if (!data.site && data.tenant && req.payload) {
+            const siteRes = await req.payload.find({
+                collection: 'sites',
+                where: { tenant: { equals: data.tenant } },
+                limit: 1
+            })
+            if (siteRes.docs.length > 0) {
+                data.site = siteRes.docs[0].id
+            }
+        }
+    }
+    return data
+}
+
 export const Products: CollectionConfig = {
     slug: 'products',
     hooks: {
+        beforeChange: [beforeChangeHook],
         afterChange: [afterChangeHook],
     },
     admin: {
@@ -89,7 +115,12 @@ export const Products: CollectionConfig = {
         {
             name: 'description',
             type: 'richText',
-            admin: { description: 'Product description (supports rich text)' },
+            admin: { description: 'Product description in English (supports rich text)' },
+        },
+        {
+            name: 'descriptionBM',
+            type: 'richText',
+            admin: { description: 'Product description in Bahasa Melayu (supports rich text)' },
         },
         {
             name: 'shortDescription',
@@ -123,7 +154,7 @@ export const Products: CollectionConfig = {
         {
             name: 'images',
             type: 'array',
-            maxRows: 10,
+            maxRows: 5,
             fields: [
                 {
                     name: 'image',
@@ -137,11 +168,14 @@ export const Products: CollectionConfig = {
                     admin: { description: 'Alt text for accessibility and SEO' },
                 },
             ],
+            admin: { description: 'Product images (Max 5, <= 5MB each)' },
         },
         {
             name: 'category',
-            type: 'text',
-            admin: { description: 'Product category' },
+            type: 'relationship',
+            relationTo: 'categories',
+            hasMany: true,
+            admin: { description: 'Danh mục sản phẩm (Hỗ trợ Multi-select)' },
         },
         {
             name: 'tags',
@@ -174,6 +208,47 @@ export const Products: CollectionConfig = {
             admin: { description: 'Stock Keeping Unit (optional)' },
         },
         {
+            name: 'hasVariants',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: { description: 'Sản phẩm có nhiều phân loại (Variants)' },
+        },
+        {
+            name: 'variantConfigs',
+            type: 'array',
+            maxRows: 2,
+            admin: {
+                condition: (data) => Boolean(data?.hasVariants),
+                description: 'Cấu hình các phân loại (VD: Màu sắc, Kích cỡ)',
+            },
+            fields: [
+                { name: 'name', type: 'text', required: true, admin: { description: 'Tên phân loại (VD: Màu sắc)' } },
+                {
+                    name: 'options',
+                    type: 'array',
+                    minRows: 1,
+                    fields: [
+                        { name: 'value', type: 'text', required: true, admin: { description: 'Giá trị tùy chọn (VD: Đỏ, Xanh)' } }
+                    ]
+                }
+            ],
+        },
+        {
+            name: 'variants',
+            type: 'array',
+            admin: {
+                condition: (data) => Boolean(data?.hasVariants),
+                description: 'Ma trận SKU (Tự động sinh ra từ cấu hình ở trên)',
+            },
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'sku', type: 'text' },
+                { name: 'price', type: 'number', required: true, min: 0 },
+                { name: 'compareAtPrice', type: 'number', min: 0 },
+                { name: 'stock', type: 'number', required: true, min: 0, defaultValue: 0 },
+            ],
+        },
+        {
             name: 'halalCertified',
             type: 'checkbox',
             defaultValue: false,
@@ -194,6 +269,26 @@ export const Products: CollectionConfig = {
             min: 0,
             defaultValue: 0,
             admin: { description: 'Product weight in grams (for shipping calculation)' },
+        },
+        {
+            name: 'dimensions',
+            type: 'group',
+            admin: { description: 'Package dimensions matching shipping logic in F14' },
+            fields: [
+                { name: 'length', type: 'number', min: 0, defaultValue: 0, admin: { description: 'Length (cm)' } },
+                { name: 'width', type: 'number', min: 0, defaultValue: 0, admin: { description: 'Width (cm)' } },
+                { name: 'height', type: 'number', min: 0, defaultValue: 0, admin: { description: 'Height (cm)' } },
+            ],
+        },
+        {
+            name: 'attributes',
+            type: 'array',
+            maxRows: 20,
+            admin: { description: 'Dynamic key/value attributes for Storefront SEO/Rich Snippets' },
+            fields: [
+                { name: 'key', type: 'text', required: true, admin: { placeholder: 'e.g., Material' } },
+                { name: 'value', type: 'text', required: true, admin: { placeholder: 'e.g., 100% Cotton' } },
+            ],
         },
         {
             name: 'seo',
