@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { ImagePlus, Loader2, Sparkles } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { toast } from 'sonner'
@@ -38,8 +38,15 @@ async function generateFavicon(imageUrl: string): Promise<Blob | null> {
 
 export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const previewUrlRef = useRef<string | null>(null)
     const [isUploading, setIsUploading] = useState(false)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+    useEffect(() => {
+        return () => {
+            if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
+        }
+    }, [])
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -50,7 +57,9 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
         try {
             // 1. Process & compress logo
             const processed = await processImageFile(file)
+            if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
             const localPreview = URL.createObjectURL(processed)
+            previewUrlRef.current = localPreview
             setPreviewUrl(localPreview)
 
             // 2. Upload logo
