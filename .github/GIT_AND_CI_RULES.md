@@ -576,6 +576,33 @@ Issue tự chuyển **QA Testing**. QC test trên staging → pass thì close is
 
 ---
 
+## §6 Monitoring & Logs
+
+### Betterstack — Logs realtime cho staging
+
+Team dev xem logs staging **không cần** truy cập DigitalOcean. Dùng Betterstack:
+
+| Công cụ | Link | Mục đích |
+|---------|------|----------|
+| **Live tail** | [telemetry.betterstack.com](https://telemetry.betterstack.com/team/t518152/tail) | Xem logs realtime |
+| **Uptime monitor** | [uptime.betterstack.com](https://uptime.betterstack.com) | Check staging up/down |
+
+**Cách dùng Live tail:**
+1. Mở link Live tail ở trên (cần được invite — hỏi PM/DevOps)
+2. Chọn source: `ech-prime-web-v2-staging`
+3. Search: gõ keyword (VD: `Error`, `500`, `ECONNREFUSED`)
+4. Filter: click vào log line → filter theo field
+
+**Khi nào dùng:**
+- Deploy staging xong → QC/Dev vào test → thấy lỗi → mở Live tail search error
+- Staging down → check Uptime monitor → xem alert
+- Debug API 500 → search endpoint path trong Live tail
+
+**Invite team:**
+PM/DevOps invite qua Betterstack → Settings → Team → Invite (dùng email công ty).
+
+---
+
 ## Tham chiếu
 
 - [Conventional Commits](https://www.conventionalcommits.org/)

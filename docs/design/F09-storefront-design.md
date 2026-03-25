@@ -2,6 +2,7 @@
 
 > **Epic:** Storefront Commerce
 > **Feature Code:** F09
+> **Figma Design:** [Link](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30905-1342&t=nJsYvzayVPDFNauW-1)
 
 Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho giao diện công khai của cửa hàng (End-user Storefront), dựa trên PRD và User Stories F09. 
 *Lưu ý:* Các màn hình Storefront độc lập hoàn toàn với F18 CMS Global Layout (không có Sidebar hay Topbar Admin).

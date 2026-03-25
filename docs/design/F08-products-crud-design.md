@@ -29,17 +29,17 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 │              │ ──────────────────────────────────────── │
 │              │ [🔍 Tìm theo Tên/SKU...]  [ Lọc (2) ▼ ]  │
 │              │                                          │
-│              │ ┌──────────────────────────────────────┐ │
-│              │ │ IMG │ Name         │ Price │ Stock   │ │
-│              │ │ ────┴──────────────┴───────┴─────────│ │
-│              │ │ 📦  │ Baju Kurung  │ RM 89 │ 25      │ │
-│              │ │     │ ├ Đỏ - S     │ RM 89 │ 10      │ │
-│              │ │     │ └ Đỏ - M     │ RM 89 │ 15      │ │
-│              │ │ ────┼──────────────┼───────┼─────────│ │
-│              │ │ 🖼️  │ Lip Gloss    │ RM 39 │ 0 🔴    │ │
-│              │ │ ────┼──────────────┼───────┼─────────│ │
-│              │ │ 📦  │ Mù Tạt Vàng  │ RM 15 │ 12      │ │
-│              │ └──────────────────────────────────────┘ │
+│              │ ┌──────────────────────────────────────────────┐ │
+│              │ │ IMG │ Name         │ Price │ Stock │ Weight  │ │
+│              │ │ ────┴──────────────┴───────┴───────┴─────────│ │
+│              │ │ 📦  │ Baju Kurung  │ RM 89 │ 25    │ 0.5 kg  │ │
+│              │ │     │ ├ Đỏ - S     │ RM 89 │ 10    │         │ │
+│              │ │     │ └ Đỏ - M     │ RM 89 │ 15    │         │ │
+│              │ │ ────┼──────────────┼───────┼───────┼─────────│ │
+│              │ │ 🖼️  │ Lip Gloss    │ RM 39 │ 0 🔴  │ 0.1 kg  │ │
+│              │ │ ────┼──────────────┼───────┼───────┼─────────│ │
+│              │ │ 📦  │ Mù Tạt Vàng  │ RM 15 │ 12    │ 1.2 kg  │ │
+│              │ └──────────────────────────────────────────────┘ │
 └──────────────┴──────────────────────────────────────────┘
 ```
 
@@ -99,8 +99,7 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 │              │ │ 🔲 Sản phẩm có nhiều Tuỳ chọn/Biến thể│ │
 │              │ │                                      │ │
 │              │ │ (Nếu KHÔNG Tích checkbox trên)       │ │
-│              │ │ Giá bán thực : [ RM 0.00 ]           │ │
-│              │ │ Giá KM (C.a.P):[ RM 0.00 ]           │ │
+│              │ │ Giá bán  : [ RM 0.00 ]               │ │
 │              │ │ Tồn Kho  : [ 0       ]               │ │
 │              │ │ SKU Code : [         ]               │ │
 │              │ │                                      │ │
@@ -114,12 +113,17 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 │              │ │ | Đỏ - L   | [      ] | [   ] | [  ] | │
 │              │ └──────────────────────────────────────┘ │
 │              │                                          │
-│              │ ┌─ 2.5. VẬN CHUYỂN & ĐÓNG GÓI ─────────┐ │
-│              │ │ Cân nặng (kg) : [        ]           │ │
-│              │ │ Kích thước (DxRxC cm): [ ]x[ ]x[ ]   │ │
+│              │ ┌─ 3. VẬN CHUYỂN & HALAL (SHIPPING) ───┐ │
+│              │ │ Khối lượng (Weight) (*): [ 0.5 ] kg  │ │
+│              │ │ Chiều Dài (L) : [ 10 ] cm            │ │
+│              │ │ Chiều Rộng (W): [ 10 ] cm            │ │
+│              │ │ Chiều Cao (H) : [  5 ] cm            │ │
+│              │ │                                      │ │
+│              │ │ 🔲 Đạt chứng nhận Halal              │ │
+│              │ │    ↳ [📤 Tải lên Chứng nhận]          │ │
 │              │ └──────────────────────────────────────┘ │
 │              │                                          │
-│              │ ┌─ 3. MÔ TẢ & THUỘC TÍNH MỞ RỘNG (SEO) ┐ │
+│              │ ┌─ 4. MÔ TẢ & THUỘC TÍNH MỞ RỘNG (SEO) ┐ │
 │              │ │ [ ✨ Viết Mô Tả bằng AI ]              │ │
 │              │ │ [ B I U Ξ ]                          │ │
 │              │ │ [ Rich text description box...     ] │ │
@@ -183,7 +187,6 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 ---
 
 ## 5. UI States & Cảnh Báo
-1. **Empty State:** Dùng component "No Data" chung cho list Products. Hiển thị Illustration khay hàng trống, dòng text "Chưa có sản phẩm nào" và nút CTA "Tạo Sản Phẩm" để mời gọi user.
-2. **Low Stock / Out of Stock (🔴):** Nếu tồn kho (Stock) = 0, ô text sẽ highlight chói (Đỏ) trên Dashboard quản trị để thu hút cự chú ý. *Lưu ý: Không tự động chuyển SP thành Draft.*
-3. **Missing Validations:** Nếu bấm lưu mà thiếu Tên, Giá, Stock hoặc SKU của Biến thể, Input sẽ viền Đỏ kèm dòng chữ: `Trường này là bắt buộc`.
-4. **Draft Fallback:** Tất cả các hành động Create (Thủ công hoặc Bulk AI) sẽ mặc định sinh ra trạng thái **[📝 Draft]**. Nút *Publish* ở Form Edit phải do thao tác ấn chủ động để bật SP lên F09 Storefront.
+1. **Low Stock / Out of Stock (🔴):** Nếu tồn kho (Stock) = 0, ô text sẽ highlight chói (Đỏ) trên Dashboard quản trị để thu hút cự chú ý. *Lưu ý: Không tự động chuyển SP thành Draft.*
+2. **Missing Validations:** Nếu bấm lưu mà thiếu Tên, Giá, Stock hoặc SKU của Biến thể, Input sẽ viền Đỏ kèm dòng chữ: `Trường này là bắt buộc`.
+3. **Draft Fallback:** Tất cả các hành động Create (Thủ công hoặc Bulk AI) sẽ mặc định sinh ra trạng thái **[📝 Draft]**. Nút *Publish* ở Form Edit phải do thao tác ấn chủ động để bật SP lên F09 Storefront.
