@@ -150,12 +150,15 @@ SO THAT tôi không bao giờ bỏ lỡ các đơn hàng mới hoặc thông bá
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình Dropdown / Drawer (Danh sách thông báo)
 - **Mô tả:** Màn hình popup list khi click vào biểu tượng chuông.
 - **Components chính:**
   - Header: Tiêu đề "Notifications" và nút "Mark all as read".
   - List View: Danh sách các item thông báo (Title, Nội dung ngắn, Icon tròn, Timestamp). Item chưa đọc có chấm xanh hoặc in đậm.
-- **Wireframe:**
+- **Design / Wireframe:**
 ```text
 [Header Navigation]
   Logo    |   Search                          |   [🔔 (3)]   UserAvatar
@@ -190,36 +193,15 @@ SO THAT tôi không bao giờ bỏ lỡ các đơn hàng mới hoặc thông bá
                                                            (Live Popup Corner)
 ```
   - Native Push Notification:
-```text
-┌──────────────────────────────────────────────┐
-│ 🔔 [PrimeWeb] - System                       │
-│ 📦 Đơn hàng mới: ORD-1025                   │
-│ Khách hàng Aisha vừa đặt Baju Kurung.       │
-└──────────────────────────────────────────────┘
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Mobile View (Full-screen Drawer / Bottom Sheet)
 - **Mô tả:** Trên mobile (<768px), Dropdown list không đủ chỗ hiển thị. Giao diện trở thành một cửa sổ trượt từ dưới lên (Bottom Sheet) hoặc Full-screen phủ hết toàn màn hình đễ dễ bấm ngón tay.
-- **Wireframe:**
-```text
-┌─ Mobile Screen ───────────────┐
-│ Notifications           [ X ] │
-│ ───────────────────────────── │
-│                  [Mark Read]  │
-│                               │
-│ [🔵] 📦 New Order #1024       │
-│      RM 150.00 • 2 mins ago   │
-│ ───────────────────────────── │
-│ [🔵] 📢 System Maintenance    │
-│      Downtime at 2AM • 1 hr   │
-│ ───────────────────────────── │
-│ [ ]  📦 New Order #1023       │
-│      RM 80.00 • 5 hours ago   │
-│                               │
-└───────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ---
+
 
 ## 11. Acceptance Criteria
 

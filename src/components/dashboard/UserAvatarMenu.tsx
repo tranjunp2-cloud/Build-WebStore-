@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, LogOut, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 type UserAvatarMenuProps = {
     userName: string
@@ -12,6 +13,7 @@ type UserAvatarMenuProps = {
 export function UserAvatarMenu({ userName, userInitial }: UserAvatarMenuProps) {
     const [open, setOpen] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
+    const { t } = useI18n()
 
     // Close on click outside
     useEffect(() => {
@@ -70,7 +72,7 @@ export function UserAvatarMenu({ userName, userInitial }: UserAvatarMenuProps) {
                     {/* Profile */}
                     <button className="flex w-full items-center gap-3 rounded-[12px] px-3 py-2 bg-transparent border-none outline-none hover:bg-white/5 cursor-pointer transition-colors text-left text-[14px] font-normal leading-[1.43] text-[#F8FAFC]">
                         <User className="h-4 w-4" />
-                        Profile
+                        {t.cms.profile}
                     </button>
 
                     <div className="my-1 h-px bg-white/10" />
@@ -81,7 +83,7 @@ export function UserAvatarMenu({ userName, userInitial }: UserAvatarMenuProps) {
                         className="flex w-full items-center gap-3 rounded-[12px] px-3 py-2 bg-transparent border-none outline-none hover:bg-white/5 cursor-pointer transition-colors text-left text-[14px] font-normal leading-[1.43] text-[#FF6467]"
                     >
                         <LogOut className="h-4 w-4" />
-                        Logout
+                        {t.cms.logout}
                     </button>
                 </div>
             )}

@@ -138,67 +138,36 @@ Checkout form → type address
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình Cấu hình Shipping (CMS Dashboard)
 - **Mô tả:** Màn hình do người bán thiết lập mức phí vận chuyển.
 - **Components chính:**
   - Card: Các Vùng Địa Lý (Semenanjung, Sabah/Sarawak). Field cho Giá Vận Chuyển.
   - Tích chọn: Enable Free Shipping Threshold và điền Amount.
-- **Wireframe:**
-```text
-Settings (/settings/shipping):
-┌──────────────────────────────────────┐
-│  Semenanjung (West):  [RM 8  ]       │
-│  Sabah & Sarawak:     [RM 15 ]       │
-│  Free shipping above: [RM 150]       │
-│  ☐ Enable free shipping              │
-│  [Save Settings]                     │
-└──────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Tính phí Shipping Checkout (Storefront)
 - **Mô tả:** Phần điền địa chỉ để tính phí tự động.
 - **Components chính:**
   - Form nhập: Điền State (16 Vùng).
   - Tự động nhảy text "Standard Delivery – RM X.00".
-- **Wireframe:**
-```text
-Checkout (/sites/[slug]/checkout):
-┌─ Shipping ─────────────────────────────┐
-│  [Address Line 1*     ]                │
-│  [City*   ] [Postcode*]                │
-│  [State ▼ — 16 states]                 │
-│                                         │
-│  📦 Standard Delivery — RM 8.00        │
-│     Est. 3-5 business days             │
-│     (Sabah/Sarawak: RM 15, 5-7 days)  │
-│                                         │
-│  ✨ Add RM 20.00 more to unlock        │
-│     FREE Shipping!                     │
-└────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Mobile View (Shipping Configuration & Checkout)
 - **Mô tả:** Hiển thị cấu hình vận chuyển thu gọn trên Settings CMS của Mobile, và khối chọn State trong Form Checkout của Mobile Storefront.
-- **Wireframe:**
-```text
-┌─ Mobile Settings: Shipping ─────────────────┐
-│ [←] Back         [Save]                     │
-│ ─────────────────────────────────────────── │
-│ 📦 STANDARD DELIVERY                        │
-│ Semenanjung:     [RM 8  ]                   │
-│ Sabah/Sarawak:   [RM 15 ]                   │
-│                                             │
-│ 🎁 CẤU HÌNH FREE SHIPPING                   │
-│ Free shipping từ [RM 150]                   │
-│ [ON] Kích hoạt Free Shipping                │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.4. Các trạng thái UI (UI States) & Modals
 - **Loading State:** Text Shipping mờ nhẹ hoặc hiện vòng quay Spinner mỗi khi User Trigger đổi giá trị ô State (debounced).
 - **Error State / Edge Cases:** Nếu nhập thiếu Postal Code, ô input highlight viền Đỏ.
 
 ---
+
 
 ## 11. Acceptance Criteria
 

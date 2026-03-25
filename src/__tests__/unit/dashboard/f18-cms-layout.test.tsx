@@ -6,7 +6,14 @@ import React from 'react'
 vi.mock('@/i18n', () => ({
     useI18n: () => ({
         locale: 'en',
+        setLocale: vi.fn(),
         toggleLocale: vi.fn(),
+        t: {
+            cms: { profile: 'Profile', logout: 'Logout' },
+            dashboard: { overview: { greeting: 'Good' } },
+        },
+        tp: vi.fn(),
+        ti: vi.fn(),
     }),
     I18nProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
@@ -87,7 +94,14 @@ describe('F18 CMS Core Layout', () => {
 
         it('[TC-F18.10] Toggles Language (MY/EN)', () => {
             const toggleLocaleMock = vi.fn()
-            vi.spyOn(i18n, 'useI18n').mockReturnValue({ locale: 'en', toggleLocale: toggleLocaleMock, t: {} as any })
+            vi.spyOn(i18n, 'useI18n').mockReturnValue({ 
+                locale: 'en', 
+                setLocale: vi.fn(), 
+                toggleLocale: toggleLocaleMock, 
+                t: { cms: { profile: 'Profile', logout: 'Logout' }, dashboard: { overview: { greeting: 'Good' } } } as any,
+                tp: vi.fn(),
+                ti: vi.fn()
+            })
             
             render(<DashboardSidebar {...defaultProps} />)
             

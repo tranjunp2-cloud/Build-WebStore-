@@ -174,67 +174,30 @@ graph TD
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Templates Modal / Popup)
 - **Mô tả:** Nơi cho phép hiển thị list templates và tương tác tìm kiếm AI.
 - **Components chính:**
   - Search Bar: Form nhập liệu văn bản với kiểu Gemini-style chat input.
   - Template Grid: Lưới hiển thị Card cho các templates.
   - Card Item: Thumbnail ảnh, Tiêu đề template, Nút [Apply], [Preview].
-- **Wireframe:**
-```text
-┌─ AI Editor ─────────────────────────────────────────────┐
-│  [Templates Icon] → Opens Modal                          │
-│                                                          │
-│  ┌─ Templates Modal ──────────────────────────────────┐  │
-│  │  [🔍 Chat: "tìm mẫu nhà hàng..."]                 │  │
-│  │  ─────────────────────────────────────────         │  │
-│  │  [Template Card 1] [Template Card 2] [Card 3]      │  │
-│  │  [Template Card 4] [Template Card 5] [Card 6]      │  │
-│  │                                                    │  │
-│  │  [Preview] [Apply Template]  ← per card buttons   │  │
-│  └────────────────────────────────────────────────────┘  │
-│                                                          │
-│  After Apply:                                            │
-│  [Undo ↩] button appears in Editor toolbar              │
-└──────────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Chi tiết (Full View-Only Preview Mode)
 - **Mô tả:** Fullscreen modal để xem trước kết quả áp dụng Template với dữ liệu site hiện tại.
 - **Components chính:**
   - Header Navbar (Fixed): Nút tắt chế độ Preview, Nút [Apply This Template] ở trên cùng.
   - Iframe Content Area: Trang web rendered bởi component view-only (disable events).
-- **Wireframe:**
-```text
-Full Preview Mode (fullscreen modal):
-┌──────────────────────────────────────────────────────────┐
-│  [✕ Close]                    [Apply This Template ▶]   │
-│  ──────────────────────────────────────────────────────  │
-│  [Template rendered full page — view only]               │
-└──────────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Mobile View (Bottom Sheet Gallery)
 - **Mô tả:** Gallery chọn Template được đổi kiểu thành Bottom sheet vuốt từ dưới lên, danh sách Card chia 2 cột.
-- **Wireframe:**
-```text
-┌─ Mobile AI Editor ──────────────────────────┐
-│ [≡] Website             [Preview][Publish]  │
-│ ─────────────────────────────────────────── │
-│ ...                                         │
-│                                             │
-│ ╭─ Templates (Swipe Up) ──────────────────╮ │
-│ │ 🔍 Chat: "tìm mẫu quán cafe..."         │ │
-│ │ ─────────────────────────────────────── │ │
-│ │  ┌──────────┐      ┌──────────┐         │ │
-│ │  │ [ Image] │      │ [ Image] │         │ │
-│ │  │ Nhà hàng │      │ Fashion  │         │ │
-│ │  └──────────┘      └──────────┘         │ │
-│ │  [Apply][👁]      [Apply][👁]         │ │
-│ │                                         │ │
-│ ╰─────────────────────────────────────────╯ │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.4. Các trạng thái UI (UI States) & Modals
 - **Empty State:** Hình khối vector lỗi 404 + text "Không tìm thấy mẫu phù hợp" xuất hiện khi text Search vô nghiệm.
@@ -243,6 +206,7 @@ Full Preview Mode (fullscreen modal):
 - **Modals:** (Ngoài Template Preview), hiển thị Guard Rail Warn modal (Confirmation Dialog) chống Undo khi bấm núy Save ở editor.
 
 ---
+
 
 ## 11. Acceptance Criteria
 

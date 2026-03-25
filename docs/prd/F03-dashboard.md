@@ -141,6 +141,9 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Dashboard Overview)
 - **Mô tả:** Trang chủ trung tâm hiển thị top metrics và widgets quản lý chung.
 - **Components chính:**
@@ -149,58 +152,9 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
   - Stat Cards View (4 cột): Traffic, Leads, Orders, Revenue.
   - Action Required List: Các tác vụ đang pending.
   - SEO Health Widget: Biểu đồ tròn điểm tổng quát và CTA AI Fix.
-- **Wireframe:**
-```text
-┌──────────────────────────────────────────────────────────┐
-│  Sidebar           │  Dashboard                          │
-│  📊 Dashboard      │                                     │
-│  🌐 My Webstore ▼  │  [🚀 Overview] [📈 Analytics] [🔍 SEO]│
-│    ├ Editor        │  ────────────────────────────────── │
-│    └ Blog          │  Good morning, SME Owner! 👋         │
-│  ...               │  ┌────┐ ┌────┐ ┌────┐ ┌────┐        │
-│                    │  │5.2K│ │150 │ │12  │ │$300│        │
-│                    │  │Viw │ │Lead│ │Ords│ │Rev │        │
-│                    │  └────┘ └────┘ └────┘ └────┘        │
-│                    │  ┌─ Actions Needed ───────┐         │
-│                    │  │ • Order #001 pending   │         │
-│                    │  │ • Order #002 pending   │         │
-│                    │  └────────────────────────┘         │
-│                    │  ┌─ SEO Health ───────────┐         │
-│                    │  │ 72/100                 │         │
-│                    │  │ [AI Fix All Issues ✨] │         │
-│                    │  └────────────────────────┘         │
-└────────────────────┴─────────────────────────────────────┘
-
-**Wireframe Mobile (< 768px): 2x2 Grid Overview**
-```text
-┌─ 📱 Mobile Browser ─────────────────────────┐
-│ [≡] Dashboard            [👤 Owner]         │
-│ ─────────────────────────────────────────── │
-│  Good morning, SME Owner! 👋                │
-│  [  Today ▼ ]  (Time Filter)                │
-│                                             │
-│  ┌─ 2x2 Stat Grid ────────────────┐         │
-│  │ ┌─────────┐      ┌─────────┐   │         │
-│  │ │ 5.2K    │      │ 150     │   │         │
-│  │ │ Views   │      │ Leads   │   │         │
-│  │ └─────────┘      └─────────┘   │         │
-│  │ ┌─────────┐      ┌─────────┐   │         │
-│  │ │ 12      │      │ $300    │   │         │
-│  │ │ Orders  │      │ Revenue │   │         │
-│  │ └─────────┘      └─────────┘   │         │
-│  └────────────────────────────────┘         │
-│                                             │
-│  ┌─ Actions Needed ───────────────┐         │
-│  │ • Order #001 pending      [→]  │         │
-│  └────────────────────────────────┘         │
-│                                             │
-│  ┌─ SEO Health ───────────────────┐         │
-│  │         ( 72/100 )             │         │
-│  │    [AI Fix All Issues ✨]       │         │
-│  └────────────────────────────────┘         │
-└─────────────────────────────────────────────┘
-```
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]text
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Chi tiết (Analytics Detail & SEO Dashboard)
 - **Mô tả:** Các màn hình mở rộng Analytics và SEO.
@@ -209,50 +163,13 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
   - **Analytics:** Daily Bar Chart lớn, Bảng xếp hạng Top Pages/Products/Blogs.
   - **SEO Dashboard:** Bảng Breakdown điểm từng hạng mục, danh sách Keywords Tracker, tiến trình AI Fix All (SSE real-time streaming bar).
 
-- **Wireframe (Analytics Detail):**
+- **Design / Wireframe (Analytics Detail):**
 ```text
-┌──────────────────────────────────────────────────────────┐
-│  Dashboard                [ Filter: Last 30 Days ▼]      │
-│  [🚀 Overview] [📈 Analytics (Active)] [🔍 SEO]              │
-│  ──────────────────────────────────────────────────────  │
-│  ┌─ Site Traffic (Daily) ─────────────────────────┐      │
-│  │   📈 +12% vs last period                       │      │
-│  │    _   _                                       │      │
-│  │  _ | | | |   _       _                         │      │
-│  │ | || | | |_ | | ... | |                        │      │
-│  │ 1  2  3  4  5       30                         │      │
-│  └────────────────────────────────────────────────┘      │
-│                                                          │
-│  ┌─ Top Pages ────────┐  ┌─ Top Products ─────────┐      │
-│  │ /home        1.2K  │  │ 1. Coffee Bean    800  │      │
-│  │ /about       500   │  │ 2. Espresso Mac.  450  │      │
-│  │ /products    400   │  │ 3. Filter Paper   200  │      │
-│  └────────────────────┘  └────────────────────────┘      │
-└──────────────────────────────────────────────────────────┘
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
-- **Wireframe (SEO Dashboard):**
+- **Design / Wireframe (SEO Dashboard):**
 ```text
-┌──────────────────────────────────────────────────────────┐
-│  Dashboard                                               │
-│  [🚀 Overview] [📈 Analytics] [🔍 SEO (Active)]              │
-│  ──────────────────────────────────────────────────────  │
-│  ┌─ Overall Score ────────┐ ┌─ AI Actions ────────┐      │
-│  │       ( 72/100 )       │ │ Fix 5 issues now    │      │
-│  │  Needs Improvement     │ │ [✨ AI Fix All]      │      │
-│  │                        │ │                     │      │
-│  │  Meta Tags: 80/100     │ │ Status: Ready       │      │
-│  │  Headings:  60/100     │ │                     │      │
-│  └────────────────────────┘ └─────────────────────┘      │
-│                                                          │
-│  ┌─ Keyword Tracker ──────────────────────[+ Add]─┐      │
-│  │ Keyword            Rank          Trend         │      │
-│  │ 1. Cafe KL         #12           🔼 +2         │      │
-│  │ 2. Arabica beans   #4            ➖            │      │
-│  │ 3. Best pastry     #45           🔽 -5         │      │
-│  └────────────────────────────────────────────────┘      │
-└──────────────────────────────────────────────────────────┘
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Các trạng thái UI (UI States) & Modals
 - **Empty State:** User chưa có site -> Hiển thị Prompt tạo website đầu tiên (Illustration box). Dashboards khác sẽ báo "Chưa có dữ liệu" với số liệu là 0.
@@ -261,6 +178,7 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 - **Modals:** Modal "Tùy chỉnh Dashboard" cho phép user gạch/chọn (checkbox) và Drag-and-drop để reorder các Stat Cards.
 
 ---
+
 
 ## 11. Acceptance Criteria
 

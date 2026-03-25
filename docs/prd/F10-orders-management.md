@@ -139,27 +139,17 @@ New order placed (Storefront) → Order created 'pending'
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Orders Dashboard / List)
 - **Mô tả:** Trung tâm quản lý toàn bộ đơn hàng của nhà bán.
 - **Components chính:**
   - Status Stats Bar: Thanh ngang (Hoặc Widget KPIs) trên cùng tóm tắt số liệu đơn theo trạng thái (vd: Pending: 3, Confirmed: 5, Shipped: 12).
   - Search & Filter Bar: Tìm theo Mã Đơn/KH; Lọc theo Ngày/Tháng; Khối thao tác Bulk Action "Confirm x Orders".
   - Data Table: Cột Mã Đơn (Clickable), Tên Khách, Tổng tiền (RM), Status Badge (đổi màu theo state), Loại thanh toán, Thời gian.
-- **Wireframe:**
-```text
-┌─ /orders ────────────────────────────────────────────────┐
-│  Orders                                                  │
-│  Pending: 3  │ Confirmed: 5  │ Shipped: 12               │
-│  [All ▼] [Date Range] [🔍 Search]                        │
-│                                                          │
-│  Order#     │ Customer │ Total  │ Status                 │
-│  ORD-A1B2C3 │ Aisha    │ RM156  │ 🟡 Pending             │
-│  ORD-D4E5F6 │ Kumar    │ RM89   │ 🟢 Confirmed            │
-│  ORD-G7H8I9 │ Wei Lin  │ RM245  │ 📦 Shipped             │
-│                                                          │
-│ Mobile: cards, detail = full page                        │
-└──────────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Chi tiết (Order Detail / Info Drawer)
 - **Mô tả:** Màn hình chi tiết của 1 đơn hàng cụ thể, thường được thiết kế dưới dạng Flyout Sidebar trượt từ phải ra (hoặc Page riêng độc lập).
@@ -169,55 +159,13 @@ New order placed (Storefront) → Order created 'pending'
   - Customer Block: Tên, SDT, Địa chỉ giao hàng, Địa chỉ email.
   - Payment Detail: Loại hình (COD/QR), Nếu là QR thì hiển thị ảnh receipt do khách upload kèm nút [Mở To Ảnh].
   - Line Items list: Danh sách các SKU khách đặt mua kèm Cân nặng, Giá tiền. Summary khối tính tổng: Subtotal, Shipping fee, SST 6%, Grand Total.
-- **Wireframe (Order Detail Drawer):**
-```text
-┌─ Order Detail: ORD-A1B2C3 ──────────[X]┐
-│  🟢 Confirmed  |  May 15, 2026 14:30   │
-│                                        │
-│  ┌─ STATUS TIMELINE ─────────────────┐ │
-│  │ (✓) Pending -> (✓) Confirmed      │ │
-│  │     -> ( ) Shipped -> ( ) Done    │ │
-│  └───────────────────────────────────┘ │
-│  [ Mark as Shipped ]  [ Cancel Order ] │
-│                                        │
-│  ┌─ CUSTOMER ────────────────────────┐ │
-│  │ Aisha Binti Omar | 012-345-6789   │ │
-│  │ aisha@email.com                   │ │
-│  │ 123 Jalan Ampang, Kuala Lumpur    │ │
-│  └───────────────────────────────────┘ │
-│  ┌─ ITEMS (2) ───────────────────────┐ │
-│  │ Baju Kurung (Đỏ, M) x1    RM 89   │ │
-│  │ Head Scarf (Đen) x2       RM 40   │ │
-│  └───────────────────────────────────┘ │
-│  Subtotal: RM 129 | Ship: RM 8 | SST: RM 7 │
-│  TOTAL: RM 144.00 (Paid via QR)        │
-└────────────────────────────────────────┘
-```
+- **Design / Wireframe (Order Detail Drawer):**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Mobile View (Order Cards & Full-page Detail)
 - **Mô tả:** Thay vì bảng Data Table khó xem trên mobile, danh sách đơn hàng biến thành các Blocks. Tương tác vuốt (Swipe) thẻ để thực hiện thao tác nhanh. Khi click vào chi tiết, Drawer chuyển thành một màn hình dọc toàn phần (Full-page modal) thay vì Sidebar móp méo bên phải.
-- **Wireframe:**
-```text
-┌─ 📱 Mobile Orders ──────────────────────────┐
-│ [≡] Orders                                  │
-│ ─────────────────────────────────────────── │
-│  Pending: 3  │ Conf: 5  │ Ship: 12          │
-│                                             │
-│ [ 🔍 Mã đơn / Tên khách... ]                │
-│ ─────────────────────────────────────────── │
-│ ┌─ ORD-A1B2C3 ─────────[ 🟡 Pending ]─┐     │
-│ │ Khách: Aisha Binti Omar             │     │
-│ │ Ngày: 15/05/26        Giá: RM 144   │     │
-│ │                                     │     │
-│ │ [ Hủy Đơn ]          [ Xác nhận ✔ ] │     │
-│ └─────────────────────────────────────┘     │
-│                                             │
-│ ┌─ ORD-D4E5F6 ─────────[ 🟢 Confirmed]─┐     │
-│ │ Khách: Kumar                        │     │
-│ │ Ngày: 14/05/26        Giá: RM 89    │     │
-│ └─────────────────────────────────────┘     │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.4. Các trạng thái UI (UI States) & Modals
 - **Empty State:** Hình xe giao hàng lủi thủi + "Bạn chưa có đơn hàng nào. Hãy chia sẻ link store!".
@@ -226,6 +174,7 @@ New order placed (Storefront) → Order created 'pending'
 - **Modals:** Modal Cancel Order buộc nhập Text Reason. Modal Image Viewer (khi click vào ảnh receipt QR Payment Proof).
 
 ---
+
 
 ## 11. Acceptance Criteria
 

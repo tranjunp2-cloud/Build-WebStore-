@@ -94,7 +94,7 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 
 | FR-ID | Requirement | Story Ref | Priority | Notes |
 |-------|-------------|-----------|----------|-------|
-| FR-01 | Product list: Status Tabs (Active, Draft, Archived). Cột: Thumbnail, Name, Category, Price (RM), Total Stock. | US-F08-01 | P0 | |
+| FR-01 | Product list: Status Tabs (Active, Draft, Archived). Cột: Thumbnail, Name, SKU, Category, Price (RM), Total Stock, Cân nặng, Trạng thái (Toggle). Bổ sung thao tác Edit/Delete trên mỗi hàng. | US-F08-01 | P0 | Detailed Grid |
 | FR-02 | Search Bar & Advanced List Actions: Ô Search độc lập (theo Name, SKU). Sắp xếp theo Tên, Giá, Mới nhất, Stock. Lọc theo Category, Trạng thái Sale. | US-F08-01 | P1 | Power User UX |
 | FR-02.1| Low/Out of Stock Alerts: Đánh dấu (Badge/Đổi màu đỏ) cột Stock nếu = 0. Có nút filter "Hiển thị sản phẩm Hết/Sắp hết hàng". | US-F08-01 | P0 | |
 | FR-03 | Product Status Toggle: Chuyển đổi Active/Draft/Archived. **Mặc định khi tạo mới luôn là Draft.** Cần user manual gạt sang Active để hiện lên web. | US-F08-01 | P0 | Draft by Default |
@@ -106,12 +106,33 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 | FR-09 | Product Image Upload: Kéo thả, max 5 ảnh. Khối lượng <= 5MB/ảnh tuân thủ chuẩn Editor. Format JPG/PNG/WEBP. AI auto scale/compress. | US-F08-01 | P0 | |
 | FR-10 | Bulk AI Create (Tạo hàng loạt): Nhập 1 list item -> AI parse ra Name, Price, Category, Variants. Hiển thị Bảng Preview để Edit ngang hàng (Data Grid). Khi duyệt xong lưu thành Draft, bỏ qua hình ảnh. | US-F08-04 | P0 | NLP Array parser |
 | FR-11 | Default product image: Khi không có ảnh, hiển thị placeholder hình "Thùng hàng carton dễ thương". | US-F08-04 | P1 | Fallback UI |
-| FR-12 | Category Management: CRUD danh mục. Hỗ trợ Parent-Child tree (Tối đa 3 level sâu: L1 > L2 > L3). Gán n-Category cho 1 Product. | US-F08-05 | P0 | Nested Set Model / ParentID |
+| FR-12 | Category Management: CRUD danh mục. Hỗ trợ Parent-Child tree (Tối đa 3 level sâu: L1 > L2 > L3). Gán n-Category cho 1 Product. Bố trí nút/menu Direct "Quản lý Danh mục" bên cạnh nút "Add Product". | US-F08-05 | P0 | Nested Set Model / ParentID |
 | FR-13 | Dynamic Attributes: Ô thêm/xóa Key-Value tùy biến (VD: "Chất liệu": "Cotton"). Gen thành SEO Rich Snippets ngoài storefront. | US-F08-06 | P0 | Key-Value Array / JSON |
 | FR-14 | Storefront PLP Layout: View danh sách Grid/List, Sidebar Filters (Menu theo Category 3-Level, Khoảng Giá, Attributes). | US-F08-06 | P0 | F09 Dependency |
 | FR-15 | Storefront PDP Layout: Breadcrumbs (L1 > L2), Gallery ảnh (Trái), Thông tin (Phải). Khối Attributes Table ở nửa dưới trang. | US-F08-06 | P0 | F09 Dependency |
 | FR-16 | **[Mobile]** Danh sách quản lý sản phẩm trên màn hình < 768px chuyển từ cấu trúc Bảng (Data Table) sang dạng Thẻ Card xổ dọc (Stacked Cards Layout). | US-F08-07 | P1 | Chống scroll ngang |
 | FR-17 | **[Mobile]** Bảng cấu hình SKU Matrix (Variants) trên điện thoại chuyển thành nhóm Accordion xếp dọc. | US-F08-07 | P1 | Tối ưu touch target |
+
+### 7.5. Data Validation Rules (Quy tắc Xác thực Dữ liệu)
+
+Để đảm bảo tính toàn vẹn dữ liệu cho F08, hệ thống áp dụng bộ Validation Rules cụ thể sau tại Form Tạo/Sửa Sản Phẩm:
+
+| Field Name | Lĩnh vực (Type/Rule) | Error Message |
+|------------|-----------------------|---------------|
+| **Product Name** | `string` (Min 3, Max 120 chars). Không chèn mã HTML. | "Product name must be between 3 and 120 characters." |
+| **Price** | `number` (>= 0). Không nhận ký tự chữ. | "Price must be greater than or equal to 0." |
+| **Compare At Price**| `number` (> `Price`). Tùy chọn, có thể bỏ trống. | "Compare at price must be greater than the regular price." |
+| **SKU** | `string` (Max 50 chars). Chỉ nhận Alpha-numeric. Unique. | "SKU already exists or is invalid." |
+| **Stock** | `integer` (>= 0). Không điền số thập phân. | "Stock cannot be negative." |
+| **Category** | `array/select` (Min length = 1). Ít nhất 1 danh mục. | "Product must belong to at least one category." |
+| **Weight** | `number` (> 0). Bắt buộc để tính phí Vận chuyển (F14). | "Weight must be greater than 0."|
+| **Length (L)** | `number` (>= 0). Đơn vị cm. | "Length must be greater than or equal to 0." |
+| **Width (W)** | `number` (>= 0). Đơn vị cm. | "Width must be greater than or equal to 0." |
+| **Height (H)** | `number` (>= 0). Đơn vị cm. | "Height must be greater than or equal to 0." |
+| **Images** | `array of files` (Max 5 items). Max 5MB/ảnh. | "Maximum 5 images allowed, up to 5MB each." |
+| **SEO Title** | `string` (Max 70 chars). Hỗ trợ gen bằng AI. | "SEO Title should not exceed 70 characters." |
+| **SEO Description**| `string` (Max 160 chars). Hỗ trợ gen bằng AI. | "SEO description should not exceed 160 characters." |
+| **URL Slug** | `string`. Only lowercase, numbers, and hyphens. Unique. | "Slug must be lowercase alphanumeric with hyphens, and unique." |
 
 ---
 
@@ -131,7 +152,7 @@ SO THAT sản phẩm có mô tả đẹp mà không mất thời gian
 ```
 /products
   ↓
-[+ Add Product] HOẶC [✨ Tạo hàng loạt bằng AI Chat]
+[+ Add Product] HOẶC [✨ Tạo hàng loạt bằng AI Chat] HOẶC [📁 Quản lý Danh mục]
   ├── (Chat): "Nhập kho 2 mặt hàng: Áo khoác da size M L giá 500k và Mù tạt lọ 10k"
   │
  ↙ (AI Xử lý NLP trả về Preview Array)
@@ -172,36 +193,18 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Products Data Grid / List)
 - **Mô tả:** Danh sách quản lý tất cả các sản phẩm thuộc tài khoản cửa hàng.
 - **Components chính:**
-  - Top Toolbar: Nút [+ Add Product], Nút [✨ Tạo Hàng Loạt Bằng AI].
+  - Top Toolbar: Nút [+ Add Product], Nút [✨ Tạo Hàng Loạt Bằng AI], Nút [📁 Quản lý Danh mục] (Direct Link sang trang cấu hình Danh Mục).
   - Tabs Header: Active, Draft, Archived có kèm badged counter.
   - Search & Filters: Search bar (theo tên/SKU), bộ lọc Dropdowns (Category, Sort by Price).
-  - Data Table: Cột Ảnh đại diện, Tên Sản Phẩm (kèm Tên Biến thể nhỏ bên trong hàng Expandable), Phân loại, Giá, Stock quantity.
-- **Wireframe:**
-```text
-┌─ /products ─────────────────────────────────┐
-│  Products                          [+ Add Product]     │
-│  [✨ Chat: Tạo "Móc khóa cute giá 5k, màu xanh đỏ"...] │
-│  ───────────────────────────────────────────────────── │
-│  [✅ Active (45)] [📝 Draft (2)] [📦 Archvied (5)]    │
-│  ───────────────────────────────────────────────────── │
-│  [🔍 Bắt đầu nhập tên SP hoặc mã SKU để tìm nhanh... ] │ 
-│  [Category ▼] [Sort: Giá ▼] [⚠️ Lọc Kho Cạn]           │
-│                                                         │
-│  IMG │ Name          │ Category │  Price  │ Stock      │
-│  ──  │ ────────────  │ ──────── │ ─────── │ ─────      │
-│  📦  │ Baju Kurung   │ Fashion  │ RM 89   │ 25         │
-│      │ ├── Đỏ - S    │   (SKU: BJ-RED-S)  │ 10         │
-│      │ └── Đỏ - M    │   (SKU: BJ-RED-M)  │ 15         │
-│  📷  │ Kuih Raya     │ F&B      │ RM 29   │ 100        │
-│  📦  │ Lip Gloss     │ Beauty   │ RM 39   │ 0 🔴        │
-│                                                         │
-│ * Ghi chú ảnh: 📦 là Thùng Carton mặc định, 📷 là User Up  │
-│ Mobile: cards with expanding accordion for variants    │
-└────────────────────────────────────────────────────────┘
-```
+  - Data Table: Bản nâng cấp hiển thị cột Ảnh đại diện, Tên Sản Phẩm, SKU, Danh Mục, Giá, Cân Nặng (Weight), Kho (Stock - Cảnh báo Đỏ nếu =0), Cột Switch Toggle nhanh Trạng thái (Publish/Hidden), Thao tác (Sửa/Xóa).
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình Chi tiết (Create / Edit Product Form)
 - **Mô tả:** Trang Form nhập đa lớp để khởi tạo 1 sản phẩm mới.
@@ -212,65 +215,13 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
   - Vận chuyển: Các NumberInputs nhập khối lượng và chu vi.
   - Content & SEO: Hộp soạn thảo Rich Text + Nút gọi API AI Viết Mô Tả; Khối chỉnh tùy biến JSON KV Custom Attributes.
   - Header Navbar Actions: Nút "Save as Draft", Nút "Publish/Active", Nút Delete.
-- **Wireframe:**
-```text
-┌─ 📝 Thêm Sản Phẩm Mới ─────────────────[Save Draft] [Publish] ┐
-│                                                                 │
-│ ┌─ THÔNG TIN CHUNG ───────────┐ ┌─ HÌNH ẢNH ──────────────────┐ │
-│ │ Tên: [ Áo khoác da ]        │ │ ┌─────┐ ┌───┐ ┌───┐         │ │
-│ │ Ngành: [ Fashion ▼ ]        │ │ │ 🖼️  │ │ 🖼️ │ │ + │         │ │
-│ │                             │ │ └─────┘ └───┘ └───┘         │ │
-│ │ MÔ TẢ (AI Supported)     ✨ │ │ Max 5 images, <5MB          │ │
-│ │ [ B  I  U  H1  =  Ξ ]       │ └─────────────────────────────┘ │
-│ │ Áo khoác da bò thật 100%... │ ┌─ TỒN KHO & BIẾN THỂ ────────┐ │
-│ │                             │ │ 🔲 Sản phẩm có nhiều Opts   │ │
-│ └─────────────────────────────┘ │ Giá Bán: [ RM 500  ]        │ │
-│                                 │ SKU:     [ AKD-001 ]        │ │
-│ ┌─ CATEGORY & SEO ────────────┐ │ Stock:   [ 15      ]        │ │
-│ │ [ Fashion ▼ ] [ Áo Nam ▼]   │ └─────────────────────────────┘ │
-│ │ Meta: [ Áo khoác da... ]  ✨│                                 │
-│ └─────────────────────────────┘                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Mobile View (Products List & Stacked Form)
 - **Mô tả:** Danh sách sản phẩm thu gọn cột dư thừa thành các Card hoặc Swipeable Rows. Form tạo sản phẩm đổ dọc (Stack) với Accordion cho phần hiển thị biến thể.
-- **Wireframe:**
-```text
-┌─ Mobile Products ───────────────────────────┐
-│ [≡] Products               [+ Add] [✨ AI] │
-│ ─────────────────────────────────────────── │
-│ [ 🔍 Search by Name/SKU...               ]  │
-│ [ Filters ▼ ] [ Sort ▼ ]                    │
-│                                             │
-│ ┌─ 📦 Baju Kurung ────────────────────────┐ │
-│ │ Fashion • RM 89 • Stock: 25   [Edit][⋮]│ │
-│ │ ├ Đỏ - S (Qty: 10)                      │ │
-│ │ └ Đỏ - M (Qty: 15)                      │ │
-│ └─────────────────────────────────────────┘ │
-│                                             │
-│ ┌─ 📦 Lip Gloss ──────────────────────────┐ │
-│ │ Beauty • RM 39 • Stock: 0 🔴  [Edit][⋮]│ │
-│ └─────────────────────────────────────────┘ │
-└─────────────────────────────────────────────┘
-
-┌─ Mobile Edit Form ──────────────────────────┐
-│ [←] Back                     [Save][Publish]│
-│ ─────────────────────────────────────────── │
-│ 🖼 HÌNH ẢNH                                 │
-│ [ + Add Photo ] (Max 5)                     │
-│                                             │
-│ 📄 THÔNG TIN                                │
-│ Name: [Baju Kurung]                         │
-│ Price: [RM 89]                              │
-│                                             │
-│ 🛍 TỒN KHO & BIẾN THỂ  [+] Thêm Option      │
-│ [ Màu sắc ▼ ] : Đỏ, Xanh                    │
-│ [ Kích cỡ ▼ ] : S, M                        │
-│                                             │
-│ ⚙ CÀI ĐẶT NÂNG CAO (Shipping, SEO...)  ▼    │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.4. Các trạng thái UI (UI States) & Modals
 - **Empty State:** Icon khay hàng trống + CTA "Hãy tạo sản phẩm đầu tiên".
@@ -284,6 +235,7 @@ Cân nặng (Weight: kg/g), Chiều Dài (L), Rộng (W), Cao (H) (cm) -> Để 
 > 📌 **Lưu ý:** Giao diện hiển thị phía End-user (Storefront) đã được chuyển giao cho **PRD: F09-storefront-commerce.md**. Vui lòng sang tài liệu F09 để xem mockups chi tiết cho màn hình Danh sách Sản phẩm (Shop) và Chi tiết Sản phẩm (Product View).
 
 ---
+
 
 ## 11. Acceptance Criteria
 

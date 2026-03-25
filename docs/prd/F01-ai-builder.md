@@ -174,45 +174,17 @@ User click "Tạo Website"
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình chính (Builder Screen)
 - **Mô tả:** Màn hình chính cho phép user nhập form để AI generate website và xem live preview.
 - **Components chính:**
   - Form Panel (Left): [Các trường input Tên DN, Lĩnh vực, Mô tả, Dịch vụ, Nút Generate]
   - Live Preview (Right): [Hiển thị website được generate block-by-block dạng iframe, thao tác drag-and-drop]
-- **Wireframe:**
-```text
-┌─ /builder/new ─────────────────────────────────────────┐
-│  ┌──────────────┐          ┌──────────────────────┐    │
-│  │  FORM PANEL  │          │    LIVE PREVIEW       │    │
-│  │  (380px)     │          │    (remaining width)  │    │
-│  │ [Tên DN]     │          │  [skeleton loading]   │    │
-│  │ [Lĩnh vực]   │  ──→     │  Nav → Hero → About   │    │
-│  │ [Mô tả]      │          │  → Contact → Footer   │    │
-│  │ [Dịch vụ]    │          │                       │    │
-│  │ [Generate]   │          │                       │    │
-│  │              │          │  Draft badge          │    │
-│  │              │          │                       │    │
-│  └──────────────┘          └──────────────────────┘    │
-└─────────────────────────────────────────────────────────┘
-
-**Wireframe Mobile (< 768px): Vertical Form & Immersive Preview**
-```text
-┌─ 📱 Mobile Browser ─────────┐  ┌─ 📱 Immersive Preview ──────┐
-│ [≡] Builder                 │  │           [Hero]            │
-│ ─────────────────────────── │  │          PrimeWeb           │
-│ Tên Doanh Nghiệp:           │  │                             │
-│ [ _______________________ ] │  │         [Features]          │
-│ Ngành nghề / Lĩnh vực:      │  │       - Feature 1           │
-│ [F&B] [Retail] [Beauty] ▾ │  │       - Feature 2           │
-│ Mô tả ngắn:                 │  │                             │
-│ [                         ] │  │                             │
-│ [ _______________________ ] │  │      ╭────────────────╮     │
-│                             │  │      │ ⏳ Đang tạo...  │     │
-│ ─────────────────────────── │  │      ╰────────────────╯     │
-│        [✨ Tạo Website]      │  │                             │
-└─────────────────────────────┘  └─────────────────────────────┘
-  (Nút bấm Sticky dưới cùng)      (Chỉ hiện Live Site + Progress)
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]text
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Các trạng thái UI (UI States) & Modals
 - **Empty State:** Form sạch sẽ với placeholder rõ ràng. Banner preview trống.
@@ -222,37 +194,14 @@ User click "Tạo Website"
 
 **Wireframe Mobile Reorder Mode (< 768px):**
 ```text
-┌─ 📱 Mobile Browser ─────────┐
-│ [X Đóng] Sắp xếp bố cục     │
-│ ─────────────────────────── │
-│  [ Header (Cố định)     ] 🔒│
-│                             │
-│  [ Hero Banner          ] ≡ │
-│                             │
-│  [ About Us             ] ≡ │  ← Kéo thả thẻ (Card List) thay 
-│                             │     vì kéo cả khối Iframe to    
-│  [ Products & Services  ] ≡ │
-│                             │
-│  [ Footer (Cố định)     ] 🔒│
-│ ─────────────────────────── │
-│        [✓ Hoàn tất]         │
-└─────────────────────────────┘
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 **Wireframe Success Modal:**
 ```text
-┌─────────────────────────────────┐
-│ ✨ Website Generated!           │
-│                                 │
-│ Your website is now live at:    │
-│ 🌐 my-bakery.primeweb.app [Copy]│
-│                                 │
-│ [ Go to Admin Dashboard ]       │
-│ [ Edit in Advanced Mode ]       │
-└─────────────────────────────────┘
-```
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ---
+
 
 ## 11. Acceptance Criteria
 

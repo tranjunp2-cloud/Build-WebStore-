@@ -141,25 +141,17 @@ The Onboarding Wizard (AI Discovery) relies on a database flag: `has_seen_ai_wiz
 
 > **[BẮT BUỘC]** Liệt kê chi tiết các màn hình (screens) và các state quan trọng (ví dụ: Empty, Loading, Error, Success). Mỗi màn hình cần mô tả UI component chính và luồng hiển thị.
 
+> **[Wireframe & Design Rule]** Không cần dùng ASCII để minh hoạ. Dẫn nguồn trực tiếp từ wireframe ở thư mục design nếu có.
+> **[Quy tắc Cập nhật]** Mỗi khi 1 design/wireframe mới được thêm, BẮT BUỘC phải bổ sung ở Screen Layout đường dẫn tới file đó.
+
 ### 10.1. Màn hình Welcome (Zero-Friction Welcome)
 - **Mô tả:** Màn hình chào mừng siêu tốc sau khi Sign Up.
 - **Components chính:**
   - Tiêu đề thông điệp chào mừng trung tâm.
   - Only ONE Primary Action: Nút CTA lớn "Create My Store".
   - Một link phụ bên dưới: "Bỏ qua & Đi tới Dashboard".
-- **Wireframe:**
-```text
-┌──────────────────────────────────────────┐
-│                                          │
-│        🎉 Chào mừng tới PrimeWeb         │
-│     Bắt đầu xây dựng cửa hàng của bạn    │
-│                                          │
-│       [ 🚀 Create My Store ]             │
-│                                          │
-│       Bỏ qua & Đi tới Dashboard          │
-│                                          │
-└──────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.2. Màn hình AI Discovery Wizard (CMS Overlay Carousel)
 - **Mô tả:** Modal tự bật hiện tại Dashboard hướng dẫn sử dụng AI CMS.
@@ -169,58 +161,13 @@ The Onboarding Wizard (AI Discovery) relies on a database flag: `has_seen_ai_wiz
   - Media Box: Khung hiển thị GIF/Video (16:9 ratio, max 500KB).
   - Content Text: Heading, Body (14-16px).
   - Navigation Footer: Nút Skip (phụ), Nút Next (chính), Progress dots (● ○ ○).
-- **Wireframe:**
-```text
-CMS Dashboard - Background is darkened (opacity 0.6)
-┌──────────────────────────────────────────┐
-│ ✦ Khám phá Quyền năng AI            [✕]  │
-│                                          │
-│   ┌──────────────────────────────────┐   │
-│   │                                  │   │
-│   │        [ 🖼️ GIF/Video ]          │   │
-│   │      (Looping, Max 500KB)        │   │
-│   │                                  │   │
-│   └──────────────────────────────────┘   │
-│                                          │
-│  [Tiêu đề] Thiết kế bằng AI              │
-│  [Mô tả] Hỗ trợ bạn thay đổi thiết kế... │
-│                                          │
-│           (●) (○) (○)  Indicator         │
-│                                          │
-│  [ Bỏ qua ] ───────────── [ Tiếp tục ]   │
-└──────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.3. Mobile View (Stack Onboarding)
 - **Mô tả:** Màn hình Welcome và CMS AI Wizard trên Mobile, tối ưu cho việc sử dụng ngón cái (Thumb-zone) và trình diễn theo chiều dọc.
-- **Wireframe:**
-```text
-┌─ 📱 Mobile Browser ─────────────────────────┐
-│        🎉 Chào mừng tới PrimeWeb           │
-│     Bắt đầu xây dựng cửa hàng của           │
-│     bạn ngay hôm nay!                       │
-│                                             │
-│       [ 🚀 Create My Store ]                │
-│                                             │
-│       Bỏ qua & Đi tới Dashboard             │
-└─────────────────────────────────────────────┘
-
-┌─ 📱 Mobile AI Wizard (Overlay) ─────────────┐
-│ ✦ Khám phá Quyền năng AI               [✕]  │
-│                                             │
-│   ┌──────────────────────────────────┐      │
-│   │        [ 🖼️ GIF/Video ]          │      │
-│   └──────────────────────────────────┘      │
-│                                             │
-│  [Tiêu đề] Thiết kế bằng AI                 │
-│  [Mô tả] Hỗ trợ bạn thay đổi thiết kế       │
-│  chỉ với một cú chạm.                       │
-│                                             │
-│               (●) (○) (○)                   │
-│                                             │
-│  [ Bỏ qua ]              [ ➔ Tiếp tục ]     │
-└─────────────────────────────────────────────┘
-```
+- **Design / Wireframe:**
+  - [Link tới file wireframe/design trong thư mục docs/design/...]
 
 ### 10.4. Các trạng thái UI (UI States) & Modals
 - **Loading State:** Có Shimmer skeleton chờ GIF tải xong bên trong hộp ảnh 16:9. Nút CTA Disable lúc transition slide.
@@ -228,6 +175,7 @@ CMS Dashboard - Background is darkened (opacity 0.6)
 - **Success State:** Fade-out mượt khi hoàn tất Carousel và Update state vô db.
 
 ---
+
 
 ## 11. Acceptance Criteria
 
