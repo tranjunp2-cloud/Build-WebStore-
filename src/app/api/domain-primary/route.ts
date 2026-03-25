@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
         // Find the tenant that has this custom domain
         const result = await payload.find({
             collection: 'tenants',
-            limit: 1,
+            limit: 1000,
             where: {},
         })
 
