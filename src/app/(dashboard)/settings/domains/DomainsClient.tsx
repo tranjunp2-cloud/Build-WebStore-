@@ -1,0 +1,469 @@
+"use client";
+
+import React, { useState, useTransition } from 'react';
+import { Globe, Plus, AlertCircle, Copy, Check, ChevronRight, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
+
+// Đọc từ env vars — deploy production chỉ cần set 2 biến này, không sửa code
+const DNS_A_RECORD = process.env.NEXT_PUBLIC_SERVER_IP ?? '192.168.1.1';
+const DNS_CNAME = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'primeweb.app';
+
+type DomainEntry = { domain: string; status: string; isPrimary?: boolean | null };
+
+// ── Select Primary Domain — Right-Side Panel ────────────────────────────────
+function SelectPrimaryPanel({
+    tenantSlug,
+    domains,
+    currentPrimary,
+    isPending,
+    onClose,
+    onSave,
+}: {
+    tenantSlug: string;
+    domains: DomainEntry[];
+    currentPrimary: string | null;   // null = platform subdomain is primary
+    isPending: boolean;
+    onClose: () => void;
+    onSave: (selected: string | null) => void;
+}) {
+    const platformDomain = `${tenantSlug}.${DNS_CNAME}`;
+    const activeDomains = domains.filter(d => d.status === 'active');
+    const [selected, setSelected] = useState<string | null>(currentPrimary);
+
+    // All options: platform subdomain first, then verified custom domains
+    const options: { label: string; value: string | null }[] = [
+        { label: platformDomain, value: null },
+        ...activeDomains.map(d => ({ label: d.domain, value: d.domain })),
+    ];
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 z-[100] bg-[#0B1120]/60 animate-in fade-in duration-200"
+                onClick={onClose}
+            />
+            {/* Slide-in panel from right — Figma: bg #0B1120, w-592px on desktop */}
+            <div className="fixed right-0 top-0 bottom-0 z-[101] flex flex-col w-full max-w-[448px] sm:max-w-[448px] bg-[#0B1120] animate-in slide-in-from-right duration-300 shadow-[−25px_0_50px_-12px_rgba(0,0,0,0.5)]">
+
+                {/* Close chevron button — Figma circular outlined accent */}
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="absolute top-[20px] left-[-18px] flex h-[36px] w-[36px] items-center justify-center rounded-full bg-[#0B1120] border border-[#1F2937] text-white hover:bg-[#1E293B] transition-colors shrink-0 z-10"
+                >
+                    <ChevronRight className="h-5 w-5" />
+                </button>
+
+                {/* Content */}
+                <div className="flex flex-col flex-1 px-[32px] pt-[32px] pb-[24px] overflow-y-auto">
+                    <h2 className="text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter'] mb-[24px]">
+                        Select primary domain
+                    </h2>
+
+                    {/* Radio list */}
+                    <div className="flex flex-col gap-[12px]">
+                        {options.map(opt => {
+                            const isSelected = selected === opt.value;
+                            return (
+                                <button
+                                    key={opt.value ?? '__platform__'}
+                                    type="button"
+                                    onClick={() => setSelected(opt.value)}
+                                    className={`flex items-center gap-[12px] w-full p-[16px] rounded-[8px] border transition-all text-left font-['Inter'] ${isSelected
+                                        ? 'border-[#00D3D4] bg-[rgba(0,211,212,0.06)]'
+                                        : 'border-[rgba(255,255,255,0.1)] bg-[#0B1120] hover:bg-white/[0.03]'
+                                        }`}
+                                >
+                                    {/* Custom radio */}
+                                    <div className={`flex shrink-0 items-center justify-center h-[20px] w-[20px] rounded-full border-2 transition-all ${isSelected
+                                        ? 'border-[#00D3D4]'
+                                        : 'border-white/30 bg-transparent'
+                                        }`}>
+                                        {isSelected && (
+                                            <div className="h-[10px] w-[10px] rounded-full bg-[#00D3D4]" />
+                                        )}
+                                    </div>
+                                    <span className={`text-[16px] font-normal leading-normal truncate ${isSelected ? 'text-white' : 'text-white/70'
+                                        }`}>
+                                        {opt.label}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {activeDomains.length === 0 && (
+                        <p className="mt-[16px] text-[13px] text-[rgba(248,250,252,0.4)] font-['Inter']">
+                            No verified custom domains yet. Add and verify a custom domain first.
+                        </p>
+                    )}
+                </div>
+
+                {/* Footer buttons — Figma: Cancel ghost + Save gradient, mt-auto */}
+                <div className="flex items-center gap-[12px] px-[32px] pb-[32px] pt-[16px] border-t border-white/[0.06]">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium hover:bg-white/5 transition-colors font-['Inter']"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => onSave(selected)}
+                        style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
+                        className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] font-['Inter'] disabled:opacity-50"
+                    >
+                        {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
+                        Save
+                    </button>
+                </div>
+            </div>
+        </>
+    );
+}
+
+// ── Main DomainsClient ───────────────────────────────────────────────────────
+export function DomainsClient({
+    tenantId,
+    tenantSlug,
+    customDomains,
+}: {
+    tenantId: string;
+    tenantSlug: string;
+    customDomains: DomainEntry[];
+}) {
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [isSelectPrimaryOpen, setIsSelectPrimaryOpen] = useState(false);
+    const [newDomainInput, setNewDomainInput] = useState('');
+    const [isPending, startTransition] = useTransition();
+    const [domains, setDomains] = useState<DomainEntry[]>(customDomains);
+    const [verifyErrors, setVerifyErrors] = useState<Record<string, string>>({});
+    const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null);
+
+    const handleAddDomain = () => {
+        const domainValue = newDomainInput.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+        
+        if (!domainRegex.test(domainValue)) {
+            toast.error('Invalid domain format. Please enter a valid domain (e.g., store.example.com)');
+            return;
+        }
+        startTransition(async () => {
+            const res = await addCustomDomain(tenantId, domainValue);
+            if (res.success) {
+                setIsAddModalOpen(false);
+                setNewDomainInput('');
+                setDomains(prev => [...prev, { domain: domainValue, status: 'pending' }]);
+                toast.success('Domain added successfully! Please configure DNS.');
+            } else {
+                toast.error(res.error || 'Failed to add domain');
+            }
+        });
+    };
+
+    const handleVerify = (domain: string) => {
+        setVerifyErrors(prev => { const next = { ...prev }; delete next[domain]; return next; });
+        setVerifyingDomain(domain);
+        startTransition(async () => {
+            const res = await verifyCustomDomain(tenantId, domain);
+            setVerifyingDomain(null);
+            if (res.success) {
+                setDomains(prev => prev.map(d => d.domain === domain ? { ...d, status: 'active' } : d));
+                toast.success('Domain verified successfully! SSL connection secured.');
+            } else {
+                setVerifyErrors(prev => ({ ...prev, [domain]: res.error || 'Verification failed.' }));
+            }
+        });
+    };
+
+    const handleRemove = (domain: string) => {
+        startTransition(async () => {
+            const res = await removeCustomDomain(tenantId, domain);
+            if (res.success) {
+                setDomains(prev => prev.filter(d => d.domain !== domain));
+                toast.success('Custom domain removed.');
+            } else {
+                toast.error(res.error || 'Failed to remove domain');
+            }
+        });
+    };
+
+    // Save primary domain from the panel
+    const handleSavePrimary = (selected: string | null) => {
+        startTransition(async () => {
+            let res: { success: boolean; error?: string };
+            if (selected === null) {
+                // Reset to platform subdomain as primary
+                res = await clearPrimaryDomain(tenantId);
+                if (res.success) {
+                    setDomains(prev => prev.map(d => ({ ...d, isPrimary: false })));
+                    toast.success('Platform subdomain is now your primary domain.');
+                }
+            } else {
+                res = await setPrimaryDomain(tenantId, selected);
+                if (res.success) {
+                    setDomains(prev => prev.map(d => ({ ...d, isPrimary: d.domain === selected })));
+                    toast.success(`"${selected}" is now your Primary Domain.`);
+                }
+            }
+            if (!res.success) {
+                toast.error(res.error || 'Failed to update primary domain.');
+            } else {
+                setIsSelectPrimaryOpen(false);
+            }
+        });
+    };
+
+    // Derive current primary: find active domain with isPrimary, else null = platform subdomain
+    const hasCustomPrimary = domains.some(d => d.status === 'active' && d.isPrimary);
+    const currentPrimaryDomain = domains.find(d => d.status === 'active' && d.isPrimary)?.domain ?? null;
+
+    return (
+        <div className="w-full space-y-[28px]">
+            {/* Page Header */}
+            <div className="flex items-center gap-4">
+                <div className="hidden sm:flex h-[50px] w-[50px] items-center justify-center rounded-[16px] bg-blue-500/10 border border-blue-500/20 shrink-0">
+                    <Globe className="h-6 w-6 text-blue-500" />
+                </div>
+                <div>
+                    <h1 className="text-[24px] font-bold text-slate-50">Domain Management</h1>
+                    <p className="mt-1 text-[14px] text-slate-50/60 font-normal">Manage custom domains for your webstore</p>
+                </div>
+            </div>
+
+            <div className="space-y-[16px]">
+                {/* Banner — Figma 30963:10681, height 102, padding 25 25 1 */}
+                <div className="flex flex-col gap-4 pt-[25px] px-[25px] pb-[1px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-[4px]">
+                        <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.556em] font-['Inter']">Add a Domain to your store</h2>
+                        <p className="text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.429em] font-['Inter']">Connect your custom domain to make your store accessible</p>
+                    </div>
+                    {/* Buttons row — Figma: gap 24px, justify-end */}
+                    <div className="flex flex-col sm:flex-row items-center gap-[24px] pb-[25px] sm:pb-0">
+                        {/* Ghost: "Select primary domain" */}
+                        <button
+                            type="button"
+                            onClick={() => setIsSelectPrimaryOpen(true)}
+                            className="w-full sm:w-auto flex items-center justify-center h-[48px] px-[28px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium hover:bg-white/5 transition-colors whitespace-nowrap font-['Inter']"
+                        >
+                            Select primary domain
+                        </button>
+                        {/* Gradient: "Add Custom Domain" */}
+                        <button
+                            type="button"
+                            onClick={() => setIsAddModalOpen(true)}
+                            style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 h-[48px] px-6 rounded-[16px] text-white font-semibold shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
+                        >
+                            <Plus className="h-5 w-5" />
+                            <span>Add Custom Domain</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Platform subdomain card — always present */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[25px] px-[25px] pb-[1px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-[16px]">
+                    <div className="flex flex-col gap-2 pb-[25px]">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{tenantSlug}.{DNS_CNAME}</h3>
+                            {!hasCustomPrimary && (
+                                <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
+                                    <span className="text-[12px] font-semibold text-[#C4B5FD]">Current Primary Domain</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
+                            <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
+                            <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">Connected</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Custom Domain Cards */}
+                {domains.map((domainObj) => {
+                    const { domain, status } = domainObj;
+
+                    if (status === 'pending') {
+                        return (
+                            <div key={domain} className="flex flex-col p-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-[16px] animate-in slide-in-from-bottom-4 fade-in duration-300">
+                                <div className="flex flex-col gap-2">
+                                    <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{domain}</h3>
+                                    <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-orange-500/30 bg-orange-500/10 pl-[12px] pr-[16px]">
+                                        <AlertCircle className="h-4 w-4 text-orange-400" strokeWidth={2.5} />
+                                        <span className="text-[14px] font-medium leading-none text-orange-300">Pending Verification</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col p-[16px] rounded-[16px] border border-white/[0.08] bg-[#0B1120]/50 gap-4">
+                                    <p className="text-[14px] text-[#F8FAFC]">Configure these DNS records at your domain registrar:</p>
+                                    <div className="flex flex-col gap-4">
+                                        {/* A Record */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">A Record</span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1 h-[44px] flex items-center px-4 rounded-[12px] border border-white/[0.08] bg-[#1E293B]/40">
+                                                    <span className="text-[14px] text-[#F8FAFC] font-mono">{DNS_A_RECORD}</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { navigator.clipboard.writeText(DNS_A_RECORD); toast.success('Copied! ✅'); }}
+                                                    className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0"
+                                                >
+                                                    <Copy className="h-5 w-5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {/* CNAME Record */}
+                                        <div className="flex flex-col gap-1.5">
+                                            <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">CNAME Record</span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1 h-[44px] flex items-center px-4 rounded-[12px] border border-white/[0.08] bg-[#1E293B]/40">
+                                                    <span className="text-[14px] text-[#F8FAFC] font-mono">{DNS_CNAME}</span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { navigator.clipboard.writeText(DNS_CNAME); toast.success('Copied! ✅'); }}
+                                                    className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0"
+                                                >
+                                                    <Copy className="h-5 w-5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Error banner */}
+                                {verifyErrors[domain] && (
+                                    <div className="flex items-start gap-[12px] w-full p-[16px] rounded-[16px] border border-[rgba(251,44,54,0.3)] bg-[rgba(251,44,54,0.1)] animate-in fade-in duration-200">
+                                        <AlertCircle className="h-5 w-5 text-[#FF6467] shrink-0 mt-[1px]" strokeWidth={1.67} />
+                                        <span className="text-[14px] font-normal leading-[1.43em] text-[#FFC9C9] font-['Inter']">
+                                            {verifyErrors[domain]}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Action buttons */}
+                                <div className="flex flex-col sm:flex-row w-full gap-[12px]">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleVerify(domain)}
+                                        disabled={verifyingDomain === domain}
+                                        className="w-full sm:flex-1 flex items-center justify-center h-[50px] rounded-[16px] hover:opacity-90 text-white text-[16px] font-semibold font-['Inter'] transition-opacity gap-[8px] shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] disabled:opacity-70"
+                                        style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
+                                    >
+                                        {verifyingDomain === domain ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" strokeWidth={2.5} />}
+                                        {verifyingDomain === domain ? 'Verifying...' : 'Verify Connection'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemove(domain)}
+                                        disabled={isPending}
+                                        className="w-full sm:w-[112px] flex items-center justify-center h-[50px] rounded-[16px] border border-[rgba(251,44,54,0.3)] bg-transparent text-[#FF6467] hover:bg-[rgba(251,44,54,0.08)] text-[16px] font-semibold font-['Inter'] transition-colors disabled:opacity-50"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    if (status === 'active') {
+                        const isPrimary = domainObj.isPrimary;
+                        return (
+                            <div key={domain} className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[25px] px-[25px] pb-[1px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-[16px] animate-in slide-in-from-bottom-4 fade-in duration-300">
+                                <div className="flex flex-col gap-2 pb-[25px]">
+                                    <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{domain}</h3>
+                                    <div className="flex flex-wrap gap-2 items-center">
+                                        <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
+                                            <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
+                                            <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">Connected & Secured</span>
+                                        </div>
+                                        {isPrimary && (
+                                            <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
+                                                <span className="text-[12px] font-semibold text-[#C4B5FD]">Current Primary Domain</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Only Remove button — no Set as Primary here */}
+                                <div className="hidden sm:flex items-center gap-3 pb-[25px]">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemove(domain)}
+                                        disabled={isPending || isPrimary === true}
+                                        className="flex items-center justify-center h-[44px] px-[16px] rounded-[12px] border border-[#FB2C36]/30 bg-transparent text-[#FF6467] hover:bg-[#FB2C36]/10 text-[14px] font-semibold transition-colors font-['Inter'] disabled:opacity-50"
+                                        title={isPrimary ? 'Cannot remove the primary domain' : 'Remove domain'}
+                                    >
+                                        Remove Domain
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    return null;
+                })}
+            </div>
+
+            {/* ── Add Domain Modal ──────────────────────────────────────────── */}
+            {isAddModalOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0B1120]/80 p-4 animate-in fade-in duration-200">
+                    <div className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] bg-[#1E293B] border border-white/[0.08] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200 gap-[24px]">
+                        <div className="flex flex-col gap-[8px]">
+                            <h3 className="text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter']">
+                                Enter the domain name you own
+                            </h3>
+                            <p className="text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.429em] font-['Inter']">
+                                Note: Make sure you have access to your registrar to update DNS records.
+                            </p>
+                        </div>
+                        <input
+                            type="text"
+                            value={newDomainInput}
+                            onChange={(e) => setNewDomainInput(e.target.value.replace(/https?:\/\//i, ''))}
+                            onKeyDown={(e) => e.key === 'Enter' && !isPending && handleAddDomain()}
+                            placeholder="example.com"
+                            autoFocus
+                            className="w-full h-[50px] px-[16px] rounded-[16px] bg-[#0B1120] border border-white/[0.08] text-[16px] font-normal text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.4)] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-['Inter']"
+                        />
+                        <div className="flex items-center gap-[12px]">
+                            <button
+                                type="button"
+                                onClick={() => { setIsAddModalOpen(false); setNewDomainInput(''); }}
+                                className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium hover:bg-white/5 transition-colors font-['Inter']"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleAddDomain}
+                                disabled={isPending}
+                                style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
+                                className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] font-['Inter'] disabled:opacity-50"
+                            >
+                                {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
+                                Add Domain
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Select Primary Domain Panel ───────────────────────────────── */}
+            {isSelectPrimaryOpen && (
+                <SelectPrimaryPanel
+                    tenantSlug={tenantSlug}
+                    domains={domains}
+                    currentPrimary={currentPrimaryDomain}
+                    isPending={isPending}
+                    onClose={() => setIsSelectPrimaryOpen(false)}
+                    onSave={handleSavePrimary}
+                />
+            )}
+        </div>
+    );
+}

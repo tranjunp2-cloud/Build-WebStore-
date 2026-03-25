@@ -51,12 +51,16 @@ export const Tenants: CollectionConfig = {
             },
         },
         {
-            name: 'customDomain',
-            type: 'text',
-            unique: true,
+            name: 'customDomains',
+            type: 'array',
             admin: {
-                description: 'Custom domain (e.g. www.mybakery.com). Leave blank to use subdomain.',
+                description: 'List of custom domains attached to this store',
             },
+            fields: [
+                { name: 'domain', type: 'text', required: true, index: true },
+                { name: 'status', type: 'select', defaultValue: 'pending', options: [{ label: 'Pending', value: 'pending' }, { label: 'Active', value: 'active' }] },
+                { name: 'isPrimary', type: 'checkbox', defaultValue: false },
+            ],
         },
         {
             name: 'plan',
