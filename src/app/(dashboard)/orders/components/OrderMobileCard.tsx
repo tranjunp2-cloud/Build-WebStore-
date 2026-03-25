@@ -49,7 +49,13 @@ export function OrderMobileCard({
                         checked={isSelected}
                         onChange={(e) => onToggleSelect(order.id, e.target.checked)}
                     />
-                    <div className="cursor-pointer min-w-0" onClick={() => onSelect(order)}>
+                    <div
+                        className="cursor-pointer min-w-0"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => onSelect(order)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(order) } }}
+                    >
                         <p className="text-sm font-semibold text-white">
                             #{order.orderNumber}
                         </p>
@@ -68,7 +74,10 @@ export function OrderMobileCard({
             {/* Bottom Row: Items, Total, Payment, Date */}
             <div
                 className="mt-3 flex items-center justify-between cursor-pointer"
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelect(order)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(order) } }}
             >
                 <div className="flex items-center gap-3">
                     {/* Total */}

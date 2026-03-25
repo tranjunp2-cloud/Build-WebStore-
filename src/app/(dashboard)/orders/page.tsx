@@ -348,14 +348,14 @@ export default function OrdersPage() {
                                     }}
                                 />
                             </div>
-                            <div className="cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                            <div className="cursor-pointer" role="button" tabIndex={0} onClick={() => setSelectedOrder(order)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedOrder(order) } }}>
                                 <p className="text-sm font-medium text-white">#{order.orderNumber}</p>
                                 <p className="text-sm text-gray-400 mt-0.5 truncate">{order.customerName}</p>
                             </div>
-                            <div className="text-sm text-gray-500 cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                            <div className="text-sm text-gray-500 cursor-pointer" role="button" tabIndex={0} onClick={() => setSelectedOrder(order)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedOrder(order) } }}>
                                 {order.items.length} {order.items.length !== 1 ? o.table.itemPlural : o.table.item}
                             </div>
-                            <div className="text-sm font-medium text-white cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                            <div className="text-sm font-medium text-white cursor-pointer" role="button" tabIndex={0} onClick={() => setSelectedOrder(order)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedOrder(order) } }}>
                                 {formatPrice(order.total, order.currency)}
                             </div>
                             <div className="flex items-center">
@@ -365,7 +365,7 @@ export default function OrdersPage() {
                                     isUpdating={updatingId}
                                 />
                             </div>
-                            <div className="text-xs text-gray-500 cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                            <div className="text-xs text-gray-500 cursor-pointer" role="button" tabIndex={0} onClick={() => setSelectedOrder(order)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedOrder(order) } }}>
                                 {new Date(order.createdAt).toLocaleDateString('en-MY')}
                             </div>
                         </div>
