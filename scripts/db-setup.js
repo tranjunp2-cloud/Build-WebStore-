@@ -111,6 +111,14 @@ const MIGRATIONS = [
     name: 'sites.shipping_config_free_above',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_free_above numeric;`,
   },
+  {
+    name: 'sites.header_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS header_block varchar;`,
+  },
+  {
+    name: 'sites.footer_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS footer_block varchar;`,
+  },
   // ── Products: Halal + Weight ──
   {
     name: 'products.halal_certified',
@@ -140,6 +148,14 @@ const MIGRATIONS = [
   {
     name: 'orders.stripe_payment_intent_id_idx',
     sql: `CREATE INDEX IF NOT EXISTS orders_stripe_payment_intent_id_idx ON orders (stripe_payment_intent_id);`,
+  },
+  {
+    name: 'orders.payment_method',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method varchar;`,
+  },
+  {
+    name: 'orders.payment_reference',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_reference varchar;`,
   },
   // ── Blog Categories table ──
   {

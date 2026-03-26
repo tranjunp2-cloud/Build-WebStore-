@@ -282,6 +282,79 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
         }
       })
 
+      // US-F05-08: Drag and drop component from outside
+      const dropIndicator = document.createElement('div')
+      dropIndicator.className = 'drop-indicator'
+      dropIndicator.style.cssText = 'height: 4px; background-color: #3b82f6; width: 100%; position: absolute; z-index: 9999; display: none; pointer-events: none;'
+      document.body.appendChild(dropIndicator)
+
+      document.addEventListener('dragover', (e) => {
+        e.preventDefault()
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+
+        const blocks = Array.from(document.querySelectorAll('[data-block-index]'))
+        if (blocks.length === 0) return
+
+        let closestBlock = null
+        let closestDist = Infinity
+        let insertAfter = false
+
+        for (const block of blocks) {
+          const rect = block.getBoundingClientRect()
+          const midY = rect.top + rect.height / 2
+          const dist = Math.abs(e.clientY - midY)
+          
+          if (dist < closestDist) {
+            closestDist = dist
+            closestBlock = block
+            insertAfter = e.clientY > midY
+          }
+        }
+
+        if (closestBlock) {
+          const rect = closestBlock.getBoundingClientRect()
+          dropIndicator.style.display = 'block'
+          if (insertAfter) {
+             dropIndicator.style.top = (rect.bottom + window.scrollY - 2) + 'px'
+          } else {
+             dropIndicator.style.top = (rect.top + window.scrollY - 2) + 'px'
+          }
+          dropIndicator.dataset.index = closestBlock.getAttribute('data-block-index') || '0'
+          dropIndicator.dataset.insertAfter = insertAfter.toString()
+        }
+      })
+
+      document.addEventListener('dragleave', (e) => {
+         if (!e.relatedTarget) {
+            dropIndicator.style.display = 'none'
+         }
+      })
+
+      document.addEventListener('drop', (e) => {
+        e.preventDefault()
+        dropIndicator.style.display = 'none'
+
+        try {
+          const dataStr = e.dataTransfer?.getData('application/json')
+          if (!dataStr) return
+          
+          const blockData = JSON.parse(dataStr)
+          const targetIndexAttr = dropIndicator.dataset.index
+          const isAfter = dropIndicator.dataset.insertAfter === 'true'
+          
+          if (!targetIndexAttr) return
+          let targetIndex = parseInt(targetIndexAttr)
+          if (isAfter) targetIndex += 1
+
+          window.parent.postMessage({
+            type: 'EDITOR_BLOCK_DROP',
+            payload: { index: targetIndex, blockData }
+          }, '*')
+        } catch (err) {
+          console.error('Drop error:', err)
+        }
+      })
+
       // Parent command execution (for bold, italic etc from RichTextToolbar)
       window.addEventListener('message', (e) => {
         if (e.data?.type === 'EXEC_COMMAND') {

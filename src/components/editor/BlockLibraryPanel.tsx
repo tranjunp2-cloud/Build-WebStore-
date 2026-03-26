@@ -136,8 +136,14 @@ export function BlockLibraryPanel({
                                             <button
                                                 key={item.type}
                                                 type="button"
+                                                draggable={true}
+                                                onDragStart={(e) => {
+                                                    const blockData = { blockType: item.type, variant: item.defaultVariant }
+                                                    e.dataTransfer.setData('application/json', JSON.stringify(blockData))
+                                                    e.dataTransfer.effectAllowed = 'copy'
+                                                }}
                                                 onClick={() => handleAddBlock(item.type, item.defaultVariant)}
-                                                className="group flex w-full flex-col gap-2 rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#1E293B] px-[13px] py-[13px] text-left transition-colors hover:border-cyan-500/25 hover:bg-[#223049]"
+                                                className="group flex w-full flex-col gap-2 rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#1E293B] px-[13px] py-[13px] text-left transition-colors hover:border-cyan-500/25 hover:bg-[#223049] cursor-grab active:cursor-grabbing"
                                             >
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[linear-gradient(135deg,rgba(59,130,246,0.2),rgba(45,212,191,0.2))] text-[20px]">
