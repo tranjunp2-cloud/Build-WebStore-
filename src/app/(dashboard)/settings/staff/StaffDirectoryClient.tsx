@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useMemo, useTransition } from 'react';
-import { Users, Plus, Trash2, Shield, ShieldAlert, Loader2, Search, MoreHorizontal, Mail, Power, PowerOff, Edit2 } from 'lucide-react';
+import { Users, Plus, UserPlus, Trash2, Shield, ShieldAlert, Loader2, Search, MoreHorizontal, Mail, Power, PowerOff, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { removeStaff, bulkRemoveStaff, updateStaffStatus, resendInvite } from './actions';
 import { StaffDrawer } from './StaffDrawer';
+import { RemoveStaffModal } from './RemoveStaffModal';
 
 export type StaffMember = {
     id: string;
@@ -31,7 +32,7 @@ export function StaffDirectoryClient({
     React.useEffect(() => {
         setStaff(initialStaff);
     }, [initialStaff]);
-    
+
     // UI States
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
@@ -39,6 +40,7 @@ export function StaffDirectoryClient({
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+    const [userToRemove, setUserToRemove] = useState<StaffMember | null>(null);
     const [isPending, startTransition] = useTransition();
 
     const itemsPerPage = 10;
@@ -55,12 +57,12 @@ export function StaffDirectoryClient({
         let filtered = [...staff];
         if (debouncedSearch) {
             const lowerQuery = debouncedSearch.toLowerCase();
-            filtered = filtered.filter(s => 
-                s.email.toLowerCase().includes(lowerQuery) || 
+            filtered = filtered.filter(s =>
+                s.email.toLowerCase().includes(lowerQuery) ||
                 ((s.firstName || '') + ' ' + (s.lastName || '')).toLowerCase().includes(lowerQuery)
             );
         }
-        
+
         // Sort by lastLoginAt DESC
         filtered.sort((a, b) => {
             if (!a.lastLoginAt) return 1;
@@ -102,17 +104,8 @@ export function StaffDirectoryClient({
     };
 
     const handleRemove = (userId: string) => {
-        if (!confirm('Are you sure you want to remove this user from the workspace?')) return;
-        startTransition(async () => {
-            const res = await removeStaff(userId);
-            if (res.success) {
-                setStaff(prev => prev.filter(s => s.id !== userId));
-                toast.success('User removed from workspace');
-                setOpenDropdownId(null);
-            } else {
-                toast.error(res.error || 'Failed to remove user');
-            }
-        });
+        const user = staff.find(s => s.id === userId);
+        if (user) setUserToRemove(user);
     };
 
     const handleToggleStatus = (userId: string, currentStatus: string) => {
@@ -154,58 +147,47 @@ export function StaffDirectoryClient({
 
     return (
         <div className="w-full space-y-[28px]">
-            {/* Page Header */}
+            {/* Page Header — Figma 31058:693 */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="hidden sm:flex h-[50px] w-[50px] items-center justify-center rounded-[16px] bg-indigo-500/10 border border-indigo-500/20 shrink-0">
-                        <Users className="h-6 w-6 text-indigo-500" />
-                    </div>
-                    <div>
-                        <h1 className="text-[24px] font-bold text-slate-50">Team Members</h1>
-                        <p className="mt-1 text-[14px] text-slate-50/60 font-normal">Manage who has access to your store and their permissions</p>
-                    </div>
+                <div className="flex flex-col">
+                    <div className="m-0 p-0 text-[30px] font-bold text-[#F8FAFC] leading-[1.2em] font-['Inter']">Staff Management</div>
+                    <div className="m-0 p-0 mt-[2px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter']">Manage your team members and their access permissions</div>
                 </div>
-                
-                <div className="flex items-center gap-3">
+
+                <div className="flex items-center gap-[12px]">
                     {selectedIds.length > 0 && (
                         <button
                             type="button"
                             onClick={handleBulkRemove}
                             disabled={isPending}
-                            className="flex items-center justify-center gap-2 h-[44px] px-[16px] rounded-[14px] bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors font-medium text-[14px]"
+                            className="flex items-center justify-center gap-2 h-[48px] px-[16px] rounded-[16px] bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors font-medium text-[14px]"
                         >
                             <Trash2 className="h-4 w-4" />
                             Delete ({selectedIds.length})
                         </button>
                     )}
+                    {/* Invite Staff Button — Figma 31058:699 */}
                     <button
                         type="button"
                         onClick={() => { setEditingStaff(null); setIsDrawerOpen(true); }}
-                        style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
-                        className="flex items-center justify-center gap-2 h-[44px] px-[20px] rounded-[14px] text-white font-semibold shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
+                        style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', boxShadow: '0px 4px 6px -4px rgba(59, 130, 246, 0.3), 0px 10px 15px -3px rgba(59, 130, 246, 0.3)' }}
+                        className="flex items-center justify-center gap-[8px] h-[48px] px-[24px] rounded-[16px] text-white text-[16px] font-semibold leading-[1.5em] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
                     >
-                        <Plus className="h-5 w-5" />
-                        <span className="hidden sm:inline">Add Staff</span>
+                        <UserPlus className="h-5 w-5" />
+                        <span>Invite Staff</span>
                     </button>
                 </div>
             </div>
 
-            {/* Controls */}
-            <div className="flex items-center justify-between gap-4">
-                <div className="relative w-full max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
-                    <input 
-                        type="text" 
-                        placeholder="Search by email or name..." 
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="w-full h-[40px] pl-[40px] pr-[16px] rounded-[10px] bg-[#1E293B]/60 border border-white/[0.08] text-[14px] text-[#F8FAFC] placeholder:text-slate-500 focus:outline-none focus:border-indigo-500/50"
-                    />
-                </div>
-            </div>
 
-            {/* Table Area */}
-            <div className="overflow-hidden rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 relative pb-[60px]">
+
+            {/* Table Area — Figma 31058:706 */}
+            <div className="overflow-hidden rounded-[16px] border border-white/[0.08] bg-[#1E293B]">
+                {/* Heading 2 — Figma 31058:708 */}
+                <div className="py-[16px] px-[24px] pb-[1px] border-b border-white/[0.08]">
+                    <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.556em] font-['Inter']">Staff Directory</h2>
+                </div>
+
                 {/* Loader overlay */}
                 {isPending && (
                     <div className="absolute inset-0 z-50 bg-[#0B1120]/50 flex items-center justify-center">
@@ -213,169 +195,106 @@ export function StaffDirectoryClient({
                     </div>
                 )}
                 
-                <div className="overflow-x-auto">
+                {/* Card Gap: 24px — Figma 31058:706 */}
+                <div className="overflow-x-auto mt-[24px]">
                     <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead>
-                            <tr className="border-b border-white/[0.08] bg-[#0B1120]/40">
-                                <th className="px-[24px] py-[16px] w-[50px]">
-                                    <div className="flex items-center justify-center">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={selectedIds.length === currentStaffPage.length && currentStaffPage.length > 0}
-                                            onChange={handleSelectAll}
-                                            className="w-4 h-4 rounded-[4px] border-white/20 bg-[#1E293B] cursor-pointer" 
-                                        />
-                                    </div>
-                                </th>
-                                <th className="px-[24px] py-[16px] text-[13px] font-medium text-slate-400 uppercase tracking-wider">Full Name & Email</th>
-                                <th className="px-[24px] py-[16px] text-[13px] font-medium text-slate-400 uppercase tracking-wider">Status</th>
-                                <th className="px-[24px] py-[16px] text-[13px] font-medium text-slate-400 uppercase tracking-wider">Role & Permissions</th>
-                                <th className="px-[24px] py-[16px] text-[13px] font-medium text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                            <tr className="border-b border-white/[0.08]">
+                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">NAME / EMAIL</th>
+                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">ROLE</th>
+                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">STATUS</th>
+                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/[0.08]">
                             {currentStaffPage.map((user) => {
-                                const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') || 
-                                                    user.email.split('@')[0];
+                                const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+                                    user.email.split('@')[0];
                                 const isOwner = user.role === 'owner';
-                                
+
                                 return (
-                                    <tr key={user.id} className="hover:bg-white/[0.02] transition-colors group">
-                                        <td className="px-[24px] py-[20px]">
-                                            <div className="flex items-center justify-center">
-                                                <input 
-                                                    type="checkbox" 
-                                                    disabled={isOwner}
-                                                    checked={selectedIds.includes(user.id)}
-                                                    onChange={() => handleSelectOne(user.id)}
-                                                    className="w-4 h-4 rounded-[4px] border-white/20 bg-[#1E293B] cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed" 
-                                                />
-                                            </div>
-                                        </td>
-                                        <td className="px-[24px] py-[20px] whitespace-nowrap">
-                                            <div className="flex items-center gap-[16px]">
+                                    <tr key={user.id} className="h-[73px] border-b border-white/[0.05] hover:bg-white/[0.02] transition-colors group">
+                                        {/* NAME / EMAIL */}
+                                        <td className="px-[24px] whitespace-nowrap">
+                                            <div className="flex items-center gap-[12px]">
                                                 {user.avatar ? (
-                                                    <img src={user.avatar} alt={displayName} className="h-[44px] w-[44px] rounded-full object-cover border border-white/10" />
+                                                    <img src={user.avatar} alt={displayName} className="h-[40px] w-[40px] rounded-full object-cover" />
                                                 ) : (
-                                                    <div className="h-[44px] w-[44px] rounded-full bg-[#3B82F6]/20 border border-[#3B82F6]/30 flex items-center justify-center text-[#93C5FD] font-bold text-[18px]">
-                                                        {displayName.charAt(0).toUpperCase()}
+                                                    <div
+                                                        className="h-[40px] w-[40px] rounded-full flex items-center justify-center text-white text-[14px] font-semibold font-['Inter'] leading-[1.428em]"
+                                                        style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 1) 0%, rgba(57, 137, 243, 1) 7%, rgba(55, 143, 239, 1) 14%, rgba(53, 150, 236, 1) 21%, rgba(51, 156, 233, 1) 29%, rgba(45, 212, 191, 1) 100%)' }}
+                                                    >
+                                                        {displayName.substring(0, 2).toUpperCase()}
                                                     </div>
                                                 )}
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[15px] font-semibold text-[#F8FAFC]">{displayName}</span>
-                                                        {isOwner && (
-                                                            <div className="flex items-center justify-center h-[22px] px-2 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
-                                                                <span className="text-[11px] font-semibold text-[#C4B5FD] uppercase tracking-wider">Owner</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <span className="text-[13px] text-slate-400">{user.email}</span>
+                                                <div className="flex flex-col h-[40px] justify-center gap-[0px]">
+                                                    <span className="text-[14px] font-medium text-[#F8FAFC] leading-[1.428em] font-['Inter']">{displayName}</span>
+                                                    <span className="text-[12px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.333em] font-['Inter']">{user.email}</span>
                                                 </div>
                                             </div>
                                         </td>
-                                        
-                                        <td className="px-[24px] py-[20px] whitespace-nowrap">
-                                            {user.status === 'active' ? (
-                                                <div className="flex h-[30px] w-fit items-center justify-center gap-[6px] rounded-[10px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[8px] pr-[12px]">
-                                                    <div className="w-2 h-2 rounded-full bg-[#05DF72]" />
-                                                    <span className="text-[13px] font-medium leading-none text-[#B9F8CF]">Active</span>
+
+                                        {/* ROLE */}
+                                        <td className="px-[24px] whitespace-nowrap">
+                                            {isOwner ? (
+                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.2)]">
+                                                    <span className="text-[12px] font-semibold text-[#3B82F6] leading-[1.333em] font-['Inter']">Owner</span>
                                                 </div>
-                                            ) : user.status === 'suspended' ? (
-                                                <div className="flex h-[30px] w-fit items-center justify-center gap-[6px] rounded-[10px] border border-red-500/30 bg-red-500/10 pl-[8px] pr-[12px]">
-                                                    <div className="w-2 h-2 rounded-full bg-red-400" />
-                                                    <span className="text-[13px] font-medium leading-none text-red-300">Suspended</span>
+                                            ) : user.role === 'custom' ? (
+                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(240,177,0,0.1)] border border-[rgba(240,177,0,0.2)]">
+                                                    <span className="text-[12px] font-semibold text-[#FDC700] leading-[1.333em] font-['Inter']">Custom Features</span>
                                                 </div>
                                             ) : (
-                                                <div className="flex flex-col items-start gap-1">
-                                                    <div className="flex h-[30px] w-fit items-center justify-center gap-[6px] rounded-[10px] border border-orange-500/30 bg-orange-500/10 pl-[8px] pr-[12px]">
-                                                        <div className="w-2 h-2 rounded-full bg-orange-400" />
-                                                        <span className="text-[13px] font-medium leading-none text-orange-300">Pending</span>
-                                                    </div>
-                                                    {/* Optional: Add Last Login check if relevant */}
+                                                <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(0,201,80,0.1)] border border-[rgba(0,201,80,0.2)]">
+                                                    <span className="text-[12px] font-semibold text-[#05DF72] leading-[1.333em] font-['Inter']">Full Access</span>
                                                 </div>
                                             )}
                                         </td>
 
-                                        <td className="px-[24px] py-[20px]">
-                                            <div className="flex flex-col gap-2">
-                                                <div className="flex items-center gap-[6px] text-slate-200">
-                                                    {isOwner || user.role === 'admin' ? (
-                                                        <Shield className="w-4 h-4 text-indigo-400" />
-                                                    ) : (
-                                                        <ShieldAlert className="w-4 h-4 text-emerald-400" />
-                                                    )}
-                                                    <span className="font-medium text-[14px]">{getRoleLabel(user.role)}</span>
+                                        {/* STATUS */}
+                                        <td className="px-[24px] whitespace-nowrap">
+                                            {user.status === 'active' ? (
+                                                <div className="flex items-center gap-[8px]">
+                                                    <div className="w-[8px] h-[8px] rounded-full bg-[#00C950]"></div>
+                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">Active</span>
                                                 </div>
-                                                
-                                                {user.role === 'custom' && user.permissions?.length > 0 && (
-                                                    <div className="flex flex-wrap gap-2 mt-1">
-                                                        {user.permissions.map(p => (
-                                                            <span key={p} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-800 text-slate-300 border border-slate-700 capitalize">
-                                                                {p.replace('-', ' ')}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
+                                            ) : user.status === 'suspended' ? (
+                                                <div className="flex items-center gap-[8px]">
+                                                    <div className="w-[8px] h-[8px] rounded-full bg-[#EF4444]"></div>
+                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">Suspended</span>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-[8px]">
+                                                    <div className="w-[8px] h-[8px] rounded-full bg-[rgba(248,250,252,0.3)]"></div>
+                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">Pending</span>
+                                                </div>
+                                            )}
                                         </td>
 
-                                        <td className="px-[24px] py-[20px] whitespace-nowrap text-right relative">
-                                            {/* Action Dropdown Toggle */}
-                                            <button
-                                                type="button"
-                                                onClick={() => setOpenDropdownId(openDropdownId === user.id ? null : user.id)}
-                                                className="inline-flex items-center justify-center w-[36px] h-[36px] rounded-[10px] hover:bg-white/5 text-slate-400 hover:text-white transition-colors"
-                                            >
-                                                <MoreHorizontal className="w-5 h-5" />
-                                            </button>
-
-                                            {/* Dropdown Menu */}
-                                            {openDropdownId === user.id && (
-                                                <>
-                                                    <div className="fixed inset-0 z-40" onClick={() => setOpenDropdownId(null)} />
-                                                    <div className="absolute right-[24px] top-[50px] z-50 w-[180px] rounded-[12px] bg-[#1E293B] border border-white/[0.08] shadow-xl py-1 animate-in zoom-in-95 duration-150">
-                                                        <button 
-                                                            disabled={isOwner}
-                                                            onClick={() => { setEditingStaff(user); setIsDrawerOpen(true); setOpenDropdownId(null); }}
-                                                            className="flex w-full items-center gap-2 px-4 py-2 text-[13px] text-slate-200 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed text-left"
-                                                        >
-                                                            <Edit2 className="w-4 h-4 text-slate-400" /> Edit Details
-                                                        </button>
-                                                        
-                                                        {user.status === 'pending' && (
-                                                            <button 
-                                                                disabled={isOwner}
-                                                                onClick={() => handleResend(user.id)}
-                                                                className="flex w-full items-center gap-2 px-4 py-2 text-[13px] text-slate-200 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed text-left"
-                                                            >
-                                                                <Mail className="w-4 h-4 text-indigo-400" /> Resend Invite
-                                                            </button>
-                                                        )}
-
-                                                        <button 
-                                                            disabled={isOwner}
-                                                            onClick={() => handleToggleStatus(user.id, user.status)}
-                                                            className="flex w-full items-center gap-2 px-4 py-2 text-[13px] text-slate-200 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed text-left"
-                                                        >
-                                                            {user.status === 'active' ? (
-                                                                <><PowerOff className="w-4 h-4 text-orange-400" /> Deactivate</>
-                                                            ) : (
-                                                                <><Power className="w-4 h-4 text-emerald-400" /> Activate</>
-                                                            )}
-                                                        </button>
-
-                                                        <div className="h-px bg-white/[0.06] my-1" />
-
-                                                        <button 
-                                                            disabled={isOwner}
-                                                            onClick={() => handleRemove(user.id)}
-                                                            className="flex w-full items-center gap-2 px-4 py-2 text-[13px] text-red-400 hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed text-left hover:text-red-300"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" /> Remove User
-                                                        </button>
-                                                    </div>
-                                                </>
+                                        {/* ACTIONS */}
+                                        <td className="px-[24px] whitespace-nowrap relative">
+                                            {isOwner ? (
+                                                <span className="text-[14px] font-normal text-[rgba(248,250,252,0.4)] leading-[1.428em] font-['Inter']">—</span>
+                                            ) : (
+                                                <div className="flex items-center gap-[16px]">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setEditingStaff(user); setIsDrawerOpen(true); }}
+                                                        className="bg-transparent border-none shadow-none p-0 m-0 outline-none hover:opacity-80 transition-opacity flex items-center justify-center"
+                                                        title="Edit Details"
+                                                    >
+                                                        <Edit2 className="w-[18px] h-[18px] text-[#3B82F6]" strokeWidth={2.5} />
+                                                    </button>
+                                                    
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemove(user.id)}
+                                                        className="bg-transparent border-none shadow-none p-0 m-0 outline-none hover:opacity-80 transition-opacity flex items-center justify-center"
+                                                        title="Remove User"
+                                                    >
+                                                        <Trash2 className="w-[18px] h-[18px] text-[#FF6467]" strokeWidth={2.5} />
+                                                    </button>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
@@ -384,7 +303,7 @@ export function StaffDirectoryClient({
 
                             {currentStaffPage.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="px-[24px] py-[60px] text-center text-slate-400">
+                                    <td colSpan={4} className="px-[24px] py-[60px] text-center text-[rgba(248,250,252,0.6)]">
                                         <div className="flex flex-col items-center gap-3">
                                             <Users className="w-10 h-10 text-slate-600" />
                                             <p>{debouncedSearch ? 'No staff members match your search.' : 'No staff members found.'}</p>
@@ -396,9 +315,9 @@ export function StaffDirectoryClient({
                     </table>
                 </div>
 
-                {/* Pagination (Absolute bottom inside table wrapper) */}
+                {/* Pagination (Inline flow) */}
                 {totalPages > 1 && (
-                    <div className="absolute bottom-0 left-0 right-0 h-[56px] border-t border-white/[0.08] flex items-center justify-between px-[24px] bg-[#0B1120]/40">
+                    <div className="h-[56px] border-t border-white/[0.08] flex items-center justify-between px-[24px] bg-[#1E293B]">
                         <span className="text-[13px] text-slate-400">
                             Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredStaff.length)} of {filteredStaff.length} results
                         </span>
@@ -422,10 +341,21 @@ export function StaffDirectoryClient({
                 )}
             </div>
 
-            <StaffDrawer 
-                isOpen={isDrawerOpen} 
-                onClose={() => { setIsDrawerOpen(false); setEditingStaff(null); }} 
+            <StaffDrawer
+                isOpen={isDrawerOpen}
+                onClose={() => { setIsDrawerOpen(false); setEditingStaff(null); }}
                 editData={editingStaff}
+            />
+
+            <RemoveStaffModal
+                isOpen={!!userToRemove}
+                onClose={() => setUserToRemove(null)}
+                user={userToRemove}
+                onSuccess={(userId) => {
+                    setStaff(prev => prev.filter(s => s.id !== userId));
+                    setSelectedIds(prev => prev.filter(id => id !== userId));
+                    setUserToRemove(null);
+                }}
             />
         </div>
     );
