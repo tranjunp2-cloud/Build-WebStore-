@@ -48,7 +48,7 @@ function isRemoteDatabase(): boolean {
  * Enable it explicitly only when you intend to sync schema changes.
  */
 function shouldPushSchema(): boolean {
-  return true // Temporarily force true for Page Manager feature schema change
+  return process.env.PAYLOAD_PUSH_SCHEMA === 'true'
 }
 
 function getEmailConfig() {
