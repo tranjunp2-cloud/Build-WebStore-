@@ -13,6 +13,8 @@ import { useEditorStore } from '@/store/editorStore'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
+import { PrePublishModal } from '@/components/editor/PrePublishModal'
+import { UnpublishModal } from '@/components/editor/UnpublishModal'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 type BlockData = { blockType: string } & Record<string, unknown>
@@ -36,6 +38,9 @@ export default function EditorPage() {
     const [saveSuccess, setSaveSuccess] = useState(false)
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
     const [iframeKey, setIframeKey] = useState(0)
+
+    const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
+    const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
 
     // Editor store (F-06 Undo/Redo + F-07 Auto-Save)
     const editorStore = useEditorStore()
@@ -240,7 +245,22 @@ export default function EditorPage() {
             if (res.ok) {
                 setPublishSuccess(true)
                 setSite(prev => prev ? { ...prev, status: currentlyPublished ? 'draft' : 'published' } : prev)
-                toast.success(currentlyPublished ? 'Site unpublished' : 'Site published!')
+                setIsPublishModalOpen(false)
+                setIsUnpublishModalOpen(false)
+                
+                if (!currentlyPublished) {
+                    const domainUrl = `${site?.name ? site.name.toLowerCase().replace(/\s+/g, '-') : 'site'}.primeweb.app` // Gần đúng, API trả về chuẩn hơn
+                    toast.success('🎉 Website đã live!', { 
+                        description: `Domain: ${domainUrl}`,
+                        action: {
+                            label: 'View',
+                            onClick: () => window.open(`http://${domainUrl}`, '_blank')
+                        }
+                    })
+                } else {
+                    toast.success('Đã đưa website về trạng thái bảo trì.')
+                }
+                
                 setTimeout(() => setPublishSuccess(false), 3000)
             } else {
                 toast.error('Publish failed', { description: `Server returned ${res.status}` })
@@ -306,7 +326,7 @@ export default function EditorPage() {
                         className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-gray-300 hover:bg-white/10 transition-colors">
                         <ExternalLink className="h-3.5 w-3.5" /> Preview
                     </a>
-                    <button onClick={handlePublish} disabled={isPublishing || publishSuccess}
+                    <button onClick={() => isPublished ? setIsUnpublishModalOpen(true) : setIsPublishModalOpen(true)} disabled={isPublishing || publishSuccess}
                         className={cn('flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium text-white transition-colors shadow-lg',
                             publishSuccess ? 'bg-green-600 shadow-green-500/25' : isPublished ? 'bg-green-600/80 shadow-green-500/25 hover:bg-green-500' : 'bg-blue-600 shadow-blue-500/25 hover:bg-blue-500')}>
                         {isPublishing ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Publishing...</> : publishSuccess ? <><Check className="h-3.5 w-3.5" /> Published!</> : isPublished ? <><Check className="h-3.5 w-3.5" /> Published</> : <><Upload className="h-3.5 w-3.5" /> Publish</>}
@@ -359,12 +379,27 @@ export default function EditorPage() {
                 <div className="flex items-center gap-3">
                     <span className="text-gray-500">{blocks.length} blocks</span>
                     <span className="text-gray-600">History: {editorStore.historyIndex + 1}/{editorStore.history.length}</span>
-                    <span className={cn('rounded px-1.5 py-0.5 font-medium',
-                        isPublished ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400')}>
-                        {isPublished ? 'Published' : 'Draft'}
+                    <span className={cn('rounded px-2 flex items-center gap-1 py-0.5 font-medium',
+                        isPublished ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-500')}>
+                        <span className={cn('block h-1.5 w-1.5 rounded-full', isPublished ? 'bg-green-400' : 'bg-yellow-500')} /> {isPublished ? 'Live' : 'Draft'}
                     </span>
                 </div>
             </div>
+
+            <PrePublishModal
+                isOpen={isPublishModalOpen}
+                onOpenChange={setIsPublishModalOpen}
+                onPublish={handlePublish}
+                isPublishing={isPublishing}
+                hasUnsavedChanges={hasUnsavedChanges}
+            />
+            
+            <UnpublishModal
+                isOpen={isUnpublishModalOpen}
+                onOpenChange={setIsUnpublishModalOpen}
+                onUnpublish={handlePublish}
+                isPublishing={isPublishing}
+            />
         </div>
     )
 }
