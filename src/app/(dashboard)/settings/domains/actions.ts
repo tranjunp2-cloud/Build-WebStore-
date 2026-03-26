@@ -3,6 +3,7 @@
 import { getPayloadHMR } from '@payloadcms/next/utilities';
 import configPromise from '@payload-config';
 import { revalidatePath } from 'next/cache';
+import { getCurrentTenantId } from '@/lib/auth';
 
 type DomainEntry = { domain: string; status: 'pending' | 'active'; isPrimary?: boolean };
 
@@ -14,7 +15,12 @@ async function getTenantDomains(payload: Awaited<ReturnType<typeof getPayloadHMR
     return raw as DomainEntry[];
 }
 
-export async function addCustomDomain(tenantId: string, rawDomain: string) {
+export async function addCustomDomain(rawDomain: string) {
+    const tenantId = await getCurrentTenantId();
+    if (!tenantId) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
     // 1) Sanitize and validate domain format
     const domain = rawDomain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
     
@@ -62,7 +68,12 @@ export async function addCustomDomain(tenantId: string, rawDomain: string) {
     }
 }
 
-export async function removeCustomDomain(tenantId: string, domain: string) {
+export async function removeCustomDomain(domain: string) {
+    const tenantId = await getCurrentTenantId();
+    if (!tenantId) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
     const payload = await getPayloadHMR({ config: configPromise });
     try {
         const current = await getTenantDomains(payload, tenantId);
@@ -79,7 +90,12 @@ export async function removeCustomDomain(tenantId: string, domain: string) {
     }
 }
 
-export async function verifyCustomDomain(tenantId: string, domain: string) {
+export async function verifyCustomDomain(domain: string) {
+    const tenantId = await getCurrentTenantId();
+    if (!tenantId) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
     const payload = await getPayloadHMR({ config: configPromise });
 
     const serverIp = process.env.SERVER_IP;
@@ -129,7 +145,12 @@ export async function verifyCustomDomain(tenantId: string, domain: string) {
 
 // REQ-F19-05: Set a verified (active) domain as the Primary Domain
 // Clears isPrimary on all others, sets isPrimary:true on target
-export async function setPrimaryDomain(tenantId: string, domain: string) {
+export async function setPrimaryDomain(domain: string) {
+    const tenantId = await getCurrentTenantId();
+    if (!tenantId) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
     const payload = await getPayloadHMR({ config: configPromise });
     try {
         const current = await getTenantDomains(payload, tenantId);
@@ -155,7 +176,12 @@ export async function setPrimaryDomain(tenantId: string, domain: string) {
 }
 
 // Clear isPrimary on all custom domains → platform subdomain becomes default primary
-export async function clearPrimaryDomain(tenantId: string) {
+export async function clearPrimaryDomain() {
+    const tenantId = await getCurrentTenantId();
+    if (!tenantId) {
+        return { success: false, error: 'Unauthorized' };
+    }
+
     const payload = await getPayloadHMR({ config: configPromise });
     try {
         const current = await getTenantDomains(payload, tenantId);
