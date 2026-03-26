@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentTenantId } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { cookies } from 'next/headers'
 
 export async function updateDashboardPreferences(preferences: string[]) {
   const tenantId = await getCurrentTenantId()
@@ -32,4 +33,10 @@ export async function updateDashboardPreferences(preferences: string[]) {
     console.error('Failed to save preferences:', error)
     return { success: false, error: 'Failed to save preferences' }
   }
+}
+
+export async function logoutAction() {
+  const cookieStore = await cookies()
+  cookieStore.delete('payload-token')
+  return { success: true }
 }

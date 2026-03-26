@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, LogOut, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { logoutAction } from '@/app/(dashboard)/actions'
 
 type UserAvatarMenuProps = {
     userName: string
@@ -35,7 +36,7 @@ export function UserAvatarMenu({ userName, userInitial }: UserAvatarMenuProps) {
         } catch {
             // Ignore
         }
-        document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
+        await logoutAction()
         window.location.href = '/login'
     }
 
