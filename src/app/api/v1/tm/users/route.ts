@@ -7,8 +7,8 @@ import crypto from 'crypto'
  * POST /api/v1/tm/users
  *
  * SSO Auto-Provisioning endpoint.
- * Receives full payload from TM Legacy SSO system, validates required fields,
- * creates User (Owner) + Tenant (Workspace), stores raw payload as metaData.
+ * Receives payload from TM Legacy SSO system, creates User (Owner) + Tenant.
+ * Compatible with v1 params: name, email, password, phone, company_name, subscription_code...
  *
  * Auth: Requires Bearer token from admin login.
  */
@@ -27,10 +27,8 @@ export async function POST(req: NextRequest) {
 
         const token = authHeader.split(' ')[1]
 
-        // Verify the token belongs to an admin/super-admin user
         let callerUser: any
         try {
-            // Decode and verify JWT manually using the same secret as Payload
             const secret = process.env.PAYLOAD_SECRET || 'fallback-dev-secret'
             const [header, body, signature] = token.split('.')
             const expectedSig = crypto
@@ -39,32 +37,18 @@ export async function POST(req: NextRequest) {
                 .digest('base64url')
 
             if (signature !== expectedSig) {
-                return NextResponse.json(
-                    { message: 'Invalid token' },
-                    { status: 401 },
-                )
+                return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
             }
 
             const decoded = JSON.parse(Buffer.from(body, 'base64url').toString())
 
-            // Check expiry
             if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
-                return NextResponse.json(
-                    { message: 'Token expired' },
-                    { status: 401 },
-                )
+                return NextResponse.json({ message: 'Token expired' }, { status: 401 })
             }
 
-            // Fetch the user to verify roles
-            callerUser = await payload.findByID({
-                collection: 'users',
-                id: decoded.id,
-            })
+            callerUser = await payload.findByID({ collection: 'users', id: decoded.id })
         } catch {
-            return NextResponse.json(
-                { message: 'Invalid token' },
-                { status: 401 },
-            )
+            return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
         }
 
         if (!callerUser?.roles?.includes('super-admin')) {
@@ -74,70 +58,49 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // ── 2. Parse & Validate Payload ──
+        // ── 2. Parse Payload (support cả v1 params & v2 params) ──
         const rawPayload = await req.json()
-        const {
-            company_name,
-            email,
-            customer_id_number,
-            service_id,
-            first_name,
-            last_name,
-            pack_code,
-            telephone,
-            preferred_language,
-            unifi_order_id,
-            // Address fields
-            unit_number,
-            floor_number,
-            building_name,
-            street_name,
-            section,
-            post_code,
-            city,
-            state,
-            country,
-        } = rawPayload
 
-        // Required fields check (FR-02)
-        const requiredFields = { company_name, email, customer_id_number, service_id, first_name, last_name, pack_code }
-        const missingFields = Object.entries(requiredFields)
-            .filter(([, v]) => !v || String(v).trim() === '')
-            .map(([k]) => k)
+        // Mapping v1 → v2 fields
+        const companyName = rawPayload.company_name || ''
+        const email = rawPayload.email || ''
+        const password = rawPayload.password || ''
+        const phone = rawPayload.phone || rawPayload.telephone || ''
+        const packCode = rawPayload.subscription_code || rawPayload.pack_code || ''
+        const customerId = rawPayload.customer_id_number || ''
+        const serviceId = rawPayload.service_id || ''
+        const orderId = rawPayload.unifi_order_id || ''
 
-        if (missingFields.length > 0) {
+        // Name: v1 gửi `name` (full), v2 gửi `first_name` + `last_name`
+        let firstName = rawPayload.first_name || ''
+        let lastName = rawPayload.last_name || ''
+        if (!firstName && rawPayload.name) {
+            const parts = rawPayload.name.trim().split(/\s+/)
+            firstName = parts[0] || ''
+            lastName = parts.slice(1).join(' ') || ''
+        }
+
+        // ── 3. Validate Required Fields ──
+        const missing: string[] = []
+        if (!companyName) missing.push('company_name')
+        if (!email) missing.push('email')
+        if (!password) missing.push('password')
+        if (!firstName) missing.push('first_name or name')
+        if (!packCode) missing.push('subscription_code or pack_code')
+
+        if (missing.length > 0) {
             return NextResponse.json(
-                { message: `Missing required fields: ${missingFields.join(', ')}` },
+                { message: `Missing required fields: ${missing.join(', ')}` },
                 { status: 400 },
             )
         }
 
-        // Service ID must not be "NA" (FR-02)
-        if (service_id === 'NA' || String(service_id).trim() === '') {
-            return NextResponse.json(
-                { message: 'service_id is required and cannot be "NA"' },
-                { status: 400 },
-            )
-        }
-
-        // ── 3. Unique Check (FR-02) ──
-        const [existingEmail, existingCustomerId, existingServiceId] = await Promise.all([
-            payload.find({
-                collection: 'users',
-                where: { email: { equals: email } },
-                limit: 1,
-            }),
-            payload.find({
-                collection: 'tenants',
-                where: { customerId: { equals: customer_id_number } },
-                limit: 1,
-            }),
-            payload.find({
-                collection: 'tenants',
-                where: { serviceId: { equals: service_id } },
-                limit: 1,
-            }),
-        ])
+        // ── 4. Unique Check ──
+        const existingEmail = await payload.find({
+            collection: 'users',
+            where: { email: { equals: email } },
+            limit: 1,
+        })
 
         if (existingEmail.docs.length > 0) {
             return NextResponse.json(
@@ -145,20 +108,8 @@ export async function POST(req: NextRequest) {
                 { status: 409 },
             )
         }
-        if (existingCustomerId.docs.length > 0) {
-            return NextResponse.json(
-                { message: 'Tenant with this customer_id_number already exists' },
-                { status: 409 },
-            )
-        }
-        if (existingServiceId.docs.length > 0) {
-            return NextResponse.json(
-                { message: 'Tenant with this service_id already exists' },
-                { status: 409 },
-            )
-        }
 
-        // ── 4. Map pack_code → plan (FR-03) ──
+        // ── 5. Map pack_code → plan ──
         const mapPlan = (code: string): string => {
             const c = code.toLowerCase()
             if (c.includes('business')) return 'business'
@@ -167,61 +118,42 @@ export async function POST(req: NextRequest) {
             return 'free'
         }
 
-        // ── 5. Build address object ──
-        const addressData = {
-            unit_number: unit_number || null,
-            floor_number: floor_number !== 'NA' ? floor_number : null,
-            building_name: building_name !== 'NA' ? building_name : null,
-            street_name: street_name || null,
-            section: section || null,
-            post_code: post_code || null,
-            city: city || null,
-            state: state || null,
-            country: country || null,
-        }
-
         // ── 6. Generate slug ──
-        const baseSlug = company_name
+        const baseSlug = companyName
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/(^-|-$)+/g, '')
             .substring(0, 30)
         const uniqueSlug = `${baseSlug}-${crypto.randomBytes(3).toString('hex')}`
 
-        // ── 7. Create Tenant (FR-04) ──
+        // ── 7. Create Tenant ──
         const newTenant = await payload.create({
             collection: 'tenants',
             data: {
-                name: company_name,
+                name: companyName,
                 slug: uniqueSlug,
-                plan: mapPlan(pack_code),
-                customerId: customer_id_number,
-                serviceId: service_id,
-                packCode: pack_code,
-                orderId: unifi_order_id || null,
-                address: addressData,
-                metaData: rawPayload,
+                plan: mapPlan(packCode),
                 status: 'active',
+                // SSO fields (optional — populated if provided)
+                ...(customerId && { customerId }),
+                ...(serviceId && serviceId !== 'NA' && { serviceId }),
+                ...(packCode && { packCode }),
+                ...(orderId && { orderId }),
+                // Store raw payload for future reference
+                metaData: rawPayload,
             },
         })
 
-        // ── 8. Create User (FR-04) ──
-        const generatedPassword = crypto.randomBytes(16).toString('hex')
-        const mapLang = (langCode: number | undefined): string => {
-            if (langCode === 2) return 'ms'
-            return 'en'
-        }
-
+        // ── 8. Create User (with password from SSO) ──
         const newUser = await payload.create({
             collection: 'users',
             data: {
                 email,
-                password: generatedPassword,
-                firstName: first_name,
-                lastName: last_name || '',
-                phone: telephone || '',
+                password, // SSO provides password → user can login immediately
+                firstName,
+                lastName,
+                phone,
                 roles: ['tenant-owner'],
-                prefer_lang: mapLang(preferred_language),
                 tenants: [
                     {
                         tenant: newTenant.id,
