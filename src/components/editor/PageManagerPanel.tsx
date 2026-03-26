@@ -280,7 +280,7 @@ export function PageManagerPanel({
                                                 type="button"
                                                 onClick={() => handleToggleVisibility(page)}
                                                 disabled={isSystemPage}
-                                                className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                                className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                                                 title={page.isVisible ? 'Ẩn trang' : 'Hiện trang'}
                                             >
                                                 {page.isVisible ? (
@@ -293,7 +293,7 @@ export function PageManagerPanel({
                                                 type="button"
                                                 onClick={() => handleDelete(page)}
                                                 disabled={isSystemPage || pendingPageId === page.id}
-                                                className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-red-500/20 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
+                                                className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-red-500/20 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
                                                 title="Xóa trang"
                                             >
                                                 {pendingPageId === page.id ? (

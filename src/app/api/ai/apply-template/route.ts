@@ -89,7 +89,7 @@ export const POST = withAuth(async (user, req) => {
             collection: 'pages',
             data: {
                 title: '404 Not Found',
-                slug: '/404',
+                slug: '404',
                 site: site.id,
                 tenant: tenant.id,
                 isHomepage: false,
