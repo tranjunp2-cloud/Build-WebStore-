@@ -1,16 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useTransition } from 'react';
-import { ChevronRight, Loader2 } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { inviteStaffAction, updateStaff } from './actions';
 import type { StaffMember } from './StaffDirectoryClient';
 
 const CUSTOM_FEATURES = [
-    { id: 'web-builder', label: 'Web Builder' },
-    { id: 'content-manager', label: 'Content Manager' },
-    { id: 'sales-operation', label: 'Sales Operation' },
-    { id: 'settings', label: 'Settings' },
+    { id: 'products', label: 'Products & Inventory' },
+    { id: 'orders', label: 'Orders & Fulfillment' },
+    { id: 'blog', label: 'Blog Management' },
+    { id: 'builder', label: 'Store Design (Builder)' },
+    { id: 'settings', label: 'Settings & Domain' },
 ];
 
 export function StaffDrawer({
@@ -24,7 +25,6 @@ export function StaffDrawer({
 }) {
     const isEditMode = !!editData;
     const [email, setEmail] = useState('');
-    const [name, setName] = useState('');
     const [role, setRole] = useState<'admin' | 'custom'>('admin');
     const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
     const [isPending, startTransition] = useTransition();
@@ -33,13 +33,10 @@ export function StaffDrawer({
         if (isOpen) {
             if (editData) {
                 setEmail(editData.email);
-                const displayName = [editData.firstName, editData.lastName].filter(Boolean).join(' ') || '';
-                setName(displayName);
                 setRole(editData.role === 'admin' || editData.role === 'owner' ? 'admin' : 'custom');
                 setSelectedFeatures(editData.permissions || []);
             } else {
                 setEmail('');
-                setName('');
                 setRole('admin');
                 setSelectedFeatures([]);
             }
@@ -57,11 +54,6 @@ export function StaffDrawer({
     };
 
     const handleSave = () => {
-        if (!name.trim()) {
-            toast.error('Please enter a full name');
-            return;
-        }
-
         if (!isEditMode && (!email.trim() || !email.includes('@'))) {
             toast.error('Please enter a valid email address');
             return;
@@ -74,9 +66,9 @@ export function StaffDrawer({
 
         startTransition(async () => {
             if (isEditMode) {
-                // In edit mode we can only update role & permissions
                 if (!editData) return;
-                const res = await updateStaff(editData.id, name, role, role === 'custom' ? selectedFeatures : undefined);
+                const displayName = [editData.firstName, editData.lastName].filter(Boolean).join(' ') || '';
+                const res = await updateStaff(editData.id, displayName, role, role === 'custom' ? selectedFeatures : undefined);
                 if (res.success) {
                     toast.success('Staff updated successfully!');
                     onClose();
@@ -84,10 +76,9 @@ export function StaffDrawer({
                     toast.error(res.error || 'Failed to update staff');
                 }
             } else {
-                // In add mode we invite
                 const res = await inviteStaffAction({
                     email: email,
-                    name: name,
+                    name: email.split('@')[0], 
                     role: role,
                     permissions: role === 'custom' ? selectedFeatures : undefined
                 });
@@ -103,141 +94,132 @@ export function StaffDrawer({
 
     return (
         <>
-            <div className="fixed inset-0 z-[100] bg-[#0B1120]/60 animate-in fade-in duration-200" onClick={onClose} />
+            <div className="fixed inset-0 z-[100] bg-slate-950/60 animate-in fade-in duration-200" onClick={onClose} />
             
-            <div className="fixed right-0 top-0 bottom-0 z-[101] flex flex-col w-full max-w-[448px] sm:max-w-[448px] bg-[#0B1120] animate-in slide-in-from-right duration-300 shadow-[-25px_0_50px_-12px_rgba(0,0,0,0.5)]">
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="absolute top-[20px] left-[-18px] flex h-[36px] w-[36px] items-center justify-center rounded-full bg-[#0B1120] border border-[#1F2937] text-white hover:bg-[#1E293B] transition-colors shrink-0 z-10"
-                >
-                    <ChevronRight className="h-5 w-5" />
-                </button>
+            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] flex flex-col w-[calc(100%-32px)] sm:w-full max-w-[448px] max-h-[calc(100vh-32px)] bg-slate-800 rounded-[16px] animate-in zoom-in-95 duration-200" style={{ border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 25px 50px -12px rgba(59,130,246,0.2)' }}>
+                {/* Header */}
+                <div className="flex items-center justify-between px-[24px] pt-[24px] pb-[16px]">
+                    <h2 className="text-[24px] font-bold text-slate-50 leading-[1.333em] font-['Inter']">
+                        {isEditMode ? 'Edit Staff Permissions' : 'Invite New Staff'}
+                    </h2>
+                    <button onClick={onClose} className="p-0 m-0 border-none shadow-none outline-none appearance-none bg-transparent hover:bg-white/5 rounded-[8px] flex items-center justify-center w-[32px] h-[32px] text-slate-50/60 hover:text-white transition-colors">
+                        <X className="w-5 h-5" strokeWidth={1.6} />
+                    </button>
+                </div>
 
-                <div className="flex flex-col flex-1 px-[32px] pt-[32px] pb-[24px] overflow-y-auto">
-                        <h2 className="text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter'] mb-[24px]">
-                            {isEditMode ? 'Edit Staff Permissions' : 'Invite Staff'}
-                        </h2>
+                {/* Header bottom divider (Above Email) */}
+                <div className="w-full h-[1px] bg-[rgba(255,255,255,0.08)] shrink-0" />
 
-                        <div className="flex flex-col gap-[24px]">
-                            {/* Name Input */}
-                            <div className="flex flex-col gap-[8px]">
-                                <label className="text-[14px] font-medium text-[rgba(248,250,252,0.8)] font-['Inter']">
-                                    Full Name <span className="text-red-400">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    placeholder="John Doe"
-                                    className="w-full h-[50px] px-[16px] rounded-[16px] bg-[#1E293B]/40 border border-white/[0.08] text-[16px] text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.4)] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-['Inter']"
-                                />
-                            </div>
+                {/* Body Content */}
+                <div className="flex flex-col overflow-y-auto max-h-[70vh]">
+                    
+                    {/* Email Input */}
+                    <div className="flex flex-col gap-[8px] px-[24px] pt-[24px]">
+                        <label className="text-[14px] font-medium text-slate-50 font-['Inter']">
+                            {isEditMode ? 'Login Email' : 'Email Address'}
+                        </label>
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            disabled={isEditMode}
+                            placeholder="staff@domain.com"
+                            className="w-full h-[48px] px-[16px] rounded-[12px] bg-slate-900/50 text-[16px] text-slate-50 placeholder:text-slate-50/40 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-['Inter'] disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+                        />
+                        {!isEditMode && (
+                            <p className="text-[12px] font-normal text-slate-50/50 font-['Inter'] mt-[4px]">
+                                Send an invitation to join your store.
+                            </p>
+                        )}
+                    </div>
 
-                            {/* Email Input */}
-                            <div className="flex flex-col gap-[8px]">
-                                <label className="text-[14px] font-medium text-[rgba(248,250,252,0.8)] font-['Inter']">
-                                    {isEditMode ? 'Login Email (Cannot be changed)' : 'Login Email '} <span className="text-red-400 opacity-80">*</span>
-                                </label>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    disabled={isEditMode}
-                                    placeholder="colleague@example.com"
-                                className="w-full h-[50px] px-[16px] rounded-[16px] bg-[#1E293B]/40 border border-white/[0.08] text-[16px] text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.4)] focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-['Inter'] disabled:opacity-50 disabled:cursor-not-allowed"
-                            />
-                        </div>
-
-                        {/* Role Selection */}
+                    {/* Role Selection */}
+                    <div className="flex flex-col gap-[16px] px-[24px] pt-[24px] pb-[24px]">
+                        <label className="text-[14px] font-semibold text-slate-50 font-['Inter']">
+                            Select Role
+                        </label>
                         <div className="flex flex-col gap-[12px]">
-                            <label className="text-[14px] font-medium text-[rgba(248,250,252,0.8)] font-['Inter']">
-                                Access Level
-                            </label>
-                            <div className="flex flex-col gap-[12px]">
-                                {[ 
-                                    { value: 'admin', label: 'Manager (Full Access)', desc: 'Can configure all store settings and manage staff.' },
-                                    { value: 'custom', label: 'Crew (Custom Features)', desc: 'Select specific features to grant access to.' }
-                                ].map(opt => {
-                                    const isSelected = role === opt.value;
-                                    const isDisabled = editData?.role === 'owner'; // Owners cannot restrict their own access here
-                                    return (
-                                        <button
-                                            key={opt.value}
-                                            type="button"
-                                            disabled={isDisabled}
-                                            onClick={() => setRole(opt.value as any)}
-                                            className={`flex items-start gap-[12px] w-full p-[16px] rounded-[12px] border transition-all text-left font-['Inter'] disabled:opacity-50 disabled:cursor-not-allowed ${isSelected
-                                                ? 'border-[#00D3D4] bg-[rgba(0,211,212,0.06)]'
-                                                : 'border-[rgba(255,255,255,0.1)] bg-[#1E293B]/40 hover:bg-white/[0.03]'
-                                                }`}
-                                        >
-                                            <div className={`flex shrink-0 items-center justify-center h-[20px] w-[20px] mt-0.5 rounded-full border-2 transition-all ${isSelected
-                                                ? 'border-[#00D3D4]'
-                                                : 'border-white/30 bg-transparent'
-                                                }`}>
-                                                {isSelected && <div className="h-[10px] w-[10px] rounded-full bg-[#00D3D4]" />}
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className={`text-[15px] font-medium leading-tight mb-1 ${isSelected ? 'text-white' : 'text-white/80'}`}>
-                                                    {opt.label}
-                                                </span>
-                                                <span className="text-[13px] text-[rgba(248,250,252,0.5)]">
-                                                    {opt.desc}
-                                                </span>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Custom Features Tick Boxes */}
-                        {role === 'custom' && (
-                            <div className="flex flex-col gap-[12px] animate-in slide-in-from-top-4 fade-in duration-200">
-                                <label className="text-[14px] font-medium text-[rgba(248,250,252,0.8)] font-['Inter']">
-                                    Select Permissions
-                                </label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-[12px]">
-                                    {CUSTOM_FEATURES.map(feature => {
-                                        const isChecked = selectedFeatures.includes(feature.id);
-                                        const isDisabled = editData?.role === 'owner';
-                                        return (
-                                            <label 
-                                                key={feature.id}
-                                                className={`flex items-center gap-[12px] p-[12px] rounded-[12px] border cursor-pointer transition-all ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''} ${isChecked ? 'border-blue-500/50 bg-blue-500/5' : 'border-white/[0.08] bg-[#1E293B]/20 hover:bg-white/[0.03]'}`}
-                                            >
-                                                <div className={`flex items-center justify-center w-[20px] h-[20px] rounded-[6px] border ${isChecked ? 'bg-blue-500 border-blue-500' : 'border-white/[0.2] bg-transparent'}`}>
-                                                    <input 
-                                                        type="checkbox"
-                                                        className="hidden"
-                                                        disabled={isDisabled}
-                                                        checked={isChecked}
-                                                        onChange={() => handleToggleFeature(feature.id)}
-                                                    />
-                                                    {isChecked && (
-                                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                        </svg>
-                                                    )}
-                                                </div>
-                                                <span className={`text-[14px] select-none ${isChecked ? 'text-white font-medium' : 'text-white/70'}`}>
-                                                    {feature.label}
-                                                </span>
-                                            </label>
-                                        );
-                                    })}
+                            
+                            {/* Full Access Option */}
+                            <div 
+                                onClick={() => { if(editData?.role !== 'owner') setRole('admin'); }}
+                                className={`flex items-start px-[18px] py-[18px] min-h-[76px] rounded-[12px] border-2 border-solid transition-all cursor-pointer ${
+                                    role === 'admin' 
+                                        ? 'border-blue-500 bg-blue-500/5' 
+                                        : 'border-white/10 bg-transparent hover:bg-white/5'
+                                } ${editData?.role === 'owner' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                <div className={`flex shrink-0 items-center justify-center w-[20px] h-[20px] rounded-full border-2 border-solid transition-all mr-[16px] mt-[1px] ${role === 'admin' ? 'border-blue-500' : 'border-white/30 bg-transparent'}`}>
+                                    {role === 'admin' && <div className="w-[10px] h-[10px] rounded-full bg-blue-500" />}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className={`text-[15px] font-medium leading-tight mb-[6px] ${role === 'admin' ? 'text-slate-50' : 'text-slate-50/80'}`}>Full Access</span>
+                                    <span className="text-[13px] text-slate-50/50">Can manage everything except delete the store.</span>
                                 </div>
                             </div>
-                        )}
+
+                            {/* Custom Features Option */}
+                            <div 
+                                onClick={() => {
+                                    if(editData?.role !== 'owner' && role !== 'custom') {
+                                        setRole('custom');
+                                    }
+                                }}
+                                className={`flex flex-col w-full rounded-[12px] border-2 border-solid transition-all ${
+                                    role === 'custom' 
+                                        ? 'border-blue-500 bg-blue-500/5' 
+                                        : 'border-white/10 bg-transparent hover:bg-white/5 cursor-pointer'
+                                } ${editData?.role === 'owner' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                                <div className={`flex items-center px-[18px] ${role === 'custom' ? 'pt-[18px] pb-[16px]' : 'py-[18px]'}`}>
+                                    <div className={`flex shrink-0 items-center justify-center w-[20px] h-[20px] rounded-full border-2 border-solid transition-all mr-[16px] ${role === 'custom' ? 'border-blue-500' : 'border-white/30 bg-transparent'}`}>
+                                        {role === 'custom' && <div className="w-[10px] h-[10px] rounded-full bg-blue-500" />}
+                                    </div>
+                                    <span className={`text-[15px] font-medium leading-tight ${role === 'custom' ? 'text-slate-50' : 'text-slate-50/80'}`}>
+                                        Custom Features
+                                    </span>
+                                </div>
+                                
+                                {role === 'custom' && (
+                                    <div className="flex flex-col gap-[12px] pb-[20px] pr-[18px] pl-[54px] animate-in fade-in duration-200">
+                                        {CUSTOM_FEATURES.map(feature => {
+                                            const isChecked = selectedFeatures.includes(feature.id);
+                                            const isFeatureDisabled = editData?.role === 'owner';
+                                            return (
+                                                <div 
+                                                    key={feature.id}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if(!isFeatureDisabled) handleToggleFeature(feature.id);
+                                                    }}
+                                                    className={`flex items-center gap-[12px] cursor-pointer transition-all ${isFeatureDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                >
+                                                    <div className={`flex shrink-0 items-center justify-center w-[18px] h-[18px] rounded-[4px] border border-solid transition-colors ${isChecked ? 'bg-blue-500 border-blue-500' : 'border-white/20 bg-transparent hover:border-white/40'}`} />
+                                                    <span className={`text-[14px] leading-tight select-none ${isChecked ? 'text-slate-50 font-medium' : 'text-slate-50/80 font-normal'}`}>
+                                                        {feature.label}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                        </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-[12px] px-[32px] pb-[32px] pt-[16px] border-t border-white/[0.06]">
+                {/* Divider below Role Selection (Footer top line) */}
+                <div className="w-full h-[1px] bg-[rgba(255,255,255,0.08)] shrink-0" />
+
+                {/* Footer buttons */}
+                <div className="flex items-center justify-end gap-[12px] px-[24px] py-[24px]">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium hover:bg-white/5 transition-colors font-['Inter']"
+                        className="flex items-center justify-center px-[28px] h-[46px] rounded-[12px] bg-slate-900/50 text-slate-50 text-[16px] font-medium hover:bg-white/10 transition-colors font-['Inter']"
+                        style={{ border: '1px solid rgba(255,255,255,0.08)' }}
                     >
                         Cancel
                     </button>
@@ -245,10 +227,10 @@ export function StaffDrawer({
                         type="button"
                         disabled={isPending || editData?.role === 'owner'}
                         onClick={handleSave}
-                        style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
-                        className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] font-['Inter'] disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', boxShadow: '0px 4px 6px -4px rgba(59, 130, 246, 0.3), 0px 10px 15px -3px rgba(59, 130, 246, 0.3)' }}
+                        className="flex items-center justify-center px-[32px] h-[46px] rounded-[12px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity font-['Inter'] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
+                        {isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                         {isEditMode ? 'Save Changes' : 'Send Invite'}
                     </button>
                 </div>

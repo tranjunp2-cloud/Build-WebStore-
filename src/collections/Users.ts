@@ -96,7 +96,7 @@ export const Users: CollectionConfig = {
                     } else {
                         // Generate a strong random password since they will login via OTP anyway
                         const randomPassword = require('crypto').randomBytes(16).toString('hex')
-                        
+
                         targetUser = await req.payload.create({
                             collection: 'users',
                             data: {
@@ -110,22 +110,22 @@ export const Users: CollectionConfig = {
                             }
                         })
                     }
-                    
+
                     // Fetch tenant details for email
                     const tenant = await req.payload.findByID({ collection: 'tenants', id: tenantId })
                     const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
                     const loginUrl = `${serverUrl}/login`
-                    
-                    const { subject, html } = staffInvitationEmail({ 
-                        userName: name || targetUser.firstName || email.split('@')[0], 
+
+                    const { subject, html } = staffInvitationEmail({
+                        userName: name || targetUser.firstName || email.split('@')[0],
                         workspaceName: tenant.name as string,
-                        loginUrl 
+                        loginUrl
                     })
-                    
+
                     req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
                         console.error(`[StaffInvite] Failed to send email to ${email}:`, err)
                     })
-                    
+
                     return Response.json({ message: 'Invitation sent successfully' })
                 } catch (error: any) {
                     console.error('[StaffInvite]', error)
@@ -168,16 +168,16 @@ export const Users: CollectionConfig = {
                 if (targetTenantRole === 'owner') {
                     // Check if there are other owners
                     const allStaff = await req.payload.find({
-                         collection: 'users',
-                         where: {
-                             'tenants.tenant': { equals: tenantId }
-                         },
-                         limit: 1000
+                        collection: 'users',
+                        where: {
+                            'tenants.tenant': { equals: tenantId }
+                        },
+                        limit: 1000
                     })
-                    const activeOwners = allStaff.docs.filter((u: any) => 
-                         u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                    const activeOwners = allStaff.docs.filter((u: any) =>
+                        u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
                     )
-                    
+
                     if (activeOwners.length <= 1) {
                         return Response.json({ errors: [{ message: 'Cannot remove the last workspace owner' }] }, { status: 400 })
                     }
@@ -227,12 +227,12 @@ export const Users: CollectionConfig = {
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                 if (targetTenantRole === 'owner' && role !== 'owner') {
                     const allStaff = await req.payload.find({
-                         collection: 'users',
-                         where: { 'tenants.tenant': { equals: tenantId } },
-                         limit: 1000
+                        collection: 'users',
+                        where: { 'tenants.tenant': { equals: tenantId } },
+                        limit: 1000
                     })
-                    const activeOwners = allStaff.docs.filter((u: any) => 
-                         u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                    const activeOwners = allStaff.docs.filter((u: any) =>
+                        u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
                     )
                     if (activeOwners.length <= 1) {
                         return Response.json({ errors: [{ message: 'Cannot demote the last workspace owner' }] }, { status: 400 })
@@ -246,9 +246,9 @@ export const Users: CollectionConfig = {
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
-                    data: { 
+                    data: {
                         firstName: name, // Overwrite name along with access rights
-                        tenants: updatedTenants 
+                        tenants: updatedTenants
                     }
                 })
 
@@ -286,12 +286,12 @@ export const Users: CollectionConfig = {
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                 if (targetTenantRole === 'owner') {
                     const allStaff = await req.payload.find({
-                         collection: 'users',
-                         where: { 'tenants.tenant': { equals: tenantId } },
-                         limit: 1000
+                        collection: 'users',
+                        where: { 'tenants.tenant': { equals: tenantId } },
+                        limit: 1000
                     })
-                    const activeOwners = allStaff.docs.filter((u: any) => 
-                         u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                    const activeOwners = allStaff.docs.filter((u: any) =>
+                        u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
                     )
                     if (activeOwners.length <= 1 && status !== 'active') {
                         return Response.json({ errors: [{ message: 'Cannot deactivate the last workspace owner' }] }, { status: 400 })
@@ -333,13 +333,13 @@ export const Users: CollectionConfig = {
                 const tenant = await req.payload.findByID({ collection: 'tenants', id: tenantId })
                 const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
                 const loginUrl = `${serverUrl}/login`
-                
-                const { subject, html } = staffInvitationEmail({ 
-                    userName: targetUser.firstName || targetUser.email.split('@')[0], 
+
+                const { subject, html } = staffInvitationEmail({
+                    userName: targetUser.firstName || targetUser.email.split('@')[0],
                     workspaceName: tenant.name as string,
-                    loginUrl 
+                    loginUrl
                 })
-                
+
                 req.payload.sendEmail({ to: targetUser.email, subject, html }).catch((err: unknown) => {
                     console.error(`[StaffInvite] Failed to resend email to ${targetUser.email}:`, err)
                 })
@@ -670,10 +670,11 @@ export const Users: CollectionConfig = {
                         description: 'Select custom features this user can access',
                     },
                     options: [
-                        { label: 'Web Builder', value: 'web-builder' },
-                        { label: 'Content Manager', value: 'content-manager' },
-                        { label: 'Sales Operation', value: 'sales-operation' },
-                        { label: 'Settings', value: 'settings' },
+                        { label: 'Products & Inventory', value: 'products' },
+                        { label: 'Orders & Fulfillment', value: 'orders' },
+                        { label: 'Blog Management', value: 'blog' },
+                        { label: 'Store Design (Builder)', value: 'builder' },
+                        { label: 'Settings & Domain', value: 'settings' },
                     ],
                 },
             ],
