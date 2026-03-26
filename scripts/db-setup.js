@@ -263,6 +263,19 @@ const MIGRATIONS = [
     name: 'payload_locked_documents_rels.blog_categories_id',
     sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS blog_categories_id integer;`,
   },
+  // ── Tenants: Payment Methods ──
+  {
+    name: 'tenants.payments_payment_cod',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_payment_cod boolean DEFAULT false;`,
+  },
+  {
+    name: 'tenants.payments_payment_qr',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_payment_qr boolean DEFAULT false;`,
+  },
+  {
+    name: 'tenants.payments_qr_image_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_qr_image_id integer;`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -523,6 +536,18 @@ async function main() {
   -- F10 Array/Nested Bypass
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS variant
   ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_proof_image
+
+  -- F19 Payments Group Bypass
+  ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments
+  ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payment_cod
+  ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payment_qr
+  ALTER TABLE tenants ADD COLUMN IF NOT EXISTS qr_image
+
+  -- F19 Domains Array Bypass
+  ALTER TABLE tenants ADD COLUMN IF NOT EXISTS custom_domains
+  ALTER TABLE tenants ADD COLUMN IF NOT EXISTS domain
+  ALTER TABLE tenants ADD COLUMN IF NOT EXISTS status
+  ALTER TABLE tenants ADD COLUMN IF NOT EXISTS is_primary
 */
 
 main().catch((e) => {
