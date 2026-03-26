@@ -19,18 +19,6 @@ THEN  nội dung của tính năng phải được render gọn bên trong Main 
 
 ---
 
-## 🌍 Global Acceptance Criteria (CMS Layout Compliance)
-
-> **Áp dụng cho mọi User Story trong file này.**
-
-```gherkin
-GIVEN user truy cập tính năng trang quản trị (Dashboard, Products, Orders, v.v.)
-THEN  nội dung của tính năng phải được render gọn bên trong Main Content Area (tuân thủ F18-03)
-  AND Global Top Header (F18-02) và Global Sidebar Navigation (F18-01) vẫn giữ nguyên và hoạt động bình thường, không bị che khuất hay re-render toàn trang.
-```
-
----
-
 ## Báo Cáo Phân Tích & Rà Soát Trùng Lặp (BA Analysis)
 
 **1. Kết quả rà soát các feature hiện tại:**

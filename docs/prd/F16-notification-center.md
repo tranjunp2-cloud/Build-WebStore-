@@ -193,12 +193,12 @@ SO THAT tôi không bao giờ bỏ lỡ các đơn hàng mới hoặc thông bá
                                                            (Live Popup Corner)
 ```
   - Native Push Notification:
-  - [Link tới file wireframe/design trong thư mục docs/design/...]
+  - [Thiết kế & Wireframe chi tiết xem tại `docs/design/F16-notification-center-design.md`](../design/F16-notification-center-design.md)
 
 ### 10.3. Mobile View (Full-screen Drawer / Bottom Sheet)
 - **Mô tả:** Trên mobile (<768px), Dropdown list không đủ chỗ hiển thị. Giao diện trở thành một cửa sổ trượt từ dưới lên (Bottom Sheet) hoặc Full-screen phủ hết toàn màn hình đễ dễ bấm ngón tay.
 - **Design / Wireframe:**
-  - [Link tới file wireframe/design trong thư mục docs/design/...]
+  - [Thiết kế & Wireframe chi tiết xem tại `docs/design/F16-notification-center-design.md`](../design/F16-notification-center-design.md)
 
 ---
 
