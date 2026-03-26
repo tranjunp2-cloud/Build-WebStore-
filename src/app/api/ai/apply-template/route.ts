@@ -67,8 +67,10 @@ export const POST = withAuth(async (user, req) => {
             },
         })
 
-        // Create homepage with template blocks
+        // Create homepage and 404 page with template blocks
         const blocks = template.defaultBlocks || []
+        
+        // Homepage
         await payload.create({
             collection: 'pages',
             data: {
@@ -79,6 +81,25 @@ export const POST = withAuth(async (user, req) => {
                 isHomepage: true,
                 status: 'draft',
                 layout: blocks,
+            },
+        })
+
+        // 404 Page
+        await payload.create({
+            collection: 'pages',
+            data: {
+                title: '404 Not Found',
+                slug: '/404',
+                site: site.id,
+                tenant: tenant.id,
+                isHomepage: false,
+                status: 'draft',
+                layout: blocks,
+                seo: {
+                    title: '404 - Page Not Found',
+                    description: 'The page you are looking for does not exist.',
+                    noIndex: true,
+                },
             },
         })
 
