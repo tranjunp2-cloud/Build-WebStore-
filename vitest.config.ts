@@ -21,6 +21,7 @@ export default defineConfig({
                 'src/__tests__/**',
             ],
             thresholds: {
+                // TODO: Nâng lên 20/15/15/20 sau khi thêm tests cho F01 + F05
                 lines: 15,
                 branches: 10,
                 functions: 10,
