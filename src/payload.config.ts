@@ -62,9 +62,11 @@ export default buildConfig({
     : nodemailerAdapter({
         defaultFromAddress: 'noreply@primeweb.app',
         defaultFromName: 'PrimeWeb',
+        // No SMTP configured — use stream transport (logs to console, no crash)
         transportOptions: {
-          jsonTransport: true, // logs email to console instead of sending
-        },
+          streamTransport: true,
+          newline: 'unix',
+        } as Record<string, unknown>,
       }),
   admin: {
     user: Users.slug,
