@@ -7,10 +7,35 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
+import {
+    createAddSectionBlock,
+    getAddSectionLabel,
+    inferAddSectionType,
+    isAddSectionInstruction,
+    normalizeAddSectionBlock,
+} from '@/lib/ai/add-section'
 import { editBlockSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+
+type AIEditPayload = {
+    instruction: string
+    block?: Record<string, unknown> | null
+    blockIndex?: number | null
+    allBlocks?: Record<string, unknown>[]
+    theme?: Record<string, unknown>
+    siteName?: string
+}
+
+type AIEditResult = {
+    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block'
+    changes?: Record<string, unknown>
+    blockIndex?: number
+    afterIndex?: number
+    block?: Record<string, unknown>
+    message?: string
+}
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -18,27 +43,34 @@ function getOpenAI(): OpenAI | null {
     return new OpenAI({ apiKey: key })
 }
 
-export const POST = withAuth(async (user, req) => {
-    try {
-        // Rate Limit: 20 AI tasks per hour
-        const rateLimit = checkRateLimit(String(user.id), 20)
-        if (!rateLimit.allowed) {
-            return NextResponse.json(
-                { error: 'Rate limit exceeded. Try again later.' },
-                { status: 429 }
-            )
+function describeAction(result: AIEditResult): string {
+    if (result.message) return result.message
+
+    switch (result.action) {
+        case 'update_theme':
+            return 'Da cap nhat giao dien va mau sac cho website.'
+        case 'add_block': {
+            const sectionType = inferAddSectionType('', String(result.block?.blockType || ''))
+            return `Da them section ${getAddSectionLabel(sectionType)} vao cuoi trang.`
         }
+        case 'delete_block':
+            return 'Da xoa section duoc chon khoi trang.'
+        case 'update_block':
+        default:
+            return 'Da cap nhat noi dung cho section duoc chon.'
+    }
+}
 
-        const { data, errorResponse } = await parseRequest(req, editBlockSchema)
-        if (errorResponse) return errorResponse
-        
-        const { instruction, block, blockIndex = 0, allBlocks, theme, siteName } = data!
+async function generateEditResult(data: AIEditPayload): Promise<AIEditResult> {
+    const { instruction, block, allBlocks, theme, siteName } = data
+    const blockIndex = data.blockIndex ?? 0
+    const inferredSectionType = inferAddSectionType(instruction)
+    const defaultAfterIndex = Math.max(-1, (allBlocks?.length || 0) - 1)
 
-        // Build context-aware system prompt
-        const blockMetas = blockRegistry.getAllMeta()
-        const availableTypes = blockMetas.map(m => `${m.type} (${m.name}): variants=[${m.variants.join(',')}]`).join('\n')
+    const blockMetas = blockRegistry.getAllMeta()
+    const availableTypes = blockMetas.map(m => `${m.type} (${m.name}): variants=[${m.variants.join(',')}]`).join('\n')
 
-        const systemPrompt = `You are an AI website editor. The user wants to modify their website.
+    const systemPrompt = `You are an AI website editor. The user wants to modify their website.
 
 ## CONTEXT
 - Site name: "${siteName || 'Website'}"
@@ -57,79 +89,189 @@ For modifying an existing block:
 {
   "action": "update_block",
   "blockIndex": ${blockIndex ?? 0},
-  "changes": { "field": "new_value", ... }
+  "changes": { "field": "new_value", ... },
+  "message": "A short explanation of what was changed."
 }
 
 For changing the theme:
 {
   "action": "update_theme",
-  "changes": { "primaryColor": "#hex", ... }
+  "changes": { "primaryColor": "#hex", ... },
+  "message": "A short explanation of what was changed."
 }
 
 For adding a new block:
 {
   "action": "add_block",
   "afterIndex": ${blockIndex ?? -1},
-  "block": { "blockType": "...", "variant": "...", ... }
+  "block": { "blockType": "...", "variant": "...", ... },
+  "message": "A short explanation of what was changed."
 }
 
 For deleting a block:
 {
   "action": "delete_block",
-  "blockIndex": ${blockIndex ?? 0}
+  "blockIndex": ${blockIndex ?? 0},
+  "message": "A short explanation of what was changed."
 }
 
-For rewriting text content:
+For undoing the previous action:
 {
-  "action": "update_block",
-  "blockIndex": ${blockIndex ?? 0},
-  "changes": { "headline": "new text", "subheadline": "new text" }
+  "action": "undo",
+  "message": "A short explanation of what was changed."
 }
 
 ## RULES
 1. Respond ONLY with the JSON object
-2. "changes" should only include fields that are being modified
-3. For text changes, generate professional, natural content
-4. For theme changes, use tasteful colors that work together
-5. blockType in new blocks MUST be one of the available types
-6. If the user asks to add a section, use add_block with appropriate content`
+2. Always include a concise "message" explaining the applied change
+3. "changes" should only include fields that are being modified
+4. For text changes, generate professional, natural content
+5. For theme changes, use tasteful colors that work together
+6. blockType in new blocks MUST be one of the available types
+7. If the user asks to add a section, use add_block with appropriate content
+8. Supported add-section types: testimonials, faq, gallery, features, team, newsletter, banner, cta
+9. New sections should be appended to the bottom by default unless the user explicitly asks otherwise
+10. If the user asks to undo, revert, or go back to the previous state, use the "undo" action with a polite message.`
 
-        const openai = getOpenAI()
-        if (!openai) {
-            return NextResponse.json({
-                action: 'update_block',
-                blockIndex: blockIndex ?? 0,
-                changes: {},
-                message: 'AI editing requires OpenAI API key. Please set OPENAI_API_KEY in .env.local',
+    const openai = getOpenAI()
+    if (!openai) {
+        if (isAddSectionInstruction(instruction) && inferredSectionType) {
+            const fallbackBlock = createAddSectionBlock({
+                instruction,
+                requestedType: inferredSectionType,
+                siteName,
+                theme,
             })
-        }
 
-        const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: instruction },
-            ],
-            temperature: 0.7,
-            max_tokens: 2000,
-            response_format: { type: 'json_object' },
-        })
-
-        const content = completion.choices[0]?.message?.content
-        if (!content) {
-            throw new Error('Empty AI response')
-        }
-
-        const result = JSON.parse(content)
-
-        // Validate if adding a new block
-        if (result.action === 'add_block' && result.block?.blockType) {
-            if (!blockRegistry.has(result.block.blockType)) {
-                return NextResponse.json({ error: `Unknown block type: ${result.block.blockType}` }, { status: 400 })
+            if (fallbackBlock) {
+                return {
+                    action: 'add_block',
+                    afterIndex: defaultAfterIndex,
+                    block: fallbackBlock,
+                    message: `Da them section ${getAddSectionLabel(inferredSectionType)} vao cuoi trang.`,
+                }
             }
         }
 
-        return NextResponse.json(result)
+        return {
+            action: 'update_block',
+            blockIndex: blockIndex ?? 0,
+            changes: {},
+            message: 'AI editing requires OPENAI_API_KEY. Please set it before using chat editing.',
+        }
+    }
+
+    const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: instruction },
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' },
+    })
+
+    const content = completion.choices[0]?.message?.content
+    if (!content) {
+        throw new Error('Empty AI response')
+    }
+
+    const result = JSON.parse(content) as AIEditResult
+
+    if (result.action === 'add_block') {
+        const normalizedBlock = normalizeAddSectionBlock(
+            {
+                instruction,
+                requestedType: String(result.block?.blockType || inferredSectionType || ''),
+                siteName,
+                theme,
+            },
+            result.block,
+        )
+
+        if (!normalizedBlock?.blockType || !blockRegistry.has(String(normalizedBlock.blockType))) {
+            throw new Error(`Unknown block type: ${String(normalizedBlock?.blockType || result.block?.blockType || 'unknown')}`)
+        }
+
+        result.block = normalizedBlock
+        result.afterIndex = typeof result.afterIndex === 'number' ? result.afterIndex : defaultAfterIndex
+
+        const validation = blockRegistry.validate(String(result.block.blockType), result.block)
+        if (!validation.success) {
+            const fallbackBlock = createAddSectionBlock({
+                instruction,
+                requestedType: String(result.block.blockType),
+                siteName,
+                theme,
+            })
+
+            if (!fallbackBlock) {
+                throw new Error(validation.error || 'Invalid block generated by AI')
+            }
+
+            result.block = fallbackBlock
+        }
+    }
+
+    result.message = describeAction(result)
+    return result
+}
+
+function createSSEMessage(event: string, data: unknown) {
+    return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+}
+
+export const POST = withAuth(async (user, req) => {
+    try {
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
+            )
+        }
+
+        const { data, errorResponse } = await parseRequest(req, editBlockSchema)
+        if (errorResponse) return errorResponse
+        const shouldStream = new URL(req.url).searchParams.get('stream') === 'true'
+
+        if (!shouldStream) {
+            const result = await generateEditResult(data!)
+            return NextResponse.json(result)
+        }
+
+        const encoder = new TextEncoder()
+        const stream = new ReadableStream({
+            async start(controller) {
+                const send = (event: string, payload: unknown) => {
+                    controller.enqueue(encoder.encode(createSSEMessage(event, payload)))
+                }
+
+                try {
+                    send('status', { message: 'AI dang doc yeu cau cua ban...' })
+                    send('status', { message: 'Dang chuan bi thay doi cho preview...' })
+
+                    const result = await generateEditResult(data!)
+                    send('action', result)
+                    send('done', result)
+                } catch (error: any) {
+                    console.error('[AI Edit Block Stream Error]', error)
+                    send('error', { error: error?.message || 'AI editing failed' })
+                } finally {
+                    controller.close()
+                }
+            },
+        })
+
+        return new NextResponse(stream, {
+            headers: {
+                'Content-Type': 'text/event-stream; charset=utf-8',
+                'Cache-Control': 'no-cache, no-transform',
+                Connection: 'keep-alive',
+            },
+        })
 
     } catch (error: any) {
         console.error('[AI Edit Block Error]', error)

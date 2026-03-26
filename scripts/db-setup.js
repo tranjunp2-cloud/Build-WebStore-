@@ -128,6 +128,14 @@ const MIGRATIONS = [
     name: 'sites.shipping_config_free_above',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_free_above numeric;`,
   },
+  {
+    name: 'sites.header_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS header_block varchar;`,
+  },
+  {
+    name: 'sites.footer_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS footer_block varchar;`,
+  },
   // ── Products: Halal + Weight ──
   {
     name: 'products.halal_certified',

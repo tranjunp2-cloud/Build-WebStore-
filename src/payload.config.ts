@@ -3,6 +3,7 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { createRequire } from 'module'
 import sharp from 'sharp'
 
 import { Tenants } from './collections/Tenants'
@@ -23,6 +24,7 @@ import { Categories } from './collections/Categories'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+const require = createRequire(import.meta.url)
 
 /** Trả về connection string (bỏ sslmode để tránh parse ghi đè pool.ssl). */
 function getDatabaseConnectionString(): string {
@@ -42,23 +44,52 @@ function isRemoteDatabase(): boolean {
   )
 }
 
+/** Schema push is expensive in dev Docker and can block auth/API requests.
+ * Enable it explicitly only when you intend to sync schema changes.
+ */
+function shouldPushSchema(): boolean {
+  return true // Temporarily force true for Page Manager feature schema change
+}
+
+function getEmailConfig() {
+  const hasMailConfig = Boolean(
+    process.env.MAIL_HOST &&
+    process.env.MAIL_PORT &&
+    process.env.MAIL_FROM_ADDRESS,
+  )
+
+  if (!hasMailConfig) {
+    return undefined
+  }
+
+  try {
+    const adapterModuleName = '@payloadcms/email-nodemailer'
+    const { nodemailerAdapter } = require(adapterModuleName)
+
+    return nodemailerAdapter({
+      defaultFromAddress: process.env.MAIL_FROM_ADDRESS || 'noreply@primeweb.app',
+      defaultFromName: process.env.MAIL_FROM_NAME || 'PrimeWeb',
+      transportOptions: {
+        host: process.env.MAIL_HOST,
+        port: parseInt(process.env.MAIL_PORT || '587'),
+        secure: process.env.MAIL_PORT === '465',
+        auth: {
+          user: process.env.MAIL_USERNAME,
+          pass: process.env.MAIL_PASSWORD,
+        },
+      },
+    })
+  } catch (error) {
+    console.warn('[Payload Config] Email adapter unavailable, email features disabled.', error)
+    return undefined
+  }
+}
+
+const emailConfig = getEmailConfig()
+
 export default buildConfig({
   serverURL: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
-  email: nodemailerAdapter({
-    defaultFromAddress: process.env.MAIL_FROM_ADDRESS || 'noreply@primeweb.app',
-    defaultFromName: process.env.MAIL_FROM_NAME || 'PrimeWeb',
-    transportOptions: {
-      host: process.env.MAIL_HOST,
-      port: parseInt(process.env.MAIL_PORT || '587'),
-      // Port 587 = STARTTLS (secure: false, nodemailer auto-upgrades)
-      // Port 465 = implicit SSL (secure: true)
-      secure: process.env.MAIL_PORT === '465',
-      auth: {
-        user: process.env.MAIL_USERNAME,
-        pass: process.env.MAIL_PASSWORD,
-      },
-    },
-  }),
+  ...(emailConfig ? { email: emailConfig } : {}),
   admin: {
     user: Users.slug,
     meta: {
@@ -99,9 +130,10 @@ export default buildConfig({
       // Truyền rõ ở đây vì parse(connectionString) có thể ghi đè nếu URL còn sslmode.
       ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: false } } : {}),
     },
-    // push: true auto-creates tables when NODE_ENV !== 'production'.
-    // For staging (NODE_ENV=development via DO env var), this creates tables on first run.
-    push: true,
+    // Push schema only when explicitly requested to avoid expensive sync on every
+    // local Docker request. Use `PAYLOAD_PUSH_SCHEMA=true` or the db push script
+    // when you intentionally need a schema update.
+    push: shouldPushSchema(),
   }),
   sharp,
   plugins: [

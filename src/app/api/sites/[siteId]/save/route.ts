@@ -49,16 +49,19 @@ export async function PATCH(
         }
 
         const { siteId } = await params
+        const pageId = req.nextUrl.searchParams.get('pageId')
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
         
-        const { blocks, theme, locale, shippingConfig } = data!
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock } = data!
 
         // Update site-level fields if provided
         const siteUpdateData: any = {}
         if (theme) siteUpdateData.theme = theme
         if (locale) siteUpdateData.locale = locale
         if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
+        if (headerBlock !== undefined) siteUpdateData.headerBlock = headerBlock
+        if (footerBlock !== undefined) siteUpdateData.footerBlock = footerBlock
 
         if (Object.keys(siteUpdateData).length > 0) {
             await payload.update({
@@ -68,27 +71,45 @@ export async function PATCH(
             })
         }
 
-        // Update blocks on homepage if provided
+        // Update blocks on the selected page if provided
         if (blocks) {
             const numericSiteId = Number(siteId)
-            let pagesResult = await payload.find({
-                collection: 'pages',
-                where: {
-                    site: { equals: numericSiteId },
-                    isHomepage: { equals: true },
-                },
-                limit: 1,
-            })
+            let page: any = null
 
-            if (pagesResult.docs.length === 0) {
-                pagesResult = await payload.find({
+            if (pageId) {
+                const requestedPage = await payload.findByID({
                     collection: 'pages',
-                    where: { site: { equals: numericSiteId } },
-                    limit: 1,
+                    id: pageId,
                 })
+                const requestedPageSiteId =
+                    typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
+
+                if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
+                    page = requestedPage
+                }
             }
 
-            const page = pagesResult.docs[0]
+            if (!page) {
+                let pagesResult = await payload.find({
+                    collection: 'pages',
+                    where: {
+                        site: { equals: numericSiteId },
+                        isHomepage: { equals: true },
+                    },
+                    limit: 1,
+                })
+
+                if (pagesResult.docs.length === 0) {
+                    pagesResult = await payload.find({
+                        collection: 'pages',
+                        where: { site: { equals: numericSiteId } },
+                        limit: 1,
+                    })
+                }
+
+                page = pagesResult.docs[0]
+            }
+
             if (page) {
                 await payload.update({
                     collection: 'pages',

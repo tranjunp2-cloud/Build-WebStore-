@@ -494,13 +494,25 @@ function buildGeneratedPages({
     const contact = blocks.find((block) => block.blockType === 'contact') || null
     const footer = blocks.find((block) => block.blockType === 'footer') || null
 
+    const page404 = [
+        navigation,
+        createPageHero(hero, {
+            headline: '404 - Page Not Found',
+            subheadline: 'The page you are looking for does not exist or has been moved.',
+            primaryLabel: 'Back to Homepage',
+            primaryUrl: '/',
+            badgeText: 'Error 404',
+        }),
+        footer,
+    ]
+
     const compact = (pageBlocks: Array<any | null>) =>
         pageBlocks.filter(Boolean).map((block) => cloneBlockData(block))
 
     return [
         {
             title: 'Homepage',
-            slug: '/',
+            slug: 'home',
             isHomepage: true,
             layout: cloneBlockData(blocks),
             seo: {
@@ -510,7 +522,7 @@ function buildGeneratedPages({
         },
         {
             title: 'About',
-            slug: '/about',
+            slug: 'about',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -534,7 +546,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Products',
-            slug: '/products',
+            slug: 'products',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -558,7 +570,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Contact',
-            slug: '/contact',
+            slug: 'contact',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -577,6 +589,17 @@ function buildGeneratedPages({
             seo: {
                 title: `Contact ${businessInfo.businessName}`,
                 description: `Get in touch with ${businessInfo.businessName}.`,
+            },
+        },
+        {
+            title: '404 Not Found',
+            slug: '404',
+            isHomepage: false,
+            layout: compact(page404),
+            seo: {
+                title: '404 - Page Not Found',
+                description: 'The page you are looking for does not exist.',
+                noIndex: true, // Do not index the 404 page
             },
         },
     ]

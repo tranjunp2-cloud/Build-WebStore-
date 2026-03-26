@@ -32,12 +32,17 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
   setSectionCategory(cat)
 
   // Separate nav/hero from other sections for semantic HTML
-  const navHtml = blocks.filter(b => b.blockType === 'navigation').map(b => renderNav(b, t)).join('\n')
-  const heroHtml = blocks.filter(b => b.blockType === 'hero').map(b => renderHero(b, t, cat)).join('\n')
-  const footerHtml = blocks.filter(b => b.blockType === 'footer').map(b => renderSections(b, t, cat)).join('\n')
+  const addDataAttr = (html: string, index: number, type: string) => {
+    return html.replace(/^<([a-z0-9]+)\s/i, `<$1 data-block-index="${index}" data-block-type="${type}" `)
+  }
+
+  const navHtml = blocks.map((b, i) => b.blockType === 'navigation' ? addDataAttr(renderNav(b, t), i, b.blockType) : '').filter(Boolean).join('\n')
+  const heroHtml = blocks.map((b, i) => b.blockType === 'hero' ? addDataAttr(renderHero(b, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
+  const footerHtml = blocks.map((b, i) => b.blockType === 'footer' ? addDataAttr(renderSections(b, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
   const mainHtml = blocks
-    .filter(b => !['navigation', 'hero', 'footer'].includes(b.blockType))
-    .map(b => renderSections(b, t, cat)).join('\n')
+    .map((b, i) => !['navigation', 'hero', 'footer'].includes(b.blockType) ? addDataAttr(renderSections(b, t, cat), i, b.blockType) : '')
+    .filter(Boolean)
+    .join('\n')
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -69,45 +74,370 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
     ${mainHtml}
   </main>
   ${footerHtml}
+
+  <script>
+    (function() {
+      const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
+      const excludedBlockTypes = ['navigation', 'footer']
+      let hoveredEl = null;
+      let hoverTimer = null;
+      let hoveredBlock = null;
+
+      const getEditableLayouts = () => {
+        return Array.from(document.querySelectorAll('[data-block-index]'))
+          .map((node) => {
+            const rect = node.getBoundingClientRect()
+            return {
+              top: rect.top,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+              blockIndex: parseInt(node.getAttribute('data-block-index')),
+              blockType: node.getAttribute('data-block-type')
+            }
+          })
+          .filter((layout) => !excludedBlockTypes.includes(layout.blockType))
+      }
+
+      const postLayouts = () => {
+        window.parent.postMessage({
+          type: 'BLOCK_LAYOUT',
+          layouts: getEditableLayouts()
+        }, '*')
+      }
+
+      const clearHoverState = () => {
+        if (hoverTimer) {
+          clearTimeout(hoverTimer)
+          hoverTimer = null
+        }
+
+        hoveredEl = null
+        hoveredBlock = null
+        window.parent.postMessage({ type: 'BLOCK_MOUSEOUT' }, '*')
+      }
+
+      document.addEventListener('mouseover', (e) => {
+        let target = e.target
+        let blockContainer = target.closest('[data-block-index]')
+        if (!blockContainer) {
+          clearHoverState()
+          return
+        }
+
+        const blockType = blockContainer.getAttribute('data-block-type')
+        if (!excludedBlockTypes.includes(blockType) && hoveredBlock !== blockContainer) {
+          hoveredBlock = blockContainer
+          const rect = blockContainer.getBoundingClientRect()
+          window.parent.postMessage({
+            type: 'BLOCK_CONTAINER_HOVERED',
+            layout: {
+              top: rect.top,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+              blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+              blockType
+            }
+          }, '*')
+        }
+        
+        if (target.tagName === 'IMG') {
+          // Send IMAGE_HOVERED
+          if (hoverTimer) clearTimeout(hoverTimer)
+          hoverTimer = window.setTimeout(() => {
+            const rect = target.getBoundingClientRect()
+            window.parent.postMessage({
+              type: 'IMAGE_HOVERED',
+              rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+              src: target.src,
+              blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+              blockType: blockContainer.getAttribute('data-block-type')
+            }, '*')
+          }, 200)
+          return
+        }
+
+        if (!validTags.includes(target.tagName) || target.children.length > 1) {
+          return
+        }
+        
+        const text = target.innerText?.trim()
+        if (!text || text.length < 2) return
+
+        if (hoveredEl === target) return
+
+        if (hoverTimer) {
+          clearTimeout(hoverTimer)
+        }
+
+        hoveredEl = target
+        hoverTimer = window.setTimeout(() => {
+          const rect = target.getBoundingClientRect()
+
+          window.parent.postMessage({
+            type: 'BLOCK_HOVERED',
+            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+            text: text,
+            blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+            blockType: blockContainer.getAttribute('data-block-type')
+          }, '*')
+        }, 200)
+      })
+
+      document.addEventListener('mouseout', (e) => {
+        if (!hoveredEl) return
+        if (e.target === hoveredEl) {
+          clearHoverState()
+        }
+        // Fix: Clear IMAGE_HOVERED timer when mouse leaves an img
+        if (e.target && e.target.tagName === 'IMG') {
+          if (hoverTimer) {
+            clearTimeout(hoverTimer)
+            hoverTimer = null
+          }
+        }
+      })
+
+      document.addEventListener('pointerdown', () => {
+        window.parent.postMessage({ type: 'PREVIEW_POINTER_DOWN' }, '*')
+      })
+
+      // US-F05-06: WYSIWYG Text Editing
+      let currentEditingEl = null
+      let originalText = ''
+
+      const cleanUpEditing = () => {
+        if (!currentEditingEl) return
+        currentEditingEl.removeAttribute('contenteditable')
+        const newText = currentEditingEl.innerText?.trim()
+        window.parent.postMessage({
+          type: 'TEXT_EDITED',
+          blockIndex: parseInt(currentEditingEl.closest('[data-block-index]')?.getAttribute('data-block-index')),
+          oldText: originalText,
+          newText: newText
+        }, '*')
+        currentEditingEl = null
+        window.parent.postMessage({ type: 'TEXT_EDITING_STOPPED' }, '*')
+      }
+
+      document.addEventListener('dblclick', (e) => {
+        let target = e.target
+        let blockContainer = target.closest('[data-block-index]')
+        if (!blockContainer || excludedBlockTypes.includes(blockContainer.getAttribute('data-block-type'))) return
+
+        if (validTags.includes(target.tagName) && target.children.length <= 1) {
+          e.preventDefault()
+          e.stopPropagation()
+          if (currentEditingEl && currentEditingEl !== target) {
+            cleanUpEditing()
+          }
+          currentEditingEl = target
+          currentEditingEl.setAttribute('contenteditable', 'true')
+          currentEditingEl.focus()
+          originalText = currentEditingEl.innerText?.trim()
+          
+          const rect = target.getBoundingClientRect()
+          window.parent.postMessage({
+            type: 'TEXT_EDITING_STARTED',
+            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+            blockIndex: parseInt(blockContainer.getAttribute('data-block-index'))
+          }, '*')
+        }
+      })
+
+      document.addEventListener('blur', (e) => {
+        if (currentEditingEl === e.target) {
+          cleanUpEditing()
+        }
+      }, true)
+
+      document.addEventListener('keydown', (e) => {
+        if (currentEditingEl && (e.key === 'Enter' || e.key === 'Escape')) {
+          e.preventDefault()
+          cleanUpEditing()
+          window.getSelection()?.removeAllRanges() // Remove selection
+        }
+      })
+
+      // Image click handling
+      document.addEventListener('click', (e) => {
+        let target = e.target
+        if (target.tagName === 'IMG') {
+          let blockContainer = target.closest('[data-block-index]')
+          if (!blockContainer || excludedBlockTypes.includes(blockContainer.getAttribute('data-block-type'))) return
+          
+          const rect = target.getBoundingClientRect()
+          window.parent.postMessage({
+            type: 'IMAGE_CLICKED',
+            src: target.src,
+            rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+            blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+            blockType: blockContainer.getAttribute('data-block-type')
+          }, '*')
+        } else if (currentEditingEl && target !== currentEditingEl) {
+           // Clicking outside while editing will blur
+        } else {
+           window.parent.postMessage({ type: 'PREVIEW_CANVAS_CLICKED' }, '*')
+        }
+      })
+
+      // US-F05-08: Drag and drop component from outside
+      const dropIndicator = document.createElement('div')
+      dropIndicator.className = 'drop-indicator'
+      dropIndicator.style.cssText = 'height: 4px; background-color: #3b82f6; width: 100%; position: absolute; z-index: 9999; display: none; pointer-events: none;'
+      document.body.appendChild(dropIndicator)
+
+      document.addEventListener('dragover', (e) => {
+        e.preventDefault()
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+
+        const blocks = Array.from(document.querySelectorAll('[data-block-index]'))
+        if (blocks.length === 0) return
+
+        let closestBlock = null
+        let closestDist = Infinity
+        let insertAfter = false
+
+        for (const block of blocks) {
+          const rect = block.getBoundingClientRect()
+          const midY = rect.top + rect.height / 2
+          const dist = Math.abs(e.clientY - midY)
+          
+          if (dist < closestDist) {
+            closestDist = dist
+            closestBlock = block
+            insertAfter = e.clientY > midY
+          }
+        }
+
+        if (closestBlock) {
+          const rect = closestBlock.getBoundingClientRect()
+          dropIndicator.style.display = 'block'
+          if (insertAfter) {
+             dropIndicator.style.top = (rect.bottom + window.scrollY - 2) + 'px'
+          } else {
+             dropIndicator.style.top = (rect.top + window.scrollY - 2) + 'px'
+          }
+          dropIndicator.dataset.index = closestBlock.getAttribute('data-block-index') || '0'
+          dropIndicator.dataset.insertAfter = insertAfter.toString()
+        }
+      })
+
+      document.addEventListener('dragleave', (e) => {
+         if (!e.relatedTarget) {
+            dropIndicator.style.display = 'none'
+         }
+      })
+
+      document.addEventListener('drop', (e) => {
+        e.preventDefault()
+        dropIndicator.style.display = 'none'
+
+        try {
+          const dataStr = e.dataTransfer?.getData('application/json')
+          if (!dataStr) return
+          
+          const blockData = JSON.parse(dataStr)
+          const targetIndexAttr = dropIndicator.dataset.index
+          const isAfter = dropIndicator.dataset.insertAfter === 'true'
+          
+          if (!targetIndexAttr) return
+          let targetIndex = parseInt(targetIndexAttr)
+          if (isAfter) targetIndex += 1
+
+          window.parent.postMessage({
+            type: 'EDITOR_BLOCK_DROP',
+            payload: { index: targetIndex, blockData }
+          }, '*')
+        } catch (err) {
+          console.error('Drop error:', err)
+        }
+      })
+
+      // Parent command execution (for bold, italic etc from RichTextToolbar)
+      window.addEventListener('message', (e) => {
+        if (e.data?.type === 'EXEC_COMMAND') {
+          document.execCommand(e.data.command, false, e.data.value)
+          currentEditingEl?.focus() // keep focus on the element
+        }
+      })
+
+      window.addEventListener('load', postLayouts)
+      window.addEventListener('resize', postLayouts)
+      window.addEventListener('scroll', postLayouts, { passive: true })
+      document.addEventListener('DOMContentLoaded', postLayouts)
+      setTimeout(postLayouts, 50)
+    })();
+  </script>
 </body>
 </html>`
 }
 
-export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_user, _req, ctx) => {
+export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_user, req, ctx) => {
   try {
     const { siteId } = await ctx.params
     const payload = await getPayload({ config })
     const numericSiteId = Number(siteId)
+    const pageId = new URL(req.url).searchParams.get('pageId')
 
     // Fetch site info
     const site: any = await payload.findByID({ collection: 'sites', id: numericSiteId })
     if (!site) return new NextResponse('Not found', { status: 404 })
 
-    // Fetch blocks from pages collection (homepage or first page)
-    let pagesResult = await payload.find({
-      collection: 'pages',
-      where: {
-        site: { equals: numericSiteId },
-        isHomepage: { equals: true },
-      },
-      limit: 1,
-    })
+    let page: any = null
 
-    // Fallback: get first page for this site
-    if (pagesResult.docs.length === 0) {
-      pagesResult = await payload.find({
+    if (pageId) {
+      const requestedPage = await payload.findByID({
         collection: 'pages',
-        where: { site: { equals: numericSiteId } },
-        limit: 1,
+        id: pageId,
       })
+      const requestedPageSiteId =
+        typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
+
+      if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
+        page = requestedPage
+      }
     }
 
-    const page: any = pagesResult.docs[0]
-    const blocks = page?.layout || []
+    if (!page) {
+      let pagesResult = await payload.find({
+        collection: 'pages',
+        where: {
+          site: { equals: numericSiteId },
+          isHomepage: { equals: true },
+        },
+        limit: 1,
+      })
 
-    const cat = detectCategory(blocks, site.name || '')
+      if (pagesResult.docs.length === 0) {
+        pagesResult = await payload.find({
+          collection: 'pages',
+          where: { site: { equals: numericSiteId } },
+          limit: 1,
+        })
+      }
+
+      page = pagesResult.docs[0]
+    }
+
+    const blocks = page?.layout || []
+    
+    // Inject global header/footer from site level
+    // Remove existing page-level navigation and footer to avoid duplicates, but keep them as fallback
+    const oldNav = blocks.find((b: any) => b.blockType === 'navigation')
+    const oldFooter = blocks.find((b: any) => b.blockType === 'footer')
+    const combinedBlocks = blocks.filter((b: any) => b.blockType !== 'navigation' && b.blockType !== 'footer')
+    
+    const finalHeader = site.headerBlock || oldNav
+    const finalFooter = site.footerBlock || oldFooter
+    
+    if (finalHeader) combinedBlocks.unshift(finalHeader)
+    if (finalFooter) combinedBlocks.push(finalFooter)
+
+    const cat = detectCategory(combinedBlocks, site.name || '')
     const t = THEMES[cat] || THEMES.business
-    const html = buildFullHTML(blocks, t, cat, {
+    const html = buildFullHTML(combinedBlocks, t, cat, {
       name: site.name,
       description: site.description,
     })
