@@ -514,6 +514,7 @@ export default function EditorPage() {
                 currentPageId={currentPageId}
                 siteName={siteName || site?.name || ''}
                 currentPageTitle={currentPageTitle}
+                pages={pages}
                 isPublished={Boolean(isPublished)}
                 isSaving={isSaving}
                 saveSuccess={saveSuccess}
@@ -526,6 +527,7 @@ export default function EditorPage() {
                 compact={isCompactLayout}
                 onOpenMenu={() => setIsMenuOpen(true)}
                 onOpenTemplates={() => toast.info('Template gallery will be connected in the next step.')}
+                onPageSelected={handlePageSelected}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onSave={() => void handleSave()}

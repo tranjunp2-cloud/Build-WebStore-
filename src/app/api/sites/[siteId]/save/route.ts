@@ -5,6 +5,17 @@ import { cookies } from 'next/headers'
 
 import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
+import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+
+function normalizeBlocksForPersistence(blocks: Record<string, unknown>[]) {
+    return blocks.map(block => {
+        if (block?.blockType === 'socialWidget') {
+            return normalizeSocialWidgetConfig(block)
+        }
+
+        return block
+    })
+}
 
 /**
  * PATCH /api/sites/[siteId]/save
@@ -54,6 +65,7 @@ export async function PATCH(
         if (errorResponse) return errorResponse
         
         const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock } = data!
+        const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
 
         // Update site-level fields if provided
         const siteUpdateData: any = {}
@@ -72,7 +84,7 @@ export async function PATCH(
         }
 
         // Update blocks on the selected page if provided
-        if (blocks) {
+        if (normalizedBlocks) {
             const numericSiteId = Number(siteId)
             let page: any = null
 
@@ -114,7 +126,7 @@ export async function PATCH(
                 await payload.update({
                     collection: 'pages',
                     id: page.id,
-                    data: { layout: blocks },
+                    data: { layout: normalizedBlocks },
                 })
             }
         }

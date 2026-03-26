@@ -4,9 +4,49 @@ import React, { memo, useEffect, useState } from 'react'
 import { CircleDot, Copy, Globe2, MenuSquare, Search, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
+import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
 import { LogoEditor } from './LogoEditor'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
+
+type SocialWidgetLink = {
+    platform: 'facebook' | 'whatsapp' | 'instagram' | 'linkedin' | 'youtube'
+    url: string
+    enabled?: boolean
+}
+
+const SOCIAL_PLATFORM_META: Record<SocialWidgetLink['platform'], { label: string; mark: string; placeholder: string; accent: string }> = {
+    facebook: {
+        label: 'Facebook',
+        mark: 'f',
+        placeholder: 'facebook.com/yourbrand',
+        accent: '#2563eb',
+    },
+    whatsapp: {
+        label: 'WhatsApp',
+        mark: 'wa',
+        placeholder: '60123456789',
+        accent: '#16a34a',
+    },
+    instagram: {
+        label: 'Instagram',
+        mark: 'ig',
+        placeholder: 'instagram.com/yourbrand',
+        accent: '#db2777',
+    },
+    linkedin: {
+        label: 'LinkedIn',
+        mark: 'in',
+        placeholder: 'linkedin.com/company/yourbrand',
+        accent: '#0284c7',
+    },
+    youtube: {
+        label: 'YouTube',
+        mark: '▶',
+        placeholder: 'youtube.com/@yourbrand',
+        accent: '#dc2626',
+    },
+}
 
 // ─── Constants ──────────────────────────────────────────────────────────
 const FONT_OPTIONS = ['Outfit', 'Inter', 'DM Sans', 'Playfair Display', 'Roboto', 'Poppins', 'Plus Jakarta Sans']
@@ -229,7 +269,7 @@ function SettingsPanelInner({
     const currentBlockIndex = blockIndex ?? 0
 
     // Helper: update item in an array field
-    const updateArrayItem = (field: string, index: number, key: string, val: string) => {
+    const updateArrayItem = (field: string, index: number, key: string, val: unknown) => {
         const arr = [...(((block?.[field] as Record<string, unknown>[] | undefined) || []))]
         arr[index] = { ...arr[index], [key]: val }
         onBlockUpdate(currentBlockIndex, { [field]: arr })
@@ -571,6 +611,167 @@ function SettingsPanelInner({
                                 <div className="text-[10px] text-gray-500 mt-1">{(col.links || []).length} links</div>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {bt === 'socialWidget' && (
+                    <div className={sectionCls}>
+                        {(() => {
+                            const normalizedSocialBlock = normalizeSocialWidgetConfig(block as Record<string, unknown>)
+
+                            return (
+                                <>
+                        <label className="text-xs font-medium uppercase text-gray-500">Social Widget</label>
+                        <div className="mt-3 space-y-3">
+                            <div>
+                                <label className={labelCls}>Headline</label>
+                                <input
+                                    defaultValue={(normalizedSocialBlock.headline as string) || ''}
+                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
+                                    className={inputCls}
+                                    placeholder="Stay connected"
+                                />
+                            </div>
+                            <div>
+                                <label className={labelCls}>Display Style</label>
+                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                    {['floating', 'inline'].map(variant => (
+                                        <button
+                                            key={variant}
+                                            type="button"
+                                            onClick={() => onBlockUpdate(currentBlockIndex, { variant })}
+                                            className={cn(
+                                                'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
+                                                (block.variant || 'floating') === variant
+                                                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
+                                            )}
+                                        >
+                                            {variant}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
+                                    Platforms
+                                </p>
+                                <p className="mt-2 text-xs text-slate-400">
+                                    Published site should open each enabled platform in a new tab.
+                                </p>
+                            </div>
+                            {(normalizedSocialBlock.links as SocialWidgetLink[]).map((link, i) => (
+                                <div key={`social-${i}`} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-3">
+                                            <span
+                                                className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white/90 text-[11px] font-black uppercase tracking-[0.04em]"
+                                                style={{
+                                                    color: SOCIAL_PLATFORM_META[link.platform].accent,
+                                                    borderColor: `${SOCIAL_PLATFORM_META[link.platform].accent}22`,
+                                                }}
+                                            >
+                                                {SOCIAL_PLATFORM_META[link.platform].mark}
+                                            </span>
+                                            <div>
+                                                <p className="text-sm font-medium text-white">
+                                                    {SOCIAL_PLATFORM_META[link.platform].label}
+                                                </p>
+                                                <p className="text-[11px] text-slate-500">
+                                                    {link.platform === 'whatsapp' ? 'Phone number or wa.me link' : 'Public profile URL'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => updateArrayItem('links', i, 'enabled', link.enabled === false)}
+                                            className={cn(
+                                                'rounded-full px-2.5 py-1 text-[10px] font-medium transition-colors',
+                                                link.enabled === false
+                                                    ? 'bg-white/10 text-slate-400'
+                                                    : 'bg-green-500/15 text-green-300',
+                                            )}
+                                        >
+                                            {link.enabled === false ? 'Hidden' : 'Visible'}
+                                        </button>
+                                    </div>
+                                    <input
+                                        defaultValue={link.url || ''}
+                                        placeholder={SOCIAL_PLATFORM_META[link.platform].placeholder}
+                                        onBlur={(e: FieldBlurEvent) => updateArrayItem('links', i, 'url', e.target.value)}
+                                        className={inputCls}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                                </>
+                            )
+                        })()}
+                    </div>
+                )}
+
+                {bt === 'cartWidget' && (
+                    <div className={sectionCls}>
+                        <label className="text-xs font-medium uppercase text-gray-500">Cart Widget</label>
+                        <div className="mt-3 space-y-3">
+                            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
+                                    Checkout Behavior
+                                </p>
+                                <p className="mt-2 text-xs text-slate-400">
+                                    In preview, checkout falls back to a toast when storefront checkout is unavailable.
+                                </p>
+                            </div>
+                            <div>
+                                <label className={labelCls}>Display Style</label>
+                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                    {['floating', 'inline'].map(variant => (
+                                        <button
+                                            key={variant}
+                                            type="button"
+                                            onClick={() => onBlockUpdate(currentBlockIndex, { variant })}
+                                            className={cn(
+                                                'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
+                                                (block.variant || 'floating') === variant
+                                                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
+                                                    : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10',
+                                            )}
+                                        >
+                                            {variant}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className={labelCls}>Button Label</label>
+                                <input
+                                    defaultValue={(block.label as string) || 'Cart'}
+                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'label', e.target.value)}
+                                    className={inputCls}
+                                    placeholder="Cart"
+                                />
+                            </div>
+                            <div>
+                                <label className={labelCls}>Show Text Label</label>
+                                <div className="mt-2 flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => onBlockUpdate(currentBlockIndex, { showLabel: !block.showLabel })}
+                                        className={cn(
+                                            'rounded-full px-3 py-2 text-xs font-medium transition-colors',
+                                            block.showLabel
+                                                ? 'bg-blue-500/15 text-blue-300'
+                                                : 'bg-white/5 text-slate-400 hover:bg-white/10',
+                                        )}
+                                    >
+                                        {block.showLabel ? 'Label visible' : 'Icon only'}
+                                    </button>
+                                    <span className="text-[11px] text-slate-500">
+                                        Badge count always stays visible
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 

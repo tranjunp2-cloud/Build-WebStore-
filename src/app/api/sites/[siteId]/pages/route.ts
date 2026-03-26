@@ -29,6 +29,7 @@ export async function GET(
             title: p.title,
             slug: p.slug,
             status: p._status || 'draft',
+            isHomepage: Boolean(p.isHomepage),
             isVisible: p.isVisible ?? true,
             updatedAt: p.updatedAt,
         }))
@@ -73,6 +74,7 @@ export async function POST(
                 title: newPage.title,
                 slug: newPage.slug,
                 status: newPage._status || 'draft',
+                isHomepage: Boolean(newPage.isHomepage),
                 isVisible: newPage.isVisible ?? true,
                 updatedAt: newPage.updatedAt,
             }

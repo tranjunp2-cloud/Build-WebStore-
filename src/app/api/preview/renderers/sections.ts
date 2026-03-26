@@ -4,6 +4,7 @@
  */
 import { TemplateTheme } from './styles'
 import { getGalleryImages, getAboutImage, getTeamAvatar } from './images'
+import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 
 // Category for image selection
 let _category = 'business'
@@ -23,8 +24,70 @@ export function renderSections(block: any, t: TemplateTheme, category?: string):
     case 'gallery': return renderGallery(block, t)
     case 'team': return renderTeam(block, t)
     case 'cta': return renderCta(block, t)
+    case 'socialWidget': return renderSocialWidget(block, t)
+    case 'cartWidget': return renderCartWidget(block, t)
     default: return ''
   }
+}
+
+function renderSocialWidget(b: any, t: TemplateTheme) {
+  const normalizedBlock = normalizeSocialWidgetConfig(b)
+  const links = normalizedBlock.links.filter((item: any) => item?.enabled !== false)
+  const isFloating = (normalizedBlock.variant || 'floating') !== 'inline'
+
+  if (links.length === 0) return ''
+
+  const platformMeta: Record<string, { label: string; mark: string; accent: string }> = {
+    facebook: { label: 'Facebook', mark: 'f', accent: '#2563eb' },
+    whatsapp: { label: 'WhatsApp', mark: 'wa', accent: '#16a34a' },
+    instagram: { label: 'Instagram', mark: 'ig', accent: '#db2777' },
+    linkedin: { label: 'LinkedIn', mark: 'in', accent: '#0284c7' },
+    youtube: { label: 'YouTube', mark: '▶', accent: '#dc2626' },
+  }
+
+  const normalizeUrl = (platform: string, value: string) => {
+    const trimmed = String(value || '').trim()
+    if (!trimmed) return '#'
+    if (/^https?:\/\//i.test(trimmed)) return trimmed
+    if (platform === 'whatsapp') {
+      const digits = trimmed.replace(/[^\d]/g, '')
+      return digits ? `https://wa.me/${digits}` : '#'
+    }
+    return `https://${trimmed}`
+  }
+
+  return `<section style="${isFloating ? 'position:fixed;right:24px;bottom:24px;z-index:50;' : 'padding:40px 0;'}">
+    <div class="${isFloating ? '' : 'container'}" style="${isFloating ? 'display:flex;flex-direction:column;align-items:flex-end;gap:12px;' : ''}">
+      ${normalizedBlock.headline ? `<p style="font-size:14px;color:${t.muted};font-weight:600;">${normalizedBlock.headline}</p>` : ''}
+      <div style="display:flex;${isFloating ? 'flex-direction:column;' : 'flex-wrap:wrap;'}gap:12px;">
+        ${links.map((item: any) => {
+          const meta = platformMeta[item.platform] || { label: item.platform || 'Social', mark: '•', accent: t.primary }
+          return `<a href="${normalizeUrl(item.platform, item.url)}" target="_blank" rel="noreferrer" aria-label="${meta.label}"
+            style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;border:1px solid ${meta.accent}33;background:linear-gradient(135deg, ${meta.accent}22, ${t.primary}15);box-shadow:0 14px 32px rgba(15,23,42,0.16);">
+            <span style="display:inline-flex;width:36px;height:36px;border-radius:999px;align-items:center;justify-content:center;background:rgba(255,255,255,.92);color:${meta.accent};font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;border:1px solid ${meta.accent}22;">${meta.mark}</span>
+            ${isFloating ? '' : `<span style="font-size:14px;font-weight:600;color:${t.text};">${meta.label}</span>`}
+          </a>`
+        }).join('')}
+      </div>
+    </div>
+  </section>`
+}
+
+function renderCartWidget(b: any, t: TemplateTheme) {
+  const isFloating = (b.variant || 'floating') !== 'inline'
+  const label = b.label || 'Cart'
+  const showLabel = Boolean(b.showLabel)
+
+  return `<section style="${isFloating ? 'position:fixed;left:24px;bottom:24px;z-index:50;' : 'padding:40px 0;'}">
+    <div class="${isFloating ? '' : 'container'}">
+      <button type="button"
+        style="position:relative;display:inline-flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;border:1px solid ${t.primary}55;background:linear-gradient(135deg, ${t.primary}, ${t.secondary});color:#fff;font-weight:600;box-shadow:0 16px 32px rgba(2,6,23,0.22);">
+        <span style="font-size:18px;">🛒</span>
+        ${showLabel ? `<span>${label}</span>` : ''}
+        <span style="position:absolute;right:-8px;top:-8px;display:inline-flex;min-width:24px;min-height:24px;padding:0 6px;align-items:center;justify-content:center;border-radius:999px;background:#fff;color:#0f172a;font-size:12px;font-weight:800;">0</span>
+      </button>
+    </div>
+  </section>`
 }
 
 function renderFeatures(b: any, t: TemplateTheme) {

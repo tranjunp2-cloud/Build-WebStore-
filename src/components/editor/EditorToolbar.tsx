@@ -1,6 +1,8 @@
 'use client'
 
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
+    ChevronDown,
     Check,
     ExternalLink,
     Home,
@@ -16,12 +18,14 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import type { PageData } from '@/store/editorStore'
 
 interface EditorToolbarProps {
     siteId: string
     currentPageId: string | null
     siteName: string
     currentPageTitle: string
+    pages: PageData[]
     isPublished: boolean
     isSaving: boolean
     saveSuccess: boolean
@@ -34,6 +38,7 @@ interface EditorToolbarProps {
     compact?: boolean
     onOpenMenu: () => void
     onOpenTemplates?: () => void
+    onPageSelected: (pageId: string) => void
     onUndo: () => void
     onRedo: () => void
     onSave: () => void
@@ -46,6 +51,7 @@ export function EditorToolbar({
     currentPageId,
     siteName,
     currentPageTitle,
+    pages,
     isPublished,
     isSaving,
     saveSuccess,
@@ -58,12 +64,23 @@ export function EditorToolbar({
     compact = false,
     onOpenMenu,
     onOpenTemplates,
+    onPageSelected,
     onUndo,
     onRedo,
     onSave,
     onPublish,
     onViewportChange,
 }: EditorToolbarProps) {
+    const selectablePages = pages.filter(page => !page.deletedAt)
+
+    const getPageIcon = (page: PageData) => {
+        if (page.isHomepage || page.slug === 'home' || page.slug === '') return '🏠'
+        if (page.slug.includes('product')) return '🛍️'
+        if (page.slug.includes('about')) return '📝'
+        if (page.slug === '404') return '🚫'
+        return '📄'
+    }
+
     if (compact) {
         return (
             <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[rgba(30,41,59,0.3)] px-2.5">
@@ -144,13 +161,45 @@ export function EditorToolbar({
                     Menu
                 </button>
 
-                <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
-                >
-                    <Home className="h-3.5 w-3.5" />
-                    <span className="truncate">{currentPageTitle}</span>
-                </button>
+                <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                        <button
+                            type="button"
+                            className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-100 transition-colors hover:bg-white/5 hover:text-white"
+                        >
+                            <Home className="h-3.5 w-3.5" />
+                            <span className="truncate">{currentPageTitle}</span>
+                            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                        </button>
+                    </DropdownMenu.Trigger>
+
+                    <DropdownMenu.Portal>
+                        <DropdownMenu.Content
+                            sideOffset={8}
+                            align="start"
+                            className="z-50 min-w-[192px] rounded-xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.95)] p-1 shadow-[0_18px_40px_rgba(2,6,23,0.45)] backdrop-blur-[5px]"
+                        >
+                            {selectablePages.map(page => {
+                                const isActive = page.id === currentPageId
+                                return (
+                                    <DropdownMenu.Item
+                                        key={page.id}
+                                        onSelect={() => onPageSelected(page.id)}
+                                        className={cn(
+                                            'flex h-9 cursor-pointer items-center gap-2.5 rounded-[10px] px-4 text-sm font-medium text-[#F8FAFC] outline-none transition-colors',
+                                            isActive ? 'bg-white/5' : 'hover:bg-white/5',
+                                        )}
+                                    >
+                                        <span aria-hidden="true" className="text-sm leading-none">
+                                            {getPageIcon(page)}
+                                        </span>
+                                        <span className="truncate">{page.title}</span>
+                                    </DropdownMenu.Item>
+                                )
+                            })}
+                        </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                </DropdownMenu.Root>
 
                 <button
                     type="button"

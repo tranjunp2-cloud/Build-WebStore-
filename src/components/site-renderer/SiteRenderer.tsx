@@ -54,11 +54,10 @@ export function SiteRenderer({ site, page }: SiteRendererProps) {
 
                 return (
                     <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
-                        <BlockComponent block={block} theme={theme} />
+                        <BlockComponent block={block} theme={theme} site={site} page={page} />
                     </BlockErrorBoundary>
                 )
             })}
         </>
     )
 }
-

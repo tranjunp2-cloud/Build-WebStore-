@@ -1,7 +1,7 @@
 'use client'
 
 import type { BlockProps } from '../types'
-import type { SocialLinkItem, SocialPlatform, SocialWidgetConfig } from './config'
+import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig, type SocialLinkItem, type SocialPlatform, type SocialWidgetConfig } from './config'
 
 const PLATFORM_META: Record<SocialPlatform, { label: string; mark: string; accent: string }> = {
     facebook: { label: 'Facebook', mark: 'f', accent: '#2563eb' },
@@ -48,22 +48,19 @@ function PlatformBadge({ platform }: { platform: SocialPlatform }) {
 }
 
 export function SocialWidgetBlock({ block, theme }: BlockProps<SocialWidgetConfig>) {
-    let links = (block.links || []).filter((item: SocialLinkItem) => item.enabled !== false)
+    const normalizedBlock = normalizeSocialWidgetConfig(block)
+    let links = normalizedBlock.links.filter((item: SocialLinkItem) => item.enabled !== false)
     const isFloating = block.variant !== 'inline'
 
     if (links.length === 0) {
-        links = [
-            { platform: 'facebook', url: '', enabled: true },
-            { platform: 'whatsapp', url: '', enabled: true },
-            { platform: 'instagram', url: '', enabled: true },
-        ]
+        links = getDefaultSocialWidgetLinks().filter(item => item.enabled !== false)
     }
 
     return (
         <section className={isFloating ? 'fixed bottom-6 right-6 z-40' : 'py-10'}>
             <div className={isFloating ? 'flex flex-col items-end gap-3' : 'container mx-auto px-6'}>
-                {block.headline ? (
-                    <p className="mb-1 text-sm font-medium text-slate-400">{block.headline}</p>
+                {normalizedBlock.headline ? (
+                    <p className="mb-1 text-sm font-medium text-slate-400">{normalizedBlock.headline}</p>
                 ) : null}
                 <div className={`flex ${isFloating ? 'flex-col' : 'flex-wrap'} gap-3`}>
                     {links.map(item => {

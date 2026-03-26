@@ -23,6 +23,7 @@ export type PageData = {
     title: string
     slug: string
     status: 'published' | 'draft'
+    isHomepage?: boolean
     isVisible: boolean
     deletedAt?: string | null
     updatedAt: string

@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
+import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+
+function normalizeEditorLayout(layout: unknown) {
+    if (!Array.isArray(layout)) return []
+
+    return layout.map(block => {
+        if (block && typeof block === 'object' && (block as any).blockType === 'socialWidget') {
+            return normalizeSocialWidgetConfig(block as Record<string, unknown>)
+        }
+
+        return block
+    })
+}
 
 /**
  * GET /api/sites/[siteId]/editor-data
@@ -75,7 +88,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
             page: page ? {
                 id: page.id,
                 title: (page as any).title || 'Homepage',
-                layout: (page as any).layout || [],
+                layout: normalizeEditorLayout((page as any).layout),
             } : null,
         })
 

@@ -26,6 +26,7 @@ export const BLOCK_TYPES = [
     'cta', 'stats', 'team', 'newsletter',
     'products-grid', 'products-featured',
     'video', 'logo-cloud', 'blog-list', 'custom-html',
+    'socialWidget', 'cartWidget',
 ] as const
 
 export type BlockType = (typeof BLOCK_TYPES)[number]
