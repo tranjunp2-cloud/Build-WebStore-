@@ -143,8 +143,8 @@ export const POST = withAuth(async (_user, request) => {
             cancelUrl: `${baseUrl}/sites/${siteSlug}/checkout/cancel`,
             stripeAccountId,
             metadata: {
-                siteId,
-                tenantId,
+                siteId: String(siteId),
+                tenantId: String(tenantId),
                 orderNumber,
             },
         })

@@ -329,6 +329,222 @@
                 "failed": "SEO analysis failed",
                 "retry": "Retry"
             }
+        },
+        "orders": {
+            "title": "Orders Management",
+            "subtitle": "Auto-sync every 60s",
+            "trackOrders": "Track and process your orders",
+            "confirm": "Confirm",
+            "orders": "orders",
+            "changeTo": "Change to",
+            "search": "Search order ID, customer name...",
+            "noOrdersFound": "No orders found matching the filters",
+            "noOrdersYet": "No orders yet",
+            "noOrdersDesc": "New orders will appear here when customers complete checkout.",
+            "filters": {
+                "all": "All",
+                "pending": "Pending",
+                "confirmed": "Confirmed",
+                "readyToShip": "Ready to Ship",
+                "shipped": "Shipped",
+                "completed": "Completed",
+                "cancelled": "Cancelled",
+                "refunded": "Refunded"
+            },
+            "sort": {
+                "dateNewest": "Date: Newest first",
+                "dateOldest": "Date: Oldest first",
+                "totalHigh": "Total: High → Low",
+                "totalLow": "Total: Low → High"
+            },
+            "paymentFilter": {
+                "all": "All Pay",
+                "cod": "COD",
+                "qrBanking": "QR Banking"
+            },
+            "table": {
+                "orderId": "Order ID / Customer",
+                "items": "Items",
+                "total": "Total",
+                "status": "Status",
+                "date": "Date",
+                "item": "item",
+                "itemPlural": "items"
+            },
+            "drawer": {
+                "timeline": "Status Timeline",
+                "customer": "Customer",
+                "noPhone": "No phone provided",
+                "payment": "Payment",
+                "viewReceipt": "View Receipt",
+                "lineItems": "Line Items",
+                "subtotal": "Subtotal",
+                "shipping": "Shipping",
+                "tax": "Tax (6%)",
+                "total": "Total",
+                "orderCancelled": "Order cancelled",
+                "orderRefunded": "Order refunded",
+                "reason": "Reason"
+            },
+            "status": {
+                "pending": "Pending",
+                "confirmed": "Confirmed",
+                "readyToShip": "Ready to Ship",
+                "shipped": "Shipped",
+                "completed": "Completed",
+                "cancelled": "Cancelled",
+                "refunded": "Refunded",
+                "processing": "Processing",
+                "paid": "Paid"
+            },
+            "toast": {
+                "updated": "Order status updated",
+                "loadFailed": "Failed to load orders",
+                "bulkSuccess": "Successfully confirmed {count} orders",
+                "bulkFailed": "{count} orders failed (invalid workflow)",
+                "updateFailed": "Error: {message}"
+            }
+        },
+        "products": {
+            "title": "Products",
+            "addProduct": "Add Product",
+            "empty": {
+                "title": "No products yet",
+                "description": "Start adding new products to sell. Manage categories, pricing, and inventory easily."
+            },
+            "list": {
+                "filterAll": "All",
+                "filterOutOfStock": "Out of Stock",
+                "sortNewest": "Newest",
+                "sortNameAsc": "Name (A-Z)",
+                "sortNameDesc": "Name (Z-A)",
+                "sortPriceAsc": "Price (Low to High)",
+                "sortPriceDesc": "Price (High to Low)",
+                "sortStockAsc": "Stock (Low to High)",
+                "sortStockDesc": "Stock (High to Low)",
+                "search": "Search by name or SKU...",
+                "noResults": "No products match the current filters.",
+                "inStock": "in stock",
+                "outOfStock": "Out of stock",
+                "product": "Product",
+                "price": "Price",
+                "status": "Status",
+                "stock": "Stock"
+            },
+            "form": {
+                "editTitle": "Edit Product",
+                "newTitle": "Add New Product",
+                "basicInfo": "Basic Information",
+                "nameLabel": "Product Name *",
+                "slugLabel": "Slug",
+                "pricing": "Pricing & Inventory",
+                "shipping": "Shipping",
+                "seo": "Content & SEO",
+                "aiSeoButton": "✨ AI SEO",
+                "aiSeoGenerating": "Generating...",
+                "aiSeoToastSuccess": "SEO fields filled by AI — review before saving",
+                "aiSeoToastError": "AI SEO generation failed. Please try again.",
+                "aiSeoNameRequired": "Enter a product name first",
+                "seoTitle": "Meta Title",
+                "seoTitleHint": "{count}/70 chars",
+                "seoDescription": "Meta Description",
+                "seoDescriptionHint": "{count}/160 chars — target 150-160",
+                "seoSlug": "URL Slug",
+                "images": "Product Images",
+                "halalCert": "Halal Certification",
+                "save": "Save",
+                "saveDraft": "Save as Draft",
+                "publish": "Publish",
+                "delete": "Delete",
+                "deleteConfirmTitle": "Delete this product?",
+                "deleteConfirmText": "Are you sure you want to delete the product",
+                "deleteConfirmRestorable": "This product can be restored later.",
+                "cancel": "Cancel",
+                "confirmDeleteBtn": "Confirm Delete",
+                "toastSaved": "Product saved successfully",
+                "toastDraft": "Saved as draft. Switch to Active to display on storefront.",
+                "toastDeleted": "Product deleted.",
+                "undo": "Undo",
+                "toastRestored": "Product restored!",
+                "deleteFailed": "Delete failed",
+                "networkError": "Network error",
+                "errors": {
+                    "nameMin": "Product name must be at least 3 characters",
+                    "priceRequired": "Valid price (≥ 0) is required",
+                    "comparePriceInvalid": "Compare price must be greater than regular price",
+                    "weightInvalid": "Weight must be greater than 0",
+                    "skuRequired": "SKU is required",
+                    "categoryRequired": "Category is required",
+                    "checkErrors": "Please check the form for errors"
+                },
+                "categories": {
+                    "select": "Select categories...",
+                    "search": "Search categories...",
+                    "empty": "No categories matched.",
+                    "label": "Categories *"
+                },
+                "attributes": {
+                    "label": "Specifications & Attributes",
+                    "description": "Add dynamic key/value properties (e.g., Material: Cotton, Brand: Nike) for SEO and PDP table.",
+                    "addBtn": "+ Add Attribute",
+                    "keyPlaceholder": "e.g. Material",
+                    "valuePlaceholder": "e.g. 100% Cotton",
+                    "propertyName": "Property Name",
+                    "propertyValue": "Value",
+                    "empty": "No attributes added yet.",
+                    "errorMax": "Maximum 20 attributes allowed.",
+                    "errorEmpty": "Attribute names and values cannot be empty.",
+                    "errorDuplicate": "Duplicate attribute names are not allowed."
+                },
+                "variants": {
+                    "hasVariantsToggle": "Product has Variants",
+                    "tierConfig": "Variant Properties",
+                    "tierConfigDesc": "E.g. Size, Color, Material",
+                    "tierName": "Property Name",
+                    "tierNamePlaceholder": "E.g. Size",
+                    "options": "Options",
+                    "optionsPlaceholder": "Type and press Enter...",
+                    "addTier": "+ Add property",
+                    "matrixTitle": "Variant List",
+                    "price": "Price",
+                    "compareAtPrice": "Compare at Price",
+                    "stock": "Stock",
+                    "sku": "SKU",
+                    "errors": {
+                        "emptyMatrix": "Please create at least 1 variant or disable Variants.",
+                        "incompleteMatrix": "Please input Price and Stock for all variants."
+                    }
+                }
+            },
+            "bulkCreate": {
+                "title": "Fast AI Bulk Create",
+                "subtitle": "Paste a list of items for AI to process automatically",
+                "promptLabel": "Prompt / Item List",
+                "promptPlaceholder": "Example: 2 brown capybara keychains $15, 1 red slippers size M $5...",
+                "parseEmptyError": "Please enter a product list description",
+                "parseButton": "Analyze NLP",
+                "parsing": "Parsing...",
+                "parseSuccess": "Successfully extracted {count} products",
+                "parseInvalidData": "AI returned invalid data",
+                "parseError": "Processing error",
+                "previewTitle": "Preview Grid (AI Processed)",
+                "previewSubtitle": "Empty images will use a default carton icon when saved",
+                "colImage": "Image",
+                "colName": "Product Name",
+                "colPrice": "Price",
+                "colCategory": "Category",
+                "colVariants": "Variants",
+                "colStatus": "Status",
+                "variantsCount": "{count} variants",
+                "editorHint": "💡 Click directly on Name, Price, or Category cells to edit before saving.",
+                "footerCount": "{selected} / {total} products selected",
+                "cancel": "Cancel",
+                "saveButton": "Save {count} Products",
+                "saveEmptyError": "Please select at least 1 product to save",
+                "saveSuccess": "Created {count} draft products. Please add images before publishing.",
+                "saveFailed": "Failed to create products",
+                "saveError": "Error saving products"
+            }
         }
     },
     "auth": {
@@ -389,12 +605,33 @@
         "logout": "Logout"
     },
     "plural": {
-        "issue":   { "one": "{count} issue",    "other": "{count} issues" },
-        "order":   { "one": "{count} order",    "other": "{count} orders" },
-        "keyword": { "one": "{count} keyword",  "other": "{count} keywords" },
-        "page":    { "one": "{count} page",     "other": "{count} pages" },
-        "product": { "one": "{count} product",  "other": "{count} products" },
-        "fix":     { "one": "{count} fix applied", "other": "{count} fixes applied" },
-        "result":  { "one": "{count} result",   "other": "{count} results" }
+        "issue": {
+            "one": "{count} issue",
+            "other": "{count} issues"
+        },
+        "order": {
+            "one": "{count} order",
+            "other": "{count} orders"
+        },
+        "keyword": {
+            "one": "{count} keyword",
+            "other": "{count} keywords"
+        },
+        "page": {
+            "one": "{count} page",
+            "other": "{count} pages"
+        },
+        "product": {
+            "one": "{count} product",
+            "other": "{count} products"
+        },
+        "fix": {
+            "one": "{count} fix applied",
+            "other": "{count} fixes applied"
+        },
+        "result": {
+            "one": "{count} result",
+            "other": "{count} results"
+        }
     }
 }
