@@ -31,7 +31,7 @@ export default async function StaffPage() {
     const staffMembers = usersRes.docs.map(u => {
         const tenantInfo = u.tenants?.find((t: any) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId);
         return {
-            id: u.id,
+            id: String(u.id),
             email: u.email,
             firstName: u.firstName,
             lastName: u.lastName,
