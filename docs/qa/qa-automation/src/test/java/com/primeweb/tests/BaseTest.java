@@ -53,10 +53,14 @@ public abstract class BaseTest {
 
     /** Login with test account → save cookies/storage to auth-state.json */
     private static void loginAndSaveState() {
-        String email = System.getenv("TEST_EMAIL") != null
-            ? System.getenv("TEST_EMAIL") : "phuong.ltweb@gmail.com";
-        String password = System.getenv("TEST_PASSWORD") != null
-            ? System.getenv("TEST_PASSWORD") : "Aa123456@";
+        String email = System.getenv("TEST_EMAIL");
+        String password = System.getenv("TEST_PASSWORD");
+        if (email == null || email.isEmpty() || password == null || password.isEmpty()) {
+            throw new RuntimeException(
+                "❌ TEST_EMAIL and TEST_PASSWORD env vars are required. "
+                + "Set them in .env file or CI secrets."
+            );
+        }
 
         BrowserContext authCtx = browser.newContext();
         Page authPage = authCtx.newPage();

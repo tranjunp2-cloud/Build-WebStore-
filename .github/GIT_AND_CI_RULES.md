@@ -578,7 +578,60 @@ Issue tự chuyển **QA Testing**. QC test trên staging → pass thì close is
 
 ---
 
-## §6 Monitoring & Logs
+## §6 Testing Pipeline
+
+### CI/CD Flow — từ PR tới QC
+
+```
+PR created
+  → CI: Lint → Typecheck → Unit Test → Build
+  → Reviewer approve → Merge staging
+  → Deploy staging (DO App Platform)
+  → Smoke Test (30s): health check + page loads
+  → E2E Tests (3-5 min): Java Playwright tự động
+  → QC Manual UAT: UX/visual check
+  → Pass → Done / Fail → Re-Open
+```
+
+### Board Status (7 cột)
+
+| Status | Ai làm | Trigger |
+|--------|--------|---------|
+| 📋 Backlog | PM | Issue tạo mới |
+| 🔍 Review | UIUX + BA | PM chuyển |
+| 🔨 In Progress | Dev | Dev assign |
+| 👀 Code Review | Reviewer | Dev tạo PR |
+| 🧪 QA Testing | QC | PR merged (bot tự chuyển) |
+| 🔄 Re-Open | Dev | QC gắn `qa:failed` (bot tự chuyển) |
+| ✅ Done | — | QC close issue |
+
+### QA Flow chi tiết
+
+```
+PR merged → Bot gắn qa:pending + chuyển "QA Testing"
+  → Lark notify QC: "🧪 Issue #N chờ test"
+
+QC test trên staging:
+  ├── ✅ Pass → QC gắn qa:passed → close issue → Done
+  └── ❌ Fail → QC gắn qa:failed
+       → Bot chuyển "Re-Open" + tạo bug template
+       → Lark notify Dev: "🔴 QA Failed — @dev fix"
+       → Dev fix → PR mới → merge → lại "QA Testing" (loop)
+```
+
+### Lark Notifications
+
+| Event | Ai nhận | Nội dung |
+|-------|---------|----------|
+| PR merged | QC | 🧪 QA Ready — Issue #N chờ test |
+| qa:failed | Dev | 🔴 QA Failed — @dev fix #N |
+| Smoke fail | Team | 🔴 Staging down after deploy |
+| E2E pass | QC | ✅ E2E passed — bắt đầu UAT |
+| E2E fail | Dev | ❌ E2E failed — xem report |
+
+---
+
+## §7 Monitoring & Logs
 
 ### Betterstack — Logs realtime cho staging
 
