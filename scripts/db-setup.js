@@ -236,6 +236,54 @@ const MIGRATIONS = [
     name: 'blogs.slug_idx',
     sql: `CREATE INDEX IF NOT EXISTS blogs_slug_idx ON blogs (slug);`,
   },
+  // ── Users: Tenant memberships (Payload array type → separate tables) ──
+  {
+    name: 'users_tenants.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_tenants (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL,
+      _parent_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      tenant_id integer REFERENCES tenants(id) ON DELETE SET NULL,
+      role varchar DEFAULT 'viewer'
+    );`,
+  },
+  {
+    name: 'users_tenants.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_tenants_parent_idx ON users_tenants (_parent_id);`,
+  },
+  {
+    name: 'users_tenants.order_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_tenants_order_idx ON users_tenants (_order);`,
+  },
+  // ── Users: Tenant permissions (Payload internal auth table) ──
+  {
+    name: 'users_tenants_permissions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_tenants_permissions (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL,
+      _parent_id integer NOT NULL REFERENCES users_tenants(id) ON DELETE CASCADE,
+      value varchar
+    );`,
+  },
+  {
+    name: 'users_tenants_permissions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_tenants_permissions_parent_idx ON users_tenants_permissions (_parent_id);`,
+  },
+  // ── Users: Sessions (Payload auth sessions table) ──
+  {
+    name: 'users_sessions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_sessions (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL,
+      _parent_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at timestamptz DEFAULT now(),
+      expires_at timestamptz
+    );`,
+  },
+  {
+    name: 'users_sessions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_sessions_parent_idx ON users_sessions (_parent_id);`,
+  },
   // ── Users: Language preference ──
   {
     name: 'users.prefer_lang',
