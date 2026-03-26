@@ -340,7 +340,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                     <div>
                         <h4 className="text-[16px] font-semibold text-slate-50 mt-[2px]">Payment Method Setup</h4>
                         <p className="mt-1 text-[14px] text-slate-50/60 leading-relaxed w-full">
-                            Customers will only see enabled payment methods during checkout. For Stripe integration, you'll need to connect your account in the advanced settings.
+                            Customers will only see enabled payment methods during checkout. For Stripe integration, you&apos;ll need to connect your account in the advanced settings.
                         </p>
                     </div>
                 </div>
