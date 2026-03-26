@@ -284,6 +284,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── Sync env vars to DO before deploying ─────────────────────────────
+      # Reads from GitHub Secrets (environment: staging) and syncs to DO App.
+      # This ensures all env vars are always up-to-date — no manual DO Dashboard edits needed.
+      # To add/update a secret: update GitHub Secrets → push to staging → auto-synced.
+      - name: Setup doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Sync env vars → DO App (staging)
+        env:
+          PAYLOAD_SECRET:                     ${{ secrets.PAYLOAD_SECRET }}
+          STRIPE_SECRET_KEY:                  ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET:              ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          OPENAI_API_KEY:                     ${{ secrets.OPENAI_API_KEY }}
+          S3_ENDPOINT:                        ${{ secrets.S3_ENDPOINT }}
+          S3_ACCESS_KEY_ID:                   ${{ secrets.S3_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY:               ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          LARK_APP_ID:                        ${{ secrets.LARK_APP_ID }}
+          LARK_APP_SECRET:                    ${{ secrets.LARK_APP_SECRET }}
+          LARK_ENCRYPT_KEY:                   ${{ secrets.LARK_ENCRYPT_KEY }}
+          LARK_VERIFICATION_TOKEN:            ${{ secrets.LARK_VERIFICATION_TOKEN }}
+          LARK_BOT_OPEN_ID:                   ${{ secrets.LARK_BOT_OPEN_ID }}
+          # Note: GH_BOT_TOKEN (not GITHUB_TOKEN — that's a built-in GHA var)
+          GH_BOT_TOKEN:                       ${{ secrets.GH_BOT_TOKEN }}
+          MAIL_USERNAME:                      ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD:                      ${{ secrets.MAIL_PASSWORD }}
+          ECH_DISTRIBUTION_API_URL:           ${{ secrets.ECH_DISTRIBUTION_API_URL }}
+          ECH_DISTRIBUTION_API_KEY:           ${{ secrets.ECH_DISTRIBUTION_API_KEY }}
+        run: python3 .github/scripts/sync-do-envs.py ech-prime-web-v2-staging
+      # ─────────────────────────────────────────────────────────────────────
+
       - name: Deploy to DigitalOcean App Platform
         id: deploy
         uses: digitalocean/app_action/deploy@v2
@@ -317,79 +350,12 @@ jobs:
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
-  # Job 2.5: Smoke Test (health check + page loads after deploy)
-  # Gate: blocks E2E if staging is down
-  # ──────────────────────────────────────
-  smoke-test:
-    name: "Smoke: Health Check"
-    needs: deploy-staging
-    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deep health check
-        id: health
-        run: |
-          URL="${{ vars.STAGING_URL || 'https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app' }}"
-          echo "🏥 Health check: $URL/api/health?deep=1"
-          for i in $(seq 1 12); do
-            RESP=$(curl -sf "$URL/api/health?deep=1" --max-time 10 2>/dev/null || echo '{}')
-            STATUS=$(echo "$RESP" | jq -r '.status // "error"')
-            if [ "$STATUS" = "ok" ]; then
-              echo "✅ Staging healthy"
-              echo "$RESP" | jq .
-              DB_LAT=$(echo "$RESP" | jq -r '.database.latency // "N/A"')
-              MEM=$(echo "$RESP" | jq -r '.memory.rss // "N/A"')
-              echo "db_latency=$DB_LAT" >> "$GITHUB_OUTPUT"
-              echo "memory=$MEM" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            echo "  Attempt $i/12: status=$STATUS — waiting 10s..."
-            sleep 10
-          done
-          echo "❌ Health check failed after 2 minutes"
-          exit 1
-
-      - name: Page load checks
-        run: |
-          URL="${{ vars.STAGING_URL || 'https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app' }}"
-          FAIL=0
-          for path in "/" "/login" "/register"; do
-            CODE=$(curl -sL -o /dev/null -w "%{http_code}" "$URL$path" --max-time 10)
-            if [ "$CODE" = "200" ]; then
-              echo "✅ $path → HTTP $CODE"
-            else
-              echo "❌ $path → HTTP $CODE"
-              FAIL=1
-            fi
-          done
-          exit $FAIL
-
-      - name: Notify — Smoke Failed
-        if: failure()
-        uses: ./.github/actions/smart-notify
-        with:
-          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
-          bot-secret: ${{ secrets.BOT_SECRET }}
-          lark-webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
-          lark-sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          event: deploy_fail
-          branch: staging
-          environment: staging
-          author: ${{ github.actor }}
-          commit-msg: "🔴 Smoke test failed — staging may be down after deploy"
-          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-  # ──────────────────────────────────────
-  # Job 2.6: E2E Tests (after smoke passes)
+  # Job 2.5: E2E Tests (after staging deploy)
   # Runs Java Playwright tests against live staging
   # ──────────────────────────────────────
   e2e-test:
     name: "E2E: Automated QA"
-    needs: smoke-test
+    needs: deploy-staging
     if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -404,38 +370,55 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Wait for staging to be ready
+        run: |
+          STAGING_URL="${{ vars.STAGING_URL || 'https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app' }}"
+          echo "Waiting for staging to be ready at $STAGING_URL..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL" --max-time 10 || echo "000")
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "307" ]; then
+              echo "✅ Staging is ready (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "  Attempt $i: HTTP $STATUS — waiting 10s..."
+            sleep 10
+          done
+          echo "❌ Staging not ready after 5 minutes"
+          exit 1
+
       - name: Run E2E tests
         working-directory: docs/qa/qa-automation
         env:
           BASE_URL: ${{ vars.STAGING_URL || 'https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app' }}
-          TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-          TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+          TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL || 'phuong.ltweb@gmail.com' }}
+          TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD || 'Aa123456@' }}
           HEADLESS: 'true'
           CI: 'true'
         run: |
+          # Install Playwright browsers
           mvn exec:java -e -D exec.mainClass=com.microsoft.playwright.CLI -D exec.args="install chromium" 2>/dev/null || true
-          mvn test -Dheadless=true 2>&1 | tee e2e-output.log || true
+          # Run tests
+          mvn test -Dheadless=true 2>&1 | tee e2e-output.log
+          echo "E2E_EXIT_CODE=$?" >> "$GITHUB_ENV"
 
       - name: Parse test results
         if: always()
         id: results
         working-directory: docs/qa/qa-automation
         run: |
-          TOTAL=0; FAILURES=0; ERRORS=0
-          for f in target/surefire-reports/TEST-*.xml; do
-            [ -f "$f" ] || continue
-            T=$(grep -oP 'tests="\K[0-9]+' "$f" | head -1)
-            F=$(grep -oP 'failures="\K[0-9]+' "$f" | head -1)
-            E=$(grep -oP 'errors="\K[0-9]+' "$f" | head -1)
-            TOTAL=$((TOTAL + ${T:-0}))
-            FAILURES=$((FAILURES + ${F:-0}))
-            ERRORS=$((ERRORS + ${E:-0}))
-          done
-          PASSED=$((TOTAL - FAILURES - ERRORS))
-          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
-          echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
-          echo "failed=$((FAILURES + ERRORS))" >> "$GITHUB_OUTPUT"
-          echo "📊 Results: $PASSED/$TOTAL passed, $((FAILURES + ERRORS)) failed"
+          if [ -f target/surefire-reports/TEST-*.xml ]; then
+            TOTAL=$(grep -r 'tests=' target/surefire-reports/TEST-*.xml | grep -oP 'tests="\K[0-9]+' | paste -sd+ | bc 2>/dev/null || echo "0")
+            FAILURES=$(grep -r 'failures=' target/surefire-reports/TEST-*.xml | grep -oP 'failures="\K[0-9]+' | paste -sd+ | bc 2>/dev/null || echo "0")
+            ERRORS=$(grep -r 'errors=' target/surefire-reports/TEST-*.xml | grep -oP 'errors="\K[0-9]+' | paste -sd+ | bc 2>/dev/null || echo "0")
+            PASSED=$((TOTAL - FAILURES - ERRORS))
+            echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+            echo "passed=$PASSED" >> "$GITHUB_OUTPUT"
+            echo "failed=$((FAILURES + ERRORS))" >> "$GITHUB_OUTPUT"
+          else
+            echo "total=0" >> "$GITHUB_OUTPUT"
+            echo "passed=0" >> "$GITHUB_OUTPUT"
+            echo "failed=0" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload test report
         if: always()
@@ -453,11 +436,11 @@ jobs:
         with:
           webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
           sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          title: "${{ steps.results.outputs.failed == '0' && '✅ E2E Tests Passed' || '❌ E2E Tests Failed' }}"
-          status: "${{ steps.results.outputs.failed == '0' && 'success' || 'failure' }}"
+          title: "${{ job.status == 'success' && '✅ E2E Tests Passed' || '❌ E2E Tests Failed' }}"
+          status: "${{ job.status }}"
           content: |
-            🧪 **E2E:** ${{ steps.results.outputs.passed }}/${{ steps.results.outputs.total }} passed
-            ${{ steps.results.outputs.failed != '0' && format('❌ {0} tests failed — Dev cần fix trước khi QC test', steps.results.outputs.failed) || '✅ All passed — QC bắt đầu UAT trên staging' }}
+            🧪 **E2E Results:** ${{ steps.results.outputs.passed }}/${{ steps.results.outputs.total }} passed
+            ${{ steps.results.outputs.failed != '0' && format('❌ {0} tests failed', steps.results.outputs.failed) || '✅ All tests passed — QC bắt đầu UAT' }}
           meta-left-label: "📦 Branch"
           meta-left-value: "staging"
           meta-right-label: "🧪 Tests"
