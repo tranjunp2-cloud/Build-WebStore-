@@ -156,22 +156,24 @@ Closes #123         ← SAI: issue tự close khi merge, skip QA
 
 #### 4.4 Issue Lifecycle — Quy trình chi tiết từ tạo đến Done
 
-> **6 trạng thái trên Board.** Bot tự chuyển status theo automation. Team chỉ cần thao tác đúng role.
+> **7 trạng thái trên Board.** Bot tự chuyển status theo automation. Team chỉ cần thao tác đúng role.
 
 **Tổng quan flow:**
 
 ```
 📋 Backlog → 🔍 Review → 🔨 In Progress → 👀 Code Review → 🧪 QA Testing → ✅ Done
-      ↑          │                ↑                                │
-      │          │                │                                │
-      └── rejected               └──────── qa:failed ─────────────┘
+      ↑                                          ↑                │
+      │                                          │                │
+      └── rejected               🔄 Re-Open ←── qa:failed ───────┘
+                                 (dev fix → PR → merge → QA Testing lại)
 ```
 
 | Status | Ai | Trigger | Hành động |
 |--------|-----|---------|-----------|
 | **📋 Backlog** | PM | Issue mới tạo (auto) | PM viết story → Bot tạo issue → PM assign UIUX+BA |
 | **🔍 Review** | UIUX + BA | PM assign (thủ công) | UIUX design, BA verify AC. Approve → `status:ready` |
-| **🔨 In Progress** | Dev | Label `status:ready` / QA fail trả về (auto) | Dev tạo branch, code theo AC + design |
+| **🔨 In Progress** | Dev | Label `status:ready` (auto) | Dev tạo branch, code theo AC + design |
+| **🔄 Re-Open** | Dev | QA fail → `qa:failed` label (auto) | Dev fix bug, tạo PR mới |
 | **👀 Code Review** | Reviewer | PR opened + linked issue (auto) | Review code → approve hoặc request changes |
 | **🧪 QA Testing** | QC | PR merged to staging (auto) | QC test trên staging theo AC |
 | **✅ Done** | QC | QC close issue (thủ công) | Milestone % tăng |
@@ -231,7 +233,7 @@ QC mở Issue #98 → đọc AC → test trên staging
   │
   └── ❌ Fail → QC gắn label `qa:failed` + comment mô tả bug
         ↓
-      Bot tự: tạo bug report template + chuyển board "In Progress" + assign dev
+      Bot tự: tạo bug report template + chuyển board "Re-Open" + assign dev
         ↓
       🔔 Lark thông báo Dev: "🔴 QA Failed — #98 — @dev fix"
         ↓
@@ -330,7 +332,7 @@ PM chỉnh spec → assign lại UIUX+BA → review lại
 | PR approved + CI pass | Gắn `approved` + `ready-to-merge` | pr-lifecycle.yml |
 | PR merged | Status → QA Testing, label `qa:pending`, **Lark → QC** | pr-lifecycle.yml |
 | PR merged → staging | Auto-deploy staging | ci.yml |
-| Label `qa:failed` | Status → In Progress, assign dev, bug template, **Lark → Dev** | issue-lifecycle.yml |
+| Label `qa:failed` | Status → **Re-Open**, assign dev, bug template, **Lark → Dev** | issue-lifecycle.yml |
 | Issue closed | Status → Done | issue-lifecycle.yml |
 
 ---
