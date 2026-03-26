@@ -1,0 +1,115 @@
+# Staging Health Check — manual trigger or post-deploy
+# Dev team can trigger via GitHub Actions tab or Lark bot
+name: Staging Health
+
+on:
+  workflow_dispatch:
+    inputs:
+      notify:
+        description: 'Send result to Lark?'
+        type: boolean
+        default: true
+
+jobs:
+  health-check:
+    name: 'Check Staging Health'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for lark-notify action)
+        uses: actions/checkout@v4
+
+      - name: Check staging health
+        id: health
+        run: |
+          STAGING_URL="${{ vars.STAGING_URL || 'https://ech-prime-web-v2-staging-fgwck.ondigitalocean.app' }}"
+
+          echo "Checking: $STAGING_URL/api/health?deep=1"
+
+          # Basic health
+          HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$STAGING_URL/api/health" || echo "000")
+          echo "basic_status=$HTTP_CODE" >> "$GITHUB_OUTPUT"
+
+          # Deep health
+          DEEP=$(curl -s --max-time 30 "$STAGING_URL/api/health?deep=1" || echo '{"status":"unreachable","error":"Connection failed"}')
+          echo "deep_result<<HEREDOC" >> "$GITHUB_OUTPUT"
+          echo "$DEEP" >> "$GITHUB_OUTPUT"
+          echo "HEREDOC" >> "$GITHUB_OUTPUT"
+
+          # Parse key fields
+          STATUS=$(echo "$DEEP" | jq -r '.status // "unknown"')
+          DB_STATUS=$(echo "$DEEP" | jq -r '.db.status // "unknown"')
+          DB_LATENCY=$(echo "$DEEP" | jq -r '.db.latency // "N/A"')
+          DB_ERROR=$(echo "$DEEP" | jq -r '.db.error // ""')
+          UPTIME=$(echo "$DEEP" | jq -r '.uptime // "0"')
+          MEMORY=$(echo "$DEEP" | jq -r '.memory.rss // "0"')
+          NODE=$(echo "$DEEP" | jq -r '.node // "unknown"')
+          ENV_CHECK=$(echo "$DEEP" | jq -r '.envCheck // {} | to_entries | map(select(.value != "✅")) | map(.key) | join(", ")' 2>/dev/null)
+
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "db_status=$DB_STATUS" >> "$GITHUB_OUTPUT"
+          echo "db_latency=${DB_LATENCY}ms" >> "$GITHUB_OUTPUT"
+          echo "db_error=$DB_ERROR" >> "$GITHUB_OUTPUT"
+          echo "uptime=$UPTIME" >> "$GITHUB_OUTPUT"
+          echo "memory=${MEMORY}MB" >> "$GITHUB_OUTPUT"
+          echo "node=$NODE" >> "$GITHUB_OUTPUT"
+          echo "missing_envs=${ENV_CHECK:-none}" >> "$GITHUB_OUTPUT"
+
+          # Summary
+          if [ "$STATUS" = "ok" ]; then
+            echo "emoji=✅" >> "$GITHUB_OUTPUT"
+            echo "template=green" >> "$GITHUB_OUTPUT"
+            echo "summary=Staging healthy — DB ${DB_LATENCY}ms, uptime ${UPTIME}s" >> "$GITHUB_OUTPUT"
+          elif [ "$STATUS" = "degraded" ]; then
+            echo "emoji=⚠️" >> "$GITHUB_OUTPUT"
+            echo "template=yellow" >> "$GITHUB_OUTPUT"
+            echo "summary=Staging degraded — DB: ${DB_ERROR}" >> "$GITHUB_OUTPUT"
+          else
+            echo "emoji=🔴" >> "$GITHUB_OUTPUT"
+            echo "template=red" >> "$GITHUB_OUTPUT"
+            echo "summary=Staging DOWN — cannot reach health endpoint" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post result to GitHub Summary
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## ${{ steps.health.outputs.emoji }} Staging Health Check
+
+          | Metric | Value |
+          |--------|-------|
+          | **Status** | ${{ steps.health.outputs.status }} |
+          | **HTTP** | ${{ steps.health.outputs.basic_status }} |
+          | **DB** | ${{ steps.health.outputs.db_status }} (${{ steps.health.outputs.db_latency }}) |
+          | **Uptime** | ${{ steps.health.outputs.uptime }}s |
+          | **Memory** | ${{ steps.health.outputs.memory }} |
+          | **Node** | ${{ steps.health.outputs.node }} |
+          | **Missing Envs** | ${{ steps.health.outputs.missing_envs }} |
+
+          <details><summary>Raw JSON</summary>
+
+          ```json
+          ${{ steps.health.outputs.deep_result }}
+          ```
+          </details>
+          EOF
+
+      - name: Notify Lark
+        if: inputs.notify
+        uses: ./.github/actions/lark-notify
+        with:
+          webhook-url: ${{ secrets.LARK_WEBHOOK_URL }}
+          sign-key: ${{ secrets.LARK_SIGN_KEY || '' }}
+          title: "${{ steps.health.outputs.emoji }} Staging Health"
+          template: ${{ steps.health.outputs.template }}
+          meta-left-label: "🔌 Status"
+          meta-left-value: "${{ steps.health.outputs.status }}"
+          meta-right-label: "🗄️ Database"
+          meta-right-value: "${{ steps.health.outputs.db_status }} (${{ steps.health.outputs.db_latency }})"
+          meta2-left-label: "⏱️ Uptime"
+          meta2-left-value: "${{ steps.health.outputs.uptime }}s"
+          meta2-right-label: "💾 Memory"
+          meta2-right-value: "${{ steps.health.outputs.memory }}"
+          content: |
+            ${{ steps.health.outputs.summary }}
+            ${{ steps.health.outputs.db_error != '' && format('🔴 DB Error: {0}', steps.health.outputs.db_error) || '' }}
+            ${{ steps.health.outputs.missing_envs != 'none' && format('⚠️ Missing: {0}', steps.health.outputs.missing_envs) || '' }}
+          buttons: '[{"text":"📊 View Details","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"primary"},{"text":"🔗 Open Staging","url":"${{ vars.STAGING_URL || ''https://ech-prime-web-v2-staging-fgwck.ondigitalocean.app'' }}","type":"default"}]'

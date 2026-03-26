@@ -1,0 +1,242 @@
+# Smart Notify — Bot AI first, Lark webhook fallback
+# Bot generates friendly Vietnamese messages via AI.
+# If Bot is down/timeout, falls back to direct Lark webhook (template).
+name: 'Smart Notify'
+description: 'Send notification via Bot (AI) with Lark webhook fallback'
+
+inputs:
+  # Bot config
+  bot-url:
+    description: 'Bot API base URL'
+    required: false
+    default: ''
+  bot-secret:
+    description: 'Bot auth secret (CRON_SECRET)'
+    required: false
+    default: ''
+
+  # Lark fallback config
+  lark-webhook-url:
+    description: 'Lark webhook URL (fallback)'
+    required: false
+    default: ''
+  lark-sign-key:
+    description: 'Lark webhook sign key (fallback)'
+    required: false
+    default: ''
+
+  # Event data
+  event:
+    description: 'Event type: ci_pass, ci_fail, deploy_success, deploy_fail'
+    required: true
+  project:
+    description: 'Project name'
+    required: false
+    default: 'PrimeWeb'
+  branch:
+    description: 'Branch name'
+    required: true
+  environment:
+    description: 'Deploy environment: staging or production'
+    required: false
+    default: 'staging'
+  author:
+    description: 'GitHub actor who triggered'
+    required: true
+  commit-sha:
+    description: 'Short commit SHA'
+    required: false
+    default: ''
+  commit-msg:
+    description: 'Commit message'
+    required: false
+    default: ''
+  pr-number:
+    description: 'PR number if applicable'
+    required: false
+    default: ''
+  pr-title:
+    description: 'PR title'
+    required: false
+    default: ''
+  pr-url:
+    description: 'PR URL'
+    required: false
+    default: ''
+
+  # CI status details
+  ci-status:
+    description: 'CI status line (e.g. Lint ✅ TypeCheck ✅ Test ✅ Build ✅)'
+    required: false
+    default: ''
+  failed-step:
+    description: 'Which CI step failed (if any)'
+    required: false
+    default: ''
+
+  # Links
+  run-url:
+    description: 'GitHub Actions run URL'
+    required: false
+    default: ''
+  staging-url:
+    description: 'Staging site URL'
+    required: false
+    default: 'https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Try Bot notification (AI-powered)
+      id: bot
+      shell: bash
+      run: |
+        BOT_URL="${{ inputs.bot-url }}"
+        if [ -z "$BOT_URL" ]; then
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          echo "::notice::No BOT_URL configured — using Lark fallback"
+          exit 0
+        fi
+
+        echo "🤖 Sending to Bot..."
+        HTTP_CODE=$(curl -s -o /tmp/bot-response.json -w "%{http_code}" \
+          --max-time 8 \
+          -X POST "$BOT_URL/api/ci/notify" \
+          -H "Authorization: Bearer ${{ inputs.bot-secret }}" \
+          -H "Content-Type: application/json" \
+          -d "$(cat <<'PAYLOAD'
+        {
+          "event": "${{ inputs.event }}",
+          "project": "${{ inputs.project }}",
+          "branch": "${{ inputs.branch }}",
+          "environment": "${{ inputs.environment }}",
+          "author": "${{ inputs.author }}",
+          "commit": {
+            "sha": "${{ inputs.commit-sha }}",
+            "message": "${{ inputs.commit-msg }}"
+          },
+          "pr": {
+            "number": "${{ inputs.pr-number }}",
+            "title": "${{ inputs.pr-title }}",
+            "url": "${{ inputs.pr-url }}"
+          },
+          "ci": {
+            "statusLine": "${{ inputs.ci-status }}",
+            "failedStep": "${{ inputs.failed-step }}"
+          },
+          "urls": {
+            "run": "${{ inputs.run-url }}",
+            "staging": "${{ inputs.staging-url }}"
+          }
+        }
+        PAYLOAD
+        )" 2>/dev/null || HTTP_CODE="000")
+
+        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "✅ Bot notification sent"
+        else
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          echo "::warning::Bot returned $HTTP_CODE — falling back to Lark webhook"
+          cat /tmp/bot-response.json 2>/dev/null || true
+        fi
+
+    - name: Fallback — Lark webhook (template)
+      if: steps.bot.outputs.skip == 'true'
+      shell: bash
+      run: |
+        WEBHOOK_URL="${{ inputs.lark-webhook-url }}"
+        if [ -z "$WEBHOOK_URL" ]; then
+          echo "::warning::No Lark webhook URL configured — notification skipped"
+          exit 0
+        fi
+
+        # Build fallback message based on event type
+        EVENT="${{ inputs.event }}"
+        AUTHOR="${{ inputs.author }}"
+        BRANCH="${{ inputs.branch }}"
+        COMMIT_MSG="${{ inputs.commit-msg }}"
+        RUN_URL="${{ inputs.run-url }}"
+
+        SHORT_SHA="${{ inputs.commit-sha }}"
+        SHORT_SHA="${SHORT_SHA:0:7}"
+        COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ inputs.commit-sha }}"
+        ACTIONS_URL="$RUN_URL"
+
+        case "$EVENT" in
+          deploy_success)
+            TITLE="🚀 Deploy Success — ${BRANCH}"
+            COLOR="green"
+            BODY="**Branch:** ${BRANCH}\n**Commit:** ${COMMIT_MSG}\n**Author:** ${AUTHOR}\n**Environment:** staging"
+            BTN_TEXT="🌐 Mở App"
+            BTN_URL="${{ inputs.staging-url }}"
+            ;;
+          deploy_fail)
+            TITLE="💥 Deploy Failed — ${BRANCH}"
+            COLOR="red"
+            BODY="**Branch:** ${BRANCH}\n**Commit:** ${COMMIT_MSG}\n**Author:** ${AUTHOR}\n**Environment:** staging"
+            BTN_TEXT="📋 Xem Logs"
+            BTN_URL="$RUN_URL"
+            ;;
+          ci_fail)
+            TITLE="❌ CI Failed — ${BRANCH}"
+            COLOR="red"
+            BODY="**Branch:** ${BRANCH}\n**Failed:** ${{ inputs.failed-step }}\n**Commit:** ${COMMIT_MSG}\n**Author:** ${AUTHOR}\n${{ inputs.ci-status }}"
+            BTN_TEXT="📋 Xem Logs"
+            BTN_URL="$RUN_URL"
+            ;;
+          ci_pass)
+            TITLE="✅ CI Passed — ${BRANCH}"
+            COLOR="green"
+            BODY="**Branch:** ${BRANCH}\n**Commit:** ${COMMIT_MSG}\n**Author:** ${AUTHOR}\n${{ inputs.ci-status }}"
+            BTN_TEXT="✅ Xem Commit"
+            BTN_URL="$COMMIT_URL"
+            ;;
+          *)
+            TITLE="📢 ${EVENT} — ${BRANCH}"
+            COLOR="blue"
+            BODY="**Commit:** ${COMMIT_MSG}\n**Author:** ${AUTHOR}"
+            BTN_TEXT="View"
+            BTN_URL="$RUN_URL"
+            ;;
+        esac
+
+        # Generate sign if key provided
+        SIGN_KEY="${{ inputs.lark-sign-key }}"
+        SIGN_PART=""
+        if [ -n "$SIGN_KEY" ]; then
+          TIMESTAMP=$(date +%s)
+          STRING_TO_SIGN="${TIMESTAMP}\n${SIGN_KEY}"
+          SIGN=$(echo -ne "$STRING_TO_SIGN" | openssl dgst -sha256 -hmac "$SIGN_KEY" -binary | base64)
+          SIGN_PART="\"timestamp\": \"$TIMESTAMP\", \"sign\": \"$SIGN\","
+        fi
+
+        PAYLOAD=$(cat <<ENDJSON
+        {
+          $SIGN_PART
+          "msg_type": "interactive",
+          "card": {
+            "header": {
+              "title": {"content": "$TITLE", "tag": "plain_text"},
+              "template": "$COLOR"
+            },
+            "elements": [
+              {"tag": "div", "text": {"content": "$BODY", "tag": "lark_md"}},
+              {"tag": "hr"},
+              {"tag": "action", "actions": [
+                {"tag": "button", "text": {"content": "$BTN_TEXT", "tag": "plain_text"}, "url": "$BTN_URL", "type": "primary"},
+                {"tag": "button", "text": {"content": "📝 Xem Code", "tag": "plain_text"}, "url": "$COMMIT_URL", "type": "default"},
+                {"tag": "button", "text": {"content": "📋 CI Logs", "tag": "plain_text"}, "url": "$ACTIONS_URL", "type": "default"}
+              ]},
+              {"tag": "note", "elements": [{"tag": "plain_text", "content": "🚀 PrimeWeb · $BRANCH · $AUTHOR · $SHORT_SHA"}]}
+            ]
+          }
+        }
+        ENDJSON
+        )
+
+        RESP=$(curl -s --max-time 10 -X POST "$WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d "$PAYLOAD")
+
+        echo "📢 Lark fallback sent: $TITLE"
