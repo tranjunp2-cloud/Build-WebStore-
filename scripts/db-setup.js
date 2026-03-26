@@ -94,6 +94,23 @@ const MIGRATIONS = [
     name: 'tenants.ech_integration_merchant_id',
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS ech_integration_merchant_id varchar;`,
   },
+  // ── Tenants: Settings group ──
+  {
+    name: 'tenants.settings_allowed_websites',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_allowed_websites numeric DEFAULT 1;`,
+  },
+  {
+    name: 'tenants.settings_storage_used',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_storage_used numeric DEFAULT 0;`,
+  },
+  {
+    name: 'tenants.settings_storage_limit_bytes',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_storage_limit_bytes numeric DEFAULT 524288000;`,
+  },
+  {
+    name: 'tenants.settings_dashboard_preferences',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS settings_dashboard_preferences jsonb;`,
+  },
   // ── Sites: Locale + Shipping ──
   {
     name: 'sites.locale',
@@ -140,6 +157,31 @@ const MIGRATIONS = [
   {
     name: 'orders.stripe_payment_intent_id_idx',
     sql: `CREATE INDEX IF NOT EXISTS orders_stripe_payment_intent_id_idx ON orders (stripe_payment_intent_id);`,
+  },
+  // ── Orders: F10 fields ──
+  {
+    name: 'orders.shipping_fee',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_fee numeric;`,
+  },
+  {
+    name: 'orders.payment_method',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method varchar;`,
+  },
+  {
+    name: 'orders.payment_proof_image_id',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_proof_image_id integer;`,
+  },
+  {
+    name: 'orders.payment_reference',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_reference varchar;`,
+  },
+  {
+    name: 'orders.tracking_number',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_number varchar;`,
+  },
+  {
+    name: 'orders.cancel_reason',
+    sql: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancel_reason varchar;`,
   },
   // ── Blog Categories table ──
   {
@@ -265,7 +307,7 @@ async function checkDB() {
     };
   } catch (e) {
     console.error('[db-setup] DB check failed:', e.message);
-    await pool.end().catch(() => {});
+    await pool.end().catch(() => { });
     return { needsPush: false, tableCount: -1 };
   }
 }
@@ -299,7 +341,7 @@ async function waitForTables(maxWaitSec = 120) {
   }
 
   console.error(`[db-setup] ⏰ Schema push timed out after ${maxWaitSec}s`);
-  await pool.end().catch(() => {});
+  await pool.end().catch(() => { });
   return false;
 }
 
@@ -357,7 +399,7 @@ async function waitForSchemaSync(maxWaitSec = 30) {
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`[db-setup] ⚠️ Schema sync timeout after ${elapsed}s — proceeding anyway`);
-  await pool.end().catch(() => {});
+  await pool.end().catch(() => { });
   return true; // Proceed even on timeout — might be fine
 }
 
@@ -458,6 +500,29 @@ async function main() {
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS current_rank
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS previous_rank
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS last_checked_at
+
+  -- F08 Array/Nested Bypass
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS description_b_m
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS has_variants
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_configs
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS name
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS options
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS value
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS variants
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS sku
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS price
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS compare_at_price
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS stock
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS length
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS width
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS height
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS attributes
+  ALTER TABLE products ADD COLUMN IF NOT EXISTS key
+
+  -- F10 Array/Nested Bypass
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS variant
+  ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_proof_image
 */
 
 main().catch((e) => {

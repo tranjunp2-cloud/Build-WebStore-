@@ -1,5 +1,24 @@
 import type { CollectionConfig } from 'payload'
 
+/**
+ * Valid status transitions for manual orders (COD/QR Banking).
+ * Exported for reuse in API route validation.
+ */
+export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
+    pending: ['confirmed', 'cancelled'],
+    confirmed: ['ready_to_ship', 'cancelled'],
+    ready_to_ship: ['shipped'],
+    shipped: ['completed', 'refunded'],
+    completed: ['refunded'],
+    // Terminal states — no further transitions
+    cancelled: [],
+    refunded: [],
+    // Stripe-specific statuses (kept for backward compat)
+    paid: ['processing', 'cancelled'],
+    payment_failed: [],
+    processing: ['shipped', 'cancelled'],
+}
+
 export const Orders: CollectionConfig = {
     slug: 'orders',
     admin: {
@@ -66,6 +85,11 @@ export const Orders: CollectionConfig = {
                     admin: { description: 'Snapshot of product name at time of order' },
                 },
                 {
+                    name: 'variant',
+                    type: 'text',
+                    admin: { description: 'Variant info (e.g. "Red - M")' },
+                },
+                {
                     name: 'quantity',
                     type: 'number',
                     required: true,
@@ -84,6 +108,12 @@ export const Orders: CollectionConfig = {
             type: 'number',
             required: true,
             min: 0,
+        },
+        {
+            name: 'shippingFee',
+            type: 'number',
+            min: 0,
+            defaultValue: 0,
         },
         {
             name: 'tax',
@@ -108,40 +138,62 @@ export const Orders: CollectionConfig = {
             ],
         },
         {
+            name: 'status',
+            type: 'select',
+            required: true,
+            defaultValue: 'pending',
+            index: true,
+            options: [
+                { label: 'Pending', value: 'pending' },
+                { label: 'Confirmed', value: 'confirmed' },
+                { label: 'Ready to Ship', value: 'ready_to_ship' },
+                { label: 'Shipped', value: 'shipped' },
+                { label: 'Completed', value: 'completed' },
+                { label: 'Cancelled', value: 'cancelled' },
+                { label: 'Refunded', value: 'refunded' },
+                // Stripe-specific (backward compat)
+                { label: 'Paid', value: 'paid' },
+                { label: 'Payment Failed', value: 'payment_failed' },
+                { label: 'Processing', value: 'processing' },
+            ],
+        },
+        // --- Payment ---
+        {
+            name: 'paymentMethod',
+            type: 'select',
+            options: [
+                { label: 'Cash on Delivery', value: 'cod' },
+                { label: 'QR Banking', value: 'qr_banking' },
+                { label: 'Credit Card', value: 'card' },
+                { label: 'Bank Transfer', value: 'bank' },
+                { label: 'e-Wallet', value: 'ewallet' },
+            ],
+        },
+        {
+            name: 'paymentProofImage',
+            type: 'upload',
+            relationTo: 'media',
+            admin: { description: 'Payment proof image uploaded by customer (QR Banking)' },
+        },
+        {
+            name: 'paymentReference',
+            type: 'text',
+            admin: { description: 'External payment gateway reference ID' },
+        },
+        {
             name: 'stripeSessionId',
             type: 'text',
             unique: true,
             index: true,
-            admin: {
-                readOnly: true,
-                description: 'Stripe Checkout Session ID',
-            },
+            admin: { readOnly: true, description: 'Stripe Checkout Session ID' },
         },
         {
             name: 'stripePaymentIntentId',
             type: 'text',
             index: true,
-            admin: {
-                readOnly: true,
-                description: 'Stripe PaymentIntent ID for failure tracking',
-            },
+            admin: { readOnly: true, description: 'Stripe PaymentIntent ID' },
         },
-        {
-            name: 'status',
-            type: 'select',
-            required: true,
-            defaultValue: 'pending',
-            options: [
-                { label: 'Pending', value: 'pending' },
-                { label: 'Paid', value: 'paid' },
-                { label: 'Payment Failed', value: 'payment_failed' },
-                { label: 'Processing', value: 'processing' },
-                { label: 'Shipped', value: 'shipped' },
-                { label: 'Completed', value: 'completed' },
-                { label: 'Cancelled', value: 'cancelled' },
-                { label: 'Refunded', value: 'refunded' },
-            ],
-        },
+        // --- Customer ---
         {
             name: 'customerEmail',
             type: 'email',
@@ -168,21 +220,19 @@ export const Orders: CollectionConfig = {
                 { name: 'country', type: 'text', defaultValue: 'Malaysia' },
             ],
         },
+        // --- Delivery ---
         {
-            name: 'paymentMethod',
-            type: 'select',
-            options: [
-                { label: 'Credit Card', value: 'card' },
-                { label: 'Bank Transfer', value: 'bank' },
-                { label: 'e-Wallet', value: 'ewallet' },
-                { label: 'Cash on Delivery', value: 'cod' },
-            ],
-        },
-        {
-            name: 'paymentReference',
+            name: 'trackingNumber',
             type: 'text',
-            admin: { description: 'External payment gateway reference ID' },
+            admin: { description: 'Shipping tracking number' },
         },
+        // --- Cancellation ---
+        {
+            name: 'cancelReason',
+            type: 'textarea',
+            admin: { description: 'Required reason when order is cancelled' },
+        },
+        // --- Notes ---
         {
             name: 'notes',
             type: 'textarea',

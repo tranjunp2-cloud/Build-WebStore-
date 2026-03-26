@@ -3,6 +3,8 @@ import { POST as GenerateSitePOST } from '@/app/api/ai/generate-site/route'
 import { POST as EditBlockPOST } from '@/app/api/ai/edit-block/route'
 import { POST as RewriteTextPOST } from '@/app/api/ai/rewrite-text/route'
 import { POST as ApplyTemplatePOST } from '@/app/api/ai/apply-template/route'
+import { POST as SeoGeneratePOST } from '@/app/api/ai/seo-generate/route'
+import { POST as BulkParsePOST } from '@/app/api/ai/products-bulk-parse/route'
 import { NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 
@@ -22,6 +24,15 @@ vi.mock('next/headers', () => ({
     cookies: vi.fn().mockResolvedValue({
         get: vi.fn().mockReturnValue({ value: 'valid-token' })
     })
+}))
+
+// Mock RateLimiter
+let mockRateLimitAllowed = true
+vi.mock('@/lib/rateLimit', () => ({
+    checkRateLimit: vi.fn().mockImplementation(() => ({
+        allowed: mockRateLimitAllowed,
+        remaining: 10
+    }))
 }))
 
 // Mock Database (PayloadCMS)
@@ -85,6 +96,7 @@ describe('AI Streaming APIs', () => {
         mockSiteDB = []
         mockPageDB = []
         mockTenant = { id: 'tenant-1', plan: 'pro', aiGenerationsCount: 0 }
+        mockRateLimitAllowed = true
     })
 
     describe('POST /api/ai/generate-site', () => {
@@ -291,6 +303,85 @@ describe('AI Streaming APIs', () => {
             const result = await res.json()
             expect(result.success).toBe(true)
             expect(result.templateName).toBe('Premium Template')
+        })
+    })
+
+    describe('POST /api/ai/seo-generate (TC-F08.13)', () => {
+        it('returns 429 when rate limit exceeded', async () => {
+            mockRateLimitAllowed = false
+            const req = new NextRequest('http://localhost:3000/api/ai/seo-generate', {
+                method: 'POST',
+                body: JSON.stringify({ name: 'Valid Product' })
+            })
+            const res = await SeoGeneratePOST(req)
+            expect(res.status).toBe(429)
+        })
+
+        it('returns 400 when name is too short', async () => {
+            mockRateLimitAllowed = true
+            const req = new NextRequest('http://localhost:3000/api/ai/seo-generate', {
+                method: 'POST',
+                body: JSON.stringify({ name: 'A' })
+            })
+            const res = await SeoGeneratePOST(req)
+            expect(res.status).toBe(400)
+        })
+
+        it('returns 200 with JSON format when parameters are valid', async () => {
+            mockRateLimitAllowed = true
+            vi.mocked(process).env.OPENAI_API_KEY = 'test-key'
+            
+            // Re-mock openai for SEO Generator locally
+            vi.mock('openai', () => {
+                const OpenAI = vi.fn()
+                OpenAI.prototype.chat = {
+                    completions: {
+                        create: vi.fn().mockResolvedValue({
+                            choices: [{ message: { content: JSON.stringify({ title: "Generated Title", description: "Generated Description", slug: "generated-slug" }) } }]
+                        })
+                    }
+                }
+                return { default: OpenAI }
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/ai/seo-generate', {
+                method: 'POST',
+                body: JSON.stringify({ name: 'Trà Đào Cam Sả' })
+            })
+            const res = await SeoGeneratePOST(req)
+            const json = await res.json()
+            expect(res.status).toBe(200)
+            expect(json.success).toBe(true)
+            expect(json.data.slug).toBe('generated-slug')
+        })
+    })
+
+    describe('POST /api/ai/products-bulk-parse (TC-F08.15 & TC-F08.18)', () => {
+        it('returns 429 when rate limit is hit (Stress Protection)', async () => {
+            mockRateLimitAllowed = false
+            const req = new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+                method: 'POST',
+                body: JSON.stringify({ promptText: 'Áo thun 50k' })
+            })
+            const res = await BulkParsePOST(req)
+            expect(res.status).toBe(429)
+        })
+
+        it('returns fallback data when OPENAI_API_KEY is completely missing', async () => {
+            mockRateLimitAllowed = true
+            const prev = process.env.OPENAI_API_KEY
+            delete process.env.OPENAI_API_KEY
+            
+            const req = new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
+                method: 'POST',
+                body: JSON.stringify({ promptText: 'Áo thun 50k' })
+            })
+            const res = await BulkParsePOST(req)
+            const json = await res.json()
+            expect(res.status).toBe(200)
+            expect(json.products[0].name).toContain('Không API Key')
+            
+            process.env.OPENAI_API_KEY = prev
         })
     })
 

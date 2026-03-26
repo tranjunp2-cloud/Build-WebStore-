@@ -19,6 +19,7 @@ import { SEOMetaJobs } from './collections/SEOMetaJobs'
 import { Blogs } from './collections/Blogs'
 import { BlogCategories } from './collections/BlogCategories'
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
+import { Categories } from './collections/Categories'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -84,6 +85,7 @@ export default buildConfig({
     SEOMetaJobs,
     Blogs,
     BlogCategories,
+    Categories,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',
