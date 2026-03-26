@@ -605,6 +605,66 @@ PM/DevOps invite qua Betterstack → Settings → Team → Invite (dùng email c
 
 ---
 
+## §7 Testing Pipeline (Best Practice)
+
+### Testing Pyramid
+
+```
+         ╱╲
+        ╱  ╲        Manual UAT (QC)
+       ╱ QC ╲       → UX, visual, edge cases
+      ╱──────╲
+     ╱  E2E   ╲     E2E Tests (Java Playwright)
+    ╱──────────╲    → Critical user flows trên staging
+   ╱Integration ╲   Integration Tests (API routes)
+  ╱──────────────╲  → Test API endpoints (mock DB)
+ ╱   Unit Tests   ╲ Unit Tests (Vitest)
+╱──────────────────╲→ Logic, utils, components
+```
+
+### CI Pipeline — Full flow
+
+```
+PR created
+  ↓
+CI Gate (TRƯỚC merge):
+  ├── Lint (ESLint)
+  ├── Typecheck (tsc --noEmit)
+  ├── Unit + Integration Tests (Vitest, coverage ≥ 40%)
+  └── Build check (Next.js build)
+  ↓ (all pass + reviewer approve)
+Merge → Deploy staging (DigitalOcean)
+  ↓
+Smoke Test (30s):
+  ├── /api/health?deep=1 → DB connected? Memory OK?
+  ├── / → HTTP 200?
+  ├── /login → HTTP 200?
+  └── /register → HTTP 200?
+  ↓ (pass)
+E2E Tests (3-5 min — Java Playwright):
+  ├── Login → create site → products CRUD → orders
+  └── Parse results → upload report artifact
+  ↓
+Lark Notifications:
+  ├── 🔴 Smoke fail → "Staging may be down" (Dev + DevOps)
+  ├── ❌ E2E fail → "X/Y tests failed" (Dev)
+  └── ✅ E2E pass → "QC bắt đầu UAT" (QC)
+```
+
+### Lark notifications mỗi stage
+
+| Event | Ai nhận | Message |
+|-------|---------|---------|
+| CI fail (PR) | Dev | "❌ CI failed — lint/test/build" |
+| Deploy staging success | Team | "🚀 Staging deployed — commit abc" |
+| Smoke test fail | Dev + DevOps | "🔴 Staging down after deploy" |
+| E2E tests pass | QC | "✅ E2E passed — QC bắt đầu UAT" |
+| E2E tests fail | Dev | "❌ E2E 12/15 failed — fix trước QC test" |
+| QA failed (manual) | Dev | "🔴 QA Failed — #98 — @dev fix" |
+| Issue closed (QA pass) | PM | Board → Done, milestone % tăng |
+
+---
+
 ## Tham chiếu
 
 - [Conventional Commits](https://www.conventionalcommits.org/)

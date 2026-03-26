@@ -20,6 +20,12 @@ export default defineConfig({
                 'src/app/**/layout.tsx',
                 'src/__tests__/**',
             ],
+            thresholds: {
+                lines: 40,
+                branches: 30,
+                functions: 30,
+                statements: 40,
+            },
         },
     },
     resolve: {
