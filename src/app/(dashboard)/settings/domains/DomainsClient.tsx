@@ -153,7 +153,7 @@ export function DomainsClient({
             return;
         }
         startTransition(async () => {
-            const res = await addCustomDomain(tenantId, domainValue);
+            const res = await addCustomDomain(domainValue);
             if (res.success) {
                 setIsAddModalOpen(false);
                 setNewDomainInput('');
@@ -169,7 +169,7 @@ export function DomainsClient({
         setVerifyErrors(prev => { const next = { ...prev }; delete next[domain]; return next; });
         setVerifyingDomain(domain);
         startTransition(async () => {
-            const res = await verifyCustomDomain(tenantId, domain);
+            const res = await verifyCustomDomain(domain);
             setVerifyingDomain(null);
             if (res.success) {
                 setDomains(prev => prev.map(d => d.domain === domain ? { ...d, status: 'active' } : d));
@@ -182,7 +182,7 @@ export function DomainsClient({
 
     const handleRemove = (domain: string) => {
         startTransition(async () => {
-            const res = await removeCustomDomain(tenantId, domain);
+            const res = await removeCustomDomain(domain);
             if (res.success) {
                 setDomains(prev => prev.filter(d => d.domain !== domain));
                 toast.success('Custom domain removed.');
@@ -198,13 +198,13 @@ export function DomainsClient({
             let res: { success: boolean; error?: string };
             if (selected === null) {
                 // Reset to platform subdomain as primary
-                res = await clearPrimaryDomain(tenantId);
+                res = await clearPrimaryDomain();
                 if (res.success) {
                     setDomains(prev => prev.map(d => ({ ...d, isPrimary: false })));
                     toast.success('Platform subdomain is now your primary domain.');
                 }
             } else {
-                res = await setPrimaryDomain(tenantId, selected);
+                res = await setPrimaryDomain(selected);
                 if (res.success) {
                     setDomains(prev => prev.map(d => ({ ...d, isPrimary: d.domain === selected })));
                     toast.success(`"${selected}" is now your Primary Domain.`);
