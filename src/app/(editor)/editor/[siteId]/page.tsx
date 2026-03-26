@@ -14,6 +14,8 @@ import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
 import { useEditorStore } from '@/store/editorStore'
 import type { AIAction } from '@/types/editor'
+import { PrePublishModal } from '@/components/editor/PrePublishModal'
+import { UnpublishModal } from '@/components/editor/UnpublishModal'
 
 type SiteData = {
     id: string
@@ -53,6 +55,8 @@ export default function EditorPage() {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
     const [isCompactLayout, setIsCompactLayout] = useState(false)
+    const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
+    const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
 
     const blocks = useEditorStore(state => state.blocks)
     const theme = useEditorStore(state => state.theme)
@@ -425,7 +429,23 @@ export default function EditorPage() {
                 ...prev,
                 status: currentlyPublished ? 'draft' : 'published',
             } : prev)
-            toast.success(currentlyPublished ? 'Site unpublished' : 'Site published!')
+
+            setIsPublishModalOpen(false)
+            setIsUnpublishModalOpen(false)
+            
+            if (!currentlyPublished) {
+                const domainUrl = `${siteName ? siteName.toLowerCase().replace(/\s+/g, '-') : 'site'}.primeweb.app` 
+                toast.success('🎉 Website đã live!', { 
+                    description: `Domain: ${domainUrl}`,
+                    action: {
+                        label: 'View',
+                        onClick: () => window.open(`http://${domainUrl}`, '_blank')
+                    }
+                })
+            } else {
+                toast.success('Đã đưa website về trạng thái bảo trì.')
+            }
+
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Publish failed'
@@ -433,7 +453,7 @@ export default function EditorPage() {
         } finally {
             setIsPublishing(false)
         }
-    }, [handleSave, hasUnsavedChanges, isPublishing, site?.status, siteId])
+    }, [handleSave, hasUnsavedChanges, isPublishing, site?.status, siteId, siteName])
 
     const handlePageSelected = useCallback((pageId: string) => {
         const nextParams = new URLSearchParams(searchParams.toString())
@@ -509,7 +529,7 @@ export default function EditorPage() {
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onSave={() => void handleSave()}
-                onPublish={handlePublish}
+                onPublish={() => isPublished ? setIsUnpublishModalOpen(true) : setIsPublishModalOpen(true)}
                 onViewportChange={setViewport}
             />
 
@@ -573,6 +593,21 @@ export default function EditorPage() {
                     />
                 </div>
             )}
+
+            <PrePublishModal
+                isOpen={isPublishModalOpen}
+                onOpenChange={setIsPublishModalOpen}
+                onPublish={handlePublish}
+                isPublishing={isPublishing}
+                hasUnsavedChanges={hasUnsavedChanges}
+            />
+            
+            <UnpublishModal
+                isOpen={isUnpublishModalOpen}
+                onOpenChange={setIsUnpublishModalOpen}
+                onUnpublish={handlePublish}
+                isPublishing={isPublishing}
+            />
         </div>
     )
 }
