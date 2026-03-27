@@ -261,12 +261,13 @@ const MIGRATIONS = [
     sql: `ALTER TABLE users_tenants ADD COLUMN IF NOT EXISTS status varchar DEFAULT 'active';`,
   },
   // ── Users: Tenant permissions (Payload internal auth table) ──
+  // No FK constraint: users_tenants may use different id type (Payload-created)
   {
     name: 'users_tenants_permissions.create_table',
     sql: `CREATE TABLE IF NOT EXISTS users_tenants_permissions (
       id serial PRIMARY KEY,
       _order integer NOT NULL,
-      _parent_id integer NOT NULL REFERENCES users_tenants(id) ON DELETE CASCADE,
+      _parent_id integer NOT NULL,
       value varchar
     );`,
   },
