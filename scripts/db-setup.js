@@ -236,60 +236,10 @@ const MIGRATIONS = [
     name: 'blogs.slug_idx',
     sql: `CREATE INDEX IF NOT EXISTS blogs_slug_idx ON blogs (slug);`,
   },
-  // ── Users: Tenant memberships (Payload array type → separate tables) ──
-  {
-    name: 'users_tenants.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS users_tenants (
-      id serial PRIMARY KEY,
-      _order integer NOT NULL,
-      _parent_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      tenant_id integer REFERENCES tenants(id) ON DELETE SET NULL,
-      role varchar DEFAULT 'viewer'
-    );`,
-  },
-  {
-    name: 'users_tenants.parent_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_tenants_parent_idx ON users_tenants (_parent_id);`,
-  },
-  {
-    name: 'users_tenants.order_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_tenants_order_idx ON users_tenants (_order);`,
-  },
-  // ── Users: Tenant status (for staff management — pending/active/suspended) ──
-  {
-    name: 'users_tenants.status',
-    sql: `ALTER TABLE users_tenants ADD COLUMN IF NOT EXISTS status varchar DEFAULT 'active';`,
-  },
-  // ── Users: Tenant permissions (Payload internal auth table) ──
-  // No FK constraint: users_tenants may use different id type (Payload-created)
-  {
-    name: 'users_tenants_permissions.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS users_tenants_permissions (
-      id serial PRIMARY KEY,
-      _order integer NOT NULL,
-      _parent_id integer NOT NULL,
-      value varchar
-    );`,
-  },
-  {
-    name: 'users_tenants_permissions.parent_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_tenants_permissions_parent_idx ON users_tenants_permissions (_parent_id);`,
-  },
-  // ── Users: Sessions (Payload auth sessions table) ──
-  {
-    name: 'users_sessions.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS users_sessions (
-      id serial PRIMARY KEY,
-      _order integer NOT NULL,
-      _parent_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at timestamptz DEFAULT now(),
-      expires_at timestamptz
-    );`,
-  },
-  {
-    name: 'users_sessions.parent_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_sessions_parent_idx ON users_sessions (_parent_id);`,
-  },
+  // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
+  // These tables are created by Payload pushDevSchema (runs every deploy).
+  // DO NOT add manual CREATE TABLE migrations — they create wrong column types.
+  // pushDevSchema handles correct Drizzle ORM schema (types, constraints, _uuid, indexes).
   // ── Users: Language preference ──
   {
     name: 'users.prefer_lang',
@@ -397,9 +347,11 @@ async function checkDB() {
 
     await pool.end();
 
-    // Only need Payload pushDevSchema for fresh DB (0 tables)
+    // ALWAYS run pushDevSchema — idempotent, handles new fields/tables
+    // Payload Drizzle creates correct schema (types, constraints, indexes)
+    // Manual SQL migrations may create wrong column types → query fails
     return {
-      needsPush: tableCount === 0,
+      needsPush: true,
       tableCount,
     };
   } catch (e) {
