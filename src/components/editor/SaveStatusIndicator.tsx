@@ -34,7 +34,7 @@ export const SaveStatusIndicator: React.FC = () => {
                         className="flex items-center gap-1.5 text-blue-400"
                     >
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        <span className="text-xs font-medium">Saving...</span>
+                        <span className="text-xs font-medium hidden md:inline">Saving...</span>
                     </motion.div>
                 )
             case 'saved':
@@ -46,7 +46,7 @@ export const SaveStatusIndicator: React.FC = () => {
                         className="flex items-center gap-1.5 text-green-400"
                     >
                         <Cloud className="h-3.5 w-3.5" />
-                        <span className="text-xs font-medium">
+                        <span className="text-xs font-medium hidden md:inline">
                             {lastSavedAt ? `Saved ${timeAgo}` : 'Saved'}
                         </span>
                     </motion.div>
@@ -60,7 +60,7 @@ export const SaveStatusIndicator: React.FC = () => {
                         className="flex items-center gap-1.5 text-red-400"
                     >
                         <AlertCircle className="h-3.5 w-3.5" />
-                        <span className="text-xs font-medium">Not saved</span>
+                        <span className="text-xs font-medium hidden md:inline">Not saved</span>
                     </motion.div>
                 )
             case 'idle':
@@ -73,7 +73,7 @@ export const SaveStatusIndicator: React.FC = () => {
                             className="flex items-center gap-1.5 text-yellow-400/80"
                         >
                             <CloudUpload className="h-3.5 w-3.5 animate-pulse" />
-                            <span className="text-xs font-medium">Draft saving in 3s...</span>
+                            <span className="text-xs font-medium hidden md:inline">Draft saving in 3s...</span>
                         </motion.div>
                     )
                 }
