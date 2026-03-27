@@ -51,14 +51,22 @@ async function getTableCount(pool) {
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
-  // ── Users: Auth tables (created manually with correct schema) ──
-  // Payload uses mixed naming: roles=parent_id, tenants/sessions=_parent_id
-  // DO NOT DROP — tables already exist with correct schema
+  // ── Users: Auth tables (Payload Drizzle schema) ──
+  // Payload 3.14 uses VARCHAR id (UUID), mixed column naming:
+  //   roles: parent_id, order (no underscore)
+  //   tenants/sessions: _parent_id, _order (with underscore)
+  //   tenants_permissions: parent_id, order (no underscore)
+  // Tables need _uuid column for array types
   {
     name: 'users_tenants.create_table',
     sql: `CREATE TABLE IF NOT EXISTS users_tenants (
-      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      tenant_id integer REFERENCES tenants(id) ON DELETE SET NULL, status varchar DEFAULT 'active', role varchar DEFAULT 'viewer');`,
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tenant_id integer,
+      status varchar DEFAULT 'active',
+      role varchar DEFAULT 'viewer');`,
   },
   {
     name: 'users_tenants.parent_idx',
@@ -67,7 +75,10 @@ const MIGRATIONS = [
   {
     name: 'users_tenants_permissions.create_table',
     sql: `CREATE TABLE IF NOT EXISTS users_tenants_permissions (
-      id serial PRIMARY KEY, "order" integer NOT NULL DEFAULT 0, parent_id integer NOT NULL, value varchar);`,
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      "order" integer NOT NULL DEFAULT 0,
+      parent_id varchar NOT NULL,
+      value varchar);`,
   },
   {
     name: 'users_tenants_permissions.parent_idx',
@@ -76,8 +87,12 @@ const MIGRATIONS = [
   {
     name: 'users_sessions.create_table',
     sql: `CREATE TABLE IF NOT EXISTS users_sessions (
-      id serial PRIMARY KEY, _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at timestamptz DEFAULT now(), expires_at timestamptz);`,
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      created_at timestamptz DEFAULT now(),
+      expires_at timestamptz);`,
   },
   {
     name: 'users_sessions.parent_idx',
