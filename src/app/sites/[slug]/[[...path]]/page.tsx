@@ -58,7 +58,16 @@ async function getTenantAndPage(slug: string, pagePath: string) {
 
     const page = pagesResult.docs[0]
 
-    return { tenant, site, page }
+    const navigationPages = await payload.find({
+        collection: 'pages',
+        where: {
+            site: { equals: site.id },
+        },
+        limit: 100,
+        sort: 'createdAt',
+    })
+
+    return { tenant, site, page, pages: navigationPages.docs }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -127,12 +136,13 @@ export default async function TenantSitePage({ params }: Props) {
         notFound()
     }
 
-    const { site, page } = data
+    const { site, page, pages } = data
 
     return (
         <SiteRenderer
             site={site as any}
             page={page as any}
+            pages={pages as any[]}
         />
     )
 }

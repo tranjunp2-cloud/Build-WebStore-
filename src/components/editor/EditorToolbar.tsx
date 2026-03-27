@@ -5,10 +5,14 @@ import {
     ChevronDown,
     Check,
     ExternalLink,
+    FilePenLine,
+    FileWarning,
+    FileText,
     Home,
     Loader2,
     Menu,
     Monitor,
+    ShoppingBag,
     Smartphone,
     Palette,
     PanelLeft,
@@ -72,14 +76,17 @@ export function EditorToolbar({
     onViewportChange,
 }: EditorToolbarProps) {
     const selectablePages = pages.filter(page => !page.deletedAt)
+    const currentPage = selectablePages.find(page => page.id === currentPageId) ?? null
 
-    const getPageIcon = (page: PageData) => {
-        if (page.isHomepage || page.slug === 'home' || page.slug === '') return '🏠'
-        if (page.slug.includes('product')) return '🛍️'
-        if (page.slug.includes('about')) return '📝'
-        if (page.slug === '404') return '🚫'
-        return '📄'
+    const getPageIcon = (page: Pick<PageData, 'isHomepage' | 'slug'>) => {
+        if (page.isHomepage || page.slug === 'home' || page.slug === '') return Home
+        if (page.slug === '404' || page.slug === '/404') return FileWarning
+        if (page.slug.includes('product') || page.slug.includes('shop') || page.slug.includes('store')) return ShoppingBag
+        if (page.slug.includes('about') || page.slug.includes('blog') || page.slug.includes('news')) return FilePenLine
+        return FileText
     }
+
+    const CurrentPageIcon = getPageIcon(currentPage ?? { isHomepage: false, slug: '' })
 
     if (compact) {
         return (
@@ -167,7 +174,7 @@ export function EditorToolbar({
                             type="button"
                             className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-100 transition-colors hover:bg-white/5 hover:text-white"
                         >
-                            <Home className="h-3.5 w-3.5" />
+                            <CurrentPageIcon className="h-3.5 w-3.5" />
                             <span className="truncate">{currentPageTitle}</span>
                             <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
                         </button>
@@ -181,6 +188,7 @@ export function EditorToolbar({
                         >
                             {selectablePages.map(page => {
                                 const isActive = page.id === currentPageId
+                                const PageIcon = getPageIcon(page)
                                 return (
                                     <DropdownMenu.Item
                                         key={page.id}
@@ -190,9 +198,7 @@ export function EditorToolbar({
                                             isActive ? 'bg-white/5' : 'hover:bg-white/5',
                                         )}
                                     >
-                                        <span aria-hidden="true" className="text-sm leading-none">
-                                            {getPageIcon(page)}
-                                        </span>
+                                        <PageIcon className="h-4 w-4 shrink-0 text-slate-300" />
                                         <span className="truncate">{page.title}</span>
                                     </DropdownMenu.Item>
                                 )

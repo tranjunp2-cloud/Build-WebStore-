@@ -75,9 +75,18 @@ export default async function NotFound() {
     })
     const page404 = pagesResult.docs[0]
 
+    const navigationPages = await payload.find({
+        collection: 'pages',
+        where: {
+            site: { equals: site.id },
+        },
+        limit: 100,
+        sort: 'createdAt',
+    })
+
     // Render exact matching 404 page from Payload
     if (page404) {
-        return <SiteRenderer site={site as any} page={page404 as any} />
+        return <SiteRenderer site={site as any} page={page404 as any} pages={navigationPages.docs as any[]} />
     }
 
     // Default UI if site exists but missing 404 page in DB

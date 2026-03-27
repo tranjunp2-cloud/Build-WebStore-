@@ -21,7 +21,7 @@ export async function GET(
                     exists: false,
                 }
             },
-            sort: '-updatedAt',
+            sort: 'createdAt',
         })
 
         const formattedPages = pages.map((p: any) => ({
@@ -31,6 +31,8 @@ export async function GET(
             status: p._status || 'draft',
             isHomepage: Boolean(p.isHomepage),
             isVisible: p.isVisible ?? true,
+            seoTitle: p.seo?.title ?? null,
+            seoDescription: p.seo?.description ?? null,
             updatedAt: p.updatedAt,
         }))
 
@@ -76,6 +78,8 @@ export async function POST(
                 status: newPage._status || 'draft',
                 isHomepage: Boolean(newPage.isHomepage),
                 isVisible: newPage.isVisible ?? true,
+                seoTitle: newPage.seo?.title ?? null,
+                seoDescription: newPage.seo?.description ?? null,
                 updatedAt: newPage.updatedAt,
             }
         })

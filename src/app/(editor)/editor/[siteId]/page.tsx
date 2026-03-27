@@ -496,6 +496,7 @@ export default function EditorPage() {
                     siteId={siteId}
                     currentPageId={currentPageId}
                     onPageSelected={handlePageSelected}
+                    onPagesChanged={() => setIframeKey(key => key + 1)}
                 />
             ) : null}
         </>
@@ -602,6 +603,7 @@ export default function EditorPage() {
                 onPublish={handlePublish}
                 isPublishing={isPublishing}
                 hasUnsavedChanges={hasUnsavedChanges}
+                pages={pages}
             />
             
             <UnpublishModal

@@ -25,6 +25,8 @@ export type PageData = {
     status: 'published' | 'draft'
     isHomepage?: boolean
     isVisible: boolean
+    seoTitle?: string | null
+    seoDescription?: string | null
     deletedAt?: string | null
     updatedAt: string
 }
