@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * DB Setup Script — runs as Docker CMD on DO App Platform
+ * DB Setup Script — runs as Docker CMD on DO App Platform.
  *
  * Problem: Payload CMS's `push: true` only creates tables when
  * `process.env.NODE_ENV !== 'production'` (checked at runtime in
