@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
 import { LogoEditor } from './LogoEditor'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
+import type { PageData } from '@/store/editorStore'
+import { toast } from 'sonner'
 
 type SocialWidgetLink = {
     platform: 'facebook' | 'whatsapp' | 'instagram' | 'linkedin' | 'youtube'
@@ -99,7 +101,7 @@ interface SettingsPanelProps {
     siteStatus: string
     headerBlock?: BlockData | null
     footerBlock?: BlockData | null
-    pages?: { id: string; title: string; slug: string }[]
+    pages?: PageData[]
     onThemeChange: (key: string, value: string) => void
     onDeleteBlock: (idx: number) => void
     onDuplicateBlock: (idx: number) => void
@@ -117,13 +119,15 @@ interface SettingsPanelProps {
         headerBlock?: Record<string, unknown>
         footerBlock?: Record<string, unknown>
     }) => void | Promise<void>
+    currentPageId?: string | null
+    onPageUpdate?: (pageId: string, changes: Partial<PageData>) => void
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
 function SettingsPanelInner({
-    block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages,
+    block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages, currentPageId,
     onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
-    onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange,
+    onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate
 }: SettingsPanelProps) {
     const [activeTab, setActiveTab] = useState<SettingsTab>(block ? 'block' : 'global')
     const [openGlobalSections, setOpenGlobalSections] = useState({
@@ -131,6 +135,7 @@ function SettingsPanelInner({
         contact: true,
         social: true,
     })
+    const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
 
     useEffect(() => {
         if (block) {
@@ -277,40 +282,140 @@ function SettingsPanelInner({
         </div>
     )
 
-    const renderSeoContent = () => (
-        <div className="space-y-5">
-            <div>
-                <label className={labelCls}>Meta Title</label>
-                <Input
-                    defaultValue={siteSeo.metaTitle || siteName || 'Homepage'}
-                    key={`seo-title-${siteSeo.metaTitle || siteName || 'Homepage'}`}
-                    onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ seo: { ...siteSeo, metaTitle: e.target.value } })}
-                    variant="editor"
-                    className={editorInputClassName}
-                />
-            </div>
-            <div>
-                <label className={labelCls}>Meta Description</label>
-                <Textarea
-                    rows={4}
-                    defaultValue={siteSeo.metaDescription || ''}
-                    key={`seo-description-${siteSeo.metaDescription || ''}`}
-                    onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ seo: { ...siteSeo, metaDescription: e.target.value } })}
-                    variant="editor"
-                    className={editorTextareaClassName}
-                    placeholder="Tell search engines and social platforms what this site is about."
-                />
-            </div>
-            <div className={sectionCls}>
-                <label className="text-xs font-medium uppercase text-gray-500">Open Graph</label>
-                <div className="mt-3 rounded-2xl border border-dashed border-[#334155] bg-[#172033] px-4 py-5 text-center">
-                    <UploadCloud className="mx-auto h-5 w-5 text-slate-500" />
-                    <p className="mt-2 text-sm font-medium text-slate-200">Social Share Thumbnail</p>
-                    <p className="mt-1 text-xs text-slate-500">Upload support will be connected in the next step.</p>
+    const activePage = useMemo(() => {
+        if (!pages || !currentPageId) return null
+        return pages.find(p => p.id === currentPageId) || null
+    }, [pages, currentPageId])
+
+    const handleSeoUpdate = (field: keyof PageData, value: string) => {
+        if (!activePage || !currentPageId) return
+        if (activePage[field] === value) return
+        onPageUpdate?.(currentPageId, { [field]: value })
+    }
+
+    const seoTitleValue = activePage?.seoTitle || activePage?.title || ''
+    const seoDescriptionValue = activePage?.seoDescription || ''
+    const seoSlugValue = activePage?.slug || ''
+    const isHomepage = activePage?.isHomepage || seoSlugValue === 'home' || seoSlugValue === '/' || seoSlugValue === ''
+
+    const renderSeoContent = () => {
+        if (!activePage) {
+            return (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-400">
+                    Select a page to configure SEO settings.
+                </div>
+            )
+        }
+
+        return (
+            <div className="space-y-5">
+                <div>
+                    <label className={labelCls}>URL Slug</label>
+                    <Input
+                        defaultValue={isHomepage ? '/' : seoSlugValue}
+                        key={`seo-slug-${seoSlugValue}`}
+                        disabled={isHomepage}
+                        onBlur={(e: FieldBlurEvent) => {
+                            let val = e.target.value.trim()
+                            if (val.startsWith('/')) val = val.substring(1)
+                            handleSeoUpdate('slug', val)
+                        }}
+                        variant="editor"
+                        className={editorInputClassName}
+                    />
+                </div>
+                <div>
+                    <label className={labelCls}>Meta Title</label>
+                    <Input
+                        defaultValue={seoTitleValue}
+                        key={`seo-title-${seoTitleValue}`}
+                        maxLength={60}
+                        onBlur={(e: FieldBlurEvent) => handleSeoUpdate('seoTitle', e.target.value)}
+                        variant="editor"
+                        className={editorInputClassName}
+                    />
+                    <div className="mt-1 flex justify-end">
+                        <span className="text-[10px] text-slate-500">{seoTitleValue.length}/60 characters</span>
+                    </div>
+                </div>
+                <div>
+                    <label className={labelCls}>Meta Description</label>
+                    <Textarea
+                        rows={4}
+                        defaultValue={seoDescriptionValue}
+                        key={`seo-description-${seoDescriptionValue}`}
+                        maxLength={160}
+                        onBlur={(e: FieldBlurEvent) => handleSeoUpdate('seoDescription', e.target.value)}
+                        variant="editor"
+                        className={editorTextareaClassName}
+                        placeholder="Tell search engines and social platforms what this page is about."
+                    />
+                    <div className="mt-1 flex justify-end">
+                        <span className="text-[10px] text-slate-500">{seoDescriptionValue.length}/160 characters</span>
+                    </div>
+                </div>
+                
+                <div className={sectionCls}>
+                    <label className="text-xs font-medium uppercase text-gray-500">Google Preview</label>
+                    <div className="mt-3 rounded-[8px] border border-[#25324A] bg-white p-4">
+                        <div className="text-[14px] text-[#202124] truncate" style={{fontFamily: 'arial,sans-serif'}}>
+                            <span className="text-[12px] text-[#202124] flex items-center gap-2">
+                                <Globe2 className="w-4 h-4 text-slate-400" />
+                                {siteName || 'Your Website'}
+                            </span>
+                        </div>
+                        <div className="text-[12px] text-[#006621] mt-1 truncate" style={{fontFamily: 'arial,sans-serif'}}>
+                            https://yourdomain.com/{isHomepage ? '' : seoSlugValue}
+                        </div>
+                        <div className="text-[18px] text-[#1a0dab] font-normal mt-1 truncate hover:underline cursor-pointer leading-[1.2]" style={{fontFamily: 'arial,sans-serif'}}>
+                            {seoTitleValue || 'Page Title'}
+                        </div>
+                        <div className="text-[13px] text-[#4d5156] mt-1 line-clamp-2 leading-[1.4]" style={{fontFamily: 'arial,sans-serif'}}>
+                            {seoDescriptionValue || 'Provide a meta description to help users know what this page is about before they click on the search result.'}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="pt-2">
+                    <button
+                        type="button"
+                        disabled={isGeneratingSEO}
+                        onClick={async () => {
+                            if (!currentPageId || !site?.id) return
+                            setIsGeneratingSEO(true)
+                            const loadingToastId = toast.loading('Generating SEO optimization using AI...')
+                            try {
+                                const res = await fetch(`/api/sites/${site.id}/pages/${currentPageId}/generate-seo`, {
+                                    method: 'POST'
+                                })
+                                if (res.ok) {
+                                    const data = await res.json()
+                                    if (data.title) handleSeoUpdate('seoTitle', data.title)
+                                    if (data.description) handleSeoUpdate('seoDescription', data.description)
+                                    if (data.slug) handleSeoUpdate('slug', data.slug)
+                                    toast.success('SEO optimization successfully generated!', { id: loadingToastId })
+                                } else {
+                                    toast.error('Failed to generate SEO', { id: loadingToastId })
+                                }
+                            } catch (error) {
+                                toast.error('Error generating SEO', { id: loadingToastId })
+                            } finally {
+                                setIsGeneratingSEO(false)
+                            }
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[linear-gradient(90deg,#3B82F6_0%,#2DD4BF_100%)] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-50"
+                    >
+                        {isGeneratingSEO ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                            <span>✨</span>
+                        )}
+                        {isGeneratingSEO ? 'Generating...' : 'Automatic SEO Optimization'}
+                    </button>
                 </div>
             </div>
-        </div>
-    )
+        )
+    }
 
     const renderMenuContent = () => (
         <div className="space-y-5">

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -98,7 +99,7 @@ function Fallback404() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'system-ui, sans-serif' }}>
             <h1 style={{ fontSize: '3rem', margin: 0, fontWeight: 700 }}>404</h1>
             <p style={{ fontSize: '1.25rem', color: '#666', marginTop: '0.5rem' }}>Page Not Found</p>
-            <a href="/" style={{ marginTop: '1.5rem', color: '#0ea5e9', textDecoration: 'none', fontWeight: 500, padding: '0.5rem 1rem', border: '1px solid #0ea5e9', borderRadius: '0.375rem' }}>Back to Homepage</a>
+            <Link href="/" style={{ marginTop: '1.5rem', color: '#0ea5e9', textDecoration: 'none', fontWeight: 500, padding: '0.5rem 1rem', border: '1px solid #0ea5e9', borderRadius: '0.375rem' }}>Back to Homepage</Link>
         </div>
     )
 }

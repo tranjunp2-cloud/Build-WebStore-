@@ -13,11 +13,18 @@ export async function PATCH(
         const numericSiteId = Number(siteId)
         const body = await request.json()
 
-        const { isVisible, deletedAt } = body
+        const { isVisible, deletedAt, slug, seoTitle, seoDescription } = body
 
-        const updateData: any = {}
+        const updateData: Record<string, any> = {}
         if (isVisible !== undefined) updateData.isVisible = isVisible
         if (deletedAt !== undefined) updateData.deletedAt = deletedAt
+        if (slug !== undefined) updateData.slug = slug
+
+        if (seoTitle !== undefined || seoDescription !== undefined) {
+            updateData.seo = {}
+            if (seoTitle !== undefined) updateData.seo.title = seoTitle
+            if (seoDescription !== undefined) updateData.seo.description = seoDescription
+        }
 
         if (Object.keys(updateData).length === 0) {
             return new NextResponse('No fields to update', { status: 400 })

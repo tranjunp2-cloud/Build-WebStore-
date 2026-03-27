@@ -9,8 +9,9 @@ RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
-# 1. Copy ONLY package files first (cache layer for npm install)
-COPY package.json package-lock.json* ./
+# 1. Copy package files and install-time scripts first (cache layer for npm install)
+COPY package.json package-lock.json* node-polyfill.js ./
+COPY scripts ./scripts
 
 # 2. Install with npm cache mount — tránh download lại mỗi lần build
 RUN --mount=type=cache,target=/root/.npm \

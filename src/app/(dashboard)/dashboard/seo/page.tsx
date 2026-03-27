@@ -331,6 +331,7 @@ function SEODashboardInner() {
         } catch {
             toast.error('Undo Failed')
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedSiteId])
 
     // AC-1/FR-12: Keyboard shortcut for Undo Batch Fix

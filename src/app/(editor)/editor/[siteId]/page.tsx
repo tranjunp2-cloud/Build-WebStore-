@@ -53,7 +53,10 @@ type SiteData = {
 type LoadedPageData = {
     id: string
     title: string
+    slug?: string
 }
+
+import type { PageData } from '@/store/editorStore'
 
 type SaveOptions = {
     showToast?: boolean
@@ -96,6 +99,7 @@ export default function EditorPage() {
     const init = useEditorStore(state => state.init)
     const setPages = useEditorStore(state => state.setPages)
     const setCurrentPageId = useEditorStore(state => state.setCurrentPageId)
+    const updatePageInState = useEditorStore(state => state.updatePageInState)
     const updateBlock = useEditorStore(state => state.updateBlock)
     const addBlock = useEditorStore(state => state.addBlock)
     const deleteBlock = useEditorStore(state => state.deleteBlock)
@@ -413,6 +417,7 @@ export default function EditorPage() {
             id: `drop-${Date.now()}`,
             content: `Added ${blockData.blockType} block`,
         })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [addBlock, theme])
 
     const handleAIAction = useCallback(async (action: AIAction) => {
@@ -548,6 +553,20 @@ export default function EditorPage() {
         router.replace(`/editor/${siteId}?${nextParams.toString()}`)
     }, [router, searchParams, siteId])
 
+    const handlePageUpdate = useCallback(async (pageId: string, changes: Partial<PageData>) => {
+        updatePageInState(pageId, changes)
+        try {
+            await fetch(`/api/sites/${siteId}/pages/${pageId}`, {
+                method: 'PATCH',
+                headers: { 'Content-type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(changes),
+            })
+        } catch {
+            toast.error('Failed to update page settings')
+        }
+    }, [siteId, updatePageInState])
+
     const sidebarTabs = [
         { id: 'chat' as const, label: 'AI Chat', icon: <span aria-hidden="true">💬</span> },
         { id: 'components' as const, label: 'Components', icon: <span aria-hidden="true">⚡</span> },
@@ -675,7 +694,8 @@ export default function EditorPage() {
                         siteStatus={site?.status || 'draft'}
                         headerBlock={headerBlock}
                         footerBlock={footerBlock}
-                        pages={pages as any}
+                        pages={pages}
+                        currentPageId={currentPageId}
                         onThemeChange={handleThemeChange}
                         onDeleteBlock={handleDeleteBlock}
                         onDuplicateBlock={handleDuplicateBlock}
@@ -684,6 +704,7 @@ export default function EditorPage() {
                         onHeaderUpdate={(changes) => updateHeaderBlock(changes)}
                         onFooterUpdate={(changes) => updateFooterBlock(changes)}
                         onSiteSettingsChange={handleSiteSettingsChange}
+                        onPageUpdate={handlePageUpdate}
                     />
                 </div>
             )}
