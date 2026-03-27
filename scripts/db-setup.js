@@ -52,8 +52,8 @@ async function getTableCount(pool) {
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
   // ── ONE-TIME CLEANUP: Drop wrong-schema Payload tables ──
-  // Manual SQL migrations created these with wrong column names
-  // (_parent_id instead of parent_id). pushDevSchema can't fix existing tables.
+  // Manual SQL migrations created wrong column names (_parent_id vs parent_id).
+  // pushDevSchema can't fix existing tables — must DROP first, then recreate.
   // Drop so pushDevSchema recreates with correct Drizzle schema.
   {
     name: 'cleanup.drop_users_tenants_permissions',
