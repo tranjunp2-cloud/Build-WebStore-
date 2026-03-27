@@ -24,11 +24,13 @@ Cung cấp bộ Test Suite ngắn gọn, dễ hiểu để kiểm thử tính n�
 | ID | LOẠI | KỊCH BẢN (Scenario) | CÁC BƯỚC THỰC HIỆN | KẾT QUẢ MONG ĐỢI (EXPECTED) | MỨC ĐỘ |
 |:---|:---|:---|:---|:---|:---:|
 | **[US-F10-01] Quản lý Đơn hàng & Trạng thái** ||||||
-| **TC-F10.01** | `Perf`| Nhận thông báo đơn hàng realtime | Khách đặt hàng. Cửa hàng đang mở trang Orders. | Đơn mới xuất hiện đầu danh sách < 15 giây, không cần reload web. Có hiện Toast notification. | Critical |
+| **TC-F10.01** | `Perf`| Nhận thông báo đơn hàng realtime | Khách đặt hàng. Cửa hàng đang mở trang Orders. | Đơn mới xuất hiện đầu danh sách < 15 giây. Có hiện Toast notification Kèm Tiếng "PING" Audio báo hiệu chuẩn Design. | Critical |
 | **TC-F10.02** | `Logic`| Xử lý xung đột (Concurrency) | Nhân viên A duyệt đơn. Nhân viên B hủy đơn cùng lúc. | Trả lỗi HTTP 409 Conflict. Chỉ lưu thao tác gửi tới Server đầu tiên. | Blocker |
-| **TC-F10.03** | `UI` | Giao diện Empty State | Truy cập Orders bằng cửa hàng chưa có đơn hàng. | Hiện Icon Lập phương và chữ "No orders found" đúng Mockup. | Low |
+| **TC-F10.03** | `UI` | Giao diện Empty State | Truy cập Orders bằng cửa hàng chưa có đơn hàng. | Hiện UX Graphic "Xe giao hàng lủi thủi" và chữ "Bạn chưa có đơn hàng nào..." khớp khít Mockup Design F10. | Low |
 | **TC-F10.03b**| `UI` | Chuyển trang SPA | Chuyển qua lại giữa Dashboard và Orders. | Layout Header / Sidebar giữ nguyên. Không tải lại toàn trang (No White Flash). | High |
 | **TC-F10.04** | `UX` | Xem hóa đơn thanh toán | Bấm phóng to ảnh hóa đơn Bank QR. | Ảnh mở lớn dạng popup Lightbox có nút đóng. Không bị lỗi thanh cuộn. | High |
+| **TC-F10.04b**| `UI` | Giao diện Thanh Tiến Trình (Progress) | Mở xem chi tiết 1 Đơn bất kỳ đang có Status là "Ready to Ship". | Cái dải Progress bar hiển thị đúng nấc xanh lá sáng đèn ở ô "Ready", các ô sau bị xám/mờ. | High |
+| **TC-F10.04c**| `Logic`| Xác nhận thuật toán Order Summary | Xem khối Order Summary dưới đáy Drawer/Modal chi tiết đơn. | Giao diện tính đúng công thức: `Subtotal + Shipping Fee + SST(6%) = Grand Total`. Mọi số liệu tính ra khớp Database. | Blocker |
 | **TC-F10.05** | `Time` | Hiển thị theo Timezone | Khách ở múi giờ Mỹ (UTC-5) đặt đơn. Shop xem ở UTC+8. | Thời gian đặt đơn tự convert về mốc giờ máy của Shop (UTC+8). | High |
 | **TC-F10.06** | `UI` | Thống kê số lượng đơn | Kiểm tra 4 thẻ thống kê số lượng Orders ở đầu trang. | Hiện chuẩn 4 màu & Icon: Pending, Ready to Ship, Confirmed, Shipped. Dữ liệu khớp DB. | High |
 | **TC-F10.07** | `Bulk` | Nút thao tác Hàng loạt (Bulk) | Chọn 1 ô checkbox của Đơn Hàng bất kỳ. | Nút Bulk Action sáng lên kèm số liệu đã chọn "(1)". | Medium |
@@ -63,7 +65,14 @@ Cung cấp bộ Test Suite ngắn gọn, dễ hiểu để kiểm thử tính n�
 | **TC-F10.26** | `Res` | Popup Mobile vs Drawer PC | Nhấn mở Chi Tiết một Đơn Hàng dưới điện thoại (<= 768px).| Hệ thống mở Full-screen Popup Modal tiện lợi thay vì kiểu Cửa Sổ Kéo (Drawer) nhỏ như ở Desktop. | High |
 | **TC-F10.27** | `UX` | Thanh ActionBar dính mép dưới| Cuộn nội dung Modal chi tiết Khách Dài trên Điện Thoại. | Các nút hành động (Confirm, Ship, Cancel) bị ghim dính ở cuối màn hình để dễ chạm ngón tay. | Critical |
 | **TC-F10.28** | `i18n` | Map nội dung Đa ngôn ngữ | Đổi hệ thống sang ngôn ngữ Tiền Định "Malay (MY)". | Tất cả các dòng Text kể cả Empty State, Trạng Thái, Modal Dịch qua mã Malaysia hoàn chỉnh 100%. | Blocker |
-
+| **[ĐẶC NHIỆM: KỊCH BẢN BẢO MẬT API]** ||||||
+| **TC-F10.29** | `Sec` | IDOR Liên Cửa Hàng (Cross-Tenant Leak) | **1.** Dùng User của Shop A gọi API `PATCH /api/orders/ID_CUA_SHOP_B`. | Backend bắt buộc chặn HTTP 403/404. Chỉ Scope Role chặt chẽ theo Tenant. Cấm Dev quên kẹp `where[site][equals]={id}` trong CSDL. | Blocker | [ ] |
+| **TC-F10.30** | `API` | Bơm Tồn Kho Khống (Cancel Idempotency Override) | **1.** Bắn đồng loạt (Spam) API `POST /orders/:id/cancel` 10 lần cho 1 đơn hàng. | Lỗi cực kỳ cổ điển: Tồn kho chỉ được phép hoàn trả (+Quantity) ĐÚNG 1 LẦN DUY NHẤT. Backend phải check Idempotency chặn spam tạo khống tồn kho rác. | Blocker | [ ] |
+| **TC-F10.31** | `Perf`| Bulk Action Phá Sập Server (N+1 Query Loop) | **1.** Viết Script Mock chọn 1,000 Đơn Hàng Pending.<br>**2.** Gọi API Bulk Confirm Update Status. | Dev ẩu thường xài Vòng lặp For chạy n+1 câu Query & Hàm gửi Mail -> Crash vỡ RAM Server. Yêu cầu BE dùng `UpdateMany` và Đẩy Send Email vào Background Job Queue (RabbitMQ/BullMQ). | High | [ ] |
+| **TC-F10.32** | `Sec` | Bypass State Machine Khống Trạng Thái | **1.** Bỏ qua FE, gọi thẳng API đổi Đơn "Pending" thành "Refunded". | Frontend đã làm mờ nút nhưng Backend LƯỜI KHÔNG CHECK IF-ELSE. Yêu cầu Backend tự kiểm tra State Machine. Ép văng HTTP 400 Invalid State Transition. | Blocker | [ ] |
+| **[ĐẶC NHIỆM: ĐỒNG BỘ FIREFRAME UI/UX DESIGN]** ||||||
+| **TC-F10.33** | `UX` | Skeleton Loading Lines Lấp Chỗ | **1.** Reload trang lúc mạng Throttle 3G chậm. | Tại Panel lưới đơn hàng phải chớp Nháy Khung viền Skeleton mờ (Giảm Bounce rate). Tín hiệu UX tuyệt đối cấm Màn hình Trắng Bóc cụt data. | High | [ ] |
+| **TC-F10.34** | `UX` | Modal Cảnh báo Hủy Reassurance Text | **1.** Nhấn nút Huỷ Đơn. | Popup Huỷ bắt buộc có dòng chữ Trấn An: "💡 Tồn kho... sẽ tự động cộng lại". Giúp Chủ shop không sợ hãi bấm Huỷ sợ sập hàng. | Medium | [ ] |
 ---
 
 ## 4. Biên Bản Kiểm Định QC (10-Point Checklist)
@@ -79,5 +88,7 @@ Cung cấp bộ Test Suite ngắn gọn, dễ hiểu để kiểm thử tính n�
 8.  **[ ] Validation Required Lý do Hủy:** Form chặn Red Error Fields nếu bấm Submit Hủy thiếu dòng Text Nguyên Nhân.
 9.  **[ ] Disable Refund Button Logic:** Nút Hoàn Tiền bị làm mờ, chặn click khi Status Đơn chưa Đạt cấp độ Hoàn Tất Giao.
 10. **[ ] SPA Routing Performance:** Menu Navigation không Refresh, API Component Load êm ả không chớp giao diện Web Layout.
+11. **[ ] Xác thực Toán học (Order Summary):** Đảm bảo tính năng cộng tiền lẻ Tax/Ship hoàn hảo, khớp giá DB cuối.
+12. **[ ] Giao diện Timeline Tracking:** 5 Nấc trạng thái đổi màu xanh ngọc bám chuẩn theo trạng thái backend API trả về.
 
 ---
