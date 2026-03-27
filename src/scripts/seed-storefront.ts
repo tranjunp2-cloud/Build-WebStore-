@@ -121,7 +121,35 @@ async function seed() {
         console.log(`✅ Created site: ${site.name} (id: ${site.id})`)
     }
 
-    // ── 4. Create 5 Products ────────────────────────────────────────────────────
+    // ── 4. Create Categories ────────────────────────────────────────────────────
+    const categoryNames = ['Bread', 'Pastries', 'Cakes', 'Giày dép', 'Phụ kiện', 'Thời trang Nam', 'Thời trang Nữ', 'Túi xách']
+    const categoryMap: Record<string, string> = {}
+    
+    for (const catName of categoryNames) {
+        const existingCat = await payload.find({
+            collection: 'categories',
+            where: { name: { equals: catName } },
+            limit: 1,
+        })
+        
+        if (existingCat.docs.length > 0) {
+            categoryMap[catName] = String(existingCat.docs[0].id)
+            console.log(`✅ Category exists: ${catName}`)
+        } else {
+            const newCat = await payload.create({
+                collection: 'categories',
+                data: {
+                    tenant: tenant.id,
+                    site: site.id,
+                    name: catName,
+                } as any,
+            })
+            categoryMap[catName] = String(newCat.id)
+            console.log(`✅ Created category: ${catName}`)
+        }
+    }
+
+    // ── 5. Create 5 Products ────────────────────────────────────────────────────
     const products = [
         {
             name: 'Sourdough Loaf',
@@ -129,7 +157,7 @@ async function seed() {
             shortDescription: 'Traditional sourdough bread, slow-fermented for 24 hours with a crispy crust and soft interior.',
             price: 18.90,
             compareAtPrice: 22.00,
-            category: 'Bread',
+            categoryName: 'Bread',
             inventory: 50,
             sku: 'BB-BREAD-001',
         },
@@ -138,7 +166,7 @@ async function seed() {
             slug: 'butter-croissant',
             shortDescription: 'Flaky, buttery layers of golden pastry. Made with premium French butter.',
             price: 8.50,
-            category: 'Pastries',
+            categoryName: 'Pastries',
             inventory: 100,
             sku: 'BB-PASTRY-001',
         },
@@ -148,7 +176,7 @@ async function seed() {
             shortDescription: 'Rich dark chocolate cake with a molten center. Perfect for dessert lovers.',
             price: 32.00,
             compareAtPrice: 38.00,
-            category: 'Cakes',
+            categoryName: 'Cakes',
             inventory: 20,
             sku: 'BB-CAKE-001',
         },
@@ -157,7 +185,7 @@ async function seed() {
             slug: 'matcha-swiss-roll',
             shortDescription: 'Light sponge cake infused with premium Uji matcha, filled with fresh cream.',
             price: 28.00,
-            category: 'Cakes',
+            categoryName: 'Cakes',
             inventory: 15,
             sku: 'BB-CAKE-002',
         },
@@ -167,9 +195,19 @@ async function seed() {
             shortDescription: 'Six pillowy cinnamon rolls with cream cheese frosting. Great for sharing!',
             price: 24.90,
             compareAtPrice: 29.90,
-            category: 'Pastries',
+            categoryName: 'Pastries',
             inventory: 30,
             sku: 'BB-PASTRY-002',
+        },
+         {
+            name: 'Premium Leather Jacket',
+            slug: 'premium-leather-jacket',
+            shortDescription: 'High quality premium leather jacket for women.',
+            price: 1550,
+            compareAtPrice: 1990,
+            categoryName: 'Thời trang Nữ',
+            inventory: 25,
+            sku: 'AKD-001',
         },
     ]
 
@@ -182,6 +220,14 @@ async function seed() {
 
         if (existing.docs.length > 0) {
             console.log(`✅ Product exists: ${p.name}`)
+            // Need to update the existing product to have the correct category reference
+            await payload.update({
+                collection: 'products',
+                id: existing.docs[0].id,
+                data: {
+                    category: [categoryMap[p.categoryName]],
+                } as any,
+            })
             continue
         }
 
@@ -196,7 +242,7 @@ async function seed() {
                 price: p.price,
                 compareAtPrice: p.compareAtPrice,
                 currency: 'MYR',
-                category: p.category,
+                category: [categoryMap[p.categoryName]],
                 status: 'active',
                 inventory: p.inventory,
                 sku: p.sku,

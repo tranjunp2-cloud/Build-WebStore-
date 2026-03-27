@@ -2,12 +2,12 @@
 
 import { useState, useRef } from 'react'
 import Image from 'next/image'
-import { UploadCloud, X, Loader2, AlertCircle } from 'lucide-react'
+import { Upload, X, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
 export type UploadedImage = {
-    id: string
+    id: string | number
     url: string
 }
 
@@ -61,18 +61,35 @@ export function ImageUploader({
             try {
                 const formData = new FormData()
                 formData.append('file', file)
+                formData.append('_payload', JSON.stringify({ alt: file.name }))
 
                 const res = await fetch('/api/media', {
                     method: 'POST',
+                    credentials: 'include',
                     body: formData,
                 })
 
                 if (!res.ok) throw new Error('Failed to upload image')
 
                 const data = await res.json()
+                const uploadedDoc = data?.doc || data
+
+                if (!uploadedDoc?.id || !uploadedDoc?.url) {
+                    throw new Error('Invalid response format from server')
+                }
+
+                // Convert absolute URL to relative path to avoid Next.js unconfigured host errors
+                let relativeUrl = String(uploadedDoc.url)
+                try {
+                    const parsedUrl = new URL(relativeUrl)
+                    relativeUrl = parsedUrl.pathname + parsedUrl.search
+                } catch (e) {
+                    // if it's not a valid absolute URL, it's already relative
+                }
+
                 newImages.push({
-                    id: data.doc.id,
-                    url: data.doc.url,
+                    id: uploadedDoc.id,
+                    url: relativeUrl,
                 })
             } catch (err) {
                 toast.error(`Failed to upload ${file.name}`)
@@ -83,7 +100,7 @@ export function ImageUploader({
         onChange(newImages)
     }
 
-    const removeImage = (idToRemove: string) => {
+    const removeImage = (idToRemove: string | number) => {
         onChange(value.filter(img => img.id !== idToRemove))
     }
 
@@ -108,7 +125,7 @@ export function ImageUploader({
 
     return (
         <div className={cn('space-y-4', className)}>
-            <div className="flex justify-between items-end">
+            <div className="hidden">
                 <div>
                     <h3 className="text-sm font-medium text-gray-300">{label}</h3>
                     <p className="text-xs text-gray-500 mt-1">{description}</p>
@@ -118,23 +135,38 @@ export function ImageUploader({
                 </span>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {value.map((img, idx) => (
-                    <div key={img.id || idx} className="relative group aspect-square rounded-lg border border-white/10 overflow-hidden bg-[#0B1120]">
-                        <Image src={img.url} alt={`Uploaded ${idx + 1}`} fill className="object-cover" sizes="(max-width: 768px) 50vw, 20vw" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button type="button" onClick={() => removeImage(img.id)} className="p-2 bg-red-500/80 text-white rounded-full hover:bg-red-600 transition-colors">
-                                <X className="h-4 w-4" />
-                            </button>
+            <div className="flex flex-wrap gap-4 mt-2">
+                {value.map((img, idx) => {
+                    const safeUrl = (() => {
+                        try {
+                            return new URL(img.url, 'http://localhost').pathname
+                        } catch {
+                            return img.url
+                        }
+                    })()
+                    
+                    return (
+                    <div key={img.id || idx} className="relative w-[147px] h-[147px] shrink-0">
+                        <div className="w-full h-full p-[2px] rounded-[16px] border border-white/10 bg-[#0B1120]">
+                            <div className="w-full h-full relative overflow-hidden rounded-[14px]">
+                                <Image src={safeUrl} alt={`Uploaded ${idx + 1}`} fill className="object-cover" sizes="(max-width: 768px) 50vw, 20vw" />
+                            </div>
                         </div>
+                        <button 
+                            type="button" 
+                            onClick={() => removeImage(img.id)} 
+                            className="absolute z-10 top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#FB2C36] text-white border-0 outline-none ring-0 shadow-none transition-transform hover:scale-110"
+                        >
+                            <X className="h-[10px] w-[10px]" strokeWidth={2.5} />
+                        </button>
                     </div>
-                ))}
+                )})}
 
                 {value.length < maxImages && (
                     <div
                         className={cn(
-                            "relative aspect-square rounded-lg border-2 border-dashed flex flex-col items-center justify-center p-4 transition-colors text-center cursor-pointer",
-                            dragActive ? "border-blue-500 bg-blue-500/10" : "border-white/10 hover:border-white/30 hover:bg-white/5",
+                            "relative w-[147px] h-[147px] shrink-0 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center p-4 transition-colors text-center cursor-pointer bg-[#0B1120]",
+                            dragActive ? "border-blue-500 bg-blue-500/10" : "border-white/[0.08] hover:border-white/20 hover:bg-white/5",
                             isUploading && "pointer-events-none opacity-50"
                         )}
                         onDragEnter={handleDrag}
@@ -146,12 +178,12 @@ export function ImageUploader({
                         {isUploading ? (
                             <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
                         ) : (
-                            <>
-                                <UploadCloud className={cn("h-6 w-6 mb-2", dragActive ? "text-blue-500" : "text-gray-400")} />
-                                <span className={cn("text-xs font-medium", dragActive ? "text-blue-400" : "text-gray-400")}>
-                                    Upload or drag
+                            <div className="flex flex-col items-center justify-center gap-2">
+                                <Upload className={cn("w-6 h-6", dragActive ? "text-blue-500" : "text-[#F8FAFC]/40")} />
+                                <span className={cn("text-[12px] font-medium leading-[1.33]", dragActive ? "text-blue-400" : "text-[#F8FAFC]/40")}>
+                                    Upload
                                 </span>
-                            </>
+                            </div>
                         )}
                     </div>
                 )}
