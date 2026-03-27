@@ -117,7 +117,7 @@ Response (success):
 
 | Collection | Change | Fields |
 |-----------|--------|--------|
-| `notifications` | NEW | `id` (PK)<br>`user_id`/`store_id` (FK)<br>`type` (enum: ORDER_NEW, SYSTEM_ALERT, PRODUCT_LOW_STOCK)<br>`title` (string)<br>`message` (text)<br>`action_url` (string, null)<br>`is_read` (boolean, default: false)<br>`created_at` (timestamp)<br>`expires_at` (timestamp) |
+| `notifications` | NEW | `id` (PK)<br>`user_id`/`store_id` (FK)<br>`type` (enum: ORDER_NEW, SYSTEM_ALERT, PRODUCT_LOW_STOCK)<br>`title` (string)<br>`message` (text)<br>`action_url` (string, null)<br>`is_read` (boolean, default: false)<br>`created_at` (timestamp)<br>`expires_at` (timestamp, dùng để clear data theo retention policy 30 ngày) |
 
 ## 8. Error Handling Matrix
 
@@ -150,7 +150,7 @@ Response (success):
 ## 12. Migration / Rollback Plan
 
 - **Migration**: 
-  1. Frontend support fallback (Polling mỗi 10s) nếu Websocket chưa sẵn sàng.
+  1. Frontend support fallback (Polling mỗi 5s) nếu Websocket chưa sẵn sàng.
   2. Implement backend Notification Table + Service CRUD.
   3. Emit trigger ở các module F10, F15 sang module Notification.
 - **Rollback**: Disable feature toggle hiển thị icon `🔔` ở Header. API không bị ảnh hưởng.

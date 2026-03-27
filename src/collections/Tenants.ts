@@ -51,12 +51,16 @@ export const Tenants: CollectionConfig = {
             },
         },
         {
-            name: 'customDomain',
-            type: 'text',
-            unique: true,
+            name: 'customDomains',
+            type: 'array',
             admin: {
-                description: 'Custom domain (e.g. www.mybakery.com). Leave blank to use subdomain.',
+                description: 'List of custom domains attached to this store',
             },
+            fields: [
+                { name: 'domain', type: 'text', required: true, index: true },
+                { name: 'status', type: 'select', defaultValue: 'pending', options: [{ label: 'Pending', value: 'pending' }, { label: 'Active', value: 'active' }] },
+                { name: 'isPrimary', type: 'checkbox', defaultValue: false },
+            ],
         },
         {
             name: 'plan',
@@ -136,6 +140,57 @@ export const Tenants: CollectionConfig = {
                     name: 'dashboardPreferences',
                     type: 'json',
                     admin: { description: 'User widget layout configuration for Dashboard' },
+                },
+            ],
+        },
+        {
+            name: 'payments',
+            type: 'group',
+            fields: [
+                {
+                    name: 'payment_cod',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'Cash on Delivery (COD)',
+                    admin: { description: 'Enable Cash on Delivery' },
+                },
+                {
+                    name: 'payment_qr',
+                    type: 'checkbox',
+                    defaultValue: false,
+                    label: 'Bank Transfer / QR Banking',
+                    admin: { description: 'Enable QR Banking / Bank Transfer' },
+                    hooks: {
+                        beforeChange: [
+                            ({ siblingData, value }) => {
+                                // Enforce rule: cannot enable QR without an image
+                                if (value && !siblingData.qr_image) {
+                                    return false
+                                }
+                                return value
+                            },
+                        ],
+                    },
+                },
+                {
+                    name: 'qr_image',
+                    type: 'upload',
+                    relationTo: 'media',
+                    label: 'QR Code Image',
+                    admin: {
+                        description: 'Upload QR Code image (Max 2MB, JPG/PNG)',
+                    },
+                    hooks: {
+                        beforeChange: [
+                            ({ value, siblingData }) => {
+                                // If image is removed, disable the qr toggle
+                                if (!value) {
+                                    siblingData.payment_qr = false
+                                }
+                                return value
+                            },
+                        ],
+                    },
                 },
             ],
         },

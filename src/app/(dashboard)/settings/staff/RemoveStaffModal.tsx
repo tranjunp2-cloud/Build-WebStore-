@@ -1,0 +1,127 @@
+import React, { useTransition } from 'react';
+import { ShieldAlert, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { removeStaff } from './actions';
+import type { StaffMember } from './StaffDirectoryClient';
+
+interface RemoveStaffModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    user: StaffMember | null;
+    onSuccess: (userId: string) => void;
+}
+
+export function RemoveStaffModal({ isOpen, onClose, user, onSuccess }: RemoveStaffModalProps) {
+    const [isPending, startTransition] = useTransition();
+
+    if (!isOpen || !user) return null;
+
+    const handleConfirm = () => {
+        startTransition(async () => {
+            const res = await removeStaff(user.id);
+            if (res.success) {
+                toast.success('User removed from workspace');
+                onSuccess(user.id);
+                onClose();
+            } else {
+                toast.error(res.error || 'Failed to remove user');
+            }
+        });
+    };
+
+    const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+        user.email.split('@')[0];
+
+    return (
+        <>
+            <div className="fixed inset-0 z-[100] bg-slate-950/60 animate-in fade-in duration-200" onClick={isPending ? undefined : onClose} />
+
+            <div
+                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] flex flex-col w-[calc(100%-32px)] max-w-[448px] bg-[#1E293B] rounded-[16px] animate-in zoom-in-95 duration-200 shadow-2xl overflow-hidden"
+                style={{
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: '0px 25px 50px -12px rgba(251, 44, 54, 0.2)'
+                }}
+            >
+                {/* Header */}
+                <div className="flex flex-col items-stretch px-[24px] py-[24px] pb-[23px]" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <h2 className="text-[24px] font-bold text-[#F8FAFC] leading-[1.333em] font-['Inter'] m-0 p-0 tracking-tight">
+                        Remove Staff Access
+                    </h2>
+                </div>
+
+                {/* Body Content */}
+                <div className="flex flex-col px-[24px] pt-[24px] pb-[32px] gap-[24px]">
+                    {/* Icon */}
+                    <div className="flex justify-center">
+                        <div className="w-[64px] h-[64px] rounded-full flex items-center justify-center bg-[rgba(240,177,0,0.1)] border-[2px] border-[rgba(240,177,0,0.3)]">
+                            <ShieldAlert className="w-[32px] h-[32px] text-[#F0B100]" strokeWidth={1.5} />
+                        </div>
+                    </div>
+
+                    {/* Text Block */}
+                    <div className="flex flex-col gap-[12px] text-center">
+                        <h3 className="text-[18px] font-bold text-[#F8FAFC] leading-[1.556em] font-['Inter'] m-0 p-0">
+                            Are you sure you want to remove access for this user?
+                        </h3>
+                        <p className="text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter'] m-0 p-0 px-[8px]">
+                            This person will immediately lose access to the system and all store data. This action cannot be undone.
+                        </p>
+                    </div>
+
+                    {/* User Card */}
+                    <div className="w-full">
+                        <div className="w-full flex items-center justify-center gap-[12px] px-[20px] py-[12px] rounded-[12px] bg-[#0B1120]/50" style={{ border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                            {/* Avatar */}
+                            {user.avatar ? (
+                                <img src={user.avatar} alt={displayName} className="h-[40px] w-[40px] rounded-[33px] object-cover" />
+                            ) : (
+                                <div
+                                    className="h-[40px] w-[40px] shrink-0 rounded-[33px] flex items-center justify-center text-white text-[14px] font-semibold font-['Inter']"
+                                    style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 1) 0%, rgba(57, 137, 243, 1) 7%, rgba(55, 143, 239, 1) 14%, rgba(53, 150, 236, 1) 21%, rgba(51, 156, 233, 1) 29%, rgba(45, 212, 191, 1) 100%)' }}
+                                >
+                                    {displayName.substring(0, 2).toUpperCase()}
+                                </div>
+                            )}
+
+                            {/* Details */}
+                            <div className="flex flex-col justify-center">
+                                <span className="text-[14px] font-medium text-[#F8FAFC] leading-[1.428em] font-['Inter']">
+                                    {displayName}
+                                </span>
+                                <span className="text-[12px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.333em] font-['Inter']">
+                                    {user.email}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-[12px] px-[24px] py-[24px] bg-[#1E293B]" style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isPending}
+                        className="flex items-center justify-center h-[46px] px-[24px] rounded-[12px] bg-[#0B1120]/50 border border-white/[0.08] text-[16px] font-medium text-[#F8FAFC] hover:bg-[#0B1120]/80 transition-colors focus:outline-none"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleConfirm}
+                        disabled={isPending}
+                        className="flex items-center justify-center gap-[8px] h-[44px] px-[28px] rounded-[12px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity focus:outline-none"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(231, 0, 11, 1) 0%, rgba(193, 0, 7, 1) 100%)',
+                            boxShadow: '0px 4px 6px -4px rgba(251, 44, 54, 0.3), 0px 10px 15px -3px rgba(251, 44, 54, 0.3)'
+                        }}
+                    >
+                        {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                        Yes, Remove
+                    </button>
+                </div>
+            </div>
+        </>
+    );
+}

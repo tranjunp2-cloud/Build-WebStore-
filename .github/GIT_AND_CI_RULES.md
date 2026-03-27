@@ -578,7 +578,60 @@ Issue tự chuyển **QA Testing**. QC test trên staging → pass thì close is
 
 ---
 
-## §6 Monitoring & Logs
+## §6 Testing Pipeline
+
+### CI/CD Flow — từ PR tới QC
+
+```
+PR created
+  → CI: Lint → Typecheck → Unit Test → Build
+  → Reviewer approve → Merge staging
+  → Deploy staging (DO App Platform)
+  → Smoke Test (30s): health check + page loads
+  → E2E Tests (3-5 min): Java Playwright tự động
+  → QC Manual UAT: UX/visual check
+  → Pass → Done / Fail → Re-Open
+```
+
+### Board Status (7 cột)
+
+| Status | Ai làm | Trigger |
+|--------|--------|---------|
+| 📋 Backlog | PM | Issue tạo mới |
+| 🔍 Review | UIUX + BA | PM chuyển |
+| 🔨 In Progress | Dev | Dev assign |
+| 👀 Code Review | Reviewer | Dev tạo PR |
+| 🧪 QA Testing | QC | PR merged (bot tự chuyển) |
+| 🔄 Re-Open | Dev | QC gắn `qa:failed` (bot tự chuyển) |
+| ✅ Done | — | QC close issue |
+
+### QA Flow chi tiết
+
+```
+PR merged → Bot gắn qa:pending + chuyển "QA Testing"
+  → Lark notify QC: "🧪 Issue #N chờ test"
+
+QC test trên staging:
+  ├── ✅ Pass → QC gắn qa:passed → close issue → Done
+  └── ❌ Fail → QC gắn qa:failed
+       → Bot chuyển "Re-Open" + tạo bug template
+       → Lark notify Dev: "🔴 QA Failed — @dev fix"
+       → Dev fix → PR mới → merge → lại "QA Testing" (loop)
+```
+
+### Lark Notifications
+
+| Event | Ai nhận | Nội dung |
+|-------|---------|----------|
+| PR merged | QC | 🧪 QA Ready — Issue #N chờ test |
+| qa:failed | Dev | 🔴 QA Failed — @dev fix #N |
+| Smoke fail | Team | 🔴 Staging down after deploy |
+| E2E pass | QC | ✅ E2E passed — bắt đầu UAT |
+| E2E fail | Dev | ❌ E2E failed — xem report |
+
+---
+
+## §7 Monitoring & Logs
 
 ### Betterstack — Logs realtime cho staging
 
@@ -602,6 +655,66 @@ Team dev xem logs staging **không cần** truy cập DigitalOcean. Dùng Better
 
 **Invite team:**
 PM/DevOps invite qua Betterstack → Settings → Team → Invite (dùng email công ty).
+
+---
+
+## §7 Testing Pipeline (Best Practice)
+
+### Testing Pyramid
+
+```
+         ╱╲
+        ╱  ╲        Manual UAT (QC)
+       ╱ QC ╲       → UX, visual, edge cases
+      ╱──────╲
+     ╱  E2E   ╲     E2E Tests (Java Playwright)
+    ╱──────────╲    → Critical user flows trên staging
+   ╱Integration ╲   Integration Tests (API routes)
+  ╱──────────────╲  → Test API endpoints (mock DB)
+ ╱   Unit Tests   ╲ Unit Tests (Vitest)
+╱──────────────────╲→ Logic, utils, components
+```
+
+### CI Pipeline — Full flow
+
+```
+PR created
+  ↓
+CI Gate (TRƯỚC merge):
+  ├── Lint (ESLint)
+  ├── Typecheck (tsc --noEmit)
+  ├── Unit + Integration Tests (Vitest, coverage ≥ 40%)
+  └── Build check (Next.js build)
+  ↓ (all pass + reviewer approve)
+Merge → Deploy staging (DigitalOcean)
+  ↓
+Smoke Test (30s):
+  ├── /api/health?deep=1 → DB connected? Memory OK?
+  ├── / → HTTP 200?
+  ├── /login → HTTP 200?
+  └── /register → HTTP 200?
+  ↓ (pass)
+E2E Tests (3-5 min — Java Playwright):
+  ├── Login → create site → products CRUD → orders
+  └── Parse results → upload report artifact
+  ↓
+Lark Notifications:
+  ├── 🔴 Smoke fail → "Staging may be down" (Dev + DevOps)
+  ├── ❌ E2E fail → "X/Y tests failed" (Dev)
+  └── ✅ E2E pass → "QC bắt đầu UAT" (QC)
+```
+
+### Lark notifications mỗi stage
+
+| Event | Ai nhận | Message |
+|-------|---------|---------|
+| CI fail (PR) | Dev | "❌ CI failed — lint/test/build" |
+| Deploy staging success | Team | "🚀 Staging deployed — commit abc" |
+| Smoke test fail | Dev + DevOps | "🔴 Staging down after deploy" |
+| E2E tests pass | QC | "✅ E2E passed — QC bắt đầu UAT" |
+| E2E tests fail | Dev | "❌ E2E 12/15 failed — fix trước QC test" |
+| QA failed (manual) | Dev | "🔴 QA Failed — #98 — @dev fix" |
+| Issue closed (QA pass) | PM | Board → Done, milestone % tăng |
 
 ---
 
