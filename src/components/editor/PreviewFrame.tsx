@@ -18,7 +18,8 @@ interface PreviewFrameProps {
  * Does NOT re-render when user types in settings panel or switches blocks.
  */
 function PreviewFrameInner({ siteId, iframeKey, isLoading }: PreviewFrameProps) {
-    if (isLoading) {
+    // Only show full-screen loader on pure initial load
+    if (isLoading && !siteId) {
         return (
             <div className="flex-1 flex items-center justify-center bg-[#0F172A]">
                 <div className="text-center">

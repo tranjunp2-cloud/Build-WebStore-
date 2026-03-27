@@ -32,8 +32,8 @@ type EditorState = {
     hasUnsavedChanges: boolean
     lastSavedAt: number | null
     isSaving: boolean
-    autoSaveEnabled: boolean
-    autoSaveIntervalMs: number
+    saveStatus: 'idle' | 'saving' | 'saved' | 'error'
+    autoSaveTimer: NodeJS.Timeout | null
 }
 
 type EditorActions = {
@@ -57,6 +57,8 @@ type EditorActions = {
     canRedo: () => boolean
 
     // Save (F-07)
+    handleContentChange: () => void
+    performSave: (isManual?: boolean) => Promise<void>
     markSaved: () => void
     setIsSaving: (saving: boolean) => void
 
@@ -86,8 +88,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     hasUnsavedChanges: false,
     lastSavedAt: null,
     isSaving: false,
-    autoSaveEnabled: true,
-    autoSaveIntervalMs: 30000, // 30s
+    saveStatus: 'idle',
+    autoSaveTimer: null,
 
     init: (siteId, blocks, theme, siteName) => {
         const snapshot = createSnapshot(blocks, theme)
@@ -115,8 +117,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     addBlock: (afterIndex, block) => {
@@ -133,8 +135,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     deleteBlock: (index) => {
@@ -150,8 +152,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     duplicateBlock: (index) => {
@@ -169,8 +171,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     reorderBlocks: (fromIndex, toIndex) => {
@@ -188,8 +190,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     // ── Theme ────────────────────────────────────────────────────────────
@@ -207,8 +209,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             theme: newTheme,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     // ── Undo/Redo (F-06) ────────────────────────────────────────────────
@@ -222,8 +224,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: JSON.parse(JSON.stringify(snapshot.blocks)),
             theme: JSON.parse(JSON.stringify(snapshot.theme)),
             historyIndex: newIndex,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     redo: () => {
@@ -235,16 +237,62 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: JSON.parse(JSON.stringify(snapshot.blocks)),
             theme: JSON.parse(JSON.stringify(snapshot.theme)),
             historyIndex: newIndex,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     canUndo: () => get().historyIndex > 0,
     canRedo: () => get().historyIndex < get().history.length - 1,
 
     // ── Save (F-07) ─────────────────────────────────────────────────────
+    handleContentChange: () => {
+        const { autoSaveTimer, siteId } = get()
+        if (!siteId) return
 
-    markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now() }),
+        set({ hasUnsavedChanges: true, saveStatus: 'idle' })
+
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+
+        const timer = setTimeout(() => {
+            get().performSave()
+        }, 3000) // 3s debounce
+
+        set({ autoSaveTimer: timer })
+    },
+
+    performSave: async (isManual = false) => {
+        const { siteId, blocks, theme, autoSaveTimer } = get()
+        if (!siteId) return
+
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+        set({ isSaving: true, saveStatus: 'saving', autoSaveTimer: null })
+
+        try {
+            const res = await fetch(`/api/sites/${siteId}/save`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blocks, theme, isDraft: true }),
+            })
+
+            if (res.ok) {
+                set({
+                    hasUnsavedChanges: false,
+                    saveStatus: 'saved',
+                    lastSavedAt: Date.now(),
+                    isSaving: false,
+                })
+                // Only show toast for manual save (optional, based on requirement)
+                // if (isManual) { /* toast handled in component */ }
+            } else {
+                set({ saveStatus: 'error', isSaving: false })
+            }
+        } catch (err) {
+            set({ saveStatus: 'error', isSaving: false })
+            // Potential retry logic could be added here
+        }
+    },
+
+    markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now(), saveStatus: 'saved' }),
     setIsSaving: (saving) => set({ isSaving: saving }),
 
     reset: () => set({

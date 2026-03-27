@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import {
-    ArrowLeft, Undo2, Redo2, Save, ExternalLink, Upload,
+    ArrowLeft, Undo2, Redo2, ExternalLink, Upload,
     Check, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -13,6 +13,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
+import { SaveStatusIndicator } from '@/components/editor/SaveStatusIndicator'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 type BlockData = { blockType: string } & Record<string, unknown>
@@ -32,9 +33,6 @@ export default function EditorPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [isPublishing, setIsPublishing] = useState(false)
     const [publishSuccess, setPublishSuccess] = useState(false)
-    const [isSaving, setIsSaving] = useState(false)
-    const [saveSuccess, setSaveSuccess] = useState(false)
-    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
     const [iframeKey, setIframeKey] = useState(0)
 
     // Editor store (F-06 Undo/Redo + F-07 Auto-Save)
@@ -76,7 +74,6 @@ export default function EditorPage() {
                         editorStore.redo()
                         setPage(prev => prev ? { ...prev, layout: editorStore.blocks } : prev)
                         setSite(prev => prev ? { ...prev, theme: editorStore.theme } : prev)
-                        setHasUnsavedChanges(true)
                         setIframeKey(k => k + 1)
                     }
                 } else {
@@ -84,70 +81,48 @@ export default function EditorPage() {
                         editorStore.undo()
                         setPage(prev => prev ? { ...prev, layout: editorStore.blocks } : prev)
                         setSite(prev => prev ? { ...prev, theme: editorStore.theme } : prev)
-                        setHasUnsavedChanges(true)
                         setIframeKey(k => k + 1)
                     }
                 }
             }
             if ((e.metaKey || e.ctrlKey) && e.key === 's') {
                 e.preventDefault()
-                handleSave()
+                editorStore.performSave(true).then(() => {
+                    toast.success('Changes saved')
+                })
             }
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [editorStore])
 
-    // ── F-07: Auto-save (every 30s if unsaved changes) ───────────────────
+    // ── F-07: Auto-refresh preview on save
     useEffect(() => {
-        if (!hasUnsavedChanges || !siteId) return
-        const timer = setTimeout(() => { handleSave() }, 30000)
-        return () => clearTimeout(timer)
-    }, [hasUnsavedChanges, siteId])
-
-    // ── Memoized Handlers ────────────────────────────────────────────────
-    const handleSave = useCallback(async () => {
-        if (!siteId || !page) return
-        setIsSaving(true)
-        try {
-            const res = await fetch(`/api/sites/${siteId}/save`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ blocks: page.layout, theme: site?.theme }),
-            })
-            if (res.ok) {
-                setSaveSuccess(true)
-                setHasUnsavedChanges(false)
-                setIframeKey(k => k + 1)
-                toast.success('Changes saved')
-                setTimeout(() => setSaveSuccess(false), 2000)
-            } else {
-                toast.error('Save failed', { description: `Server returned ${res.status}` })
-            }
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Save failed'
-            toast.error('Save failed', { description: message })
+        if (editorStore.lastSavedAt) {
+            setIframeKey(k => k + 1)
         }
-        finally { setIsSaving(false) }
-    }, [siteId, page, site?.theme])
+    }, [editorStore.lastSavedAt, editorStore.siteId])
+
+    // ── Handlers ─────────────────────────────────────────────────────────
+
 
     const handleThemeChange = useCallback((key: string, value: string) => {
+        editorStore.updateTheme({ [key]: value })
         setSite(prev => prev ? { ...prev, theme: { ...prev.theme, [key]: value } } : prev)
-        setHasUnsavedChanges(true)
-    }, [])
+    }, [editorStore])
 
     const handleDeleteBlock = useCallback((idx: number) => {
+        editorStore.deleteBlock(idx)
         setPage(prev => {
             if (!prev) return prev
             const newLayout = prev.layout.filter((_, i) => i !== idx)
             return { ...prev, layout: newLayout }
         })
         setSelectedBlock(prev => Math.max(0, idx < prev ? prev - 1 : Math.min(prev, idx - 1)))
-        setHasUnsavedChanges(true)
-    }, [])
+    }, [editorStore])
 
     const handleDuplicateBlock = useCallback((idx: number) => {
+        editorStore.duplicateBlock(idx)
         setPage(prev => {
             if (!prev) return prev
             const blockCopy = JSON.parse(JSON.stringify(prev.layout[idx]))
@@ -156,28 +131,27 @@ export default function EditorPage() {
             return { ...prev, layout: newLayout }
         })
         setSelectedBlock(idx + 1)
-        setHasUnsavedChanges(true)
-    }, [])
+    }, [editorStore])
 
     const handleBlockFieldChange = useCallback((idx: number, field: string, value: string) => {
+        editorStore.updateBlock(idx, { [field]: value })
         setPage(prev => {
             if (!prev) return prev
             const newLayout = [...prev.layout]
             newLayout[idx] = { ...newLayout[idx], [field]: value }
             return { ...prev, layout: newLayout }
         })
-        setHasUnsavedChanges(true)
-    }, [])
+    }, [editorStore])
 
     const handleBlockUpdate = useCallback((idx: number, changes: Record<string, unknown>) => {
+        editorStore.updateBlock(idx, changes)
         setPage(prev => {
             if (!prev) return prev
             const newLayout = [...prev.layout]
             newLayout[idx] = { ...newLayout[idx], ...changes }
             return { ...prev, layout: newLayout }
         })
-        setHasUnsavedChanges(true)
-    }, [])
+    }, [editorStore])
 
     const handleAIAction = useCallback((action: Record<string, unknown>) => {
         if (!page) return
@@ -185,41 +159,44 @@ export default function EditorPage() {
         switch (action.action) {
             case 'update_block': {
                 const idx = (action.blockIndex as number) ?? selectedBlock
+                const changes = action.changes as Record<string, unknown>
+                editorStore.updateBlock(idx, changes)
                 setPage(prev => {
                     if (!prev) return prev
                     const newLayout = [...prev.layout]
-                    newLayout[idx] = { ...newLayout[idx], ...(action.changes as Record<string, unknown>) }
+                    newLayout[idx] = { ...newLayout[idx], ...changes }
                     return { ...prev, layout: newLayout }
                 })
-                setHasUnsavedChanges(true)
                 break
             }
             case 'update_theme': {
-                setSite(prev => prev ? { ...prev, theme: { ...prev.theme, ...(action.changes as Record<string, unknown>) } } : prev)
-                setHasUnsavedChanges(true)
+                const changes = action.changes as Record<string, unknown>
+                editorStore.updateTheme(changes)
+                setSite(prev => prev ? { ...prev, theme: { ...prev.theme, ...changes } } : prev)
                 break
             }
             case 'add_block': {
                 const afterIdx = (action.afterIndex as number) ?? blocks.length - 1
+                const block = action.block as BlockData
+                editorStore.addBlock(afterIdx, block)
                 setPage(prev => {
                     if (!prev) return prev
                     const newLayout = [...prev.layout]
-                    newLayout.splice(afterIdx + 1, 0, action.block as BlockData)
+                    newLayout.splice(afterIdx + 1, 0, block)
                     return { ...prev, layout: newLayout }
                 })
                 setSelectedBlock(afterIdx + 1)
-                setHasUnsavedChanges(true)
                 break
             }
             case 'delete_block': {
                 const idx = (action.blockIndex as number) ?? selectedBlock
+                editorStore.deleteBlock(idx)
                 setPage(prev => {
                     if (!prev) return prev
                     const newLayout = prev.layout.filter((_, i) => i !== idx)
                     return { ...prev, layout: newLayout }
                 })
-                setSelectedBlock(Math.max(0, ((action.blockIndex as number) ?? selectedBlock) - 1))
-                setHasUnsavedChanges(true)
+                setSelectedBlock(Math.max(0, idx - 1))
                 break
             }
         }
@@ -258,7 +235,6 @@ export default function EditorPage() {
         editorStore.undo()
         setPage(p => p ? { ...p, layout: editorStore.blocks } : p)
         setSite(s => s ? { ...s, theme: editorStore.theme } : s)
-        setHasUnsavedChanges(true)
         setIframeKey(k => k + 1)
     }, [editorStore])
 
@@ -266,7 +242,6 @@ export default function EditorPage() {
         editorStore.redo()
         setPage(p => p ? { ...p, layout: editorStore.blocks } : p)
         setSite(s => s ? { ...s, theme: editorStore.theme } : s)
-        setHasUnsavedChanges(true)
         setIframeKey(k => k + 1)
     }, [editorStore])
 
@@ -296,12 +271,7 @@ export default function EditorPage() {
                         <Redo2 className="h-4 w-4" />
                     </button>
                     <div className="mx-1 h-5 w-px bg-white/10" />
-                    {hasUnsavedChanges && <span className="text-[10px] text-yellow-400 animate-pulse">● Auto-save in 30s</span>}
-                    <button onClick={handleSave} disabled={isSaving || saveSuccess || !hasUnsavedChanges}
-                        className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                            saveSuccess ? 'bg-green-600/20 text-green-400' : hasUnsavedChanges ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-white/5 text-gray-500 cursor-default')}>
-                        {isSaving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...</> : saveSuccess ? <><Check className="h-3.5 w-3.5" /> Saved!</> : <><Save className="h-3.5 w-3.5" /> Save</>}
-                    </button>
+                    <SaveStatusIndicator />
                     <a href={`/api/preview/${siteId}`} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-gray-300 hover:bg-white/10 transition-colors">
                         <ExternalLink className="h-3.5 w-3.5" /> Preview

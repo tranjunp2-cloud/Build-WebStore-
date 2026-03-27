@@ -91,14 +91,16 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
         isHomepage: { equals: true },
       },
       limit: 1,
+      draft: true,
     })
 
-    // Fallback: get first page for this site
+    // Fallback: get first page (including drafts)
     if (pagesResult.docs.length === 0) {
       pagesResult = await payload.find({
         collection: 'pages',
         where: { site: { equals: numericSiteId } },
         limit: 1,
+        draft: true,
       })
     }
 

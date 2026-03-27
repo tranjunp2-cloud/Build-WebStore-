@@ -9,6 +9,7 @@ export const saveSiteSchema = z.object({
         eastRate: z.number().optional(),
         freeAbove: z.number().nullable().optional(),
     }).optional(),
-}).refine(data => data.blocks !== undefined || data.theme !== undefined || data.locale !== undefined || data.shippingConfig !== undefined, {
+    isDraft: z.boolean().optional(),
+}).refine(data => data.blocks !== undefined || data.theme !== undefined || data.locale !== undefined || data.shippingConfig !== undefined || data.isDraft !== undefined, {
     message: 'At least one field (blocks, theme, locale, or shippingConfig) must be provided',
 })
