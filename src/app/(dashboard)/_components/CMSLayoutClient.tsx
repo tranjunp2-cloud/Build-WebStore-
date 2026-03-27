@@ -42,7 +42,9 @@ export function CMSLayoutClient({ userName, userInitial, children }: CMSLayoutCl
                     classNames: {
                         toast: "bg-[#1E293B] border border-white/[0.08] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[16px] px-[24px] flex items-center gap-[8px] min-h-[46px] w-full",
                         title: "text-[14px] font-medium text-slate-50",
-                        icon: "text-[#05DF72] w-[20px] h-[20px]",
+                        success: "[&>div>svg]:text-[#05DF72]",
+                        error: "[&>div>svg]:text-red-500",
+                        icon: "w-[20px] h-[20px]",
                     }
                 }}
             />

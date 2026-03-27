@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ProductForm } from '@/components/dashboard/product-form/ProductForm'
 import { ProductFormValues } from '@/components/dashboard/product-form/schema'
+import { useI18n } from '@/i18n'
 
 function slugify(text: string) {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -30,6 +31,7 @@ const textToLexical = (text: string) => {
 
 export default function NewProductPage() {
     const router = useRouter()
+    const { t } = useI18n()
 
     const handleSave = async (data: ProductFormValues) => {
         const body = {
@@ -47,17 +49,19 @@ export default function NewProductPage() {
                 width: data.shippingWidth || 0,
                 height: data.shippingHeight || 0,
             },
-            images: data.images.map(img => ({ image: img.id, alt: data.name })),
+            images: data.images?.map(img => ({ image: img.id, alt: data.name })) || [],
             hasVariants: data.hasVariants,
-            variantConfigs: data.hasVariants ? data.tiers : [],
-            variants: data.hasVariants ? data.variants?.map(v => ({
+            variantConfigs: data.hasVariants ? data.tiers?.map((t) => ({
+                name: t.name,
+                options: t.options.map((opt) => ({ value: opt }))
+            })) || [] : [],
+            variants: data.hasVariants ? data.variants?.map((v) => ({
                 name: v.variantName,          // Payload schema field: 'name'
                 sku: v.skuCode,               // Payload schema field: 'sku'
                 price: v.price,
                 compareAtPrice: v.discount,
                 stock: v.stock,
-                options: v.variantName.split(' - ')
-            })) : [],
+            })) || [] : [],
             seo: {
                 title: data.metaTitle,
                 description: data.metaDescription,
@@ -74,13 +78,13 @@ export default function NewProductPage() {
         })
 
         if (res.ok) {
-            toast.success('Đã lưu nháp. Hãy chuyển sang Active để hiển thị trên web.')
+            toast.success(t.dashboard.products.form.draftSaved)
             setTimeout(() => {
                 router.push('/products')
             }, 1500)
         } else {
             const errData = await res.json()
-            throw new Error(errData.error?.message || 'Failed to save product')
+            throw new Error(errData.error?.message || t.dashboard.products.form.somethingWentWrong)
         }
     }
 

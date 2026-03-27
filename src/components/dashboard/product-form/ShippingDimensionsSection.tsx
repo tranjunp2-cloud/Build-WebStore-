@@ -2,9 +2,10 @@
 
 import { useFormContext } from 'react-hook-form'
 import { ProductFormValues } from './schema'
+import { cn } from '@/lib/utils'
 
 export function ShippingDimensionsSection() {
-    const { register } = useFormContext<ProductFormValues>()
+    const { register, formState: { errors } } = useFormContext<ProductFormValues>()
 
     return (
         <div className="rounded-2xl border border-white/[0.08] bg-[#1E293B]/60 p-[25px] flex flex-col gap-5">
@@ -21,12 +22,16 @@ export function ShippingDimensionsSection() {
                             type="number"
                             step="0.01"
                             {...register('shippingWeight')}
-                            className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] pl-4 pr-12 py-3 text-[16px] text-[#F8FAFC] focus:border-white focus:ring-1 focus:ring-white outline-none transition-colors"
+                            className={cn(
+                                "w-full rounded-2xl border bg-[#0B1120] pl-4 pr-12 py-3 text-[16px] text-[#F8FAFC] focus:ring-1 focus:ring-white outline-none transition-colors",
+                                errors.shippingWeight ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                            )}
                         />
                         <span className="absolute right-4 text-[16px] text-[#F8FAFC]/40 pointer-events-none">
                             kg
                         </span>
                     </div>
+                    {errors.shippingWeight && <span className="text-[12px] text-red-500">{errors.shippingWeight.message}</span>}
                 </div>
 
                 {/* Length */}
@@ -39,12 +44,16 @@ export function ShippingDimensionsSection() {
                             type="number"
                             step="0.01"
                             {...register('shippingLength')}
-                            className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] pl-4 pr-12 py-3 text-[16px] text-[#F8FAFC] focus:border-white focus:ring-1 focus:ring-white outline-none transition-colors"
+                            className={cn(
+                                "w-full rounded-2xl border bg-[#0B1120] pl-4 pr-12 py-3 text-[16px] text-[#F8FAFC] focus:ring-1 focus:ring-white outline-none transition-colors",
+                                errors.shippingLength ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                            )}
                         />
                         <span className="absolute right-4 text-[16px] text-[#F8FAFC]/40 pointer-events-none">
                             cm
                         </span>
                     </div>
+                    {errors.shippingLength && <span className="text-[12px] text-red-500">{errors.shippingLength.message}</span>}
                 </div>
 
                 {/* Height */}
@@ -57,12 +66,16 @@ export function ShippingDimensionsSection() {
                             type="number"
                             step="0.01"
                             {...register('shippingHeight')}
-                            className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] pl-4 pr-12 py-3 text-[16px] text-[#F8FAFC] focus:border-white focus:ring-1 focus:ring-white outline-none transition-colors"
+                            className={cn(
+                                "w-full rounded-2xl border bg-[#0B1120] pl-4 pr-12 py-3 text-[16px] text-[#F8FAFC] focus:ring-1 focus:ring-white outline-none transition-colors",
+                                errors.shippingHeight ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                            )}
                         />
                         <span className="absolute right-4 text-[16px] text-[#F8FAFC]/40 pointer-events-none">
                             cm
                         </span>
                     </div>
+                    {errors.shippingHeight && <span className="text-[12px] text-red-500">{errors.shippingHeight.message}</span>}
                 </div>
 
                 {/* Width */}
@@ -75,12 +88,16 @@ export function ShippingDimensionsSection() {
                             type="number"
                             step="0.01"
                             {...register('shippingWidth')}
-                            className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] pl-4 pr-12 py-3 text-[16px] text-[#F8FAFC] focus:border-white focus:ring-1 focus:ring-white outline-none transition-colors"
+                            className={cn(
+                                "w-full rounded-2xl border bg-[#0B1120] pl-4 pr-12 py-3 text-[16px] text-[#F8FAFC] focus:ring-1 focus:ring-white outline-none transition-colors",
+                                errors.shippingWidth ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                            )}
                         />
                         <span className="absolute right-4 text-[16px] text-[#F8FAFC]/40 pointer-events-none">
                             cm
                         </span>
                     </div>
+                    {errors.shippingWidth && <span className="text-[12px] text-red-500">{errors.shippingWidth.message}</span>}
                 </div>
             </div>
         </div>

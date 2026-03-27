@@ -35,29 +35,35 @@ export function GeneralInfoSection({ categories }: Props) {
             </div>
 
             {/* Category */}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2" id="categoryIds">
                 <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43]">
                     Category
                 </label>
                 <CategorySelect 
                     categories={categories}
                     selectedIds={categoryIds || []}
-                    onChange={(ids) => setValue('categoryIds', ids, { shouldDirty: true })}
+                    onChange={(ids) => setValue('categoryIds', ids, { shouldDirty: true, shouldValidate: true })}
                     error={errors.categoryIds?.message}
                 />
+                {errors.categoryIds && (
+                    <p className="text-xs text-red-500 mt-1">{errors.categoryIds.message}</p>
+                )}
             </div>
 
             {/* Images */}
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2" id="images">
                 <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43]">
                     Images (Up to 5 images, each &lt; 5MB)
                 </label>
                 <ImageUploader 
                     value={images || []}
-                    onChange={(newImages) => setValue('images', newImages, { shouldDirty: true })}
+                    onChange={(newImages) => setValue('images', newImages, { shouldDirty: true, shouldValidate: true })}
                     maxImages={5}
                     maxSizeMB={5}
                 />
+                {errors.images && (
+                    <p className="text-xs text-red-500 mt-1">{errors.images.message}</p>
+                )}
             </div>
         </div>
     )

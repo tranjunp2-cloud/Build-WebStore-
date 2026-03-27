@@ -177,7 +177,7 @@ export function VariantsInventorySection() {
                     <div className="space-y-6">
                         
                         {/* Tiers List */}
-                        <div className="space-y-4">
+                        <div className="space-y-4" id="tiers">
                             {tiers.map((tier, index) => (
                                 <div key={tier.id} className="flex flex-col gap-4 relative group">
                                     <div className="flex items-center justify-between">
@@ -185,32 +185,42 @@ export function VariantsInventorySection() {
                                             Tier {index + 1} (Example: {index === 0 ? 'Color' : 'Size'})
                                         </label>
                                     </div>
-                                    <input
-                                        {...register(`tiers.${index}.name`)}
-                                        placeholder={index === 0 ? "e.g. Color" : "e.g. Size"}
-                                        className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 outline-none focus:border-white focus:ring-1 focus:ring-white transition-colors"
-                                    />
+                                    <div className="flex flex-col gap-1 w-full">
+                                        <input
+                                            {...register(`tiers.${index}.name`)}
+                                            placeholder={index === 0 ? "e.g. Color" : "e.g. Size"}
+                                            className={cn("w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                errors.tiers?.[index]?.name ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                            )}
+                                        />
+                                        {errors.tiers?.[index]?.name && <span className="text-[12px] text-red-500">{errors.tiers[index]?.name?.message}</span>}
+                                    </div>
                                     
                                     <div className="flex flex-col gap-3">
                                         {tier.options.map((opt, oIdx) => (
-                                            <div key={oIdx} className="flex items-center gap-3">
-                                                <input
-                                                    {...register(`tiers.${index}.options.${oIdx}` as const)}
-                                                    placeholder={index === 0 ? "e.g. Red" : "e.g. Small"}
-                                                    className="w-full rounded-xl border border-white/[0.08] bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] outline-none focus:border-white focus:ring-1 focus:ring-white transition-colors"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const liveTier = getValues(`tiers.${index}`) || tier
-                                                        const newOptions = [...(liveTier.options || [])]
-                                                        newOptions.splice(oIdx, 1)
-                                                        updateTier(index, { ...liveTier, options: newOptions })
-                                                    }}
-                                                    className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-red-500/10 bg-red-500/10 text-red-500/80 hover:bg-red-500/20 hover:text-red-400 transition-colors"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
+                                            <div key={oIdx} className="flex flex-col gap-1 w-full">
+                                                <div className="flex items-center gap-3">
+                                                    <input
+                                                        {...register(`tiers.${index}.options.${oIdx}` as const)}
+                                                        placeholder={index === 0 ? "e.g. Red" : "e.g. Small"}
+                                                        className={cn("w-full rounded-xl border bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                            errors.tiers?.[index]?.options?.[oIdx] ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                                        )}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const liveTier = getValues(`tiers.${index}`) || tier
+                                                            const newOptions = [...(liveTier.options || [])]
+                                                            newOptions.splice(oIdx, 1)
+                                                            updateTier(index, { ...liveTier, options: newOptions })
+                                                        }}
+                                                        className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-xl border border-red-500/10 bg-red-500/10 text-red-500/80 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                                {errors.tiers?.[index]?.options?.[oIdx] && <span className="text-[12px] text-red-500">{errors.tiers[index]?.options?.[oIdx]?.message as string}</span>}
                                             </div>
                                         ))}
 
@@ -248,7 +258,7 @@ export function VariantsInventorySection() {
 
                         {/* SKU Matrix Table */}
                         {variants.length > 0 && (
-                            <div className="mt-6 rounded-2xl border border-white/[0.08] bg-[#1E293B]/30 overflow-hidden">
+                            <div className="mt-6 rounded-2xl border border-white/[0.08] bg-[#1E293B]/30 overflow-hidden" id="variants">
                                 <div className="px-4 py-3 border-b border-white/[0.08] bg-[#1E293B]/50">
                                     <h3 className="text-[14px] font-medium text-[#F8FAFC]">SKU Matrix Table</h3>
                                 </div>
@@ -268,17 +278,27 @@ export function VariantsInventorySection() {
                                                 <tr key={v.id} className="group">
                                                     <td className="px-4 py-2 text-[#F8FAFC] text-[14px] font-normal min-w-[120px]">{v.variantName}</td>
                                                     <td className="px-4 py-2">
-                                                        <input 
-                                                            {...register(`variants.${i}.skuCode`)} 
-                                                            className="w-full rounded-xl border border-white/[0.08] bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[140px] outline-none focus:border-white focus:ring-1 focus:ring-white transition-colors" 
-                                                        />
+                                                        <div className="flex flex-col gap-1">
+                                                            <input 
+                                                                {...register(`variants.${i}.skuCode`)} 
+                                                                className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[140px] outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                                    errors.variants?.[i]?.skuCode ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                                                )} 
+                                                            />
+                                                            {errors.variants?.[i]?.skuCode && <span className="text-[10px] text-red-500">{errors.variants[i]?.skuCode?.message}</span>}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-2">
-                                                        <input 
-                                                            type="number" 
-                                                            {...register(`variants.${i}.price`)} 
-                                                            className="w-full rounded-xl border border-white/[0.08] bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:border-white focus:ring-1 focus:ring-white transition-colors" 
-                                                        />
+                                                        <div className="flex flex-col gap-1">
+                                                            <input 
+                                                                type="number" 
+                                                                {...register(`variants.${i}.price`)} 
+                                                                className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                                    errors.variants?.[i]?.price ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                                                )} 
+                                                            />
+                                                            {errors.variants?.[i]?.price && <span className="text-[10px] text-red-500">{errors.variants[i]?.price?.message}</span>}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <input 
@@ -288,11 +308,16 @@ export function VariantsInventorySection() {
                                                         />
                                                     </td>
                                                     <td className="px-4 py-2">
-                                                        <input 
-                                                            type="number" 
-                                                            {...register(`variants.${i}.stock`)} 
-                                                            className="w-full rounded-xl border border-white/[0.08] bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:border-white focus:ring-1 focus:ring-white transition-colors" 
-                                                        />
+                                                        <div className="flex flex-col gap-1">
+                                                            <input 
+                                                                type="number" 
+                                                                {...register(`variants.${i}.stock`)} 
+                                                                className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                                    errors.variants?.[i]?.stock ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                                                )} 
+                                                            />
+                                                            {errors.variants?.[i]?.stock && <span className="text-[10px] text-red-500">{errors.variants[i]?.stock?.message}</span>}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}

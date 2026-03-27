@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
 export type UploadedImage = {
-    id: string
+    id: string | number
     url: string
 }
 
@@ -88,7 +88,7 @@ export function ImageUploader({
                 }
 
                 newImages.push({
-                    id: String(uploadedDoc.id),
+                    id: uploadedDoc.id,
                     url: relativeUrl,
                 })
             } catch (err) {
@@ -100,7 +100,7 @@ export function ImageUploader({
         onChange(newImages)
     }
 
-    const removeImage = (idToRemove: string) => {
+    const removeImage = (idToRemove: string | number) => {
         onChange(value.filter(img => img.id !== idToRemove))
     }
 
@@ -136,22 +136,31 @@ export function ImageUploader({
             </div>
 
             <div className="flex flex-wrap gap-4 mt-2">
-                {value.map((img, idx) => (
+                {value.map((img, idx) => {
+                    const safeUrl = (() => {
+                        try {
+                            return new URL(img.url, 'http://localhost').pathname
+                        } catch {
+                            return img.url
+                        }
+                    })()
+                    
+                    return (
                     <div key={img.id || idx} className="relative w-[147px] h-[147px] shrink-0">
                         <div className="w-full h-full p-[2px] rounded-[16px] border border-white/10 bg-[#0B1120]">
                             <div className="w-full h-full relative overflow-hidden rounded-[14px]">
-                                <Image src={img.url} alt={`Uploaded ${idx + 1}`} fill className="object-cover" sizes="(max-width: 768px) 50vw, 20vw" />
+                                <Image src={safeUrl} alt={`Uploaded ${idx + 1}`} fill className="object-cover" sizes="(max-width: 768px) 50vw, 20vw" />
                             </div>
                         </div>
                         <button 
                             type="button" 
                             onClick={() => removeImage(img.id)} 
-                            className="absolute z-10 -top-[6px] -right-[6px] flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#FF4D4F] text-white transition-transform hover:scale-110 shadow-lg"
+                            className="absolute z-10 top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#FB2C36] text-white border-0 outline-none ring-0 shadow-none transition-transform hover:scale-110"
                         >
-                            <X className="h-3.5 w-3.5" strokeWidth={3} />
+                            <X className="h-[10px] w-[10px]" strokeWidth={2.5} />
                         </button>
                     </div>
-                ))}
+                )})}
 
                 {value.length < maxImages && (
                     <div

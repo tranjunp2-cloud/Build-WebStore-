@@ -6,7 +6,7 @@ import { Sparkles, Wand2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function DescriptionSeoSection() {
-    const { register, watch, setValue } = useFormContext<ProductFormValues>()
+    const { register, watch, setValue, formState: { errors } } = useFormContext<ProductFormValues>()
     
     const autoGenerateSeo = watch('autoGenerateSeo')
 
@@ -63,8 +63,12 @@ export function DescriptionSeoSection() {
                         <input
                             {...register('metaTitle')}
                             placeholder="Title for SEO"
-                            className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:border-white focus:ring-1 focus:ring-white focus:outline-none transition-colors"
+                            className={cn(
+                                "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white focus:outline-none transition-colors",
+                                errors.metaTitle ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                            )}
                         />
+                        {errors.metaTitle && <span className="text-[12px] text-red-500">{errors.metaTitle.message}</span>}
                     </div>
                     <div className="flex flex-col gap-2">
                         <label className="text-[14px] font-medium text-[#F8FAFC] m-0">Meta Description <span className="text-[#F8FAFC]/40 font-normal">(max 160 chars)</span></label>
@@ -72,16 +76,24 @@ export function DescriptionSeoSection() {
                             {...register('metaDescription')}
                             placeholder="Meta description for search engines..."
                             rows={3}
-                            className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:border-white focus:ring-1 focus:ring-white focus:outline-none transition-colors resize-none"
+                            className={cn(
+                                "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white focus:outline-none transition-colors resize-none",
+                                errors.metaDescription ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                            )}
                         />
+                        {errors.metaDescription && <span className="text-[12px] text-red-500">{errors.metaDescription.message}</span>}
                     </div>
                     <div className="flex flex-col gap-2">
                         <label className="text-[14px] font-medium text-[#F8FAFC] m-0">URL Slug</label>
                         <input
                             {...register('urlSlug')}
                             placeholder="product-url"
-                            className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:border-white focus:ring-1 focus:ring-white focus:outline-none transition-colors"
+                            className={cn(
+                                "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white focus:outline-none transition-colors",
+                                errors.urlSlug ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                            )}
                         />
+                        {errors.urlSlug && <span className="text-[12px] text-red-500">{errors.urlSlug.message}</span>}
                     </div>
                 </div>
             </div>

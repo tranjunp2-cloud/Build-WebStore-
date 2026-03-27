@@ -1,4 +1,4 @@
-import { z } from 'zod'
+  import { z } from 'zod'
 
 export const optionTierSchema = z.object({
     id: z.string(),
@@ -17,8 +17,8 @@ export const skuVariantSchema = z.object({
 
 export const productFormSchema = z.object({
     name: z.string().min(3, 'Product name must be at least 3 characters').max(120, 'Product name must not exceed 120 characters'),
-    categoryIds: z.array(z.string()).min(1, 'Product must belong to at least one category'),
-    images: z.array(z.object({ id: z.string(), url: z.string() })).max(5, 'Maximum 5 images allowed'),
+    categoryIds: z.array(z.union([z.string(), z.number()])).min(1, 'Product must belong to at least one category'),
+    images: z.array(z.object({ id: z.union([z.string(), z.number()]), url: z.string() })).max(5, 'Maximum 5 images allowed'),
     
     hasVariants: z.boolean().default(false),
     
@@ -33,7 +33,7 @@ export const productFormSchema = z.object({
     variants: z.array(skuVariantSchema).optional(),
     
     // Shipping & Dimensions
-    shippingWeight: z.coerce.number().min(0, 'Weight must be at least 0').optional(),
+    shippingWeight: z.coerce.number().min(0.01, 'Weight must be greater than 0').optional(),
     shippingLength: z.coerce.number().min(0, 'Length must be at least 0').optional(),
     shippingHeight: z.coerce.number().min(0, 'Height must be at least 0').optional(),
     shippingWidth: z.coerce.number().min(0, 'Width must be at least 0').optional(),
@@ -44,6 +44,16 @@ export const productFormSchema = z.object({
     metaTitle: z.string().max(70, 'SEO Title should not exceed 70 characters').optional(),
     metaDescription: z.string().max(160, 'SEO description should not exceed 160 characters').optional(),
     urlSlug: z.string().optional(),
+}).refine((data) => {
+    if (!data.hasVariants) {
+        if (data.compareAtPrice !== undefined && data.basePrice !== undefined) {
+            return data.compareAtPrice > data.basePrice;
+        }
+    }
+    return true;
+}, {
+    message: 'Compare at price must be strictly GREATER than base price',
+    path: ['compareAtPrice']
 })
 
 export type ProductFormValues = z.infer<typeof productFormSchema>

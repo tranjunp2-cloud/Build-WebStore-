@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { ProductForm } from '@/components/dashboard/product-form/ProductForm'
 import { ProductFormValues } from '@/components/dashboard/product-form/schema'
+import { useI18n } from '@/i18n'
 
 const lexicalToText = (data: any): string => {
     if (!data || !data.root || !data.root.children) return typeof data === 'string' ? data : '';
@@ -46,6 +47,7 @@ function slugify(text: string) {
 export default function ProductEditPage() {
     const params = useParams()
     const router = useRouter()
+    const { t } = useI18n()
     const productId = params?.id as string
     const isNew = productId === 'new'
 
@@ -83,7 +85,11 @@ export default function ProductEditPage() {
                         baseInventory: data.inventory ? parseInt(data.inventory) : undefined,
                         baseSku: data.sku || '',
                         
-                        tiers: data.variantConfigs || [],
+                        tiers: (data.variantConfigs || []).map((t: any, idx: number) => ({
+                            id: t.id || `tier-${idx}`,
+                            name: t.name || '',
+                            options: (t.options || []).map((o: any) => o.value)
+                        })),
                         variants: (data.variants || []).map((v: any, index: number) => ({
                             id: v.id || v.skuCode || `var-${index}`,
                             variantName: v.options ? v.options.join(' / ') : '',
@@ -103,10 +109,10 @@ export default function ProductEditPage() {
                     }
                     setInitialData(mappedData)
                 } else {
-                    toast.error('Failed to load product')
+                    toast.error(t.dashboard.products.form.failedLoad)
                 }
             } catch (err) {
-                toast.error('Failed to load product')
+                toast.error(t.dashboard.products.form.failedLoad)
             } finally {
                 setIsLoading(false)
             }
@@ -131,22 +137,24 @@ export default function ProductEditPage() {
                     width: data.shippingWidth || 0,
                     height: data.shippingHeight || 0,
                 },
-                images: data.images.map(img => ({ image: img.id, alt: data.name })),
+                images: data.images?.map(img => ({ image: img.id, alt: data.name })) || [],
                 hasVariants: data.hasVariants,
-                variantConfigs: data.hasVariants ? data.tiers : [],
-                variants: data.hasVariants ? data.variants?.map(v => ({
+                variantConfigs: data.hasVariants ? data.tiers?.map((t) => ({
+                    name: t.name,
+                    options: t.options.map((opt) => ({ value: opt }))
+                })) || [] : [],
+                variants: data.hasVariants ? data.variants?.map((v) => ({
                     name: v.variantName,          // Payload schema field: 'name'
                     sku: v.skuCode,               // Payload schema field: 'sku'
                     price: v.price,
                     compareAtPrice: v.discount,
                     stock: v.stock,
-                    options: v.variantName.split(' - ')
-                })) : [],
+                })) || [] : [],
                 seo: {
                     title: data.metaTitle,
                     description: data.metaDescription,
                 },
-                status: 'draft', // Standard
+                ...(isNew ? { status: 'draft' } : {}),
                 currency: 'MYR'
             }
 
@@ -161,36 +169,36 @@ export default function ProductEditPage() {
             })
 
             if (res.ok) {
-                toast.success(isNew ? 'Product created successfully' : 'Product updated successfully')
+                toast.success(isNew ? t.dashboard.products.form.productCreated : t.dashboard.products.form.productUpdated)
                 setTimeout(() => {
                     router.push('/products')
                 }, 1500)
             } else {
                 const errData = await res.json()
-                throw new Error(errData.error?.message || 'Failed to save')
+                throw new Error(errData.error?.message || t.dashboard.products.form.somethingWentWrong)
             }
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Network error'
+            const message = err instanceof Error ? err.message : t.dashboard.products.form.networkError
             toast.error(message)
             throw err; // throw to let ProductForm know it failed (so it stops isSaving state if it had one)
         }
     }
 
     const handleDelete = async () => {
-        if (!confirm('Are you sure you want to delete this product?')) return;
+        if (!confirm(t.dashboard.products.form.confirmDelete)) return;
         try {
             const res = await fetch(`/api/products/${productId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
             if (res.ok) {
-                toast.success('Product deleted successfully');
+                toast.success(t.dashboard.products.form.deleteSuccess);
                 router.push('/products');
             } else {
-                toast.error('Failed to delete product');
+                toast.error(t.dashboard.products.form.deleteFailed);
             }
         } catch (err) {
-            toast.error('Network error');
+            toast.error(t.dashboard.products.form.networkError);
         }
     }
 

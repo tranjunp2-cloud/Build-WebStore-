@@ -6,15 +6,15 @@ import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
 export type Category = {
-    id: string
+    id: string | number
     name: string
     breadcrumbs?: string
 }
 
 interface CategorySelectProps {
     categories: Category[]
-    selectedIds: string[]
-    onChange: (ids: string[]) => void
+    selectedIds: (string | number)[]
+    onChange: (ids: (string | number)[]) => void
     error?: string
     className?: string
 }
@@ -35,7 +35,7 @@ export function CategorySelect({ categories, selectedIds, onChange, error, class
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    const toggleCategory = (id: string) => {
+    const toggleCategory = (id: string | number) => {
         if (selectedIds.includes(id)) {
             onChange([])
         } else {

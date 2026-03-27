@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
-import { X, Trash2, Pencil } from 'lucide-react'
+import { ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 // We extend the Product type locally as page.tsx might not have all fields typed
@@ -55,7 +55,13 @@ interface ProductQuickViewModalProps {
 
 function getImageUrl(image: ProductImage | string | null): string | null {
     if (!image || typeof image === 'string') return null
-    return image.url || image.thumbnailURL || null
+    const url = image.url || image.thumbnailURL || null
+    if (!url) return null
+    try {
+        return new URL(url, 'http://localhost').pathname
+    } catch {
+        return url
+    }
 }
 
 function formatPrice(price: number, currency: string) {
@@ -114,23 +120,23 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
     }
 
     return createPortal(
-        <div className="hidden md:flex fixed inset-0 z-[9999] justify-end bg-[#0B0E14]/80 backdrop-blur-sm animate-in fade-in duration-200"
+        <div className="hidden md:flex fixed inset-0 z-[9999] justify-end items-end bg-[#0B0E14]/80 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={onClose}
             style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
             <div 
-                className="relative flex flex-col md:flex-row w-full max-w-[960px] h-full bg-[#191C22] shadow-[-25px_0_50px_-12px_rgba(0,0,0,0.5)] border-l border-white/[0.05] animate-in slide-in-from-right duration-300"
+                className="relative flex flex-col md:flex-row w-full max-w-[1024px] h-[calc(100vh-32px)] bg-[#191C22] rounded-tl-[16px] shadow-[-25px_0_50px_-12px_rgba(0,0,0,0.5)] border-t border-l border-white/[0.05] animate-in slide-in-from-right duration-300"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Close Button - absolute to the drawer itself */}
                 <button 
                     onClick={onClose}
-                    className="absolute top-6 right-6 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                    className="absolute top-[32px] -left-[18px] z-20 w-[36px] h-[36px] flex items-center justify-center rounded-full bg-[#0B1120] border border-white/10 text-white hover:bg-white/10 transition-colors shadow-[0_0_15px_rgba(0,0,0,0.5)]"
                 >
-                    <X className="w-5 h-5" />
+                    <ChevronRight className="w-5 h-5" />
                 </button>
 
                 {/* Column 1: Visuals & Core Status (Node 30928:3970) */}
-                <div className="flex flex-col w-full md:w-[480px] shrink-0 bg-[#0B0E14] border-r border-white/5 h-full overflow-y-auto custom-scrollbar p-[32px] gap-[24px]">
+                <div className="flex flex-col w-full md:w-[480px] shrink-0 bg-[#0B0E14] rounded-tl-[16px] border-r border-white/5 h-full overflow-y-auto custom-scrollbar p-[32px] gap-[24px]">
                     
                     {/* Main Image */}
                     <div className="flex flex-col bg-[#1D2026] rounded-[8px] w-full aspect-square shrink-0 overflow-hidden relative border border-white/5">
