@@ -329,6 +329,36 @@ const MIGRATIONS = [
     name: 'tenants.payments_qr_image_id',
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_qr_image_id integer;`,
   },
+  // ── Tenants: SSO Provisioning fields (F02) ──
+  {
+    name: 'tenants.customer_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS customer_id varchar;`,
+  },
+  {
+    name: 'tenants.service_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS service_id varchar;`,
+  },
+  {
+    name: 'tenants.pack_code',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS pack_code varchar;`,
+  },
+  {
+    name: 'tenants.order_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS order_id varchar;`,
+  },
+  {
+    name: 'tenants.address',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS address jsonb;`,
+  },
+  {
+    name: 'tenants.meta_data',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS meta_data jsonb;`,
+  },
+  // ── Users: Phone field (F02) ──
+  {
+    name: 'users.phone',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone varchar;`,
+  },
 ];
 
 async function runMigrations(pool) {
