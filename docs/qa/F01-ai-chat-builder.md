@@ -1,123 +1,237 @@
-# Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F01 - AI Chat Builder
-> **Phiên bản:** 5.7 (57-Case Exhaustive Matrix AC-Mapped) | **Cập nhật:** 2026-03-19 | **Thực hiện:** QA Team
-> **Nguồn Tham chiếu:** PRD (`F01-ai-chat-builder.md`), User Stories (26 ACs), Figma Design (Node 30607:17719)
-> **Kỹ năng ứng dụng (.agent):** BDD (Gherkin Expectations), Performance SLA Validators, Security Contexting, Automation Locator Healer, Payload CMS DB Assertions.
+# Kiểm Thử Chi Tiết: F01 — AI Website Builder
+> **Phiên bản:** 6.0 (85-Case Full Coverage) | **Cập nhật:** 2026-03-27 | **Thực hiện:** QA Team
+> **Nguồn tham chiếu:** PRD v2.1 (`F01-ai-builder.md`), User Stories 10 US / 26 ACs (`F01-ai-builder-stories.md`), Figma Design (Desktop + Mobile)
+> **Nhánh làm việc:** `qa/F01-testcase-update`
 
 ---
 
-## 1. Mục Tiêu (Objective)
-Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lượng toàn diện cho tính năng khởi tạo Website qua hội thoại AI (AI Chat Builder - F01). Mục tiêu cốt lõi là đạt độ phủ (Coverage) 100% cho 8 User Stories, bao quát chính xác **26 Acceptance Criteria (ACs)** đã định nghĩa tại tài liệu đặc tả và các yêu cầu thẩm mỹ UI từ bản thiết kế Figma hiện tại.
+## 1. Mục Tiêu
 
-Bộ kiểm thử bao gồm **62 kịch bản chi tiết** (Positive + Negative edge cases). Toàn bộ kịch bản được tổng hợp trong Unified Matrix.
+Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng **AI Website Builder (F01)** — cho phép người dùng SME nhập thông tin doanh nghiệp qua form và để AI tự động tạo website hoàn chỉnh.
+
+**Phạm vi bao phủ:**
+- 10 User Stories (US-F01-01 → US-F01-10) với 26 Acceptance Criteria
+- 26 Functional Requirements (FR-01 → FR-26)
+- 9 Business Rules (BR-01 → BR-09)
+- Responsive Design: Desktop (1920×1080) + Mobile (375px)
+
+**Tổng số kịch bản:** **85 test cases** (Positive + Negative + Edge + Mobile)
+
 ---
 
-## 2. Test Environment (Môi trường Kiểm thử)
-| Biến (Variable) | Yêu cầu (Requirements) |
+## 2. Môi Trường Kiểm Thử
+
+| Hạng mục | Yêu cầu |
 |---|---|
-| Môi trường (Env) | Staging / Pre-Production |
-| Browsers | Chrome (v110+), Firefox (v105+), Safari |
-| Devices (Responsive) | Desktop (1920x1080), Mobile (iPhone 14 Pro 375px) |
-| Test Data & SLA | Input XSS/SQLi Vectors, Network Throttling, SLA Metrics `<60s` |
+| Môi trường | Staging / Pre-Production |
+| Trình duyệt | Chrome (v110+), Firefox (v105+), Safari |
+| Thiết bị | Desktop (1920×1080), Mobile (iPhone 14 Pro — 375px) |
+| Dữ liệu kiểm thử | Input XSS/SQLi vectors, network throttling, SLA metrics `<60s` |
+| URL | `https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app` |
 
 ---
 
-## 3. Unified Test Cases (Traceability Matrix)
+## 3. Ma Trận Kiểm Thử Tổng Hợp (Traceability Matrix)
 
-| ID | Tham chiếu | LOẠI | TIÊU ĐỀ (Scenario) | CÁC BƯỚC THỰC HIỆN & DỮ LIỆU (Steps & Test Data) | KẾT QUẢ MONG ĐỢI GHERKIN & DB CHECKS (Expected) | MỨC ĐỘ | AUTO |
+### 3.1 Xác Thực Người Dùng (Authentication)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **[FIGMA US-00] Xác thực Người dùng (Authentication)** |
-| **TC-F01.01** | `Design` | `UI` | **[Negative]** Validation Form Đăng Ký (Password Strength) | **1.** Tới `/signup`. Nhập Name, Email hợp lệ.<br>**2.** Nhập Password: `abcxyz12` (Không in hoa). | **GIVEN** User nhập Pass thiếu In Hoa **WHEN** Submit **THEN** Nut đăng ký Disabled.<br>UI Đỏ 1 mục checklist `One uppercase`. | High | [ ] |
-| **TC-F01.02** | `Design` | `Sec` | **[Negative]** Ràng buộc SQL Injection Đăng nhập | **1.** Tới `/login`. Email nhập: `admin' OR 1=1--`.<br>**2.** Nhập Pass ngẫu nhiên, ấn Submit. | Request trả Http 401. Không lỗi SQL ra ngoài màn hình. Backend Sanitized payload sạch sẽ. | Blocker | [x] |
-| **TC-F01.03** | `Design` | `Func` | **[Positive]** Đăng nhập thành công với Remember Me | **1.** Điền Email & Pass chuẩn xác.<br>**2.** Tích ô "Remember me" và Login. | **THEN** Điều hướng `/builder/new`. Trình duyệt ghi nhận Auth Cookie sống tới 30 ngày (Expire Limit). | Blocker | [x] |
-| **[FIGMA Design System] Kiểm tra Pixel-Perfect & Trạng Thái Giao Diện** |
-| **TC-F01.03a** | `UI/UX` | `Design` | **[Positive]** Typography & Color Scheme (Design System) | **1.** Mở màn hình `/builder/new`.<br>**2.** Dùng công cụ Inspect (F12) soi các Headline và Nút bấm. | Mã màu Primary (VD: `#1D4ED8`), Secondary, Error đỏ, và Font chữ (VD: `Inter` hoặc `Roboto`) phải khớp 100% với Figma Design Token. Không dùng font mặc định của trình duyệt. | High | [ ] |
-| **TC-F01.03b** | `UI/UX` | `Layout` | **[Positive]** Layout Bố Cục Phân Trữ Khung Chat (Grid System) | **1.** Chát văn bản dài.<br>**2.** Đo khoảng cách Margin/Padding của Bong bóng chat (Bubble). | Khoảng cách Padding giữa các Bubble chuẩn xác (VD: `16px`). Border Radius bo góc mềm mại (VD: `8px`). Không bị méo xệch tỷ lệ khi khung chữ dài ra. | High | [ ] |
-| **TC-F01.03c** | `UI/UX` | `State` | **[Positive]** Trạng Thái Khung Chat Rỗng (Empty State Visuals) | **1.** Vào `/builder/new` khi chưa gõ bất cứ từ nào.<br>**2.** Quan sát phần màn hình trắng bên phải. | Hiển thị hình ảnh minh họa (Illustration) mượt mà kèm dòng chữ gợi ý "Hãy bắt đầu bằng cách mô tả cửa hàng của bạn", không để trang trắng bóc gây hụt hẫng. | Medium | [ ] |
-| **TC-F01.03d** | `UI/UX` | `Interact`| **[Positive]** Trạng Thái Hover & Active Của Các Nút CTA | **1.** Dùng chuột rê (Hover) và Click giữ (Active) lên nút `[Gửi lệnh]` hoặc `[Publish]`. | Nút bấm phải có hiệu ứng CSS Transition mượt mà chuyển màu (Darken 10% khi Hover, Scale down 0.98 khi Click). Thể hiện nút có hồn và phản hồi tốt. | Medium | [ ] |
-| **TC-F01.03e** | `UI/UX` | `State` | **[Positive]** Hiển Thị Khung Tải Dữ Liệu Ảo (Skeleton Loading UI) | **1.** Gửi lệnh tạo Website.<br>**2.** Nhìn sang khung Preview trong 3 giây đầu. | Box Preview phải hiển thị các khối xám chớp nháy (Shimmer effect / Skeleton) tạo cảm giác đợi mượt mà, thay vì khung trắng toát (White Screen) chờ DOM load. | High | [ ] |
-| **[US-F01-02 & US-F01-05: Store Setup & AI Builder Input Forms] (Step 1/3)** |
-| **TC-F01.04** | `Design` | `UI` | **[Positive]** Hiển thị Form thông tin UI Step 1/3 | **1.** Truy cập luồng Create AI Website. | Màn hình Form thay vì Chat. Hiển thị đủ Input: Business Name, Industry, Products, Style Button Single. | Blocker | [x] |
-| **TC-F01.05** | `Design` | `Boundary`| **[Negative]** Ngăn chặn Form thiếu trường bắt buộc | **1.** Để trống toàn bộ Box.<br>**2.** Nhấn `Continue`. | UI Báo lỗi bắt buộc ở `Business Name` (`Must be at least 3 chars`) và `Industry`. DOM chặn không bắn API POST. | High | [ ] |
-| **TC-F01.06** | `Design` | `Func` | **[Positive]** Trạng thái chọn Single-Select Industry | **1.** Hover/Click "Tech / IT".<br>**2.** Hover/Click "Restaurant". | **WHEN** Nhấp Button thứ 2 **THEN** Chuyển style `.active`, Button 1 bị gỡ active. Store chỉ nhận 1 Value duy nhất. | Medium | [ ] |
-| **TC-F01.07** | `Design` | `Sec` | **[Negative]** Injection XSS trong Text Phụ trợ | **1.** Điền Prompt Products: `<iframe src="javascript:alert('XSS')">`. Bấm Continue. | Payload được HTML encode lúc Submit. Request OpenAI an toàn. Website HTML sinh ra escape chuỗi string trong thẻ. | Blocker | [x] |
-| **[US-F01-01: AI Builder — Generate Site from Structured Input]** |
-| **TC-F01.08** | `AC-1` | `Perf` | **[Positive]** Stream khởi tạo web thành công dưới 60s | **1.** Submit Business Name và Industry hợp lệ. | **THEN** Bắt đầu kết nối SSE dưới `2000ms`. Sự kiện Message `done` phải đến trước cột mốc StartTime `60,000` ms. | Blocker | [x] |
-| **TC-F01.09** | `AC-1` | `UI` | **[Positive]** Giao diện Live Preview Update Realtime | **1.** Quan sát iFrame vùng phải trong quá trình Generation (Khoảng giây 10 - 20). | Lần lượt nhận Component Skeleton qua Component Text Block Cập nhập Mượt Mà theo chuỗi Stream của Backend. | High | [ ] |
-| **TC-F01.10** | `AC-2` | `NLU` | **[Positive]** Cơ chế Phản hồi hỏi thêm (Clarifying) | **1.** Submit thông tin quá nghèo nàn: "Web Bán Hàng". | **GIVEN** Dữ liệu thiếu intent **WHEN** API Trigger **THEN** AI hỏi thêm để làm rõ loại mặt hàng đang bán. | High | [x] |
-| **TC-F01.11** | `AC-2` | `Logic` | **[Edge]** Tự động Khởi tạo (Assume) sau 2 lần hỏi | **1.** User cố lặp trả lời cụt (VD: "Không biết"). Lặp lại 2 Turn. | Từ Turn thứ 3, Cắt chuỗi Prompt hỏi đáp, LLM chốt Assume giá trị Default ngẫu nhiên và Lệnh tạo Web bắt buộc chạy. | Medium | [x] |
-| **TC-F01.12** | `AC-3` | `Flow` | **[Positive]** Cụm CTAs khi Build Done Hoàn thành | **1.** Chờ Progress Bar Bar 100%. | Trạng thái Editor kích hoạt 2 nút CTA bự: `[Tinh chỉnh]` (Go Edits) & `[Publish ngay]`. CMS Auto lưu tệp vào Draft Table. | High | [x] |
-| **TC-F01.13** | `AC-4` | `Data` | **[Positive]** Khôi phục Session SessionRecovery (F5) | **1.** Luồng chạy Tới 50%, Tắt trình duyệt hoặc bấm F5 Reload. | **WHEN** Khởi tạo lại Page **THEN** Call GET `/api/drafts`. Giao diện không Drop Progress bằng 0%, nối lại đúng điểm 50%. | High | [x] |
-| **TC-F01.14** | `AC-5` | `Edge` | **[Negative]** Timeout Lỗi 500 Từ API OpenAI | **1.** Mô phỏng Timeout Mạng Node OpenAI. | Thanh Progress Ngắt. Băng rôn Error Toast Đỏ: `Không thể tạo website` xuất hiện. | High | [ ] |
-| **TC-F01.15** | `AC-5` | `UX` | **[Positive]** Khôi phục dữ liệu Mồi khi Retry OpenAI Fail | **1.** Tiếp nối TC-F01.14. Nhìn vào khung Input Prompt/Form. | **EXPECTED** Dữ liệu TextField đã gõ trước đó không bị Xóa/Reset Blank. Nút `Làm Lại` giữ nguyên Body Request cũ. | Blocker | [x] |
-| **TC-F01.16** | `AC-8` | `Mobile`| **[Positive]** Toggle Chế độ Màn hình nhỏ 375px | **1.** Chạy Mobile Simulator Window. | **THEN** Chatbot / Form Layout ăn Form 100% Mobile Screen. iFrame Preview tự động Ẩn (Display None). Có Icon Mắt bật qua lại. | Low  | [ ] |
-| **TC-F01.17** | `AC-9` | `Func` | **[Positive]** Cấu trúc 4 Trang Bắt Buộc Tạo ra | **1.** Mở Site vừa gen xong. Crawler Link Navigation. | Crawler tìm thấy chính xác 4 HyperLinks Anchor Tag: (1) `Homepage`, (2) `About`, (3) `Products`, (4) `Contact` hoạt động trả 200 Code. | Blocker | [x] |
-| **TC-F01.18** | `AC-10` | `Theme` | **[Positive]** Lấy Layout Category F&B Food | **1.** Nhập Input: "Mở Quán Phở bò Nam Định". Gen rùi Dòm Layout. | Layout CMS chọn Filter Component có `MenuFoodBlocks` Object. Cấu Hình Theme Tone Màu Ấm. | High | [ ] |
-| **TC-F01.19** | `AC-10` | `Theme` | **[Positive]** Lấy Layout Thẩm Mỹ Khối Spa/Beauty | **1.** Nhập Input: "Mở tiệm Nails Spa". Gen Dòm Layout. | Layout CMS Gen xuất Gallery Mẫu Nails Bóng, Tông màu chủ đạo chuyển sang Pastel/Mềm mại Nữ tính thanh nhã. | High | [ ] |
-| **[US-F01-03: AI Image Generation for Store]** |
-| **TC-F01.20** | `AC-6` | `API` | **[Positive]** Tạo Ảnh DALL-E Hero Banner Nhúng vào Payload CMS | **1.** Prompt Gen cửa hàng thú cưng. | DB Object Layout trả tham số URL Ảnh. Src Ảnh trỏ về Payload CMS Uploaded `.../media/dalle-img.jpg` Thành công. Node Resize đúng 1200x400px. | Blocker | [x] |
-| **TC-F01.21** | `AC-6` | `Edge` | **[Negative]** Fallback sang Stock Image (Khi API Ảnh Fail) | **1.** Ép Mock Function DALLH_Fail. Generate site. | Hệ System không Block Generation. Trang web kết xuất gán src thẻ img Hero thành file Base Local Fallback (`stock-pet.png`) hợp lí. | High | [x] |
-| **[US-F01-07: Post-Generation Confirm & CMS Redirect]** |
-| **TC-F01.22** | `AC-7` | `Flow` | **[Positive]** Đẩy Phát Hành Live Cloud Domain Dưới 30 Giây | **1.** Tại Page Draft Build, Click Action "Publish ngay". | Trigger CMS Route Ghi Publish. Bắt Subdomain Router trong `30,000ms`. Call Http.get(`slug.primeweb.app`) Passed StatusCode 200. | Blocker | [x] |
-| **TC-F01.23** | `AC-18` | `UI` | **[Positive]** Modal Post-Publish Highlight Thông Điệp | **1.** Kết thúc Lệnh Publish Post. Chờ Popup Modal Hiện Lên. | Màn Hình Hiển Thị Block Label Link Tên Miền Màu Xanh. Gồm Các Group Action Buttons: "Copy Link", "View Live Site", "Goto Admin". | Medium | [ ] |
-| **TC-F01.24** | `AC-19` | `Sec` | **[Positive]** Seamless SSO CMS Redirect (Admin Board Auth) | **1.** Nhấp Label Click To "Go to Admin Dashboard". | Payload Route Pass Auth JWT Header Check. User Đi Vào `/admin/collections/sites` Thành công, Không bắt phải Bơm Key Pass/Email Log Lại. | Blocker | [x] |
-| **TC-F01.25** | `AC-20` | `State` | **[Positive]** Thao Tác Continue Editing Đẩy Mode | **1.** Nhấp Label Click To "Continue Editing". | Controller Chuyển Hướng Route App URL `/editor/:id`. Status Field Database Page Đã Up Tái từ Draft Sàng Label Nhãn Published. | High | [x] |
-| **TC-F01.26** | `AC-21` | `Func` | **[Positive]** Copy To Clipboard API Native Support Logic | **1.** Nhấp Link Text Nút Copy Link Trực Trên Cụm Panel Success. | Notification Pop Hiện Text `Copied ✓`. Browser Read Text Document Clipboard trả Giá Trị Khớp Mã SubDomain Slug URL Chính Xác 100%. | Low | [ ] |
-| **[US-F01-06: Multilingual Site Output]** |
-| **TC-F01.27** | `AC-11` | `Locale`| **[Positive]** Hiển thị Cấu Trúc Khởi Màn Bằng Tiếng Anh Ngay | **1.** Xóa Session, Mở Trình `/builder/new` Account Tươi Trắng. | Bot Cất Giọng Chào Bằng Text Literal Ngôn English `< 2 Cặp Câu` (Vd: *"Hi! I'm your AI Builder"*), Có Khối Dòng Sample Example Text Guide. | Medium | [ ] |
-| **TC-F01.28** | `AC-12` | `NLU` | **[Positive]** NPU Tiếng Việt - Nhận Dạng Context Vietnamese | **1.** Send Text: *"Tôi muốn xây trang bán cơm sườn"*. | Context Trigger Model Detect `vi`. Lập Tức Dịch Base Prompt Chuyển Luồng Hành Văn Thành Thạo Tiếng Việt Mời Khách Hàng. | High | [ ] |
-| **TC-F01.29** | `AC-12` | `NLU` | **[Positive]** NPU Mã Lai - Nhận Dạng Bahasa Melayu | **1.** Send Text: *"Kedai Makan sedap"*. | Language Switcher Detect `ms`. Bot Reply Trở Lại Dựa Trên Base Lang MS (Formal). Ghi File Header Locales Lưu Data DB Tờ Mẫu Trang BM. | High | [x] |
-| **TC-F01.30** | `AC-13` | `Logic` | **[Positive]** Quick-reply Chips thu thập Option nhánh | **1.** Nhấp Tap Box Text Rời Label Chip Tag `[👗 Fashion]`. | Thay Màn Hình Hiện Text Gõ Rời Cục, Chip Phát Đi Tác Cử Send Trực Tiếp Context Fashion Tương Đường Chuỗi Type. | Low | [ ] |
-| **TC-F01.31** | `AC-13` | `Limit` | **[Negative]** Trạng Lặp Bot Khống Chế Limit Cố Định Không Quá Vòng 4 | **1.** Chat Rác Text "hmmm..." Qua Lại Trả Lời Vòng Thứ 4 | Lệnh System Config Limit Cứng (IF turn >= 4). Trực Cấp Bot Ngắt Giao Thức Hỏi Cầm Khách, Kick Lệnh Generator Execute Tạo Website Khống. | High | [x] |
-| **TC-F01.32** | `AC-14` | `NLU` | **[Positive]** Trích Suất Khói Dữ Liệu Thực Thể Multi Entity 1 Điểm | **1.** Send Chuỗi: *"Tiệm Coffee Sữa đá Quận 1 Mở 2 Năm"* 1 Câu Đơn. | Logic Node Bóc Được: Object { loai: 'coffee', viTri: 'q1', years: 2 }. Trả Xác Nhận Không Hỏi Rời Rạc Từng Mẩu Lại Nữa. | Medium | [ ] |
-| **TC-F01.33** | `AC-15` | `Locale`| **[Positive]** Ngữ Nghĩa Phát Tiếng Việt CopyWrite Chuẩn Lõi SME | **1.** Test Tròn Luồng Từ Điểm Cài Tiếng Việt Output Render Ra. | Body Các Text Khối Nút Nút Kêu Gọi Nhu Cầu Mua Hàng Không Lạch Đạch Text Ngô Nghê, Thích Nghi Hoàn Toàn Cách Văn Doanh Nghiệp Việt. | High | [x] |
-| **TC-F01.34** | `AC-15` | `Locale`| **[Positive]** Ngữ Nghĩa Phát Bản BM Formal Copywrite Tròn Text | **1.** Test Tròn Luồng Context Tọa Nhánh BM Ra Output Hàng Cuối. | Lệnh Text Content Của Navigation Và Body Paragraph Chuẩn Bahasa Melayu Lịch Sự Cho Business Malaisia Thay Vì Indonesia Locale Mix. | High | [x] |
-| **TC-F01.35** | `AC-16` | `Func` | **[Positive]** Tùy Chọn Cấp Modal Build Nhánh Version Tiếng Anh Kẹp Nách | **1.** Build Xong App Local. Dừng Tại Màn Suggest. Nhấp Nút Option Suggest Bơm English. | Chạy Nạp Tool Pipeline Lệnh Generate Song Song Branch Content Thứ 2. Trả Link Bản Translate Node Text Bằng Tiếng Anh Full Lắp Nhanh Lẹ. | Medium | [ ] |
-| **TC-F01.36** | `AC-17` | `Edge` | **[Negative]** Xử lý Fallback Tiếng Anh với Ngôn ngữ hiếm | **1.** Send Text Tiếng H-Mông Hoặc Arabic `أريد بناء` Không Support. | Không Sập Cục CMS Server Backend. Xử Lý Rơi Khung Data Text Content Toàn Cầu Tiếng Anh (English Fallback). Nhắc Thông Toast Báo Vận. | High | [x] |
-| **[US-F01-08: Drag-and-Drop Block Reorder in Builder Preview]** |
-| **TC-F01.37** | `AC-22` | `UX` | **[Positive]** Tương Tác Cấp Drag Chuột Kéo Lê Chuyển Khối Component | **1.** Desktop Click Ngay Div Điểm Biểu Tượng Grid Lấy Chuột Kéo Kẹp Khối Products Đẩy Lên Trên Hero Block Bỏ Ra.| Khối Target Đổi Vị Trí Node Tới Điểm Hero Trước Đó. Thay Đổi React Chỉnh Order Áp Ngay Vị Trí Mới. Preview Frame Không Đảo Cục Reload Reload Flash. | Blocker | [ ] |
-| **TC-F01.38** | `AC-22` | `Func` | **[Positive]** Đồng Bộ Đơn Cấu Trúc Khối Bọc Render Của BuilderStore Mới | **1.** Kéo Blocks Xong Tại Web Client Check Biến BuilderStore Local Var Status.| Datalist Array Khối Element Thay Đổi Cặp Index Lịch Sự Trong Client Trạng Thái Phản Xả, Phục Vụ Nạp Dữ Liệu Call Lệnh Publish Cấp Sợi Chốt. | High | [ ] |
-| **TC-F01.39** | `AC-23` | `UI` | **[Positive]** Cầm Bắt Giao Diện Ánh Xạ CSS Transition Smooth Bắt Trọng Vị | **1.** Nhấp Kéo Khối Đang Di Trên Không Trung (Drag IN-Progress Phase).| Mảnh DOM Nguồn Thay Đổi Ánh Opacity Dịch Hạ Thang Nhẹ 0.7 Chỉ Độ Chướng Kèm Box Shadows. Đường Threshold Highlight Sáng Gợi Nền Target Điểm Xác Nhận Đi Đặt. Thả Khối Cài Hiệu Ứng Bắt Slide In Frame Ngắn Animation (200~300ms). | Low | [ ] |
-| **TC-F01.40** | `AC-24` | `DB` | **[Positive]** Payload Layout SortOrder Push Đồng Vị Database Object Storage Lệnh| **1.** Kéo Layout Hoàn Chỉnh Mọi Điểm Index. Gọi Save Nhấn Publish Action Button.| Đóng Gói Yêu Cầu `PATCH/PUT` File CMS Payload Đẩy Cây Mảng Array Tác Vụ Ghi Object Dọc `page.layout.sortOrder`. Mở Cấp Call DB Tìm Array Render Đích Trả Code Map 100% Cấu Hình Sort Vừa Kéo Tại Màn Preview. | Blocker | [x] |
-| **TC-F01.41** | `AC-24` | `DB` | **[Positive]** Layout Bơm Check Đồng Bộ Tại Website Phía Mắt User Ngoại Trái| **1.** Đổ Xong Bước TC-F01.40. Mở Cửa Sổ Trình Duyệt Bằng Nhánh External Khách Hàng View Target Trực Live Web Subdomain Vừa Gọi Up Đi.| Dữ Liệu Bố Cục Thật Trên URL Public Mả Giống Tuyệt Bức Với Phiên Render Móng Test Vừa Kéo Trước Khi Đẩy Save Xuống Không Sai Lệch Điểm Thang. | High | [x] |
-| **TC-F01.42** | `AC-25` | `Mobile`| **[Positive]** Lật Trọng Năng Cấp Longpress Touch Cho Mobile Screen | **1.** Mobile View Resize Tương Kích Khung. Điểm Kích Mở Con Mắt Bật View Cục Mảnh Cắt Preview Touch Chạm Chắn Sát Khay HandGrip Block Chực Lưu Rê Giữ 500MS Mới Lăn Cục Touch. | Node DOM Nhả Sự Kiện Context Drag Được. Thả Lùi Tay Để Swap Khối Touch Pad Mượt Chế Ngự Ràng Buộc Element. | High | [ ] |
-| **TC-F01.43** | `AC-25` | `Mobile`| **[Negative]** Chặn Lỗi Ráp Window Scroll Cảm Ứng Di Touch Kéo Conflict Nhau | **1.** Touch Cuộn Động Rê Drag Handle. Lăn Cục Ngón Tay Căng View Trên Tab Chạm Vừa Di Cục Bất Kỳ Bọc View Y Window.| Khóa Freeze Hàm Native CSS Javascript Ghi Mệnh `touch-action: none` Ở Trình Scroll Bar Kín Trên Khay Y. Cục Kéo Duy Nhất Ăn Điểm Touch. Quá Trình Không Bị Lấn Cấn Cuộn Web Rơi Tụt Kéo Không Tới Block Đích. | High | [ ] |
-| **TC-F01.44** | `AC-26` | `Logic` | **[Negative]** Ràng Buộc Cơ Sở Core Cấp Thiết Chống Xê Dịch Top Navbar Header Khối Block Lên Nóc| **1.** Hover Trỏ Pointer Lên Tít Cục Thẻ Block Lõi Header Navigation Dọc Lưng Layout Trái Chóp. Nhắm Bó Cục Lép Click Di Lôi Handle.| Không Phát Tín Hiệu Grip Biểu Tượng Kéo. Nhồi Tooltip Info Thông Báo: "Navigation Phụ Định Fixed". Thuật Toán Drop Z-Index Ngăn Cường Chế Ngự Header Đảo Thấp. | Blocker | [ ] |
-| **TC-F01.45** | `AC-26` | `Logic` | **[Negative]** Miễn Trừ Dây Khối Chức Năng Cố Fix Vị Cuối Đáy Mép Chân Trang Element Footer Cuối Cục| **1.** Kéo Khối Text Body Hoặc Ảnh Đi Tìm Cọc Rễ Footer Kích Block Drag Lút Xuống Khay Dưới Cục Footer. Nhắm Thổi Đáy.| Bất Thành Thang Điểm Insert Chèn Target Thềm DropZone Đáy Của Khay Khung Footer Cuối Site Hoàn Toàn Bị Block Nốt Chữ Ký Fix Chống Xê Tròn Trịa Vỡ Bóp Mảng Thiết Kế Cứ Điểm Navigation Chéo. | High | [ ] |
-| **[Business Limits & Security Shield Rules] Dẫn Khung Cước, Hậu Check & Giới Hạn SLA AI Dịch Tầm Vóc** |
-| **TC-F01.46** | `FR-15` | `API` | **[Negative]** Bảo Mật Gateway Cấm Xả Lụt Quota Stress Lượng Gen Cũ Tạo Cước OpenAI Đội Gấp Khủng | **1.** Kích Cầu Tác Cửa Scripts Code Bypass API Flood Tấn Công POST `api/ai/generate-site` Nhanh 10 Request/Giây.| Middleware Hàng Tiền Tuyến Không Cho Payload Lọt Vô Request OpenAI Core Tốn Credits. Chặn Trả Mốc Code Response Rate Liimit `HTTP 429 Too Many Requests`. | Blocker | [x] |
-| **TC-F01.47** | `FR-15` | `DB` | **[Negative]** Rule Trữ Gói Cước Doanh Thu Tiền User Lõi Hạn Trần Plan Free Build AI | **1.** Tài khoản Free Plan, Build Web Thành Công 1 Lần. Bấm Build Lần 2.| Lớp Limit Cản Lượt Gen Lên Server. Gọi Modal UI "Upgrade Trả Cước Để Xây Dựng Tiệp Web". API Không Bắn. | Blocker | [x] |
-| **TC-F01.48** | `BR-01` | `Sec` | **[Negative]** Chống Trượt Bảng Data Tenant Identity Token Quyền Cấp | **1.** Đổ Chéo Identity Gán JWT User A gửi GET Request Lén Cắp Dữ Liệu Site Object Của User B Mật Bằng ID Trực Tiếp.| Rào Quyền CMS Tự Bóp Data Object Policy Ref Role Gán Quyền Cản Code Chuẩn Thắng `HTTP 403 Forbidden` Đoạt Mã. Đóng Chặn Dữ Liệu Site Object Tắt Hoạt. | Blocker | [x] |
-| **TC-F01.49** | `BR-06` | `Data` | **[Negative]** Hệ Điều Moderation Lớp Tường Cấm Xuyên Prompt Nguồn Phản Cảm Khóa Vĩnh| **1.** Nhập Prompt Từ Nội Khu NSFW (Khiêu dâm bạo lực lừa đảo).| API Rà Cản Policy Nhả Cảnh Cáo Bỏ Khối Output Request Fail Chặn Call OpenAI. 400 Bad Vi Phạm Chính Sách Không Build Độc Lệnh Dữ. Toast Màn Báo Lỗi Nguy Bạo Tác Bãi. | Blocker | [x] |
-| **TC-F01.50** | `BR-09` | `Cron`| **[Positive]** Hệ Tự Dọn Trút Trọn Khung Khỏa Tẩy Bản Data Draft 30 Days Out Cũ | **1.** Kí Mongo DB Collection Sinh Draft Site Object Age Date 30 Days+. Trigger Node Cron API Mất.| Payload CMS Delete Cục Bản Rác (Hard Rớt Bỏ Data Object Status Không Hoàn Lại). Chống Ngập Khung CSD Storage Tốc Tốn Giữ Size Gọng Cốc Sạch. | High | [x] |
-| **TC-F01.51** | `BR-09` | `Cron`| **[Positive]** Tẩy Không Dọn Status Published Xuyên Rule Nặng Đè Bảo Tồn Live Core Cứng Site Vàng | **1.** Draft File Document Khớp Mốc Đã Cũ 31 Days, Cố Tình Thay Thuộc `Status == 'Published'`. Đắp Cron Job Target Data Nhắm Trừng Phạt Quét Thu.| Móc Quét Tách Lọc Lệnh Delete. Object Cánh Không Phai Mực Vẹn Nguyên Giữ An Toàn Cho Web Đã Bắn Link Live Sống Chắc Lên Mạng Tránh Dọn Nhầm. | Blocker | [x] |
-| **TC-F01.52** | `Limit` | `ToKen` | **[Negative]** Độ Bàn Phím Khung Nhồi Ký Tự Input Text Quá Biên Bóp Chặn Sập OpenAI| **1.** Chạy Test Code Paster Paste Nhả Dump Chuỗi Text Payload > `10,000` Size Chars Tới Khay Text Send.| Khóa Lại Frontend Validator Cấm Đi Phím JS Ngăn Submit Payload Trả Cảnh Báo Limit. API Chặn Không Bắn Request Kể Cả Hack Bypass Khống Khống Ngắn Thổi Khủng OOM Bộ LLM Băm Đo Cỡ Nát Core Tràn Nhớ Memory Leak Out.| High | [x] |
-| **[AI NLU Edge-Cases] Đa Ngôn Ngữ Nâng Cao (Real User Behaviors)** |
-| **TC-F01.53** | `NLU` | `Lang` | **[Positive]** Nhận diện Trộn Ngôn Ngữ (Code-switching / Spanglish) | **1.** Nhập Lệnh: *"Mình muốn open 1 cái coffee shop ở district 1, phong cách vintage"*. | Nhận diện Base Locale là Tiếng Việt. Hiểu rành mạch các Entity Tiếng Anh (coffee shop, district 1, vintage) để chọn Theme quán Ký Cà Phê Cổ Điển mà không nhầm sang Tiết mục Tạp Hóa. | High | [ ] |
-| **TC-F01.54** | `NLU` | `Logic`| **[Positive]** Xử lý Sai Lỗi Chính Tả Nặng / Tiếng Lóng (Typoes/Slang) | **1.** Nhập Lệnh: *"Mk mún dg 1 wán nướng vĩa hè cho shvu sinh vin"*. | AI Model Tự Động Normalize Dịch Ra: *"Tôi muốn dựng 1 quán nướng vỉa hè cho sinh viên"*. Tạo Copywriting Trang Web Lịch Sự, Phát Triển Văn Phong Tone Chuyên Nghiệp. Block Toàn Bộ Tiếng Lóng Lên UI Trang. | High | [ ] |
-| **TC-F01.55** | `NLU` | `Flow` | **[Positive]** Bẻ Lái Chuyển Ngữ Giữa Chừng (Mid-thread Pivot) | **1.** Bắt đầu Chat bằng Tiếng Anh: *"I need a pizza store"*. AI Reply Tiếng Anh.<br>**2.** Nhập tiếp: *"À quên, làm web tiếng Việt giúp nha, khách ở Hà Nội"*. | Từ Turn thứ 2, AI Phản Ứng Gắt Chuyển Trục Về Tiếng Việt Cả Bề Mặt Hội Thoại Lẫn Nội Dung Content (Menu, Khuyến Mãi) Chuẩn Format VN (Ví Dụ: VNĐ thay vì USD). | High | [ ] |
-| **TC-F01.56** | `UI/UX` | `Font` | **[Boundary]** Hiển Thị Ký Tự Đặc Biệt (RTL & Double Byte) Trên Chat UI | **1.** Nhập Câu Có Ký Tự Tiếng Trung: *"Mở Nhà Hàng Dimsum 點心"*. Hoặc Ký Tự Ả Rập (RTL). | Font Chữ Khung Chat Render Đẹp Ký Tự Tượng Hình Mà Không Bị Lỗi \square. Ký Tự Không Làm Tràn Hay Nhảy Dòng Của Ô Text Input Nhập Lệnh. | Medium | [ ] |
-| **TC-F01.57** | `NLU` | `Logic`| **[Positive]** Yêu Cầu Gắn Nội Dung Song Ngữ Rõ Ràng Trong 1 Câu | **1.** Nhập Lệnh: *"Tạo web bán áo thun, nội dung để cả tiếng Anh và tiếng Việt đan xen nhé"*. | Trực AI Bóc Được Option Multi-Language Content. Đổ Dữ Liệu CMS Layout Ra Ví Dụ: Tương Trợ Thẻ H1 Có Sub-text Eng *(VD: Sản Phẩm Mới Mẻ / New Arrivals)*. | High | [ ] |
+| TC-F01.01 | Design | UI | **[Negative]** Validation đăng ký — Mật khẩu yếu | **1.** Truy cập `/signup`. Nhập Name, Email hợp lệ.<br>**2.** Nhập Password: `abcxyz12` (thiếu chữ in hoa). | Nút đăng ký ở trạng thái Disabled. Checklist mật khẩu đánh dấu đỏ mục "One uppercase". | High | [ ] |
+| TC-F01.02 | Design | Sec | **[Negative]** Chống SQL Injection khi đăng nhập | **1.** Truy cập `/login`. Nhập Email: `admin' OR 1=1--`.<br>**2.** Nhập mật khẩu bất kỳ, nhấn Submit. | Server trả HTTP 401. Không hiển thị lỗi SQL ra màn hình. Payload được sanitize. | Blocker | [x] |
+| TC-F01.03 | Design | Func | **[Positive]** Đăng nhập thành công với Remember Me | **1.** Nhập Email và Password chính xác.<br>**2.** Tích ô "Remember me", nhấn Login. | Chuyển hướng tới `/builder/new`. Auth Cookie có thời hạn 30 ngày. | Blocker | [x] |
 
 ---
 
-## 4. Hành trình Trải nghiệm End-to-End (E2E UAT Flow)
-_Mô tả kịch bản kiểm thử dựa trên hành vi tổng thể của Cửa hàng Bán lẻ (SME Owner)._
+### 3.2 Giao Diện & Thiết Kế (UI/UX Design System)
 
-**Kịch bản E2E Cốt Lõi:** 
-1. **[Bơm Context]** Đăng ký/đăng nhập User Account SME (Pass Auth Limit qua). Nhập Tên Quán, Ngành `Cake Bakery`, Text Body Content Prompt (Bao Phủ Lọc NLU Bơm Chuyển Ngữ Từ Tiếng Việt Đọc Sinh Text Mảng Sống Tường Lõi Thư Mẫu Tươi UI Form). Check Validate Quá Số Liền Lỗi Gửi Data Nhích Bọn Submit Hoàn Chốt Đỏ Ngang.
-2. **[Thổi Lõi AI Stream & Phanh Đáy Ảnh Error]** Nút Start Bày Nấu Tạo 4 Thang Lệnh Trang Home... Gắn Nền. Mắt Bắt Lệnh Khảo Đồng Tiến Chạp Chóp Thanh Lấy Kẽ Ngưng Nối Trình 60s Bật SLA SSE Bắn Nhịp Chặn Khối Hero Data Render Cấp DALL-E (Không sập Cấp Gọi Khung Khi Trượt Fail Đổ Rác Fallback Hình Mẫu Cứng Đóng). Kẽ Drop Kéo Lại DOM Rải Đều Order Blocks List 375px Mới Layout Rõ Lại Ổn.
-3. **[Xuất Bản Thầu Live & Single CMS Bypass]** Nhấp Nút Mắc Bật Bền Cloud Live Phát Publish Sub Domain `Cập-Bến-Bánh-ABC` Gắn Code Ping OK Mã 200 Cho Lần View Ngoài. Click Copy Link Rẽ Đám Bật Bền Redirect Khỏi Bố Trình Chặn App Lót Kẽ Mở Lưng Bơm Thằng Vào Core Panel Payload Admin Admin Điểm Edit Quản Lý Lại Core Dữ Data Cực Thoáng Thỏa Ký Nháy Lượt Code Chặn Tenant Isolation An Bình Tuyệt Cứng Chống Bơm Hỏa Tấn Rác Hack Móc.
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.03a | UI/UX | Design | **[Positive]** Typography & Color Scheme | **1.** Mở `/builder/new`.<br>**2.** Kiểm tra (Inspect F12) màu và font các Headline, Button. | Mã màu Primary, Secondary, Error khớp 100% với Design Token trong Figma. Sử dụng font `Inter` hoặc `Roboto`, không dùng font mặc định trình duyệt. | High | [ ] |
+| TC-F01.03b | UI/UX | Layout | **[Positive]** Bố cục khung Chat — Padding & Border | **1.** Nhập văn bản dài trong khung chat.<br>**2.** Đo khoảng cách Margin/Padding của Chat Bubble. | Padding giữa các Bubble đúng chuẩn (VD: `16px`). Border-radius bo góc mềm mại (VD: `8px`). Không bị méo khi nội dung dài. | High | [ ] |
+| TC-F01.03c | UI/UX | State | **[Positive]** Trạng thái trang trống (Empty State) | **1.** Truy cập `/builder/new` khi chưa nhập gì.<br>**2.** Quan sát phần preview bên phải. | Hiển thị hình minh họa kèm dòng chữ gợi ý (VD: "Hãy bắt đầu bằng cách mô tả cửa hàng của bạn"). Không để trang trắng. | Medium | [ ] |
+| TC-F01.03d | UI/UX | Interact | **[Positive]** Hiệu ứng Hover & Active trên nút CTA | **1.** Di chuột (Hover) và giữ chuột (Active) lên nút "Continue" hoặc "Publish". | Nút có hiệu ứng CSS Transition mượt: tối hơn 10% khi Hover, thu nhỏ nhẹ (scale 0.98) khi Click. | Medium | [ ] |
+| TC-F01.03e | UI/UX | State | **[Positive]** Skeleton Loading khi đang tạo website | **1.** Nhấn tạo website.<br>**2.** Quan sát khung Preview trong 3 giây đầu. | Preview hiển thị các khối xám nhấp nháy (Shimmer/Skeleton) thay vì màn hình trắng chờ tải DOM. | High | [ ] |
 
 ---
 
-## 5. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates)
+### 3.3 Form Nhập Liệu & Validation (US-F01-02 & US-F01-05)
 
-| Nhóm Kiểm thử (Criteria) | Trạng Thái (Status) | Ghi chú (Notes & Rules .Agent Trích Chọn) |
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.04 | AC-1 | UI | **[Positive]** Hiển thị đầy đủ Form nhập liệu (Step 1/3) | **1.** Truy cập luồng tạo website bằng AI (`/builder/new`). | Hiển thị Form (không phải Chat) gồm 4 trường: Business Name (required), Industry (chips/buttons required), Products/Services (required), Description (optional). Nút "Continue — AI will create your website →" ở cuối form. Sidebar phải hiện 3 bước: "1. Enter business information → 2. AI creates content & design → 3. Preview & Publish". | Blocker | [x] |
+| TC-F01.05 | AC-2 | Boundary | **[Negative]** Không cho submit khi thiếu trường bắt buộc | **1.** Để trống toàn bộ các trường bắt buộc.<br>**2.** Nhấn "Continue". | Hiển thị lỗi tại Business Name ("Must be at least 3 characters") và Industry. Form không gửi API request. | High | [ ] |
+| TC-F01.06 | AC-3 | Func | **[Positive]** Industry — Chỉ chọn được 1 (Single-Select) | **1.** Click chọn "Tech / IT / SaaS".<br>**2.** Click chọn "Restaurant / Cafe / F&B". | Khi chọn chip thứ 2, chip thứ 1 tự động bỏ chọn (mất trạng thái `.active`). Industry chỉ lưu 1 giá trị duy nhất. Cần verify tất cả 9 options: Restaurant/Cafe/F&B, Shop/Fashion/Ecommerce, Tech/IT/SaaS, Health/Dental/Clinic, Real Estate/Property, Portfolio/Freelancer/Agency, Education/Training, Gym/Fitness/Yoga, Other. | Medium | [ ] |
+| TC-F01.07 | Design | Sec | **[Negative]** Chống XSS Injection trong form | **1.** Nhập vào Products/Services: `<iframe src="javascript:alert('XSS')">`. Nhấn Continue. | Payload được HTML encode trước khi gửi. Request gửi tới API an toàn. Website được tạo ra escape chuỗi đúng cách. | Blocker | [x] |
+
+---
+
+### 3.4 Tạo Website Bằng AI (US-F01-01: AI Generation & SSE)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.08 | AC-1 | Perf | **[Positive]** Tạo website thành công dưới 60 giây | **1.** Nhập đầy đủ Business Name và Industry hợp lệ, nhấn "Continue". | SSE stream bắt đầu trong < 2 giây. Giao diện hiển thị 3 bước tiến trình: "✅ Analyzing business information" → "⏳ Generating content & design" → "Preparing preview". Toàn bộ quá trình hoàn thành trong < 60 giây. Form bị khóa (disable) trong suốt quá trình. | Blocker | [x] |
+| TC-F01.09 | AC-1 | UI | **[Positive]** Live Preview cập nhật theo thời gian thực | **1.** Quan sát iFrame preview bên phải trong quá trình tạo (khoảng giây 10–20). | Preview cập nhật mượt mà từng block theo chuỗi SSE stream. Có toggle **Desktop / Mobile** preview và nút **"View Full Preview"** để xem toàn màn hình. | High | [ ] |
+| TC-F01.10 | AC-2 | NLU | **[Positive]** AI hỏi thêm khi thông tin quá mơ hồ | **1.** Submit thông tin nghèo nàn: chỉ "Web Bán Hàng" ở Business Name, không có mô tả chi tiết. | AI phát hiện thiếu ngữ cảnh và yêu cầu bổ sung thêm thông tin (VD: loại mặt hàng đang kinh doanh). | High | [x] |
+| TC-F01.11 | AC-2 | Logic | **[Edge]** Tự động tạo website sau 2 lần hỏi thêm | **1.** Trả lời cụt lần 1 (VD: "Không biết").<br>**2.** Trả lời cụt lần 2. | Từ lượt thứ 3, AI ngừng hỏi, tự điền giá trị mặc định hợp lý và bắt đầu tạo website. | Medium | [x] |
+| TC-F01.12 | AC-3 | Flow | **[Positive]** Hiển thị CTAs sau khi tạo xong | **1.** Chờ quá trình tạo website hoàn thành 100%. | Xuất hiện thông báo thành công: "Website has been created successfully!" kèm thống kê (số sections, thời gian). Hiển thị 2 nút CTA: **"Dashboard"** (primary) và **"Open Editor"** (secondary). Bản nháp tự động lưu vào DB. | High | [x] |
+| TC-F01.13 | AC-4 | Data | **[Positive]** Khôi phục phiên làm việc khi Refresh (F5) | **1.** Trong lúc đang tạo (≈50%), nhấn F5 hoặc đóng trình duyệt.<br>**2.** Mở lại trang. | Gọi API `GET /api/drafts`. Giao diện không mất dữ liệu, tiếp tục từ điểm dừng (~50%). | High | [x] |
+| TC-F01.14 | AC-5 | Edge | **[Negative]** Xử lý lỗi khi API OpenAI timeout | **1.** Mô phỏng timeout mạng tới OpenAI. | Thanh tiến trình dừng lại. Hiển thị toast đỏ: "Không thể tạo website". | High | [ ] |
+| TC-F01.15 | AC-5 | UX | **[Positive]** Giữ nguyên dữ liệu form khi Retry | **1.** Tiếp nối TC-F01.14. Kiểm tra form nhập liệu. | Dữ liệu đã nhập trước đó không bị xóa. Nút "Thử lại" gửi lại request cũ mà không cần nhập lại. | Blocker | [x] |
+
+---
+
+### 3.5 Responsive Mobile — Form & Preview (US-F01-09)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.16 | AC-8 | Mobile | **[Positive]** Chuyển đổi chế độ xem trên mobile (375px) | **1.** Mở trang trên thiết bị mobile hoặc simulator 375px. | Form chiếm 100% chiều rộng màn hình. iFrame Preview ẩn mặc định. Có toggle để chuyển qua lại giữa Form và Preview. | Low | [ ] |
+| TC-F01.M01 | AC-1 (09) | Mobile | **[Positive]** Form xếp dọc (Vertical Layout) trên mobile | **1.** Truy cập `/builder/new` trên thiết bị 375px. | 4 trường nhập liệu (Business Name, Industry, Products/Services, Description) xếp dọc full-width. Labels nằm **phía trên** input. Không có thanh cuộn ngang (horizontal scroll). | High | [ ] |
+| TC-F01.M02 | AC-1 (09) | Mobile | **[Positive]** Font size ≥ 16px chống iOS auto-zoom | **1.** Trên iPhone/Safari: nhấn vào ô nhập liệu bất kỳ. | Font-size tất cả input ≥ 16px. Safari không tự zoom màn hình khi focus vào input. | High | [ ] |
+| TC-F01.M03 | AC-1 (09) | Mobile | **[Positive]** Nút CTA dính đáy màn hình (Sticky) | **1.** Trên mobile, mở bàn phím ảo bằng cách nhấn vào ô nhập liệu. | Nút "Continue — AI will create your website →" luôn hiển thị ở đáy màn hình, không bị bàn phím ảo che khuất. | Blocker | [ ] |
+| TC-F01.M04 | Design | Mobile | **[Positive]** Industry Chips hiển thị 2 cột trên mobile | **1.** Trên mobile 375px, quan sát phần Industry. | 9 chips Industry hiển thị trong layout 2 cột, đủ chỗ cho text, không bị tràn hoặc cắt chữ. | Medium | [ ] |
+| TC-F01.M05 | Design | Mobile | **[Positive]** Trường Description không bắt buộc | **1.** Trên mobile, để trống trường Description (optional).<br>**2.** Nhấn "Continue". | Form cho phép submit mà không báo lỗi ở trường Description. | Medium | [ ] |
+| TC-F01.M06 | Bug | Mobile | **[Negative]** Trường Products/Services không bị hiển thị trùng lặp | **1.** Trên mobile 375px, cuộn xuống phần dưới form. | Trường "Products / Services" chỉ xuất hiện **đúng 1 lần**. Không có hiện tượng render trùng (duplicate). | Blocker | [ ] |
+| TC-F01.M07 | AC-2 (09) | Mobile | **[Positive]** Chuyển từ Form sang màn hình Generation | **1.** Trên mobile, nhấn "Continue" sau khi điền đủ thông tin. | Form trượt ra (slide away) biến mất. Màn hình chuyển sang trạng thái Generation với thông báo "Starting website creation..." dạng chat bubble. Không hiển thị inline iframe preview. | High | [ ] |
+| TC-F01.M08 | AC-3 (09) | Mobile | **[Positive]** Hiển thị tiến trình tạo website trên mobile | **1.** Quan sát màn hình mobile trong quá trình AI đang tạo website. | Hiển thị floating pill hoặc chat bubble ở cuối màn hình thông báo bước hiện tại (VD: "✨ Đang tạo Hero Banner..."). Backdrop hơi mờ (blur) để không che hoàn toàn nội dung. | High | [ ] |
+| TC-F01.M09 | Design | Mobile | **[Positive]** Màn hình thành công trên mobile | **1.** Chờ tạo website hoàn tất trên mobile. | Hiển thị card thành công: "Website has been created successfully!" kèm "+N sections generated" và thời gian tạo. Có nút "View Full Preview" để mở preview toàn màn hình. | High | [ ] |
+| TC-F01.M10 | Design | Mobile | **[Positive]** Nút CTA xếp dọc trên mobile (Success) | **1.** Quan sát phần nút bấm sau khi tạo xong website trên mobile. | Hai nút **"Dashboard"** (primary, gradient xanh, full-width) và **"Open Editor"** (secondary, outline) xếp dọc theo thứ tự. | Medium | [ ] |
+| TC-F01.M11 | Design | Mobile | **[Positive]** Nút "View Full Preview" mở preview toàn màn hình | **1.** Trên mobile, nhấn nút "View Full Preview" ở màn hình thành công. | Mở preview website full-screen vì mobile không có panel preview inline như desktop. | High | [ ] |
+
+---
+
+### 3.6 Cấu Trúc Website & Layout Theo Ngành (US-F01-01)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.17 | AC-9 | Func | **[Positive]** Website tạo ra có đủ 4 trang bắt buộc | **1.** Mở website vừa tạo xong. Kiểm tra menu điều hướng (navigation). | Có đúng 4 trang: Homepage, About, Products, Contact. Tất cả link trả mã HTTP 200. | Blocker | [x] |
+| TC-F01.18 | AC-10 | Theme | **[Positive]** Layout phù hợp ngành F&B | **1.** Nhập: "Mở Quán Phở bò Nam Định". Tạo website, kiểm tra layout. | Layout sử dụng component phù hợp ngành ẩm thực (VD: Menu Grid, Food Gallery). Tone màu ấm. | High | [ ] |
+| TC-F01.19 | AC-10 | Theme | **[Positive]** Layout phù hợp ngành Spa/Beauty | **1.** Nhập: "Mở tiệm Nails Spa". Tạo website, kiểm tra layout. | Layout sử dụng Gallery mẫu nails. Tone màu chủ đạo Pastel mềm mại, thanh nhã. | High | [ ] |
+
+---
+
+### 3.7 Tạo Ảnh Bằng AI (US-F01-03)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.20 | AC-6 | API | **[Positive]** Tạo ảnh Hero Banner bằng DALL-E | **1.** Nhập prompt tạo cửa hàng thú cưng. Kiểm tra ảnh Hero. | Ảnh Hero Banner được tạo (1200×400px), URL ảnh trỏ về Payload CMS media (`/media/dalle-img.jpg`). | Blocker | [x] |
+| TC-F01.21 | AC-6 | Edge | **[Negative]** Sử dụng ảnh dự phòng khi API ảnh lỗi | **1.** Mock API DALL-E trả lỗi. Tạo website. | Website vẫn tạo thành công. Ảnh Hero sử dụng stock image phù hợp ngành từ thư viện dự phòng. Không hiển thị ảnh bị lỗi (broken image). | High | [x] |
+| TC-F01.59 | AC-3 (03) | Func | **[Positive]** Tạo lại ảnh AI (Regenerate Image) | **1.** Sau khi tạo website xong, nhấn nút "Generate New Image" trên ảnh Hero.<br>**2.** Chờ ảnh mới được tạo. | Ảnh mới thay thế ảnh cũ. Ảnh mới tự động lưu vào Payload CMS media library. | High | [ ] |
+
+---
+
+### 3.8 Xuất Bản & Hậu Xuất Bản (US-F01-04 & US-F01-07)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.22 | AC-7 | Flow | **[Positive]** Publish website dưới 30 giây | **1.** Tại trang kết quả, nhấn nút Publish. | Website xuất bản thành công trong < 30 giây. Truy cập `{slug}.primeweb.app` trả HTTP 200. | Blocker | [x] |
+| TC-F01.23 | AC-18 | UI | **[Positive]** Màn hình thành công sau Publish | **1.** Chờ Publish hoàn tất, quan sát Popup/Modal hiện lên. | Hiển thị domain màu xanh nổi bật. Có các nút: "Copy Link", "View Live Site", "Go to Admin Dashboard". | Medium | [ ] |
+| TC-F01.24 | AC-19 | Sec | **[Positive]** Chuyển hướng SSO vào CMS Admin | **1.** Nhấn nút "Go to Admin Dashboard". | Chuyển hướng tới `/admin/collections/sites` thành công. Không yêu cầu đăng nhập lại (JWT auth tự động). | Blocker | [x] |
+| TC-F01.25 | AC-20 | State | **[Positive]** Tiếp tục chỉnh sửa (Continue Editing) | **1.** Nhấn nút "Open Editor" (hoặc "Continue Editing"). | Chuyển hướng tới `/editor/:id`. Trạng thái website trong DB đã cập nhật từ Draft sang Published. | High | [x] |
+| TC-F01.26 | AC-21 | Func | **[Positive]** Sao chép link website (Copy to Clipboard) | **1.** Nhấn nút "Copy Link" trên màn hình thành công. | Hiển thị thông báo "Copied ✓" hoặc "Link copied! 🎉". Giá trị trong clipboard khớp chính xác với subdomain URL. | Low | [ ] |
+| TC-F01.60 | AC-2 (04) | Func | **[Positive]** Unpublish — Website trả 404 | **1.** Vào Settings của website đã publish.<br>**2.** Nhấn "Unpublish". | Website chuyển về trạng thái Draft. Truy cập URL `{slug}.primeweb.app` trả HTTP 404. Dashboard hiển thị trạng thái "Draft". | Blocker | [ ] |
+
+---
+
+### 3.9 Đa Ngôn Ngữ & NLU (US-F01-06)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.27 | AC-11 | Locale | **[Positive]** Giao diện mặc định hiển thị tiếng Anh | **1.** Xóa session, truy cập `/builder/new` với tài khoản mới. | Giao diện chào bằng tiếng Anh (VD: "Hi! I'm your AI Builder"). Có dòng hướng dẫn mẫu bằng tiếng Anh. | Medium | [ ] |
+| TC-F01.28 | AC-12 | NLU | **[Positive]** Nhận diện ngữ cảnh tiếng Việt | **1.** Nhập: "Tôi muốn xây trang bán cơm sườn". | AI nhận diện ngôn ngữ tiếng Việt. Phản hồi và nội dung website được tạo bằng tiếng Việt phù hợp. | High | [ ] |
+| TC-F01.29 | AC-12 | NLU | **[Positive]** Nhận diện Bahasa Melayu | **1.** Nhập: "Kedai Makan sedap". | AI nhận diện ngôn ngữ Bahasa Melayu. Phản hồi bằng BM formal (không phải Bahasa Indonesia). Nội dung website bằng BM. | High | [x] |
+| TC-F01.30 | AC-13 | Logic | **[Positive]** Quick-reply Chips thu thập lựa chọn nhanh | **1.** Nhấn vào chip gợi ý (VD: `[👗 Fashion]`). | Chip gửi giá trị tương ứng (như "Fashion") mà không cần gõ. Hệ thống xử lý như input thông thường. | Low | [ ] |
+| TC-F01.31 | AC-13 | Limit | **[Negative]** Giới hạn số lượt hỏi đáp tối đa 4 vòng | **1.** Nhập nội dung vô nghĩa (VD: "hmmm...") qua lại 4 lần. | Từ lượt thứ 4, AI ngừng hỏi và tự động bắt đầu tạo website với thông tin đã thu thập được. | High | [x] |
+| TC-F01.32 | AC-14 | NLU | **[Positive]** Trích xuất nhiều thực thể từ một câu | **1.** Nhập: "Tiệm Coffee Sữa đá Quận 1 Mở 2 Năm". | AI trích xuất được: loại hình = coffee, vị trí = Quận 1, thâm niên = 2 năm. Không hỏi lại từng mục riêng lẻ. | Medium | [ ] |
+| TC-F01.33 | AC-15 | Locale | **[Positive]** Nội dung tiếng Việt chuyên nghiệp cho SME | **1.** Tạo website hoàn chỉnh bằng tiếng Việt, kiểm tra nội dung output. | Các đoạn văn (heading, CTA, mô tả) sử dụng văn phong chuyên nghiệp phù hợp doanh nghiệp Việt Nam. Không có lỗi ngữ pháp nghiêm trọng. | High | [x] |
+| TC-F01.34 | AC-15 | Locale | **[Positive]** Nội dung Bahasa Melayu formal | **1.** Tạo website bằng BM, kiểm tra nội dung output. | Nội dung sử dụng Bahasa Melayu lịch sự (formal), phù hợp thị trường Malaysia. Không lẫn với Bahasa Indonesia. | High | [x] |
+| TC-F01.35 | AC-16 | Func | **[Positive]** Gợi ý thêm phiên bản tiếng Anh | **1.** Tạo xong website bằng tiếng Việt hoặc BM.<br>**2.** Quan sát màn hình kết quả. | Hiển thị gợi ý: "Want an English version too? [Add English Content]". Nếu chọn → tạo thêm bản dịch tiếng Anh song song. | Medium | [ ] |
+| TC-F01.36 | AC-17 | Edge | **[Negative]** Fallback sang tiếng Anh với ngôn ngữ không hỗ trợ | **1.** Nhập bằng tiếng Ả Rập: `أريد بناء` hoặc tiếng H'Mông. | Website vẫn tạo thành công bằng tiếng Anh (fallback). Hiển thị thông báo giải thích (VD: "Your site has been generated in English"). Không bị crash. | High | [x] |
+
+---
+
+### 3.10 NLU Nâng Cao — Tình Huống Thực Tế
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.53 | NLU | Lang | **[Positive]** Nhận diện trộn ngôn ngữ (Code-switching) | **1.** Nhập: "Mình muốn open 1 cái coffee shop ở district 1, phong cách vintage". | AI nhận diện ngôn ngữ chính là tiếng Việt. Hiểu các từ tiếng Anh xen kẽ (coffee shop, district 1, vintage) để chọn layout phù hợp quán cà phê phong cách cổ điển. | High | [ ] |
+| TC-F01.54 | NLU | Logic | **[Positive]** Xử lý lỗi chính tả và tiếng lóng | **1.** Nhập: "Mk mún dg 1 wán nướng vĩa hè cho shvu sinh vin". | AI tự normalize thành: "Tôi muốn dựng 1 quán nướng vỉa hè cho sinh viên". Nội dung website sử dụng văn phong chuyên nghiệp, không có tiếng lóng. | High | [ ] |
+| TC-F01.55 | NLU | Flow | **[Positive]** Chuyển ngôn ngữ giữa chừng (Mid-thread Pivot) | **1.** Bắt đầu bằng tiếng Anh: "I need a pizza store". AI phản hồi tiếng Anh.<br>**2.** Tiếp: "À quên, làm web tiếng Việt giúp nha, khách ở Hà Nội". | Từ lượt thứ 2, AI chuyển hoàn toàn sang tiếng Việt cho cả giao diện hội thoại lẫn nội dung website. Đơn vị tiền tệ đổi sang VNĐ. | High | [ ] |
+| TC-F01.56 | UI/UX | Font | **[Boundary]** Hiển thị ký tự đặc biệt (CJK, RTL) trong Chat | **1.** Nhập câu chứa ký tự tiếng Trung: "Mở Nhà Hàng Dimsum 點心" hoặc ký tự Ả Rập (RTL). | Font render đúng ký tự tượng hình, không hiện ô vuông (□). Không bị tràn hoặc nhảy dòng bất thường trong ô nhập liệu. | Medium | [ ] |
+| TC-F01.57 | NLU | Logic | **[Positive]** Nội dung song ngữ trong cùng 1 website | **1.** Nhập: "Tạo web bán áo thun, nội dung để cả tiếng Anh và tiếng Việt đan xen nhé". | AI tạo website với nội dung song ngữ (VD: heading "Sản Phẩm Mới / New Arrivals"). | High | [ ] |
+
+---
+
+### 3.11 Kéo Thả Sắp Xếp Block (US-F01-08: Drag-and-Drop)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.37 | AC-22 | UX | **[Positive]** Kéo thả đổi vị trí block trên Desktop | **1.** Tại preview (Normal view), hover vào block Products.<br>**2.** Kéo handle (⠿) lên trên Hero Block rồi thả. | Block Products di chuyển tới vị trí trước Hero. Preview cập nhật tức thì, không reload. Không thể kéo thả ở chế độ Full-screen view. | Blocker | [ ] |
+| TC-F01.38 | AC-22 | Func | **[Positive]** Đồng bộ thứ tự block trong State | **1.** Sau khi kéo thả, kiểm tra biến `builderStore` trong DevTools. | Mảng blocks đã cập nhật thứ tự index mới, sẵn sàng cho lệnh Publish. | High | [ ] |
+| TC-F01.39 | AC-23 | UI | **[Positive]** Hiệu ứng CSS khi đang kéo | **1.** Kéo một block, giữ ở giữa (drag in-progress). | Block gốc có opacity 0.7 + box-shadow. Vị trí drop target hiển thị đường highlight. Animation smooth 200–300ms khi thả block. | Low | [ ] |
+| TC-F01.40 | AC-24 | DB | **[Positive]** Lưu thứ tự block vào Database | **1.** Hoàn tất kéo thả, nhấn "Publish". | Request `PATCH/PUT` gửi mảng `page.layout.sortOrder` tới Payload CMS. Dữ liệu trong DB khớp 100% với thứ tự vừa sắp xếp trong Preview. | Blocker | [x] |
+| TC-F01.41 | AC-24 | DB | **[Positive]** Website live hiển thị đúng thứ tự đã sắp xếp | **1.** Hoàn tất TC-F01.40. Mở website public trên trình duyệt khác. | Thứ tự block trên website live khớp chính xác với thứ tự vừa kéo thả. | High | [x] |
+| TC-F01.42 | AC-25 | Mobile | **[Positive]** Kéo thả bằng cử chỉ chạm (Touch Drag) trên mobile | **1.** Trên mobile 375px, bật chế độ Preview. Giữ chạm (longpress 500ms) vào drag handle của block. | Block có thể kéo thả bằng cử chỉ touch. Thả tay → block hoán đổi vị trí mượt mà. | High | [ ] |
+| TC-F01.43 | AC-25 | Mobile | **[Negative]** Không xung đột giữa kéo block và cuộn trang | **1.** Trên mobile, kéo block trong khi cuộn trang. | CSS `touch-action: none` khóa cuộn trang khi đang kéo block. Chỉ 1 thao tác xảy ra tại một thời điểm, không bị giật hoặc cuộn nhầm. | High | [ ] |
+| TC-F01.44 | AC-26 | Logic | **[Negative]** Không cho kéo block Navigation (Header) | **1.** Hover vào block Navigation Header trên cùng. | Drag handle **không xuất hiện**. Tooltip hiển thị: "Navigation and Footer position is fixed". | Blocker | [ ] |
+| TC-F01.45 | AC-26 | Logic | **[Negative]** Không cho kéo block Footer | **1.** Kéo block nội dung xuống dưới Footer. | Không thể thả block vào vị trí dưới Footer. Footer cố định ở cuối trang, không thể di chuyển. | High | [ ] |
+
+---
+
+### 3.12 Mobile Reorder — Chạm An Toàn (US-F01-10)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.M12 | AC-1 (10) | Mobile | **[Positive]** Sắp xếp block bằng nút Lên/Xuống (Tap Up/Down) | **1.** Trên mobile, chạm vào block (VD: About Us).<br>**2.** Nhấn nút [⬆ Lên] trên floating action bar. | Block hoán đổi vị trí với block phía trên tức thì. State được cập nhật, không cần reload. Nút chạm phải ≥ 44×44px (chuẩn touch target). | High | [ ] |
+| TC-F01.M13 | AC-2 (10) | Mobile | **[Positive]** Chế độ sắp xếp dạng danh sách (Card List Mode) | **1.** Trên mobile, nhấn nút "≡ Sắp xếp" trên toolbar.<br>**2.** Kéo thả các card nhỏ gọn.<br>**3.** Nhấn "Xong". | Iframe preview tạm thời thay bằng danh sách Card (Hero, About, Products, Contact). Kéo thả card native smooth, không xung đột scroll. Sau khi nhấn "Xong", quay lại preview đầy đủ với thứ tự mới. | High | [ ] |
+
+---
+
+### 3.13 Giới Hạn Kinh Doanh & Bảo Mật (Business Rules & Security)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.46 | FR-15 | API | **[Negative]** Chống tấn công Rate Limit (API Flood) | **1.** Gửi 10 request/giây tới `POST /api/ai/generate-site` bằng script. | Middleware chặn trước khi request tới OpenAI. Trả mã `HTTP 429 Too Many Requests`. | Blocker | [x] |
+| TC-F01.47 | FR-15 | DB | **[Negative]** Giới hạn tạo website cho gói Free | **1.** Tài khoản Free đã tạo 1 website thành công. Nhấn tạo website lần 2. | Hiển thị modal "Nâng cấp gói để tạo thêm website". API không gửi request tới OpenAI. | Blocker | [x] |
+| TC-F01.48 | BR-01 | Sec | **[Negative]** Cách ly dữ liệu theo Tenant (Tenant Isolation) | **1.** Dùng JWT của User A gửi GET request lấy dữ liệu website của User B bằng ID trực tiếp. | Server trả `HTTP 403 Forbidden`. Không trả dữ liệu của user khác. | Blocker | [x] |
+| TC-F01.49 | BR-06 | Data | **[Negative]** Chặn nội dung phản cảm (NSFW Content Filter) | **1.** Nhập prompt chứa nội dung bạo lực, khiêu dâm, hoặc lừa đảo. | API từ chối xử lý, trả HTTP 400. Không gọi tới OpenAI. Hiển thị thông báo lỗi vi phạm chính sách. | Blocker | [x] |
+| TC-F01.50 | BR-09 | Cron | **[Positive]** Tự động xóa bản nháp quá 30 ngày | **1.** Tạo document Draft trong MongoDB với `createdAt` > 30 ngày. Kích hoạt Cron Job. | Payload CMS xóa bản nháp cũ (hard delete). Giải phóng dung lượng DB. | High | [x] |
+| TC-F01.51 | BR-09 | Cron | **[Positive]** Giữ nguyên website đã Publish khi dọn dẹp | **1.** Tạo document có `createdAt` > 31 ngày nhưng `status = Published`. Kích hoạt Cron Job. | Cron Job bỏ qua document này. Website Published luôn được bảo toàn, không bị xóa nhầm. | Blocker | [x] |
+| TC-F01.52 | Limit | Token | **[Negative]** Chặn nhập quá 10.000 ký tự | **1.** Paste chuỗi văn bản > 10.000 ký tự vào ô nhập liệu. | Frontend chặn submit, hiển thị cảnh báo giới hạn ký tự. API không gửi request ngay cả khi bypass frontend. | High | [x] |
+| TC-F01.65 | BR-02 | DB | **[Negative]** Chỉ Soft Delete — Không Hard Delete website | **1.** Gọi API xóa website.<br>**2.** Kiểm tra database. | Website chỉ được đánh dấu `deletedAt` (soft delete). Record vẫn tồn tại trong DB. Không hard delete. | High | [ ] |
+| TC-F01.66 | BR-04 | UI | **[Positive]** Nhãn "AI Generated ✨" hiện trong Editor, ẩn trên Storefront | **1.** Mở website trong Editor → kiểm tra ảnh/nội dung AI tạo.<br>**2.** Mở website live (storefront) cùng vị trí. | Trong Editor: hiển thị nhãn "AI Generated ✨" trên các ảnh/nội dung do AI tạo. Trên Storefront: nhãn không hiển thị cho khách truy cập. | Medium | [ ] |
+| TC-F01.67 | BR-07 | Logic | **[Negative]** Không trừ quota khi tạo website thất bại | **1.** Tạo website, để API OpenAI timeout (simulate server error).<br>**2.** Kiểm tra quota còn lại. | Quota không bị trừ khi lỗi server. Sau khi Retry thành công, quota mới bị trừ. | High | [ ] |
+
+---
+
+### 3.14 Luồng Phụ — Template Flow (US-F01-02)
+
+| ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| TC-F01.58 | AC-2 (02) | Func | **[Positive]** Chọn Template thay vì AI Builder | **1.** Tại màn hình onboarding, chọn "Chọn Template" thay vì "Tạo bằng AI".<br>**2.** Chuyển tới `/templates`, chọn 1 template.<br>**3.** Xác nhận chọn template. | Hệ thống tạo website từ template đã chọn. Chuyển hướng tới `/editor/:id`. Website hiển thị đúng layout của template. | Medium | [ ] |
+
+---
+
+## 4. Hành Trình Trải Nghiệm End-to-End (E2E UAT Flow)
+
+_Mô tả kịch bản kiểm thử dựa trên hành vi tổng thể của chủ cửa hàng SME._
+
+**Kịch bản E2E cốt lõi:**
+1. **[Đăng ký & Nhập thông tin]** Đăng ký/đăng nhập tài khoản SME. Truy cập `/builder/new`. Nhập tên quán, chọn ngành "Restaurant / Cafe / F&B", mô tả sản phẩm. Kiểm tra validation khi thiếu trường bắt buộc. Nhấn "Continue — AI will create your website →".
+2. **[AI Stream & Tạo Website]** Quan sát 3 bước tiến trình (Analyzing → Generating → Preparing). Preview cập nhật realtime qua SSE. Ảnh Hero Banner tạo bằng DALL-E (fallback stock image nếu lỗi). Kéo thả sắp xếp lại block trong Preview. Trên mobile: xem tiến trình qua floating pill, success screen hiển thị "View Full Preview".
+3. **[Xuất bản & Quản trị]** Nhấn "Dashboard" hoặc "Publish". Domain `{slug}.primeweb.app` hiển thị, copy link thành công. SSO redirect vào CMS Admin không cần đăng nhập lại. Kiểm tra Tenant Isolation, chống tấn công API flood.
+
+---
+
+## 5. Tiêu Chí Đánh Giá Chất Lượng (Quality Gates)
+
+| Nhóm kiểm thử | Trạng thái | Ghi chú |
 |---|---|---|
-| **1. UI/UX Coverage** | [ ] Đã chạy 0/20 TC | `Locator Healer Agent` Định Giá Thang Giao DOM Test. Bảo Trì Touch Drag & Drop |
-| **2. AI Logic & Functions** | [ ] Đã chạy 0/15 TC | Khắc Lõi Mở `BDD Cucumber Agent` Gắn Expected Theo Bền Chắc Đỡ Rung Khung Chốt Đọc Ngôn Ngọt Logic Phản Xạ |
-| **3. Security & DB Validation** | [ ] Đã chạy 0/12 TC | Code Kháng Mạng Bypass Data Rác Prompt NSFW Lõi Database Payload Check `QC & Flaky Fixer Test` |
-| **4. Performance SLA** | [ ] Not Run | Call Benchmark `Performance Load Tester Agent` SLA Cứng Đo API SSE & DALL-E Nháp |
-| **5. E2E UAT Approval** | [ ] Not Run | Chốt File P0/P1 Lệnh Hoàn Thành Cứng Cựa Cho Năng Lực Core Giá Giá Của App V2 |
+| **1. UI/UX & Design System** | [ ] 0/18 TC đã chạy | Bao gồm Desktop + Mobile responsive |
+| **2. AI Logic & NLU** | [ ] 0/16 TC đã chạy | Đa ngôn ngữ, code-switching, slang |
+| **3. Security & DB Validation** | [ ] 0/12 TC đã chạy | XSS, SQLi, Tenant Isolation, NSFW filter |
+| **4. Performance SLA** | [ ] Chưa chạy | SSE < 2s, Generation < 60s, Publish < 30s |
+| **5. E2E UAT** | [ ] Chưa chạy | Full flow từ đăng nhập → publish → verify live |
+| **6. Mobile Responsive** | [ ] 0/13 TC đã chạy | US-F01-09 + US-F01-10 coverage |
 
-> **Khuyến Nghị Release:** Với việc bổ sung 62 Cases Tường Tận tới Độ Sâu Giới Hạn Boundary Payload Cập Nhập DB. Vòng Automation Regression Sẽ Cần Chặn Hầu Rate 100% Cột Điểm Auto[X] Tại Tương Lai Gần Chốt Cửa.
+> **Khuyến nghị Release:** Bộ kiểm thử bao gồm **85 kịch bản** phủ 100% các Acceptance Criteria, Functional Requirements, và Business Rules. Cần đạt tỷ lệ **≥ 95% PASS** ở nhóm Blocker/High trước khi chuyển lên Production.
