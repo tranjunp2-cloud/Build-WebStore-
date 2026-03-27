@@ -75,8 +75,18 @@ def get_app_id(app_name: str) -> str:
 
 
 def get_app_spec(app_id: str) -> dict:
-    result = run(["doctl", "apps", "spec", "get", app_id])
-    return json.loads(result.stdout)
+    # doctl defaults to YAML — force JSON output
+    result = run(["doctl", "apps", "spec", "get", app_id, "-o", "json"])
+    stdout = result.stdout.strip()
+    if not stdout:
+        print("❌ doctl returned empty spec — check DIGITALOCEAN_ACCESS_TOKEN and app ID", file=sys.stderr)
+        sys.exit(1)
+    try:
+        return json.loads(stdout)
+    except json.JSONDecodeError as e:
+        print(f"❌ Cannot parse doctl output as JSON: {e}", file=sys.stderr)
+        print(f"   First 200 chars: {stdout[:200]}", file=sys.stderr)
+        sys.exit(1)
 
 
 def patch_envs(spec: dict) -> tuple[dict, list[str], list[str]]:
