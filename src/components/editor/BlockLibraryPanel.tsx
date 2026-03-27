@@ -20,7 +20,7 @@ const categoryConfig: CategoryConfig[] = [
     { id: 'store', label: 'Store', icon: '🛍️', blockTypes: ['products-grid', 'products-featured', 'pricing'] },
     { id: 'content', label: 'Content', icon: '📄', blockTypes: ['about', 'blog-list', 'faq'] },
     { id: 'form', label: 'Form', icon: '📝', blockTypes: ['contact', 'newsletter'] },
-    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud'] },
+    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'socialWidget', 'cartWidget'] },
 ]
 
 const itemIconOverrides: Record<string, string> = {
@@ -28,6 +28,8 @@ const itemIconOverrides: Record<string, string> = {
     hero: '🎯',
     gallery: '🖼️',
     cta: '🔘',
+    socialWidget: '💬',
+    cartWidget: '🛒',
 }
 
 function getBlockMeta(blockType: string) {

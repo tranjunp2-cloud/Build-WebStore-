@@ -1,15 +1,17 @@
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
+import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
 type SiteRendererProps = {
     site: any
     page: any
+    pages?: any[]
 }
 
-export function SiteRenderer({ site, page }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
     const theme: ThemeConfig = {
         primaryColor: site.theme?.primaryColor || '#0ea5e9',
         secondaryColor: site.theme?.secondaryColor || '#d946ef',
@@ -52,13 +54,19 @@ export function SiteRenderer({ site, page }: SiteRendererProps) {
                     return null
                 }
 
+                const normalizedBlock = block.blockType === 'navigation'
+                    ? {
+                        ...block,
+                        links: filterNavigationLinksByVisibility(block.links, pages),
+                    }
+                    : block
+
                 return (
                     <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
-                        <BlockComponent block={block} theme={theme} />
+                        <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
                     </BlockErrorBoundary>
                 )
             })}
         </>
     )
 }
-

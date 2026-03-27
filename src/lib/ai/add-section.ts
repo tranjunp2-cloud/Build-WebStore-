@@ -1,4 +1,5 @@
 import type { BlockData, ThemeData } from '@/types/editor'
+import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 
 export type SupportedAddSectionType =
     | 'testimonials'
@@ -9,6 +10,8 @@ export type SupportedAddSectionType =
     | 'newsletter'
     | 'banner'
     | 'cta'
+    | 'socialWidget'
+    | 'cartWidget'
 
 type AddSectionContext = {
     instruction: string
@@ -26,6 +29,8 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['newsletter', [/\bnewsletter\b/i, /\bsubscribe\b/i, /\bemail capture\b/i]],
     ['banner', [/\bbanner\b/i, /\bpromo\b/i, /\bpromotion\b/i]],
     ['cta', [/\bcta\b/i, /\bcall to action\b/i]],
+    ['socialWidget', [/\bsocial\b/i, /\bwhatsapp\b/i, /\bfacebook\b/i, /\binstagram\b/i, /\blinkedin\b/i, /\byoutube\b/i]],
+    ['cartWidget', [/\bcart\b/i, /\bshopping cart\b/i, /\bbag\b/i, /\bcheckout\b/i]],
 ]
 
 const ADD_SECTION_INTENT_MATCHERS = [/\badd\b/i, /\binsert\b/i, /\bappend\b/i, /\bcreate\b/i]
@@ -38,6 +43,8 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     newsletter: 'newsletter',
     banner: 'banner',
     cta: 'CTA',
+    socialWidget: 'social media',
+    cartWidget: 'cart',
 }
 
 function getPlaceholderImage(index: number) {
@@ -180,6 +187,22 @@ export function createAddSectionBlock({
                 ctaButtons: [{ label: 'Get Started', url: '#contact', style: 'primary' }],
             }
 
+        case 'socialWidget':
+            return normalizeSocialWidgetConfig({
+                blockType: 'socialWidget',
+                variant: 'floating',
+                headline: 'Stay connected',
+                links: getDefaultSocialWidgetLinks(),
+            })
+
+        case 'cartWidget':
+            return {
+                blockType: 'cartWidget',
+                variant: 'floating',
+                label: 'Cart',
+                showLabel: false,
+            }
+
         default:
             return null
     }
@@ -284,6 +307,10 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
                 return newM
             }),
         }
+    }
+
+    if (mergedBlock.blockType === 'socialWidget') {
+        return normalizeSocialWidgetConfig(mergedBlock)
     }
 
     // CTA / Newsletter / Banner fallbacks are already mapped to Hero by createAddSectionBlock

@@ -11,6 +11,7 @@ import { setHeroCategory } from '../renderers/hero'
 import { setSectionCategory } from '../renderers/sections'
 import { detectCategory } from '@/lib/preview'
 import { withAuth } from '@/lib/auth'
+import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 
 // Force dynamic rendering — never cache this route
 export const dynamic = 'force-dynamic'
@@ -422,6 +423,13 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
     }
 
     const blocks = page?.layout || []
+
+    const visiblePagesResult = await payload.find({
+      collection: 'pages',
+      where: { site: { equals: numericSiteId } },
+      limit: 100,
+      sort: 'createdAt',
+    })
     
     // Inject global header/footer from site level
     // Remove existing page-level navigation and footer to avoid duplicates, but keep them as fallback
@@ -431,8 +439,15 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
     
     const finalHeader = site.headerBlock || oldNav
     const finalFooter = site.footerBlock || oldFooter
-    
-    if (finalHeader) combinedBlocks.unshift(finalHeader)
+
+    const normalizedHeader = finalHeader?.blockType === 'navigation'
+      ? {
+        ...finalHeader,
+        links: filterNavigationLinksByVisibility(finalHeader.links, visiblePagesResult.docs),
+      }
+      : finalHeader
+
+    if (normalizedHeader) combinedBlocks.unshift(normalizedHeader)
     if (finalFooter) combinedBlocks.push(finalFooter)
 
     const cat = detectCategory(combinedBlocks, site.name || '')

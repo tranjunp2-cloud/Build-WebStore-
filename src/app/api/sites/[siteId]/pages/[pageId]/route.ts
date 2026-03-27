@@ -10,6 +10,7 @@ export async function PATCH(
         const payload = await getPayload({ config })
         const resolvedParams = await Promise.resolve(params)
         const { siteId, pageId } = resolvedParams
+        const numericSiteId = Number(siteId)
         const body = await request.json()
 
         const { isVisible, deletedAt } = body
@@ -27,7 +28,9 @@ export async function PATCH(
             id: pageId,
         })
 
-        if (!page || (typeof page.site === 'object' ? page.site.id : page.site) !== siteId) {
+        const pageSiteId = typeof page?.site === 'object' ? page.site?.id : page?.site
+
+        if (!page || Number(pageSiteId) !== numericSiteId) {
             return new NextResponse('Not found', { status: 404 })
         }
 
@@ -44,6 +47,8 @@ export async function PATCH(
                 slug: updatedPage.slug,
                 status: updatedPage._status || 'draft',
                 isVisible: updatedPage.isVisible ?? true,
+                seoTitle: updatedPage.seo?.title ?? null,
+                seoDescription: updatedPage.seo?.description ?? null,
                 updatedAt: updatedPage.updatedAt,
             }
         })

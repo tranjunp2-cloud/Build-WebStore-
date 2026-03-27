@@ -23,7 +23,10 @@ export type PageData = {
     title: string
     slug: string
     status: 'published' | 'draft'
+    isHomepage?: boolean
     isVisible: boolean
+    seoTitle?: string | null
+    seoDescription?: string | null
     deletedAt?: string | null
     updatedAt: string
 }
