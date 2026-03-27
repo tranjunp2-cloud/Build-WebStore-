@@ -51,6 +51,22 @@ async function getTableCount(pool) {
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
+  // ── ONE-TIME CLEANUP: Drop wrong-schema Payload tables ──
+  // Manual SQL migrations created these with wrong column names
+  // (_parent_id instead of parent_id). pushDevSchema can't fix existing tables.
+  // Drop so pushDevSchema recreates with correct Drizzle schema.
+  {
+    name: 'cleanup.drop_users_tenants_permissions',
+    sql: `DROP TABLE IF EXISTS users_tenants_permissions CASCADE;`,
+  },
+  {
+    name: 'cleanup.drop_users_tenants',
+    sql: `DROP TABLE IF EXISTS users_tenants CASCADE;`,
+  },
+  {
+    name: 'cleanup.drop_users_sessions',
+    sql: `DROP TABLE IF EXISTS users_sessions CASCADE;`,
+  },
   // ── Tenants: Stripe Connect ──
   {
     name: 'tenants.stripe_account_id',
