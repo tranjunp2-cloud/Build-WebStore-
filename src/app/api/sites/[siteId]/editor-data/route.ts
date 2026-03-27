@@ -61,6 +61,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
                 id: page.id,
                 title: (page as any).title || 'Homepage',
                 layout: (page as any).layout || [],
+                _status: (page as any)._status || 'published',
+                updatedAt: (page as any).updatedAt,
             } : null,
         })
 
