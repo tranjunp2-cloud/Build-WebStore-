@@ -3,14 +3,15 @@
 import React, { memo, useState, useEffect, useRef } from 'react'
 import {
     Sparkles, LayoutGrid, Send, GripVertical,
-    PanelLeftClose, PanelLeftOpen, Plus
+    PanelLeftClose, PanelLeftOpen, Plus, Undo2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
 import type { BlockData, AIAction, ThemeData } from '@/types/editor'
+import { useEditorStore } from '@/store/editorStore'
 
 // ─── Types ──────────────────────────────────────────────────────────────
-type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
+type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string; historyIndex?: number }
 
 function getBlockInfo(blockType: string) {
     const meta = blockRegistry.getBlockMeta(blockType)
@@ -34,6 +35,7 @@ function AIChatPanelInner({
     isOpen, onToggle, blocks, onBlockSelect, selectedBlock,
     onAIAction, siteName, theme,
 }: AIChatPanelProps) {
+    const storeHistoryIndex = useEditorStore((s) => s.historyIndex)
     const [tab, setTab] = useState<'chat' | 'blocks'>('blocks')
     const [input, setInput] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
@@ -89,6 +91,7 @@ function AIChatPanelInner({
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(), role: 'assistant',
                 content: `${actionDesc}\n${data.message || ''}`,
+                historyIndex: useEditorStore.getState().historyIndex
             }])
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Unknown error'
@@ -177,19 +180,43 @@ function AIChatPanelInner({
                 <div role="tabpanel" className="flex flex-1 flex-col">
                     {/* AI Chat Messages */}
                     <div className="flex-1 overflow-y-auto p-3 space-y-3" role="log" aria-label="AI chat messages">
-                        {messages.map(msg => (
-                            <div key={msg.id} className={cn('flex gap-2', msg.role === 'user' ? 'flex-row-reverse' : '')}>
-                                {msg.role === 'assistant' && (
-                                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
-                                        <Sparkles className="h-3 w-3 text-white" />
+                        {messages.map(msg => {
+                            const isUndone = msg.historyIndex !== undefined && storeHistoryIndex < msg.historyIndex;
+                            const isCurrent = msg.historyIndex !== undefined && storeHistoryIndex === msg.historyIndex;
+                            const canUndoMsg = isCurrent && useEditorStore.getState().canUndo();
+
+                            return (
+                                <div key={msg.id} className={cn('flex gap-2', msg.role === 'user' ? 'flex-row-reverse' : '', isUndone ? 'opacity-60' : '')}>
+                                    {msg.role === 'assistant' && (
+                                        <div className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full", isUndone ? "bg-gray-800" : "bg-gradient-to-br from-purple-500 to-blue-500")}>
+                                            <Sparkles className={cn("h-3 w-3", isUndone ? "text-gray-500" : "text-white")} />
+                                        </div>
+                                    )}
+                                    <div className={cn('relative max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed',
+                                        msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-[#1E293B] text-gray-300 rounded-bl-sm border border-white/5',
+                                        isUndone ? 'border-dashed border-gray-600 bg-transparent' : ''
+                                    )}>
+                                        {isUndone && msg.role === 'assistant' && (
+                                            <div className="mb-1.5">
+                                                <span className="inline-block rounded border border-gray-600 bg-gray-800 px-1.5 py-0.5 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                                                    Undone
+                                                </span>
+                                            </div>
+                                        )}
+                                        <p className={cn("whitespace-pre-wrap", isUndone && msg.role === 'assistant' ? "line-through text-gray-500" : "")}>{msg.content}</p>
+                                        
+                                        {!isUndone && isCurrent && msg.role === 'assistant' && canUndoMsg && (
+                                            <button 
+                                                onClick={() => useEditorStore.getState().undo()}
+                                                className="mt-2.5 w-full flex items-center justify-center gap-1.5 rounded-md bg-white/5 py-1.5 text-[11px] font-medium text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                                            >
+                                                <Undo2 className="h-3 w-3" /> Undo Change
+                                            </button>
+                                        )}
                                     </div>
-                                )}
-                                <div className={cn('max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed',
-                                    msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-sm' : 'bg-[#1E293B] text-gray-300 rounded-bl-sm border border-white/5')}>
-                                    <p className="whitespace-pre-wrap">{msg.content}</p>
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        })}
                         {isProcessing && (
                             <div className="flex gap-2" role="status" aria-label="AI is thinking">
                                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500">
