@@ -1,0 +1,92 @@
+'use client'
+
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { ProductForm } from '@/components/dashboard/product-form/ProductForm'
+import { ProductFormValues } from '@/components/dashboard/product-form/schema'
+
+function slugify(text: string) {
+    return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+}
+
+const textToLexical = (text: string) => {
+    if (!text) return undefined;
+    return {
+        root: {
+            type: 'root',
+            format: '',
+            indent: 0,
+            version: 1,
+            children: text.split('\n\n').map(p => ({
+                type: 'paragraph',
+                format: '',
+                indent: 0,
+                version: 1,
+                children: p ? [{ type: 'text', text: p, mode: 'normal', style: '', detail: 0, format: 0, version: 1 }] : []
+            }))
+        }
+    };
+}
+
+export default function NewProductPage() {
+    const router = useRouter()
+
+    const handleSave = async (data: ProductFormValues) => {
+        const body = {
+            name: data.name,
+            slug: data.urlSlug || slugify(data.name),
+            description: data.description ? textToLexical(data.description) : undefined,
+            price: data.hasVariants ? 0 : data.basePrice || 0,
+            compareAtPrice: data.hasVariants ? undefined : data.compareAtPrice || undefined,
+            category: data.categoryIds,
+            inventory: data.hasVariants ? 0 : data.baseInventory || 0,
+            sku: data.hasVariants ? '' : data.baseSku || '',
+            weight: data.shippingWeight || 0,
+            dimensions: {
+                length: data.shippingLength || 0,
+                width: data.shippingWidth || 0,
+                height: data.shippingHeight || 0,
+            },
+            images: data.images.map(img => ({ image: img.id, alt: data.name })),
+            hasVariants: data.hasVariants,
+            variantConfigs: data.hasVariants ? data.tiers : [],
+            variants: data.hasVariants ? data.variants?.map(v => ({
+                name: v.variantName,          // Payload schema field: 'name'
+                sku: v.skuCode,               // Payload schema field: 'sku'
+                price: v.price,
+                compareAtPrice: v.discount,
+                stock: v.stock,
+                options: v.variantName.split(' - ')
+            })) : [],
+            seo: {
+                title: data.metaTitle,
+                description: data.metaDescription,
+            },
+            status: 'draft',
+            currency: 'MYR'
+        }
+
+        const res = await fetch('/api/products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+        })
+
+        if (res.ok) {
+            toast.success('Đã lưu nháp. Hãy chuyển sang Active để hiển thị trên web.')
+            setTimeout(() => {
+                router.push('/products')
+            }, 1500)
+        } else {
+            const errData = await res.json()
+            throw new Error(errData.error?.message || 'Failed to save product')
+        }
+    }
+
+    return (
+        <div className="w-full">
+            <ProductForm onSubmitForm={handleSave} />
+        </div>
+    )
+}

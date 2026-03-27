@@ -15,7 +15,7 @@ export function CMSLayoutClient({ userName, userInitial, children }: CMSLayoutCl
     const [sidebarOpen, setSidebarOpen] = useState(false)
 
     return (
-        <div className="min-h-screen bg-[#0F172A] flex flex-col">
+        <div className="min-h-screen bg-[#0B1120] flex flex-col">
             <TopHeader
                 userName={userName}
                 userInitial={userInitial}
