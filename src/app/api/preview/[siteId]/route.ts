@@ -12,12 +12,13 @@ import { setSectionCategory } from '../renderers/sections'
 import { detectCategory } from '@/lib/preview'
 import { withAuth } from '@/lib/auth'
 import { filterNavigationLinksByVisibility } from '@/lib/navigation'
+import { mergeFooterSocialsWithSite, mergeNavigationBrandingWithSite } from '@/lib/site-settings'
 
 // Force dynamic rendering — never cache this route
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string }): string {
+export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string }, site?: any): string {
   const cat = category || 'business'
   const t = theme || THEMES[cat] || THEMES.business
 
@@ -39,9 +40,9 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
 
   const navHtml = blocks.map((b, i) => b.blockType === 'navigation' ? addDataAttr(renderNav(b, t), i, b.blockType) : '').filter(Boolean).join('\n')
   const heroHtml = blocks.map((b, i) => b.blockType === 'hero' ? addDataAttr(renderHero(b, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
-  const footerHtml = blocks.map((b, i) => b.blockType === 'footer' ? addDataAttr(renderSections(b, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
+  const footerHtml = blocks.map((b, i) => b.blockType === 'footer' ? addDataAttr(renderSections(b, t, cat, site), i, b.blockType) : '').filter(Boolean).join('\n')
   const mainHtml = blocks
-    .map((b, i) => !['navigation', 'hero', 'footer'].includes(b.blockType) ? addDataAttr(renderSections(b, t, cat), i, b.blockType) : '')
+    .map((b, i) => !['navigation', 'hero', 'footer'].includes(b.blockType) ? addDataAttr(renderSections(b, t, cat, site), i, b.blockType) : '')
     .filter(Boolean)
     .join('\n')
 
@@ -264,8 +265,8 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
       // Image click handling
       document.addEventListener('click', (e) => {
         let target = e.target
+        let blockContainer = target.closest('[data-block-index]')
         if (target.tagName === 'IMG') {
-          let blockContainer = target.closest('[data-block-index]')
           if (!blockContainer || excludedBlockTypes.includes(blockContainer.getAttribute('data-block-type'))) return
           
           const rect = target.getBoundingClientRect()
@@ -278,6 +279,20 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
           }, '*')
         } else if (currentEditingEl && target !== currentEditingEl) {
            // Clicking outside while editing will blur
+        } else if (blockContainer && !excludedBlockTypes.includes(blockContainer.getAttribute('data-block-type'))) {
+          const rect = blockContainer.getBoundingClientRect()
+          window.parent.postMessage({
+            type: 'BLOCK_CONTAINER_CLICKED',
+            blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+            layout: {
+              top: rect.top,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+              blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
+              blockType: blockContainer.getAttribute('data-block-type')
+            }
+          }, '*')
         } else {
            window.parent.postMessage({ type: 'PREVIEW_CANVAS_CLICKED' }, '*')
         }
@@ -442,20 +457,25 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
 
     const normalizedHeader = finalHeader?.blockType === 'navigation'
       ? {
-        ...finalHeader,
+        ...mergeNavigationBrandingWithSite(finalHeader, site),
         links: filterNavigationLinksByVisibility(finalHeader.links, visiblePagesResult.docs),
       }
       : finalHeader
 
+    const normalizedFooter = finalFooter?.blockType === 'footer'
+      ? mergeFooterSocialsWithSite(finalFooter, site)
+      : finalFooter
+
     if (normalizedHeader) combinedBlocks.unshift(normalizedHeader)
-    if (finalFooter) combinedBlocks.push(finalFooter)
+    if (normalizedFooter) combinedBlocks.push(normalizedFooter)
 
     const cat = detectCategory(combinedBlocks, site.name || '')
     const t = THEMES[cat] || THEMES.business
     const html = buildFullHTML(combinedBlocks, t, cat, {
-      name: site.name,
-      description: site.description,
-    })
+      name: site.seo?.metaTitle || site.name,
+      description: site.seo?.metaDescription || site.description,
+      lang: site.locale || 'en',
+    }, site)
 
     return new NextResponse(html, {
       headers: {

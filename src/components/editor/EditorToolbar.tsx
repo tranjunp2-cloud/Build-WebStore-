@@ -4,7 +4,6 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
     ChevronDown,
     Check,
-    ExternalLink,
     FilePenLine,
     FileWarning,
     FileText,
@@ -14,6 +13,7 @@ import {
     Monitor,
     ShoppingBag,
     Smartphone,
+    SquareArrowOutUpRight,
     Palette,
     PanelLeft,
     Redo2,
@@ -156,15 +156,15 @@ export function EditorToolbar({
     }
 
     return (
-        <header className="flex h-11 shrink-0 items-center justify-between border-b border-white/5 bg-[#111827] px-3">
+        <header className="relative flex h-14 shrink-0 items-center justify-between border-b border-[rgba(59,130,246,0.07)] bg-[rgba(30,41,59,0.3)] px-6">
             <div className="flex min-w-0 items-center gap-3">
                 <button
                     type="button"
                     onClick={onOpenMenu}
-                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+                    className="inline-flex h-8 items-center gap-2 rounded-xl px-3 text-sm font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
                     title="Open menu"
                 >
-                    <Menu className="h-3.5 w-3.5" />
+                    <Menu className="h-4 w-4" />
                     Menu
                 </button>
 
@@ -172,11 +172,11 @@ export function EditorToolbar({
                     <DropdownMenu.Trigger asChild>
                         <button
                             type="button"
-                            className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-100 transition-colors hover:bg-white/5 hover:text-white"
+                            className="inline-flex h-8 items-center gap-2 rounded-xl px-3 text-sm font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
                         >
-                            <CurrentPageIcon className="h-3.5 w-3.5" />
+                            <CurrentPageIcon className="h-4 w-4" />
                             <span className="truncate">{currentPageTitle}</span>
-                            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                            <ChevronDown className="h-3.5 w-3.5 text-[#94A3B8]" />
                         </button>
                     </DropdownMenu.Trigger>
 
@@ -210,22 +210,22 @@ export function EditorToolbar({
                 <button
                     type="button"
                     onClick={onOpenTemplates}
-                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/5 hover:text-white"
+                    className="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-sm font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
                 >
-                    <Palette className="h-3.5 w-3.5 text-amber-300" />
+                    <span className="text-base leading-none">🎨</span>
                     Templates
                 </button>
 
-                <div className="mx-1 h-3.5 w-px bg-white/10" />
+                <div className="mx-1 h-6 w-px bg-[rgba(59,130,246,0.07)]" />
 
                 <button
                     type="button"
                     onClick={onUndo}
                     disabled={!canUndo}
-                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-8 items-center gap-2 rounded-[10px] px-2.5 text-xs font-medium text-[#F8FAFC] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                     title="Undo (Cmd/Ctrl+Z)"
                 >
-                    <Undo2 className="h-3.5 w-3.5" />
+                    <Undo2 className="h-4 w-4" />
                     Undo
                 </button>
 
@@ -233,60 +233,65 @@ export function EditorToolbar({
                     type="button"
                     onClick={onRedo}
                     disabled={!canRedo}
-                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-8 items-center gap-2 rounded-[10px] px-2.5 text-xs font-medium text-[#F8FAFC] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                     title="Redo (Cmd/Ctrl+Shift+Z)"
                 >
-                    <Redo2 className="h-3.5 w-3.5" />
+                    <Redo2 className="h-4 w-4" />
                     Redo
                 </button>
             </div>
 
-            <div className="flex items-center gap-2">
-                <div className="flex items-center rounded-full bg-white/[0.04] p-0.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                <div className="flex h-[38px] items-center rounded-full border border-[rgba(59,130,246,0.04)] bg-[rgba(30,41,59,0.8)] px-[5px] py-px">
                     <button
                         type="button"
                         onClick={() => onViewportChange('desktop')}
                         className={cn(
-                            'inline-flex min-w-[76px] items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors',
+                            'inline-flex h-7 min-w-[104px] items-center justify-center gap-2 rounded-full px-4 text-xs transition-colors',
                             viewport === 'desktop'
-                                ? 'bg-[#3B82F6] text-white'
-                                : 'text-slate-500 hover:text-white',
+                                ? 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] font-semibold text-white'
+                                : 'font-medium text-white/70 hover:text-white',
                         )}
                     >
-                        <Monitor className="h-3.5 w-3.5" />
+                        <span className="text-[15px] leading-none">💻</span>
                         Desktop
                     </button>
                     <button
                         type="button"
                         onClick={() => onViewportChange('mobile')}
                         className={cn(
-                            'inline-flex min-w-[76px] items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors',
+                            'inline-flex h-7 min-w-[94px] items-center justify-center gap-2 rounded-full px-4 text-xs transition-colors',
                             viewport === 'mobile'
-                                ? 'bg-[#3B82F6] text-white'
-                                : 'text-slate-500 hover:text-white',
+                                ? 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] font-semibold text-white'
+                                : 'font-medium text-white/70 hover:text-white',
                         )}
                     >
-                        <Smartphone className="h-3.5 w-3.5" />
+                        <span className="text-[15px] leading-none">📱</span>
                         Mobile
                     </button>
                 </div>
+            </div>
 
-                <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
-                    <span className={cn('h-1.5 w-1.5 rounded-full', isSaving ? 'bg-amber-400' : 'bg-emerald-400')} />
-                    <span>{isSaving ? 'Saving' : saveSuccess || !hasUnsavedChanges ? 'Saved' : 'Draft changes'}</span>
+            <div className="flex items-center gap-4">
+                <div className="inline-flex items-center gap-2 text-xs">
+                    <span className={cn('h-2 w-2 rounded-full', isSaving ? 'bg-amber-400' : 'bg-[#00C950]')} />
+                    <span className="font-normal text-[#B9F8CF]">{isSaving ? 'Saving' : saveSuccess || !hasUnsavedChanges ? 'Saved' : 'Saved'}</span>
                 </div>
 
-                <div className="inline-flex items-center rounded-full bg-white/[0.04] px-2.5 py-1 text-[11px] font-semibold text-slate-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]">
-                    {isPublished ? 'Live' : 'Draft'}
+                <div className="h-6 w-px bg-[rgba(59,130,246,0.07)]" />
+
+                <div className="inline-flex h-[30px] items-center rounded-full border border-[rgba(106,114,130,0.3)] bg-[rgba(106,114,130,0.2)] px-3">
+                    <span className="mr-2 h-2 w-2 rounded-full bg-[#99A1AF]" />
+                    <span className="text-xs font-semibold text-[#D1D5DC]">{isPublished ? 'Live' : 'Draft'}</span>
                 </div>
 
-                <Button variant="ghost" size="sm" asChild className="h-8 rounded-full px-3 text-[11px] font-medium text-slate-300 hover:bg-white/5 hover:text-white">
+                <Button variant="ghost" size="sm" asChild className="h-9 rounded-[10px] border border-[rgba(59,130,246,0.07)] px-3 text-xs font-medium text-[#F8FAFC] hover:bg-white/5">
                     <a
                         href={currentPageId ? `/api/preview/${siteId}?pageId=${currentPageId}` : `/api/preview/${siteId}`}
                         target="_blank"
                         rel="noopener noreferrer"
                     >
-                        <ExternalLink className="h-3.5 w-3.5" />
+                        <SquareArrowOutUpRight className="h-4 w-4" />
                         Preview
                     </a>
                 </Button>
@@ -297,7 +302,7 @@ export function EditorToolbar({
                     onClick={onPublish}
                     disabled={isPublishing || publishSuccess}
                     className={cn(
-                        'h-7 rounded-full border border-[#60A5FA]/20 bg-gradient-to-r from-[#3B82F6] to-[#22C55E] px-3.5 text-[11px] font-semibold text-white shadow-[0_10px_20px_rgba(59,130,246,0.18)] hover:opacity-95',
+                        'h-9 rounded-full border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-xs font-semibold text-white shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] hover:opacity-95',
                         publishSuccess && 'from-emerald-500 to-emerald-400',
                     )}
                 >

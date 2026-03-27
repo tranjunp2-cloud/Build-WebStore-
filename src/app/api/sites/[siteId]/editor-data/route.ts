@@ -83,6 +83,12 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
                 theme: site.theme || {},
                 siteType: site.siteType || 'business',
                 locale: site.locale || 'ms',
+                contactInfo: site.contactInfo || {},
+                socialLinks: site.socialLinks || {},
+                branding: site.branding || {},
+                seo: site.seo || {},
+                headerBlock: site.headerBlock || null,
+                footerBlock: site.footerBlock || null,
                 shippingConfig: site.shippingConfig || {},
             },
             page: page ? {
