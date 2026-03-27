@@ -88,6 +88,7 @@ SO THAT I can quickly learn how to use the system and troubleshoot issues indepe
 | FR-03 | Mỗi module phải có trang hướng dẫn riêng kèm text và screenshots | US-F20-03 | P1 | |
 | FR-04 | User có thể click vào screenshot để phóng to (Lightbox) | US-F20-03 | P2 | Tăng trải nghiệm nhìn |
 | FR-05 | **[Mobile]** Khung Lightbox cho phép Pinch-to-zoom và double-tap zoom trên mobile. | US-F20-04 | P2 | Tối ưu đọc text nhỏ |
+| FR-06 | **[Mobile]** Thanh điều hướng Sidebar chuyển thành sticky top dropdown hoặc tab-bar | US-F20-04 | P2 | Tối ưu không gian đọc |
 
 ---
 
@@ -172,8 +173,7 @@ Step 2: User selects a tab / menu item:
 - **Design / Wireframe:**
 ```text
   - [Link tới file wireframe/design trong thư mục docs/design/...]
-
-  - [Link tới file wireframe/design trong thư mục docs/design/...]
+```
 
 ---
 
@@ -218,6 +218,24 @@ GIVEN the user is viewing module instructions
 WHEN  they click on a screenshot
 THEN  the screenshot should expand in a lightbox/modal for better visibility
   AND they can close it to return to the text
+```
+
+### AC-5: Pinch-to-Zoom Support
+> 📌 Source: [US-F20-04](../stories/F20-help-center-stories.md) — AC-1: Pinch-to-Zoom Support
+
+```gherkin
+GIVEN the user opens a screenshot in the Lightbox on a mobile device
+WHEN  they use the pinch gesture (two fingers spreading) or double-tap
+THEN  the image zooms in smoothly without exiting the lightbox
+```
+
+### AC-6: Mobile-Friendly Navigation
+> 📌 Source: [US-F20-04](../stories/F20-help-center-stories.md) — AC-2: Mobile-Friendly Navigation
+
+```gherkin
+GIVEN the user is reading a module guide on mobile
+WHEN  they view the page
+THEN  the left Sidebar navigation shifts to a sticky top dropdown or horizontal scrollable tab-bar to preserve vertical reading space
 ```
 
 ---
