@@ -65,6 +65,21 @@ export default function ForgotPasswordPage() {
 
     const onSubmit = async (data: ForgotForm) => {
         try {
+            // ── FR-07/FR-08: Check if user is Owner (SSO) or Staff (internal) ──
+            const checkRes = await fetch('/api/auth/check-reset-flow', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: data.email }),
+            })
+            const checkData = await checkRes.json()
+
+            if (checkData.flow === 'sso' && checkData.redirectUrl) {
+                // Owner → redirect straight to SSO portal (no intermediate screen)
+                window.location.href = checkData.redirectUrl
+                return
+            }
+
+            // Staff → internal reset flow
             const success = await sendResetLink(data.email)
 
             if (success) {
@@ -106,7 +121,7 @@ export default function ForgotPasswordPage() {
         }
     }
 
-    // Success state
+    // Success state — Staff reset link sent
     if (submitted) {
         return (
             <div className="animate-in fade-in duration-500 text-center py-4">
@@ -129,8 +144,8 @@ export default function ForgotPasswordPage() {
                             onClick={handleResend}
                             disabled={cooldown > 0 || resending}
                             className={`inline-flex items-center gap-1.5 text-sm font-medium transition-colors ${cooldown > 0 || resending
-                                    ? 'text-gray-600 cursor-not-allowed'
-                                    : 'text-blue-400 hover:text-blue-300'
+                                ? 'text-gray-600 cursor-not-allowed'
+                                : 'text-blue-400 hover:text-blue-300'
                                 }`}
                         >
                             {resending ? (
