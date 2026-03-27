@@ -90,15 +90,15 @@ function LoginFormContent() {
             if (data.flow === 'sso' && data.redirectUrl) {
                 // Owner → redirect straight to SSO portal
                 window.location.href = data.redirectUrl
+                // Return here without resetting state to keep loading active while browser redirects
                 return
             }
         } catch {
             // On error, fall through to internal page
-        } finally {
-            setCheckingReset(false)
         }
 
         // Staff or unknown → internal forgot-password page
+        setCheckingReset(false)
         router.push('/forgot-password')
     }
 

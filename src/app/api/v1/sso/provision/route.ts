@@ -112,6 +112,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ── 6. Generate slug ──
+        // ── 7. Create Tenant ──
         const baseSlug = companyName
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
@@ -119,7 +120,8 @@ export async function POST(req: NextRequest) {
             .substring(0, 30)
         const uniqueSlug = `${baseSlug}-${crypto.randomBytes(3).toString('hex')}`
 
-        // ── 7. Create Tenant ──
+        const { password: _ssoPassword, ...safeMetaData } = rawPayload
+
         const newTenant = await payload.create({
             collection: 'tenants',
             data: {
@@ -132,8 +134,8 @@ export async function POST(req: NextRequest) {
                 ...(serviceId && serviceId !== 'NA' && { serviceId }),
                 ...(packCode && { packCode }),
                 ...(orderId && { orderId }),
-                // Store raw payload for future reference
-                metaData: rawPayload,
+                // Store raw payload for future reference (exclude plaintext password)
+                metaData: safeMetaData,
             },
         })
 
