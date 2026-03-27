@@ -255,6 +255,11 @@ const MIGRATIONS = [
     name: 'users_tenants.order_idx',
     sql: `CREATE INDEX IF NOT EXISTS users_tenants_order_idx ON users_tenants (_order);`,
   },
+  // ── Users: Tenant status (for staff management — pending/active/suspended) ──
+  {
+    name: 'users_tenants.status',
+    sql: `ALTER TABLE users_tenants ADD COLUMN IF NOT EXISTS status varchar DEFAULT 'active';`,
+  },
   // ── Users: Tenant permissions (Payload internal auth table) ──
   {
     name: 'users_tenants_permissions.create_table',
