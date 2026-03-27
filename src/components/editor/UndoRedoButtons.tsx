@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
  *   - Count badge beside label
  *   - Gap between buttons: 4px
  */
-export function UndoRedoButtons() {
+export function UndoRedoButtons({ className }: { className?: string }) {
     const undo = useEditorStore((s) => s.undo)
     const redo = useEditorStore((s) => s.redo)
     const canUndo = useEditorStore((s) => s.canUndo)
@@ -23,6 +23,23 @@ export function UndoRedoButtons() {
     const historyIndex = useEditorStore((s) => s.historyIndex)
     const historyLength = useEditorStore((s) => s.history.length)
 
+    // FR-09 Haptic Feedback
+    const triggerHaptic = (duration = 50) => {
+        if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+            window.navigator.vibrate(duration)
+        }
+    }
+
+    const handleUndo = () => {
+        triggerHaptic()
+        undo()
+    }
+
+    const handleRedo = () => {
+        triggerHaptic()
+        redo()
+    }
+
     const undoCount = historyIndex
     const redoCount = historyLength - 1 - historyIndex
 
@@ -30,15 +47,15 @@ export function UndoRedoButtons() {
     const isRedoEnabled = canRedo()
 
     return (
-        <div className="flex items-center gap-1" role="group" aria-label="Undo and redo">
+        <div className={cn("flex items-center gap-1", className)} role="group" aria-label="Undo and redo">
             {/* Undo */}
             <button
-                onClick={undo}
+                onClick={handleUndo}
                 disabled={!isUndoEnabled}
                 title={isUndoEnabled ? `Undo: ${undoLabel() ?? 'last change'} (Ctrl+Z)` : 'Nothing to undo'}
                 aria-label={`Undo${undoCount > 0 ? ` (${undoCount})` : ''}`}
                 className={cn(
-                    'flex h-8 items-center gap-2 rounded-[10px] px-2.5 transition-all duration-150',
+                    'flex h-8 items-center gap-2 rounded-[10px] px-2.5 transition-all duration-150 touch-manipulation',
                     'bg-white/5 text-[#F8FAFC] font-medium text-[12px]',
                     isUndoEnabled
                         ? 'opacity-100 hover:bg-white/15 cursor-pointer'
@@ -56,12 +73,12 @@ export function UndoRedoButtons() {
 
             {/* Redo */}
             <button
-                onClick={redo}
+                onClick={handleRedo}
                 disabled={!isRedoEnabled}
                 title={isRedoEnabled ? `Redo: ${redoLabel() ?? 'last undone change'} (Ctrl+Y)` : 'Nothing to redo'}
                 aria-label={`Redo${redoCount > 0 ? ` (${redoCount})` : ''}`}
                 className={cn(
-                    'flex h-8 items-center gap-2 rounded-[10px] px-2.5 transition-all duration-150',
+                    'flex h-8 items-center gap-2 rounded-[10px] px-2.5 transition-all duration-150 touch-manipulation',
                     'bg-white/5 text-[#F8FAFC] font-medium text-[12px]',
                     isRedoEnabled
                         ? 'opacity-100 hover:bg-white/15 cursor-pointer'

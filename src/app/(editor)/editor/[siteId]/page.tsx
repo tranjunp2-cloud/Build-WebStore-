@@ -14,6 +14,7 @@ import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import { UndoRedoButtons } from '@/components/editor/UndoRedoButtons'
+import { MobileUndoRedoButtons } from '@/components/editor/MobileUndoRedoButtons'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -247,7 +248,7 @@ export default function EditorPage() {
                     {site && <span className="text-sm font-medium text-white">{site.name}</span>}
                     <div className="mx-2 h-5 w-px bg-white/10" />
                     {/* F-11: Undo/Redo — bên trái toolbar */}
-                    <UndoRedoButtons />
+                    <UndoRedoButtons className="hidden md:flex" />
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -322,6 +323,9 @@ export default function EditorPage() {
                     </span>
                 </div>
             </div>
+
+            {/* F-11: Undo/Redo Floating Toolbar for Mobile */}
+            <MobileUndoRedoButtons className="md:hidden flex" />
         </div>
     )
 }
