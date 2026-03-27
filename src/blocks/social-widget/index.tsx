@@ -2,6 +2,7 @@
 
 import type { BlockProps } from '../types'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig, type SocialLinkItem, type SocialPlatform, type SocialWidgetConfig } from './config'
+import { mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
 
 const PLATFORM_META: Record<SocialPlatform, { label: string; mark: string; accent: string }> = {
     facebook: { label: 'Facebook', mark: 'f', accent: '#2563eb' },
@@ -47,8 +48,8 @@ function PlatformBadge({ platform }: { platform: SocialPlatform }) {
     )
 }
 
-export function SocialWidgetBlock({ block, theme }: BlockProps<SocialWidgetConfig>) {
-    const normalizedBlock = normalizeSocialWidgetConfig(block)
+export function SocialWidgetBlock({ block, theme, site }: BlockProps<SocialWidgetConfig>) {
+    const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(block, site?.socialLinks))
     let links = normalizedBlock.links.filter((item: SocialLinkItem) => item.enabled !== false)
     const isFloating = block.variant !== 'inline'
 

@@ -3,9 +3,11 @@
 import type { BlockProps } from '../types'
 import type { NavigationConfig } from './config'
 import { motion } from 'framer-motion'
+import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
 
-export function NavigationBlock({ block, theme }: BlockProps<NavigationConfig>) {
-    const { logoText, links = [], ctaButton, variant = 'simple' } = block
+export function NavigationBlock({ block, theme, site }: BlockProps<NavigationConfig>) {
+    const mergedBlock = mergeNavigationBrandingWithSite(block, site)
+    const { logoText, links = [], ctaButton, variant = 'simple' } = mergedBlock
     const pc = theme.primaryColor
 
     return (
@@ -27,8 +29,8 @@ export function NavigationBlock({ block, theme }: BlockProps<NavigationConfig>) 
                     whileHover={{ scale: 1.02 }}
                     className="font-bold text-xl font-heading flex items-center gap-2"
                 >
-                    {block.logo?.url ? (
-                        <img src={block.logo.url} alt={logoText || 'Logo'} className="h-8 w-auto" />
+                    {mergedBlock.logo?.url ? (
+                        <img src={mergedBlock.logo.url} alt={logoText || 'Logo'} className="h-8 w-auto" />
                     ) : (
                         <span style={{
                             background: `linear-gradient(135deg, ${pc}, ${pc}90)`,

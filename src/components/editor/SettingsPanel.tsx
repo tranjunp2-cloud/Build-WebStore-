@@ -1,10 +1,12 @@
 'use client'
 
-import React, { memo, useEffect, useState } from 'react'
-import { CircleDot, Copy, Globe2, MenuSquare, Search, Trash2 } from 'lucide-react'
+import React, { memo, useEffect, useMemo, useState } from 'react'
+import { ChevronDown, CircleDot, Copy, Globe2, MenuSquare, Search, Trash2, UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
 import { LogoEditor } from './LogoEditor'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
@@ -50,8 +52,6 @@ const SOCIAL_PLATFORM_META: Record<SocialWidgetLink['platform'], { label: string
 
 // ─── Constants ──────────────────────────────────────────────────────────
 const FONT_OPTIONS = ['Outfit', 'Inter', 'DM Sans', 'Playfair Display', 'Roboto', 'Poppins', 'Plus Jakarta Sans']
-const inputCls = "mt-1.5 w-full rounded-xl border border-[#25324A] bg-[#172033] px-3 py-2 text-sm text-white outline-none focus:border-blue-500/50"
-const textareaCls = `${inputCls} resize-none`
 const labelCls = "text-[11px] font-medium text-slate-400"
 const sectionCls = "border-t border-white/10 pt-4"
 
@@ -68,6 +68,33 @@ interface SettingsPanelProps {
     block: BlockData | null
     blockIndex: number | null
     theme: ThemeData | undefined
+    site?: {
+        id: string
+        name: string
+        status: string
+        branding?: {
+            logo?: string
+            favicon?: string
+        }
+        contactInfo?: {
+            phone?: string
+            email?: string
+            address?: string
+        }
+        socialLinks?: {
+            facebook?: string
+            instagram?: string
+            twitter?: string
+            linkedin?: string
+            youtube?: string
+            tiktok?: string
+        }
+        seo?: {
+            metaTitle?: string
+            metaDescription?: string
+            ogImage?: string | number | null
+        }
+    } | null
     siteName: string
     siteStatus: string
     headerBlock?: BlockData | null
@@ -81,15 +108,29 @@ interface SettingsPanelProps {
     onHeaderUpdate?: (changes: Record<string, unknown>) => void
     onFooterUpdate?: (changes: Record<string, unknown>) => void
     onLogoChange?: (logoUrl: string, faviconUrl?: string) => void
+    onSiteSettingsChange?: (changes: {
+        name?: string
+        branding?: { logo?: string; favicon?: string }
+        contactInfo?: { phone?: string; email?: string; address?: string }
+        socialLinks?: { facebook?: string; instagram?: string; twitter?: string; linkedin?: string; youtube?: string; tiktok?: string }
+        seo?: { metaTitle?: string; metaDescription?: string; ogImage?: string | number | null }
+        headerBlock?: Record<string, unknown>
+        footerBlock?: Record<string, unknown>
+    }) => void | Promise<void>
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
 function SettingsPanelInner({
-    block, blockIndex, theme, siteName, siteStatus, headerBlock, footerBlock, pages,
+    block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages,
     onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
-    onHeaderUpdate, onFooterUpdate, onLogoChange,
+    onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange,
 }: SettingsPanelProps) {
     const [activeTab, setActiveTab] = useState<SettingsTab>(block ? 'block' : 'global')
+    const [openGlobalSections, setOpenGlobalSections] = useState({
+        brand: true,
+        contact: true,
+        social: true,
+    })
 
     useEffect(() => {
         if (block) {
@@ -100,82 +141,139 @@ function SettingsPanelInner({
         setActiveTab(prev => (prev === 'block' ? 'global' : prev))
     }, [block])
 
+    const siteContactInfo = site?.contactInfo || {}
+    const siteSocialLinks = site?.socialLinks || {}
+    const siteSeo = site?.seo || {}
+    const siteBranding = site?.branding || {}
+
+    const globalAccordionButtonCls = 'flex w-full items-center justify-between rounded-t-[14px] border border-[#25324A] bg-[#1A2437] px-3 py-3 text-left'
+    const globalAccordionBodyCls = 'rounded-b-[14px] border border-t-0 border-[#25324A] bg-[#131D2E] px-4 py-4'
+
+    const renderGlobalAccordion = (
+        id: keyof typeof openGlobalSections,
+        title: string,
+        content: React.ReactNode,
+    ) => (
+        <div className="rounded-[14px]">
+            <button
+                type="button"
+                onClick={() => setOpenGlobalSections(prev => ({ ...prev, [id]: !prev[id] }))}
+                className={cn(
+                    globalAccordionButtonCls,
+                    openGlobalSections[id] ? 'rounded-b-none' : 'rounded-b-[14px]',
+                )}
+            >
+                <span className="text-[15px] font-medium text-white">{openGlobalSections[id] ? '▼' : '▶'} {title}</span>
+                <ChevronDown
+                    className={cn(
+                        'h-4 w-4 text-slate-500 transition-transform',
+                        openGlobalSections[id] && 'rotate-180',
+                    )}
+                />
+            </button>
+            {openGlobalSections[id] ? (
+                <div className={globalAccordionBodyCls}>
+                    {content}
+                </div>
+            ) : null}
+        </div>
+    )
+
+    const editorInputClassName = 'mt-1.5'
+    const editorTextareaClassName = 'mt-1.5 min-h-[96px]'
+
     const renderGlobalContent = () => (
-        <div className="space-y-5">
-            <div>
-                <label className={labelCls}>Site Name</label>
-                <div className={`${inputCls} flex items-center text-gray-300`}>
-                    {siteName || 'Untitled Website'}
+        <div className="space-y-4">
+            {renderGlobalAccordion('brand', 'Brand Identity', (
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-[12px] font-medium text-[#A5B4CF]">Business Name</label>
+                        <Input
+                            defaultValue={siteName || site?.name || ''}
+                            key={`business-name-${siteName || site?.name || ''}`}
+                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ name: e.target.value })}
+                            variant="editor"
+                            className={editorInputClassName}
+                            placeholder="Your Company"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[12px] font-medium text-[#A5B4CF]">Upload Logo</label>
+                        <div className="mt-2">
+                            <LogoEditor
+                                currentLogo={(siteBranding.logo as string) || ((headerBlock as any)?.logo as string) || null}
+                                onLogoChange={(logoUrl, faviconUrl) => {
+                                    const siteBrandingChanges: any = { logo: logoUrl }
+                                    if (faviconUrl) siteBrandingChanges.favicon = faviconUrl
+                                    onHeaderUpdate?.(siteBrandingChanges)
+                                    onFooterUpdate?.(siteBrandingChanges)
+                                    void onSiteSettingsChange?.({ branding: siteBrandingChanges })
+                                    if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
+                                }}
+                            />
+                        </div>
+                    </div>
                 </div>
-                <p className="mt-2 text-xs text-gray-500">
-                    Select a block in preview to edit details, or use AI chat for quick updates.
-                </p>
-            </div>
+            ))}
 
-            <div className={sectionCls}>
-                <label className="text-xs font-medium uppercase text-gray-500">Brand Colors</label>
-                <div className="mt-3 space-y-3">
+            {renderGlobalAccordion('contact', 'Contact Info', (
+                <div className="space-y-4">
                     <div>
-                        <label className={labelCls}>Primary Color</label>
-                        <input
-                            defaultValue={String(theme?.primaryColor || '')}
-                            key={`primary-${String(theme?.primaryColor || '')}`}
-                            onBlur={(e: FieldBlurEvent) => onThemeChange('primaryColor', e.target.value)}
-                            className={inputCls}
+                        <label className="text-[12px] font-medium text-[#A5B4CF]">Phone</label>
+                        <Input
+                            defaultValue={siteContactInfo.phone || ''}
+                            key={`contact-phone-${siteContactInfo.phone || ''}`}
+                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: e.target.value } })}
+                            variant="editor"
+                            className={editorInputClassName}
+                            placeholder="+60 12-345-6789"
                         />
                     </div>
                     <div>
-                        <label className={labelCls}>Secondary Color</label>
-                        <input
-                            defaultValue={String(theme?.secondaryColor || '')}
-                            key={`secondary-${String(theme?.secondaryColor || '')}`}
-                            onBlur={(e: FieldBlurEvent) => onThemeChange('secondaryColor', e.target.value)}
-                            className={inputCls}
+                        <label className="text-[12px] font-medium text-[#A5B4CF]">Email</label>
+                        <Input
+                            defaultValue={siteContactInfo.email || ''}
+                            key={`contact-email-${siteContactInfo.email || ''}`}
+                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, email: e.target.value } })}
+                            variant="editor"
+                            className={editorInputClassName}
+                            placeholder="hello@company.com"
                         />
                     </div>
                     <div>
-                        <label className={labelCls}>Accent Color</label>
-                        <input
-                            defaultValue={String(theme?.accentColor || '')}
-                            key={`accent-${String(theme?.accentColor || '')}`}
-                            onBlur={(e: FieldBlurEvent) => onThemeChange('accentColor', e.target.value)}
-                            className={inputCls}
+                        <label className="text-[12px] font-medium text-[#A5B4CF]">Address</label>
+                        <Textarea
+                            defaultValue={siteContactInfo.address || ''}
+                            key={`contact-address-${siteContactInfo.address || ''}`}
+                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, address: e.target.value } })}
+                            variant="editor"
+                            className={editorTextareaClassName}
+                            placeholder="12 Jalan Ampang, Kuala Lumpur"
                         />
                     </div>
                 </div>
-            </div>
+            ))}
 
-            <div className={sectionCls}>
-                <label className="text-xs font-medium uppercase text-gray-500">Typography</label>
-                <div className="mt-3 space-y-3">
-                    <div>
-                        <label className={labelCls}>Heading Font</label>
-                        <select
-                            defaultValue={String(theme?.fontHeading || 'Outfit')}
-                            key={`font-heading-${String(theme?.fontHeading || 'Outfit')}`}
-                            onChange={(e) => onThemeChange('fontHeading', e.target.value)}
-                            className={inputCls}
-                        >
-                            {FONT_OPTIONS.map(option => (
-                                <option key={option} value={option}>{option}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className={labelCls}>Body Font</label>
-                        <select
-                            defaultValue={String(theme?.fontBody || 'Inter')}
-                            key={`font-body-${String(theme?.fontBody || 'Inter')}`}
-                            onChange={(e) => onThemeChange('fontBody', e.target.value)}
-                            className={inputCls}
-                        >
-                            {FONT_OPTIONS.map(option => (
-                                <option key={option} value={option}>{option}</option>
-                            ))}
-                        </select>
-                    </div>
+            {renderGlobalAccordion('social', 'Social Links', (
+                <div className="space-y-3">
+                    <Input
+                        defaultValue={siteSocialLinks.facebook || ''}
+                        key={`social-facebook-${siteSocialLinks.facebook || ''}`}
+                        onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ socialLinks: { ...siteSocialLinks, facebook: e.target.value } })}
+                        variant="editor"
+                        className={editorInputClassName}
+                        placeholder="Facebook URL"
+                    />
+                    <Input
+                        defaultValue={siteSocialLinks.instagram || ''}
+                        key={`social-instagram-${siteSocialLinks.instagram || ''}`}
+                        onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ socialLinks: { ...siteSocialLinks, instagram: e.target.value } })}
+                        variant="editor"
+                        className={editorInputClassName}
+                        placeholder="Instagram URL"
+                    />
                 </div>
-            </div>
+            ))}
         </div>
     )
 
@@ -183,21 +281,32 @@ function SettingsPanelInner({
         <div className="space-y-5">
             <div>
                 <label className={labelCls}>Meta Title</label>
-                <input defaultValue={siteName || 'Homepage'} className={inputCls} />
+                <Input
+                    defaultValue={siteSeo.metaTitle || siteName || 'Homepage'}
+                    key={`seo-title-${siteSeo.metaTitle || siteName || 'Homepage'}`}
+                    onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ seo: { ...siteSeo, metaTitle: e.target.value } })}
+                    variant="editor"
+                    className={editorInputClassName}
+                />
             </div>
             <div>
                 <label className={labelCls}>Meta Description</label>
-                <textarea
+                <Textarea
                     rows={4}
-                    defaultValue="PrimeWeb generated page optimized for search and share previews."
-                    className={textareaCls}
+                    defaultValue={siteSeo.metaDescription || ''}
+                    key={`seo-description-${siteSeo.metaDescription || ''}`}
+                    onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ seo: { ...siteSeo, metaDescription: e.target.value } })}
+                    variant="editor"
+                    className={editorTextareaClassName}
+                    placeholder="Tell search engines and social platforms what this site is about."
                 />
             </div>
             <div className={sectionCls}>
                 <label className="text-xs font-medium uppercase text-gray-500">Open Graph</label>
-                <div className="mt-3 space-y-3">
-                    <input defaultValue={siteName || 'PrimeWeb site preview'} className={inputCls} />
-                    <textarea rows={3} defaultValue="Preview text shown when this page is shared on social media." className={textareaCls} />
+                <div className="mt-3 rounded-2xl border border-dashed border-[#334155] bg-[#172033] px-4 py-5 text-center">
+                    <UploadCloud className="mx-auto h-5 w-5 text-slate-500" />
+                    <p className="mt-2 text-sm font-medium text-slate-200">Social Share Thumbnail</p>
+                    <p className="mt-1 text-xs text-slate-500">Upload support will be connected in the next step.</p>
                 </div>
             </div>
         </div>
@@ -249,7 +358,7 @@ function SettingsPanelInner({
     )
 
     const panelTitle = activeTab === 'global'
-        ? 'Global Settings'
+        ? 'Global Site Settings'
         : activeTab === 'seo'
             ? 'SEO Settings'
             : activeTab === 'menu'
@@ -260,9 +369,9 @@ function SettingsPanelInner({
         ? 'Adjust spacing, content, and presentation for the selected block.'
         : activeTab === 'seo'
             ? 'Control metadata and social preview content.'
-            : activeTab === 'menu'
-                ? 'Configure navigation structure and menu presentation.'
-                : 'Manage site identity, colors, and typography.'
+        : activeTab === 'menu'
+            ? 'Configure navigation structure and menu presentation.'
+            : 'Manage business identity, contact info, and social channels.'
 
     const info = block ? getBlockInfo(block.blockType) : null
     const bt = block?.blockType
@@ -295,8 +404,8 @@ function SettingsPanelInner({
     ]
 
     return (
-        <div className="flex h-full w-[260px] shrink-0 flex-col border-l border-white/5 bg-[#111827]">
-            <div className="border-b border-white/5 px-3 py-3">
+        <div className="flex h-full w-[320px] shrink-0 flex-col border-l border-white/5 bg-[#111827]">
+            <div className="border-b border-white/5 px-4 py-4">
                 <div className="grid grid-cols-2 gap-2">
                     {tabs.map(tab => (
                         <button
@@ -319,21 +428,20 @@ function SettingsPanelInner({
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-3 py-4">
-                <div className="mb-4">
-                    <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 overflow-y-auto px-4 py-5">
+                <div className="mb-6">
+                    <div className="flex items-start gap-4">
                         <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#A5B4CF]">{panelTitle}</p>
+                            <div className="flex items-start gap-2">
+                                <span className="text-[16px] font-semibold leading-6 text-[#2DD4BF]">
+                                    {activeTab === 'global' ? '⚙️' : activeTab === 'seo' ? '🔍' : activeTab === 'menu' ? '🧭' : '🎨'}
+                                </span>
+                                <p className="pt-[2px] text-[14px] font-semibold uppercase leading-5 tracking-normal text-[#2DD4BF]">{panelTitle}</p>
+                            </div>
                             {activeTab === 'block' && block ? (
-                                <p className="mt-1 text-[11px] text-slate-500">[{block.blockType}]</p>
+                                <p className="mt-1 pl-7 text-[11px] text-slate-500">[{block.blockType}]</p>
                             ) : null}
                         </div>
-                        <span className={cn(
-                            'rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]',
-                            siteStatus === 'published' ? 'bg-green-500/15 text-green-300' : 'bg-yellow-500/15 text-yellow-300',
-                        )}>
-                            {siteStatus === 'published' ? 'Published' : 'Draft'}
-                        </span>
                     </div>
                 </div>
 
@@ -376,63 +484,70 @@ function SettingsPanelInner({
                 {block.logoText !== undefined && (
                     <div>
                         <label className={labelCls}>Logo Text</label>
-                        <input defaultValue={block.logoText as string} key={`logo-${currentBlockIndex}`}
+                        <Input defaultValue={block.logoText as string} key={`logo-${currentBlockIndex}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'logoText', e.target.value)}
-                            className={inputCls} />
+                            variant="editor"
+                            className={editorInputClassName} />
                     </div>
                 )}
 
                 {block.headline !== undefined && (
                     <div>
                         <label className={labelCls}>Headline</label>
-                        <input defaultValue={block.headline as string} key={`hl-${currentBlockIndex}`}
+                        <Input defaultValue={block.headline as string} key={`hl-${currentBlockIndex}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
-                            className={inputCls} />
+                            variant="editor"
+                            className={editorInputClassName} />
                     </div>
                 )}
 
                 {block.subheadline !== undefined && (
                     <div>
                         <label className={labelCls}>Subheadline</label>
-                        <textarea defaultValue={block.subheadline as string} rows={2} key={`sub-${currentBlockIndex}`}
+                        <Textarea defaultValue={block.subheadline as string} rows={2} key={`sub-${currentBlockIndex}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subheadline', e.target.value)}
-                            className={textareaCls} />
+                            variant="editor"
+                            className={editorTextareaClassName} />
                     </div>
                 )}
 
                 {block.sectionLabel !== undefined && (
                     <div>
                         <label className={labelCls}>Section Label</label>
-                        <input defaultValue={block.sectionLabel as string} key={`sl-${currentBlockIndex}`}
+                        <Input defaultValue={block.sectionLabel as string} key={`sl-${currentBlockIndex}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'sectionLabel', e.target.value)}
-                            className={inputCls} />
+                            variant="editor"
+                            className={editorInputClassName} />
                     </div>
                 )}
 
                 {block.body !== undefined && (
                     <div>
                         <label className={labelCls}>Body Text</label>
-                        <textarea defaultValue={block.body as string} rows={4} key={`body-${currentBlockIndex}`}
+                        <Textarea defaultValue={block.body as string} rows={4} key={`body-${currentBlockIndex}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'body', e.target.value)}
-                            className={textareaCls} />
+                            variant="editor"
+                            className={editorTextareaClassName} />
                     </div>
                 )}
 
                 {block.subtext !== undefined && (
                     <div>
                         <label className={labelCls}>Description</label>
-                        <textarea defaultValue={block.subtext as string} rows={3} key={`subtext-${currentBlockIndex}`}
+                        <Textarea defaultValue={block.subtext as string} rows={3} key={`subtext-${currentBlockIndex}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subtext', e.target.value)}
-                            className={textareaCls} />
+                            variant="editor"
+                            className={editorTextareaClassName} />
                     </div>
                 )}
 
                 {block.tagline !== undefined && (
                     <div>
                         <label className={labelCls}>Tagline</label>
-                        <textarea defaultValue={block.tagline as string} rows={2} key={`tag-${currentBlockIndex}`}
+                        <Textarea defaultValue={block.tagline as string} rows={2} key={`tag-${currentBlockIndex}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'tagline', e.target.value)}
-                            className={textareaCls} />
+                            variant="editor"
+                            className={editorTextareaClassName} />
                     </div>
                 )}
 
@@ -443,21 +558,24 @@ function SettingsPanelInner({
                         <div className="mt-3 space-y-3">
                             <div>
                                 <label className={labelCls}>Email</label>
-                                <input defaultValue={(block.email as string) || ''} key={`email-${currentBlockIndex}`}
+                                <Input defaultValue={(block.email as string) || ''} key={`email-${currentBlockIndex}`}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'email', e.target.value)}
-                                    className={inputCls} placeholder="contact@example.com" />
+                                    variant="editor"
+                                    className={editorInputClassName} placeholder="contact@example.com" />
                             </div>
                             <div>
                                 <label className={labelCls}>Phone</label>
-                                <input defaultValue={(block.phone as string) || ''} key={`phone-${currentBlockIndex}`}
+                                <Input defaultValue={(block.phone as string) || ''} key={`phone-${currentBlockIndex}`}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'phone', e.target.value)}
-                                    className={inputCls} placeholder="+84 xxx xxx xxx" />
+                                    variant="editor"
+                                    className={editorInputClassName} placeholder="+84 xxx xxx xxx" />
                             </div>
                             <div>
                                 <label className={labelCls}>Address</label>
-                                <textarea defaultValue={(block.address as string) || ''} rows={2} key={`addr-${currentBlockIndex}`}
+                                <Textarea defaultValue={(block.address as string) || ''} rows={2} key={`addr-${currentBlockIndex}`}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'address', e.target.value)}
-                                    className={textareaCls} placeholder="123 Street, City" />
+                                    variant="editor"
+                                    className={editorTextareaClassName} placeholder="123 Street, City" />
                             </div>
                         </div>
                     </div>
@@ -468,12 +586,14 @@ function SettingsPanelInner({
                     <div>
                         <label className={labelCls}>CTA Button</label>
                         <div className="mt-1.5 space-y-2">
-                            <input defaultValue={(block.ctaLabel as string) || ''} key={`ctalbl-${currentBlockIndex}`}
+                            <Input defaultValue={(block.ctaLabel as string) || ''} key={`ctalbl-${currentBlockIndex}`}
                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaLabel', e.target.value)}
-                                className={inputCls} placeholder="Button text" />
-                            <input defaultValue={(block.ctaUrl as string) || ''} key={`ctaurl-${currentBlockIndex}`}
+                                variant="editor"
+                                className={editorInputClassName} placeholder="Button text" />
+                            <Input defaultValue={(block.ctaUrl as string) || ''} key={`ctaurl-${currentBlockIndex}`}
                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaUrl', e.target.value)}
-                                className={inputCls} placeholder="Button URL" />
+                                variant="editor"
+                                className={editorInputClassName} placeholder="Button URL" />
                         </div>
                     </div>
                 )}
@@ -481,9 +601,10 @@ function SettingsPanelInner({
                 {block.copyrightText !== undefined && (
                     <div>
                         <label className={labelCls}>Copyright</label>
-                        <input defaultValue={block.copyrightText as string} key={`copy-${currentBlockIndex}`}
+                        <Input defaultValue={block.copyrightText as string} key={`copy-${currentBlockIndex}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'copyrightText', e.target.value)}
-                            className={inputCls} />
+                            variant="editor"
+                            className={editorInputClassName} />
                     </div>
                 )}
 
@@ -497,12 +618,14 @@ function SettingsPanelInner({
                                     <span className="text-[10px] text-gray-500">Button {i + 1}</span>
                                     <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
-                                <input defaultValue={btn.label || ''} placeholder="Label"
+                                <Input defaultValue={btn.label || ''} placeholder="Label"
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'label', e.target.value)}
-                                    className={inputCls} />
-                                <input defaultValue={btn.url || ''} placeholder="URL"
+                                    variant="editor"
+                                    className={editorInputClassName} />
+                                <Input defaultValue={btn.url || ''} placeholder="URL"
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'url', e.target.value)}
-                                    className={inputCls} />
+                                    variant="editor"
+                                    className={editorInputClassName} />
                             </div>
                         ))}
                         <button onClick={() => addArrayItem('ctaButtons', { label: 'New Button', url: '#' })}
@@ -528,12 +651,14 @@ function SettingsPanelInner({
                         {!!block.ctaButton && (
                             <div className="mt-3">
                                 <label className={labelCls}>CTA Button</label>
-                                <input defaultValue={(block.ctaButton as CtaButton)?.label || ''} placeholder="CTA Label"
+                                <Input defaultValue={(block.ctaButton as CtaButton)?.label || ''} placeholder="CTA Label"
                                     onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), label: e.target.value } })}
-                                    className={inputCls} />
-                                <input defaultValue={(block.ctaButton as CtaButton)?.url || ''} placeholder="CTA URL"
+                                    variant="editor"
+                                    className={editorInputClassName} />
+                                <Input defaultValue={(block.ctaButton as CtaButton)?.url || ''} placeholder="CTA URL"
                                     onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), url: e.target.value } })}
-                                    className={`${inputCls} mt-1.5`} />
+                                    variant="editor"
+                                    className={editorInputClassName} />
                             </div>
                         )}
                     </div>
@@ -549,15 +674,18 @@ function SettingsPanelInner({
                                     <span className="text-[10px] text-gray-500">{feat.icon || '✦'} Feature {i + 1}</span>
                                     <button onClick={() => removeArrayItem('features', i)} aria-label={`Remove feature ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
-                                <input defaultValue={feat.title || ''} placeholder="Title"
+                                <Input defaultValue={feat.title || ''} placeholder="Title"
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'title', e.target.value)}
-                                    className={inputCls} />
-                                <textarea defaultValue={feat.description || ''} rows={2} placeholder="Description"
+                                    variant="editor"
+                                    className={editorInputClassName} />
+                                <Textarea defaultValue={feat.description || ''} rows={2} placeholder="Description"
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'description', e.target.value)}
-                                    className={textareaCls} />
-                                <input defaultValue={feat.icon || ''} placeholder="Icon (emoji)"
+                                    variant="editor"
+                                    className={editorTextareaClassName} />
+                                <Input defaultValue={feat.icon || ''} placeholder="Icon (emoji)"
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'icon', e.target.value)}
-                                    className={inputCls} />
+                                    variant="editor"
+                                    className={editorInputClassName} />
                             </div>
                         ))}
                         <button onClick={() => addArrayItem('features', { title: 'New Feature', description: '', icon: '✦' })}
@@ -575,15 +703,18 @@ function SettingsPanelInner({
                                     <span className="text-[10px] text-gray-500">Review {i + 1}</span>
                                     <button onClick={() => removeArrayItem('testimonials', i)} aria-label={`Remove testimonial ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
-                                <input defaultValue={item.name || ''} placeholder="Name"
+                                <Input defaultValue={item.name || ''} placeholder="Name"
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'name', e.target.value)}
-                                    className={inputCls} />
-                                <input defaultValue={item.title || ''} placeholder="Title / Role"
+                                    variant="editor"
+                                    className={editorInputClassName} />
+                                <Input defaultValue={item.title || ''} placeholder="Title / Role"
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'title', e.target.value)}
-                                    className={inputCls} />
-                                <textarea defaultValue={item.quote || ''} rows={2} placeholder="Quote"
+                                    variant="editor"
+                                    className={editorInputClassName} />
+                                <Textarea defaultValue={item.quote || ''} rows={2} placeholder="Quote"
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'quote', e.target.value)}
-                                    className={textareaCls} />
+                                    variant="editor"
+                                    className={editorTextareaClassName} />
                             </div>
                         ))}
                         <button onClick={() => addArrayItem('testimonials', { name: 'Customer', title: '', quote: 'Great experience!', rating: 5 })}
@@ -601,13 +732,14 @@ function SettingsPanelInner({
                                     <span className="text-[10px] text-gray-500">Column {i + 1}</span>
                                     <button onClick={() => removeArrayItem('columns', i)} aria-label={`Remove column ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
-                                <input defaultValue={col.title || ''} placeholder="Column Title"
+                                <Input defaultValue={col.title || ''} placeholder="Column Title"
                                     onBlur={(e: FieldBlurEvent) => {
                                         const cols = [...((block.columns || []) as FooterColumn[])]
                                         cols[i] = { ...cols[i], title: e.target.value }
                                         onBlockUpdate(currentBlockIndex, { columns: cols })
                                     }}
-                                    className={inputCls} />
+                                    variant="editor"
+                                    className={editorInputClassName} />
                                 <div className="text-[10px] text-gray-500 mt-1">{(col.links || []).length} links</div>
                             </div>
                         ))}
@@ -625,10 +757,11 @@ function SettingsPanelInner({
                         <div className="mt-3 space-y-3">
                             <div>
                                 <label className={labelCls}>Headline</label>
-                                <input
+                                <Input
                                     defaultValue={(normalizedSocialBlock.headline as string) || ''}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
-                                    className={inputCls}
+                                    variant="editor"
+                                    className={editorInputClassName}
                                     placeholder="Stay connected"
                                 />
                             </div>
@@ -695,11 +828,12 @@ function SettingsPanelInner({
                                             {link.enabled === false ? 'Hidden' : 'Visible'}
                                         </button>
                                     </div>
-                                    <input
+                                    <Input
                                         defaultValue={link.url || ''}
                                         placeholder={SOCIAL_PLATFORM_META[link.platform].placeholder}
                                         onBlur={(e: FieldBlurEvent) => updateArrayItem('links', i, 'url', e.target.value)}
-                                        className={inputCls}
+                                        variant="editor"
+                                        className={editorInputClassName}
                                     />
                                 </div>
                             ))}
@@ -744,10 +878,11 @@ function SettingsPanelInner({
                             </div>
                             <div>
                                 <label className={labelCls}>Button Label</label>
-                                <input
+                                <Input
                                     defaultValue={(block.label as string) || 'Cart'}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'label', e.target.value)}
-                                    className={inputCls}
+                                    variant="editor"
+                                    className={editorInputClassName}
                                     placeholder="Cart"
                                 />
                             </div>

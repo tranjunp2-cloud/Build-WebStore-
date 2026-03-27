@@ -235,6 +235,7 @@ export function PageManagerPanel({
                             value={newPageTitle}
                             onChange={e => setNewPageTitle(e.target.value)}
                             placeholder="Tên trang (VD: Khuyến mãi)"
+                            variant="editor"
                         />
                         <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                             <span>Slug: /{slugifyPageTitle(newPageTitle || 'new-page')}</span>
@@ -264,6 +265,7 @@ export function PageManagerPanel({
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Tìm kiếm trang..."
+                        variant="editor"
                         className="pl-9"
                     />
                 </div>

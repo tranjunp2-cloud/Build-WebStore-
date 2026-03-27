@@ -220,6 +220,23 @@ export const Sites: CollectionConfig = {
             ],
         },
         {
+            name: 'branding',
+            type: 'group',
+            fields: [
+                { name: 'logo', type: 'text' },
+                { name: 'favicon', type: 'text' },
+            ],
+        },
+        {
+            name: 'contactInfo',
+            type: 'group',
+            fields: [
+                { name: 'phone', type: 'text' },
+                { name: 'email', type: 'text' },
+                { name: 'address', type: 'textarea' },
+            ],
+        },
+        {
             name: 'aiGenerationMetadata',
             type: 'group',
             label: 'AI Generation Info',

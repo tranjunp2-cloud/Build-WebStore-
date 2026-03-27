@@ -64,16 +64,21 @@ export async function PATCH(
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
         
-        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock } = data!
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, siteName, contactInfo, socialLinks, branding, seo } = data!
         const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
 
         // Update site-level fields if provided
         const siteUpdateData: any = {}
         if (theme) siteUpdateData.theme = theme
+        if (siteName) siteUpdateData.name = siteName
         if (locale) siteUpdateData.locale = locale
         if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
         if (headerBlock !== undefined) siteUpdateData.headerBlock = headerBlock
         if (footerBlock !== undefined) siteUpdateData.footerBlock = footerBlock
+        if (contactInfo) siteUpdateData.contactInfo = contactInfo
+        if (socialLinks) siteUpdateData.socialLinks = socialLinks
+        if (branding) siteUpdateData.branding = branding
+        if (seo) siteUpdateData.seo = seo
 
         if (Object.keys(siteUpdateData).length > 0) {
             await payload.update({

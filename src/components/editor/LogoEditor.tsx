@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useState, useEffect } from 'react'
-import { ImagePlus, Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Upload } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { toast } from 'sonner'
 
@@ -104,48 +104,39 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
 
     return (
         <div className="space-y-2">
-            <label className="text-xs font-medium uppercase text-gray-500">Logo</label>
+            <input
+                type="file"
+                className="hidden"
+                ref={fileInputRef}
+                accept="image/*"
+                onChange={handleFileSelect}
+            />
 
-            <div className="flex items-center gap-3">
-                {/* Logo preview */}
-                <div className="w-16 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-                    {displayLogo ? (
-                        <img src={displayLogo} alt="Logo" className="max-w-full max-h-full object-contain" />
-                    ) : (
-                        <span className="text-[10px] text-gray-600">No logo</span>
-                    )}
-                </div>
+            <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="flex w-full flex-col items-center justify-center gap-2 rounded-[12px] border-2 border-dashed border-[rgba(59,130,246,0.07)] bg-[rgba(11,17,32,0.3)] px-0 py-[26px] text-center transition-colors hover:bg-[rgba(17,24,39,0.55)] disabled:opacity-60"
+            >
+                {displayLogo ? (
+                    <div className="mb-1 flex h-16 w-full items-center justify-center overflow-hidden rounded-[10px] border border-white/10 bg-white/[0.03]">
+                        <img src={displayLogo} alt="Logo" className="max-h-full max-w-full object-contain" />
+                    </div>
+                ) : (
+                    <div className="flex h-5 w-5 items-center justify-center">
+                        {isUploading ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                        ) : (
+                            <Upload className="h-5 w-5 text-slate-400" strokeWidth={1.8} />
+                        )}
+                    </div>
+                )}
 
-                {/* Upload button */}
-                <input
-                    type="file"
-                    className="hidden"
-                    ref={fileInputRef}
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                />
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition-colors disabled:opacity-50"
-                >
-                    {isUploading ? (
-                        <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            Uploading...
-                        </>
-                    ) : (
-                        <>
-                            <ImagePlus className="w-3.5 h-3.5" />
-                            Change Logo
-                        </>
-                    )}
-                </button>
-            </div>
+                <span className="text-xs font-medium leading-4 text-[#94A3B8]">
+                    {isUploading ? 'Uploading...' : 'Click to upload'}
+                </span>
+            </button>
 
-            <p className="text-[10px] text-gray-600">
-                Upload a logo image. Favicon will be auto-generated from your logo.
-            </p>
         </div>
     )
 }

@@ -52,6 +52,8 @@ export const BaseBlockSchema = z.object({
 export type BlockProps<T extends Record<string, unknown> = Record<string, unknown>> = {
     block: T & BaseBlockConfig
     theme: ThemeConfig
+    site?: any
+    page?: any
 }
 
 // ── Block Metadata (for AI Editor) ───────────────────────────────────────────

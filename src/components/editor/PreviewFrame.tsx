@@ -14,6 +14,8 @@ interface PreviewFrameProps {
     iframeKey: number
     isLoading: boolean
     viewport: 'desktop' | 'mobile'
+    selectedBlock: number | null
+    onBlockSelect?: (blockIndex: number | null) => void
     onInlineEditApplied?: (content: string, blockIndex: number) => void
     onReorderBlocks?: (fromIndex: number, toIndex: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
@@ -44,6 +46,11 @@ type DragState = {
     sourceRect: HoverRect
     pointerOffsetY: number
     currentY: number
+}
+
+type DragFinishPayload = {
+    sourceIndex: number
+    nextDropIndex: number | null
 }
 
 function getEditableBlockLayouts(layouts: BlockLayoutRect[]) {
@@ -133,6 +140,8 @@ function PreviewFrameInner({
     iframeKey,
     isLoading,
     viewport,
+    selectedBlock,
+    onBlockSelect,
     onInlineEditApplied,
     onReorderBlocks,
     onBlockDrop,
@@ -150,7 +159,43 @@ function PreviewFrameInner({
     const [isImageProcessing, setIsImageProcessing] = useState(false)
     const [frameElement, setFrameElement] = useState<HTMLIFrameElement | null>(null)
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
+    const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null)
     const clearHoverTimerRef = useRef<number | null>(null)
+    const dragPointerClientYRef = useRef<number | null>(null)
+
+    const syncDragPosition = useCallback((clientY: number) => {
+        if (!frameElement || !dragState) return
+
+        const frameRect = frameElement.getBoundingClientRect()
+        const nextY = clientY - frameRect.top
+        dragPointerClientYRef.current = clientY
+
+        setDragState(prev => prev ? { ...prev, currentY: nextY } : prev)
+
+        const editableLayouts = getEditableBlockLayouts(blockLayouts)
+        const remainingLayouts = editableLayouts.filter(
+            layout => layout.blockIndex !== dragState.sourceIndex,
+        )
+
+        if (remainingLayouts.length === 0) {
+            setDropIndex(null)
+            return
+        }
+
+        let nextIndex = remainingLayouts.length
+
+        for (let index = 0; index < remainingLayouts.length; index += 1) {
+            const layout = remainingLayouts[index]
+            const midpoint = layout.top + layout.height / 2
+            if (nextY < midpoint) {
+                nextIndex = index
+                break
+            }
+            nextIndex = index + 1
+        }
+
+        setDropIndex(nextIndex)
+    }, [blockLayouts, dragState, frameElement])
 
     const cancelPendingHoverClear = useCallback(() => {
         if (clearHoverTimerRef.current !== null) {
@@ -158,6 +203,42 @@ function PreviewFrameInner({
             clearHoverTimerRef.current = null
         }
     }, [])
+
+    const finishDrag = useCallback(({ sourceIndex, nextDropIndex }: DragFinishPayload) => {
+        const editableLayouts = getEditableBlockLayouts(blockLayouts)
+        const sourcePosition = editableLayouts.findIndex(
+            layout => layout.blockIndex === sourceIndex,
+        )
+
+        if (nextDropIndex !== null && sourcePosition !== -1) {
+            const remainingLayouts = editableLayouts.filter(
+                layout => layout.blockIndex !== sourceIndex,
+            )
+
+            if (remainingLayouts.length > 0) {
+                const boundedInsertionIndex = Math.max(
+                    0,
+                    Math.min(nextDropIndex, remainingLayouts.length),
+                )
+
+                const rawTargetIndex =
+                    boundedInsertionIndex >= remainingLayouts.length
+                        ? remainingLayouts[remainingLayouts.length - 1].blockIndex + 1
+                        : remainingLayouts[boundedInsertionIndex].blockIndex
+
+                const targetIndex =
+                    rawTargetIndex > sourceIndex ? rawTargetIndex - 1 : rawTargetIndex
+
+                if (targetIndex !== sourceIndex) {
+                    onReorderBlocks?.(sourceIndex, targetIndex)
+                }
+            }
+        }
+
+        setDragState(null)
+        setDropIndex(null)
+        dragPointerClientYRef.current = null
+    }, [blockLayouts, onReorderBlocks])
 
     useEffect(() => {
         const handleMessage = (e: MessageEvent) => {
@@ -191,6 +272,16 @@ function PreviewFrameInner({
                 if (isEditing) {
                     setIsEditing(false)
                 }
+            } else if (e.data?.type === 'BLOCK_CONTAINER_CLICKED') {
+                const blockIndex = Number(e.data.blockIndex)
+                if (!Number.isNaN(blockIndex)) {
+                    onBlockSelect?.(blockIndex)
+                    setHoverData(null)
+                    setBlockHover(e.data.layout as BlockLayoutRect)
+                    setIsEditing(false)
+                }
+            } else if (e.data?.type === 'PREVIEW_CANVAS_CLICKED') {
+                onBlockSelect?.(null)
             } else if (e.data?.type === 'TEXT_EDITING_STARTED') {
                 setTextEditingData({ rect: e.data.rect, blockIndex: e.data.blockIndex })
                 setImageClickData(null)
@@ -226,7 +317,7 @@ function PreviewFrameInner({
             cancelPendingHoverClear()
             window.removeEventListener('message', handleMessage)
         }
-    }, [blocks, cancelPendingHoverClear, dragState, isEditing, onBlockDrop])
+    }, [blocks, cancelPendingHoverClear, dragState, isEditing, onBlockDrop, onBlockSelect])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -342,81 +433,113 @@ function PreviewFrameInner({
     useEffect(() => {
         if (!dragState || !containerElement || !frameElement) return
 
-        const frameRect = frameElement.getBoundingClientRect()
-        const containerRect = containerElement.getBoundingClientRect()
-
         const handlePointerMove = (event: PointerEvent) => {
-            const nextY = event.clientY - frameRect.top
-            setDragState(prev => prev ? { ...prev, currentY: nextY } : prev)
-
-            const editableLayouts = getEditableBlockLayouts(blockLayouts)
-            const remainingLayouts = editableLayouts.filter(
-                layout => layout.blockIndex !== dragState.sourceIndex,
-            )
-
-            if (remainingLayouts.length === 0) {
-                setDropIndex(null)
-                return
-            }
-
-            let nextIndex = remainingLayouts.length
-
-            for (let index = 0; index < remainingLayouts.length; index += 1) {
-                const layout = remainingLayouts[index]
-                const midpoint = layout.top + layout.height / 2
-                if (nextY < midpoint) {
-                    nextIndex = index
-                    break
-                }
-                nextIndex = index + 1
-            }
-
-            setDropIndex(nextIndex)
+            syncDragPosition(event.clientY)
         }
 
         const handlePointerUp = () => {
-            const editableLayouts = getEditableBlockLayouts(blockLayouts)
-            const sourcePosition = editableLayouts.findIndex(
-                layout => layout.blockIndex === dragState.sourceIndex,
-            )
-
-            if (dropIndex !== null && sourcePosition !== -1) {
-                const remainingLayouts = editableLayouts.filter(
-                    layout => layout.blockIndex !== dragState.sourceIndex,
-                )
-
-                if (remainingLayouts.length > 0) {
-                    const boundedInsertionIndex = Math.max(
-                        0,
-                        Math.min(dropIndex, remainingLayouts.length),
-                    )
-
-                    const rawTargetIndex =
-                        boundedInsertionIndex >= remainingLayouts.length
-                            ? remainingLayouts[remainingLayouts.length - 1].blockIndex + 1
-                            : remainingLayouts[boundedInsertionIndex].blockIndex
-
-                    const targetIndex =
-                        rawTargetIndex > dragState.sourceIndex ? rawTargetIndex - 1 : rawTargetIndex
-
-                    if (targetIndex !== dragState.sourceIndex) {
-                        onReorderBlocks?.(dragState.sourceIndex, targetIndex)
-                    }
-                }
-            }
-
-            setDragState(null)
-            setDropIndex(null)
+            finishDrag({
+                sourceIndex: dragState.sourceIndex,
+                nextDropIndex: dropIndex,
+            })
         }
 
         window.addEventListener('pointermove', handlePointerMove)
         window.addEventListener('pointerup', handlePointerUp, { once: true })
+        window.addEventListener('mouseup', handlePointerUp, { once: true })
+        window.addEventListener('pointercancel', handlePointerUp, { once: true })
+        window.addEventListener('blur', handlePointerUp, { once: true })
 
         return () => {
             window.removeEventListener('pointermove', handlePointerMove)
             window.removeEventListener('pointerup', handlePointerUp)
+            window.removeEventListener('mouseup', handlePointerUp)
+            window.removeEventListener('pointercancel', handlePointerUp)
+            window.removeEventListener('blur', handlePointerUp)
         }
-    }, [blockLayouts, containerElement, dragState, dropIndex, frameElement, onReorderBlocks])
+    }, [containerElement, dragState, dropIndex, finishDrag, frameElement, syncDragPosition])
+
+    useEffect(() => {
+        if (!frameElement) return
+
+        frameElement.style.pointerEvents = dragState ? 'none' : 'auto'
+
+        return () => {
+            frameElement.style.pointerEvents = 'auto'
+        }
+    }, [dragState, frameElement])
+
+    useEffect(() => {
+        if (!dragState || !scrollContainerElement) return
+
+        const handleWheel = (event: WheelEvent) => {
+            event.preventDefault()
+            scrollContainerElement.scrollTop += event.deltaY
+
+            if (dragPointerClientYRef.current !== null) {
+                syncDragPosition(dragPointerClientYRef.current)
+            }
+        }
+
+        window.addEventListener('wheel', handleWheel, { passive: false })
+
+        return () => {
+            window.removeEventListener('wheel', handleWheel)
+        }
+    }, [dragState, scrollContainerElement, syncDragPosition])
+
+    useEffect(() => {
+        if (!dragState || !scrollContainerElement) return
+
+        let animationFrameId = 0
+        const edgeThreshold = 72
+        const maxStep = 18
+
+        const tick = () => {
+            const pointerY = dragPointerClientYRef.current
+            if (pointerY !== null) {
+                const scrollRect = scrollContainerElement.getBoundingClientRect()
+                const distanceToTop = pointerY - scrollRect.top
+                const distanceToBottom = scrollRect.bottom - pointerY
+                let scrollDelta = 0
+
+                if (distanceToTop < edgeThreshold) {
+                    scrollDelta = -Math.max(
+                        4,
+                        ((edgeThreshold - distanceToTop) / edgeThreshold) * maxStep,
+                    )
+                } else if (distanceToBottom < edgeThreshold) {
+                    scrollDelta = Math.max(
+                        4,
+                        ((edgeThreshold - distanceToBottom) / edgeThreshold) * maxStep,
+                    )
+                }
+
+                if (scrollDelta !== 0) {
+                    const nextScrollTop = Math.max(
+                        0,
+                        Math.min(
+                            scrollContainerElement.scrollHeight - scrollContainerElement.clientHeight,
+                            scrollContainerElement.scrollTop + scrollDelta,
+                        ),
+                    )
+
+                    if (nextScrollTop !== scrollContainerElement.scrollTop) {
+                        scrollContainerElement.scrollTop = nextScrollTop
+                        syncDragPosition(pointerY)
+                    }
+                }
+            }
+
+            animationFrameId = window.requestAnimationFrame(tick)
+        }
+
+        animationFrameId = window.requestAnimationFrame(tick)
+
+        return () => {
+            window.cancelAnimationFrame(animationFrameId)
+        }
+    }, [dragState, scrollContainerElement, syncDragPosition])
 
     const handleInlineRewrite = useCallback(async (instruction: string) => {
         if (!hoverData) return
@@ -517,7 +640,10 @@ function PreviewFrameInner({
             ref={setContainerElement}
             className="relative flex-1 overflow-hidden bg-[#111827] p-6"
         >
-            <div className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4">
+            <div
+                ref={setScrollContainerElement}
+                className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4"
+            >
                 <div
                     className="relative h-full overflow-hidden rounded-[24px] border border-white/10 bg-white shadow-2xl transition-all"
                     style={{
@@ -536,21 +662,45 @@ function PreviewFrameInner({
                 </div>
             </div>
 
-            {blockHover && overlayOffset && !dragState ? (
-                <div
-                    className="pointer-events-none absolute rounded-xl border border-cyan-400/40 bg-cyan-400/5 transition-all duration-150"
-                    style={{
-                        top: overlayOffset.top + blockHover.top - 6,
-                        left: overlayOffset.left + blockHover.left - 6,
-                        width: blockHover.width + 12,
-                        height: blockHover.height + 12,
-                        zIndex: 30,
-                    }}
-                >
-                    {!['navigation', 'footer'].includes(blockHover.blockType) ? (
+            {((blockHover && !dragState) || (selectedBlock !== null && overlayOffset)) ? (
+                <>
+                    {(() => {
+                        const selectedLayout = selectedBlock !== null
+                            ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
+                            : null
+                        const activeLayout = blockHover || selectedLayout
+                        if (!activeLayout || !overlayOffset || dragState) return null
+
+                        return (
+                            <div
+                                className="pointer-events-none absolute rounded-xl border border-cyan-400/40 bg-cyan-400/5 transition-all duration-150"
+                                style={{
+                                    top: overlayOffset.top + activeLayout.top - 6,
+                                    left: overlayOffset.left + activeLayout.left - 6,
+                                    width: activeLayout.width + 12,
+                                    height: activeLayout.height + 12,
+                                    zIndex: 30,
+                                }}
+                            />
+                        )
+                    })()}
+                    {(() => {
+                        const activeLayout = blockHover || (selectedBlock !== null
+                            ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
+                            : null)
+                        if (!activeLayout || !overlayOffset || dragState || ['navigation', 'footer'].includes(activeLayout.blockType)) {
+                            return null
+                        }
+
+                        return (
                         <button
                             type="button"
-                            className="pointer-events-auto absolute -left-5 top-4 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/20 bg-[#0F172A]/95 text-cyan-300 shadow-lg transition-colors hover:bg-[#162136] hover:text-cyan-200"
+                            className="absolute inline-flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-400/20 bg-[#0F172A]/95 text-cyan-300 shadow-lg transition-colors hover:bg-[#162136] hover:text-cyan-200"
+                            style={{
+                                top: overlayOffset.top + activeLayout.top + 10,
+                                left: overlayOffset.left + activeLayout.left - 20,
+                                zIndex: 45,
+                            }}
                             onMouseEnter={cancelPendingHoverClear}
                             onMouseDown={(event) => {
                                 const frameRect = frameElement?.getBoundingClientRect()
@@ -558,26 +708,29 @@ function PreviewFrameInner({
 
                                 event.preventDefault()
                                 event.stopPropagation()
+                                cancelPendingHoverClear()
+                                dragPointerClientYRef.current = event.clientY
                                 setHoverData(null)
                                 setIsEditing(false)
                                 setDropIndex(
                                     editableLayouts.findIndex(
-                                        layout => layout.blockIndex === blockHover.blockIndex,
+                                        layout => layout.blockIndex === activeLayout.blockIndex,
                                     ),
                                 )
                                 setDragState({
-                                    sourceIndex: blockHover.blockIndex,
-                                    sourceRect: blockHover,
+                                    sourceIndex: activeLayout.blockIndex,
+                                    sourceRect: activeLayout,
                                     pointerOffsetY:
-                                        event.clientY - frameRect.top - blockHover.top,
-                                    currentY: blockHover.top,
+                                        event.clientY - frameRect.top - activeLayout.top,
+                                    currentY: activeLayout.top,
                                 })
                             }}
                         >
                             <GripVertical className="h-4 w-4" />
                         </button>
-                    ) : null}
-                </div>
+                        )
+                    })()}
+                </>
             ) : null}
 
             {dragState && overlayOffset ? (

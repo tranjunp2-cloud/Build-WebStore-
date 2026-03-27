@@ -23,6 +23,31 @@ type SiteData = {
     status: string
     theme: Record<string, unknown>
     siteType: string
+    branding?: {
+        logo?: string
+        favicon?: string
+    }
+    headerBlock?: Record<string, unknown> | null
+    footerBlock?: Record<string, unknown> | null
+    locale?: string
+    contactInfo?: {
+        phone?: string
+        email?: string
+        address?: string
+    }
+    socialLinks?: {
+        facebook?: string
+        instagram?: string
+        twitter?: string
+        linkedin?: string
+        youtube?: string
+        tiktok?: string
+    }
+    seo?: {
+        metaTitle?: string
+        metaDescription?: string
+        ogImage?: string | number | null
+    }
 }
 
 type LoadedPageData = {
@@ -271,6 +296,68 @@ export default function EditorPage() {
     const handleThemeChange = useCallback((key: string, value: string) => {
         updateTheme({ [key]: value })
     }, [updateTheme])
+
+    const handleSiteSettingsChange = useCallback(async (changes: Partial<SiteData>) => {
+        if (!siteId) return
+
+        setSite(prev => {
+            if (!prev) return prev
+
+            return {
+                ...prev,
+                ...changes,
+                contactInfo: {
+                    ...(prev.contactInfo || {}),
+                    ...(changes.contactInfo || {}),
+                },
+                socialLinks: {
+                    ...(prev.socialLinks || {}),
+                    ...(changes.socialLinks || {}),
+                },
+                seo: {
+                    ...(prev.seo || {}),
+                    ...(changes.seo || {}),
+                },
+                branding: {
+                    ...(prev.branding || {}),
+                    ...(changes.branding || {}),
+                },
+            }
+        })
+
+        try {
+            const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
+            if (currentPageId) {
+                saveUrl.searchParams.set('pageId', currentPageId)
+            }
+
+            const response = await fetch(saveUrl.toString(), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    siteName: changes.name,
+                    contactInfo: changes.contactInfo,
+                    socialLinks: changes.socialLinks,
+                    branding: changes.branding,
+                    seo: changes.seo,
+                    headerBlock: changes.headerBlock,
+                    footerBlock: changes.footerBlock,
+                }),
+            })
+
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`)
+            }
+
+            setSaveSuccess(true)
+            setIframeKey(key => key + 1)
+            window.setTimeout(() => setSaveSuccess(false), 1800)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to update site settings'
+            toast.error('Failed to update site settings', { description: message })
+        }
+    }, [currentPageId, siteId])
 
     const handleDeleteBlock = useCallback((index: number) => {
         deleteBlock(index)
@@ -564,6 +651,8 @@ export default function EditorPage() {
                             iframeKey={iframeKey}
                             isLoading={isLoading}
                             viewport={viewport}
+                            selectedBlock={selectedBlock}
+                            onBlockSelect={setSelectedBlock}
                             onInlineEditApplied={(content, blockIndex) => {
                                 setSelectedBlock(blockIndex)
                                 setActiveSidebarTab('chat')
@@ -581,6 +670,7 @@ export default function EditorPage() {
                         block={currentBlock}
                         blockIndex={selectedBlock}
                         theme={theme}
+                        site={site}
                         siteName={siteName || site?.name || ''}
                         siteStatus={site?.status || 'draft'}
                         headerBlock={headerBlock}
@@ -593,6 +683,7 @@ export default function EditorPage() {
                         onBlockUpdate={handleBlockUpdate}
                         onHeaderUpdate={(changes) => updateHeaderBlock(changes)}
                         onFooterUpdate={(changes) => updateFooterBlock(changes)}
+                        onSiteSettingsChange={handleSiteSettingsChange}
                     />
                 </div>
             )}

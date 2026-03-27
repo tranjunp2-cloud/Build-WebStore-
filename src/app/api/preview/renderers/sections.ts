@@ -5,33 +5,34 @@
 import { TemplateTheme } from './styles'
 import { getGalleryImages, getAboutImage, getTeamAvatar } from './images'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { mergeContactInfoWithSite, mergeFooterSocialsWithSite, mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
 
 // Category for image selection
 let _category = 'business'
 export function setSectionCategory(cat: string) { _category = cat }
 
-export function renderSections(block: any, t: TemplateTheme, category?: string): string {
+export function renderSections(block: any, t: TemplateTheme, category?: string, site?: any): string {
   if (category) _category = category
   switch (block.blockType) {
     case 'features': return renderFeatures(block, t)
     case 'about': return renderAbout(block, t)
     case 'testimonials': return renderTestimonials(block, t)
-    case 'contact': return renderContact(block, t)
-    case 'footer': return renderFooter(block, t)
+    case 'contact': return renderContact(block, t, site)
+    case 'footer': return renderFooter(block, t, site)
     case 'stats': return renderStats(block, t)
     case 'pricing': return renderPricing(block, t)
     case 'faq': return renderFaq(block, t)
     case 'gallery': return renderGallery(block, t)
     case 'team': return renderTeam(block, t)
     case 'cta': return renderCta(block, t)
-    case 'socialWidget': return renderSocialWidget(block, t)
+    case 'socialWidget': return renderSocialWidget(block, t, site)
     case 'cartWidget': return renderCartWidget(block, t)
     default: return ''
   }
 }
 
-function renderSocialWidget(b: any, t: TemplateTheme) {
-  const normalizedBlock = normalizeSocialWidgetConfig(b)
+function renderSocialWidget(b: any, t: TemplateTheme, site?: any) {
+  const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(b, site?.socialLinks))
   const links = normalizedBlock.links.filter((item: any) => item?.enabled !== false)
   const isFloating = (normalizedBlock.variant || 'floating') !== 'inline'
 
@@ -269,17 +270,18 @@ function renderCta(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderContact(b: any, t: TemplateTheme) {
+function renderContact(b: any, t: TemplateTheme, site?: any) {
+  const mergedBlock = mergeContactInfoWithSite(b, site?.contactInfo)
   return `<section class="section">
     <div class="container" style="display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start;">
       <div>
-        <h2 class="section-title fade-up">${b.headline || ''}</h2>
-        <p class="fade-up fade-up-d1" style="font-size:15px;color:${t.muted};margin-bottom:32px;">${b.subtext || ''}</p>
+        <h2 class="section-title fade-up">${mergedBlock.headline || ''}</h2>
+        <p class="fade-up fade-up-d1" style="font-size:15px;color:${t.muted};margin-bottom:32px;">${mergedBlock.subtext || ''}</p>
         <div style="display:flex;flex-direction:column;gap:20px;">
           ${[
-      { icon: '📧', label: 'Email', value: b.email },
-      { icon: '📞', label: 'Phone', value: b.phone },
-      { icon: '📍', label: 'Address', value: b.address },
+      { icon: '📧', label: 'Email', value: mergedBlock.email },
+      { icon: '📞', label: 'Phone', value: mergedBlock.phone },
+      { icon: '📍', label: 'Address', value: mergedBlock.address },
     ].filter(c => c.value).map((c, i) => `
             <div class="fade-up fade-up-d${i + 2} card-hover" style="display:flex;align-items:center;gap:16px;padding:16px;background:${t.text}04;border-radius:12px;border:1px solid ${t.text}06;">
               <div style="width:44px;height:44px;border-radius:10px;background:${t.primary}12;display:flex;align-items:center;justify-content:center;font-size:20px;">${c.icon}</div>
@@ -289,7 +291,7 @@ function renderContact(b: any, t: TemplateTheme) {
         </div>
       </div>
       <div class="fade-up fade-up-d2" style="padding:32px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:20px;">
-        ${(b.formFields || []).map((f: any) => `
+        ${(mergedBlock.formFields || []).map((f: any) => `
           <div style="margin-bottom:16px;">
             <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">${f.label}</label>
             ${f.fieldType === 'textarea'
@@ -304,14 +306,16 @@ function renderContact(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderFooter(b: any, t: TemplateTheme) {
-  const cols = b.columns || []
+function renderFooter(b: any, t: TemplateTheme, site?: any) {
+  const mergedBlock = mergeFooterSocialsWithSite(b, site)
+  const cols = mergedBlock.columns || []
   return `<footer style="padding:60px 0 30px;background:${t.text}04;border-top:1px solid ${t.text}08;">
     <div class="container">
       <div style="display:grid;grid-template-columns:2fr ${cols.map(() => '1fr').join(' ')};gap:40px;margin-bottom:40px;">
         <div>
-          <div style="font-family:'${t.fontHeading}',serif;font-size:22px;font-weight:700;margin-bottom:12px;color:${t.primary};">${b.logoText || ''}</div>
-          <p style="font-size:14px;color:${t.muted};max-width:280px;line-height:1.7;">${b.tagline || ''}</p>
+          <div style="font-family:'${t.fontHeading}',serif;font-size:22px;font-weight:700;margin-bottom:12px;color:${t.primary};">${mergedBlock.logoText || ''}</div>
+          <p style="font-size:14px;color:${t.muted};max-width:280px;line-height:1.7;">${mergedBlock.tagline || ''}</p>
+          ${mergedBlock.socials && mergedBlock.socials.length > 0 ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">${mergedBlock.socials.map((social: any) => `<a href="${social.url || '#'}" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:${t.primary}10;border:1px solid ${t.primary}15;color:${t.primary};font-size:12px;font-weight:800;text-transform:uppercase;">${(social.platform || '•').slice(0,2)}</a>`).join('')}</div>` : ''}
         </div>
         ${cols.map((c: any) => `
           <div>
@@ -321,7 +325,7 @@ function renderFooter(b: any, t: TemplateTheme) {
         `).join('')}
       </div>
       <div style="border-top:1px solid ${t.text}08;padding-top:20px;text-align:center;">
-        <p style="font-size:12px;color:${t.muted};">${b.copyrightText || ''}</p>
+        <p style="font-size:12px;color:${t.muted};">${mergedBlock.copyrightText || ''}</p>
       </div>
     </div>
   </footer>`

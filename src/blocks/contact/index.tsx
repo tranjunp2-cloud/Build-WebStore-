@@ -5,9 +5,11 @@ import type { ContactConfig } from './config'
 import { AnimatedSection } from '../shared/animations'
 import { GradientBlob, SectionLabel, GlassCard } from '../shared/decorative'
 import { motion } from 'framer-motion'
+import { mergeContactInfoWithSite } from '@/lib/site-settings'
 
-export function ContactBlock({ block, theme }: BlockProps<ContactConfig>) {
-    const { headline, subtext, email, phone, address, formFields = [] } = block
+export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) {
+    const mergedBlock = mergeContactInfoWithSite(block, site?.contactInfo)
+    const { headline, subtext, email, phone, address, formFields = [] } = mergedBlock
     const pc = theme.primaryColor
 
     return (
