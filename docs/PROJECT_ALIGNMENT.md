@@ -29,8 +29,8 @@ Tuần 1-2 (Mar 12-25)    Sprint 0: Foundation
                          └── Designer Figma
 
 Tuần 3-4 (Mar 26-31)     Sprint 1: Webstore Builder 2.0 (M1 Launch)
-                         ├── (Mar 26-28) F01, F05, F18, F02, F06: Core USP, Nhóm CMS & Auth
-                         ├── (Mar 29-30) F19, F08, F09, F10: Nhóm Webstore Commerce & Checkout
+                         ├── (Mar 26-28) F01, F05, F11, F12, F18, F02, F06: Core USP, Nhóm CMS & Auth
+                         ├── (Mar 29-30) F19, F08, F09, F10, F21, F20: Nhóm Webstore Commerce & Checkout
                          └── (Mar 31) Stabilization, Bug fixes & 🚀 Launch! (F17, F03, F07, F16 best-effort)
 ```
 
