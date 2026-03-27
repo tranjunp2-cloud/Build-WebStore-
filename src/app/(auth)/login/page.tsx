@@ -52,6 +52,7 @@ function LoginFormContent() {
     const searchParams = useSearchParams()
     const returnUrl = searchParams.get('returnUrl') || '/dashboard'
     const [showPassword, setShowPassword] = useState(false)
+    const [checkingReset, setCheckingReset] = useState(false)
     const { t, setLocale } = useI18n()
 
     const {
@@ -60,10 +61,46 @@ function LoginFormContent() {
         formState: { errors, isSubmitting },
         setError: setFormError,
         resetField,
+        getValues,
     } = useForm<LoginForm>({
         resolver: zodResolver(loginSchema),
         defaultValues: { email: '', password: '' },
     })
+
+    // FR-07/FR-08: Smart forgot-password — Owner → SSO direct, Staff → internal
+    const handleForgotPassword = async (e: React.MouseEvent) => {
+        e.preventDefault()
+        const email = getValues('email')?.trim()
+
+        // No email typed → go to forgot-password form as usual
+        if (!email) {
+            router.push('/forgot-password')
+            return
+        }
+
+        setCheckingReset(true)
+        try {
+            const res = await fetch('/api/auth/check-reset-flow', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            })
+            const data = await res.json()
+
+            if (data.flow === 'sso' && data.redirectUrl) {
+                // Owner → redirect straight to SSO portal
+                window.location.href = data.redirectUrl
+                // Return here without resetting state to keep loading active while browser redirects
+                return
+            }
+        } catch {
+            // On error, fall through to internal page
+        }
+
+        // Staff or unknown → internal forgot-password page
+        setCheckingReset(false)
+        router.push('/forgot-password')
+    }
 
     const onSubmit = async (data: LoginForm) => {
         const controller = new AbortController()
@@ -173,12 +210,14 @@ function LoginFormContent() {
                 <div>
                     <div className="flex items-center justify-between">
                         <Label htmlFor="password" className="text-gray-300">{t.auth.password}</Label>
-                        <Link
-                            href="/forgot-password"
-                            className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors"
+                        <button
+                            type="button"
+                            onClick={handleForgotPassword}
+                            disabled={checkingReset}
+                            className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50"
                         >
-                            {t.auth.forgotPassword}
-                        </Link>
+                            {checkingReset ? 'Checking...' : t.auth.forgotPassword}
+                        </button>
                     </div>
                     <div className="relative mt-1.5">
                         <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
@@ -227,27 +266,6 @@ function LoginFormContent() {
                     <LanguageSwitcher variant="segmented" />
                 </div>
             </form>
-
-            {/* Divider */}
-            <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/[0.06]" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                    <span className="bg-[#101726] px-3 text-gray-400">{t.auth.or}</span>
-                </div>
-            </div>
-
-            {/* Register link */}
-            <p className="text-center text-sm text-gray-400">
-                {t.auth.noAccount}{' '}
-                <Link
-                    href="/register"
-                    className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                    {t.auth.createOneFree}
-                </Link>
-            </p>
         </div>
     )
 }

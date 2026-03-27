@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * DB Setup Script — runs as Docker CMD on DO App Platform
+ * DB Setup Script — runs as Docker CMD on DO App Platform.
  *
  * Problem: Payload CMS's `push: true` only creates tables when
  * `process.env.NODE_ENV !== 'production'` (checked at runtime in
@@ -261,12 +261,13 @@ const MIGRATIONS = [
     sql: `ALTER TABLE users_tenants ADD COLUMN IF NOT EXISTS status varchar DEFAULT 'active';`,
   },
   // ── Users: Tenant permissions (Payload internal auth table) ──
+  // No FK constraint: users_tenants may use different id type (Payload-created)
   {
     name: 'users_tenants_permissions.create_table',
     sql: `CREATE TABLE IF NOT EXISTS users_tenants_permissions (
       id serial PRIMARY KEY,
       _order integer NOT NULL,
-      _parent_id integer NOT NULL REFERENCES users_tenants(id) ON DELETE CASCADE,
+      _parent_id integer NOT NULL,
       value varchar
     );`,
   },
@@ -328,6 +329,36 @@ const MIGRATIONS = [
   {
     name: 'tenants.payments_qr_image_id',
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_qr_image_id integer;`,
+  },
+  // ── Tenants: SSO Provisioning fields (F02) ──
+  {
+    name: 'tenants.customer_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS customer_id varchar;`,
+  },
+  {
+    name: 'tenants.service_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS service_id varchar;`,
+  },
+  {
+    name: 'tenants.pack_code',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS pack_code varchar;`,
+  },
+  {
+    name: 'tenants.order_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS order_id varchar;`,
+  },
+  {
+    name: 'tenants.address',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS address jsonb;`,
+  },
+  {
+    name: 'tenants.meta_data',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS meta_data jsonb;`,
+  },
+  // ── Users: Phone field (F02) ──
+  {
+    name: 'users.phone',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone varchar;`,
   },
 ];
 

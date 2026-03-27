@@ -1,0 +1,102 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { POST } from '@/app/api/auth/check-reset-flow/route'
+import { NextRequest } from 'next/server'
+import { getPayload } from 'payload'
+
+// Mock next/server
+vi.mock('next/server', () => {
+    return {
+        NextRequest: vi.fn(),
+        NextResponse: {
+            json: vi.fn((data, init) => ({
+                data,
+                status: init?.status || 200,
+            })),
+        },
+    }
+})
+
+// Mock payload configured imports
+vi.mock('@payload-config', () => ({ default: {} }))
+
+// Mock payload
+vi.mock('payload', () => {
+    return {
+        getPayload: vi.fn(),
+    }
+})
+
+describe('POST /api/auth/check-reset-flow', () => {
+    let mockPayload: any
+
+    beforeEach(() => {
+        vi.clearAllMocks()
+
+        mockPayload = {
+            find: vi.fn(),
+        }
+
+        vi.mocked(getPayload).mockResolvedValue(mockPayload as any)
+    })
+
+    const createMockRequest = (body: any) => {
+        return {
+            json: vi.fn().mockResolvedValue(body),
+        } as unknown as NextRequest
+    }
+
+    it('returns internal flow if no email provided', async () => {
+        const req = createMockRequest({})
+        const response = await POST(req) as unknown as { data: any, status: number }
+
+        expect(response.data).toEqual({ flow: 'internal' })
+        expect(mockPayload.find).not.toHaveBeenCalled()
+    })
+
+    it('returns internal flow if email not found', async () => {
+        mockPayload.find.mockResolvedValue({ docs: [] })
+
+        const req = createMockRequest({ email: 'notfound@test.com' })
+        const response = await POST(req) as unknown as { data: any, status: number }
+
+        expect(response.data).toEqual({ flow: 'internal' })
+        expect(mockPayload.find).toHaveBeenCalledWith(expect.objectContaining({
+            collection: 'users',
+            where: { email: { equals: 'notfound@test.com' } }
+        }))
+    })
+
+    it('returns sso flow and redirectUrl for tenant-owner', async () => {
+        mockPayload.find.mockResolvedValue({
+            docs: [{ roles: ['tenant-owner'] }]
+        })
+
+        const req = createMockRequest({ email: 'owner@test.com' })
+        const response = await POST(req) as unknown as { data: any, status: number }
+
+        expect(response.data).toEqual({
+            flow: 'sso',
+            redirectUrl: expect.any(String)
+        })
+    })
+
+    it('returns internal flow for staff (editor)', async () => {
+        mockPayload.find.mockResolvedValue({
+            docs: [{ roles: ['editor'] }]
+        })
+
+        const req = createMockRequest({ email: 'staff@test.com' })
+        const response = await POST(req) as unknown as { data: any, status: number }
+
+        expect(response.data).toEqual({ flow: 'internal' })
+    })
+
+    it('returns internal flow on exception', async () => {
+        mockPayload.find.mockRejectedValue(new Error('DB Error'))
+
+        const req = createMockRequest({ email: 'error@test.com' })
+        const response = await POST(req) as unknown as { data: any, status: number }
+
+        expect(response.data).toEqual({ flow: 'internal' })
+    })
+})
