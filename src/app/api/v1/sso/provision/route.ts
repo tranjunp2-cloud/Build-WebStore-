@@ -4,7 +4,7 @@ import config from '@payload-config'
 import crypto from 'crypto'
 
 /**
- * POST /api/v1/tm/users
+ * POST /api/v1/sso/provision
  *
  * SSO Auto-Provisioning endpoint.
  * Receives payload from TM Legacy SSO system, creates User (Owner) + Tenant.
@@ -29,25 +29,18 @@ export async function POST(req: NextRequest) {
 
         let callerUser: any
         try {
-            const secret = process.env.PAYLOAD_SECRET || 'fallback-dev-secret'
-            const [header, body, signature] = token.split('.')
-            const expectedSig = crypto
-                .createHmac('sha256', secret)
-                .update(`${header}.${body}`)
-                .digest('base64url')
+            const authResult = await payload.auth({
+                headers: new Headers({
+                    Authorization: `JWT ${token}`,
+                }),
+            })
+            callerUser = authResult?.user || null
 
-            if (signature !== expectedSig) {
+            if (!callerUser) {
                 return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
             }
-
-            const decoded = JSON.parse(Buffer.from(body, 'base64url').toString())
-
-            if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) {
-                return NextResponse.json({ message: 'Token expired' }, { status: 401 })
-            }
-
-            callerUser = await payload.findByID({ collection: 'users', id: decoded.id })
-        } catch {
+        } catch (error) {
+            console.error('[SSO Auth Error]', error)
             return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
         }
 
