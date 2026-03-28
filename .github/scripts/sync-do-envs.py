@@ -32,8 +32,12 @@ SECRET_MAP = {
     "LARK_VERIFICATION_TOKEN":         "LARK_VERIFICATION_TOKEN",
     "LARK_BOT_OPEN_ID":                "LARK_BOT_OPEN_ID",
     "GITHUB_TOKEN":                    "GH_BOT_TOKEN",
+    "MAIL_HOST":                       "MAIL_HOST",
+    "MAIL_PORT":                       "MAIL_PORT",
     "MAIL_USERNAME":                   "MAIL_USERNAME",
     "MAIL_PASSWORD":                   "MAIL_PASSWORD",
+    "MAIL_FROM_ADDRESS":               "MAIL_FROM_ADDRESS",
+    "MAIL_FROM_NAME":                  "MAIL_FROM_NAME",
     "ECH_DISTRIBUTION_API_URL":        "ECH_DISTRIBUTION_API_URL",
     "ECH_DISTRIBUTION_API_KEY":        "ECH_DISTRIBUTION_API_KEY",
 }

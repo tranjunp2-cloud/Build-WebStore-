@@ -305,8 +305,12 @@ jobs:
           LARK_BOT_OPEN_ID:                   ${{ secrets.LARK_BOT_OPEN_ID }}
           # Note: GH_BOT_TOKEN (not GITHUB_TOKEN — that's a built-in GHA var)
           GH_BOT_TOKEN:                       ${{ secrets.GH_BOT_TOKEN }}
+          MAIL_HOST:                          ${{ secrets.MAIL_HOST }}
+          MAIL_PORT:                          ${{ secrets.MAIL_PORT }}
           MAIL_USERNAME:                      ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD:                      ${{ secrets.MAIL_PASSWORD }}
+          MAIL_FROM_ADDRESS:                  ${{ secrets.MAIL_FROM_ADDRESS }}
+          MAIL_FROM_NAME:                     ${{ secrets.MAIL_FROM_NAME }}
           ECH_DISTRIBUTION_API_URL:           ${{ secrets.ECH_DISTRIBUTION_API_URL }}
           ECH_DISTRIBUTION_API_KEY:           ${{ secrets.ECH_DISTRIBUTION_API_KEY }}
         run: python3 .github/scripts/sync-do-envs.py ech-prime-web-v2-staging
