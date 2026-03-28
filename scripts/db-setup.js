@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * DB Setup Script — runs as Docker CMD on DO App Platform
+ * DB Setup Script — runs as Docker CMD on DO App Platform.
  *
  * Problem: Payload CMS's `push: true` only creates tables when
  * `process.env.NODE_ENV !== 'production'` (checked at runtime in
@@ -51,6 +51,53 @@ async function getTableCount(pool) {
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
+  // ── Users: Auth tables (Payload Drizzle schema) ──
+  // Payload 3.14 uses VARCHAR id (UUID), mixed column naming:
+  //   roles: parent_id, order (no underscore)
+  //   tenants/sessions: _parent_id, _order (with underscore)
+  //   tenants_permissions: parent_id, order (no underscore)
+  // Tables need _uuid column for array types
+  {
+    name: 'users_tenants.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_tenants (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tenant_id integer,
+      status varchar DEFAULT 'active',
+      role varchar DEFAULT 'viewer');`,
+  },
+  {
+    name: 'users_tenants.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_tenants_parent_idx ON users_tenants (_parent_id);`,
+  },
+  {
+    name: 'users_tenants_permissions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_tenants_permissions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      "order" integer NOT NULL DEFAULT 0,
+      parent_id varchar NOT NULL,
+      value varchar);`,
+  },
+  {
+    name: 'users_tenants_permissions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_tenants_permissions_parent_idx ON users_tenants_permissions (parent_id);`,
+  },
+  {
+    name: 'users_sessions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_sessions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      created_at timestamptz DEFAULT now(),
+      expires_at timestamptz);`,
+  },
+  {
+    name: 'users_sessions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_sessions_parent_idx ON users_sessions (_parent_id);`,
+  },
   // ── Tenants: Stripe Connect ──
   {
     name: 'tenants.stripe_account_id',
@@ -236,54 +283,10 @@ const MIGRATIONS = [
     name: 'blogs.slug_idx',
     sql: `CREATE INDEX IF NOT EXISTS blogs_slug_idx ON blogs (slug);`,
   },
-  // ── Users: Tenant memberships (Payload array type → separate tables) ──
-  {
-    name: 'users_tenants.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS users_tenants (
-      id serial PRIMARY KEY,
-      _order integer NOT NULL,
-      _parent_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      tenant_id integer REFERENCES tenants(id) ON DELETE SET NULL,
-      role varchar DEFAULT 'viewer'
-    );`,
-  },
-  {
-    name: 'users_tenants.parent_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_tenants_parent_idx ON users_tenants (_parent_id);`,
-  },
-  {
-    name: 'users_tenants.order_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_tenants_order_idx ON users_tenants (_order);`,
-  },
-  // ── Users: Tenant permissions (Payload internal auth table) ──
-  {
-    name: 'users_tenants_permissions.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS users_tenants_permissions (
-      id serial PRIMARY KEY,
-      _order integer NOT NULL,
-      _parent_id integer NOT NULL REFERENCES users_tenants(id) ON DELETE CASCADE,
-      value varchar
-    );`,
-  },
-  {
-    name: 'users_tenants_permissions.parent_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_tenants_permissions_parent_idx ON users_tenants_permissions (_parent_id);`,
-  },
-  // ── Users: Sessions (Payload auth sessions table) ──
-  {
-    name: 'users_sessions.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS users_sessions (
-      id serial PRIMARY KEY,
-      _order integer NOT NULL,
-      _parent_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at timestamptz DEFAULT now(),
-      expires_at timestamptz
-    );`,
-  },
-  {
-    name: 'users_sessions.parent_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_sessions_parent_idx ON users_sessions (_parent_id);`,
-  },
+  // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
+  // These tables are created by Payload pushDevSchema (runs every deploy).
+  // DO NOT add manual CREATE TABLE migrations — they create wrong column types.
+  // pushDevSchema handles correct Drizzle ORM schema (types, constraints, _uuid, indexes).
   // ── Users: Language preference ──
   {
     name: 'users.prefer_lang',
@@ -324,6 +327,36 @@ const MIGRATIONS = [
     name: 'tenants.payments_qr_image_id',
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_qr_image_id integer;`,
   },
+  // ── Tenants: SSO Provisioning fields (F02) ──
+  {
+    name: 'tenants.customer_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS customer_id varchar;`,
+  },
+  {
+    name: 'tenants.service_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS service_id varchar;`,
+  },
+  {
+    name: 'tenants.pack_code',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS pack_code varchar;`,
+  },
+  {
+    name: 'tenants.order_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS order_id varchar;`,
+  },
+  {
+    name: 'tenants.address',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS address jsonb;`,
+  },
+  {
+    name: 'tenants.meta_data',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS meta_data jsonb;`,
+  },
+  // ── Users: Phone field (F02) ──
+  {
+    name: 'users.phone',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone varchar;`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -361,9 +394,11 @@ async function checkDB() {
 
     await pool.end();
 
-    // Only need Payload pushDevSchema for fresh DB (0 tables)
+    // ALWAYS run pushDevSchema — idempotent, handles new fields/tables
+    // Payload Drizzle creates correct schema (types, constraints, indexes)
+    // Manual SQL migrations may create wrong column types → query fails
     return {
-      needsPush: tableCount === 0,
+      needsPush: true,
       tableCount,
     };
   } catch (e) {
