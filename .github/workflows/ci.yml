@@ -155,7 +155,8 @@ jobs:
         run: |
           if [ -d ".next" ]; then
             TOTAL_SIZE=$(du -sh .next/ 2>/dev/null | cut -f1 || echo "N/A")
-            FIRST_LOAD=$(grep -oP 'First Load JS shared by all\s+\K[\d.]+ [kKmM]?B' build-output.txt 2>/dev/null || echo "N/A")
+            # Strip ANSI color codes before parsing
+            FIRST_LOAD=$(sed 's/\x1B\[[0-9;]*m//g' build-output.txt 2>/dev/null | grep -oP 'First Load JS shared by all\s+\K[\d.]+ [kKmM]?B' || echo "N/A")
             [ -z "$FIRST_LOAD" ] && FIRST_LOAD="N/A"
           else
             TOTAL_SIZE="N/A"; FIRST_LOAD="N/A"

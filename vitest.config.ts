@@ -12,7 +12,7 @@ export default defineConfig({
         include: ['src/__tests__/**/*.{test,spec}.{ts,tsx}'],
         exclude: ['node_modules', 'e2e'],
         coverage: {
-            reporter: ['text', 'json', 'html'],
+            reporter: ['text', 'json', 'json-summary', 'html'],
             include: ['src/**/*.{ts,tsx}'],
             exclude: [
                 'src/**/*.d.ts',
