@@ -44,7 +44,7 @@ function isRemoteDatabase(): boolean {
 
 export default buildConfig({
   serverURL: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
-  // Email: use SMTP if MAIL_HOST is configured, otherwise log to console (safe fallback)
+  // Email: SMTP via AWS SES when MAIL_HOST is configured, otherwise log to console (safe fallback)
   email: process.env.MAIL_HOST
     ? nodemailerAdapter({
         defaultFromAddress: process.env.MAIL_FROM_ADDRESS || 'noreply@primeweb.app',
