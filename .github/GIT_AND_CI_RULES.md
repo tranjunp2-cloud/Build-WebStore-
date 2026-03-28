@@ -718,6 +718,61 @@ Lark Notifications:
 
 ---
 
+## §8 Database Schema & Migration Rules
+
+### Payload CMS Column Naming Convention
+
+Payload 3.14 Drizzle ORM dùng **2 convention khác nhau** tùy field type:
+
+| Payload Field Type | Table Pattern | id | order | parent_id | Extra |
+|---|---|---|---|---|---|
+| `type: 'array'` | `{collection}_{field}` | **varchar** (UUID) | **_order** (underscore) | **_parent_id** (underscore) | **_uuid** varchar |
+| `type: 'select' + hasMany` | `{collection}_{field}` | **serial** (int) | **order** (NO underscore) | **parent_id** (NO underscore) | value varchar |
+| `type: 'group'` | same table | — | — | — | `{group}_{field}` prefix |
+| `type: 'relationship'` | same table | — | — | — | `{field}_id` integer |
+
+### Khi thay đổi collection (thêm/sửa/xóa field)
+
+1. Thêm migration vào `scripts/db-setup.js` MIGRATIONS array
+2. **Tuân theo naming convention** ở bảng trên — CI sẽ chặn nếu sai
+3. Dùng `CREATE TABLE IF NOT EXISTS` — **KHÔNG dùng DROP TABLE**
+4. Array table id phải là `varchar` (UUID) — **KHÔNG dùng serial**
+5. Test local trước PR: `node scripts/check-migrations.js origin/staging`
+
+### Ví dụ đúng
+
+```javascript
+// Array field: type 'array' → underscore prefix, varchar id
+{
+  name: 'users_tenants.create_table',
+  sql: `CREATE TABLE IF NOT EXISTS users_tenants (
+    id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    _order integer NOT NULL DEFAULT 0,
+    _parent_id integer NOT NULL,
+    _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+    tenant_id integer, role varchar DEFAULT 'viewer');`,
+},
+
+// Select hasMany: type 'select' + hasMany → NO underscore, serial id
+// (Payload tự tạo qua pushDevSchema — thường không cần manual migration)
+
+// Simple column addition:
+{
+  name: 'tenants.whatsapp_number',
+  sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_number varchar;`,
+},
+```
+
+### CI Enforcement
+
+`scripts/check-migrations.js` chạy trên mọi PR → chặn merge nếu:
+- ❌ Collection thêm field mới nhưng thiếu migration
+- ❌ Array table dùng `serial` id thay vì `varchar`
+- ❌ Array table dùng `parent_id` thay vì `_parent_id`
+- ❌ Có `DROP TABLE` trong migrations
+
+---
+
 ## Tham chiếu
 
 - [Conventional Commits](https://www.conventionalcommits.org/)
