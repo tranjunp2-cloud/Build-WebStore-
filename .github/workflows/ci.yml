@@ -77,7 +77,15 @@ jobs:
 
       - name: Test
         id: test
-        run: npm run test -- --coverage
+        run: |
+          npm run test -- --coverage --reporter=json --outputFile=test-results.json 2>&1 | tee test-output.log
+          # Parse test counts from vitest output
+          TOTAL=$(grep -oP '\d+(?= tests?)' test-output.log | tail -1 || echo "0")
+          PASSED=$(grep -oP '\d+(?= passed)' test-output.log | tail -1 || echo "0")
+          FAILED=$(grep -oP '\d+(?= failed)' test-output.log | tail -1 || echo "0")
+          echo "test_total=${TOTAL:-0}" >> "$GITHUB_OUTPUT"
+          echo "test_passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
+          echo "test_failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
 
       - name: Upload coverage artifact
         if: always()
@@ -180,10 +188,20 @@ jobs:
               firstLoad: '${{ steps.bundle.outputs.first_load }}',
             };
 
+            const tests = {
+              total: '${{ steps.test.outputs.test_total }}' || '0',
+              passed: '${{ steps.test.outputs.test_passed }}' || '0',
+              failed: '${{ steps.test.outputs.test_failed }}' || '0',
+            };
+            const testStatus = tests.failed !== '0' ? `❌ ${tests.failed} failed` : '✅ All passed';
+
             const marker = '<!-- quality-metrics -->';
             const body = [
               marker,
               '## 📊 Quality Metrics',
+              '',
+              '### Unit Tests',
+              `**${tests.passed}/${tests.total}** passed ${testStatus}`,
               '',
               '### Test Coverage',
               '| Metric | Value |',
