@@ -51,21 +51,52 @@ async function getTableCount(pool) {
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
-  // ── ONE-TIME CLEANUP: Drop wrong-schema Payload tables ──
-  // Manual SQL migrations created wrong column names (_parent_id vs parent_id).
-  // pushDevSchema can't fix existing tables — must DROP first, then recreate.
-  // Drop so pushDevSchema recreates with correct Drizzle schema.
+  // ── Users: Auth tables (Payload Drizzle schema) ──
+  // Payload 3.14 uses VARCHAR id (UUID), mixed column naming:
+  //   roles: parent_id, order (no underscore)
+  //   tenants/sessions: _parent_id, _order (with underscore)
+  //   tenants_permissions: parent_id, order (no underscore)
+  // Tables need _uuid column for array types
   {
-    name: 'cleanup.drop_users_tenants_permissions',
-    sql: `DROP TABLE IF EXISTS users_tenants_permissions CASCADE;`,
+    name: 'users_tenants.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_tenants (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tenant_id integer,
+      status varchar DEFAULT 'active',
+      role varchar DEFAULT 'viewer');`,
   },
   {
-    name: 'cleanup.drop_users_tenants',
-    sql: `DROP TABLE IF EXISTS users_tenants CASCADE;`,
+    name: 'users_tenants.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_tenants_parent_idx ON users_tenants (_parent_id);`,
   },
   {
-    name: 'cleanup.drop_users_sessions',
-    sql: `DROP TABLE IF EXISTS users_sessions CASCADE;`,
+    name: 'users_tenants_permissions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_tenants_permissions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      "order" integer NOT NULL DEFAULT 0,
+      parent_id varchar NOT NULL,
+      value varchar);`,
+  },
+  {
+    name: 'users_tenants_permissions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_tenants_permissions_parent_idx ON users_tenants_permissions (parent_id);`,
+  },
+  {
+    name: 'users_sessions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_sessions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      created_at timestamptz DEFAULT now(),
+      expires_at timestamptz);`,
+  },
+  {
+    name: 'users_sessions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_sessions_parent_idx ON users_sessions (_parent_id);`,
   },
   // ── Tenants: Stripe Connect ──
   {
