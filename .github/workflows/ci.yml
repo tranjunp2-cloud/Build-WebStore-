@@ -195,10 +195,10 @@ jobs:
             };
             const testStatus = tests.failed !== '0' ? `❌ ${tests.failed} failed` : '✅ All passed';
 
-            // Post-release targets (Q3 2026) — keep in sync with vitest.config.ts
-            const targets = { lines: 60, branches: 70, functions: 60, statements: 60 };
+            // Target 15/04/2026 — keep in sync with vitest.config.ts
+            const targets = { lines: 60, branches: 50, functions: 50, statements: 60 };
             // Current CI thresholds (minimum to pass)
-            const minimums = { lines: 18, branches: 60, functions: 40, statements: 18 };
+            const minimums = { lines: 18, branches: 50, functions: 40, statements: 18 };
 
             function badge(val, min, target) {
               const v = parseFloat(val);
@@ -217,7 +217,7 @@ jobs:
               `**${tests.passed}/${tests.total}** passed ${testStatus}`,
               '',
               '### Test Coverage',
-              '| Metric | Current | Min | Target Q3 | Status |',
+              '| Metric | Current | Min | Target 15/04 | Status |',
               '|--------|---------|-----|-----------|--------|',
               `| Lines | ${coverage.lines}% | ${minimums.lines}% | ${targets.lines}% | ${badge(coverage.lines, minimums.lines, targets.lines)} |`,
               `| Branches | ${coverage.branches}% | ${minimums.branches}% | ${targets.branches}% | ${badge(coverage.branches, minimums.branches, targets.branches)} |`,

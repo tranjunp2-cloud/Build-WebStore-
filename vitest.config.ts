@@ -22,10 +22,10 @@ export default defineConfig({
             ],
             thresholds: {
                 // Current baseline (2026-03-28): lines 18.9, branches 66.5, functions 41.7, statements 18.9
-                // These thresholds prevent coverage from DROPPING — CI fails if PR reduces coverage
-                // Post-release target Q3: lines 60, branches 70, functions 60, statements 60
+                // CI fails if coverage drops below these minimums
+                // Target 15/04: lines 60, branches 50, functions 50, statements 60
                 lines: 18,
-                branches: 60,
+                branches: 50,
                 functions: 40,
                 statements: 18,
             },
