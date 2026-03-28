@@ -21,11 +21,13 @@ export default defineConfig({
                 'src/__tests__/**',
             ],
             thresholds: {
-                // TODO: Nâng lên 20/15/15/20 sau khi thêm tests cho F01 + F05
-                lines: 15,
-                branches: 10,
-                functions: 10,
-                statements: 15,
+                // Current baseline (2026-03-28): lines 18.9, branches 66.5, functions 41.7, statements 18.9
+                // These thresholds prevent coverage from DROPPING — CI fails if PR reduces coverage
+                // Post-release target Q3: lines 60, branches 70, functions 60, statements 60
+                lines: 18,
+                branches: 60,
+                functions: 40,
+                statements: 18,
             },
         },
     },
