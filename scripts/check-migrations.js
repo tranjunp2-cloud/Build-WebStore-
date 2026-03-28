@@ -287,7 +287,36 @@ function main() {
     }
   }
 
-  // ── Phase 3: Check for DROP TABLE (dangerous) ──
+  // ── Phase 3: Validate COLLECTION_SLUGS covers all collections ──
+  const allCollectionFiles = fs.readdirSync(COLLECTIONS_DIR).filter(f => f.endsWith('.ts'))
+  const collectionSlugs = []
+  for (const file of allCollectionFiles) {
+    const fileContent = fs.readFileSync(path.join(COLLECTIONS_DIR, file), 'utf8')
+    // Only match the collection-level slug (inside CollectionConfig export), not block slugs
+    const collectionMatch = fileContent.match(/(?:CollectionConfig|Collection)\s*=\s*\{[\s\S]*?slug:\s*['"]([^'"]+)['"]/)
+    if (collectionMatch) collectionSlugs.push({ slug: collectionMatch[1], file })
+  }
+
+  // Extract COLLECTION_SLUGS array from db-setup.js
+  const slugArrayMatch = content.match(/COLLECTION_SLUGS\s*=\s*\[([\s\S]*?)\]/)
+  if (slugArrayMatch) {
+    const declaredSlugs = new Set(
+      slugArrayMatch[1].match(/['"]([^'"]+)['"]/g)?.map(s => s.replace(/['"]/g, '').replace(/-/g, '_')) || []
+    )
+
+    for (const { slug, file } of collectionSlugs) {
+      const normalizedSlug = slug.replace(/-/g, '_')
+      if (!declaredSlugs.has(normalizedSlug)) {
+        errors.push({
+          severity: '🔴 BLOCKER',
+          message: `Collection "${slug}" (${file}) is missing from COLLECTION_SLUGS in db-setup.js`,
+          fix: `Add '${slug.replace(/-/g, '_')}' to the COLLECTION_SLUGS array in scripts/db-setup.js`,
+        })
+      }
+    }
+  }
+
+  // ── Phase 4: Check for DROP TABLE (dangerous) ──
   const dropRegex = /DROP TABLE/gi
   if (dropRegex.test(content)) {
     const dropMatches = content.match(/DROP TABLE IF EXISTS\s+(\w+)/gi) || []

@@ -314,6 +314,14 @@ const MIGRATIONS = [
     name: 'payload_locked_documents_rels.blog_categories_id',
     sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS blog_categories_id integer;`,
   },
+  {
+    name: 'payload_locked_documents_rels.seo_meta_jobs_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS seo_meta_jobs_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.categories_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS categories_id integer;`,
+  },
   // ── Tenants: Payment Methods ──
   {
     name: 'tenants.payments_payment_cod',
@@ -372,6 +380,48 @@ async function runMigrations(pool) {
   }
 }
 
+/**
+ * All collection slugs in the project (source of truth).
+ * When adding a new collection, add its slug here.
+ * Hyphens are converted to underscores for DB column naming.
+ */
+const COLLECTION_SLUGS = [
+  'tenants', 'users', 'sites', 'pages', 'media',
+  'templates', 'subscriptions', 'products', 'orders',
+  'analytics', 'blogs', 'blog_categories', 'categories',
+  'seo_meta_jobs',
+];
+
+/**
+ * Auto-sync FK columns in Payload system rels tables.
+ * Payload CMS requires a `{slug}_id` column in payload_locked_documents_rels
+ * and payload_preferences_rels for every collection. This ensures no collection
+ * is missed — just add the slug to COLLECTION_SLUGS above.
+ */
+async function syncPayloadRelsTables(pool) {
+  const RELS_TABLES = [
+    'payload_locked_documents_rels',
+    'payload_preferences_rels',
+  ];
+
+  console.log(`[db-setup] Syncing Payload rels tables for ${COLLECTION_SLUGS.length} collections...`);
+
+  for (const table of RELS_TABLES) {
+    for (const slug of COLLECTION_SLUGS) {
+      const col = `${slug.replace(/-/g, '_')}_id`;
+      try {
+        await pool.query(
+          `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} integer;`
+        );
+      } catch (e) {
+        // Table might not exist yet (first deploy) — ignore
+      }
+    }
+  }
+
+  console.log(`[db-setup] ✅ Payload rels tables synced`);
+}
+
 async function checkDB() {
   const pool = createPool();
   if (!pool) {
@@ -390,6 +440,7 @@ async function checkDB() {
     // Run direct SQL migrations (idempotent — always safe)
     if (tableCount > 0) {
       await runMigrations(pool);
+      await syncPayloadRelsTables(pool);
     }
 
     await pool.end();
