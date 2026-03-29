@@ -5,41 +5,38 @@ sync-do-envs.py — Auto-sync GitHub Secrets to DigitalOcean App env vars.
 Usage (called from CI):
   python3 .github/scripts/sync-do-envs.py <app-name>
 
-Uses DO REST API directly (not doctl CLI) to avoid YAML/JSON format issues.
+How it works:
+  1. Reads ALL_SECRETS env var (JSON of all GitHub Secrets)
+  2. Filters to only app-relevant keys (skips CI-only secrets like LARK_WEBHOOK_*)
+  3. Syncs matching secrets to DO app as encrypted env vars
+
+Adding a new env var:
+  1. gh secret set MY_KEY --body "value"
+  2. That's it! Script auto-syncs all secrets to DO on next deploy.
+     Only CI-only secrets (webhooks, tokens for notifications) are excluded.
 """
 
 import json
 import os
-import subprocess
 import sys
 import urllib.request
 import urllib.error
 
 
-# Map: DO app env key → GitHub Secret env var name on runner
-SECRET_MAP = {
-    "PAYLOAD_SECRET":                  "PAYLOAD_SECRET",
-    "STRIPE_SECRET_KEY":               "STRIPE_SECRET_KEY",
-    "STRIPE_WEBHOOK_SECRET":           "STRIPE_WEBHOOK_SECRET",
-    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY": "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
-    "OPENAI_API_KEY":                  "OPENAI_API_KEY",
-    "S3_ENDPOINT":                     "S3_ENDPOINT",
-    "S3_ACCESS_KEY_ID":                "S3_ACCESS_KEY_ID",
-    "S3_SECRET_ACCESS_KEY":            "S3_SECRET_ACCESS_KEY",
-    "LARK_APP_ID":                     "LARK_APP_ID",
-    "LARK_APP_SECRET":                 "LARK_APP_SECRET",
-    "LARK_ENCRYPT_KEY":                "LARK_ENCRYPT_KEY",
-    "LARK_VERIFICATION_TOKEN":         "LARK_VERIFICATION_TOKEN",
-    "LARK_BOT_OPEN_ID":                "LARK_BOT_OPEN_ID",
-    "GITHUB_TOKEN":                    "GH_BOT_TOKEN",
-    "MAIL_HOST":                       "MAIL_HOST",
-    "MAIL_PORT":                       "MAIL_PORT",
-    "MAIL_USERNAME":                   "MAIL_USERNAME",
-    "MAIL_PASSWORD":                   "MAIL_PASSWORD",
-    "MAIL_FROM_ADDRESS":               "MAIL_FROM_ADDRESS",
-    "MAIL_FROM_NAME":                  "MAIL_FROM_NAME",
-    "ECH_DISTRIBUTION_API_URL":        "ECH_DISTRIBUTION_API_URL",
-    "ECH_DISTRIBUTION_API_KEY":        "ECH_DISTRIBUTION_API_KEY",
+# Secrets to SKIP — these are CI-only (notifications, testing) and not needed on DO app
+CI_ONLY_SECRETS = {
+    "DIGITALOCEAN_ACCESS_TOKEN",
+    "BOT_NOTIFY_URL",
+    "BOT_SECRET",
+    "LARK_WEBHOOK_URL",
+    "LARK_WEBHOOK_CI",
+    "LARK_WEBHOOK_REPORT",
+    "LARK_WEBHOOK_TASK",
+    "LARK_SIGN_KEY",
+    "LARK_SIGN_KEY_CI",
+    "E2E_TEST_EMAIL",
+    "E2E_TEST_PASSWORD",
+    "GITHUB_TOKEN",  # Built-in GHA token, not app secret
 }
 
 
@@ -91,7 +88,28 @@ def get_app_spec(app_id: str) -> dict:
     return spec
 
 
-def patch_envs(spec: dict) -> tuple[dict, list[str], list[str]]:
+def get_secrets_from_env() -> dict[str, str]:
+    """Parse ALL_SECRETS JSON env var, filter out CI-only secrets."""
+    raw = os.getenv("ALL_SECRETS", "{}")
+    try:
+        all_secrets = json.loads(raw)
+    except json.JSONDecodeError:
+        print("❌ Failed to parse ALL_SECRETS JSON", file=sys.stderr)
+        sys.exit(1)
+
+    # Filter: only app secrets, skip CI-only
+    app_secrets = {}
+    for key, value in all_secrets.items():
+        if key in CI_ONLY_SECRETS:
+            continue
+        if not value or value == "***":
+            continue
+        app_secrets[key] = value
+
+    return app_secrets
+
+
+def patch_envs(spec: dict, secrets: dict[str, str]) -> tuple[dict, list[str], list[str]]:
     """Inject secret values into the spec."""
     updated, skipped = [], []
 
@@ -100,29 +118,22 @@ def patch_envs(spec: dict) -> tuple[dict, list[str], list[str]]:
         print("❌ No services found in app spec", file=sys.stderr)
         sys.exit(1)
 
-    # Use first service (primary web app) — name varies per environment
-    for service in services[:1]:
+    # Use first service (primary web app)
+    service = services[0]
+    env_list = service.get("envs", [])
+    env_index = {e["key"]: i for i, e in enumerate(env_list)}
 
-        env_list = service.get("envs", [])
-        env_index = {e["key"]: i for i, e in enumerate(env_list)}
+    for key, value in secrets.items():
+        if key in env_index:
+            entry = env_list[env_index[key]]
+            entry["value"] = value
+            entry["type"] = "SECRET"
+            updated.append(key)
+        else:
+            env_list.append({"key": key, "value": value, "type": "SECRET", "scope": "RUN_AND_BUILD_TIME"})
+            updated.append(f"{key} (added)")
 
-        for do_key, runner_env in SECRET_MAP.items():
-            value = os.getenv(runner_env, "")
-            if not value:
-                skipped.append(f"{do_key} (env var {runner_env!r} is empty)")
-                continue
-
-            if do_key in env_index:
-                entry = env_list[env_index[do_key]]
-                entry["value"] = value
-                entry["type"] = "SECRET"
-                updated.append(do_key)
-            else:
-                env_list.append({"key": do_key, "value": value, "type": "SECRET"})
-                updated.append(f"{do_key} (added)")
-
-        service["envs"] = env_list
-
+    service["envs"] = env_list
     return spec, updated, skipped
 
 
@@ -142,16 +153,17 @@ def main() -> None:
     print(f"🔄 Syncing env vars → DO app '{app_name}'...")
     app_id = get_app_id(app_name)
     spec = get_app_spec(app_id)
-    spec, updated, skipped = patch_envs(spec)
+
+    secrets = get_secrets_from_env()
+    print(f"📦 Found {len(secrets)} app secret(s) to sync")
+
+    spec, updated, skipped = patch_envs(spec, secrets)
 
     if updated:
         print(f"📦 Updating {len(updated)} secret(s): {', '.join(updated)}")
         update_app(app_id, spec)
     else:
-        print("⚠️  No secrets to update (all runner env vars are empty — check GitHub Secrets).")
-
-    if skipped:
-        print(f"⚠️  Skipped {len(skipped)} (empty/missing): {', '.join(skipped)}")
+        print("⚠️  No secrets to update.")
 
     print("✅ Env sync complete.")
 

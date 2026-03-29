@@ -77,32 +77,22 @@ GitHub Secrets → CI (sync-do-envs.py) → DigitalOcean App → Running contain
 - Dev NEVER hardcodes secrets in code, Dockerfile, or `.do/app.yaml`
 - `.env.local` is for local development only (gitignored)
 
-### Adding a new env var
+### Adding a new env var (2 steps only)
 
-1. **Add to GitHub Secrets:**
+1. **Add real value to GitHub Secrets:**
    ```bash
    gh secret set MY_NEW_KEY --body "my-secret-value"
    ```
 
-2. **Add to sync map** in `.github/scripts/sync-do-envs.py`:
-   ```python
-   SECRET_MAP = {
-       ...
-       "MY_NEW_KEY": "MY_NEW_KEY",  # Add this line
-   }
-   ```
-
-3. **Add to CI workflow** in `.github/workflows/ci.yml` (deploy-staging job, env sync step):
-   ```yaml
-   MY_NEW_KEY: ${{ secrets.MY_NEW_KEY }}
-   ```
-
-4. **Add placeholder** to `.env.example`:
+2. **Add placeholder to `.env.example`:**
    ```
    MY_NEW_KEY=your-value-here
    ```
 
-5. **Deploy** — next push to staging/main will auto-sync the new secret to DO.
+That's it! CI auto-syncs ALL GitHub Secrets to DO on deploy. No need to edit ci.yml or sync script.
+
+- CI will **block PR** if code uses `process.env.NEW_VAR` but `.env.example` is missing the key.
+- CI-only secrets (webhooks, test creds) are auto-excluded from DO sync.
 
 ### Current secrets required
 
