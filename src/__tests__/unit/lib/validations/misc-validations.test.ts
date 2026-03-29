@@ -1,0 +1,172 @@
+import { describe, it, expect } from 'vitest'
+import { analyticsTrackSchema } from '@/lib/validations/analytics'
+import { seoAnalyzeSchema, seoFixSchema } from '@/lib/validations/seo'
+import { saveSiteSchema } from '@/lib/validations/sites'
+import { generateDescriptionSchema } from '@/lib/validations/products'
+
+// ─── TC-F22.02: Analytics tracking validation ─────────────────────────
+// ─── TC-F22.03: GA4 field validation ──────────────────────────────────
+
+describe('analyticsTrackSchema [TC-F22.02, TC-F22.03]', () => {
+    const validTrack = {
+        siteId: 'site-1',
+        pageUrl: '/home',
+    }
+
+    it('accepts valid tracking event', () => {
+        const result = analyticsTrackSchema.safeParse(validTrack)
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts with all optional fields', () => {
+        const result = analyticsTrackSchema.safeParse({
+            ...validTrack,
+            event: 'page_view',
+            referrer: 'https://google.com',
+            sessionId: 'sess-abc',
+            metadata: { browser: 'Chrome', screen: '1920x1080' },
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('rejects missing siteId', () => {
+        const result = analyticsTrackSchema.safeParse({ pageUrl: '/home' })
+        expect(result.success).toBe(false)
+    })
+
+    it('rejects empty siteId', () => {
+        const result = analyticsTrackSchema.safeParse({ siteId: '', pageUrl: '/home' })
+        expect(result.success).toBe(false)
+    })
+
+    it('rejects missing pageUrl', () => {
+        const result = analyticsTrackSchema.safeParse({ siteId: 'site-1' })
+        expect(result.success).toBe(false)
+    })
+
+    it('rejects empty pageUrl', () => {
+        const result = analyticsTrackSchema.safeParse({ siteId: 'site-1', pageUrl: '' })
+        expect(result.success).toBe(false)
+    })
+})
+
+describe('seoAnalyzeSchema', () => {
+    it('accepts valid siteId', () => {
+        const result = seoAnalyzeSchema.safeParse({ siteId: 'site-1' })
+        expect(result.success).toBe(true)
+    })
+
+    it('rejects empty siteId', () => {
+        const result = seoAnalyzeSchema.safeParse({ siteId: '' })
+        expect(result.success).toBe(false)
+    })
+
+    it('rejects missing siteId', () => {
+        const result = seoAnalyzeSchema.safeParse({})
+        expect(result.success).toBe(false)
+    })
+})
+
+describe('seoFixSchema', () => {
+    it('accepts valid siteId', () => {
+        const result = seoFixSchema.safeParse({ siteId: 'site-1' })
+        expect(result.success).toBe(true)
+    })
+
+    it('rejects empty siteId', () => {
+        const result = seoFixSchema.safeParse({ siteId: '' })
+        expect(result.success).toBe(false)
+    })
+})
+
+describe('saveSiteSchema', () => {
+    it('accepts valid blocks', () => {
+        const result = saveSiteSchema.safeParse({
+            blocks: [{ type: 'hero', content: {} }],
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts valid theme', () => {
+        const result = saveSiteSchema.safeParse({
+            theme: { primaryColor: '#ff0000' },
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts valid locale (en)', () => {
+        const result = saveSiteSchema.safeParse({ locale: 'en' })
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts valid locale (ms)', () => {
+        const result = saveSiteSchema.safeParse({ locale: 'ms' })
+        expect(result.success).toBe(true)
+    })
+
+    it('rejects invalid locale', () => {
+        const result = saveSiteSchema.safeParse({ locale: 'fr' })
+        expect(result.success).toBe(false)
+    })
+
+    it('accepts valid shippingConfig', () => {
+        const result = saveSiteSchema.safeParse({
+            shippingConfig: {
+                westRate: 8,
+                eastRate: 15,
+                freeAbove: 100,
+            },
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts shippingConfig with freeAbove null', () => {
+        const result = saveSiteSchema.safeParse({
+            shippingConfig: {
+                westRate: 8,
+                freeAbove: null,
+            },
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('rejects empty object (refine: at least one field required)', () => {
+        const result = saveSiteSchema.safeParse({})
+        expect(result.success).toBe(false)
+    })
+
+    it('accepts multiple fields together', () => {
+        const result = saveSiteSchema.safeParse({
+            blocks: [{ type: 'hero' }],
+            theme: { primaryColor: '#000' },
+            locale: 'en',
+        })
+        expect(result.success).toBe(true)
+    })
+})
+
+describe('generateDescriptionSchema', () => {
+    it('accepts valid product name', () => {
+        const result = generateDescriptionSchema.safeParse({ name: 'Nasi Lemak' })
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts with optional category and features', () => {
+        const result = generateDescriptionSchema.safeParse({
+            name: 'Nasi Lemak',
+            category: 'Malaysian Food',
+            features: 'Coconut rice, sambal, anchovies',
+        })
+        expect(result.success).toBe(true)
+    })
+
+    it('rejects missing name', () => {
+        const result = generateDescriptionSchema.safeParse({})
+        expect(result.success).toBe(false)
+    })
+
+    it('rejects empty name', () => {
+        const result = generateDescriptionSchema.safeParse({ name: '' })
+        expect(result.success).toBe(false)
+    })
+})

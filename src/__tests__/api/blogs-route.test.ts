@@ -1,0 +1,117 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+// Mock auth
+const mockUser = { id: 1, tenants: [{ tenant: 'tenant-1' }] }
+vi.mock('@/lib/auth', () => ({
+    withAuth: vi.fn((handler: any) => async (req: any, ctx?: any) => handler(mockUser, req, ctx)),
+    getCurrentUser: vi.fn(() => Promise.resolve(mockUser)),
+}))
+
+const mockFind = vi.fn()
+const mockCreate = vi.fn()
+vi.mock('payload', () => ({
+    getPayload: vi.fn(() => Promise.resolve({ find: mockFind, create: mockCreate })),
+}))
+vi.mock('@payload-config', () => ({ default: {} }))
+
+import { GET, POST } from '@/app/api/blogs/route'
+
+// ─── TC-F17: Blog CRUD API ───────────────────────────────────────────
+
+describe('GET /api/blogs [TC-F17]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('returns paginated blog list', async () => {
+        mockFind.mockResolvedValue({
+            docs: [{ id: 1, title: 'Post 1' }],
+            totalDocs: 1,
+            totalPages: 1,
+            page: 1,
+            limit: 20,
+            hasPrevPage: false,
+            hasNextPage: false,
+        })
+
+        const req = new Request('http://localhost/api/blogs')
+        const res = await GET(req, {} as any)
+        const body = await res.json()
+
+        expect(res.status).toBe(200)
+        expect(body).toHaveProperty('success', true)
+        expect(body.data).toHaveLength(1)
+    })
+
+    it('supports search query param', async () => {
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0, totalPages: 0, page: 1, limit: 20, hasPrevPage: false, hasNextPage: false })
+
+        const req = new Request('http://localhost/api/blogs?search=test')
+        await GET(req, {} as any)
+
+        expect(mockFind).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ title: { contains: 'test' } }),
+            }),
+        )
+    })
+
+    it('supports status filter', async () => {
+        mockFind.mockResolvedValue({ docs: [], totalDocs: 0, totalPages: 0, page: 1, limit: 20, hasPrevPage: false, hasNextPage: false })
+
+        const req = new Request('http://localhost/api/blogs?status=published')
+        await GET(req, {} as any)
+
+        expect(mockFind).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ status: { equals: 'published' } }),
+            }),
+        )
+    })
+})
+
+describe('POST /api/blogs [TC-F17]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('creates a blog post', async () => {
+        mockFind.mockResolvedValue({ docs: [] }) // sites find + slug check
+        mockCreate.mockResolvedValue({ id: 1, title: 'New Post', slug: 'new-post' })
+
+        // First call: sites lookup, second call: slug check
+        mockFind
+            .mockResolvedValueOnce({ docs: [{ id: 'site-1' }] }) // sites
+            .mockResolvedValueOnce({ docs: [] }) // slug uniqueness
+
+        const req = {
+            json: () => Promise.resolve({ title: 'New Post' }),
+            url: 'http://localhost/api/blogs',
+        } as unknown as Request
+
+        const res = await POST(req, {} as any)
+
+        expect(res.status).toBe(201)
+        expect(mockCreate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                collection: 'blogs',
+                data: expect.objectContaining({ title: 'New Post' }),
+            }),
+        )
+    })
+
+    it('returns 400 when no tenant found', async () => {
+        // Override mockUser to have no tenant
+        const noTenantUser = { id: 1, tenants: [] }
+        const { withAuth } = await import('@/lib/auth')
+        ;(withAuth as any).mockImplementation((handler: any) => async (req: any, ctx?: any) => handler(noTenantUser, req, ctx))
+
+        const req = {
+            json: () => Promise.resolve({ title: 'Post' }),
+            url: 'http://localhost/api/blogs',
+        } as unknown as Request
+
+        const res = await POST(req, {} as any)
+        expect(res.status).toBe(400)
+    })
+})
