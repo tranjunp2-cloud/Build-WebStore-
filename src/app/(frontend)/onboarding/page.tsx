@@ -2,17 +2,18 @@ import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import type { PlatformUser } from '@/types/user'
 import OnboardingClient from './OnboardingClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function OnboardingPage() {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser() as PlatformUser | null
 
     if (user) {
         let shouldRedirect = false
         try {
-            const rawTenant = (user as any).tenants?.[0]?.tenant
+            const rawTenant = user.tenants?.[0]?.tenant
             const tenantId = rawTenant && typeof rawTenant === 'object' ? rawTenant.id : rawTenant
 
             if (tenantId) {
@@ -24,8 +25,8 @@ export default async function OnboardingPage() {
                 })
                 shouldRedirect = sites.docs.length > 0
             }
-        } catch {
-            // If DB query fails, still show onboarding
+        } catch (error) {
+            console.error('[Onboarding] Failed to check user sites:', error)
         }
         if (shouldRedirect) {
             redirect('/dashboard')
