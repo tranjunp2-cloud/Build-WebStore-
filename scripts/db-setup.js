@@ -392,6 +392,7 @@ const MIGRATIONS = [
     );`,
   },
   {
+    name: 'products_variants.create_table',
     sql: `CREATE TABLE IF NOT EXISTS products_variants (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
