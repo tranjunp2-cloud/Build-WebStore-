@@ -415,6 +415,21 @@ const MIGRATIONS = [
       value varchar
     );`,
   },
+  // ── Products: Rels table (hasMany relationship → category) ──
+  {
+    name: 'products_rels.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_rels (
+      id serial PRIMARY KEY,
+      "order" integer,
+      parent_id integer NOT NULL,
+      path varchar NOT NULL,
+      categories_id integer
+    );`,
+  },
+  {
+    name: 'products_rels.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_rels_parent_idx ON products_rels (parent_id);`,
+  },
   // ── Orders: Items array table ──
   {
     name: 'orders_items.create_table',
