@@ -79,20 +79,28 @@ GitHub Secrets → CI (sync-do-envs.py) → DigitalOcean App → Running contain
 
 ### Adding a new env var (2 steps only)
 
-1. **Add real value to GitHub Secrets:**
+1. **Add placeholder to both env files:**
+   - `.env.staging.example` — staging values/placeholders
+   - `.env.production.example` — production values/placeholders
+
+2. **Add real value to GitHub Secrets:**
    ```bash
    gh secret set MY_NEW_KEY --body "my-secret-value"
    ```
 
-2. **Add placeholder to `.env.example`:**
-   ```
-   MY_NEW_KEY=your-value-here
-   ```
-
 That's it! CI auto-syncs ALL GitHub Secrets to DO on deploy. No need to edit ci.yml or sync script.
 
-- CI will **block PR** if code uses `process.env.NEW_VAR` but `.env.example` is missing the key.
+- CI will **block PR** if code uses `process.env.NEW_VAR` but env files are missing the key.
 - CI-only secrets (webhooks, test creds) are auto-excluded from DO sync.
+
+### Env files structure
+
+| File | Purpose | Commit to git? |
+|------|---------|---------------|
+| `.env.example` | Local dev template | ✅ Yes (placeholders only) |
+| `.env.staging.example` | Staging env var names | ✅ Yes (placeholders only) |
+| `.env.production.example` | Production env var names | ✅ Yes (placeholders only) |
+| `.env.local` | Local dev real values | ❌ No (gitignored) |
 
 ### Current secrets required
 
