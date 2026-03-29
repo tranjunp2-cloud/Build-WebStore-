@@ -155,6 +155,20 @@ feat/F08-01-product-crud  → PR → staging → QA test → Done
 
 Chi tiết: `.github/GIT_AND_CI_RULES.md` + `.github/CONTRIBUTING.md`
 
+## Testing
+
+Follow `docs/TEST_CONVENTION.md` for all test code. Key rules:
+
+- Every test MUST reference TC-ID from `docs/qa/F*.md`
+- Import from source code — NEVER re-implement logic in tests
+- AAA pattern: Arrange, Act, Assert
+- `vi.mock()` at top of file, never inside test functions
+- `beforeEach`/`afterEach` cleanup mandatory
+- Gold standard files to copy patterns from:
+  - `src/__tests__/unit/otp/otp-generate.test.ts` (pure function)
+  - `src/__tests__/unit/builder/builder-store.test.ts` (store)
+  - `src/__tests__/unit/localization/f21-localization.test.tsx` (component + TC-ID)
+
 ## Key Files
 
 | File | Purpose |
