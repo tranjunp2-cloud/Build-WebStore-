@@ -450,6 +450,49 @@ const MIGRATIONS = [
     name: 'orders_items.parent_idx',
     sql: `CREATE INDEX IF NOT EXISTS orders_items_parent_idx ON orders_items (_parent_id);`,
   },
+  // ── ALTER TABLE fallbacks ──────────────────────────────────────────────
+  // pushDevSchema may create array tables with only metadata columns (id, _order, _parent_id, _uuid).
+  // CREATE TABLE IF NOT EXISTS skips if table already exists → field columns missing.
+  // ALTER TABLE ADD COLUMN IF NOT EXISTS ensures columns exist regardless of creation order.
+  // orders_items
+  { name: 'orders_items.product_id', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS product_id integer;` },
+  { name: 'orders_items.product_name', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS product_name varchar;` },
+  { name: 'orders_items.variant', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS variant varchar;` },
+  { name: 'orders_items.quantity', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS quantity numeric;` },
+  { name: 'orders_items.unit_price', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS unit_price numeric;` },
+  // products_images
+  { name: 'products_images.image_id', sql: `ALTER TABLE products_images ADD COLUMN IF NOT EXISTS image_id integer;` },
+  { name: 'products_images.alt', sql: `ALTER TABLE products_images ADD COLUMN IF NOT EXISTS alt varchar;` },
+  // products_tags
+  { name: 'products_tags.tag', sql: `ALTER TABLE products_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
+  // products_variant_configs
+  { name: 'products_variant_configs.name', sql: `ALTER TABLE products_variant_configs ADD COLUMN IF NOT EXISTS name varchar;` },
+  // products_variant_configs_options
+  { name: 'products_variant_configs_options.value', sql: `ALTER TABLE products_variant_configs_options ADD COLUMN IF NOT EXISTS value varchar;` },
+  // products_variants
+  { name: 'products_variants.name', sql: `ALTER TABLE products_variants ADD COLUMN IF NOT EXISTS name varchar;` },
+  { name: 'products_variants.sku', sql: `ALTER TABLE products_variants ADD COLUMN IF NOT EXISTS sku varchar;` },
+  { name: 'products_variants.price', sql: `ALTER TABLE products_variants ADD COLUMN IF NOT EXISTS price numeric;` },
+  { name: 'products_variants.compare_at_price', sql: `ALTER TABLE products_variants ADD COLUMN IF NOT EXISTS compare_at_price numeric;` },
+  { name: 'products_variants.stock', sql: `ALTER TABLE products_variants ADD COLUMN IF NOT EXISTS stock numeric;` },
+  // products_attributes
+  { name: 'products_attributes.key', sql: `ALTER TABLE products_attributes ADD COLUMN IF NOT EXISTS key varchar;` },
+  { name: 'products_attributes.value', sql: `ALTER TABLE products_attributes ADD COLUMN IF NOT EXISTS value varchar;` },
+  // products_rels
+  { name: 'products_rels.order', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS "order" integer;` },
+  { name: 'products_rels.path', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS path varchar;` },
+  { name: 'products_rels.categories_id', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS categories_id integer;` },
+  // tenants_custom_domains
+  { name: 'tenants_custom_domains.domain', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS domain varchar;` },
+  { name: 'tenants_custom_domains.status', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS status varchar DEFAULT \'pending\';` },
+  { name: 'tenants_custom_domains.is_primary', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS is_primary boolean DEFAULT false;` },
+  // sites_seo_tracked_keywords
+  { name: 'sites_seo_tracked_keywords.keyword', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS keyword varchar;` },
+  { name: 'sites_seo_tracked_keywords.current_rank', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS current_rank numeric;` },
+  { name: 'sites_seo_tracked_keywords.previous_rank', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS previous_rank numeric;` },
+  { name: 'sites_seo_tracked_keywords.last_checked_at', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS last_checked_at timestamptz;` },
+  // templates_tags
+  { name: 'templates_tags.tag', sql: `ALTER TABLE templates_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
   // ── Templates: Tags array table ──
   {
     name: 'templates_tags.create_table',
