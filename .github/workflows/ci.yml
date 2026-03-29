@@ -83,12 +83,13 @@ jobs:
       - name: Test
         id: test
         run: |
-          npm run test -- --coverage --reporter=json --outputFile=test-results.json 2>&1 | tee test-output.log
-          # Parse test counts from vitest output
-          TOTAL=$(grep -oP '\d+(?= tests?)' test-output.log | tail -1 || echo "0")
-          PASSED=$(grep -oP '\d+(?= passed)' test-output.log | tail -1 || echo "0")
-          FAILED=$(grep -oP '\d+(?= failed)' test-output.log | tail -1 || echo "0")
-          echo "test_total=${TOTAL:-0}" >> "$GITHUB_OUTPUT"
+          npm run test -- --coverage 2>&1 | tee test-output.log
+          # Parse test counts from vitest summary: "Tests  590 passed (590)" or "Tests  1 passed | 1 skipped (2)"
+          # Total from parenthesized number at end of Tests line (includes passed + failed + skipped)
+          TOTAL=$(grep '^ *Tests' test-output.log | grep -oP '\((\d+)\)' | grep -oP '\d+' | head -1 || echo "0")
+          PASSED=$(grep '^ *Tests' test-output.log | grep -oP '\d+(?= passed)' | head -1 || echo "0")
+          FAILED=$(grep '^ *Tests' test-output.log | grep -oP '\d+(?= failed)' | head -1 || echo "0")
+          echo "test_total=$TOTAL" >> "$GITHUB_OUTPUT"
           echo "test_passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
           echo "test_failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
 
