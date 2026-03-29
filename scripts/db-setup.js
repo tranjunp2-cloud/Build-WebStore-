@@ -392,6 +392,7 @@ const MIGRATIONS = [
     );`,
   },
   {
+    name: 'products_variants.create_table',
     sql: `CREATE TABLE IF NOT EXISTS products_variants (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
@@ -458,6 +459,285 @@ const MIGRATIONS = [
       _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       tag varchar
+    );`,
+  },
+  // ── Pages: Block tables (Payload blocks field → separate table per block type) ──
+  // Each block has metadata + block-specific field columns (per Codex P1 review)
+  {
+    name: 'pages__blocks_navigation.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_navigation" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      style varchar, logo_id integer, logo_text varchar,
+      cta_button_show boolean DEFAULT false, cta_button_label varchar, cta_button_url varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_hero.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_hero" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      image_id integer, background_image_id integer, video_url varchar,
+      badge_show boolean DEFAULT false, badge_text varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_about.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_about" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      layout varchar, section_label varchar, headline varchar, body jsonb, image_id integer
+    );`,
+  },
+  {
+    name: 'pages__blocks_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_features" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      section_label varchar, headline varchar, subheadline varchar, layout varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_testimonials.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_testimonials" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar, variant varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_contact.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_contact" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar, subtext varchar, email varchar, phone varchar,
+      address varchar, show_map boolean DEFAULT false, map_embed_url varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_gallery.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_gallery" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar, layout varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_footer.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_footer" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      logo_text varchar, logo_id integer, tagline varchar,
+      copyright_text varchar, show_social_links boolean DEFAULT false
+    );`,
+  },
+  {
+    name: 'pages__blocks_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_stats" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_pricing.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_pricing" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_faq.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_faq" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_team.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_team" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar
+    );`,
+  },
+  // Navigation links
+  {
+    name: 'pages__blocks_navigation_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_navigation_links" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      label varchar, url varchar, open_in_new_tab boolean DEFAULT false
+    );`,
+  },
+  // Hero CTA buttons
+  {
+    name: 'pages__blocks_hero_cta_buttons.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_hero_cta_buttons" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      label varchar, url varchar, style varchar DEFAULT 'primary'
+    );`,
+  },
+  // About stats
+  {
+    name: 'pages__blocks_about_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_about_stats" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      value varchar, label varchar
+    );`,
+  },
+  // Contact form fields
+  {
+    name: 'pages__blocks_contact_form_fields.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_contact_form_fields" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      field_name varchar, label varchar, field_type varchar, required boolean DEFAULT false, placeholder varchar
+    );`,
+  },
+  // Footer columns + nested links
+  {
+    name: 'pages__blocks_footer_columns.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_footer_columns" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_footer_columns_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_footer_columns_links" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      label varchar, url varchar
+    );`,
+  },
+  // Features items
+  {
+    name: 'pages__blocks_features_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_features_features" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      icon varchar, title varchar, description varchar
+    );`,
+  },
+  // Testimonials items
+  {
+    name: 'pages__blocks_testimonials_testimonials.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_testimonials_testimonials" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      quote varchar, name varchar, title varchar, company varchar, avatar_id integer, rating numeric
+    );`,
+  },
+  // Gallery images
+  {
+    name: 'pages__blocks_gallery_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_gallery_images" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      image_id integer, caption varchar
+    );`,
+  },
+  // Stats items
+  {
+    name: 'pages__blocks_stats_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_stats_stats" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      value varchar, label varchar
+    );`,
+  },
+  // Pricing plans + nested features
+  {
+    name: 'pages__blocks_pricing_plans.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_pricing_plans" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, price varchar, description varchar, is_popular boolean DEFAULT false, cta_label varchar, cta_url varchar
+    );`,
+  },
+  {
+    name: 'pages__blocks_pricing_plans_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_pricing_plans_features" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      text varchar, included boolean DEFAULT true
+    );`,
+  },
+  // FAQ items
+  {
+    name: 'pages__blocks_faq_faqs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_faq_faqs" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      question varchar, answer varchar
+    );`,
+  },
+  // Team members
+  {
+    name: 'pages__blocks_team_members.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_team_members" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, role varchar, bio varchar, image_id integer
     );`,
   },
   // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
