@@ -283,6 +283,168 @@ const MIGRATIONS = [
     name: 'blogs.slug_idx',
     sql: `CREATE INDEX IF NOT EXISTS blogs_slug_idx ON blogs (slug);`,
   },
+  // ── Categories table ──
+  {
+    name: 'categories.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS categories (
+      id serial PRIMARY KEY,
+      tenant_id integer,
+      site_id integer,
+      name varchar NOT NULL,
+      slug varchar,
+      parent_id integer,
+      breadcrumbs varchar,
+      image_id integer,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  // ── SEO Meta Jobs table ──
+  {
+    name: 'seo_meta_jobs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS seo_meta_jobs (
+      id serial PRIMARY KEY,
+      target_collection varchar,
+      target_id varchar,
+      status varchar DEFAULT 'pending',
+      error_log varchar,
+      retry_count numeric DEFAULT 0,
+      site_id integer,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  // ── Tenants: Custom Domains array table ──
+  {
+    name: 'tenants_custom_domains.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS tenants_custom_domains (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      domain varchar,
+      status varchar DEFAULT 'pending',
+      is_primary boolean DEFAULT false
+    );`,
+  },
+  {
+    name: 'tenants_custom_domains.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_custom_domains_parent_idx ON tenants_custom_domains (_parent_id);`,
+  },
+  // ── Sites: SEO Tracked Keywords array table ──
+  {
+    name: 'sites_seo_tracked_keywords.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS sites_seo_tracked_keywords (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      keyword varchar,
+      current_rank numeric,
+      previous_rank numeric,
+      last_checked_at timestamptz
+    );`,
+  },
+  {
+    name: 'sites_seo_tracked_keywords.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS sites_seo_tracked_keywords_parent_idx ON sites_seo_tracked_keywords (_parent_id);`,
+  },
+  // ── Products: Array tables ──
+  {
+    name: 'products_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_images (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      image_id integer,
+      alt varchar
+    );`,
+  },
+  {
+    name: 'products_tags.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_tags (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tag varchar
+    );`,
+  },
+  {
+    name: 'products_variant_configs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_variant_configs (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar
+    );`,
+  },
+  {
+    name: 'products_variant_configs_options.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_variant_configs_options (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      value varchar
+    );`,
+  },
+  {
+    sql: `CREATE TABLE IF NOT EXISTS products_variants (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar,
+      sku varchar,
+      price numeric,
+      compare_at_price numeric,
+      stock numeric
+    );`,
+  },
+  {
+    name: 'products_attributes.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_attributes (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      key varchar,
+      value varchar
+    );`,
+  },
+  // ── Orders: Items array table ──
+  {
+    name: 'orders_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS orders_items (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      product_id integer,
+      product_name varchar,
+      variant varchar,
+      quantity numeric,
+      unit_price numeric
+    );`,
+  },
+  {
+    name: 'orders_items.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS orders_items_parent_idx ON orders_items (_parent_id);`,
+  },
+  // ── Templates: Tags array table ──
+  {
+    name: 'templates_tags.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS templates_tags (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tag varchar
+    );`,
+  },
   // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
   // These tables are created by Payload pushDevSchema (runs every deploy).
   // DO NOT add manual CREATE TABLE migrations — they create wrong column types.
