@@ -82,7 +82,7 @@ export const POST = withAuth(async (_user, request) => {
     } catch (error: any) {
         console.error('[AI Apply Fixes Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'UPDATE_FAILED', message: error.message } },
+            { success: false, error: { code: 'UPDATE_FAILED', message: 'Failed to apply fixes' } },
             { status: 500 }
         )
     }
