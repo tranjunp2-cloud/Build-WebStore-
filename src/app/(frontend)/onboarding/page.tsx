@@ -10,19 +10,25 @@ export default async function OnboardingPage() {
     const user = await getCurrentUser()
 
     if (user) {
+        let shouldRedirect = false
         try {
-            const payload = await getPayload({ config })
-            const sites = await payload.find({
-                collection: 'sites',
-                where: { tenant: { equals: (user as any).tenants?.[0]?.tenant } },
-                limit: 1,
-            })
+            const rawTenant = (user as any).tenants?.[0]?.tenant
+            const tenantId = rawTenant && typeof rawTenant === 'object' ? rawTenant.id : rawTenant
 
-            if (sites.docs.length > 0) {
-                redirect('/dashboard')
+            if (tenantId) {
+                const payload = await getPayload({ config })
+                const sites = await payload.find({
+                    collection: 'sites',
+                    where: { tenant: { equals: tenantId } },
+                    limit: 1,
+                })
+                shouldRedirect = sites.docs.length > 0
             }
         } catch {
             // If DB query fails, still show onboarding
+        }
+        if (shouldRedirect) {
+            redirect('/dashboard')
         }
     }
 
