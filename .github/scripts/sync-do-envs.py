@@ -95,9 +95,13 @@ def patch_envs(spec: dict) -> tuple[dict, list[str], list[str]]:
     """Inject secret values into the spec."""
     updated, skipped = [], []
 
-    for service in spec.get("services", []):
-        if service.get("name") != "web":
-            continue
+    services = spec.get("services", [])
+    if not services:
+        print("❌ No services found in app spec", file=sys.stderr)
+        sys.exit(1)
+
+    # Use first service (primary web app) — name varies per environment
+    for service in services[:1]:
 
         env_list = service.get("envs", [])
         env_index = {e["key"]: i for i, e in enumerate(env_list)}
