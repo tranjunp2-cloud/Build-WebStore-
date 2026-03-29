@@ -87,6 +87,19 @@ If PR links to an issue (`Relates to #N`):
 
 - New business logic should have unit tests
 - Coverage must not drop below thresholds in `vitest.config.ts`
+- Follow `docs/TEST_CONVENTION.md` for patterns and rules
+
+### 13. Test Generation (when generating tests)
+
+- Read `docs/TEST_CONVENTION.md` first — follow all patterns
+- Map tests to TC-IDs from `docs/qa/F{XX}.md` — only test `[x] AUTO` flagged cases
+- Import from source code — NEVER re-implement logic in test files
+- Follow AAA pattern (Arrange, Act, Assert)
+- `vi.mock()` at top of file only
+- Copy patterns from gold standard files:
+  - `src/__tests__/unit/otp/otp-generate.test.ts` (pure function)
+  - `src/__tests__/unit/builder/builder-store.test.ts` (store)
+  - `src/__tests__/unit/localization/f21-localization.test.tsx` (component)
 
 ### 12. Payload CMS Patterns
 
