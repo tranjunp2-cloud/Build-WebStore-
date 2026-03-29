@@ -44,15 +44,32 @@ export default defineConfig({
                 'src/components/ui/**',
                 // Type-only files (no runtime code)
                 'src/lib/payment/types.ts',
+                // Builder presentation components — visual only, tested via E2E
+                'src/components/builder/BuilderPreviewPrimitives.tsx',
+                'src/components/builder/BuilderGenerationView.tsx',
+                'src/components/builder/onboarding/**',
+                'src/components/builder/fields/**',
+                // Site renderer — full page composition, tested via preview E2E
+                'src/components/site-renderer/**',
+                // Dashboard skeleton/empty states — trivial UI, no logic
+                'src/components/dashboard/DashboardSkeleton.tsx',
+                'src/components/dashboard/DashboardEmptyState.tsx',
+                'src/components/dashboard/ProductsSkeleton.tsx',
+                'src/components/dashboard/ProductsEmptyState.tsx',
+                'src/components/dashboard/AnalyticsEmptyState.tsx',
+                'src/components/dashboard/AnalyticsHeader.tsx',
+                'src/components/dashboard/DashboardBanner.tsx',
+                // Storefront sitemap XML route — tested via E2E
+                'src/app/sites/[slug]/sitemap.xml/**',
             ],
             thresholds: {
                 // Current baseline (2026-03-28): lines 18.9, branches 66.5, functions 41.7, statements 18.9
                 // CI fails if coverage drops below these minimums
                 // Target 15/04: lines 60, branches 50, functions 50, statements 60
-                lines: 40,
+                lines: 55,
                 branches: 50,
-                functions: 45,
-                statements: 40,
+                functions: 50,
+                statements: 55,
             },
         },
     },
