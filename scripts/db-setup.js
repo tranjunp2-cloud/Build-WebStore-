@@ -479,6 +479,7 @@ const MIGRATIONS = [
   { name: 'products_attributes.key', sql: `ALTER TABLE products_attributes ADD COLUMN IF NOT EXISTS key varchar;` },
   { name: 'products_attributes.value', sql: `ALTER TABLE products_attributes ADD COLUMN IF NOT EXISTS value varchar;` },
   // products_rels
+  { name: 'products_rels.parent_id', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS parent_id integer;` },
   { name: 'products_rels.order', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS "order" integer;` },
   { name: 'products_rels.path', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS path varchar;` },
   { name: 'products_rels.categories_id', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS categories_id integer;` },
