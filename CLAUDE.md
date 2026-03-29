@@ -58,9 +58,86 @@ CI will block PR if migration is missing or uses wrong convention.
 
 ## Email/SMTP
 
+- SMTP via AWS SES — configured in `payload.config.ts` using `MAIL_*` env vars
 - If `MAIL_HOST` env is not set → Payload uses stream transport (logs to console, no crash)
-- Login does NOT require SMTP — Payload default auth returns JWT directly
-- OTP endpoints use `sendEmail` with fire-and-forget `.catch()` pattern
+- OTP + welcome email use `payload.sendEmail()` (fire-and-forget `.catch()` pattern)
+- Custom `sendEmail()` utility at `src/lib/email/send.ts` also uses Payload SMTP
+
+## Environment Variables & Secrets
+
+**Source of truth: GitHub Secrets** → auto-synced to DigitalOcean on every deploy.
+
+### How it works
+
+```
+GitHub Secrets → CI (sync-do-envs.py) → DigitalOcean App → Running container
+```
+
+- Script `.github/scripts/sync-do-envs.py` syncs all secrets from GitHub → DO on every staging/production deploy
+- Dev NEVER hardcodes secrets in code, Dockerfile, or `.do/app.yaml`
+- `.env.local` is for local development only (gitignored)
+
+### Adding a new env var
+
+1. **Add to GitHub Secrets:**
+   ```bash
+   gh secret set MY_NEW_KEY --body "my-secret-value"
+   ```
+
+2. **Add to sync map** in `.github/scripts/sync-do-envs.py`:
+   ```python
+   SECRET_MAP = {
+       ...
+       "MY_NEW_KEY": "MY_NEW_KEY",  # Add this line
+   }
+   ```
+
+3. **Add to CI workflow** in `.github/workflows/ci.yml` (deploy-staging job, env sync step):
+   ```yaml
+   MY_NEW_KEY: ${{ secrets.MY_NEW_KEY }}
+   ```
+
+4. **Add placeholder** to `.env.example`:
+   ```
+   MY_NEW_KEY=your-value-here
+   ```
+
+5. **Deploy** — next push to staging/main will auto-sync the new secret to DO.
+
+### Current secrets required
+
+| Secret | Service | Required for |
+|--------|---------|-------------|
+| `MAIL_HOST` | AWS SES | Email/OTP |
+| `MAIL_PORT` | AWS SES | Email/OTP |
+| `MAIL_USERNAME` | AWS SES | Email/OTP |
+| `MAIL_PASSWORD` | AWS SES | Email/OTP |
+| `MAIL_FROM_ADDRESS` | AWS SES | Email sender |
+| `MAIL_FROM_NAME` | AWS SES | Email sender name |
+| `OPENAI_API_KEY` | OpenAI | AI Builder, SEO auto-gen |
+| `STRIPE_SECRET_KEY` | Stripe | Payment processing |
+| `STRIPE_WEBHOOK_SECRET` | Stripe | Webhook verification |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe | Frontend checkout |
+| `S3_ENDPOINT` | AWS S3 | File/media upload |
+| `S3_ACCESS_KEY_ID` | AWS S3 | File/media upload |
+| `S3_SECRET_ACCESS_KEY` | AWS S3 | File/media upload |
+| `PAYLOAD_SECRET` | Payload CMS | JWT signing |
+| `LARK_APP_ID` | Lark | Bot integration |
+| `LARK_APP_SECRET` | Lark | Bot integration |
+| `LARK_ENCRYPT_KEY` | Lark | Webhook security |
+| `LARK_VERIFICATION_TOKEN` | Lark | Webhook verification |
+| `LARK_BOT_OPEN_ID` | Lark | Bot messaging |
+| `GH_BOT_TOKEN` | GitHub | Bot actions |
+| `ECH_DISTRIBUTION_API_URL` | ECH | Distribution API |
+| `ECH_DISTRIBUTION_API_KEY` | ECH | Distribution API |
+
+### IMPORTANT rules
+
+- NEVER commit real secrets to `.env.example` — use placeholders only
+- NEVER hardcode secrets in `.do/app.yaml` — let sync script handle it
+- Local dev: copy `.env.example` → `.env.local`, fill in real values
+- Check if secret exists: `gh secret list`
+- Missing secret on DO → feature silently fails (no crash, just logs error)
 
 ## Key Files
 
@@ -71,4 +148,5 @@ CI will block PR if migration is missing or uses wrong convention.
 | `src/payload.config.ts` | Payload + DB config |
 | `src/collections/*.ts` | Collection definitions (schema source of truth) |
 | `.github/workflows/ci.yml` | CI pipeline |
+| `.github/scripts/sync-do-envs.py` | Sync GitHub Secrets → DO env vars |
 | `Dockerfile` | Docker build (CMD = db-setup.js) |
