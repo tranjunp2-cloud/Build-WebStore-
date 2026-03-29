@@ -101,10 +101,11 @@ describe('POST /api/blogs [TC-F17]', () => {
     })
 
     it('returns 400 when no tenant found', async () => {
-        // Override mockUser to have no tenant
-        const noTenantUser = { id: 1, tenants: [] }
-        const { withAuth } = await import('@/lib/auth')
-        ;(withAuth as any).mockImplementation((handler: any) => async (req: any, ctx?: any) => handler(noTenantUser, req, ctx))
+        // Mutate the shared mockUser reference directly — POST already
+        // closed over this object via withAuth at import time, so
+        // rebinding withAuth would not affect the existing handler.
+        const originalTenants = mockUser.tenants
+        mockUser.tenants = [] as any
 
         const req = {
             json: () => Promise.resolve({ title: 'Post' }),
@@ -113,5 +114,8 @@ describe('POST /api/blogs [TC-F17]', () => {
 
         const res = await POST(req, {} as any)
         expect(res.status).toBe(400)
+
+        // Restore for other tests
+        mockUser.tenants = originalTenants
     })
 })
