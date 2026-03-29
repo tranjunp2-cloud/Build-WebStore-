@@ -42,6 +42,8 @@ export default defineConfig({
                 'src/instrumentation.ts',
                 // shadcn/ui base components — third-party, never modify
                 'src/components/ui/**',
+                // Type-only files (no runtime code)
+                'src/lib/payment/types.ts',
             ],
             thresholds: {
                 // Current baseline (2026-03-28): lines 18.9, branches 66.5, functions 41.7, statements 18.9
