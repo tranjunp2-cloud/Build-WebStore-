@@ -940,6 +940,97 @@ async function syncPayloadRelsTables(pool) {
   console.log(`[db-setup] ✅ Payload rels tables synced`);
 }
 
+/**
+ * Bootstrap Seed — create essential accounts on startup.
+ *
+ * Creates admin + SSO service users if they don't exist.
+ * Credentials from env vars — NEVER hardcoded.
+ * Idempotent — safe to run on every startup.
+ *
+ * Runs via raw SQL (not Payload API) because this executes
+ * before server.js starts. Payload hashes passwords with scrypt
+ * internally, but we insert a temporary password here — the real
+ * password is set by Payload on first login or via seed-sso script.
+ *
+ * NOTE: This creates users with a PLACEHOLDER hash. The actual
+ * password must be set via:
+ *   - Payload admin UI (first login flow)
+ *   - npm run db:seed-sso (uses Payload Local API to hash properly)
+ *   - POST /api/users/login with correct credentials
+ */
+async function bootstrapSeed(pool) {
+  const accounts = [
+    {
+      label: 'Admin',
+      email: process.env.BOOTSTRAP_ADMIN_EMAIL || '',
+      password: process.env.BOOTSTRAP_ADMIN_PASSWORD || '',
+    },
+    {
+      label: 'SSO Service',
+      email: process.env.SSO_SERVICE_EMAIL || '',
+      password: process.env.SSO_SERVICE_PASSWORD || '',
+    },
+  ];
+
+  console.log('[db-setup] Bootstrap: checking essential accounts...');
+
+  for (const account of accounts) {
+    if (!account.email || !account.password) {
+      console.log(`[db-setup]   ⏭  ${account.label}: SKIPPED (env var not set)`);
+      continue;
+    }
+
+    try {
+      // Check if user exists
+      const existing = await pool.query(
+        'SELECT id, email FROM users WHERE email = $1 LIMIT 1',
+        [account.email]
+      );
+
+      if (existing.rows.length > 0) {
+        // User exists — ensure super-admin role
+        const userId = existing.rows[0].id;
+        const rolesCheck = await pool.query(
+          "SELECT id FROM users_roles WHERE parent_id = $1 AND value = 'super-admin' LIMIT 1",
+          [userId]
+        );
+        if (rolesCheck.rows.length === 0) {
+          await pool.query(
+            `INSERT INTO users_roles ("order", parent_id, value)
+             VALUES (0, $1, 'super-admin')`,
+            [userId]
+          );
+          console.log(`[db-setup]   ⚠️  ${account.label}: EXISTS (ID: ${userId}) — added super-admin role`);
+        } else {
+          console.log(`[db-setup]   ✅ ${account.label}: EXISTS (ID: ${userId}) — OK`);
+        }
+      } else {
+        // Create user with placeholder — password will be set by Payload seed script
+        // Payload uses scrypt hash internally, raw SQL can't replicate it.
+        // The user MUST run `npm run db:seed-sso` or use admin UI to set real password.
+        const result = await pool.query(
+          `INSERT INTO users (email, first_name, last_name, updated_at, created_at)
+           VALUES ($1, $2, $3, now(), now())
+           RETURNING id`,
+          [account.email, account.label.split(' ')[0], account.label.split(' ').slice(1).join(' ') || 'PrimeWeb']
+        );
+        const newId = result.rows[0].id;
+
+        // Add super-admin role (id is serial — auto-increment)
+        await pool.query(
+          `INSERT INTO users_roles ("order", parent_id, value)
+           VALUES (0, $1, 'super-admin')`,
+          [newId]
+        );
+
+        console.log(`[db-setup]   ✅ ${account.label}: CREATED (ID: ${newId}) — run "npm run db:seed-sso" to set password`);
+      }
+    } catch (e) {
+      console.warn(`[db-setup]   ⚠️  ${account.label}: ${e.message}`);
+    }
+  }
+}
+
 async function checkDB() {
   const pool = createPool();
   if (!pool) {
@@ -959,6 +1050,7 @@ async function checkDB() {
     if (tableCount > 0) {
       await runMigrations(pool);
       await syncPayloadRelsTables(pool);
+      await bootstrapSeed(pool);
     }
 
     await pool.end();

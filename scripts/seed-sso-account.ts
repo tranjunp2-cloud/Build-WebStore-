@@ -2,86 +2,123 @@
  * Seed: Create SSO Service Account via Payload API
  *
  * Usage:
- *   npx tsx scripts/seed-sso-account.ts
+ *   npm run db:seed-sso
  *
- * Uses Payload CMS Local API (same pattern as seed.ts).
- * Creates a super-admin service account for SSO integration.
+ * Uses Payload CMS Local API — properly hashes password via scrypt.
+ * Creates/updates a super-admin service account for SSO integration.
+ *
+ * Credentials from env vars (never hardcoded):
+ *   SSO_SERVICE_EMAIL    — default: sso-service@primeweb.app
+ *   SSO_SERVICE_PASSWORD — REQUIRED (no default)
+ *
+ * Also seeds admin user if BOOTSTRAP_ADMIN_EMAIL + BOOTSTRAP_ADMIN_PASSWORD are set.
  */
 
 import { getPayload } from 'payload'
 import config from '../src/payload.config'
 
-const SSO_USER = {
-    email: 'sso-service@primeweb.app',
-    password: 'HxMQx_7GmmkzLJS8ssu2nK3D1Q1PHcfx',
-    firstName: 'SSO',
-    lastName: 'Service',
+const SSO_EMAIL = process.env.SSO_SERVICE_EMAIL || 'sso-service@primeweb.app'
+const SSO_PASSWORD = process.env.SSO_SERVICE_PASSWORD || ''
+
+const ADMIN_EMAIL = process.env.BOOTSTRAP_ADMIN_EMAIL || ''
+const ADMIN_PASSWORD = process.env.BOOTSTRAP_ADMIN_PASSWORD || ''
+
+interface AccountConfig {
+    email: string
+    password: string
+    firstName: string
+    lastName: string
+    label: string
 }
 
-async function seedSsoAccount() {
-    console.log('\n🔧 Creating SSO Service Account...')
-    console.log(`   Email: ${SSO_USER.email}\n`)
+async function ensureUser(
+    payload: Awaited<ReturnType<typeof getPayload>>,
+    account: AccountConfig,
+) {
+    if (!account.password) {
+        console.log(`  ⏭  ${account.label}: SKIPPED (password env var not set)`)
+        return
+    }
 
-    const payload = await getPayload({ config })
-
-    // Check if user already exists
     const existing = await payload.find({
         collection: 'users',
-        where: { email: { equals: SSO_USER.email } },
+        where: { email: { equals: account.email } },
         limit: 1,
+        overrideAccess: true,
     })
 
-    let userId: number
-
     if (existing.docs.length > 0) {
-        userId = existing.docs[0].id as number
-        console.log(`⚠️  User already exists (ID: ${userId}), updating...`)
+        const userId = existing.docs[0].id as number
+        console.log(`  ⚠️  ${account.label}: EXISTS (ID: ${userId}), updating...`)
 
         await payload.update({
             collection: 'users',
             id: userId,
             data: {
-                password: SSO_USER.password,
-                firstName: SSO_USER.firstName,
-                lastName: SSO_USER.lastName,
+                password: account.password,
+                firstName: account.firstName,
+                lastName: account.lastName,
                 roles: ['super-admin'],
             },
             overrideAccess: true,
         })
-        console.log('✅ Password & role updated')
+        console.log(`  ✅ ${account.label}: Password & role updated`)
     } else {
         const newUser = await payload.create({
             collection: 'users',
             data: {
-                email: SSO_USER.email,
-                password: SSO_USER.password,
-                firstName: SSO_USER.firstName,
-                lastName: SSO_USER.lastName,
+                email: account.email,
+                password: account.password,
+                firstName: account.firstName,
+                lastName: account.lastName,
                 roles: ['super-admin'],
             },
+            overrideAccess: true,
         })
-        userId = newUser.id as number
-        console.log(`✅ User created (ID: ${userId})`)
+        console.log(`  ✅ ${account.label}: CREATED (ID: ${newUser.id})`)
+    }
+}
+
+async function seedAccounts() {
+    console.log('\n' + '═'.repeat(50))
+    console.log('  SEED — Service Accounts (Payload Local API)')
+    console.log('═'.repeat(50))
+
+    const payload = await getPayload({ config })
+
+    // Admin user (optional)
+    if (ADMIN_EMAIL) {
+        console.log('\n📌 Admin user:')
+        await ensureUser(payload, {
+            email: ADMIN_EMAIL,
+            password: ADMIN_PASSWORD,
+            firstName: 'Admin',
+            lastName: 'PrimeWeb',
+            label: 'Admin',
+        })
     }
 
-    // Print credentials
-    console.log('\n' + '='.repeat(50))
-    console.log('📋 SSO Service Account Ready')
-    console.log('='.repeat(50))
-    console.log(`   ID:       ${userId}`)
-    console.log(`   Email:    ${SSO_USER.email}`)
-    console.log(`   Password: ${SSO_USER.password}`)
-    console.log(`   Role:     super-admin`)
-    console.log('')
-    console.log('   ENV for SSO:')
-    console.log(`   PRIME_WEB_V2_ADMIN_USERNAME=${SSO_USER.email}`)
-    console.log(`   PRIME_WEB_V2_ADMIN_PASSWORD=${SSO_USER.password}`)
-    console.log('='.repeat(50))
+    // SSO service account
+    console.log('\n📌 SSO service account:')
+    await ensureUser(payload, {
+        email: SSO_EMAIL,
+        password: SSO_PASSWORD,
+        firstName: 'SSO',
+        lastName: 'Service',
+        label: 'SSO Service',
+    })
+
+    console.log('\n' + '─'.repeat(50))
+    console.log('  ✅ Seed complete.')
+    if (SSO_PASSWORD) {
+        console.log(`  SSO account: ${SSO_EMAIL}`)
+    }
+    console.log('─'.repeat(50) + '\n')
 
     process.exit(0)
 }
 
-seedSsoAccount().catch((err) => {
+seedAccounts().catch((err) => {
     console.error('❌ Error:', err.message || err)
     process.exit(1)
 })
