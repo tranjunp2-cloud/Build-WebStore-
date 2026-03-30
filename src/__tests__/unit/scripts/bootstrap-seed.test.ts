@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 /**
- * Unit tests for bootstrapSeed() logic from scripts/db-setup.js
+ * Unit tests for bootstrapSeed() from scripts/bootstrap-seed.js
  *
  * TC-BOOT-01: Skip when email env var is empty
  * TC-BOOT-02: Existing user → log only, no role changes
@@ -10,51 +10,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  * TC-BOOT-05: Idempotency — running twice produces same result
  */
 
-// Extract bootstrapSeed logic as a testable function
-// (mirrors the implementation in scripts/db-setup.js)
-async function bootstrapSeed(
-    pool: { query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> },
-    env: Record<string, string>,
-) {
-    const accounts = [
-        { label: 'Admin', email: env.BOOTSTRAP_ADMIN_EMAIL || '' },
-        { label: 'SSO Service', email: env.SSO_SERVICE_EMAIL || '' },
-    ]
-
-    const results: { label: string; action: string }[] = []
-
-    for (const account of accounts) {
-        if (!account.email) {
-            results.push({ label: account.label, action: 'skipped' })
-            continue
-        }
-
-        try {
-            const existing = await pool.query(
-                'SELECT id, email FROM users WHERE email = $1 LIMIT 1',
-                [account.email],
-            )
-
-            if (existing.rows.length > 0) {
-                results.push({ label: account.label, action: 'exists' })
-            } else {
-                const result = await pool.query(
-                    'INSERT INTO users (email, first_name, last_name, updated_at, created_at) VALUES ($1, $2, $3, now(), now()) RETURNING id',
-                    [account.email, account.label.split(' ')[0], account.label.split(' ').slice(1).join(' ') || 'PrimeWeb'],
-                )
-                const newId = result.rows[0].id
-                await pool.query(
-                    'INSERT INTO users_roles ("order", parent_id, value) VALUES (0, $1, \'super-admin\')',
-                    [newId],
-                )
-                results.push({ label: account.label, action: 'created' })
-            }
-        } catch {
-            results.push({ label: account.label, action: 'error' })
-        }
-    }
-
-    return results
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { bootstrapSeed } = require('../../../../scripts/bootstrap-seed') as {
+    bootstrapSeed: (
+        pool: { query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> },
+        env: Record<string, string>,
+    ) => Promise<{ label: string; action: string }[]>
 }
 
 describe('bootstrapSeed()', () => {

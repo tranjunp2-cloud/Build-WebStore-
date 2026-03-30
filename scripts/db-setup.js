@@ -17,6 +17,7 @@
  * the container during schema push.
  */
 const { spawn } = require('child_process');
+const { bootstrapSeed } = require('./bootstrap-seed');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -960,59 +961,18 @@ async function syncPayloadRelsTables(pool) {
  * If user already exists, only logs a message — no role changes.
  * To change roles of existing users, use admin UI or Payload API.
  */
-async function bootstrapSeed(pool) {
-  const accounts = [
-    {
-      label: 'Admin',
-      email: process.env.BOOTSTRAP_ADMIN_EMAIL || '',
-    },
-    {
-      label: 'SSO Service',
-      email: process.env.SSO_SERVICE_EMAIL || '',
-    },
-  ];
-
+async function runBootstrapSeed(pool) {
   console.log('[db-setup] Bootstrap: checking essential accounts...');
-
-  for (const account of accounts) {
-    if (!account.email) {
-      console.log(`[db-setup]   ⏭  ${account.label}: SKIPPED (email env var not set)`);
-      continue;
-    }
-
-    try {
-      // Check if user exists
-      const existing = await pool.query(
-        'SELECT id, email FROM users WHERE email = $1 LIMIT 1',
-        [account.email]
-      );
-
-      if (existing.rows.length > 0) {
-        // User exists — DO NOT modify roles (security: avoid privilege escalation)
-        const userId = existing.rows[0].id;
-        console.log(`[db-setup]   ✅ ${account.label}: EXISTS (ID: ${userId}) — no changes`);
-      } else {
-        // Create user placeholder (email + name + role only, NO password)
-        // Password must be set via `npm run db:seed-sso` (Payload Local API)
-        const result = await pool.query(
-          `INSERT INTO users (email, first_name, last_name, updated_at, created_at)
-           VALUES ($1, $2, $3, now(), now())
-           RETURNING id`,
-          [account.email, account.label.split(' ')[0], account.label.split(' ').slice(1).join(' ') || 'PrimeWeb']
-        );
-        const newId = result.rows[0].id;
-
-        // Add super-admin role (id is serial — auto-increment)
-        await pool.query(
-          `INSERT INTO users_roles ("order", parent_id, value)
-           VALUES (0, $1, 'super-admin')`,
-          [newId]
-        );
-
-        console.log(`[db-setup]   ✅ ${account.label}: CREATED (ID: ${newId}) — run "npm run db:seed-sso" to set password`);
-      }
-    } catch (e) {
-      console.warn(`[db-setup]   ⚠️  ${account.label}: ${e.message}`);
+  const results = await bootstrapSeed(pool, process.env);
+  for (const r of results) {
+    if (r.action === 'skipped') {
+      console.log(`[db-setup]   ⏭  ${r.label}: SKIPPED (email env var not set)`);
+    } else if (r.action === 'exists') {
+      console.log(`[db-setup]   ✅ ${r.label}: EXISTS — no changes`);
+    } else if (r.action === 'created') {
+      console.log(`[db-setup]   ✅ ${r.label}: CREATED — run "npm run db:seed-sso" to set password`);
+    } else {
+      console.warn(`[db-setup]   ⚠️  ${r.label}: error during bootstrap`);
     }
   }
 }
@@ -1036,7 +996,7 @@ async function checkDB() {
     if (tableCount > 0) {
       await runMigrations(pool);
       await syncPayloadRelsTables(pool);
-      await bootstrapSeed(pool);
+      await runBootstrapSeed(pool);
     }
 
     await pool.end();
