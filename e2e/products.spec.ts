@@ -59,26 +59,26 @@ test.describe('Products Management', () => {
         await page.goto('/products/new')
         await page.waitForLoadState('networkidle')
 
+        // Form controls MUST be visible — fail if page broken/redirected
         const nameInput = page.locator('input[name="name"]').first()
-        if (await nameInput.isVisible()) {
-            // Fill product name
-            await nameInput.fill(`E2E Test Product ${Date.now()}`)
+        await expect(nameInput).toBeVisible({ timeout: 10_000 })
 
-            // Fill price if visible
-            const priceInput = page.locator('input[name="price"]').first()
-            if (await priceInput.isVisible()) {
-                await priceInput.fill('29.90')
-            }
+        // Fill product name
+        await nameInput.fill(`E2E Test Product ${Date.now()}`)
 
-            // Submit form
-            const submitBtn = page.locator('button[type="submit"], button:has-text("Save"), button:has-text("Create")').first()
-            if (await submitBtn.isVisible()) {
-                await submitBtn.click()
-                // Wait for success toast or redirect
-                await page.waitForTimeout(3000)
-                // Should not show error
-                await expect(page.locator('text=Internal Server Error')).not.toBeVisible()
-            }
+        // Fill price
+        const priceInput = page.locator('input[name="price"]').first()
+        if (await priceInput.isVisible()) {
+            await priceInput.fill('29.90')
         }
+
+        // Submit form
+        const submitBtn = page.locator('button[type="submit"], button:has-text("Save"), button:has-text("Create")').first()
+        await expect(submitBtn).toBeVisible()
+        await submitBtn.click()
+
+        // Wait and verify no server error
+        await page.waitForTimeout(3000)
+        await expect(page.locator('text=Internal Server Error')).not.toBeVisible()
     })
 })

@@ -12,8 +12,11 @@ const AUTH_FILE = './e2e/.auth/user.json'
  * TC-F02.33: Auth middleware redirect
  */
 setup('authenticate', async ({ page }) => {
-    const email = process.env.TEST_EMAIL || 'phuong.ltweb@gmail.com'
-    const password = process.env.TEST_PASSWORD || 'Aa123456@'
+    const email = process.env.TEST_EMAIL
+    const password = process.env.TEST_PASSWORD
+    if (!email || !password) {
+        throw new Error('E2E auth requires TEST_EMAIL and TEST_PASSWORD env vars. Set them in .env.local or CI secrets.')
+    }
 
     // Navigate to login
     await page.goto('/login')
