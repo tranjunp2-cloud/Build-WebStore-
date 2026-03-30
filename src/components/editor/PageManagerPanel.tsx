@@ -134,12 +134,13 @@ export function PageManagerPanel({
         updatePageInState(page.id, { isVisible: newVisible })
 
         try {
-            await fetch(`/api/sites/${siteId}/pages/${page.id}`, {
+            const res = await fetch(`/api/sites/${siteId}/pages/${page.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ isVisible: newVisible }),
             })
+            if (!res.ok) throw new Error('Failed to update page')
 
             onPagesChanged?.()
 
@@ -161,12 +162,13 @@ export function PageManagerPanel({
         setDeleteTarget(null)
 
         try {
-            await fetch(`/api/sites/${siteId}/pages/${page.id}`, {
+            const res = await fetch(`/api/sites/${siteId}/pages/${page.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ deletedAt: now }),
             })
+            if (!res.ok) throw new Error('Failed to delete page')
 
             onPagesChanged?.()
         } catch {
@@ -184,12 +186,13 @@ export function PageManagerPanel({
                     setPendingPageId(null)
 
                     try {
-                        await fetch(`/api/sites/${siteId}/pages/${page.id}`, {
+                        const res = await fetch(`/api/sites/${siteId}/pages/${page.id}`, {
                             method: 'PATCH',
                             headers: { 'Content-type': 'application/json' },
                             credentials: 'include',
                             body: JSON.stringify({ deletedAt: null }),
                         })
+                        if (!res.ok) throw new Error('Failed to undo deletion')
 
                         onPagesChanged?.()
                     } catch {
