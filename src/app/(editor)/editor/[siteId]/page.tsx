@@ -57,7 +57,7 @@ type LoadedPageData = {
     slug?: string
 }
 
-import type { PageData } from '@/store/editorStore'
+import type { PageData, BlockData } from '@/store/editorStore'
 
 type SaveOptions = {
     showToast?: boolean
@@ -410,7 +410,7 @@ export default function EditorPage() {
             blockData as Record<string, unknown>
         )
         
-        const safeBlock = nextBlock || { blockType: blockData.blockType || 'hero', variant: blockData.variant || 'default' } as any
+        const safeBlock: BlockData = nextBlock || { blockType: blockData.blockType || 'hero', variant: blockData.variant || 'default' }
 
         addBlock(index - 1, safeBlock)
         setSelectedBlock(index)

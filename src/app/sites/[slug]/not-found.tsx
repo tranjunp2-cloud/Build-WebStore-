@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
+import { SiteRenderer, type SiteRendererProps, type NavPage } from '@/components/site-renderer/SiteRenderer'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,7 +87,11 @@ export default async function NotFound() {
 
     // Render exact matching 404 page from Payload
     if (page404) {
-        return <SiteRenderer site={site as any} page={page404 as any} pages={navigationPages.docs as any[]} />
+        return <SiteRenderer 
+            site={site as SiteRendererProps['site']} 
+            page={page404 as SiteRendererProps['page']} 
+            pages={navigationPages.docs as unknown as NavPage[]} 
+        />
     }
 
     // Default UI if site exists but missing 404 page in DB

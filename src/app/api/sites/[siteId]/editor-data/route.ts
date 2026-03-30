@@ -122,9 +122,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
 
     } catch (error) {
         console.error('[Editor Data Error]', error)
-        const message = error instanceof Error ? error.message : 'Unknown error'
         return NextResponse.json(
-            { error: 'Failed to load editor data', details: message },
+            { error: 'Failed to load editor data' },
             { status: 500 },
         )
     }

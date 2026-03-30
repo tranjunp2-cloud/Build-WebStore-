@@ -11,7 +11,7 @@ import { mergeContactInfoWithSite, mergeFooterSocialsWithSite, mergeSocialWidget
 let _category = 'business'
 export function setSectionCategory(cat: string) { _category = cat }
 
-export type SocialLink = { platform?: string; url?: string; enabled?: boolean; [key: string]: unknown }
+export type SocialLink = { platform: string; url: string; enabled?: boolean; [key: string]: unknown }
 export type RenderSocialWidgetBlock = Record<string, unknown> & { links?: SocialLink[]; variant?: string; headline?: string }
 
 export type SiteSocialLinks = {
@@ -24,14 +24,24 @@ export type SiteSocialLinks = {
     [key: string]: unknown
 }
 
+export type FeatureItem = { title: string; description?: string; icon?: string }
+export type TestimonialItem = { name: string; quote: string; rating?: number; title?: string; avatar?: string }
+export type StatItem = { label: string; value: string }
+export type PricingPlan = { name: string; price: string; description?: string; features?: (string | { text: string })[]; isPopular?: boolean; ctaUrl?: string; ctaLabel?: string }
+export type FaqItem = { question: string; answer: string }
+export type MemberItem = { name: string; role?: string; image?: string }
+export type FormField = { label: string; fieldType?: string; placeholder?: string }
+export type FooterLink = { label: string; url: string }
+export type FooterColumn = { title: string; links?: FooterLink[] }
+
 export type RenderBlock = {
     blockType?: string
-    features?: { title: string; description: string; icon?: string }[]
-    testimonials?: { author: string; content: string; image?: string; title?: string }[]
-    stats?: { label: string; value: string }[]
-    plans?: { name: string; price: string; features?: string[]; buttonText?: string }[]
-    faqs?: { question: string; answer: string }[]
-    members?: { name: string; role: string; image?: string }[]
+    features?: FeatureItem[]
+    testimonials?: TestimonialItem[]
+    stats?: StatItem[]
+    plans?: PricingPlan[]
+    faqs?: FaqItem[]
+    members?: MemberItem[]
     variant?: string
     label?: string
     showLabel?: boolean
@@ -40,11 +50,11 @@ export type RenderBlock = {
     email?: string
     phone?: string
     address?: string
-    formFields?: { type: string; label: string; placeholder?: string }[]
-    columns?: { title: string; links?: { label: string; url: string }[] }[]
+    formFields?: FormField[]
+    columns?: FooterColumn[]
     tagline?: string
     copyrightText?: string
-    socials?: { platform: string; url: string; enabled?: boolean }[]
+    socials?: SocialLink[]
     [key: string]: unknown
 }
 
@@ -129,9 +139,11 @@ function renderSocialWidget(b: RenderSocialWidgetBlock, t: TemplateTheme, site?:
     <div class="${isFloating ? '' : 'container'}" style="${isFloating ? 'display:flex;flex-direction:column;align-items:flex-end;gap:12px;' : ''}">
       ${normalizedBlock.headline ? `<p style="font-size:14px;color:${t.muted};font-weight:600;">${normalizedBlock.headline}</p>` : ''}
       <div style="display:flex;${isFloating ? 'flex-direction:column;' : 'flex-wrap:wrap;'}gap:12px;">
-        ${links.map((item: any) => {
-          const meta = platformMeta[item.platform] || { label: item.platform || 'Social', mark: '•', accent: t.primary }
-          return `<a href="${normalizeUrl(item.platform, item.url)}" target="_blank" rel="noreferrer" aria-label="${meta.label}"
+        ${links.map((item: SocialLink) => {
+          const platform = item.platform || 'social'
+          const url = item.url || '#'
+          const meta = platformMeta[platform] || { label: platform, mark: '•', accent: t.primary }
+          return `<a href="${normalizeUrl(platform, url)}" target="_blank" rel="noreferrer" aria-label="${meta.label}"
             style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;border:1px solid ${meta.accent}33;background:linear-gradient(135deg, ${meta.accent}22, ${t.primary}15);box-shadow:0 14px 32px rgba(15,23,42,0.16);">
             <span style="display:inline-flex;width:36px;height:36px;border-radius:999px;align-items:center;justify-content:center;background:rgba(255,255,255,.92);color:${meta.accent};font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;border:1px solid ${meta.accent}22;">${meta.mark}</span>
             ${isFloating ? '' : `<span style="font-size:14px;font-weight:600;color:${t.text};">${meta.label}</span>`}
@@ -171,7 +183,7 @@ function renderFeatures(b: RenderBlock, t: TemplateTheme) {
         <p class="section-subtitle fade-up fade-up-d2" style="margin:0 auto;">${b.subheadline || ''}</p>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;">
-        ${items.map((f: any, i: number) => `
+        ${items.map((f: FeatureItem, i: number) => `
           <div class="fade-up fade-up-d${Math.min(i + 1, 4)} card-hover" style="padding:36px 28px;background:${cardBg};border:1px solid ${cardBorder};border-radius:16px;position:relative;overflow:hidden;">
             <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,${t.primary},${t.secondary});opacity:0;transition:opacity .3s;"></div>
             <div style="width:52px;height:52px;border-radius:14px;background:${t.primary}15;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:20px;">${f.icon || '✦'}</div>
@@ -208,7 +220,7 @@ function renderTestimonials(b: RenderBlock, t: TemplateTheme) {
         <h2 class="section-title fade-up">${b.headline || ''}</h2>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;">
-        ${items.map((t2: any, i: number) => {
+        ${items.map((t2: TestimonialItem, i: number) => {
     const avatar = getTeamAvatar(_category, i)
     return `
           <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="padding:32px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:16px;">
@@ -234,7 +246,7 @@ function renderStats(b: RenderBlock, t: TemplateTheme) {
     <div class="container">
       ${b.headline ? `<h2 style="text-align:center;font-size:24px;font-weight:700;margin-bottom:40px;" class="fade-up">${b.headline}</h2>` : ''}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:24px;text-align:center;">
-        ${items.map((s: any, i: number) => `
+        ${items.map((s: StatItem, i: number) => `
           <div class="fade-up fade-up-d${Math.min(i + 1, 4)}" style="animation:countUp .6s ease both;animation-delay:${i * .15}s;">
             <div style="font-size:clamp(28px,4vw,40px);font-weight:800;color:${t.primary};margin-bottom:4px;">${s.value}</div>
             <div style="font-size:13px;color:${t.muted};font-weight:500;">${s.label}</div>
@@ -254,14 +266,14 @@ function renderPricing(b: RenderBlock, t: TemplateTheme) {
         <p class="section-subtitle fade-up fade-up-d1" style="margin:0 auto;">${b.subheadline || ''}</p>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;max-width:900px;margin:0 auto;">
-        ${plans.map((p: any, i: number) => `
+        ${plans.map((p: PricingPlan, i: number) => `
           <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="padding:36px 28px;border-radius:20px;border:${p.isPopular ? `2px solid ${t.primary}` : `1px solid ${t.text}10`};background:${p.isPopular ? `${t.primary}08` : `${t.text}03`};position:relative;${p.isPopular ? `box-shadow:0 20px 40px ${t.primary}15;transform:scale(1.03);` : ''}">
             ${p.isPopular ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 16px;background:${t.primary};color:#fff;border-radius:100px;font-size:11px;font-weight:700;">POPULAR</div>` : ''}
             <h3 style="font-size:18px;font-weight:700;margin-bottom:4px;">${p.name}</h3>
             <p style="font-size:13px;color:${t.muted};margin-bottom:16px;">${p.description || ''}</p>
             <div style="font-size:32px;font-weight:800;color:${t.primary};margin-bottom:24px;">${p.price}</div>
             <ul style="list-style:none;margin-bottom:28px;">
-              ${(p.features || []).map((f: any) => `<li style="padding:8px 0;font-size:14px;color:${t.muted};border-bottom:1px solid ${t.text}06;display:flex;align-items:center;gap:8px;"><span style="color:${t.primary};">✓</span> ${f.text || f}</li>`).join('')}
+              ${(p.features || []).map((f: string | { text: string }) => `<li style="padding:8px 0;font-size:14px;color:${t.muted};border-bottom:1px solid ${t.text}06;display:flex;align-items:center;gap:8px;"><span style="color:${t.primary};">✓</span> ${typeof f === 'string' ? f : (f.text || '')}</li>`).join('')}
             </ul>
             <a href="${p.ctaUrl || '#'}" class="${p.isPopular ? 'btn-primary' : 'btn-outline'}" style="display:block;text-align:center;width:100%;">${p.ctaLabel || 'Choose Plan'}</a>
           </div>
@@ -276,7 +288,7 @@ function renderFaq(b: RenderBlock, t: TemplateTheme) {
   return `<section class="section">
     <div class="container" style="max-width:700px;">
       <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
-      ${items.map((f: any, i: number) => `
+      ${items.map((f: FaqItem, i: number) => `
         <div class="fade-up fade-up-d${Math.min(i + 1, 3)}" style="border-bottom:1px solid ${t.text}10;padding:24px 0;">
           <h3 style="font-size:16px;font-weight:600;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">${f.question} <span style="color:${t.primary};font-size:20px;">+</span></h3>
           <p style="font-size:14px;color:${t.muted};line-height:1.7;">${f.answer}</p>
@@ -309,7 +321,7 @@ function renderTeam(b: RenderBlock, t: TemplateTheme) {
     <div class="container">
       <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px;max-width:800px;margin:0 auto;">
-        ${members.map((m: any, i: number) => {
+        ${members.map((m: MemberItem, i: number) => {
     const avatar = getTeamAvatar(_category, i)
     return `
           <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="text-align:center;padding:32px 20px;background:${t.text}04;border-radius:16px;border:1px solid ${t.text}06;">
@@ -359,10 +371,10 @@ function renderContact(b: RenderBlock, t: TemplateTheme, site?: SiteSocialLinks)
         </div>
       </div>
       <div class="fade-up fade-up-d2" style="padding:32px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:20px;">
-        ${(mergedBlock.formFields || []).map((f: any) => `
+        ${(mergedBlock.formFields || []).map((f: FormField) => `
           <div style="margin-bottom:16px;">
             <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">${f.label}</label>
-            ${f.fieldType === 'textarea'
+            ${(f as any).fieldType === 'textarea'
         ? `<textarea placeholder="${f.placeholder || ''}" style="width:100%;padding:12px;border:1px solid ${t.text}12;border-radius:10px;background:transparent;color:${t.text};font-size:14px;resize:vertical;min-height:80px;font-family:inherit;"></textarea>`
         : `<input type="${f.fieldType || 'text'}" placeholder="${f.placeholder || ''}" style="width:100%;padding:12px;border:1px solid ${t.text}12;border-radius:10px;background:transparent;color:${t.text};font-size:14px;" />`
       }
@@ -383,12 +395,12 @@ function renderFooter(b: RenderBlock, t: TemplateTheme, site?: SiteSocialLinks) 
         <div>
           <div style="font-family:'${t.fontHeading}',serif;font-size:22px;font-weight:700;margin-bottom:12px;color:${t.primary};">${mergedBlock.logoText || ''}</div>
           <p style="font-size:14px;color:${t.muted};max-width:280px;line-height:1.7;">${mergedBlock.tagline || ''}</p>
-          ${mergedBlock.socials && mergedBlock.socials.length > 0 ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">${mergedBlock.socials.map((social: any) => `<a href="${sanitizeUrl(social.url)}" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:${t.primary}10;border:1px solid ${t.primary}15;color:${t.primary};font-size:12px;font-weight:800;text-transform:uppercase;">${(social.platform || '•').slice(0,2)}</a>`).join('')}</div>` : ''}
+          ${mergedBlock.socials && mergedBlock.socials.length > 0 ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">${mergedBlock.socials.map((social: SocialLink) => `<a href="${sanitizeUrl(social.url)}" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:${t.primary}10;border:1px solid ${t.primary}15;color:${t.primary};font-size:12px;font-weight:800;text-transform:uppercase;">${(social.platform || '•').slice(0,2)}</a>`).join('')}</div>` : ''}
         </div>
-        ${cols.map((c: any) => `
+        ${cols.map((c: FooterColumn) => `
           <div>
             <h4 style="font-size:14px;font-weight:700;margin-bottom:16px;">${c.title}</h4>
-            ${(c.links || []).map((l: any) => `<div style="margin-bottom:10px;"><a href="${sanitizeUrl(l.url)}" style="font-size:13px;color:${t.muted};transition:color .2s;">${l.label}</a></div>`).join('')}
+            ${(c.links || []).map((l: FooterLink) => `<div style="margin-bottom:10px;"><a href="${sanitizeUrl(l.url)}" style="font-size:13px;color:${t.muted};transition:color .2s;">${l.label}</a></div>`).join('')}
           </div>
         `).join('')}
       </div>

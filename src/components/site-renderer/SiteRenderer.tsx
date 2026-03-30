@@ -5,11 +5,11 @@ import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
-type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
+export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
 
-type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null };
+export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null };
 
-type SiteRendererProps = {
+export type SiteRendererProps = {
     site: {
         theme?: {
             primaryColor?: string

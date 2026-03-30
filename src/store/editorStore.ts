@@ -8,7 +8,7 @@ import { create } from 'zustand'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
-type BlockData = { blockType: string;[key: string]: unknown }
+export type BlockData = { blockType: string;[key: string]: unknown }
 
 export type UndoActionSource = 'ai_chat' | 'inline_edit' | 'manual' | 'theme_change'
 
