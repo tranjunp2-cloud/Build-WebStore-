@@ -33,11 +33,17 @@ export async function getCurrentUser() {
         // Fallback: decode custom JWT (from verify-otp endpoint)
         // The verify-otp creates a jose-signed JWT with {id, email, collection, mfa_verified}
         // which payload.auth() cannot verify — so we decode it manually
+        const payloadSecret = process.env.PAYLOAD_SECRET
+        if (!payloadSecret) {
+            console.error('getCurrentUser: PAYLOAD_SECRET is not defined. Cannot decode custom JWT.')
+            return null
+        }
+
         const { jwtVerify } = await import('jose')
-        const secret = new TextEncoder().encode(process.env.PAYLOAD_SECRET || '')
+        const secret = new TextEncoder().encode(payloadSecret)
         const { payload: decoded } = await jwtVerify(token, secret)
 
-        if (decoded.id && decoded.collection === 'users') {
+        if (decoded.id && decoded.collection === 'users' && decoded.mfa_verified === true) {
             const user = await payload.findByID({
                 collection: 'users',
                 id: decoded.id as string,

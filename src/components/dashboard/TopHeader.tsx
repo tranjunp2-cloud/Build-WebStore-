@@ -9,11 +9,12 @@ import { UserAvatarMenu } from './UserAvatarMenu'
 type TopHeaderProps = {
     userName: string
     userInitial: string
+    userEmail: string
     sidebarOpen: boolean
     setSidebarOpen: (open: boolean) => void
 }
 
-export function TopHeader({ userName, userInitial, sidebarOpen, setSidebarOpen }: TopHeaderProps) {
+export function TopHeader({ userName, userInitial, userEmail, sidebarOpen, setSidebarOpen }: TopHeaderProps) {
     return (
         <header className="fixed top-0 left-0 w-full h-[56px] bg-[#1E293B] border-b border-white/[0.08] z-50 flex items-center justify-between px-4 md:px-6">
             <div className="flex items-center gap-2 md:gap-4">
@@ -43,7 +44,7 @@ export function TopHeader({ userName, userInitial, sidebarOpen, setSidebarOpen }
             <div className="flex items-center gap-2 md:gap-4">
 
                 <NotificationBell />
-                <UserAvatarMenu userName={userName} userInitial={userInitial} />
+                <UserAvatarMenu userName={userName} userInitial={userInitial} userEmail={userEmail} />
             </div>
         </header>
     )
