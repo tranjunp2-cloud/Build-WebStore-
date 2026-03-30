@@ -67,7 +67,7 @@ export const POST = withAuth(async (user, request) => {
     } catch (error: any) {
         console.error('[Product AI Description Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Description generation failed' } },
             { status: 500 }
         )
     }

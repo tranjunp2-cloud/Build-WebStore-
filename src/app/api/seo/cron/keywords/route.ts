@@ -76,6 +76,6 @@ export async function GET(request: Request) {
         })
     } catch (error: any) {
         console.error('[SEO Cron Error]', error)
-        return NextResponse.json({ success: false, error: { message: error.message } }, { status: 500 })
+        return NextResponse.json({ success: false, error: { message: 'Keyword cron failed' } }, { status: 500 })
     }
 }

@@ -363,7 +363,7 @@ export async function POST(req: NextRequest) {
     } catch (error: any) {
         console.error('[AI Generate Site Error]', error)
         return NextResponse.json(
-            { error: error?.message || 'Internal server error' },
+            { error: 'Failed to generate website. Please try again.' },
             { status: 500 },
         )
     }
