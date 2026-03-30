@@ -2,7 +2,7 @@ name: Codex PR Review
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review]
   issue_comment:
     types: [created]
 
@@ -12,8 +12,8 @@ concurrency:
 
 jobs:
   codex-review:
-    # Auto-run khi PR mở/ready (không phải draft)
-    # Manual-run khi comment @codex review
+    # Bỏ qua Draft PR và Bot PRs
+    # Manual trigger qua @codex review comment
     if: |
       (
         github.event_name == 'pull_request' &&
@@ -31,6 +31,7 @@ jobs:
       pull-requests: write
     outputs:
       final_message: ${{ steps.run_codex.outputs['final-message'] }}
+      review_mode: ${{ steps.gen_diff.outputs.review_mode }}
 
     steps:
       - uses: actions/checkout@v4
@@ -39,13 +40,32 @@ jobs:
           fetch-depth: 0
 
       - name: Generate PR diff
+        id: gen_diff
         run: |
-          git diff origin/${{ github.event.pull_request.base.ref || 'staging' }}...HEAD -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
+          EVENT="${{ github.event_name }}"
+          ACTION="${{ github.event.action }}"
+
+          if [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "synchronize" ]; then
+            # Incremental: chỉ review commits MỚI (để verify fix, phát hiện bug mới)
+            BEFORE="${{ github.event.before }}"
+            AFTER="${{ github.event.after }}"
+            echo "📦 Incremental review: $BEFORE → $AFTER"
+            git diff "${BEFORE}...${AFTER}" -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
+            echo "review_mode=incremental" >> $GITHUB_OUTPUT
+          else
+            # Full review: toàn bộ thay đổi trong PR
+            BASE="${{ github.event.pull_request.base.ref || 'staging' }}"
+            echo "🔍 Full review: origin/$BASE → HEAD"
+            git diff "origin/${BASE}...HEAD" -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
+            echo "review_mode=full" >> $GITHUB_OUTPUT
+          fi
+
           echo "Diff size: $(wc -l < pr-diff.txt) lines"
           head -20 pr-diff.txt
 
-      - name: Run Codex Review
-        id: run_codex
+      - name: Run Codex Review (Full — lần đầu, review toàn bộ PR)
+        id: run_codex_full
+        if: steps.gen_diff.outputs.review_mode == 'full'
         uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
@@ -53,6 +73,28 @@ jobs:
           output-file: codex-output.md
           safety-strategy: drop-sudo
           sandbox: workspace-write
+
+      - name: Run Codex Review (Incremental — verify fix + check code mới)
+        id: run_codex_incremental
+        if: steps.gen_diff.outputs.review_mode == 'incremental'
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/review-incremental.md
+          output-file: codex-output.md
+          safety-strategy: drop-sudo
+          sandbox: workspace-write
+
+      - name: Merge outputs
+        id: run_codex
+        run: |
+          MODE="${{ steps.gen_diff.outputs.review_mode }}"
+          if [ "$MODE" = "full" ]; then
+            MSG="${{ steps.run_codex_full.outputs['final-message'] }}"
+          else
+            MSG="${{ steps.run_codex_incremental.outputs['final-message'] }}"
+          fi
+          echo "final-message=$MSG" >> $GITHUB_OUTPUT
 
   post-review:
     runs-on: ubuntu-latest
@@ -68,6 +110,8 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const raw = process.env.CODEX_FINAL_MESSAGE || '';
+            const reviewMode = process.env.REVIEW_MODE || 'full';
+            const isIncremental = reviewMode === 'incremental';
             const prNumber = context.payload.pull_request?.number || context.payload.issue?.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
@@ -87,15 +131,19 @@ jobs:
               console.log('JSON parse failed:', e.message);
             }
 
-            // No issues
+            const modeIcon = isIncremental ? '🔄' : '🔍';
+            const modeLabel = isIncremental ? 'Incremental Review' : 'Full Review';
+
+            // No issues — pass!
             if (issues.length === 0) {
               if (raw.trim() && !raw.includes('"issues":[]')) {
                 await github.rest.issues.createComment({
                   owner, repo,
                   issue_number: prNumber,
-                  body: `### 🤖 Codex Review\n\n${raw}\n\n---\n_Powered by OpenAI Codex API_`,
+                  body: `### 🤖 Codex ${modeIcon} ${modeLabel}\n\n${raw}\n\n---\n_Powered by OpenAI Codex API_`,
                 });
               } else {
+                // Clean pass — react with 👍
                 await github.rest.reactions.createForIssue({
                   owner, repo,
                   issue_number: prNumber,
@@ -124,7 +172,11 @@ jobs:
               });
             }
 
-            const reviewBody = `### 💡 Codex Review\n\nFound **${issues.length}** issue(s).\n\n**Reviewed commit:** \`${commitId.substring(0, 10)}\`\n\n> Tip: Fix tất cả issues, sau đó comment \`@codex review\` để verify lại.`;
+            const tip = isIncremental
+              ? '> Còn issues — fix xong push lại để Incremental Review kiểm tra tiếp.'
+              : '> Fix tất cả issues trong 1 lần, push → Incremental Review sẽ verify các fix đó.';
+
+            const reviewBody = `### 💡 Codex ${modeIcon} ${modeLabel}\n\nFound **${issues.length}** issue(s).\n\n**Reviewed commit:** \`${commitId.substring(0, 10)}\`\n\n${tip}`;
 
             // Try inline review first
             if (comments.length > 0) {
@@ -156,3 +208,4 @@ jobs:
             });
         env:
           CODEX_FINAL_MESSAGE: ${{ needs.codex-review.outputs.final_message }}
+          REVIEW_MODE: ${{ needs.codex-review.outputs.review_mode }}
