@@ -822,6 +822,15 @@ const MIGRATIONS = [
     name: 'users.otp_attempts',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_attempts numeric DEFAULT 0;`,
   },
+  // ── Users: Onboarding fields ──
+  {
+    name: 'users.has_seen_ai_wizard',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS has_seen_ai_wizard boolean DEFAULT false;`,
+  },
+  {
+    name: 'users.has_seen_ai_wizard.backfill_legacy',
+    sql: `UPDATE users SET has_seen_ai_wizard = true WHERE id IN (SELECT _parent_id::varchar FROM users_tenants WHERE _parent_id IS NOT NULL);`,
+  },
   // ── Payload locked documents rels: FK columns for new collections ──
   {
     name: 'payload_locked_documents_rels.blogs_id',
