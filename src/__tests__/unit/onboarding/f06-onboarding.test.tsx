@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import type { ComponentProps, ReactNode } from 'react'
 import '@testing-library/jest-dom'
 
 // ── Mocks ─────────────────────────────────────────────────────────────
@@ -11,15 +12,15 @@ vi.mock('next/navigation', () => ({
 
 // Mock Next.js Image to prevent warnings/errors during testing
 vi.mock('next/image', () => ({
-    default: (props: any) => {
-        // eslint-disable-next-line @next/next/no-img-element
+    default: (props: ComponentProps<'img'>) => {
+        // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
         return <img {...props} />
     }
 }))
 
 // Mock next/link
 vi.mock('next/link', () => ({
-    default: ({ href, children, ...rest }: any) => {
+    default: ({ href, children, ...rest }: { href: string; children?: ReactNode } & ComponentProps<'a'>) => {
         return (
             <a href={href} {...rest}>
                 {children}

@@ -811,7 +811,7 @@ const MIGRATIONS = [
   // ── Users: Onboarding fields ──
   {
     name: 'users.has_seen_ai_wizard',
-    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS has_seen_ai_wizard varchar;`,
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS has_seen_ai_wizard boolean DEFAULT false;`,
   },
   // ── Payload locked documents rels: FK columns for new collections ──
   {
