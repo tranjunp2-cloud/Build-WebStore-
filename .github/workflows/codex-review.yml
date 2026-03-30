@@ -81,13 +81,12 @@ jobs:
             if [ "$DIFF_LINES" -gt "$MAX_DIFF_LINES" ]; then
               printf '\n---\n## Nội dung diff cần review (%s lines — hiển thị %s dòng đầu, phần còn lại bị cắt)\n\n```diff\n' "$DIFF_LINES" "$MAX_DIFF_LINES" >> "$out"
               head -"$MAX_DIFF_LINES" pr-diff.txt >> "$out"
-              printf '```\n\n⚠️ Diff bị cắt do vượt %s dòng. Review tập trung vào phần đã hiển thị.\n' "$MAX_DIFF_LINES" >> "$out"
+              printf '```\n\n⚠️ Diff chỉ hiển thị một phần (%s/%s dòng). KHÔNG dùng tool đọc thêm file — chỉ review phần đã hiển thị.\n' "$MAX_DIFF_LINES" "$DIFF_LINES" >> "$out"
             else
               printf '\n---\n## Nội dung diff cần review (%s lines — đầy đủ)\n\n```diff\n' "$DIFF_LINES" >> "$out"
               cat pr-diff.txt >> "$out"
-              printf '```\n' >> "$out"
+              printf '```\n\nDiff đầy đủ. KHÔNG dùng tool đọc thêm file nào khác.\n' >> "$out"
             fi
-            printf '\nQUAN TRỌNG: Diff đã có đầy đủ ở trên. KHÔNG dùng tool đọc thêm file nào khác.\n' >> "$out"
           }
 
           build_runtime_prompt .github/codex/prompts/review.md .github/codex/prompts/review-runtime.md
