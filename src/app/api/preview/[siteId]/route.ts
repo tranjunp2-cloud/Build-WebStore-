@@ -417,7 +417,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
 }
 
 
-export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_user, req, ctx) => {
+export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user, req, ctx) => {
   try {
     const { siteId } = await ctx.params
     const payload = await getPayload({ config })
@@ -425,10 +425,19 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
     const pageId = new URL(req.url).searchParams.get('pageId')
 
     // Fetch site info
-    const site: any = await payload.findByID({ collection: 'sites', id: numericSiteId })
+    const site = await payload.findByID({ collection: 'sites', id: numericSiteId })
     if (!site) return new NextResponse('Not found', { status: 404 })
 
-    let page: any = null
+    const tenantIds = user.tenants?.map((t: any) =>
+      typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+    ) ?? []
+
+    const siteTenantId = typeof site.tenant === 'object' ? String(site.tenant.id) : String(site.tenant)
+    if (!tenantIds.includes(siteTenantId)) {
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+
+    let page: NonNullable<Awaited<ReturnType<typeof payload.findByID>>> | null = null
 
     if (pageId) {
       const requestedPage = await payload.findByID({
@@ -488,13 +497,13 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
 
     const normalizedHeader = finalHeader?.blockType === 'navigation'
       ? {
-        ...mergeNavigationBrandingWithSite(finalHeader, site),
-        links: filterNavigationLinksByVisibility(finalHeader.links, visiblePagesResult.docs),
+        ...mergeNavigationBrandingWithSite(finalHeader, site as Parameters<typeof mergeNavigationBrandingWithSite>[1]),
+        links: filterNavigationLinksByVisibility(finalHeader.links, visiblePagesResult.docs as any),
       }
       : finalHeader
 
     const normalizedFooter = finalFooter?.blockType === 'footer'
-      ? mergeFooterSocialsWithSite(finalFooter, site)
+      ? mergeFooterSocialsWithSite(finalFooter, site as Parameters<typeof mergeFooterSocialsWithSite>[1])
       : finalFooter
 
     if (normalizedHeader) combinedBlocks.unshift(normalizedHeader)

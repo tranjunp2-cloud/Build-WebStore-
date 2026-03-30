@@ -81,8 +81,19 @@ export async function PATCH(
         const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
         const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
 
-        // Update site-level fields if provided
-        const siteUpdateData: any = {}
+        type SiteUpdateData = Partial<{
+            theme: unknown;
+            name: unknown;
+            locale: "en" | "ms";
+            shippingConfig: unknown;
+            headerBlock: unknown;
+            footerBlock: unknown;
+            contactInfo: unknown;
+            socialLinks: unknown;
+            branding: unknown;
+            seo: unknown;
+        }>;
+        const siteUpdateData: SiteUpdateData = {}
         if (theme) siteUpdateData.theme = theme
         if (siteName) siteUpdateData.name = siteName
         if (locale) siteUpdateData.locale = locale

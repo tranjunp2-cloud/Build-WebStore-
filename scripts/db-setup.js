@@ -815,7 +815,8 @@ const MIGRATIONS = [
       _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       platform varchar,
-      url varchar
+      url varchar,
+      enabled boolean DEFAULT true
     );`,
   },
   // ── Pages: Fields required for Soft Delete & Visibility ──
