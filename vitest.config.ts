@@ -32,6 +32,10 @@ export default defineConfig({
                 'src/app/sites/**/page.tsx',
                 // Test pages
                 'src/app/test-blocks/**/page.tsx',
+                // Dashboard pages — 'use client' UI composition with heavy deps
+                // Business logic tested via API route + lib tests
+                // UI interactions tested via E2E (Playwright)
+                'src/app/(dashboard)/**/page.tsx',
                 // Block render components — pure JSX, tested via visual regression
                 'src/blocks/*/index.tsx',
                 // Block shared visual components — no business logic
@@ -80,10 +84,10 @@ export default defineConfig({
                 // Current baseline (2026-03-28): lines 18.9, branches 66.5, functions 41.7, statements 18.9
                 // CI fails if coverage drops below these minimums
                 // Target 15/04: lines 60, branches 50, functions 50, statements 60
-                lines: 45,
-                branches: 50,
-                functions: 45,
-                statements: 45,
+                lines: 55,
+                branches: 60,
+                functions: 50,
+                statements: 55,
             },
         },
     },
