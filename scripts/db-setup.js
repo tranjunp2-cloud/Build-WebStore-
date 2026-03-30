@@ -188,6 +188,12 @@ const MIGRATIONS = [
     name: 'products.weight',
     sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS weight numeric DEFAULT 0;`,
   },
+  // ── Products: Fields required by Drizzle schema ──
+  { name: 'products.has_variants', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS has_variants boolean DEFAULT false;` },
+  { name: 'products.description_b_m', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS description_b_m jsonb;` },
+  { name: 'products.dimensions_length', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_length numeric DEFAULT 0;` },
+  { name: 'products.dimensions_width', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_width numeric DEFAULT 0;` },
+  { name: 'products.dimensions_height', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_height numeric DEFAULT 0;` },
   // ── Orders: Stripe fields ──
   {
     name: 'orders.stripe_session_id',
