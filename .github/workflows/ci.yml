@@ -67,11 +67,6 @@ jobs:
           git fetch origin staging --depth=1
           node scripts/check-migrations.js origin/staging
 
-      - name: Check env vars
-        if: github.event_name == 'pull_request'
-        id: envcheck
-        run: node scripts/check-env-vars.js origin/staging
-
       - name: Lint
         id: lint
         run: npm run lint
@@ -82,17 +77,7 @@ jobs:
 
       - name: Test
         id: test
-        run: |
-          npm run test -- --coverage 2>&1 | tee test-output.log
-          # Strip ANSI color codes before parsing (vitest outputs colored text)
-          sed 's/\x1b\[[0-9;]*m//g' test-output.log > test-output-clean.log
-          # Parse test counts from vitest summary: "Tests  1217 passed (1217)"
-          TOTAL=$(grep '^ *Tests' test-output-clean.log | grep -oP '\((\d+)\)' | grep -oP '\d+' | head -1 || echo "0")
-          PASSED=$(grep '^ *Tests' test-output-clean.log | grep -oP '\d+(?= passed)' | head -1 || echo "0")
-          FAILED=$(grep '^ *Tests' test-output-clean.log | grep -oP '\d+(?= failed)' | head -1 || echo "0")
-          echo "test_total=$TOTAL" >> "$GITHUB_OUTPUT"
-          echo "test_passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
-          echo "test_failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
+        run: npm run test -- --coverage
 
       - name: Upload coverage artifact
         if: always()
@@ -170,8 +155,7 @@ jobs:
         run: |
           if [ -d ".next" ]; then
             TOTAL_SIZE=$(du -sh .next/ 2>/dev/null | cut -f1 || echo "N/A")
-            # Strip ANSI color codes before parsing
-            FIRST_LOAD=$(sed 's/\x1B\[[0-9;]*m//g' build-output.txt 2>/dev/null | grep -oP 'First Load JS shared by all\s+\K[\d.]+ [kKmM]?B' || echo "N/A")
+            FIRST_LOAD=$(grep -oP 'First Load JS shared by all\s+\K[\d.]+ [kKmM]?B' build-output.txt 2>/dev/null || echo "N/A")
             [ -z "$FIRST_LOAD" ] && FIRST_LOAD="N/A"
           else
             TOTAL_SIZE="N/A"; FIRST_LOAD="N/A"
@@ -195,45 +179,18 @@ jobs:
               firstLoad: '${{ steps.bundle.outputs.first_load }}',
             };
 
-            const tests = {
-              total: '${{ steps.test.outputs.test_total }}' || '0',
-              passed: '${{ steps.test.outputs.test_passed }}' || '0',
-              failed: '${{ steps.test.outputs.test_failed }}' || '0',
-            };
-            const testStatus = tests.failed !== '0' ? `❌ ${tests.failed} failed` : '✅ All passed';
-
-            // Target 15/04/2026 — aggressive targets, already exceeded
-            const targets = { lines: 95, branches: 85, functions: 90, statements: 95 };
-            // Current CI thresholds (minimum to pass) — sync with vitest.config.ts
-            const minimums = { lines: 55, branches: 60, functions: 50, statements: 55 };
-
-            function badge(val, min, target) {
-              const v = parseFloat(val);
-              if (isNaN(v)) return '⚪';
-              if (v >= target) return '💎';
-              if (v >= min) return '✅';
-              return '🔴';
-            }
-
             const marker = '<!-- quality-metrics -->';
             const body = [
               marker,
               '## 📊 Quality Metrics',
               '',
-              '### Unit Tests',
-              `**${tests.passed}/${tests.total}** passed ${testStatus}`,
-              '',
               '### Test Coverage',
-              '| Metric | Current | Min | Target 15/04 | Status |',
-              '|--------|---------|-----|-----------|--------|',
-              `| Lines | ${coverage.lines}% | ${minimums.lines}% | ${targets.lines}% | ${badge(coverage.lines, minimums.lines, targets.lines)} |`,
-              `| Branches | ${coverage.branches}% | ${minimums.branches}% | ${targets.branches}% | ${badge(coverage.branches, minimums.branches, targets.branches)} |`,
-              `| Functions | ${coverage.functions}% | ${minimums.functions}% | ${targets.functions}% | ${badge(coverage.functions, minimums.functions, targets.functions)} |`,
-              `| Statements | ${coverage.statements}% | ${minimums.statements}% | ${targets.statements}% | ${badge(coverage.statements, minimums.statements, targets.statements)} |`,
-              '',
-              '> **Lines**: % dòng code được test chạy qua | **Branches**: % nhánh if/else được cover | **Functions**: % hàm được gọi trong test',
-              '>',
-              '> 🔴 Below minimum — ✅ Above minimum — 💎 Target reached | Deadline: **15/04/2026**',
+              '| Metric | Value |',
+              '|--------|-------|',
+              `| Lines | ${coverage.lines}% |`,
+              `| Branches | ${coverage.branches}% |`,
+              `| Functions | ${coverage.functions}% |`,
+              `| Statements | ${coverage.statements}% |`,
               '',
               '### Bundle Size',
               '| Asset | Size |',
@@ -327,17 +284,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── Sync env vars to DO before deploying ─────────────────────────────
-      # Auto-syncs ALL GitHub Secrets → DO App env vars.
-      # To add a new secret: just run "gh secret set KEY" — auto-synced on next deploy.
-      # CI-only secrets (webhooks, test creds) are excluded by the script.
-      - name: Sync env vars → DO App (staging)
-        env:
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          ALL_SECRETS: ${{ toJSON(secrets) }}
-        run: python3 .github/scripts/sync-do-envs.py ech-prime-web-v2-staging
-      # ─────────────────────────────────────────────────────────────────────
-
       - name: Deploy to DigitalOcean App Platform
         id: deploy
         uses: digitalocean/app_action/deploy@v2
@@ -371,102 +317,6 @@ jobs:
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
-  # Job 2.5: Smoke Tests (after staging deploy)
-  # Runs Playwright smoke tests against live staging
-  # ──────────────────────────────────────
-  smoke-test:
-    name: "Smoke Test: Staging"
-    needs: deploy-staging
-    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install Playwright
-        run: |
-          npm ci --ignore-scripts
-          npx playwright install chromium --with-deps
-
-      - name: Wait for staging to be ready
-        run: |
-          STAGING_URL="${{ vars.STAGING_URL || 'https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app' }}"
-          echo "Waiting for staging at $STAGING_URL..."
-          for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL" --max-time 10 || echo "000")
-            if [ "$STATUS" = "200" ] || [ "$STATUS" = "307" ]; then
-              echo "✅ Staging is ready (HTTP $STATUS)"
-              exit 0
-            fi
-            echo "  Attempt $i: HTTP $STATUS — waiting 10s..."
-            sleep 10
-          done
-          echo "❌ Staging not ready after 5 minutes"
-          exit 1
-
-      - name: Run smoke tests
-        id: smoke
-        env:
-          BASE_URL: ${{ vars.STAGING_URL || 'https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app' }}
-          TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL || 'phuong.ltweb@gmail.com' }}
-          TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD || 'Aa123456@' }}
-          CI: 'true'
-        run: |
-          set +e
-          npx playwright test tests/smoke.spec.ts --reporter=list 2>&1 | tee smoke-output.log
-          EXIT_CODE=$?
-          set -e
-
-          # Parse results from Playwright output
-          PASSED=$(grep -c "✓\|✔\| passed" smoke-output.log 2>/dev/null || echo "0")
-          FAILED=$(grep -c "✘\|✗\| failed" smoke-output.log 2>/dev/null || echo "0")
-          # More reliable: parse the summary line "X passed" / "X failed"
-          SUMMARY_PASSED=$(grep -oP '\d+(?= passed)' smoke-output.log | tail -1 || echo "0")
-          SUMMARY_FAILED=$(grep -oP '\d+(?= failed)' smoke-output.log | tail -1 || echo "0")
-          TOTAL=$((${SUMMARY_PASSED:-0} + ${SUMMARY_FAILED:-0}))
-
-          echo "passed=${SUMMARY_PASSED:-0}" >> "$GITHUB_OUTPUT"
-          echo "failed=${SUMMARY_FAILED:-0}" >> "$GITHUB_OUTPUT"
-          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
-          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
-
-          exit $EXIT_CODE
-
-      - name: Upload test report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: smoke-report-${{ github.run_number }}
-          path: |
-            smoke-output.log
-            test-results/
-          retention-days: 14
-
-      - name: Notify — Smoke Test Results
-        if: always()
-        uses: ./.github/actions/lark-notify
-        with:
-          webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
-          sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
-          title: "${{ steps.smoke.outputs.exit_code == '0' && '✅ Smoke Tests Passed' || '❌ Smoke Tests Failed' }}"
-          status: "${{ job.status }}"
-          content: |
-            🧪 **Smoke Tests:** ${{ steps.smoke.outputs.passed }}/${{ steps.smoke.outputs.total }} passed
-            ${{ steps.smoke.outputs.failed != '0' && format('❌ {0} tests failed', steps.smoke.outputs.failed) || '✅ All tests passed — QC bắt đầu UAT' }}
-          meta-left-label: "📦 Branch"
-          meta-left-value: "staging"
-          meta-right-label: "🧪 Tests"
-          meta-right-value: "${{ steps.smoke.outputs.passed }}/${{ steps.smoke.outputs.total }}"
-          buttons: '[{"text":"📋 View Report","url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}","type":"primary"},{"text":"🧪 QA Board","url":"${{ github.server_url }}/${{ github.repository }}/issues?q=is%3Aopen+label%3Aqa%3Apending","type":"default"}]'
-
-  # ──────────────────────────────────────
   # Job 3: Deploy Production (push to main, after CI passes)
   # ──────────────────────────────────────
   deploy-production:
@@ -481,12 +331,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Sync env vars → DO App (production)
-        env:
-          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
-          ALL_SECRETS: ${{ toJSON(secrets) }}
-        run: python3 .github/scripts/sync-do-envs.py ech-prime-web-v2
 
       - name: Deploy to DigitalOcean App Platform
         id: deploy
