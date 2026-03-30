@@ -75,6 +75,17 @@ export default function EditorPage() {
                 if (res.ok) {
                     const data = await res.json()
                     if (data.site) setSite(data.site)
+                    if (data.page) {
+                        // US-F12-02: Show recovery toast if loading a draft
+                        if (data.page._status === 'draft' && data.page.updatedAt) {
+                            const date = new Date(data.page.updatedAt)
+                            const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            toast.info(`Đã khôi phục bản nháp mới nhất (Lưu lúc ${timeStr})`, {
+                                duration: 5000,
+                            })
+                        }
+                    }
+                    editorStore.init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '')
                     editorStore.init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '')
                 }
             } catch (err) {
@@ -86,11 +97,9 @@ export default function EditorPage() {
         loadData()
     }, [siteId])
 
-
     // Note: Ctrl+Z / Ctrl+Y are handled by useUndoRedo() hook above
 
-
-    // ── F-07: Auto-save (every 30s if unsaved changes) ───────────────────
+    // ── F-07: Auto-refresh preview on save
     useEffect(() => {
         if (!hasUnsavedChanges || !siteId) return
         const timer = setTimeout(() => { handleSave() }, 30000)

@@ -177,6 +177,13 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                 // Never persist error — it may contain sensitive server details
                 error: null,
             }),
+            // Clear old cached errors from localStorage (before this fix)
+            onRehydrateStorage: () => (state) => {
+                if (state?.error) {
+                    state.error = null
+                    state.status = state.status === 'error' ? 'idle' : state.status
+                }
+            },
         }
     )
 )

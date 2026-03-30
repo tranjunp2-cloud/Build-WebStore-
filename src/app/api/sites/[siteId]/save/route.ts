@@ -51,7 +51,7 @@ export async function PATCH(
         const { siteId } = await params
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
-        
+
         const { blocks, theme, locale, shippingConfig } = data!
 
         // Update site-level fields if provided
@@ -94,6 +94,7 @@ export async function PATCH(
                     collection: 'pages',
                     id: page.id,
                     data: { layout: blocks },
+                    draft: true,
                 })
             }
         }

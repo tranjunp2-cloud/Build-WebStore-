@@ -1,14 +1,14 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextResponse } from 'next/server'
-import { withAuth } from '@/lib/auth'
 import { TEMPLATE_CATEGORY_OPTIONS } from '@/collections/Templates'
 
 /**
  * GET /api/templates/categories
  * Returns template categories that actually exist in the database.
+ * Public endpoint — used by builder form to show industry options.
  */
-export const GET = withAuth(async () => {
+export async function GET() {
     try {
         const payload = await getPayload({ config })
         const result = await payload.find({
@@ -51,4 +51,4 @@ export const GET = withAuth(async () => {
             error: 'Failed to load categories',
         }, { status: 500 })
     }
-})
+}
