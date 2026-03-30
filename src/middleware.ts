@@ -129,10 +129,11 @@ export async function middleware(req: NextRequest) {
 
     if (hasToken) {
         try {
-            // Decode the JWT to check for mfa_verified flag (added in verify-otp)
-            // Using jose decodeJwt since it works on Edge Runtime
-            const { decodeJwt } = await import('jose')
-            const decoded = decodeJwt(tokenCookie)
+            // Verify JWT signature to check for mfa_verified flag (added in verify-otp)
+            // Using jose jwtVerify since it works on Edge Runtime and prevents forged tokens
+            const { jwtVerify } = await import('jose')
+            const secret = new TextEncoder().encode(process.env.PAYLOAD_SECRET || '')
+            const { payload: decoded } = await jwtVerify(tokenCookie, secret)
             if (decoded.mfa_verified === true) {
                 mfaVerified = true
             }

@@ -584,7 +584,7 @@ export const Users: CollectionConfig = {
                     status: 200,
                     headers: {
                         'Content-Type': 'application/json',
-                        'Set-Cookie': `payload-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${expSeconds}`,
+                        'Set-Cookie': `payload-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${expSeconds}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`,
                     }
                 })
             },
