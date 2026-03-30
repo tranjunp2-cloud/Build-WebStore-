@@ -3,9 +3,9 @@ import { Search, ChevronDown } from 'lucide-react'
 
 export function OrdersActionBar() {
     return (
-        <div className="flex flex-col md:flex-row items-center justify-between gap-3 w-full">
-            {/* Left Group (Figma Node 30955:250) */}
-            <div className="flex flex-col sm:flex-row items-center gap-[12px] w-full md:w-auto flex-1">
+        <div className="flex flex-col gap-[22px] w-full">
+            {/* Top Row (Figma Node 30955:250) */}
+            <div className="flex flex-col sm:flex-row items-center gap-[12px] w-full">
                 {/* Search Input (30955:269 & 30955:270) */}
                 <div className="relative w-full sm:max-w-[400px] flex-1">
                     <div className="absolute inset-y-0 left-[16px] flex items-center pointer-events-none">
@@ -34,10 +34,12 @@ export function OrdersActionBar() {
                 </div>
             </div>
 
-            {/* Right Group - Action Button (Not in 30955:250 but part of ActionBar) */}
-            <button className="w-full md:w-auto h-[50px] px-6 bg-[#1E293B] border border-[rgba(255,255,255,0.08)] rounded-[16px] text-[16px] font-semibold text-[#F8FAFC] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] hover:bg-slate-800 transition-colors shrink-0">
-                Confirm (0)
-            </button>
+            {/* Bottom Row - Action Button (Figma Node 30955:275) */}
+            <div className="flex items-start">
+                <button className="w-full sm:w-[140px] h-[50px] flex items-center justify-center bg-[#1E293B] border border-[rgba(255,255,255,0.08)] rounded-[16px] text-[16px] font-semibold text-[#F8FAFC] shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] hover:bg-slate-800 transition-colors shrink-0">
+                    Confirm (0)
+                </button>
+            </div>
         </div>
     )
 }
