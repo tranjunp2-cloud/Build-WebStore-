@@ -48,7 +48,7 @@ export const GET = withAuth(async () => {
         console.error('Templates categories error:', error)
         return NextResponse.json({
             docs: [],
-            error: error.message,
+            error: 'Failed to load categories',
         }, { status: 500 })
     }
 })

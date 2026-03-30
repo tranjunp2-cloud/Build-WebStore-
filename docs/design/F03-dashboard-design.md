@@ -3,6 +3,8 @@
 > **Feature:** F03 — Dashboard Overview, Analytics & SEO
 > **Ref PRD:** [F03-dashboard.md](../prd/F03-dashboard.md)
 > **Ref Stories:** [F03-dashboard-stories.md](../stories/F03-dashboard-stories.md)
+> **Links figma:** https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=31015-1009&t=601og2GNCjvvkTka-4
+> Link localhost: http://localhost:3000/F03-dashboard-ui-demo
 
 Tài liệu này cung cấp wireframe thô (ASCII / cấu trúc text) để minh họa cho các tính năng Dashboard Overview, Analytics và SEO của tính năng F03, phục vụ việc xây dựng UI/UX cho frontend.
 

@@ -1,5 +1,48 @@
 import type { CollectionConfig, Where, CollectionAfterChangeHook } from 'payload'
 import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
+import slugify from 'slugify'
+
+const formatSlug = (fallback: string) => async ({ value, originalDoc, data, req }: any) => {
+    // If client supplied a value, use it (or slugify it)
+    let baseSlug = ''
+    if (typeof value === 'string' && value.trim().length > 0) {
+        baseSlug = slugify(value, { lower: true, strict: true })
+    } else {
+        // Fallback to the specified field
+        const fallbackData = data?.[fallback] || originalDoc?.[fallback]
+        if (fallbackData && typeof fallbackData === 'string') {
+            baseSlug = slugify(fallbackData, { lower: true, strict: true })
+        }
+    }
+
+    if (!baseSlug) return value
+
+    let slug = baseSlug
+    let count = 1
+    let isUnique = false
+
+    // Check uniqueness (BR-03: Duplicate product name cho phép, slug auto-increments)
+    while (!isUnique) {
+        const existing = await req.payload.find({
+            collection: 'products',
+            where: {
+                slug: { equals: slug },
+                ...(originalDoc?.id ? { id: { not_equals: originalDoc.id } } : {})
+            },
+            limit: 1,
+            depth: 0
+        })
+
+        if (existing.docs.length === 0) {
+            isUnique = true
+        } else {
+            slug = `${baseSlug}-${count}`
+            count++
+        }
+    }
+    
+    return slug
+}
 
 const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation }) => {
     const isPublishingUpdate = operation === 'update' && doc.status === 'active' && previousDoc?.status !== 'active'
@@ -110,6 +153,9 @@ export const Products: CollectionConfig = {
             required: true,
             unique: true,
             index: true,
+            hooks: {
+                beforeValidate: [formatSlug('name')],
+            },
             admin: { description: 'URL-friendly slug for the product page' },
         },
         {
