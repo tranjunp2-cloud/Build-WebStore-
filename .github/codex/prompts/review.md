@@ -46,5 +46,17 @@ If PR adds `process.env.SOMETHING`:
 - Variable naming style (camelCase is standard)
 
 ## Output Format
-If no issues found, respond with: "No issues found."
-Otherwise list issues grouped by file, with severity badge and actionable description.
+You MUST respond with ONLY valid JSON, no markdown fences, no extra text.
+
+If no issues found:
+{"issues":[]}
+
+If issues found:
+{"issues":[{"file":"src/path/to/file.ts","line":42,"severity":"P1","title":"Short title","body":"Description with suggested fix"}]}
+
+Rules:
+- `file` must be the exact path from the diff (e.g., `src/app/api/foo/route.ts`)
+- `line` must be a line number from the NEW side of the diff (added/modified lines only)
+- `severity` must be one of: `P0`, `P1`, `P2`
+- `body` should include a suggested fix with code block if applicable
+- Keep each `body` under 500 characters

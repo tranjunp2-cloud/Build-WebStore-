@@ -4,14 +4,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-# Skip auto-generated PRs and dependabot
 concurrency:
   group: codex-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   codex-review:
-    # Skip if PR author is a bot
     if: github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     permissions:
@@ -41,35 +39,108 @@ jobs:
           safety-strategy: drop-sudo
           sandbox: workspace-write
 
-  post-feedback:
+  post-review:
     runs-on: ubuntu-latest
     needs: codex-review
     if: needs.codex-review.outputs.final_message != ''
     permissions:
       pull-requests: write
     steps:
-      - name: Post Codex feedback
+      - uses: actions/checkout@v5
+
+      - name: Post review
         uses: actions/github-script@v7
         with:
           github-token: ${{ github.token }}
           script: |
-            const message = process.env.CODEX_FINAL_MESSAGE;
-            if (!message || message.trim() === 'No issues found.') {
-              // React with thumbs up instead of commenting
-              await github.rest.reactions.createForIssue({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                content: '+1',
-              });
+            const raw = process.env.CODEX_FINAL_MESSAGE || '';
+
+            // Try to parse JSON from Codex output
+            let issues = [];
+            try {
+              // Find JSON in the output (may have extra text around it)
+              const jsonMatch = raw.match(/\{[\s\S]*"issues"[\s\S]*\}/);
+              if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                issues = parsed.issues || [];
+              }
+            } catch (e) {
+              console.log('Could not parse JSON, falling back to comment:', e.message);
+            }
+
+            const pr = context.payload.pull_request;
+            const commitId = pr.head.sha;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // No issues or parse failed → thumbs up or plain comment
+            if (issues.length === 0) {
+              if (raw.trim() && !raw.includes('"issues":[]')) {
+                // Non-JSON output — post as regular comment
+                await github.rest.issues.createComment({
+                  owner, repo,
+                  issue_number: pr.number,
+                  body: `### 🤖 Codex Review (API)\n\n${raw}\n\n---\n_Powered by OpenAI Codex API_`,
+                });
+              } else {
+                // No issues — react with thumbs up
+                await github.rest.reactions.createForIssue({
+                  owner, repo,
+                  issue_number: pr.number,
+                  content: '+1',
+                });
+              }
               return;
             }
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              body: `### 🤖 Codex Review (API)\n\n${message}\n\n---\n_Powered by OpenAI Codex API — [review rules](.github/codex/prompts/review.md)_`,
-            });
+            // Severity badges (same style as chatgpt-codex-connector)
+            const badges = {
+              P0: '![P0](https://img.shields.io/badge/P0-red?style=flat)',
+              P1: '![P1](https://img.shields.io/badge/P1-orange?style=flat)',
+              P2: '![P2](https://img.shields.io/badge/P2-yellow?style=flat)',
+            };
+
+            // Build inline review comments
+            const comments = [];
+            for (const issue of issues) {
+              if (!issue.file || !issue.line) continue;
+              const badge = badges[issue.severity] || badges.P2;
+              const body = `**${badge} ${issue.title || issue.severity}**\n\n${issue.body}\n\nUseful? React with 👍 / 👎.`;
+              comments.push({
+                path: issue.file,
+                line: issue.line,
+                body,
+              });
+            }
+
+            // Issues without valid file/line → include in review body
+            const unlinked = issues.filter(i => !i.file || !i.line);
+            let reviewBody = `### 💡 Codex Review\n\nFound **${issues.length}** issue(s).\n\n**Reviewed commit:** \`${commitId.substring(0, 10)}\``;
+            if (unlinked.length > 0) {
+              reviewBody += '\n\n#### General issues:\n';
+              for (const issue of unlinked) {
+                const badge = badges[issue.severity] || badges.P2;
+                reviewBody += `\n- ${badge} **${issue.title || 'Issue'}**: ${issue.body}\n`;
+              }
+            }
+
+            // Create PR review with inline comments
+            if (comments.length > 0) {
+              await github.rest.pulls.createReview({
+                owner, repo,
+                pull_number: pr.number,
+                commit_id: commitId,
+                event: 'COMMENT',
+                body: reviewBody,
+                comments,
+              });
+            } else {
+              // All issues lack file/line — post as regular comment
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: pr.number,
+                body: reviewBody,
+              });
+            }
         env:
           CODEX_FINAL_MESSAGE: ${{ needs.codex-review.outputs.final_message }}
