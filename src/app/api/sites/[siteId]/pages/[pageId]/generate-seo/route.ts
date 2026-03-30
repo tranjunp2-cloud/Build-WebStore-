@@ -31,7 +31,7 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const payload = await getPayload({ config: configPromise })
         const resolvedParams = await Promise.resolve(ctx.params)
         
-        if (!resolvedParams.siteId || !/^\d+$/.test(resolvedParams.siteId) || !resolvedParams.pageId) {
+        if (!resolvedParams.siteId || !/^\d+$/.test(resolvedParams.siteId) || !resolvedParams.pageId || !/^\d+$/.test(resolvedParams.pageId)) {
             return new NextResponse('Invalid or missing parameters', { status: 400 })
         }
 

@@ -113,17 +113,18 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             },
             page: page ? {
                 id: page.id,
-                title: (page as any).title || 'Homepage',
-                layout: normalizeEditorLayout((page as any).layout),
-                _status: (page as any)._status || 'published',
-                updatedAt: (page as any).updatedAt,
+                title: page.title || 'Homepage',
+                layout: normalizeEditorLayout(page.layout),
+                _status: page._status || 'published',
+                updatedAt: page.updatedAt,
             } : null,
         })
 
-    } catch (error: any) {
+    } catch (error) {
         console.error('[Editor Data Error]', error)
+        const message = error instanceof Error ? error.message : 'Unknown error'
         return NextResponse.json(
-            { error: 'Failed to load editor data' },
+            { error: 'Failed to load editor data', details: message },
             { status: 500 },
         )
     }

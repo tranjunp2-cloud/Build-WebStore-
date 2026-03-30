@@ -7,7 +7,7 @@ import type { CartWidgetConfig } from './config'
 import { useCartStore } from '@/store/cartStore'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 
-export function CartWidgetBlock({ block, theme, site }: BlockProps<CartWidgetConfig> & { site?: any }) {
+export function CartWidgetBlock({ block, theme, site }: BlockProps<CartWidgetConfig> & { site?: { slug?: string } }) {
     const count = useCartStore(state => state.items.reduce((sum, item) => sum + item.quantity, 0))
     const openCart = useCartStore(state => state.openCart)
     const setSiteSlug = useCartStore(state => state.setSiteSlug)

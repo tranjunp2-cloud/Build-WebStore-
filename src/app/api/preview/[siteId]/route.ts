@@ -433,6 +433,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
     const numericSiteId = Number(siteId)
     const pageId = new URL(req.url).searchParams.get('pageId')
 
+    interface NavPage { id: string | number; title?: string; slug?: string; isVisible?: boolean; [key: string]: unknown }
+
     // Fetch site info
     const site = await payload.findByID({ collection: 'sites', id: numericSiteId })
     if (!site) return new NextResponse('Not found', { status: 404 })
@@ -513,7 +515,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
     const normalizedHeader = finalHeader?.blockType === 'navigation'
       ? {
         ...mergeNavigationBrandingWithSite(finalHeader, site as Parameters<typeof mergeNavigationBrandingWithSite>[1]),
-        links: filterNavigationLinksByVisibility(finalHeader.links, visiblePagesResult.docs as any),
+        links: filterNavigationLinksByVisibility(finalHeader.links, visiblePagesResult.docs as unknown as NavPage[]),
       }
       : finalHeader
 

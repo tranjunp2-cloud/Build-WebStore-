@@ -11,12 +11,45 @@ import { mergeContactInfoWithSite, mergeFooterSocialsWithSite, mergeSocialWidget
 let _category = 'business'
 export function setSectionCategory(cat: string) { _category = cat }
 
-export type RenderBlock = {
-    blockType?: string
+export type SocialLink = { platform?: string; url?: string; enabled?: boolean; [key: string]: unknown }
+export type RenderSocialWidgetBlock = Record<string, unknown> & { links?: SocialLink[]; variant?: string; headline?: string }
+
+export type SiteSocialLinks = {
+    contactInfo?: { email?: string; phone?: string; address?: string }
+    socials?: { platform: string; url: string; enabled?: boolean }[]
+    socialLinks?: any // Still some internal opaque types but I specified fields above
+    logoText?: string
+    name?: string
+    branding?: { logo?: string }
     [key: string]: unknown
 }
 
-export function renderSections(block: RenderBlock, t: TemplateTheme, category?: string, site?: Record<string, unknown>): string {
+export type RenderBlock = {
+    blockType?: string
+    features?: { title: string; description: string; icon?: string }[]
+    testimonials?: { author: string; content: string; image?: string; title?: string }[]
+    stats?: { label: string; value: string }[]
+    plans?: { name: string; price: string; features?: string[]; buttonText?: string }[]
+    faqs?: { question: string; answer: string }[]
+    members?: { name: string; role: string; image?: string }[]
+    variant?: string
+    label?: string
+    showLabel?: boolean
+    headline?: string
+    subtext?: string
+    email?: string
+    phone?: string
+    address?: string
+    formFields?: { type: string; label: string; placeholder?: string }[]
+    columns?: { title: string; links?: { label: string; url: string }[] }[]
+    tagline?: string
+    copyrightText?: string
+    socials?: { platform: string; url: string; enabled?: boolean }[]
+    [key: string]: unknown
+}
+
+
+export function renderSections(block: RenderBlock, t: TemplateTheme, category?: string, site?: SiteSocialLinks): string {
   if (category) _category = category
   switch (block.blockType) {
     case 'features': return renderFeatures(block, t)
@@ -53,9 +86,7 @@ function sanitizeUrl(raw: string): string {
     }
 }
 
-export type SocialLink = { platform?: string; url?: string; enabled?: boolean; [key: string]: unknown }
-export type RenderSocialWidgetBlock = Record<string, unknown> & { links?: SocialLink[]; variant?: string; headline?: string }
-export type SiteSocialLinks = { socialLinks?: unknown }
+// Shared utility types are now at the top
 
 function renderSocialWidget(b: RenderSocialWidgetBlock, t: TemplateTheme, site?: SiteSocialLinks) {
   const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(b as Record<string, unknown>, site?.socialLinks as Record<string, unknown>))
@@ -111,7 +142,7 @@ function renderSocialWidget(b: RenderSocialWidgetBlock, t: TemplateTheme, site?:
   </section>`
 }
 
-function renderCartWidget(b: any, t: TemplateTheme) {
+function renderCartWidget(b: RenderBlock, t: TemplateTheme) {
   const isFloating = (b.variant || 'floating') !== 'inline'
   const label = b.label || 'Cart'
   const showLabel = Boolean(b.showLabel)
@@ -128,7 +159,7 @@ function renderCartWidget(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderFeatures(b: any, t: TemplateTheme) {
+function renderFeatures(b: RenderBlock, t: TemplateTheme) {
   const items = b.features || []
   const cardBg = `${t.text}05`
   const cardBorder = `${t.text}08`
@@ -153,7 +184,7 @@ function renderFeatures(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderAbout(b: any, t: TemplateTheme) {
+function renderAbout(b: RenderBlock, t: TemplateTheme) {
   const aboutImg = getAboutImage(_category)
   return `<section class="section" style="background:${t.primary}06;">
     <div class="container" style="display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;">
@@ -169,7 +200,7 @@ function renderAbout(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderTestimonials(b: any, t: TemplateTheme) {
+function renderTestimonials(b: RenderBlock, t: TemplateTheme) {
   const items = b.testimonials || []
   return `<section class="section">
     <div class="container">
@@ -197,7 +228,7 @@ function renderTestimonials(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderStats(b: any, t: TemplateTheme) {
+function renderStats(b: RenderBlock, t: TemplateTheme) {
   const items = b.stats || []
   return `<section style="padding:60px 0;background:linear-gradient(135deg,${t.primary}08,${t.secondary}05);">
     <div class="container">
@@ -214,7 +245,7 @@ function renderStats(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderPricing(b: any, t: TemplateTheme) {
+function renderPricing(b: RenderBlock, t: TemplateTheme) {
   const plans = b.plans || []
   return `<section class="section">
     <div class="container">
@@ -240,7 +271,7 @@ function renderPricing(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderFaq(b: any, t: TemplateTheme) {
+function renderFaq(b: RenderBlock, t: TemplateTheme) {
   const items = b.faqs || []
   return `<section class="section">
     <div class="container" style="max-width:700px;">
@@ -255,7 +286,7 @@ function renderFaq(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderGallery(b: any, t: TemplateTheme) {
+function renderGallery(b: RenderBlock, t: TemplateTheme) {
   const galleryImages = getGalleryImages(_category, 6)
   return `<section class="section">
     <div class="container">
@@ -272,7 +303,7 @@ function renderGallery(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderTeam(b: any, t: TemplateTheme) {
+function renderTeam(b: RenderBlock, t: TemplateTheme) {
   const members = b.members || []
   return `<section class="section" style="background:${t.primary}04;">
     <div class="container">
@@ -292,7 +323,7 @@ function renderTeam(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderCta(b: any, t: TemplateTheme) {
+function renderCta(b: RenderBlock, t: TemplateTheme) {
   const img = getAboutImage(_category)
   return `<section style="padding:80px 0;">
     <div class="container">
@@ -307,8 +338,8 @@ function renderCta(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderContact(b: any, t: TemplateTheme, site?: any) {
-  const mergedBlock = mergeContactInfoWithSite(b, site?.contactInfo)
+function renderContact(b: RenderBlock, t: TemplateTheme, site?: SiteSocialLinks) {
+  const mergedBlock = mergeContactInfoWithSite(b, site?.contactInfo) as RenderBlock
   return `<section class="section">
     <div class="container" style="display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start;">
       <div>
@@ -343,8 +374,8 @@ function renderContact(b: any, t: TemplateTheme, site?: any) {
   </section>`
 }
 
-function renderFooter(b: any, t: TemplateTheme, site?: any) {
-  const mergedBlock = mergeFooterSocialsWithSite(b, site)
+function renderFooter(b: RenderBlock, t: TemplateTheme, site?: SiteSocialLinks) {
+  const mergedBlock = mergeFooterSocialsWithSite(b, site) as RenderBlock
   const cols = mergedBlock.columns || []
   return `<footer style="padding:60px 0 30px;background:${t.text}04;border-top:1px solid ${t.text}08;">
     <div class="container">

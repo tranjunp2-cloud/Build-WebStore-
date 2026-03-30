@@ -29,6 +29,11 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         const payload = await getPayload({ config })
         const resolvedParams = await Promise.resolve(ctx.params)
         const { siteId, pageId } = resolvedParams
+
+        if (!siteId || !/^\d+$/.test(siteId) || !pageId || !/^\d+$/.test(pageId)) {
+            return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 })
+        }
+
         const numericSiteId = Number(siteId)
         
         // Extract tenant IDs from the current user
