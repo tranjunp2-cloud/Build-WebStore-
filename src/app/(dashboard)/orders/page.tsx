@@ -4,10 +4,7 @@ import { OrdersMetrics } from './_components/OrdersMetrics'
 import { OrdersActionBar } from './_components/OrdersActionBar'
 import { OrdersTable } from './_components/OrdersTable'
 
-export const metadata: Metadata = {
-    title: 'Orders | PrimeWeb',
-    description: 'Manage and track your orders',
-}
+
 
 export default function OrdersPage() {
 
