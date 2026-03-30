@@ -39,31 +39,77 @@ export default function LanguageSwitcher({ variant = 'pill' }: { variant?: 'pill
     }
 
     if (variant === 'segmented') {
+        const activeStyle: React.CSSProperties = {
+            background: '#2DD4BF',
+            color: '#0B1120',
+            boxShadow: '0px 0px 12px 0px rgba(45, 212, 191, 0.4)',
+        }
+        const inactiveStyle: React.CSSProperties = {
+            background: 'transparent',
+            color: 'rgba(248, 250, 252, 0.6)',
+        }
+        const tabBase: React.CSSProperties = {
+            display: 'flex',
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '8px 12px',
+            height: 32,
+            borderRadius: 12,
+            border: 'none',
+            outline: 'none',
+            cursor: 'pointer',
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 12,
+            fontWeight: 600,
+            lineHeight: '16px',
+            textAlign: 'center' as const,
+            transition: 'all 0.2s ease',
+        }
+
         return (
-            <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 shrink-0 text-[rgba(248,250,252,0.5)]" />
-                <div className="flex flex-1 items-center rounded-[16px] border border-white/[0.08] bg-[#1E293B] px-1 h-[42px]">
+            <div
+                style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    height: 'auto',
+                }}
+            >
+                <Globe
+                    style={{ width: 16, height: 16, flexShrink: 0, color: 'rgba(248, 250, 252, 0.5)' }}
+                />
+                <div
+                    style={{
+                        display: 'flex',
+                        flex: 1,
+                        alignItems: 'center',
+                        padding: '0 4px',
+                        height: 42,
+                        borderRadius: 16,
+                        background: '#1E293B',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                    }}
+                >
                     <button
                         type="button"
                         onClick={() => locale !== 'ms' && toggleLocale()}
-                        className={cn(
-                            'flex-1 flex items-center justify-center rounded-[12px] h-[32px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
-                            locale === 'ms'
-                                ? '!bg-[#2DD4BF] text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
-                                : 'text-[rgba(248,250,252,0.6)] hover:text-white'
-                        )}
+                        style={{
+                            ...tabBase,
+                            ...(locale === 'ms' ? activeStyle : inactiveStyle),
+                        }}
                     >
                         MY
                     </button>
                     <button
                         type="button"
                         onClick={() => locale !== 'en' && toggleLocale()}
-                        className={cn(
-                            'flex-1 flex items-center justify-center rounded-[12px] h-[32px] bg-transparent border-none outline-none text-[12px] font-semibold leading-[1.33] cursor-pointer transition-all',
-                            locale === 'en'
-                                ? '!bg-[#2DD4BF] text-[#0B1120] shadow-[0_0_12px_rgba(45,212,191,0.4)]'
-                                : 'text-[rgba(248,250,252,0.6)] hover:text-white'
-                        )}
+                        style={{
+                            ...tabBase,
+                            ...(locale === 'en' ? activeStyle : inactiveStyle),
+                        }}
                     >
                         EN
                     </button>

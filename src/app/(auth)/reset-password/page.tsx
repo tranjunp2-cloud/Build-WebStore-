@@ -8,9 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { Lock, Eye, EyeOff, Loader2, ArrowLeft, Check, ShieldCheck } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { useI18n } from '@/i18n'
 
 const resetSchema = z
     .object({
@@ -47,6 +46,7 @@ function ResetPasswordForm() {
     const token = searchParams.get('token')
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
+    const { t } = useI18n()
 
     const {
         register,
@@ -65,29 +65,62 @@ function ResetPasswordForm() {
     // No token → error state
     if (!token) {
         return (
-            <div className="animate-in fade-in duration-500 text-center py-4">
+            <div className="animate-in fade-in duration-500 w-full flex flex-col justify-center items-center text-center">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 ring-1 ring-red-500/20">
                     <svg className="h-8 w-8 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                     </svg>
                 </div>
-                <h2 className="text-xl font-bold text-white">Invalid reset link</h2>
-                <p className="mt-2 text-sm text-gray-400">
-                    This password reset link is invalid or has expired.
+                <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'Inter, sans-serif' }}>{t.auth.reset.invalidLink}</h2>
+                <p className="mt-2 text-sm" style={{ color: 'rgba(248, 250, 252, 0.70)', fontFamily: 'Inter, sans-serif' }}>
+                    {t.auth.reset.invalidLinkDesc}
                 </p>
-                <div className="mt-6 space-y-3">
-                    <Link href="/forgot-password">
-                        <Button className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-medium h-11">
-                            Request new reset link
-                        </Button>
+                <div className="mt-8 space-y-4 w-full">
+                    <Link href="/forgot-password" style={{ textDecoration: 'none' }}>
+                        <button
+                            type="button"
+                            className="relative w-full transition-all hover:brightness-110 active:scale-[0.99]"
+                            style={{
+                                display: 'flex',
+                                padding: '14px 0',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                borderRadius: 16,
+                                border: 'none',
+                                cursor: 'pointer',
+                                background: 'linear-gradient(90deg, #3B82F6 0%, #3989F3 7.14%, #378FEF 14.29%, #3596EC 21.43%, #339CE9 28.57%, #32A2E5 35.71%, #30A8E1 42.86%, #2FAEDE 50%, #2EB3DA 57.14%, #2DB9D6 64.29%, #2DBFD1 71.43%, #2CC4CD 78.57%, #2CC9C9 85.71%, #2DCFC4 92.86%, #2DD4BF 100%)',
+                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.10), 0 4px 6px -4px rgba(0, 0, 0, 0.10)',
+                                fontFamily: 'Inter, sans-serif',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                lineHeight: '20px',
+                                color: '#FFFFFF',
+                            }}
+                        >
+                            {t.auth.reset.requestNewLink}
+                        </button>
                     </Link>
-                    <Link
-                        href="/login"
-                        className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-300 transition-colors"
-                    >
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                        Back to sign in
-                    </Link>
+
+                    <div className="flex flex-col w-full items-center" style={{ gap: 24, marginTop: 24 }}>
+                        <Link
+                            href="/login"
+                            className="inline-flex items-center justify-center gap-[8px] text-[#3B82F6] hover:text-blue-400 transition-colors"
+                            style={{
+                                fontFamily: 'Inter, sans-serif',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                lineHeight: '20px',
+                                textDecoration: 'none',
+                            }}
+                        >
+                            <ArrowLeft className="h-4 w-4 text-[#3B82F6]" />
+                            {t.auth.reset.backToSignIn}
+                        </Link>
+
+                        <div className="w-full">
+                            <LanguageSwitcher variant="segmented" />
+                        </div>
+                    </div>
                 </div>
             </div>
         )
@@ -109,8 +142,8 @@ function ResetPasswordForm() {
                 const message = errorData?.errors?.[0]?.message || 'Reset link has expired'
 
                 if (message.toLowerCase().includes('token') || message.toLowerCase().includes('expired')) {
-                    setFormError('root', { message: 'This reset link has expired. Please request a new one.' })
-                    toast.error('Reset link expired. Please request a new one.')
+                    setFormError('root', { message: t.auth.reset.linkExpired })
+                    toast.error(t.auth.reset.linkExpired)
                 } else {
                     setFormError('root', { message })
                     toast.error(message)
@@ -118,37 +151,56 @@ function ResetPasswordForm() {
                 return
             }
 
-            toast.success('Password reset successful! 🔐', {
-                description: 'You can now sign in with your new password.',
+            toast.success(t.auth.reset.successTitle, {
+                description: t.auth.reset.successDesc,
             })
 
             router.push('/login')
         } catch {
-            setFormError('root', { message: 'Connection error. Please try again.' })
-            toast.error('Connection error. Please try again.')
+            setFormError('root', { message: t.auth.reset.connectionError })
+            toast.error(t.auth.reset.connectionError)
         }
     }
 
     const inputClasses = (hasError: boolean) =>
-        `pl-10 pr-10 bg-white/[0.06] border-white/[0.08] text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors ${hasError ? 'border-red-500/50' : ''}`
+        `w-full h-12 rounded-xl pl-10 pr-10 text-sm text-white placeholder:text-[rgba(248,250,252,0.40)] outline-none focus:ring-2 focus:ring-blue-500/30 transition-all ${hasError ? 'ring-2 ring-red-500/50 border-transparent' : ''}`
 
     return (
-        <div className="animate-in fade-in duration-500">
+        <div className="animate-in fade-in duration-500 w-full flex flex-col items-center">
             {/* Header */}
-            <div className="mb-6 text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 ring-1 ring-blue-500/20">
-                    <ShieldCheck className="h-6 w-6 text-blue-400" />
-                </div>
-                <h1 className="text-2xl font-bold text-white">Set new password</h1>
-                <p className="mt-1.5 text-sm text-gray-400">
-                    Your new password must be different from previous ones
+            <div className="flex flex-col items-center justify-center text-center mx-auto" style={{ gap: 8, maxWidth: 382 }}>
+                <h1
+                    className="text-[#F8FAFC]"
+                    style={{
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 24,
+                        fontWeight: 700,
+                        lineHeight: '32px',
+                        margin: 0,
+                    }}
+                >
+                    {t.auth.reset.title}
+                </h1>
+                <p
+                    className="text-center"
+                    style={{
+                        color: 'rgba(248, 250, 252, 0.70)',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 400,
+                        lineHeight: '22px',
+                        width: '100%',
+                        margin: 0,
+                    }}
+                >
+                    {t.auth.reset.subtitle}
                 </p>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col w-full mx-auto" style={{ maxWidth: 382 }}>
                 {/* Root error */}
                 {errors.root && (
-                    <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                    <div className="flex items-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 mt-6 text-sm text-red-400">
                         <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                         </svg>
@@ -157,29 +209,48 @@ function ResetPasswordForm() {
                 )}
 
                 {/* New Password */}
-                <div>
-                    <Label htmlFor="password" className="text-gray-300">New password</Label>
-                    <div className="relative mt-1.5">
-                        <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                        <Input
+                <div className="flex flex-col w-full" style={{ gap: 4, marginTop: 24 }}>
+                    <label
+                        htmlFor="password"
+                        style={{
+                            color: 'rgba(248, 250, 252, 0.8)',
+                            fontFamily: 'Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 500,
+                            lineHeight: '20px',
+                        }}
+                    >
+                        {t.auth.reset.newPassword}
+                    </label>
+                    <div className="relative" style={{ marginTop: 4 }}>
+                        <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#94A3B8]" />
+                        <input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
-                            placeholder="Min. 8 characters"
+                            placeholder={t.auth.reset.newPasswordPlaceholder}
                             className={inputClasses(!!errors.password)}
+                            style={{
+                                background: '#1E293B',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                boxShadow: '0px 0px 0px 0.057px rgba(59, 130, 246, 0)',
+                                fontFamily: 'Inter, sans-serif',
+                                lineHeight: '1.21em',
+                            }}
                             {...register('password')}
                             autoFocus
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent hover:text-white transition-colors"
+                            style={{ color: 'rgba(248, 250, 252, 0.40)' }}
                             tabIndex={-1}
                         >
-                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                         </button>
                     </div>
                     {errors.password && (
-                        <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>
+                        <p className="text-xs text-red-400 mt-1">{errors.password.message}</p>
                     )}
 
                     {/* Password strength */}
@@ -200,71 +271,118 @@ function ResetPasswordForm() {
                 </div>
 
                 {/* Confirm Password */}
-                <div>
-                    <Label htmlFor="confirmPassword" className="text-gray-300">Confirm new password</Label>
-                    <div className="relative mt-1.5">
-                        <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                        <Input
+                <div className="flex flex-col w-full" style={{ gap: 4, marginTop: 20 }}>
+                    <label
+                        htmlFor="confirmPassword"
+                        style={{
+                            color: 'rgba(248, 250, 252, 0.8)',
+                            fontFamily: 'Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 500,
+                            lineHeight: '20px',
+                        }}
+                    >
+                        {t.auth.reset.confirmPassword}
+                    </label>
+                    <div className="relative" style={{ marginTop: 4 }}>
+                        <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#94A3B8]" />
+                        <input
                             id="confirmPassword"
                             type={showConfirm ? 'text' : 'password'}
                             placeholder="••••••••"
                             className={inputClasses(!!errors.confirmPassword)}
+                            style={{
+                                background: '#1E293B',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                boxShadow: '0px 0px 0px 0.057px rgba(59, 130, 246, 0)',
+                                fontFamily: 'Inter, sans-serif',
+                                lineHeight: '1.21em',
+                            }}
                             {...register('confirmPassword')}
                         />
                         <button
                             type="button"
                             onClick={() => setShowConfirm(!showConfirm)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer border-none bg-transparent hover:text-white transition-colors"
+                            style={{ color: 'rgba(248, 250, 252, 0.40)' }}
                             tabIndex={-1}
                         >
-                            {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            {showConfirm ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                         </button>
                     </div>
                     {errors.confirmPassword && (
-                        <p className="mt-1 text-xs text-red-400">{errors.confirmPassword.message}</p>
+                        <p className="text-xs text-red-400 mt-1">{errors.confirmPassword.message}</p>
                     )}
                 </div>
 
                 {/* Requirements */}
-                <div className="space-y-1">
+                <div className="space-y-1.5" style={{ marginTop: 20 }}>
                     {[
-                        { test: watchPassword.length >= 8, label: 'At least 8 characters' },
-                        { test: /[A-Z]/.test(watchPassword), label: 'One uppercase letter' },
-                        { test: /[0-9]/.test(watchPassword), label: 'One number' },
+                        { test: watchPassword.length >= 8, label: t.auth.reset.reqLength },
+                        { test: /[A-Z]/.test(watchPassword), label: t.auth.reset.reqUpper },
+                        { test: /[0-9]/.test(watchPassword), label: t.auth.reset.reqNumber },
                     ].map(({ test, label }) => (
                         <div key={label} className="flex items-center gap-2 text-xs">
                             <Check className={`h-3 w-3 transition-colors ${test ? 'text-emerald-400' : 'text-gray-600'}`} />
-                            <span className={test ? 'text-gray-300' : 'text-gray-500'}>{label}</span>
+                            <span className={test ? 'text-gray-300' : 'text-gray-500'} style={{ fontFamily: 'Inter, sans-serif' }}>{label}</span>
                         </div>
                     ))}
                 </div>
 
                 {/* Submit */}
-                <Button
+                <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-medium h-11 shadow-lg shadow-blue-500/25 transition-all hover:shadow-blue-500/40 disabled:opacity-50"
+                    className="relative w-full transition-all disabled:opacity-50 hover:brightness-110 active:scale-[0.99]"
+                    style={{
+                        display: 'flex',
+                        padding: '14px 0',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderRadius: 16,
+                        marginTop: 20,
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: 'linear-gradient(90deg, #3B82F6 0%, #3989F3 7.14%, #378FEF 14.29%, #3596EC 21.43%, #339CE9 28.57%, #32A2E5 35.71%, #30A8E1 42.86%, #2FAEDE 50%, #2EB3DA 57.14%, #2DB9D6 64.29%, #2DBFD1 71.43%, #2CC4CD 78.57%, #2CC9C9 85.71%, #2DCFC4 92.86%, #2DD4BF 100%)',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.10), 0 4px 6px -4px rgba(0, 0, 0, 0.10)',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        lineHeight: '20px',
+                        color: '#FFFFFF',
+                    }}
                 >
                     {isSubmitting ? (
                         <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Resetting password...
+                            {t.auth.reset.submitting}
                         </>
                     ) : (
-                        'Reset password'
+                        t.auth.reset.submit
                     )}
-                </Button>
+                </button>
             </form>
 
-            {/* Back to login */}
-            <div className="mt-6 text-center">
+            {/* Bottom Actions */}
+            <div className="flex flex-col w-full items-center" style={{ gap: 24, marginTop: 32 }}>
                 <Link
                     href="/login"
-                    className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-300 transition-colors"
+                    className="inline-flex items-center justify-center gap-[8px] text-[#3B82F6] hover:text-blue-400 transition-colors"
+                    style={{
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        lineHeight: '20px',
+                        textDecoration: 'none',
+                    }}
                 >
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                    Back to sign in
+                    <ArrowLeft className="h-4 w-4 text-[#3B82F6]" />
+                    {t.auth.reset.backLogin}
                 </Link>
+
+                <div className="w-full">
+                    <LanguageSwitcher variant="segmented" />
+                </div>
             </div>
         </div>
     )
@@ -272,7 +390,11 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
     return (
-        <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center text-gray-400">Loading...</div>}>
+        <Suspense fallback={
+            <div className="w-full min-h-[300px] flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+            </div>
+        }>
             <ResetPasswordForm />
         </Suspense>
     )

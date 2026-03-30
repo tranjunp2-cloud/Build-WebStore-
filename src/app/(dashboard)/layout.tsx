@@ -3,6 +3,7 @@ import { I18nProvider } from '@/i18n'
 import { getCurrentUser } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 import { CMSLayoutClient } from './_components/CMSLayoutClient'
+import { AIDiscoveryWizard } from '@/components/dashboard/AIDiscoveryWizard'
 
 export default async function DashboardLayout({
     children,
@@ -16,12 +17,15 @@ export default async function DashboardLayout({
 
     return (
         <AppShell>
-    <I18nProvider defaultLocale="en">
-        <CMSLayoutClient userName={userName} userInitial={userInitial}>
-            {children}
-        </CMSLayoutClient>
-        </I18nProvider>
-    </AppShell>
+            <I18nProvider defaultLocale="en">
+                <CMSLayoutClient userName={userName} userInitial={userInitial}>
+                    {children}
+                </CMSLayoutClient>
+                {/* Only evaluate and render if the user hasn't seen the wizard yet */}
+                {!typedUser?.has_seen_ai_wizard && (
+                    <AIDiscoveryWizard userId={typedUser?.id} />
+                )}
+            </I18nProvider>
+        </AppShell>
     )
 }
-

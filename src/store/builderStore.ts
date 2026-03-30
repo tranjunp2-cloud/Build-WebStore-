@@ -167,15 +167,23 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             partialize: (state) => ({
                 businessInfo: state.businessInfo,
                 step: state.step,
-                status: state.status,
+                status: state.status === 'error' ? 'idle' : state.status,
                 messages: state.messages,
                 blocks: state.blocks,
                 theme: state.theme,
                 siteId: state.siteId,
                 siteName: state.siteName,
                 progress: state.progress,
-                error: state.error,
+                // Never persist error — it may contain sensitive server details
+                error: null,
             }),
+            // Clear old cached errors from localStorage (before this fix)
+            onRehydrateStorage: () => (state) => {
+                if (state?.error) {
+                    state.error = null
+                    state.status = state.status === 'error' ? 'idle' : state.status
+                }
+            },
         }
     )
 )

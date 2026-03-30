@@ -58,7 +58,7 @@ export const GET = withAuth(async (user, request) => {
     } catch (error: any) {
         console.error('[Orders List Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to load orders' } },
             { status: 500 }
         )
     }

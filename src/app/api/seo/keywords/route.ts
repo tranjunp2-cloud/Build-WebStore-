@@ -66,7 +66,7 @@ export const GET = withAuth(async (_user, request) => {
 
         return NextResponse.json({ success: true, data: { keywords } })
     } catch (error: any) {
-        return NextResponse.json({ success: false, error: { message: error.message } }, { status: 500 })
+        return NextResponse.json({ success: false, error: { message: 'Keyword operation failed' } }, { status: 500 })
     }
 })
 
@@ -159,7 +159,7 @@ export const POST = withAuth(async (_user, request) => {
         })
     } catch (error: any) {
         console.error('[Add Keyword Error]', error)
-        return NextResponse.json({ success: false, error: { message: error.message } }, { status: 500 })
+        return NextResponse.json({ success: false, error: { message: 'Keyword operation failed' } }, { status: 500 })
     }
 })
 
@@ -205,6 +205,6 @@ export const DELETE = withAuth(async (_user, request) => {
 
         return NextResponse.json({ success: true, data: { deleted: true } })
     } catch (error: any) {
-        return NextResponse.json({ success: false, error: { message: error.message } }, { status: 500 })
+        return NextResponse.json({ success: false, error: { message: 'Keyword operation failed' } }, { status: 500 })
     }
 })
