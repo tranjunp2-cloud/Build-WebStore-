@@ -132,16 +132,29 @@ jobs:
             const modeIcon = isIncremental ? '🔄' : '🔍';
             const modeLabel = isIncremental ? 'Incremental Review' : 'Full Review';
 
-            // No issues — pass!
+            // No issues — APPROVE!
             if (issues.length === 0) {
-              if (raw.trim() && !raw.includes('"issues":[]')) {
+              const approveBody = raw.trim() && !raw.includes('"issues":[]')
+                ? `### 🤖 Codex ${modeIcon} ${modeLabel}\n\n${raw}\n\n---\n_Powered by OpenAI Codex API_`
+                : `### ✅ Codex ${modeIcon} ${modeLabel} — LGTM!\n\nKhông tìm thấy issue nào trong commit \`${commitId.substring(0, 10)}\`.\n\n_Powered by OpenAI Codex API_`;
+
+              // Submit Approved review — hiện trong Reviewers section
+              try {
+                await github.rest.pulls.createReview({
+                  owner, repo,
+                  pull_number: prNumber,
+                  commit_id: commitId,
+                  event: 'APPROVE',
+                  body: approveBody,
+                });
+              } catch (e) {
+                // Fallback: comment + 👍 nếu không approve được (VD: author tự approve)
+                console.log('Approve failed, falling back to comment:', e.message);
                 await github.rest.issues.createComment({
                   owner, repo,
                   issue_number: prNumber,
-                  body: `### 🤖 Codex ${modeIcon} ${modeLabel}\n\n${raw}\n\n---\n_Powered by OpenAI Codex API_`,
+                  body: approveBody,
                 });
-              } else {
-                // Clean pass — react with 👍
                 await github.rest.reactions.createForIssue({
                   owner, repo,
                   issue_number: prNumber,
