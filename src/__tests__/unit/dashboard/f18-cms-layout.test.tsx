@@ -34,6 +34,10 @@ vi.mock('@/components/dashboard/NotificationBell', () => ({
     NotificationBell: () => <div data-testid="notification-bell">Bell</div>,
 }))
 
+vi.mock('@/app/(dashboard)/actions', () => ({
+    logoutAction: vi.fn(() => Promise.resolve({ success: true })),
+}))
+
 // ── Imports ─────────────────────────────────────────────────────────────
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
 import { TopHeader } from '@/components/dashboard/TopHeader'
