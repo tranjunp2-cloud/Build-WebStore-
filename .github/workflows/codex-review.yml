@@ -30,7 +30,8 @@ jobs:
       contents: read
       pull-requests: write
     outputs:
-      final_message: ${{ steps.run_codex.outputs['final-message'] }}
+      final_message_full: ${{ steps.run_codex_full.outputs['final-message'] }}
+      final_message_incremental: ${{ steps.run_codex_incremental.outputs['final-message'] }}
       review_mode: ${{ steps.gen_diff.outputs.review_mode }}
 
     steps:
@@ -45,16 +46,23 @@ jobs:
           EVENT="${{ github.event_name }}"
           ACTION="${{ github.event.action }}"
 
+          BASE="${{ github.event.pull_request.base.ref || 'staging' }}"
+
           if [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "synchronize" ]; then
-            # Incremental: chỉ review commits MỚI (để verify fix, phát hiện bug mới)
             BEFORE="${{ github.event.before }}"
             AFTER="${{ github.event.after }}"
-            echo "📦 Incremental review: $BEFORE → $AFTER"
-            git diff "${BEFORE}...${AFTER}" -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
-            echo "review_mode=incremental" >> $GITHUB_OUTPUT
+            # Fallback về full nếu BEFORE không tồn tại (force-push)
+            if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              echo "📦 Incremental review: $BEFORE → $AFTER"
+              git diff "${BEFORE}...${AFTER}" -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
+              echo "review_mode=incremental" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ BEFORE SHA not found (force-push?), fallback to full diff"
+              git diff "origin/${BASE}...HEAD" -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
+              echo "review_mode=full" >> $GITHUB_OUTPUT
+            fi
           else
             # Full review: toàn bộ thay đổi trong PR
-            BASE="${{ github.event.pull_request.base.ref || 'staging' }}"
             echo "🔍 Full review: origin/$BASE → HEAD"
             git diff "origin/${BASE}...HEAD" -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
             echo "review_mode=full" >> $GITHUB_OUTPUT
@@ -85,21 +93,11 @@ jobs:
           safety-strategy: drop-sudo
           sandbox: workspace-write
 
-      - name: Merge outputs
-        id: run_codex
-        run: |
-          MODE="${{ steps.gen_diff.outputs.review_mode }}"
-          if [ "$MODE" = "full" ]; then
-            MSG="${{ steps.run_codex_full.outputs['final-message'] }}"
-          else
-            MSG="${{ steps.run_codex_incremental.outputs['final-message'] }}"
-          fi
-          echo "final-message=$MSG" >> $GITHUB_OUTPUT
 
   post-review:
     runs-on: ubuntu-latest
     needs: codex-review
-    if: needs.codex-review.outputs.final_message != ''
+    if: needs.codex-review.outputs.final_message_full != '' || needs.codex-review.outputs.final_message_incremental != ''
     permissions:
       pull-requests: write
       issues: write
@@ -207,5 +205,5 @@ jobs:
               body,
             });
         env:
-          CODEX_FINAL_MESSAGE: ${{ needs.codex-review.outputs.final_message }}
+          CODEX_FINAL_MESSAGE: ${{ needs.codex-review.outputs.final_message_full || needs.codex-review.outputs.final_message_incremental }}
           REVIEW_MODE: ${{ needs.codex-review.outputs.review_mode }}
