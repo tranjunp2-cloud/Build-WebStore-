@@ -11,7 +11,8 @@ File `pr-diff.txt` chứa diff của CÁC COMMITS MỚI vừa được push đ�
 
 ## Phạm vi review
 
-CHỈ review những gì trong `pr-diff.txt` (dòng bắt đầu bằng `+`).
+Diff được inject trực tiếp vào cuối prompt này — KHÔNG cần đọc thêm file nào.
+- CHỈ review dòng bắt đầu bằng `+` trong diff
 - `file` phải là đường dẫn xuất hiện trong diff header
 - `line` phải là số dòng từ phía MỚI (NEW side) của diff
 
@@ -24,6 +25,7 @@ Viết comment bằng **tiếng Việt**. Mỗi issue cần có severity và g�
 - **Bảo mật**: Không hardcode secrets/API keys, không trả `error.message` ra client, phải validate input
 - **DB Schema**: Thay đổi `src/collections/*.ts` PHẢI có migration tương ứng trong `scripts/db-setup.js`
 - **TypeScript**: Không dùng `any` (trừ khi có comment giải thích), không có catch block trống
+- **Auth JWT cross-feature regression**: PR thay đổi cơ chế auth/JWT PHẢI audit routes dùng `payload.auth()` trực tiếp. Bug thực tế (PR #397→#399): đổi Jose JWT → `payload.auth()` trả null → 401. Rule: dùng `getCurrentUser()` từ `@/lib/auth`, không gọi `payload.auth()` trực tiếp trong API routes.
 
 ### P1 — Quan trọng (nên sửa)
 - Fix đúng vấn đề nhưng thiếu edge case

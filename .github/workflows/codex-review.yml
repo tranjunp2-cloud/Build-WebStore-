@@ -40,7 +40,7 @@ jobs:
           ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number }}/merge
           fetch-depth: 0
 
-      - name: Generate PR diff
+      - name: Generate PR diff and build runtime prompts
         id: gen_diff
         run: |
           EVENT="${{ github.event_name }}"
@@ -68,8 +68,29 @@ jobs:
             echo "review_mode=full" >> $GITHUB_OUTPUT
           fi
 
-          echo "Diff size: $(wc -l < pr-diff.txt) lines"
-          head -20 pr-diff.txt
+          DIFF_LINES=$(wc -l < pr-diff.txt)
+          echo "Diff size: $DIFF_LINES lines"
+
+          # Inject diff vào prompt runtime — Codex nhận diff qua context,
+          # không cần dùng tool đọc file → không scan được full source
+          MAX_DIFF_LINES=3000
+          build_runtime_prompt() {
+            local base_prompt="$1"
+            local out="$2"
+            cat "$base_prompt" > "$out"
+            if [ "$DIFF_LINES" -gt "$MAX_DIFF_LINES" ]; then
+              printf '\n---\n## Nội dung diff cần review (%s lines — hiển thị %s dòng đầu, phần còn lại bị cắt)\n\n```diff\n' "$DIFF_LINES" "$MAX_DIFF_LINES" >> "$out"
+              head -"$MAX_DIFF_LINES" pr-diff.txt >> "$out"
+              printf '```\n\n⚠️ Diff chỉ hiển thị một phần (%s/%s dòng). KHÔNG dùng tool đọc thêm file — chỉ review phần đã hiển thị.\n' "$MAX_DIFF_LINES" "$DIFF_LINES" >> "$out"
+            else
+              printf '\n---\n## Nội dung diff cần review (%s lines — đầy đủ)\n\n```diff\n' "$DIFF_LINES" >> "$out"
+              cat pr-diff.txt >> "$out"
+              printf '```\n\nDiff đầy đủ. KHÔNG dùng tool đọc thêm file nào khác.\n' >> "$out"
+            fi
+          }
+
+          build_runtime_prompt .github/codex/prompts/review.md .github/codex/prompts/review-runtime.md
+          build_runtime_prompt .github/codex/prompts/review-incremental.md .github/codex/prompts/review-incremental-runtime.md
 
       - name: Run Codex Review (Full — lần đầu, review toàn bộ PR)
         id: run_codex_full
@@ -77,7 +98,7 @@ jobs:
         uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: .github/codex/prompts/review.md
+          prompt-file: .github/codex/prompts/review-runtime.md
           output-file: codex-output.md
           safety-strategy: drop-sudo
           sandbox: workspace-write
@@ -88,7 +109,7 @@ jobs:
         uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: .github/codex/prompts/review-incremental.md
+          prompt-file: .github/codex/prompts/review-incremental-runtime.md
           output-file: codex-output.md
           safety-strategy: drop-sudo
           sandbox: workspace-write
