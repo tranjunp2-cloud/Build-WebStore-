@@ -49,8 +49,9 @@ async function ensureUser(
 
     if (existing.docs.length > 0) {
         const userId = existing.docs[0].id as number
-        console.log(`  ⚠️  ${account.label}: EXISTS (ID: ${userId}), updating...`)
+        console.log(`  ⚠️  ${account.label}: EXISTS (ID: ${userId}), updating password...`)
 
+        // Only update password + profile. Do NOT change roles (avoid privilege escalation).
         await payload.update({
             collection: 'users',
             id: userId,
@@ -58,11 +59,10 @@ async function ensureUser(
                 password: account.password,
                 firstName: account.firstName,
                 lastName: account.lastName,
-                roles: ['super-admin'],
             },
             overrideAccess: true,
         })
-        console.log(`  ✅ ${account.label}: Password & role updated`)
+        console.log(`  ✅ ${account.label}: Password updated (roles unchanged)`)
     } else {
         const newUser = await payload.create({
             collection: 'users',
