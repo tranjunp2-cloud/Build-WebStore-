@@ -36,6 +36,7 @@ export const saveSiteSchema = z.object({
         eastRate: z.number().optional(),
         freeAbove: z.number().nullable().optional(),
     }).optional(),
+    isDraft: z.boolean().optional(),
 }).refine(data => data.blocks !== undefined
     || data.theme !== undefined
     || data.locale !== undefined
@@ -46,6 +47,7 @@ export const saveSiteSchema = z.object({
     || data.contactInfo !== undefined
     || data.socialLinks !== undefined
     || data.branding !== undefined
-    || data.seo !== undefined, {
+    || data.seo !== undefined
+    || data.isDraft !== undefined, {
     message: 'At least one editable site field must be provided',
 })

@@ -161,6 +161,7 @@ export default function EditorPage() {
                     editorUrl.searchParams.set('pageId', selectedPageId)
                 }
 
+
                 const [editorRes, pagesRes] = await Promise.all([
                     fetch(editorUrl.toString(), { credentials: 'include' }),
                     fetch(`/api/sites/${siteId}/pages`, { credentials: 'include' }),

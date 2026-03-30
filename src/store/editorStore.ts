@@ -64,6 +64,8 @@ type EditorState = {
     hasUnsavedChanges: boolean
     lastSavedAt: number | null
     isSaving: boolean
+    saveStatus: 'idle' | 'saving' | 'saved' | 'error'
+    autoSaveTimer: NodeJS.Timeout | null
     autoSaveEnabled: boolean
     autoSaveIntervalMs: number
 }
@@ -108,6 +110,8 @@ type EditorActions = {
     setIsAIStreaming: (streaming: boolean) => void
 
     // Save (F-07)
+    handleContentChange: () => void
+    performSave: (isManual?: boolean) => Promise<boolean>
     markSaved: () => void
     setIsSaving: (saving: boolean) => void
 
@@ -168,7 +172,9 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     lastSavedAt: null,
     isSaving: false,
     autoSaveEnabled: true,
-    autoSaveIntervalMs: 3000, // 3s
+    autoSaveIntervalMs: 3000,
+    saveStatus: 'idle',
+    autoSaveTimer: null,
 
     init: (siteId, blocks, theme, siteName, headerBlock = null, footerBlock = null) => {
         const fallbackHeader = blocks.find(b => b.blockType === 'navigation')
@@ -218,8 +224,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     addBlock: (afterIndex, block, label) => {
@@ -234,8 +240,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     deleteBlock: (index, label) => {
@@ -250,8 +256,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     duplicateBlock: (index) => {
@@ -267,8 +273,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     reorderBlocks: (fromIndex, toIndex) => {
@@ -284,8 +290,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             blocks: newBlocks,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     // ── Theme ────────────────────────────────────────────────────────────
@@ -301,8 +307,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             theme: newTheme,
             history: newHistory,
             historyIndex: newHistory.length - 1,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     // ── AI Batch (F-11) ─────────────────────────────────────────────────
@@ -336,8 +342,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             headerBlock: snapshot.headerBlock ? JSON.parse(JSON.stringify(snapshot.headerBlock)) : null,
             footerBlock: snapshot.footerBlock ? JSON.parse(JSON.stringify(snapshot.footerBlock)) : null,
             historyIndex: newIndex,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     redo: () => {
@@ -352,8 +358,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             headerBlock: snapshot.headerBlock ? JSON.parse(JSON.stringify(snapshot.headerBlock)) : null,
             footerBlock: snapshot.footerBlock ? JSON.parse(JSON.stringify(snapshot.footerBlock)) : null,
             historyIndex: newIndex,
-            hasUnsavedChanges: true,
         })
+        get().handleContentChange()
     },
 
     canUndo: () => {
@@ -382,8 +388,74 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     setIsAIStreaming: (streaming) => set({ isAIStreaming: streaming }),
 
     // ── Save (F-07) ─────────────────────────────────────────────────────
+    handleContentChange: () => {
+        const { autoSaveTimer, siteId } = get()
+        if (!siteId) return
 
-    markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now() }),
+        set({ hasUnsavedChanges: true, saveStatus: 'idle' })
+
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+
+        const timer = setTimeout(() => {
+            get().performSave()
+        }, 3000) // 3s debounce
+
+        set({ autoSaveTimer: timer })
+    },
+
+    performSave: async (isManual = false) => {
+        const { siteId, autoSaveTimer, isSaving } = get()
+        if (!siteId) return false
+
+        // Anti-spam backpressure for manual save
+        if (isManual && isSaving) return false
+
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+        set({ isSaving: true, saveStatus: 'saving', autoSaveTimer: null })
+
+        const RETRY_DELAYS = [5000, 10000, 20000]
+
+        const attemptSave = async (retryCount = 0): Promise<boolean> => {
+            const { blocks, theme } = get()
+            try {
+                const res = await fetch(`/api/sites/${siteId}/save`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ blocks, theme, isDraft: true }),
+                })
+
+                if (res.ok) {
+                    set({
+                        hasUnsavedChanges: false,
+                        saveStatus: 'saved',
+                        lastSavedAt: Date.now(),
+                        isSaving: false,
+                    })
+                    return true
+                } else {
+                    if (res.status === 401) {
+                        set({ saveStatus: 'error', isSaving: false })
+                        return false
+                    }
+                    throw new Error('Save failed')
+                }
+            } catch (err) {
+                set({ saveStatus: 'error', isSaving: false })
+                if (retryCount < RETRY_DELAYS.length) {
+                    const timer = setTimeout(() => {
+                        set({ isSaving: true, saveStatus: 'saving' })
+                        attemptSave(retryCount + 1)
+                    }, RETRY_DELAYS[retryCount])
+                    set({ autoSaveTimer: timer })
+                }
+                return false
+            }
+        }
+
+        return await attemptSave(0)
+    },
+
+    markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now(), saveStatus: 'saved' }),
     setIsSaving: (saving) => set({ isSaving: saving }),
 
     // ── Header/Footer (F-05-07) ──────────────────────────────────────────
@@ -426,5 +498,6 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         isAIStreaming: false,
         hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
         autoSaveEnabled: true, autoSaveIntervalMs: 3000,
+        saveStatus: 'idle', autoSaveTimer: null,
     }),
 }))

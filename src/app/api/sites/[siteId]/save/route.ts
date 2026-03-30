@@ -63,8 +63,7 @@ export async function PATCH(
         const pageId = req.nextUrl.searchParams.get('pageId')
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
-        
-        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, siteName, contactInfo, socialLinks, branding, seo } = data!
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
         const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
 
         // Update site-level fields if provided
@@ -132,6 +131,7 @@ export async function PATCH(
                     collection: 'pages',
                     id: page.id,
                     data: { layout: normalizedBlocks },
+                    draft: isDraft ?? false,
                 })
             }
         }

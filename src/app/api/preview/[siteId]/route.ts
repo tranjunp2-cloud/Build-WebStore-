@@ -427,7 +427,9 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
       const requestedPage = await payload.findByID({
         collection: 'pages',
         id: pageId,
+        draft: true, // From staging: include drafts
       })
+
       const requestedPageSiteId =
         typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
 
@@ -444,6 +446,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
           isHomepage: { equals: true },
         },
         limit: 1,
+        draft: true, // From staging: include drafts
       })
 
       if (pagesResult.docs.length === 0) {
@@ -451,10 +454,11 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
           collection: 'pages',
           where: { site: { equals: numericSiteId } },
           limit: 1,
+          draft: true, // From staging: include drafts
         })
       }
 
-      page = pagesResult.docs[0]
+      page = pagesResult.docs[0] || null
     }
 
     const blocks = page?.layout || []
