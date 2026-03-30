@@ -349,26 +349,75 @@ Sau khi pull code mới và **Redeploy** (hoặc push lên `staging`) lỗi sẽ
 1. **Xác nhận bản deploy mới:** DO → App → Activity → deployment gần nhất đã chạy xong và đang Live.
 2. **Thử biến môi trường (chỉ để test):** Trên DO, App → Settings → App-level environment variables → thêm **`NODE_TLS_REJECT_UNAUTHORIZED`** = **`0`** → Save → Redeploy. Nếu app chạy được thì đúng là lỗi SSL; báo lại để kiểm tra lại pool config (hoặc giữ env này tạm cho staging, production nên dùng CA đúng).
 
-#### Runtime: relation "tenants" (hoặc bảng khác) does not exist (42P01)
+#### Database Schema Deploy — Cách DB được sync khi deploy
 
-Nếu kết nối DB đã ổn nhưng Runtime Logs báo **`relation "tenants" does not exist`** (hoặc bảng khác): database **chưa có schema** (bảng chưa được tạo). Trên production Payload **không tự push schema**, cần chạy **một lần** để tạo bảng.
+**Vấn đề:** Docker standalone KHÔNG chạy `pushDevSchema` đáng tin cậy. Dev thêm collection/field mới → code expect table → staging DB chưa có → API 500.
 
-**Cách 1 — Chạy script push schema từ máy local (khuyến nghị):**
+**Giải pháp:** Dùng SQL migrations trực tiếp trong `scripts/db-setup.js`.
 
-1. Clone repo, cài dependency: `npm ci`.
-2. Build: `npm run build`.
-3. Chạy với **connection string của staging** và để Payload push schema:
-   ```bash
-   DATABASE_URI="postgresql://user:pass@host:5432/dbname?sslmode=require" npm run db:push
-   ```
-   (Thay `DATABASE_URI` bằng connection string đầy đủ của Dev Database trên DO; lấy trong DO → component Database → Connection parameters / Connection string.)
-4. Script sẽ start app tạm (NODE_ENV=development), đợi app lên → kết nối DB → Payload push bảng → thoát. Sau đó deploy lại bình thường (staging đã có bảng).
+```
+Container start → db-setup.js chạy (Docker CMD)
+    │
+    ├─ 1. Chạy MIGRATIONS[] (CREATE TABLE, ALTER TABLE)  ← TIN CẬY 100%
+    │     Tạo tables mới, thêm columns mới
+    │
+    ├─ 2. syncPayloadRelsTables()                          ← TIN CẬY 100%
+    │     Tự tạo FK columns cho payload_locked_documents_rels
+    │
+    ├─ 3. pushDevSchema (Payload tự chạy)                  ← BACKUP, KHÔNG TIN CẬY
+    │     Payload so sánh Drizzle schema vs DB
+    │     Có thể miss tables mới trên Docker
+    │
+    └─ 4. Restart production mode → Server sẵn sàng
+```
 
-**Cách 2 — Trên DigitalOcean (one-off Job):**
+**Quy tắc cho dev khi thêm collection/field mới:**
 
-Tạo **Job** one-off trong cùng App, env giống Web Service (DATABASE_URI, PAYLOAD_SECRET), **Build Command** giống app, **Run Command:** `npm run build && DATABASE_URI="$DATABASE_URI" npm run db:push` (hoặc chạy sau khi build sẵn). Chạy Job một lần; khi xong, các bảng đã có, Web Service sẽ chạy bình thường.
+1. **Thêm collection mới** → viết `CREATE TABLE IF NOT EXISTS` trong `db-setup.js`
+2. **Thêm array field** → viết `CREATE TABLE IF NOT EXISTS {collection}_{field}` trong `db-setup.js`
+3. **Thêm column đơn** → viết `ALTER TABLE ADD COLUMN IF NOT EXISTS` trong `db-setup.js`
+4. **Thêm collection slug** → thêm vào `COLLECTION_SLUGS[]` trong `db-setup.js`
 
-Sau khi đã có bảng, không cần chạy lại `db:push`. Các lần deploy sau chỉ cần build + start.
+**CI tự động kiểm tra:**
+- `check-migrations.js` so sánh collections vs migrations → **block PR** nếu thiếu
+- Check: CREATE TABLE cho collection, sub-table cho array fields, ALTER TABLE cho columns, COLLECTION_SLUGS
+
+**Test local trước khi push:**
+```bash
+node scripts/check-migrations.js origin/staging
+```
+
+#### Khi nào cần thêm migration?
+
+| Dev thay đổi | Cần làm trong db-setup.js |
+|---|---|
+| Thêm collection mới (file mới trong `src/collections/`) | `CREATE TABLE IF NOT EXISTS {slug} (...)` + thêm slug vào `COLLECTION_SLUGS[]` |
+| Thêm `type: 'array'` field | `CREATE TABLE IF NOT EXISTS {collection}_{field} (id varchar PK, _order int, _parent_id int, _uuid varchar, ...)` |
+| Thêm `type: 'text/number/select/...'` field | `ALTER TABLE {collection} ADD COLUMN IF NOT EXISTS {field} varchar/numeric/...` |
+| Thêm `type: 'group'` field | `ALTER TABLE {collection} ADD COLUMN IF NOT EXISTS {group}_{field} ...` (cho mỗi sub-field) |
+| Thêm `type: 'relationship'` field | `ALTER TABLE {collection} ADD COLUMN IF NOT EXISTS {field}_id integer` |
+
+#### Payload Drizzle Naming Convention (QUAN TRỌNG)
+
+| Field Type | Table Name | id | order col | parent col |
+|---|---|---|---|---|
+| `type: 'array'` | `{collection}_{field}` | `varchar` (UUID) | `_order` | `_parent_id` |
+| `type: 'select' + hasMany` | `{collection}_{field}` | `serial` | `order` | `parent_id` |
+
+**CHÚ Ý:**
+- Array tables dùng `varchar` id (UUID) — **KHÔNG DÙNG `serial`**
+- Array tables dùng `_parent_id` và `_order` (**CÓ** underscore)
+- Select hasMany tables dùng `parent_id` và `order` (**KHÔNG** underscore)
+- **KHÔNG viết `DROP TABLE`** — chỉ dùng `CREATE TABLE IF NOT EXISTS`
+
+#### Runtime: relation "xxx" does not exist (42P01)
+
+Nếu staging logs báo `relation "xxx" does not exist`:
+
+1. **Kiểm tra:** Table này đã có trong `db-setup.js` MIGRATIONS[] chưa?
+2. **Nếu chưa:** Thêm `CREATE TABLE IF NOT EXISTS` vào `db-setup.js` → push → deploy lại
+3. **Nếu đã có:** Check syntax SQL, tên table đúng convention chưa
+4. **Test local:** `node scripts/check-migrations.js origin/staging`
 
 #### Tối ưu thời gian build (build > 5 phút)
 

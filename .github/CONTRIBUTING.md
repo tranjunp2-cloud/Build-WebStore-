@@ -7,11 +7,15 @@
 ## 1. Git Rules
 
 ### Branch Naming
+
+Mỗi branch = **1 User Story hoặc 1 task nhỏ**. KHÔNG tạo branch cha cho cả Feature.
+
 ```
-feature/F01-ai-builder     # Feature mới (FXX = feature code, bot dùng để auto-link issue)
-feat/F07-template-gallery  # Cũng OK — bot nhận FXX từ tên branch
-fix/F01-login-redirect     # Bug fix
-chore/deps-upgrade         # Cleanup, CI, docs (bot skip check issue)
+feat/F01-01-generate-site     # US-F01-01: 1 story = 1 branch = 1 PR
+feat/F01-02-store-setup       # US-F01-02: story tiếp theo
+feat/F08-03-bulk-create       # US-F08-03: Products bulk create
+fix/F01-builder-crash         # Bug fix cho F01
+chore/deps-upgrade            # Cleanup, CI, docs (bot skip check issue)
 ```
 
 ### Commit Convention
@@ -63,12 +67,16 @@ Backlog → Review (UIUX+BA) → In Progress → Code Review → QA Testing → 
               └── review:rejected
 ```
 
-### Branch Flow
+### Branch Flow — Merge thẳng staging
 ```
-feat/F05-editor ─→ PR vào staging ─→ review ─→ merge ─→ QA Testing ─→ QC close → Done
-                                                           ↓
-                                              main (release only)
+feat/F01-01-generate-site ─→ PR vào staging ─→ CI + review ─→ merge ─→ QA test staging ─→ Done
+feat/F01-02-store-setup   ─→ PR vào staging ─→ CI + review ─→ merge ─→ QA test staging ─→ Done
+feat/F08-01-product-crud  ─→ PR vào staging ─→ CI + review ─→ merge ─→ QA test staging ─→ Done
+                                                                              ↓
+                                              Tất cả pass → PR staging → main (release v1.0)
 ```
+
+**KHÔNG dùng feature branch cha.** Mỗi US merge thẳng staging → QA test ngay → feedback nhanh.
 
 ---
 
@@ -94,10 +102,11 @@ feat/F05-editor ─→ PR vào staging ─→ review ─→ merge ─→ QA Test
 
 ### Dev
 1. Pick issues ở **In Progress** (đã có label `status:ready`)
-2. Tạo branch: `feature/F01-mô-tả` → code → commit → push
-3. Tạo PR vào staging: title có `[US-F01-03]` → bot auto-link
-4. Đợi review + CI pass → merge khi có label `ready-to-merge`
-5. Nếu QC gắn `qa:failed` → check comment QC → fix → tạo PR mới
+2. Tạo branch từ staging: `feat/F01-01-generate-site` (1 US = 1 branch)
+3. Code → commit → push
+4. Tạo PR vào **staging**: title `feat(F01): [US-F01-01] generate site` → bot auto-link
+5. CI pass + reviewer approve → merge → staging auto-deploy
+6. Nếu QC gắn `qa:failed` → check comment QC → tạo branch fix mới → PR mới vào staging
 
 ### QC (Quality Control)
 1. Check issues ở **QA Testing** (có label `qa:pending`)

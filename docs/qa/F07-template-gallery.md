@@ -93,7 +93,38 @@
 
 ---
 
-## 8. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates - F07)
+## 8. [US-04] Cửa sổ AI Search (Natural Language Discovery)
+
+| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
+|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
+| `TC_F07_037` | Func | [Pos] Truy vấn AI Search Đa Ngôn Ngữ (VI/BM) | Yes | Blocker| 1. Nhập input: "Mẫu cho shop thể thao" (VI) hoặc "kedai baju".<br>2. Nhấn Enter.<br> *`[Loc: input.ai-search-chat]`* | API `POST /api/templates/search` trả về danh sách template khớp ngữ cảnh (trả về >= 2 mẫu) ở định dạng Grid Thumbnails trong `< 2s`. | | `Not Run` |
+| `TC_F07_038` | UI | [Neg] Trạng thái Tìm kiếm Vô nghiệm (Empty Search) | Yes | High | 1. Nhập từ khóa phi thực tế (VD: "Phi hành gia vũ trụ").<br> *`[Loc: input.ai-search-chat]`* | Grid kết quả trả rỗng. Render Component Illustration "Phi hành gia bối rối" kèm dòng Text: "Chúng tôi chưa có mẫu giao diện phù hợp với yêu cầu này". | | `Not Run` |
+
+---
+
+## 9. [US-05 & US-06] Smart Mapping & Editor Undo Mechanism
+
+| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
+|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
+| `TC_F07_039` | Logic| [Pos] Smart Mapping Giữ nguyên Nội dung (Text/Image) | Yes | Blocker| 1. Thay đổi Hero Text thành "Sale Khủng".<br>2. Click `[Apply Template]` chọn mẫu B.<br> *`[Loc: button.btn-apply-template]`* | Render Editor Template B thành công `< 2s` (Smooth Transition). Quá trình Map Content bảo toàn 100% dữ liệu gốc, Hero Text vẫn là "Sale Khủng". | | `Not Run` |
+| `TC_F07_040` | UI | [Neg] Mapping lỡ nhịp (Xử lý Orphan Component) | Yes | High | 1. Apply Template B (Không có block section tương xứng với mẫu cũ). | Template Swap hoàn tất bình thường mà không làm mất Data cũ (Lưu trạng thái ẩn Draft). Hiện Toast Vàng báo: "Một phần giao diện đã được ẩn...". | | `Not Run` |
+| `TC_F07_041` | Logic| [Pos] Phục hồi cấu trúc 1-Step (Undo Template) | Yes | Blocker| 1. Sau khi Apply mẫu B. Nhấn nút Đỏ `[⤺ Hoàn tác]` trên Toolbar Navbar.<br> *`[Loc: button.btn-undo-template]`* | Backend khôi phục Revision Snapshot cũ nhất trên Cache Stack. Giao diện mượt mà Restore 100% về UI Layout và nội dung của Mẫu A gốc. | | `Not Run` |
+| `TC_F07_042` | Bound| [Neg] Cơ chế Ghi đè Bộ đệm Undo (Override Stack) | Yes | High | 1. Apply liên tiếp Mẫu A -> B -> C.<br>2. Bấm Undo 1 lần. Bấm thêm 1 lần nữa. | Điểm Undo bị ghi đè tịnh tiến 1 Step. Nhấn Undo lần 1 sẽ lùi từ C về B. Nút Undo sau đó bị Disable ngay (Không hỗ trợ lùi tiếp về A). Không phình rác RAM. | | `Not Run` |
+| `TC_F07_043` | Sec | [Neg] Cảnh Báo Guard Rail Xóa Lịch sử khi Save | Yes | Blocker| 1. Áp dụng Mẫu mới (Mẫu B).<br>2. Nhấn ngay nút Khởi tạo / Save Site `[🚀 Lưu]`.<br> *`[Loc: button.btn-save-site]`* | Giăng Popup Xác Nhận ngay lập tức ngăn cản: "Thay đổi sẽ lưu vĩnh viễn, KHÔNG THỂ HOÀN TÁC". Nếu User chọn `[Huỷ]`, trạng thái Editor an toàn. | | `Not Run` |
+| `TC_F07_044` | Logic| [Pos] Khóa Vĩnh Viễn Undo sau khi Commit Dữ Liệu | Yes | Blocker| 1. Confirm Đồng ý ở Popup mục (043) trên. Lưu Thành Công. | Trình quản lý `UndoStackManager` Dọn dẹp Cache Stack. Nút Undo trên Navbar chuyển Disable (màu xám mờ không bấm được) vĩnh viễn. Đề phòng lỗi State Sync của DB. | | `Not Run` |
+
+---
+
+## 10. [US-08] UX/Trải Nghiệm Khách Hàng Mobile Web
+
+| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
+|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
+| `TC_F07_045` | Mob | [Pos] Giao diện Bottom Sheet Gallery Thay vì Modal | Yes | High | 1. Bật Mobile Device `< 768px`.<br>2. Click nút mở Gallery. | Pop-up Modal biến thành Bottom Sheet trượt mượt mà lên (chiều cao 90vh). Nút "Preview/Apply" Touch-target phải thao tác dễ chạm ngón cái ≥ `44x44px`. | | `Not Run` |
+| `TC_F07_046` | UI | [Pos] Mobile Gallery Grid Tối ưu Layout 2 Cột | No | Med | 1. Cuộn danh sách Grid Template trên Mobile. | CSS hiển thị `grid-template-columns: repeat(2, 1fr)`. Hai thẻ Thumbnail card ép nằm kề nhau trên 1 hàng ngang tối ưu không gian lướt xem mẫu. | | `Not Run` |
+
+---
+
+## 11. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates - F07)
 
 | Criteria | Status | Target Agent .SKILL |
 |---|---|---|

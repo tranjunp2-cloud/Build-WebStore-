@@ -26,7 +26,7 @@ export const GET = withAuth(async (_user, req) => {
         return NextResponse.json({
             docs: [],
             totalDocs: 0,
-            error: error.message,
+            error: 'Failed to load templates',
         }, { status: 500 })
     }
 })

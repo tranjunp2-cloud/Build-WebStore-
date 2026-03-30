@@ -27,6 +27,7 @@ const protectedPaths = [
     '/onboarding',
     '/settings',
     '/account',
+    '/help',
 ]
 
 const authPaths = ['/login', '/register']

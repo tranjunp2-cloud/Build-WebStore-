@@ -59,7 +59,7 @@ export const POST = withAuth(async (_user, request) => {
         console.error('Seed error:', error)
         return NextResponse.json({
             success: false,
-            error: { code: 'INTERNAL_ERROR', message: error.message },
+            error: { code: 'INTERNAL_ERROR', message: 'Template seeding failed' },
         }, { status: 500 })
     }
 })

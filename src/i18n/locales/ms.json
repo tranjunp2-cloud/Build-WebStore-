@@ -429,7 +429,39 @@
                 "product": "Produk",
                 "price": "Harga",
                 "status": "Status",
-                "stock": "Stok"
+                "stock": "Stok",
+                "filterActive": "Aktif",
+                "filterDraft": "Draf",
+                "filterArchived": "Diarkib",
+                "sortLatest": "Terbaharu",
+                "sortOldest": "Terlama",
+                "advancedFilters": "Penapis Lanjutan",
+                "clearAll": "Kosongkan",
+                "category": "Kategori",
+                "saleStatus": "Status Jualan",
+                "allProducts": "Semua Produk",
+                "onSale": "Sedang Dijual",
+                "regularPrice": "Harga Biasa",
+                "stockStatus": "Status Stok",
+                "showLowStock": "Tunjuk Stok Rendah/Habis",
+                "lowStockDesc": "Tapis produk dengan stok ≤5",
+                "activeFilters": "Penapis aktif:",
+                "colImg": "IMEJ",
+                "colName": "Nama",
+                "colPrice": "Harga (RM)",
+                "colStock": "Stok",
+                "colWeight": "Berat",
+                "colStatus": "Status",
+                "colActions": "Tindakan",
+                "edit": "Sunting",
+                "delete": "Padam",
+                "sku": "SKU:",
+                "filterBtn": "Tapis",
+                "failedToLoad": "Gagal memuatkan produk",
+                "retry": "Cuba Lagi",
+                "aiChatTitle": "Sembang AI: Cipta pelbagai produk dengan pantas",
+                "aiChatPlaceholder": "Cth: jaket kulit 500k, topi 50k",
+                "aiChatBtn": "Cipta"
             },
             "form": {
                 "editTitle": "Sunting Produk",
@@ -466,7 +498,7 @@
                 "toastDeleted": "Produk dipadamkan.",
                 "undo": "Batal",
                 "toastRestored": "Produk dipulihkan!",
-                "deleteFailed": "Gagal padam",
+                "deleteFailed": "Gagal memadam produk",
                 "networkError": "Ralat rangkaian",
                 "errors": {
                     "nameMin": "Nama produk mestilah sekurang-kurangnya 3 aksara",
@@ -514,7 +546,27 @@
                         "emptyMatrix": "Sila cipta sekurang-kurangnya 1 varian atau matikan ciri Varian.",
                         "incompleteMatrix": "Sila masukkan Harga dan Stok untuk semua varian."
                     }
-                }
+                },
+                "successMarkedAs": "Produk ditandakan sebagai",
+                "restored": "Produk dipulihkan",
+                "failedRestore": "Gagal memulihkan produk",
+                "failedUpdateStatus": "Gagal mengemas kini status",
+                "failedDelete": "Gagal memadam produk",
+                "productDeleted": "Produk dipadamkan.",
+                "size": "Saiz:",
+                "draftSaved": "Draf disimpan. Tukar kepada Aktif untuk papar di web.",
+                "productCreated": "Produk berjaya dicipta",
+                "productUpdated": "Produk berjaya dikemas kini",
+                "failedLoad": "Gagal memuatkan produk",
+                "confirmDelete": "Adakah anda pasti mahu memadamkan produk ini?",
+                "deleteSuccess": "Produk berjaya dipadamkan",
+                "somethingWentWrong": "Sesuatu yang tidak kena. Sila cuba lagi.",
+                "checkFields": "Sila semak medan berikut:",
+                "checkAllRequired": "Sila semak semua medan yang diperlukan dan cuba lagi.",
+                "editProduct": "Edit Produk",
+                "fillInfo": "Lengkapkan maklumat produk",
+                "saving": "Menyimpan...",
+                "saveChanges": "Simpan Perubahan"
             },
             "bulkCreate": {
                 "title": "Cipta Sekaligus Pantas AI",
@@ -544,7 +596,8 @@
                 "saveSuccess": "Mencipta {count} produk draf. Sila tambah imej sebelum diterbitkan.",
                 "saveFailed": "Gagal mencipta produk",
                 "saveError": "Ralat menyimpan produk"
-            }
+            },
+            "subtitle": "Urus produk kedai"
         }
     },
     "auth": {

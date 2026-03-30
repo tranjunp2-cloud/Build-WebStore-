@@ -24,10 +24,10 @@
 
 | TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
 |-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_006` | Func | [Pos] Empty State 0 Kết Quả | Yes | High | 1. Wipe clear dữ liệu bảng Blog.<br> *`[Loc: section.empty-state]`, `[Loc: button.create-first-post]`* | Màn hình hiển thị Illustration trống + Text "Chưa có bài viết nào" và CTA tạo bài mới chuẩn F08. | | `Not Run` |
+| `TC_F17_006` | Func | [Pos] Empty State 0 Kết Quả | Yes | High | 1. Wipe clear dữ liệu bảng Blog.<br> *`[Loc: section.empty-state]`, `[Loc: button.create-first-post]`* | Màn hình hiển thị Illustration "Người cầm bút viết" + Text "Chưa có bài viết nào..." chuẩn Design F17. Không dùng chung Icon Hộp của F08. | | `Not Run` |
 | `TC_F17_007` | Func | [Pos] Lưới Table Data hiển thị đúng | Yes | High | 1. Load Data có 5 bản ghi. Xem lưới Blog.<br> *`[Loc: tr.blog-row]`* | Table hiển thị 4 cột: Tiêu đề (kèm Thumbnail nhỏ), Trạng thái (Draft/Pub), Tác giả, Thời gian. Format Date `DD/MM/YYYY`. | | `Not Run` |
 | `TC_F17_008` | Func | [Pos] Search, Sort, Filter | Yes | High | 1. Nhập từ khóa "Mới" vào Search Bar.<br> *`[Loc: input.search-blog]`*, *`[Loc: select.filter-status]`* | Table React lập tức update (Debounce 500ms) Lưới dữ liệu (Không reload trình duyệt page gốc). | | `Not Run` |
-| `TC_F17_009` | Func | [Pos] Bulk Publish / Delete Action | Yes | High | 1. Tick chọn 3 bài viết. Bấm nút Tác vụ hàng loạt.<br> *`[Loc: input.checkbox-blog-row]`, `[Loc: button.bulk-publish]`* | Hệ thống áp dụng tác vụ cho 3 bài. Status badge chuyển qua màu xanh "Published". Payload Database cập nhật chính xác. | | `Not Run` |
+| `TC_F17_009` | Func | [Pos] Bulk Publish / Unpublish / Delete | Yes | High | 1. Tick chọn 3 bài viết. Bấm nút Tác vụ hàng loạt (Publish/Unpublish/Delete).<br> *`[Loc: input.checkbox-blog-row]`, `[Loc: button.bulk-publish]`* | Hệ thống áp dụng tác vụ cho 3 bài. Status badge chuyển qua màu xanh "Published" hoặc nhạt "Draft". Payload Database cập nhật chính xác. | | `Not Run` |
 | `TC_F17_010` | Func | [Neg] Partial Error Bulk Action | Yes | Med | 1. Bulk Publish 2 bài. 1 Bài cố tình xóa Title ở DB để bắt lỗi Validation.<br> *`[Loc: div.toast-warning]`* | Hiện Toast Warning: Báo cáo Publish thành công 1 bài, 1 bài từ chối do thiếu Tiêu đề. Không Rollback bài hợp lệ. | | `Not Run` |
 
 ---
@@ -48,7 +48,7 @@
 | TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
 |-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
 | `TC_F17_015` | Func | [Pos] Sinh nội dung văn bản (Generate) | Yes | High | 1. Prompt bài viết chủ đề "Cà phê sạch".<br> *`[Loc: textarea.ai-prompt]`, `[Loc: button.ai-submit]`* | Chèn Text đã gen vào vị trí con trỏ cuối cùng (Caret Focus) bên trong lõi Rich Text Editor. Giữ nguyên format. | | `Not Run` |
-| `TC_F17_016` | Logic| [Pos] Tùy biến Đoạn văn (Make Professional) | Yes | Med | 1. Highlight bôi đen đoạn Text có sẵn. Chọn Action AI "Professional".<br> *`[Loc: button.ai-action-pro]`* | Đoạn văn bôi đen lập tức bị replace bởi đoạn Text xịn hơn. Text bên ngoài vùng bôi đen giữ nguyên. | | `Not Run` |
+| `TC_F17_016` | Logic| [Pos] Tùy biến AI qua Tooltip Context Menu | Yes | Med | 1. Highlight bôi đen đoạn Text có sẵn. Popup (Tooltip) nổi lên phía trên.<br>2. Chọn Action AI "📝 Rewrite / Make Shorter".<br> *`[Loc: button.ai-action-pro]`* | Đoạn văn bôi đen bị replace bởi đoạn Text AI xử lý. Thanh Tooltip Context Menu bắt buộc phải NỔI trôi (Floating) ngay sát phía trên vùng bôi đen (Chuẩn UI Design F17). | | `Not Run` |
 | `TC_F17_017` | Sec | [Neg] Chống gọi DALL-E (Block Image API) | Yes | Blocker| 1. Bẫy Prompt "Vẽ 1 hình con chó 3D bằng tính năng Image gen".<br> *`[Loc: textarea.ai-prompt]`* | Cấu hình System Prompt chặt, AI tuyệt đối từ chối kết xuất Hình Ảnh. Phải cảnh báo "Tôi chỉ có thể khởi tạo văn bản". An toàn cho API Quota. | | `Not Run` |
 
 ---
@@ -67,7 +67,7 @@
 | TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
 |-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
 | `TC_F17_020` | Func | [Pos] Luồng Category Fallback khi Xóa Gốc | Yes | High | 1. Bài "Sale" gắn Category "C1". Xóa Category "C1". Kiểm tra bài "Sale".<br> *`[Loc: button.delete-category]`* | Xóa Category thì Bài Viết `KHÔNG` bị xóa (Soft Fallback). Trạng thái phân loại của Bài "Sale" trả về Mặc định "Uncategorized"/Null. | | `Not Run` |
-
+| `TC_F17_020b`| Func | [Neg] Chống Trùng Lặp Tên Category | Yes | High | 1. Tạo Category Name `Promotions`.<br>2. Cố tình tạo thêm Name `Promotions` nữa. | Lỗi Validation! Từ chối tạo do vi phạm Uniqueness Rule. Cảnh báo "Danh mục đã tồn tại" để chống rác URL và nhầm lẫn UX khi Assign. | | `Not Run` |
 ---
 
 ## 7. [US-F17-06] Giao diện Mobile (On-the-go Editor)
