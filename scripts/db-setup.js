@@ -185,9 +185,9 @@ const MIGRATIONS = [
   },
   // ── Sites: Branding + Contact Info ──
   { name: 'sites.branding', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding varchar;' },
+  { name: 'sites.contact_info', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info varchar;' },
   { name: 'sites.branding_logo', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding_logo varchar;' },
   { name: 'sites.branding_favicon', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding_favicon varchar;' },
-  { name: 'sites.contact_info', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info varchar;' },
   { name: 'sites.contact_info_phone', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_phone varchar;' },
   { name: 'sites.contact_info_email', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_email varchar;' },
   { name: 'sites.contact_info_address', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_address varchar;' },
