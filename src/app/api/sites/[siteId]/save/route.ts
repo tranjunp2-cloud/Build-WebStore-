@@ -116,7 +116,8 @@ export async function PATCH(
         // Update blocks on the selected page if provided
         if (normalizedBlocks) {
             const numericSiteId = Number(siteId)
-            let page: any = null
+            type PageDoc = NonNullable<Awaited<ReturnType<typeof payload.findByID>>>
+            let page: PageDoc | null = null
 
             if (pageId) {
                 const requestedPage = await payload.findByID({

@@ -39,8 +39,18 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     if (!site) return null
 
     // Require authentication to view draft sites
-    if (site.status === 'draft' && !user) {
-        return { isMaintenance: true, site }
+    if (site.status === 'draft') {
+        if (!user) {
+            return { isMaintenance: true, site }
+        }
+
+        const tenantIds = user.tenants?.map((t: any) =>
+            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+        ) ?? []
+        
+        if (!tenantIds.includes(String(tenant.id))) {
+            return { isMaintenance: true, site }
+        }
     }
 
     // Find the page
