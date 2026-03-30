@@ -360,8 +360,8 @@ export default function EditorPage() {
             setIframeKey(key => key + 1)
             window.setTimeout(() => setSaveSuccess(false), 1800)
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to update site settings'
-            toast.error('Failed to update site settings', { description: message })
+            console.error('Failed to update site settings', error)
+            toast.error('Failed to update site settings', { description: 'Please try again later.' })
         }
     }, [currentPageId, siteId])
 

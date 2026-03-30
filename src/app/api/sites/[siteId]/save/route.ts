@@ -67,7 +67,8 @@ export async function PATCH(
         })
         if (!site) return NextResponse.json({ error: 'Site not found' }, { status: 404 })
 
-        const tenantIds = user.tenants?.map((t: any) =>
+        interface TenantRef { tenant: string | number | { id: string | number } }
+        const tenantIds = user.tenants?.map((t: TenantRef) =>
             typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
         ) ?? []
         const siteTenantId = typeof site.tenant === 'object' ? String(site.tenant.id) : String(site.tenant)
@@ -129,6 +130,8 @@ export async function PATCH(
 
                 if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
                     page = requestedPage
+                } else {
+                    return NextResponse.json({ error: 'Page not found or does not belong to site' }, { status: 404 })
                 }
             }
 

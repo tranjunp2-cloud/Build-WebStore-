@@ -594,7 +594,7 @@ function PreviewFrameInner({
         } catch (error) {
             console.error('Inline rewrite failed', error)
             toast.error('Inline edit failed', {
-                description: error instanceof Error ? error.message : 'Please try again.',
+                description: 'Please try again.',
             })
         } finally {
             setIsSubmitting(false)

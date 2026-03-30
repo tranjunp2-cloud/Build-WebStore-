@@ -41,7 +41,8 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             return NextResponse.json({ error: 'Site not found' }, { status: 404 })
         }
 
-        const tenantIds = user.tenants?.map((t: any) =>
+        interface TenantRef { tenant: string | number | { id: string | number } }
+        const tenantIds = user.tenants?.map((t: TenantRef) =>
             typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
         ) ?? []
 
