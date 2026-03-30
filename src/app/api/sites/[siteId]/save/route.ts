@@ -24,6 +24,19 @@ export async function PATCH(
         const payload = await getPayload({ config })
 
         const { siteId } = await params
+
+        // Verify site exists and check ownership (tenant isolation)
+        const existingSite = await payload.findByID({ collection: 'sites', id: siteId })
+        if (!existingSite) {
+            return NextResponse.json({ error: 'Site not found' }, { status: 404 })
+        }
+        const userTenantId = (user as any).tenants?.[0]?.tenant
+        const resolvedUserTenantId = typeof userTenantId === 'object' ? userTenantId?.id : userTenantId
+        const siteTenantId = typeof existingSite.tenant === 'object' ? (existingSite.tenant as any).id : existingSite.tenant
+        if (String(siteTenantId) !== String(resolvedUserTenantId)) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
 

@@ -35,6 +35,17 @@ export async function PATCH(
             )
         }
 
+        // Verify ownership (tenant isolation)
+        const userTenantId = (user as any).tenants?.[0]?.tenant
+        const resolvedUserTenantId = typeof userTenantId === 'object' ? userTenantId?.id : userTenantId
+        const siteTenantId = typeof existing.tenant === 'object' ? (existing.tenant as any).id : existing.tenant
+        if (String(siteTenantId) !== String(resolvedUserTenantId)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Not your site' } },
+                { status: 403 }
+            )
+        }
+
         if (existing.status === 'published') {
             return NextResponse.json(
                 { success: false, error: { code: 'ALREADY_PUBLISHED', message: 'Site is already published' } },
@@ -108,6 +119,17 @@ export async function DELETE(
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
                 { status: 404 }
+            )
+        }
+
+        // Verify ownership (tenant isolation)
+        const userTenantId = (user as any).tenants?.[0]?.tenant
+        const resolvedUserTenantId = typeof userTenantId === 'object' ? userTenantId?.id : userTenantId
+        const siteTenantId = typeof existing.tenant === 'object' ? (existing.tenant as any).id : existing.tenant
+        if (String(siteTenantId) !== String(resolvedUserTenantId)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Not your site' } },
+                { status: 403 }
             )
         }
 
