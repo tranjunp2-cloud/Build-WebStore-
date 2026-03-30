@@ -22,12 +22,13 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
 
-      - name: Pre-fetch base and head refs
+      - name: Generate PR diff
         run: |
-          git fetch --no-tags origin \
-            ${{ github.event.pull_request.base.ref }} \
-            +refs/pull/${{ github.event.pull_request.number }}/head
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
+          echo "Diff size: $(wc -l < pr-diff.txt) lines"
+          head -20 pr-diff.txt
 
       - name: Run Codex Review
         id: run_codex
@@ -52,36 +53,31 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const raw = process.env.CODEX_FINAL_MESSAGE || '';
-
-            // Try to parse JSON from Codex output
-            let issues = [];
-            try {
-              // Find JSON in the output (may have extra text around it)
-              const jsonMatch = raw.match(/\{[\s\S]*"issues"[\s\S]*\}/);
-              if (jsonMatch) {
-                const parsed = JSON.parse(jsonMatch[0]);
-                issues = parsed.issues || [];
-              }
-            } catch (e) {
-              console.log('Could not parse JSON, falling back to comment:', e.message);
-            }
-
             const pr = context.payload.pull_request;
             const commitId = pr.head.sha;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // No issues or parse failed → thumbs up or plain comment
+            // Try to parse JSON
+            let issues = [];
+            try {
+              const jsonMatch = raw.match(/\{[\s\S]*"issues"[\s\S]*\}/);
+              if (jsonMatch) {
+                issues = JSON.parse(jsonMatch[0]).issues || [];
+              }
+            } catch (e) {
+              console.log('JSON parse failed:', e.message);
+            }
+
+            // No issues
             if (issues.length === 0) {
               if (raw.trim() && !raw.includes('"issues":[]')) {
-                // Non-JSON output — post as regular comment
                 await github.rest.issues.createComment({
                   owner, repo,
                   issue_number: pr.number,
                   body: `### 🤖 Codex Review (API)\n\n${raw}\n\n---\n_Powered by OpenAI Codex API_`,
                 });
               } else {
-                // No issues — react with thumbs up
                 await github.rest.reactions.createForIssue({
                   owner, repo,
                   issue_number: pr.number,
@@ -91,7 +87,7 @@ jobs:
               return;
             }
 
-            // Severity badges (same style as chatgpt-codex-connector)
+            // Severity badges
             const badges = {
               P0: '![P0](https://img.shields.io/badge/P0-red?style=flat)',
               P1: '![P1](https://img.shields.io/badge/P1-orange?style=flat)',
@@ -103,26 +99,16 @@ jobs:
             for (const issue of issues) {
               if (!issue.file || !issue.line) continue;
               const badge = badges[issue.severity] || badges.P2;
-              const body = `**${badge} ${issue.title || issue.severity}**\n\n${issue.body}\n\nUseful? React with 👍 / 👎.`;
               comments.push({
                 path: issue.file,
                 line: issue.line,
-                body,
+                body: `**${badge} ${issue.title || issue.severity}**\n\n${issue.body}\n\nUseful? React with 👍 / 👎.`,
               });
             }
 
-            // Issues without valid file/line → include in review body
-            const unlinked = issues.filter(i => !i.file || !i.line);
-            let reviewBody = `### 💡 Codex Review\n\nFound **${issues.length}** issue(s).\n\n**Reviewed commit:** \`${commitId.substring(0, 10)}\``;
-            if (unlinked.length > 0) {
-              reviewBody += '\n\n#### General issues:\n';
-              for (const issue of unlinked) {
-                const badge = badges[issue.severity] || badges.P2;
-                reviewBody += `\n- ${badge} **${issue.title || 'Issue'}**: ${issue.body}\n`;
-              }
-            }
+            const reviewBody = `### 💡 Codex Review\n\nFound **${issues.length}** issue(s).\n\n**Reviewed commit:** \`${commitId.substring(0, 10)}\``;
 
-            // Try inline review first, fallback to comment if lines are outside diff
+            // Try inline review first
             if (comments.length > 0) {
               try {
                 await github.rest.pulls.createReview({
@@ -135,20 +121,20 @@ jobs:
                 });
                 return;
               } catch (e) {
-                console.log('Inline review failed (lines may be outside diff), falling back to comment:', e.message);
+                console.log('Inline review failed, falling back:', e.message);
               }
             }
 
-            // Fallback: post all issues as a single comment
-            let fallbackBody = reviewBody;
+            // Fallback: post as comment
+            let body = reviewBody;
             for (const issue of issues) {
               const badge = badges[issue.severity] || badges.P2;
-              fallbackBody += `\n\n### \`${issue.file || 'General'}\`${issue.line ? ` (line ${issue.line})` : ''}\n${badge} **${issue.title || 'Issue'}**\n\n${issue.body}\n\nUseful? React with 👍 / 👎.`;
+              body += `\n\n### \`${issue.file || 'General'}\`${issue.line ? ` (line ${issue.line})` : ''}\n${badge} **${issue.title || 'Issue'}**\n\n${issue.body}\n\nUseful? React with 👍 / 👎.`;
             }
             await github.rest.issues.createComment({
               owner, repo,
               issue_number: pr.number,
-              body: fallbackBody,
+              body,
             });
         env:
           CODEX_FINAL_MESSAGE: ${{ needs.codex-review.outputs.final_message }}
