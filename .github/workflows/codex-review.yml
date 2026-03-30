@@ -73,14 +73,21 @@ jobs:
 
           # Inject diff vào prompt runtime — Codex nhận diff qua context,
           # không cần dùng tool đọc file → không scan được full source
+          MAX_DIFF_LINES=3000
           build_runtime_prompt() {
             local base_prompt="$1"
             local out="$2"
             cat "$base_prompt" > "$out"
-            printf '\n---\n## Nội dung diff cần review (%s lines)\n\n```diff\n' "$DIFF_LINES" >> "$out"
-            # Giới hạn 800 dòng để không vượt context limit
-            head -800 pr-diff.txt >> "$out"
-            printf '```\n\nQUAN TRỌNG: Diff đã có đầy đủ ở trên. KHÔNG dùng tool đọc thêm file nào khác.\n' >> "$out"
+            if [ "$DIFF_LINES" -gt "$MAX_DIFF_LINES" ]; then
+              printf '\n---\n## Nội dung diff cần review (%s lines — hiển thị %s dòng đầu, phần còn lại bị cắt)\n\n```diff\n' "$DIFF_LINES" "$MAX_DIFF_LINES" >> "$out"
+              head -"$MAX_DIFF_LINES" pr-diff.txt >> "$out"
+              printf '```\n\n⚠️ Diff bị cắt do vượt %s dòng. Review tập trung vào phần đã hiển thị.\n' "$MAX_DIFF_LINES" >> "$out"
+            else
+              printf '\n---\n## Nội dung diff cần review (%s lines — đầy đủ)\n\n```diff\n' "$DIFF_LINES" >> "$out"
+              cat pr-diff.txt >> "$out"
+              printf '```\n' >> "$out"
+            fi
+            printf '\nQUAN TRỌNG: Diff đã có đầy đủ ở trên. KHÔNG dùng tool đọc thêm file nào khác.\n' >> "$out"
           }
 
           build_runtime_prompt .github/codex/prompts/review.md .github/codex/prompts/review-runtime.md
