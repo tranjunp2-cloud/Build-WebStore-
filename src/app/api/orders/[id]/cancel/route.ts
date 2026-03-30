@@ -138,7 +138,7 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
     } catch (error: any) {
         console.error('[Order Cancel Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Order cancellation failed' } },
             { status: 500 }
         )
     }

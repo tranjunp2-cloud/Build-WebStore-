@@ -51,45 +51,33 @@ function shouldPushSchema(): boolean {
   return process.env.PAYLOAD_PUSH_SCHEMA === 'true'
 }
 
-function getEmailConfig() {
-  const hasMailConfig = Boolean(
-    process.env.MAIL_HOST &&
-    process.env.MAIL_PORT &&
-    process.env.MAIL_FROM_ADDRESS,
-  )
-
-  if (!hasMailConfig) {
-    return undefined
-  }
-
-  try {
-    const adapterModuleName = '@payloadcms/email-nodemailer'
-    const { nodemailerAdapter } = require(adapterModuleName)
-
-    return nodemailerAdapter({
-      defaultFromAddress: process.env.MAIL_FROM_ADDRESS || 'noreply@primeweb.app',
-      defaultFromName: process.env.MAIL_FROM_NAME || 'PrimeWeb',
-      transportOptions: {
-        host: process.env.MAIL_HOST,
-        port: parseInt(process.env.MAIL_PORT || '587'),
-        secure: process.env.MAIL_PORT === '465',
-        auth: {
-          user: process.env.MAIL_USERNAME,
-          pass: process.env.MAIL_PASSWORD,
-        },
-      },
-    })
-  } catch (error) {
-    console.warn('[Payload Config] Email adapter unavailable, email features disabled.', error)
-    return undefined
-  }
-}
-
-const emailConfig = getEmailConfig()
 
 export default buildConfig({
   serverURL: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
-  ...(emailConfig ? { email: emailConfig } : {}),
+  // Email: SMTP via AWS SES when MAIL_HOST is configured, otherwise log to console (safe fallback)
+  email: process.env.MAIL_HOST
+    ? nodemailerAdapter({
+        defaultFromAddress: process.env.MAIL_FROM_ADDRESS || 'noreply@primeweb.app',
+        defaultFromName: process.env.MAIL_FROM_NAME || 'PrimeWeb',
+        transportOptions: {
+          host: process.env.MAIL_HOST,
+          port: parseInt(process.env.MAIL_PORT || '587'),
+          secure: process.env.MAIL_PORT === '465',
+          auth: {
+            user: process.env.MAIL_USERNAME,
+            pass: process.env.MAIL_PASSWORD,
+          },
+        },
+      })
+    : nodemailerAdapter({
+        defaultFromAddress: 'noreply@primeweb.app',
+        defaultFromName: 'PrimeWeb',
+        // No SMTP configured — use stream transport (logs to console, no crash)
+        transportOptions: {
+          streamTransport: true,
+          newline: 'unix',
+        } as Record<string, unknown>,
+      }),
   admin: {
     user: Users.slug,
     meta: {

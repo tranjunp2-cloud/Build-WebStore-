@@ -27,6 +27,7 @@ const protectedPaths = [
     '/onboarding',
     '/settings',
     '/account',
+    '/help',
 ]
 
 const authPaths = ['/login', '/register']
@@ -40,7 +41,7 @@ const authPaths = ['/login', '/register']
  * - www.custom-domain.com → Tenant public site (custom domain routing)
  * - primeweb.app      → Marketing / dashboard pages
  */
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
     const { pathname, hostname } = req.nextUrl
     const url = req.nextUrl.clone()
 
@@ -107,6 +108,24 @@ export function middleware(req: NextRequest) {
         !hostname.includes('vercel.app') &&
         !hostname.includes('ondigitalocean.app')
     ) {
+        // REQ-F19-06: 301 redirect non-primary custom domains → primary domain
+        // Check via internal API to avoid DB access in edge middleware
+        try {
+            const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || `https://${PLATFORM_DOMAIN}`
+            const checkUrl = `${serverUrl}/api/domain-primary?host=${encodeURIComponent(hostname)}`
+            const checkRes = await fetch(checkUrl, { cache: 'no-store' })
+            if (checkRes.ok) {
+                const { primaryDomain, isPrimary } = await checkRes.json()
+                // If this domain is NOT the primary, 301 redirect to primary
+                if (!isPrimary && primaryDomain && primaryDomain !== hostname) {
+                    const redirectUrl = `https://${primaryDomain}${pathname}`
+                    return NextResponse.redirect(redirectUrl, { status: 301 })
+                }
+            }
+        } catch {
+            // If check fails, serve normally — don't block traffic
+        }
+
         url.pathname = `/sites/custom${pathname}`
         const response = NextResponse.rewrite(url)
         response.headers.set('x-tenant-hostname', hostname)

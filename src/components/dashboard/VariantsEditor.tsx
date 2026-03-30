@@ -67,6 +67,99 @@ export const generateVariantMatrix = (currentConfigs: VariantConfig[], currentVa
     return newVariants
 }
 
+function DesktopVariantRow({ variant, currencySymbol, vIdx, updateVariant, vt }: { variant: Variant, currencySymbol: string, vIdx: number, updateVariant: (idx: number, field: keyof Variant, val: string) => void, vt: any }) {
+    const [localVariant, setLocalVariant] = useState(variant)
+
+    useEffect(() => { setLocalVariant(variant) }, [variant])
+
+    const handleBlur = (field: keyof Variant) => {
+        if (localVariant[field] !== variant[field]) {
+            updateVariant(vIdx, field, localVariant[field]!)
+        }
+    }
+
+    const handleChange = (field: keyof Variant, value: string) => {
+        setLocalVariant(prev => ({ ...prev, [field]: value }))
+    }
+
+    return (
+        <tr className="hover:bg-white/[0.02]">
+            <td className="px-4 py-3 font-medium text-white">{variant.name}</td>
+            <td className="px-4 py-3">
+                <input type="number" min="0" step="0.01" value={localVariant.price} onChange={e => handleChange('price', e.target.value)} onBlur={() => handleBlur('price')} required
+                    className="w-full rounded-md border border-white/10 bg-transparent px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500/50" />
+            </td>
+            <td className="px-4 py-3">
+                <input type="number" min="0" step="0.01" value={localVariant.compareAtPrice || ''} onChange={e => handleChange('compareAtPrice', e.target.value)} onBlur={() => handleBlur('compareAtPrice')}
+                    className="w-full rounded-md border border-white/10 bg-transparent px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500/50" />
+            </td>
+            <td className="px-4 py-3">
+                <input type="number" min="0" value={localVariant.stock} onChange={e => handleChange('stock', e.target.value)} onBlur={() => handleBlur('stock')} required
+                    className="w-full rounded-md border border-white/10 bg-transparent px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500/50" />
+            </td>
+            <td className="px-4 py-3">
+                <input type="text" value={localVariant.sku} onChange={e => handleChange('sku', e.target.value)} onBlur={() => handleBlur('sku')}
+                    className="w-full rounded-md border border-white/10 bg-transparent px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500/50" />
+            </td>
+        </tr>
+    )
+}
+
+function MobileVariantCard({ variant, currencySymbol, vIdx, updateVariant, vt, isExpanded, toggleAccordion }: { variant: Variant, currencySymbol: string, vIdx: number, updateVariant: (idx: number, field: keyof Variant, val: string) => void, vt: any, isExpanded: boolean, toggleAccordion: () => void }) {
+    const [localVariant, setLocalVariant] = useState(variant)
+
+    useEffect(() => { setLocalVariant(variant) }, [variant])
+
+    const handleBlur = (field: keyof Variant) => {
+        if (localVariant[field] !== variant[field]) {
+            updateVariant(vIdx, field, localVariant[field]!)
+        }
+    }
+
+    const handleChange = (field: keyof Variant, value: string) => {
+        setLocalVariant(prev => ({ ...prev, [field]: value }))
+    }
+
+    return (
+        <div className="rounded-xl border border-white/10 bg-[#0B1120] overflow-hidden">
+            <button type="button" onClick={toggleAccordion}
+                className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-white tap-highlight-transparent hover:bg-white/5">
+                <span>{variant.name}</span>
+                <div className="flex items-center gap-2">
+                    {(!localVariant.price || !localVariant.stock || localVariant.stock === '0') && <span className="h-2 w-2 rounded-full bg-red-500"></span>}
+                    {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                </div>
+            </button>
+            
+            {isExpanded && (
+                <div className="border-t border-white/5 p-3 sm:p-4 space-y-4 bg-white/[0.02]">
+                    <div>
+                        <label className="text-xs text-gray-400 mb-1.5 block">{vt.price} ({currencySymbol}) *</label>
+                        <input type="number" min="0" step="0.01" value={localVariant.price} onChange={e => handleChange('price', e.target.value)} onBlur={() => handleBlur('price')}
+                            className="w-full rounded-lg border border-white/10 bg-transparent px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-400 mb-1.5 block">{vt.compareAtPrice} ({currencySymbol})</label>
+                        <input type="number" min="0" step="0.01" value={localVariant.compareAtPrice || ''} onChange={e => handleChange('compareAtPrice', e.target.value)} onBlur={() => handleBlur('compareAtPrice')}
+                            className="w-full rounded-lg border border-white/10 bg-transparent px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-400 mb-1.5 block">{vt.stock} *</label>
+                        <input type="number" min="0" value={localVariant.stock} onChange={e => handleChange('stock', e.target.value)} onBlur={() => handleBlur('stock')}
+                            className="w-full rounded-lg border border-white/10 bg-transparent px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-400 mb-1.5 block">{vt.sku}</label>
+                        <input type="text" value={localVariant.sku} onChange={e => handleChange('sku', e.target.value)} onBlur={() => handleBlur('sku')}
+                            className="w-full rounded-lg border border-white/10 bg-transparent px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+
 export function VariantsEditor({ configs, variants, onChange, currencySymbol }: VariantsEditorProps) {
     const { t } = useI18n()
     const vt = t.dashboard.products.form.variants
@@ -183,25 +276,14 @@ export function VariantsEditor({ configs, variants, onChange, currencySymbol }: 
                             </thead>
                             <tbody className="divide-y divide-white/5">
                                 {variants.map((variant, vIdx) => (
-                                    <tr key={vIdx} className="hover:bg-white/[0.02]">
-                                        <td className="px-4 py-3 font-medium text-white">{variant.name}</td>
-                                        <td className="px-4 py-3">
-                                            <input type="number" min="0" step="0.01" value={variant.price} onChange={e => updateVariant(vIdx, 'price', e.target.value)} required
-                                                className="w-full rounded-md border border-white/10 bg-transparent px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500/50" />
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <input type="number" min="0" step="0.01" value={variant.compareAtPrice || ''} onChange={e => updateVariant(vIdx, 'compareAtPrice', e.target.value)}
-                                                className="w-full rounded-md border border-white/10 bg-transparent px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500/50" />
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <input type="number" min="0" value={variant.stock} onChange={e => updateVariant(vIdx, 'stock', e.target.value)} required
-                                                className="w-full rounded-md border border-white/10 bg-transparent px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500/50" />
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <input type="text" value={variant.sku} onChange={e => updateVariant(vIdx, 'sku', e.target.value)}
-                                                className="w-full rounded-md border border-white/10 bg-transparent px-3 py-1.5 text-sm text-white outline-none focus:border-blue-500/50" />
-                                        </td>
-                                    </tr>
+                                    <DesktopVariantRow 
+                                        key={vIdx} 
+                                        variant={variant} 
+                                        currencySymbol={currencySymbol} 
+                                        vIdx={vIdx} 
+                                        updateVariant={updateVariant} 
+                                        vt={vt} 
+                                    />
                                 ))}
                             </tbody>
                         </table>
@@ -209,46 +291,18 @@ export function VariantsEditor({ configs, variants, onChange, currencySymbol }: 
 
                     {/* Mobile Accordion */}
                     <div className="md:hidden space-y-2">
-                        {variants.map((variant, vIdx) => {
-                            const isExpanded = expandedMobileIndices[vIdx]
-                            return (
-                                <div key={vIdx} className="rounded-xl border border-white/10 bg-[#0B1120] overflow-hidden">
-                                    <button type="button" onClick={() => toggleMobileAccordion(vIdx)}
-                                        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-white tap-highlight-transparent hover:bg-white/5">
-                                        <span>{variant.name}</span>
-                                        <div className="flex items-center gap-2">
-                                            {(!variant.price || !variant.stock) && <span className="h-2 w-2 rounded-full bg-red-500"></span>}
-                                            {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
-                                        </div>
-                                    </button>
-                                    
-                                    {isExpanded && (
-                                        <div className="border-t border-white/5 p-3 sm:p-4 space-y-4 bg-white/[0.02]">
-                                            <div>
-                                                <label className="text-xs text-gray-400 mb-1.5 block">{vt.price} ({currencySymbol}) *</label>
-                                                <input type="number" min="0" step="0.01" value={variant.price} onChange={e => updateVariant(vIdx, 'price', e.target.value)}
-                                                    className="w-full rounded-lg border border-white/10 bg-transparent px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-gray-400 mb-1.5 block">{vt.compareAtPrice} ({currencySymbol})</label>
-                                                <input type="number" min="0" step="0.01" value={variant.compareAtPrice || ''} onChange={e => updateVariant(vIdx, 'compareAtPrice', e.target.value)}
-                                                    className="w-full rounded-lg border border-white/10 bg-transparent px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-gray-400 mb-1.5 block">{vt.stock} *</label>
-                                                <input type="number" min="0" value={variant.stock} onChange={e => updateVariant(vIdx, 'stock', e.target.value)}
-                                                    className="w-full rounded-lg border border-white/10 bg-transparent px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-gray-400 mb-1.5 block">{vt.sku}</label>
-                                                <input type="text" value={variant.sku} onChange={e => updateVariant(vIdx, 'sku', e.target.value)}
-                                                    className="w-full rounded-lg border border-white/10 bg-transparent px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/50" />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        })}
+                        {variants.map((variant, vIdx) => (
+                            <MobileVariantCard 
+                                key={vIdx} 
+                                variant={variant} 
+                                currencySymbol={currencySymbol} 
+                                vIdx={vIdx} 
+                                updateVariant={updateVariant} 
+                                vt={vt} 
+                                isExpanded={expandedMobileIndices[vIdx] || false}
+                                toggleAccordion={() => toggleMobileAccordion(vIdx)}
+                            />
+                        ))}
                     </div>
                 </div>
             )}

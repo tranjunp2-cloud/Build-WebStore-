@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F20 Help Center — UI Interactive Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* === DARK MODE (Default) — Design System tokens === */
+:root {
+  --bg: #0B1120; --surface: #161E2E; --primary-blue: #3B82F6; --primary-teal: #2DD4BF;
+  --fg: #FFFFFF; --muted: #9CA3AF; --border: #1F2937; --secondary-bg: #1F2937;
+  --success: #10B981; --error: #EF4444; --warning: #F59E0B; --info: #3B82F6;
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0/0.5);
+  --shadow-panel: 0 4px 6px -1px rgb(0 0 0/0.6);
+  --shadow-float: 0 20px 25px -5px rgb(0 0 0/0.8);
+  --sidebar-w: 260px; --header-h: 64px;
+  --gradient-primary: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-teal) 100%);
+  --active-bg: rgba(59,130,246,.12);
+  --hover-bg: rgba(255,255,255,.05);
+}
+/* === LIGHT MODE — Design System tokens === */
+[data-theme="light"] {
+  --bg: #F8FAFC; --surface: #FFFFFF; --primary-blue: #2563EB; --primary-teal: #0D9488;
+  --fg: #0F172A; --muted: #64748B; --border: #E2E8F0; --secondary-bg: #F1F5F9;
+  --success: #059669; --error: #DC2626; --warning: #D97706; --info: #2563EB;
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0/0.1), 0 1px 2px -1px rgb(0 0 0/0.1);
+  --shadow-panel: 0 4px 6px -1px rgb(0 0 0/0.1), 0 2px 4px -2px rgb(0 0 0/0.1);
+  --shadow-float: 0 20px 25px -5px rgb(0 0 0/0.1), 0 8px 10px -6px rgb(0 0 0/0.1);
+  --active-bg: rgba(37,99,235,.08);
+  --hover-bg: rgba(0,0,0,.04);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--fg); font-size:14px; line-height:22px; overflow:hidden; height:100vh; transition:background .35s ease, color .35s ease; }
+.header, .sidebar, .guide-card, .accordion, .step-card, .tabs, .tab, .feature-item, .feature-icon, .module-tab, .qna-search input, .screenshot, .mobile-nav select { transition: background .35s ease, border-color .35s ease, color .35s ease, box-shadow .35s ease; }
+
+/* === HEADER === */
+.header { position:fixed; top:0; left:0; right:0; height:var(--header-h); background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 24px; z-index:100; gap:16px; }
+.header-logo { font-size:20px; font-weight:700; background:var(--gradient-primary); -webkit-background-clip:text; -webkit-text-fill-color:transparent; cursor:pointer; }
+.header-spacer { flex:1; }
+.header-search { background:var(--secondary-bg); border:1px solid var(--border); border-radius:var(--radius-md); padding:8px 16px; width:300px; color:var(--fg); font-size:14px; outline:none; transition:border .2s; }
+.header-search:focus { border-color:var(--primary-blue); }
+.header-bell { position:relative; cursor:pointer; font-size:20px; padding:8px; border-radius:var(--radius-md); transition:background .2s; }
+.header-bell:hover { background:var(--secondary-bg); }
+.header-bell .badge { position:absolute; top:4px; right:4px; background:var(--error); color:#fff; font-size:10px; font-weight:700; width:16px; height:16px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.header-avatar { width:36px; height:36px; border-radius:50%; background:var(--gradient-primary); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:600; font-size:14px; cursor:pointer; }
+.hamburger { display:none; font-size:22px; cursor:pointer; padding:8px; border-radius:var(--radius-md); }
+.hamburger:hover { background:var(--secondary-bg); }
+
+/* === SIDEBAR === */
+.sidebar { position:fixed; top:var(--header-h); left:0; bottom:0; width:var(--sidebar-w); background:var(--surface); border-right:1px solid var(--border); overflow-y:auto; z-index:90; transition:transform .3s ease; padding:16px 0; }
+.sidebar-section { padding:0 12px; margin-bottom:8px; }
+.sidebar-label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; padding:8px 12px; }
+.sidebar-item { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:var(--radius-md); cursor:pointer; transition:all .15s; font-size:14px; font-weight:500; color:var(--muted); text-decoration:none; }
+.sidebar-item:hover { background:var(--secondary-bg); color:var(--fg); }
+.sidebar-item.active { background:var(--active-bg); color:var(--primary-blue); font-weight:600; }
+.sidebar-item .icon { font-size:18px; width:24px; text-align:center; flex-shrink:0; }
+.sidebar-sub { padding-left:20px; }
+.sidebar-footer { position:absolute; bottom:0; left:0; right:0; padding:16px; border-top:1px solid var(--border); }
+.sidebar-footer a { display:flex; align-items:center; gap:8px; color:#25D366; font-weight:600; font-size:13px; text-decoration:none; padding:10px 12px; border-radius:var(--radius-md); transition:background .15s; }
+.sidebar-footer a:hover { background:rgba(37,211,102,.08); }
+.sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:85; }
+
+/* === MAIN CONTENT === */
+.main { margin-left:var(--sidebar-w); margin-top:var(--header-h); height:calc(100vh - var(--header-h)); overflow-y:auto; padding:32px; }
+
+/* === HELP CENTER === */
+.help-header { margin-bottom:32px; }
+.help-header h1 { font-size:32px; line-height:40px; font-weight:700; margin-bottom:8px; }
+.help-header p { color:var(--muted); font-size:16px; line-height:24px; }
+
+/* TABS */
+.tabs { display:flex; gap:4px; background:var(--secondary-bg); border-radius:var(--radius-md); padding:4px; margin-bottom:32px; width:fit-content; }
+.tab { padding:10px 20px; border-radius:6px; cursor:pointer; font-size:14px; font-weight:600; color:var(--muted); transition:all .2s; user-select:none; }
+.tab:hover { color:var(--fg); }
+.tab.active { background:var(--surface); color:var(--primary-blue); box-shadow:var(--shadow-card); }
+
+/* Mobile dropdown nav */
+.mobile-nav { display:none; margin-bottom:24px; }
+.mobile-nav select { width:100%; padding:12px 16px; border:1px solid var(--border); border-radius:var(--radius-md); font-size:14px; font-weight:600; font-family:'Inter',sans-serif; background:var(--surface); color:var(--fg); cursor:pointer; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748B' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 16px center; }
+
+/* PANEL CONTENT */
+.panel { display:none; animation:fadeIn .3s ease; }
+.panel.active { display:block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* GUIDELINE */
+.guide-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; margin-bottom:24px; box-shadow:var(--shadow-card); }
+.guide-card h2 { font-size:24px; line-height:32px; font-weight:700; margin-bottom:16px; }
+.guide-card h3 { font-size:20px; line-height:26px; font-weight:700; margin-bottom:12px; margin-top:24px; }
+.guide-card p { color:var(--muted); margin-bottom:12px; font-size:16px; line-height:24px; }
+.feature-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; margin-top:16px; }
+.feature-item { display:flex; align-items:flex-start; gap:12px; padding:16px; border:1px solid var(--border); border-radius:var(--radius-md); background:var(--secondary-bg); transition:all .2s; }
+.feature-item:hover { border-color:var(--primary-blue); background:var(--hover-bg); transform:translateY(-2px); box-shadow:var(--shadow-panel); }
+.feature-icon { font-size:28px; flex-shrink:0; width:40px; height:40px; display:flex; align-items:center; justify-content:center; background:var(--surface); border-radius:var(--radius-md); box-shadow:var(--shadow-card); }
+.feature-item h4 { font-size:14px; font-weight:600; margin-bottom:4px; }
+.feature-item p { font-size:12px; color:var(--muted); margin:0; line-height:18px; }
+
+/* Q&A ACCORDION */
+.qna-search { position:relative; margin-bottom:24px; }
+.qna-search input { width:100%; padding:12px 16px 12px 44px; border:1px solid var(--border); border-radius:var(--radius-md); font-size:14px; font-family:'Inter',sans-serif; background:var(--surface); color:var(--fg); outline:none; transition:border .2s; }
+.qna-search input:focus { border-color:var(--primary-blue); }
+.qna-search .search-icon { position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:16px; }
+.qna-category { margin-bottom:24px; }
+.qna-category h3 { font-size:16px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.accordion { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow-card); }
+.acc-item { border-bottom:1px solid var(--border); }
+.acc-item:last-child { border-bottom:none; }
+.acc-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; cursor:pointer; font-weight:600; font-size:14px; transition:background .15s; user-select:none; }
+.acc-header:hover { background:var(--secondary-bg); }
+.acc-chevron { transition:transform .25s ease; font-size:12px; color:var(--muted); }
+.acc-item.open .acc-chevron { transform:rotate(180deg); }
+.acc-body { max-height:0; overflow:hidden; transition:max-height .3s ease, padding .3s ease; }
+.acc-item.open .acc-body { max-height:500px; }
+.acc-body-inner { padding:0 20px 16px; color:var(--muted); font-size:14px; line-height:22px; }
+.empty-state { text-align:center; padding:48px 24px; color:var(--muted); }
+.empty-state .empty-icon { font-size:48px; margin-bottom:12px; }
+.empty-state p { font-size:14px; }
+
+/* MODULE GUIDES */
+.module-tabs { display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap; }
+.module-tab { padding:8px 16px; border:1px solid var(--border); border-radius:20px; cursor:pointer; font-size:13px; font-weight:600; color:var(--muted); transition:all .2s; background:var(--surface); }
+.module-tab:hover { border-color:var(--primary-blue); color:var(--primary-blue); }
+.module-tab.active { background:var(--primary-blue); color:#fff; border-color:var(--primary-blue); }
+.step-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; margin-bottom:20px; box-shadow:var(--shadow-card); }
+.step-number { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; background:var(--gradient-primary); color:#fff; font-size:13px; font-weight:700; margin-right:10px; flex-shrink:0; }
+.step-card h3 { font-size:16px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; }
+.step-card p { color:var(--muted); margin-bottom:16px; font-size:14px; line-height:22px; }
+.screenshot { width:100%; border-radius:var(--radius-md); border:1px solid var(--border); cursor:pointer; transition:all .25s; background:var(--secondary-bg); overflow:hidden; position:relative; }
+.screenshot:hover { border-color:var(--primary-blue); box-shadow:var(--shadow-panel); transform:scale(1.01); }
+.screenshot img { width:100%; height:auto; display:block; }
+.screenshot-placeholder { height:200px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--muted); font-size:13px; }
+.screenshot-placeholder .cam { font-size:32px; }
+.screenshot .zoom-hint { position:absolute; bottom:8px; right:8px; background:rgba(0,0,0,.6); color:#fff; font-size:11px; padding:4px 8px; border-radius:var(--radius-sm); opacity:0; transition:opacity .2s; }
+.screenshot:hover .zoom-hint { opacity:1; }
+
+/* LIGHTBOX */
+.lightbox { display:none; position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.85); align-items:center; justify-content:center; cursor:zoom-out; animation:lbFadeIn .25s ease; }
+.lightbox.show { display:flex; }
+@keyframes lbFadeIn { from{opacity:0} to{opacity:1} }
+.lightbox-close { position:absolute; top:20px; right:20px; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.15); color:#fff; border:none; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s; z-index:1001; }
+.lightbox-close:hover { background:rgba(255,255,255,.3); }
+.lightbox-content { max-width:90vw; max-height:85vh; border-radius:var(--radius-lg); overflow:hidden; cursor:default; touch-action:none; }
+.lightbox-content .screenshot-placeholder { width:700px; max-width:90vw; height:450px; background:#1e293b; border-radius:var(--radius-lg); }
+.lightbox-hint { position:absolute; bottom:24px; left:50%; transform:translateX(-50%); color:rgba(255,255,255,.6); font-size:12px; }
+
+/* THEME TOGGLE BUTTON */
+.theme-toggle { background:var(--secondary-bg); border:1px solid var(--border); border-radius:var(--radius-md); width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; transition:all .25s ease; position:relative; overflow:hidden; }
+.theme-toggle:hover { background:var(--hover-bg); border-color:var(--primary-blue); transform:scale(1.08); }
+.theme-toggle:active { transform:scale(0.95); }
+.theme-icon-sun, .theme-icon-moon { position:absolute; transition:transform .4s ease, opacity .3s ease; }
+[data-theme="dark"] .theme-icon-sun { display:inline !important; opacity:1; transform:rotate(0deg); }
+[data-theme="dark"] .theme-icon-moon { display:none !important; }
+[data-theme="light"] .theme-icon-sun { display:none !important; }
+[data-theme="light"] .theme-icon-moon { display:inline !important; opacity:1; transform:rotate(0deg); }
+
+/* === MOBILE === */
+@media(max-width:768px) {
+  .sidebar { transform:translateX(-100%); width:280px; }
+  .sidebar.open { transform:translateX(0); }
+  .sidebar-overlay.show { display:block; }
+  .hamburger { display:block; }
+  .main { margin-left:0; padding:20px 16px; }
+  .header-search { display:none; }
+  .tabs { display:none; }
+  .mobile-nav { display:block; }
+  .feature-grid { grid-template-columns:1fr; }
+  .module-tabs { gap:6px; }
+  .module-tab { padding:6px 12px; font-size:12px; }
+  .help-header h1 { font-size:24px; line-height:32px; }
+  .lightbox-content .screenshot-placeholder { width:90vw; height:300px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="hamburger" onclick="toggleSidebar()">☰</div>
+  <div class="header-logo">PrimeWeb</div>
+  <input type="text" class="header-search" placeholder="Search...">
+  <div class="header-spacer"></div>
+  <div class="header-bell" title="Notifications">🔔<span class="badge">3</span></div>
+  <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
+    <span class="theme-icon-sun">☀️</span>
+    <span class="theme-icon-moon" style="display:none">🌙</span>
+  </button>
+  <div class="header-avatar" title="Admin">A</div>
+</header>
+
+<!-- SIDEBAR -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-label">Main</div>
+    <a class="sidebar-item" href="#"><span class="icon">📊</span>Dashboard</a>
+    <a class="sidebar-item" href="#"><span class="icon">🌐</span>My Webstore</a>
+    <a class="sidebar-item" href="#"><span class="icon">📦</span>Products</a>
+    <a class="sidebar-item" href="#"><span class="icon">🛒</span>Orders</a>
+    <a class="sidebar-item" href="#"><span class="icon">📝</span>Blog</a>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-label">Settings</div>
+    <a class="sidebar-item" href="#"><span class="icon">⚙️</span>Store Config</a>
+    <a class="sidebar-item" href="#"><span class="icon">🔔</span>Notifications</a>
+    <a class="sidebar-item active" href="#"><span class="icon">❓</span>Help Center</a>
+  </div>
+  <div class="sidebar-footer">
+    <a href="https://wa.me/60123456789" target="_blank">💬 WhatsApp Support</a>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+  <div class="help-header">
+    <h1>📖 Help Center</h1>
+    <p>Tìm hiểu cách sử dụng hệ thống quản lý cửa hàng trực tuyến của bạn.</p>
+  </div>
+
+  <!-- Desktop Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('overview')">📋 Overview</div>
+    <div class="tab" onclick="switchTab('qna')">❓ Q&A</div>
+    <div class="tab" onclick="switchTab('modules')">📚 Module Guides</div>
+  </div>
+
+  <!-- Mobile Dropdown Nav -->
+  <div class="mobile-nav">
+    <select onchange="switchTab(this.value)">
+      <option value="overview">📋 Overview</option>
+      <option value="qna">❓ Q&A</option>
+      <option value="modules">📚 Module Guides</option>
+    </select>
+  </div>
+
+  <!-- PANEL: OVERVIEW -->
+  <div class="panel active" id="panel-overview">
+    <div class="guide-card">
+      <h2>👋 Chào mừng bạn đến với EchPrime!</h2>
+      <p>EchPrime CMS giúp bạn quản lý toàn bộ cửa hàng trực tuyến — từ tạo website, quản lý sản phẩm, xử lý đơn hàng đến phân tích doanh thu. Dưới đây là tổng quan các tính năng chính.</p>
+      <h3>🚀 Tính năng chính</h3>
+      <div class="feature-grid">
+        <div class="feature-item"><div class="feature-icon">📊</div><div><h4>Dashboard</h4><p>Xem tổng quan doanh thu, đơn hàng, khách truy cập theo thời gian thực.</p></div></div>
+        <div class="feature-item"><div class="feature-icon">🤖</div><div><h4>AI Website Builder</h4><p>Tạo website bán hàng chuyên nghiệp chỉ trong 5 phút với AI.</p></div></div>
+        <div class="feature-item"><div class="feature-icon">📦</div><div><h4>Products</h4><p>Quản lý sản phẩm, giá RM, tồn kho, Halal Badge và ảnh sản phẩm.</p></div></div>
+        <div class="feature-item"><div class="feature-icon">🛒</div><div><h4>Orders</h4><p>Xử lý đơn hàng COD, Bank Transfer, DuitNow. In hoá đơn 1 click.</p></div></div>
+        <div class="feature-item"><div class="feature-icon">📝</div><div><h4>Blog</h4><p>Viết bài blog SEO-friendly để thu hút thêm khách hàng.</p></div></div>
+        <div class="feature-item"><div class="feature-icon">⚙️</div><div><h4>Store Settings</h4><p>Cấu hình tên miền, thanh toán, mời nhân viên quản trị.</p></div></div>
+      </div>
+      <h3>📞 Cần hỗ trợ thêm?</h3>
+      <p>Nếu bạn không tìm thấy câu trả lời, hãy liên hệ đội ngũ hỗ trợ qua WhatsApp hoặc email support@echprime.com.</p>
+    </div>
+  </div>
+
+  <!-- PANEL: Q&A -->
+  <div class="panel" id="panel-qna">
+    <div class="qna-search">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="qnaSearchInput" placeholder="Tìm kiếm câu hỏi..." oninput="debounceSearch()">
+    </div>
+    <div id="qnaContent">
+      <div class="qna-category" data-cat="products">
+        <h3>🛍️ Quản Lý Sản Phẩm</h3>
+        <div class="accordion">
+          <div class="acc-item" data-q="thêm sản phẩm mới add product"><div class="acc-header" onclick="toggleAcc(this)">Làm sao để thêm sản phẩm mới?<span class="acc-chevron">▼</span></div><div class="acc-body"><div class="acc-body-inner">Vào menu <strong>Products</strong> → nhấn nút <strong>[+ Thêm Sản Phẩm]</strong> ở góc trên bên phải. Điền tên, giá RM, mô tả, upload ảnh sản phẩm (tối đa 10 ảnh, định dạng WebP recommended). Nhấn <strong>Save</strong> để lưu.</div></div></div>
+          <div class="acc-item" data-q="upload nhiều ảnh multiple images"><div class="acc-header" onclick="toggleAcc(this)">Làm sao upload nhiều ảnh cùng lúc?<span class="acc-chevron">▼</span></div><div class="acc-body"><div class="acc-body-inner">Kéo thả nhiều ảnh vào khung upload, hoặc dùng nút <strong>"Browse Files"</strong> để chọn nhiều file cùng lúc. Tối đa 10 ảnh, mỗi ảnh ≤ 5MB. Định dạng hỗ trợ: JPG, PNG, WebP.</div></div></div>
+          <div class="acc-item" data-q="halal badge chứng nhận"><div class="acc-header" onclick="toggleAcc(this)">Halal Badge hiển thị ở đâu?<span class="acc-chevron">▼</span></div><div class="acc-body"><div class="acc-body-inner">Halal Badge (JAKIM) sẽ hiển thị trên <strong>Product Card</strong> và <strong>Product Detail Page</strong> ở storefront. Bật tính năng này trong form chỉnh sửa sản phẩm → mục <strong>"Halal Certification"</strong>.</div></div></div>
+        </div>
+      </div>
+      <div class="qna-category" data-cat="orders">
+        <h3>🛒 Quản Lý Đơn Hàng</h3>
+        <div class="accordion">
+          <div class="acc-item" data-q="cod đơn hàng xử lý"><div class="acc-header" onclick="toggleAcc(this)">Đơn hàng COD xử lý như thế nào?<span class="acc-chevron">▼</span></div><div class="acc-body"><div class="acc-body-inner">Đơn COD sẽ có trạng thái <strong>"Pending Payment"</strong> cho đến khi shipper xác nhận đã thu tiền. Bạn có thể cập nhật trạng thái thủ công trong chi tiết đơn hàng → <strong>"Mark as Paid"</strong>.</div></div></div>
+          <div class="acc-item" data-q="in hoá đơn packing slip print"><div class="acc-header" onclick="toggleAcc(this)">Cách in hoá đơn / packing slip?<span class="acc-chevron">▼</span></div><div class="acc-body"><div class="acc-body-inner">Vào <strong>Orders</strong> → chọn đơn hàng → nhấn nút <strong>"Print Invoice"</strong> hoặc <strong>"Print Packing Slip"</strong>. Hệ thống sẽ tạo file PDF tương ứng để in.</div></div></div>
+        </div>
+      </div>
+      <div class="qna-category" data-cat="payments">
+        <h3>💳 Thanh Toán</h3>
+        <div class="accordion">
+          <div class="acc-item" data-q="fpx bank duitnow thanh toán"><div class="acc-header" onclick="toggleAcc(this)">Hệ thống hỗ trợ phương thức thanh toán nào?<span class="acc-chevron">▼</span></div><div class="acc-body"><div class="acc-body-inner">EchPrime hỗ trợ: <strong>FPX</strong> (online banking Malaysia), <strong>Credit/Debit Card</strong> (Visa, Mastercard), <strong>DuitNow QR</strong>, <strong>COD</strong> (Cash on Delivery), và <strong>Bank Transfer</strong> thủ công.</div></div></div>
+          <div class="acc-item" data-q="sst tax thuế"><div class="acc-header" onclick="toggleAcc(this)">SST 6% được tính tự động không?<span class="acc-chevron">▼</span></div><div class="acc-body"><div class="acc-body-inner">Có, khi bạn bật <strong>SST</strong> trong <strong>Store Settings → Tax Configuration</strong>, hệ thống sẽ tự động tính SST 6% trên tổng giá trị đơn hàng và hiển thị rõ ràng cho khách hàng.</div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="empty-state" id="qnaEmpty" style="display:none">
+      <div class="empty-icon">📭</div>
+      <p><strong>No answers found</strong></p>
+      <p style="margin-top:4px">Thử từ khoá khác hoặc liên hệ hỗ trợ qua WhatsApp.</p>
+    </div>
+  </div>
+
+  <!-- PANEL: MODULE GUIDES -->
+  <div class="panel" id="panel-modules">
+    <div class="module-tabs">
+      <div class="module-tab active" onclick="switchModule('products',this)">📦 Products</div>
+      <div class="module-tab" onclick="switchModule('orders',this)">🛒 Orders</div>
+      <div class="module-tab" onclick="switchModule('dashboard',this)">📊 Dashboard</div>
+      <div class="module-tab" onclick="switchModule('blog',this)">📝 Blog</div>
+      <div class="module-tab" onclick="switchModule('settings',this)">⚙️ Settings</div>
+    </div>
+
+    <div class="module-content" id="module-products">
+      <div class="step-card"><h3><span class="step-number">1</span>Truy cập mục Products</h3><p>Từ Sidebar trái, nhấn vào mục <strong>"📦 Products"</strong> để mở danh sách sản phẩm hiện có của bạn.</p><div class="screenshot" onclick="openLightbox('Danh sách Products — Product List View')"><div class="screenshot-placeholder"><span class="cam">📷</span>Screenshot: Danh sách Products</div><span class="zoom-hint">🔍 Click to zoom</span></div></div>
+      <div class="step-card"><h3><span class="step-number">2</span>Tạo Sản Phẩm Mới</h3><p>Nhấn nút <strong>[+ Thêm Sản Phẩm]</strong> ở góc trên bên phải. Điền thông tin vào form:</p><ul style="color:var(--muted);margin:0 0 16px 20px;font-size:14px;line-height:24px"><li>Tên sản phẩm, giá RM, mô tả chi tiết</li><li>Upload ảnh sản phẩm (WebP recommended, ≤ 5MB/ảnh)</li><li>Bật Halal Badge nếu sản phẩm có chứng nhận JAKIM</li><li>Thiết lập tồn kho và trọng lượng giao hàng</li></ul><div class="screenshot" onclick="openLightbox('Form tạo sản phẩm — Product Create Form')"><div class="screenshot-placeholder"><span class="cam">📷</span>Screenshot: Form tạo sản phẩm</div><span class="zoom-hint">🔍 Click to zoom</span></div></div>
+      <div class="step-card"><h3><span class="step-number">3</span>Quản lý Ảnh Sản Phẩm</h3><p>Kéo thả hoặc nhấn <strong>Browse Files</strong> để upload nhiều ảnh. Kéo thả để sắp xếp thứ tự. Ảnh đầu tiên sẽ là ảnh đại diện trên Storefront.</p><div class="screenshot" onclick="openLightbox('Quản lý ảnh — Image Gallery Manager')"><div class="screenshot-placeholder"><span class="cam">📷</span>Screenshot: Quản lý ảnh sản phẩm</div><span class="zoom-hint">🔍 Click to zoom</span></div></div>
+    </div>
+
+    <div class="module-content" id="module-orders" style="display:none">
+      <div class="step-card"><h3><span class="step-number">1</span>Xem Danh Sách Đơn Hàng</h3><p>Vào mục <strong>"🛒 Orders"</strong> để xem tất cả đơn hàng. Sử dụng bộ lọc Status để tìm đơn cần xử lý.</p><div class="screenshot" onclick="openLightbox('Orders List — Bảng danh sách đơn hàng')"><div class="screenshot-placeholder"><span class="cam">📷</span>Screenshot: Danh sách đơn hàng</div><span class="zoom-hint">🔍 Click to zoom</span></div></div>
+      <div class="step-card"><h3><span class="step-number">2</span>Xử Lý Đơn Hàng</h3><p>Click vào đơn hàng để xem chi tiết. Cập nhật trạng thái: <strong>Confirmed → Shipped → Delivered</strong>. Nhập mã tracking J&T/Pos Laju.</p><div class="screenshot" onclick="openLightbox('Order Detail — Chi tiết đơn hàng')"><div class="screenshot-placeholder"><span class="cam">📷</span>Screenshot: Chi tiết đơn hàng</div><span class="zoom-hint">🔍 Click to zoom</span></div></div>
+    </div>
+
+    <div class="module-content" id="module-dashboard" style="display:none">
+      <div class="step-card"><h3><span class="step-number">1</span>Tổng Quan Dashboard</h3><p>Dashboard hiển thị các chỉ số quan trọng: tổng doanh thu, số đơn hàng, khách truy cập và Quick Actions.</p><div class="screenshot" onclick="openLightbox('Dashboard Overview — Tổng quan')"><div class="screenshot-placeholder"><span class="cam">📷</span>Screenshot: Dashboard Overview</div><span class="zoom-hint">🔍 Click to zoom</span></div></div>
+    </div>
+
+    <div class="module-content" id="module-blog" style="display:none">
+      <div class="step-card"><h3><span class="step-number">1</span>Tạo Bài Blog Mới</h3><p>Vào <strong>"📝 Blog"</strong> → nhấn <strong>[+ New Post]</strong>. Viết nội dung với Rich Text Editor, thêm ảnh, set SEO meta.</p><div class="screenshot" onclick="openLightbox('Blog Editor — Trình soạn bài viết')"><div class="screenshot-placeholder"><span class="cam">📷</span>Screenshot: Blog Editor</div><span class="zoom-hint">🔍 Click to zoom</span></div></div>
+    </div>
+
+    <div class="module-content" id="module-settings" style="display:none">
+      <div class="step-card"><h3><span class="step-number">1</span>Cấu Hình Tên Miền</h3><p>Vào <strong>"⚙️ Settings → Domains"</strong>. Thêm custom domain, cấu hình DNS (A Record, CNAME), verify kết nối.</p><div class="screenshot" onclick="openLightbox('Domain Settings — Cấu hình tên miền')"><div class="screenshot-placeholder"><span class="cam">📷</span>Screenshot: Domain Management</div><span class="zoom-hint">🔍 Click to zoom</span></div></div>
+    </div>
+  </div>
+</main>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <button class="lightbox-close" onclick="closeLightbox(event,true)">✕</button>
+  <div class="lightbox-content" onclick="event.stopPropagation()">
+    <div class="screenshot-placeholder" style="background:#1e293b;color:#94a3b8">
+      <span class="cam" style="font-size:48px">🖼️</span>
+      <span id="lightboxTitle" style="font-size:16px;font-weight:600;margin-top:8px"></span>
+      <span style="font-size:12px;margin-top:4px">Full resolution screenshot</span>
+    </div>
+  </div>
+  <div class="lightbox-hint">ESC to close · Pinch to zoom on mobile</div>
+</div>
+
+<script>
+// Sidebar toggle (mobile)
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('show');
+}
+
+// Tab switching
+function switchTab(tab) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => { if(t.textContent.toLowerCase().includes(tab === 'overview' ? 'overview' : tab)) t.classList.add('active'); });
+  // Close mobile sidebar
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// Accordion toggle
+function toggleAcc(el) {
+  el.parentElement.classList.toggle('open');
+}
+
+// Q&A Search with debounce
+let searchTimeout;
+function debounceSearch() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(filterQnA, 300);
+}
+function filterQnA() {
+  const q = document.getElementById('qnaSearchInput').value.toLowerCase().trim();
+  const cats = document.querySelectorAll('.qna-category');
+  let anyVisible = false;
+  cats.forEach(cat => {
+    const items = cat.querySelectorAll('.acc-item');
+    let catVisible = false;
+    items.forEach(item => {
+      const text = item.getAttribute('data-q') + ' ' + item.textContent.toLowerCase();
+      if(!q || text.includes(q)) { item.style.display=''; catVisible=true; anyVisible=true; }
+      else { item.style.display='none'; }
+    });
+    cat.style.display = catVisible ? '' : 'none';
+  });
+  document.getElementById('qnaEmpty').style.display = anyVisible ? 'none' : 'block';
+  document.getElementById('qnaContent').style.display = anyVisible ? 'block' : 'none';
+}
+
+// Module switching
+function switchModule(mod, el) {
+  document.querySelectorAll('.module-content').forEach(m => m.style.display='none');
+  document.querySelectorAll('.module-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('module-'+mod).style.display='block';
+  if(el) el.classList.add('active');
+}
+
+// Lightbox
+function openLightbox(title) {
+  document.getElementById('lightboxTitle').textContent = title;
+  document.getElementById('lightbox').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox(e, force) {
+  if(force || e.target === document.getElementById('lightbox')) {
+    document.getElementById('lightbox').classList.remove('show');
+    document.body.style.overflow = '';
+  }
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape') { document.getElementById('lightbox').classList.remove('show'); document.body.style.overflow=''; }});
+
+// Theme Toggle
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+}
+// Restore saved theme (default: dark)
+(function() {
+  const saved = localStorage.getItem('theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+})();
+</script>
+</body>
+</html>
