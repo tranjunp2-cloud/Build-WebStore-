@@ -13,14 +13,15 @@ export default async function OnboardingPage() {
     if (user) {
         let shouldRedirect = false
         try {
-            const rawTenant = user.tenants?.[0]?.tenant
-            const tenantId = rawTenant && typeof rawTenant === 'object' ? rawTenant.id : rawTenant
+            const tenantIds = (user.tenants || [])
+                .map(t => t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
+                .filter(Boolean) as string[]
 
-            if (tenantId) {
+            if (tenantIds.length > 0) {
                 const payload = await getPayload({ config })
                 const sites = await payload.find({
                     collection: 'sites',
-                    where: { tenant: { equals: tenantId } },
+                    where: { tenant: { in: tenantIds } },
                     limit: 1,
                 })
                 shouldRedirect = sites.docs.length > 0
