@@ -30,10 +30,11 @@ export async function PATCH(
         if (!existingSite) {
             return NextResponse.json({ error: 'Site not found' }, { status: 404 })
         }
-        const userTenantId = (user as any).tenants?.[0]?.tenant
-        const resolvedUserTenantId = typeof userTenantId === 'object' ? userTenantId?.id : userTenantId
-        const siteTenantId = typeof existingSite.tenant === 'object' ? (existingSite.tenant as any).id : existingSite.tenant
-        if (String(siteTenantId) !== String(resolvedUserTenantId)) {
+        type TenantRef = string | number | { id: string | number }
+        const resolveTenantId = (t: TenantRef) => String(typeof t === 'object' ? t.id : t)
+        const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
+        const siteTenantId = resolveTenantId(existingSite.tenant as TenantRef)
+        if (!userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 

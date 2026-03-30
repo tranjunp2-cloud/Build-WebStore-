@@ -36,10 +36,11 @@ export async function PATCH(
         }
 
         // Verify ownership (tenant isolation)
-        const userTenantId = (user as any).tenants?.[0]?.tenant
-        const resolvedUserTenantId = typeof userTenantId === 'object' ? userTenantId?.id : userTenantId
-        const siteTenantId = typeof existing.tenant === 'object' ? (existing.tenant as any).id : existing.tenant
-        if (String(siteTenantId) !== String(resolvedUserTenantId)) {
+        type TenantRef = string | number | { id: string | number }
+        const resolveTenantId = (t: TenantRef) => String(typeof t === 'object' ? t.id : t)
+        const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
+        const siteTenantId = resolveTenantId(existing.tenant as TenantRef)
+        if (!userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
             return NextResponse.json(
                 { success: false, error: { code: 'FORBIDDEN', message: 'Not your site' } },
                 { status: 403 }
@@ -123,10 +124,11 @@ export async function DELETE(
         }
 
         // Verify ownership (tenant isolation)
-        const userTenantId = (user as any).tenants?.[0]?.tenant
-        const resolvedUserTenantId = typeof userTenantId === 'object' ? userTenantId?.id : userTenantId
-        const siteTenantId = typeof existing.tenant === 'object' ? (existing.tenant as any).id : existing.tenant
-        if (String(siteTenantId) !== String(resolvedUserTenantId)) {
+        type TenantRef = string | number | { id: string | number }
+        const resolveTenantId = (t: TenantRef) => String(typeof t === 'object' ? t.id : t)
+        const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
+        const siteTenantId = resolveTenantId(existing.tenant as TenantRef)
+        if (!userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
             return NextResponse.json(
                 { success: false, error: { code: 'FORBIDDEN', message: 'Not your site' } },
                 { status: 403 }
