@@ -48,12 +48,22 @@ export const BaseBlockSchema = z.object({
     sectionLabel: z.string().optional(),
 })
 
+import type { SiteContactInfo, SiteSocialLinks, SiteBranding } from '@/lib/site-settings'
+
+export type SiteData = {
+    contactInfo?: SiteContactInfo | null
+    socialLinks?: SiteSocialLinks | null
+    name?: string | null
+    branding?: SiteBranding | null
+    [key: string]: unknown
+}
+
 // ── Block Component Props ────────────────────────────────────────────────────
 export type BlockProps<T extends Record<string, unknown> = Record<string, unknown>> = {
     block: T & BaseBlockConfig
     theme: ThemeConfig
-    site?: unknown
-    page?: unknown
+    site?: SiteData | null
+    page?: Record<string, unknown> | null
 }
 
 // ── Block Metadata (for AI Editor) ───────────────────────────────────────────
