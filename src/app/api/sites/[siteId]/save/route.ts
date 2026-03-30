@@ -107,7 +107,7 @@ export async function PATCH(
     } catch (error: any) {
         console.error('[Save Error]', error)
         return NextResponse.json(
-            { error: error?.message || 'Save failed' },
+            { error: 'Save failed' },
             { status: 500 },
         )
     }

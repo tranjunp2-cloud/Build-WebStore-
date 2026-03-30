@@ -95,8 +95,6 @@ Rules:
                 message = 'Hệ thống AI đang quá tải hoặc hết hạn ngạch (Quota Exceeded), vui lòng thử lại sau hoặc báo admin.'
             } else if (error.message.includes('timeout')) {
                 message = 'Hệ thống AI phản hồi quá chậm (Timeout), vui lòng nhập ít văn bản hơn hoặc thử lại sau.'
-            } else {
-                message = error.message
             }
         }
         

@@ -11,7 +11,7 @@ export function ProductsEmptyState({ onAddProduct }: ProductsEmptyStateProps) {
 
     return (
         <div className="flex h-[60vh] flex-col items-center justify-center rounded-xl border border-dashed border-white/20 bg-[#1E293B]/20 px-6 py-12 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-500/10 mb-6">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#2DD4BF]/10 mb-6">
                 <PackageOpen className="h-10 w-10 text-blue-400" />
             </div>
             <h2 className="mb-2 text-xl font-semibold text-white">{t.dashboard.products.empty.title}</h2>
@@ -21,14 +21,14 @@ export function ProductsEmptyState({ onAddProduct }: ProductsEmptyStateProps) {
             {onAddProduct ? (
                 <button
                     onClick={onAddProduct}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-medium text-white shadow-lg shadow-blue-500/25 transition-colors hover:bg-blue-500"
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#2DD4BF] px-6 py-3 text-sm font-semibold text-[#0B1120] shadow-lg shadow-[#2DD4BF]/20 transition-colors hover:bg-[#2DD4BF]/90"
                 >
                     + {t.dashboard.products.addProduct}
                 </button>
             ) : (
                 <Link
                     href="/products/new"
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-medium text-white shadow-lg shadow-blue-500/25 transition-colors hover:bg-blue-500"
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#2DD4BF] px-6 py-3 text-sm font-semibold text-[#0B1120] shadow-lg shadow-[#2DD4BF]/20 transition-colors hover:bg-[#2DD4BF]/90"
                 >
                     + {t.dashboard.products.addProduct}
                 </Link>

@@ -122,7 +122,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
       },
     })
   } catch (e: any) {
-    console.error('[Preview Error]', e.message)
-    return new NextResponse(`Error: ${e.message}`, { status: 500 })
+    console.error('[Preview Error]', e)
+    return new NextResponse('Failed to generate preview. Please try again later.', { status: 500 })
   }
 })
