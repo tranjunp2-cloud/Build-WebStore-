@@ -5,44 +5,104 @@ import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
+import com.primeweb.pages.BasePage;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 /**
- * BaseTest serves as the core test class bridging JUnit 5 lifecycle hooks to Playwright instances.
- * All test suites must extend this to avoid repetitive browser start/stop code.
+ * BaseTest — JUnit 5 lifecycle hooks + Playwright browser management.
+ * Login once, save auth state, reuse for all tests.
  */
 public abstract class BaseTest {
     protected static Playwright playwright;
     protected static Browser browser;
+    private static final Path AUTH_STATE = Paths.get("auth-state.json");
 
     protected BrowserContext context;
     protected Page page;
 
+    static String getBaseUrl() {
+        return BasePage.getBaseUrl();
+    }
+
+    static boolean isHeadless() {
+        String headless = System.getenv("HEADLESS");
+        if (headless != null) return Boolean.parseBoolean(headless);
+        // Default: headless on CI, headed locally
+        return System.getenv("CI") != null;
+    }
+
     @BeforeAll
     static void launchBrowser() {
         playwright = Playwright.create();
-        // Use Chromium for default tests, set headless = false to see the UI running
-        browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
+        browser = playwright.chromium().launch(
+            new BrowserType.LaunchOptions().setHeadless(isHeadless())
+        );
+
+        // Login once and save auth state for all tests
+        if (!Files.exists(AUTH_STATE)) {
+            loginAndSaveState();
+        }
+    }
+
+    /** Login with test account → save cookies/storage to auth-state.json */
+    private static void loginAndSaveState() {
+        String email = System.getenv("TEST_EMAIL");
+        String password = System.getenv("TEST_PASSWORD");
+        if (email == null || email.isEmpty() || password == null || password.isEmpty()) {
+            throw new RuntimeException(
+                "❌ TEST_EMAIL and TEST_PASSWORD env vars are required. "
+                + "Set them in .env file or CI secrets."
+            );
+        }
+
+        BrowserContext authCtx = browser.newContext();
+        Page authPage = authCtx.newPage();
+
+        authPage.navigate(getBaseUrl() + "/login");
+        authPage.waitForLoadState();
+
+        // Fill login form
+        authPage.locator("input[type='email'], input[name='email']").fill(email);
+        authPage.locator("input[type='password'], input[name='password']").fill(password);
+        authPage.locator("button:has-text('Sign in'), button[type='submit']").click();
+
+        // Wait for redirect after login (dashboard or builder)
+        authPage.waitForURL(url -> !url.contains("/login"), new Page.WaitForURLOptions().setTimeout(15000));
+
+        // Save auth state
+        authCtx.storageState(new BrowserContext.StorageStateOptions().setPath(AUTH_STATE));
+        authCtx.close();
+
+        System.out.println("✅ Auth state saved to " + AUTH_STATE);
     }
 
     @AfterAll
     static void closeBrowser() {
         playwright.close();
+        // Clean up auth state
+        try { Files.deleteIfExists(AUTH_STATE); } catch (Exception ignored) {}
     }
 
     @BeforeEach
     void createContextAndPage() {
-        // Create an isolated incognito browser context for each test
-        context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1280, 720));
+        // Create context WITH saved auth state → already logged in
+        context = browser.newContext(
+            new Browser.NewContextOptions()
+                .setViewportSize(1280, 720)
+                .setStorageStatePath(AUTH_STATE)
+        );
         page = context.newPage();
     }
 
     @AfterEach
     void closeContext() {
-        // Close context after test completes to clean up trace files and session data
         context.close();
     }
 }

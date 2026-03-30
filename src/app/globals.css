@@ -72,6 +72,7 @@
 
 /* ── Component Utilities ──────────────────────────────────────────────────── */
 @layer components {
+
   /* Glass card effect */
   .glass {
     @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl;
@@ -101,41 +102,20 @@
 
   /* Button styles */
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl
-           bg-gradient-to-r from-sky-500 to-blue-600
-           text-white font-semibold
-           hover:from-sky-400 hover:to-blue-500
-           shadow-lg shadow-sky-500/25
-           transition-all duration-200
-           active:scale-95;
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-semibold hover:from-sky-400 hover:to-blue-500 shadow-lg shadow-sky-500/25 transition-all duration-200 active:scale-95;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl
-           bg-white/10 border border-white/20
-           text-white font-semibold
-           hover:bg-white/20 hover:border-white/30
-           transition-all duration-200
-           active:scale-95;
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white/10 border border-white/20 text-white font-semibold hover:bg-white/20 hover:border-white/30 transition-all duration-200 active:scale-95;
   }
 
   .btn-accent {
-    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl
-           bg-gradient-to-r from-purple-500 to-pink-600
-           text-white font-semibold
-           hover:from-purple-400 hover:to-pink-500
-           shadow-lg shadow-purple-500/25
-           transition-all duration-200
-           active:scale-95;
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold hover:from-purple-400 hover:to-pink-500 shadow-lg shadow-purple-500/25 transition-all duration-200 active:scale-95;
   }
 
   /* Input styles */
   .input {
-    @apply w-full px-4 py-3 rounded-xl
-           bg-zinc-900 border border-zinc-700
-           text-white placeholder:text-zinc-500
-           focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20
-           transition-all duration-200;
+    @apply w-full px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-700 text-white placeholder:text-zinc-500 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all duration-200;
   }
 
   /* Card styles */
@@ -155,15 +135,13 @@
 
   /* Sidebar navigation item */
   .nav-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl
-           text-zinc-400 text-sm font-medium
-           hover:bg-white/5 hover:text-white
-           transition-all duration-150;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-zinc-400 text-sm font-medium hover:bg-white/5 hover:text-white transition-all duration-150;
   }
 
   .nav-item-active {
     @apply bg-sky-500/10 text-sky-400 border border-sky-500/20;
   }
+
 }
 
 /* ── Animations ────────────────────────────────────────────────────────────── */
@@ -173,50 +151,113 @@
     animation: shimmer 2s linear infinite;
   }
 
-  @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
+  /* Hide scrollbar but keep scrollable */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 
-  .animation-delay-100 { animation-delay: 100ms; }
-  .animation-delay-200 { animation-delay: 200ms; }
-  .animation-delay-300 { animation-delay: 300ms; }
-  .animation-delay-500 { animation-delay: 500ms; }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
 
   /* LadiPage-style: floating components */
   .animate-float {
     animation: float 6s ease-in-out infinite;
   }
+
   .animate-float-slow {
     animation: float 8s ease-in-out infinite;
   }
+
   .animate-float-delay {
     animation: float 6s ease-in-out infinite;
     animation-delay: 1.5s;
   }
+
   @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-8px);
+    }
   }
+
   .hero-laptop-shadow {
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255,255,255,0.05);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
   }
 
   /* Section entrance (LadiPage-style) */
   .animate-fade-in-up {
     animation: fadeInUp 0.6s ease-out forwards;
   }
-  .animate-fade-in-up-1 { animation-delay: 0.1s; opacity: 0; }
-  .animate-fade-in-up-2 { animation-delay: 0.2s; opacity: 0; }
-  .animate-fade-in-up-3 { animation-delay: 0.3s; opacity: 0; }
-  .animate-fade-in-up-4 { animation-delay: 0.4s; opacity: 0; }
-  .animate-fade-in-up-5 { animation-delay: 0.5s; opacity: 0; }
-  .animate-fade-in-up-6 { animation-delay: 0.6s; opacity: 0; }
+
+  .animate-fade-in-up-1 {
+    animation-delay: 0.1s;
+    opacity: 0;
+  }
+
+  .animate-fade-in-up-2 {
+    animation-delay: 0.2s;
+    opacity: 0;
+  }
+
+  .animate-fade-in-up-3 {
+    animation-delay: 0.3s;
+    opacity: 0;
+  }
+
+  .animate-fade-in-up-4 {
+    animation-delay: 0.4s;
+    opacity: 0;
+  }
+
+  .animate-fade-in-up-5 {
+    animation-delay: 0.5s;
+    opacity: 0;
+  }
+
+  .animate-fade-in-up-6 {
+    animation-delay: 0.6s;
+    opacity: 0;
+  }
+
   @keyframes fadeInUp {
     from {
       opacity: 0;
       transform: translateY(16px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -227,24 +268,29 @@
   .animate-slide-in-right {
     animation: slideInRight 0.4s ease-out forwards;
   }
+
   .animate-slide-in-left {
     animation: slideInLeft 0.4s ease-out forwards;
   }
+
   @keyframes slideInRight {
     from {
       opacity: 0;
       transform: translateX(24px);
     }
+
     to {
       opacity: 1;
       transform: translateX(0);
     }
   }
+
   @keyframes slideInLeft {
     from {
       opacity: 0;
       transform: translateX(-24px);
     }
+
     to {
       opacity: 1;
       transform: translateX(0);

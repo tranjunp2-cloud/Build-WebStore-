@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     siteType: result.siteType,
-                    locale: result.language || language,
+                    locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
                     theme: {
                         primaryColor: result.theme.primaryColor,
                         secondaryColor: result.theme.secondaryColor,
@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     siteType: result.siteType,
-                    locale: result.language || language,
+                    locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
                     theme: {
                         primaryColor: result.theme.primaryColor,
                         secondaryColor: result.theme.secondaryColor,

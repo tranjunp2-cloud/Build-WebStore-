@@ -4,8 +4,8 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Locator;
 
 /**
- * BasePage is the foundation of the Page Object Model (POM) architecture.
- * All subsequent page objects should inherit from this class.
+ * BasePage — Page Object Model foundation.
+ * All page objects inherit from this class.
  */
 public abstract class BasePage {
     protected Page page;
@@ -14,20 +14,31 @@ public abstract class BasePage {
         this.page = page;
     }
 
-    /**
-     * Utility method to navigate to a specific relative URL.
-     * @param path The relative path to navigate to (e.g. "/dashboard/products")
-     */
-    public void navigateTo(String path) {
-        // Assume BASE_URL would be configured via env vars, hardcoding for template
-        String baseUrl = System.getenv("BASE_URL") != null ? System.getenv("BASE_URL") : "http://localhost:3000";
-        page.navigate(baseUrl + path);
+    public static String getBaseUrl() {
+        String url = System.getenv("BASE_URL");
+        if (url != null && !url.isEmpty()) return url;
+        return "https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app";
     }
-    
-    /**
-     * Utility method for waiting network to be idle
-     */
+
+    public void navigateTo(String path) {
+        page.navigate(getBaseUrl() + path);
+    }
+
     public void waitForNetworkIdle() {
         page.waitForLoadState(com.microsoft.playwright.options.LoadState.NETWORKIDLE);
+    }
+
+    /** Wait for toast notification to appear */
+    public Locator waitForToast() {
+        return page.locator("[data-sonner-toast]").first();
+    }
+
+    /** Wait for page to fully load (network idle + no skeleton) */
+    public void waitForPageReady() {
+        page.waitForLoadState(com.microsoft.playwright.options.LoadState.NETWORKIDLE);
+        // Wait for skeleton loaders to disappear
+        page.locator("[data-testid='skeleton']").first().waitFor(
+            new Locator.WaitForOptions().setState(com.microsoft.playwright.options.WaitForSelectorState.HIDDEN).setTimeout(5000)
+        );
     }
 }
