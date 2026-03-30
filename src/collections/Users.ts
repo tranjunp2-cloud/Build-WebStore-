@@ -419,6 +419,7 @@ export const Users: CollectionConfig = {
                     collection: 'users',
                     where: { email: { equals: email } },
                     limit: 1,
+                    overrideAccess: true, // Required to read protected fields like otpHash
                 })
 
                 if (!result.docs.length) {
@@ -486,6 +487,7 @@ export const Users: CollectionConfig = {
                     collection: 'users',
                     where: { email: { equals: email } },
                     limit: 1,
+                    overrideAccess: true, // Required to read protected fields like otpHash
                 })
 
                 if (!result.docs.length) {
@@ -551,33 +553,39 @@ export const Users: CollectionConfig = {
                     },
                 })
 
-                // Generate JWT token using built-in crypto (no external deps)
-                const crypto = await import('crypto')
+                // Generate JWT token using jose (same lib as Payload V3 internally)
+                // This ensures token is valid when verified by payload.auth()
+                const { SignJWT } = await import('jose')
                 const secret = process.env.PAYLOAD_SECRET || 'fallback-dev-secret'
+                const secretKey = new TextEncoder().encode(secret)
                 const expSeconds = 60 * 60 * 24 // 24 hours
                 const now = Math.floor(Date.now() / 1000)
 
-                const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
-                const payload = Buffer.from(JSON.stringify({
+                const token = await new SignJWT({
                     id: user.id,
                     email: user.email,
                     collection: 'users',
-                    iat: now,
-                    exp: now + expSeconds,
-                })).toString('base64url')
-                const signature = crypto.createHmac('sha256', secret)
-                    .update(`${header}.${payload}`)
-                    .digest('base64url')
-                const token = `${header}.${payload}.${signature}`
+                    mfa_verified: true,
+                })
+                    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+                    .setIssuedAt(now)
+                    .setExpirationTime(now + expSeconds)
+                    .sign(secretKey)
 
                 // Sanitize user object for response (remove sensitive fields)
                 const { otpHash: _h, otpExpiresAt: _e, otpAttempts: _a, ...safeUser } = user
 
-                return Response.json({
+                return new Response(JSON.stringify({
                     message: 'Verification successful',
                     token,
                     user: safeUser,
                     exp: now + expSeconds,
+                }), {
+                    status: 200,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Set-Cookie': `payload-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${expSeconds}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`,
+                    }
                 })
             },
         },
@@ -609,6 +617,13 @@ export const Users: CollectionConfig = {
         {
             name: 'lastName',
             type: 'text',
+        },
+        {
+            name: 'phone',
+            type: 'text',
+            admin: {
+                description: 'Phone number with country code (e.g. 60123456789)',
+            },
         },
         {
             name: 'roles',
@@ -695,6 +710,15 @@ export const Users: CollectionConfig = {
                 { label: 'English', value: 'en' },
                 { label: 'Bahasa Melayu', value: 'ms' },
             ],
+        },
+        {
+            name: 'has_seen_ai_wizard',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: {
+                position: 'sidebar',
+                description: 'Whether the user has completed the initial CMS AI Wizard.',
+            },
         },
         {
             name: 'lastLoginAt',

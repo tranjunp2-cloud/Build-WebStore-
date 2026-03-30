@@ -118,7 +118,39 @@
         "step2Title": "Pilih templat",
         "step2Subtitle": "Pilih titik permulaan — anda boleh menyesuaikan semua nanti.",
         "step3Title": "Sesuaikan laman anda",
-        "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda."
+        "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda.",
+        "welcome": {
+            "title": "Selamat datang ke PrimeWeb",
+            "subtitle": "Mula bina kedai anda. Siapkannya dalam hanya 5 minit dengan AI kami.",
+            "createStore": "🚀 Cipta Kedai Saya dengan AI",
+            "skip": "Langkau & Pergi ke Papan Pemuka",
+            "step": "Langkah 1 dari 2: Cipta Kedai"
+        },
+        "wizard": {
+            "title": "✨ Terokai Kuasa AI",
+            "slides": {
+                "editor": {
+                    "title": "Editor AI",
+                    "description": "Sunting antara muka laman web melalui sembang - tiada kod diperlukan. AI memahami permintaan anda dan mengemas kini reka bentuk secara automatik."
+                },
+                "content": {
+                    "title": "Kandungan AI",
+                    "description": "Cipta penerangan produk, jana catatan blog SEO secara automatik. AI menulis kandungan profesional yang menarik pelanggan dan dioptimumkan untuk enjin carian."
+                },
+                "seo": {
+                    "title": "SEO AI",
+                    "description": "Optimumkan laman web anda secara automatik untuk meningkatkan kedudukan carian. AI menganalisis dan meningkatkan SEO, menjadikan laman web anda lebih mudah dicari di Google."
+                }
+            },
+            "footer": {
+                "skip": "Langkau",
+                "skipInstructions": "Langkau arahan",
+                "skipGuide": "Langkau panduan",
+                "goBack": "← Kembali",
+                "continue": "Seterusnya",
+                "explore": "Teroka CMS"
+            }
+        }
     },
     "email": {
         "welcome": {
@@ -429,7 +461,39 @@
                 "product": "Produk",
                 "price": "Harga",
                 "status": "Status",
-                "stock": "Stok"
+                "stock": "Stok",
+                "filterActive": "Aktif",
+                "filterDraft": "Draf",
+                "filterArchived": "Diarkib",
+                "sortLatest": "Terbaharu",
+                "sortOldest": "Terlama",
+                "advancedFilters": "Penapis Lanjutan",
+                "clearAll": "Kosongkan",
+                "category": "Kategori",
+                "saleStatus": "Status Jualan",
+                "allProducts": "Semua Produk",
+                "onSale": "Sedang Dijual",
+                "regularPrice": "Harga Biasa",
+                "stockStatus": "Status Stok",
+                "showLowStock": "Tunjuk Stok Rendah/Habis",
+                "lowStockDesc": "Tapis produk dengan stok ≤5",
+                "activeFilters": "Penapis aktif:",
+                "colImg": "IMEJ",
+                "colName": "Nama",
+                "colPrice": "Harga (RM)",
+                "colStock": "Stok",
+                "colWeight": "Berat",
+                "colStatus": "Status",
+                "colActions": "Tindakan",
+                "edit": "Sunting",
+                "delete": "Padam",
+                "sku": "SKU:",
+                "filterBtn": "Tapis",
+                "failedToLoad": "Gagal memuatkan produk",
+                "retry": "Cuba Lagi",
+                "aiChatTitle": "Sembang AI: Cipta pelbagai produk dengan pantas",
+                "aiChatPlaceholder": "Cth: jaket kulit 500k, topi 50k",
+                "aiChatBtn": "Cipta"
             },
             "form": {
                 "editTitle": "Sunting Produk",
@@ -466,7 +530,7 @@
                 "toastDeleted": "Produk dipadamkan.",
                 "undo": "Batal",
                 "toastRestored": "Produk dipulihkan!",
-                "deleteFailed": "Gagal padam",
+                "deleteFailed": "Gagal memadam produk",
                 "networkError": "Ralat rangkaian",
                 "errors": {
                     "nameMin": "Nama produk mestilah sekurang-kurangnya 3 aksara",
@@ -514,7 +578,27 @@
                         "emptyMatrix": "Sila cipta sekurang-kurangnya 1 varian atau matikan ciri Varian.",
                         "incompleteMatrix": "Sila masukkan Harga dan Stok untuk semua varian."
                     }
-                }
+                },
+                "successMarkedAs": "Produk ditandakan sebagai",
+                "restored": "Produk dipulihkan",
+                "failedRestore": "Gagal memulihkan produk",
+                "failedUpdateStatus": "Gagal mengemas kini status",
+                "failedDelete": "Gagal memadam produk",
+                "productDeleted": "Produk dipadamkan.",
+                "size": "Saiz:",
+                "draftSaved": "Draf disimpan. Tukar kepada Aktif untuk papar di web.",
+                "productCreated": "Produk berjaya dicipta",
+                "productUpdated": "Produk berjaya dikemas kini",
+                "failedLoad": "Gagal memuatkan produk",
+                "confirmDelete": "Adakah anda pasti mahu memadamkan produk ini?",
+                "deleteSuccess": "Produk berjaya dipadamkan",
+                "somethingWentWrong": "Sesuatu yang tidak kena. Sila cuba lagi.",
+                "checkFields": "Sila semak medan berikut:",
+                "checkAllRequired": "Sila semak semua medan yang diperlukan dan cuba lagi.",
+                "editProduct": "Edit Produk",
+                "fillInfo": "Lengkapkan maklumat produk",
+                "saving": "Menyimpan...",
+                "saveChanges": "Simpan Perubahan"
             },
             "bulkCreate": {
                 "title": "Cipta Sekaligus Pantas AI",
@@ -544,12 +628,13 @@
                 "saveSuccess": "Mencipta {count} produk draf. Sila tambah imej sebelum diterbitkan.",
                 "saveFailed": "Gagal mencipta produk",
                 "saveError": "Ralat menyimpan produk"
-            }
+            },
+            "subtitle": "Urus produk kedai"
         }
     },
     "auth": {
         "welcomeBack": "Selamat kembali",
-        "signInSubtitle": "Log masuk untuk terus membina",
+        "signInSubtitle": "Log masuk untuk terus membina laman web anda",
         "email": "E-mel",
         "password": "Kata laluan",
         "forgotPassword": "Lupa kata laluan?",
@@ -589,15 +674,76 @@
             "signInLink": "Log masuk →"
         },
         "forgot": {
-            "title": "Lupa kata laluan?",
-            "subtitle": "Jangan risau, kami akan hantar pautan tetapan semula",
-            "submit": "Hantar pautan",
-            "submitting": "Menghantar pautan...",
-            "backLogin": "Kembali ke log masuk",
+            "title": "Lupa kata laluan",
+            "subtitle": "Masukkan e-mel anda untuk menerima pautan tetapan semula kata laluan.",
+            "emailLabel": "Alamat E-mel",
+            "emailPlaceholder": "ad@gmail.com",
+            "sendButton": "Hantar Pautan Pemulihan",
+            "submitting": "Menghantar...",
+            "backLogin": "Kembali ke Log Masuk",
+            "emailSentTitle": "E-mel Dihantar",
+            "emailSentDesc": "Jika e-mel wujud dalam sistem, pautan tetapan semula kata laluan telah dihantar.",
+            "emailSentBottom": "Semak peti masuk anda dan ikuti arahan untuk menetapkan semula kata laluan.",
             "checkEmail": "Semak e-mel anda",
             "sentTo": "Kami telah menghantar pautan tetapan semula ke",
             "notReceive": "Tidak menerima e-mel? Semak folder spam atau",
-            "tryAgain": "cuba lagi"
+            "tryAgain": "cuba lagi",
+            "submit": "Hantar pautan"
+        },
+        "reset": {
+            "title": "Tetapkan Semula Kata Laluan",
+            "subtitle": "Kata laluan baharu anda mestilah berbeza daripada yang sebelumnya",
+            "newPassword": "Kata laluan baharu",
+            "newPasswordPlaceholder": "Min. 8 aksara",
+            "confirmPassword": "Sahkan kata laluan baharu",
+            "confirmPlaceholder": "••••••••",
+            "submit": "Tetapkan Semula Kata Laluan",
+            "submitting": "Menetapkan semula kata laluan...",
+            "backLogin": "Kembali ke Log Masuk",
+            "reqLength": "Sekurang-kurangnya 8 aksara",
+            "reqUpper": "Satu huruf besar",
+            "reqNumber": "Satu nombor",
+            "strengthTooWeak": "Terlalu lemah",
+            "strengthWeak": "Lemah",
+            "strengthFair": "Sederhana",
+            "strengthGood": "Baik",
+            "strengthStrong": "Kuat",
+            "passwordMin": "Kata laluan mestilah sekurang-kurangnya 8 aksara",
+            "passwordMismatch": "Kata laluan tidak sepadan",
+            "invalidLink": "Pautan tetapan semula tidak sah",
+            "invalidLinkDesc": "Pautan tetapan semula kata laluan ini tidak sah atau telah tamat tempoh.",
+            "requestNewLink": "Minta pautan tetapan semula baharu",
+            "backToSignIn": "Kembali ke log masuk",
+            "linkExpired": "Pautan tetapan semula ini telah tamat tempoh. Sila minta pautan baharu.",
+            "successTitle": "Kata laluan berjaya ditetapkan semula! 🔐",
+            "successDesc": "Anda kini boleh log masuk dengan kata laluan baharu anda.",
+            "connectionError": "Ralat sambungan. Sila cuba lagi."
+        },
+        "otp": {
+            "title": "Pengesahan Dua Langkah",
+            "description": "Sila masukkan 6 digit OTP yang telah dihantar ke",
+            "confirmButton": "Sahkan OTP",
+            "verifying": "Mengesahkan...",
+            "resendCode": "Hantar semula kod",
+            "resending": "Menghantar...",
+            "after": "Selepas",
+            "expiresIn": "Kod tamat tempoh dalam",
+            "expired": "Kod telah tamat tempoh. Sila minta yang baharu.",
+            "backLogin": "Kembali ke Log Masuk",
+            "verificationFailed": "Pengesahan gagal",
+            "invalidCode": "Kod pengesahan tidak sah.",
+            "codeExpired": "Kod telah tamat tempoh. Sila minta yang baharu.",
+            "tooManyAttempts": "Terlalu banyak percubaan. Sila minta kod baharu.",
+            "noCodeFound": "Tiada kod pengesahan ditemui. Sila minta yang baharu.",
+            "connectionError": "Ralat sambungan. Sila cuba lagi.",
+            "successTitle": "Pengesahan berjaya!",
+            "successDesc": "Mengalihkan ke papan pemuka...",
+            "resendFailed": "Gagal menghantar semula kod",
+            "resendFailedRetry": "Gagal menghantar semula. Sila cuba lagi.",
+            "newCodeSent": "Kod baharu dihantar!",
+            "newCodeDesc": "Semak peti masuk e-mel anda.",
+            "noEmail": "Tiada e-mel disediakan",
+            "noEmailDesc": "Sila log masuk terlebih dahulu untuk mengesahkan identiti anda."
         }
     },
     "cms": {

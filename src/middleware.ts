@@ -27,6 +27,7 @@ const protectedPaths = [
     '/onboarding',
     '/settings',
     '/account',
+    '/help',
 ]
 
 const authPaths = ['/login', '/register']
@@ -120,19 +121,56 @@ export async function middleware(req: NextRequest) {
     // ── Auth Guard — Protected routes (US-F02-03, SPEC §11) ───────────────
     const isProtectedRoute = protectedPaths.some((p) => pathname.startsWith(p))
     const isAuthRoute = authPaths.some((p) => pathname.startsWith(p))
-    const hasToken = req.cookies.has('payload-token')
+    const tokenCookie = req.cookies.get('payload-token')?.value
+    const hasToken = !!tokenCookie
 
-    // Not logged in → trying to access protected route → redirect to login
-    if (isProtectedRoute && !hasToken) {
-        url.pathname = '/login'
-        url.searchParams.set('returnUrl', pathname)
-        return NextResponse.redirect(url)
+    let mfaVerified = false
+    let tokenEmail = ''
+
+    if (hasToken) {
+        try {
+            // Verify JWT signature to check for mfa_verified flag (added in verify-otp)
+            // Using jose jwtVerify since it works on Edge Runtime and prevents forged tokens
+            const { jwtVerify } = await import('jose')
+            const secret = new TextEncoder().encode(process.env.PAYLOAD_SECRET || '')
+            const { payload: decoded } = await jwtVerify(tokenCookie, secret)
+            if (decoded.mfa_verified === true) {
+                mfaVerified = true
+            }
+            if (decoded.email) {
+                tokenEmail = decoded.email as string
+            }
+        } catch {
+            // Ignore invalid token format
+        }
     }
 
-    // Already logged in → trying to access auth page → redirect to dashboard
+    // Protected route access requirements:
+    // 1. Must have token
+    // 2. Token MUST have mfa_verified === true (stops curl/API bypass where users get payload default token)
+    if (isProtectedRoute) {
+        if (!hasToken) {
+            url.pathname = '/login'
+            url.searchParams.set('returnUrl', pathname)
+            return NextResponse.redirect(url)
+        }
+        if (hasToken && !mfaVerified) {
+            url.pathname = '/verify-otp'
+            if (tokenEmail) url.searchParams.set('email', tokenEmail)
+            url.searchParams.set('returnUrl', pathname)
+            return NextResponse.redirect(url)
+        }
+    }
+
+    // Trying to access auth pages (login)
     if (isAuthRoute && hasToken) {
-        url.pathname = '/dashboard'
-        return NextResponse.redirect(url)
+        if (mfaVerified) {
+            // Fully logged in → skip to dashboard
+            url.pathname = '/dashboard'
+            return NextResponse.redirect(url)
+        }
+        // If they have a token but haven't verified MFA, we DO NOT redirect them to /verify-otp unconditionally here.
+        // We let them render /login or /forgot-password in case they want to switch accounts.
     }
 
     // ── Main platform (primeweb.app) — Dashboard & marketing ───────────────

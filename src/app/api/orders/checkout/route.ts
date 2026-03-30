@@ -166,7 +166,7 @@ export async function POST(request: Request) {
     } catch (error: any) {
         console.error('[Order Checkout Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Checkout failed' } },
             { status: 500 }
         )
     }

@@ -16,62 +16,7 @@ import { withAuth } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string }): string {
-  const cat = category || 'business'
-  const t = theme || THEMES[cat] || THEMES.business
-
-  // Extract site info from blocks for SEO
-  const heroBlock = blocks.find(b => b.blockType === 'hero')
-  const navBlock = blocks.find(b => b.blockType === 'navigation')
-  const siteName = meta?.name || navBlock?.logoText || 'Website'
-  const siteDesc = meta?.description || heroBlock?.subheadline || `${siteName} — Professional website`
-  const lang = meta?.lang || 'en'
-
-  // Set category for image selection in renderers
-  setHeroCategory(cat)
-  setSectionCategory(cat)
-
-  // Separate nav/hero from other sections for semantic HTML
-  const navHtml = blocks.filter(b => b.blockType === 'navigation').map(b => renderNav(b, t)).join('\n')
-  const heroHtml = blocks.filter(b => b.blockType === 'hero').map(b => renderHero(b, t, cat)).join('\n')
-  const footerHtml = blocks.filter(b => b.blockType === 'footer').map(b => renderSections(b, t, cat)).join('\n')
-  const mainHtml = blocks
-    .filter(b => !['navigation', 'hero', 'footer'].includes(b.blockType))
-    .map(b => renderSections(b, t, cat)).join('\n')
-
-  return `<!DOCTYPE html>
-<html lang="${lang}">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${siteName}</title>
-  <meta name="description" content="${siteDesc.substring(0, 160)}">
-  <meta property="og:title" content="${siteName}">
-  <meta property="og:description" content="${siteDesc.substring(0, 160)}">
-  <meta property="og:type" content="website">
-  <meta name="robots" content="index, follow">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="${getGoogleFontsLink(t)}" rel="stylesheet">
-  <style>${baseCSS(t)}</style>
-  <script type="application/ld+json">
-  ${JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": siteName,
-    "description": siteDesc.substring(0, 160),
-  })}
-  </script>
-</head>
-<body>
-  <header role="banner">${navHtml}</header>
-  <main role="main">
-    ${heroHtml}
-    ${mainHtml}
-  </main>
-  ${footerHtml}
-</body>
-</html>`
-}
+import { buildFullHTML } from '@/lib/htmlBuilder'
 
 export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_user, _req, ctx) => {
   try {
@@ -91,14 +36,16 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
         isHomepage: { equals: true },
       },
       limit: 1,
+      draft: true,
     })
 
-    // Fallback: get first page for this site
+    // Fallback: get first page (including drafts)
     if (pagesResult.docs.length === 0) {
       pagesResult = await payload.find({
         collection: 'pages',
         where: { site: { equals: numericSiteId } },
         limit: 1,
+        draft: true,
       })
     }
 
@@ -120,7 +67,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
       },
     })
   } catch (e: any) {
-    console.error('[Preview Error]', e.message)
-    return new NextResponse(`Error: ${e.message}`, { status: 500 })
+    console.error('[Preview Error]', e)
+    return new NextResponse('Failed to generate preview. Please try again later.', { status: 500 })
   }
 })

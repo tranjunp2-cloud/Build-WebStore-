@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * DB Setup Script — runs as Docker CMD on DO App Platform
+ * DB Setup Script — runs as Docker CMD on DO App Platform.
  *
  * Problem: Payload CMS's `push: true` only creates tables when
  * `process.env.NODE_ENV !== 'production'` (checked at runtime in
@@ -51,6 +51,53 @@ async function getTableCount(pool) {
 // Instead, add missing columns directly via ALTER TABLE.
 // Each migration is idempotent — safe to run multiple times.
 const MIGRATIONS = [
+  // ── Users: Auth tables (Payload Drizzle schema) ──
+  // Payload 3.14 uses VARCHAR id (UUID), mixed column naming:
+  //   roles: parent_id, order (no underscore)
+  //   tenants/sessions: _parent_id, _order (with underscore)
+  //   tenants_permissions: parent_id, order (no underscore)
+  // Tables need _uuid column for array types
+  {
+    name: 'users_tenants.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_tenants (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tenant_id integer,
+      status varchar DEFAULT 'active',
+      role varchar DEFAULT 'viewer');`,
+  },
+  {
+    name: 'users_tenants.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_tenants_parent_idx ON users_tenants (_parent_id);`,
+  },
+  {
+    name: 'users_tenants_permissions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_tenants_permissions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      "order" integer NOT NULL DEFAULT 0,
+      parent_id varchar NOT NULL,
+      value varchar);`,
+  },
+  {
+    name: 'users_tenants_permissions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_tenants_permissions_parent_idx ON users_tenants_permissions (parent_id);`,
+  },
+  {
+    name: 'users_sessions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS users_sessions (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      created_at timestamptz DEFAULT now(),
+      expires_at timestamptz);`,
+  },
+  {
+    name: 'users_sessions.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS users_sessions_parent_idx ON users_sessions (_parent_id);`,
+  },
   // ── Tenants: Stripe Connect ──
   {
     name: 'tenants.stripe_account_id',
@@ -141,6 +188,12 @@ const MIGRATIONS = [
     name: 'products.weight',
     sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS weight numeric DEFAULT 0;`,
   },
+  // ── Products: Fields required by Drizzle schema ──
+  { name: 'products.has_variants', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS has_variants boolean DEFAULT false;` },
+  { name: 'products.description_b_m', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS description_b_m jsonb;` },
+  { name: 'products.dimensions_length', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_length numeric DEFAULT 0;` },
+  { name: 'products.dimensions_width', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_width numeric DEFAULT 0;` },
+  { name: 'products.dimensions_height', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS dimensions_height numeric DEFAULT 0;` },
   // ── Orders: Stripe fields ──
   {
     name: 'orders.stripe_session_id',
@@ -236,54 +289,513 @@ const MIGRATIONS = [
     name: 'blogs.slug_idx',
     sql: `CREATE INDEX IF NOT EXISTS blogs_slug_idx ON blogs (slug);`,
   },
-  // ── Users: Tenant memberships (Payload array type → separate tables) ──
+  // ── Categories table ──
   {
-    name: 'users_tenants.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS users_tenants (
+    name: 'categories.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS categories (
       id serial PRIMARY KEY,
-      _order integer NOT NULL,
-      _parent_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      tenant_id integer REFERENCES tenants(id) ON DELETE SET NULL,
-      role varchar DEFAULT 'viewer'
+      tenant_id integer,
+      site_id integer,
+      name varchar NOT NULL,
+      slug varchar,
+      parent_id integer,
+      breadcrumbs varchar,
+      image_id integer,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  // ── SEO Meta Jobs table ──
+  {
+    name: 'seo_meta_jobs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS seo_meta_jobs (
+      id serial PRIMARY KEY,
+      target_collection varchar,
+      target_id varchar,
+      status varchar DEFAULT 'pending',
+      error_log varchar,
+      retry_count numeric DEFAULT 0,
+      site_id integer,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  // ── Tenants: Custom Domains array table ──
+  {
+    name: 'tenants_custom_domains.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS tenants_custom_domains (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      domain varchar,
+      status varchar DEFAULT 'pending',
+      is_primary boolean DEFAULT false
     );`,
   },
   {
-    name: 'users_tenants.parent_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_tenants_parent_idx ON users_tenants (_parent_id);`,
+    name: 'tenants_custom_domains.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_custom_domains_parent_idx ON tenants_custom_domains (_parent_id);`,
+  },
+  // ── Sites: SEO Tracked Keywords array table ──
+  {
+    name: 'sites_seo_tracked_keywords.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS sites_seo_tracked_keywords (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      keyword varchar,
+      current_rank numeric,
+      previous_rank numeric,
+      last_checked_at timestamptz
+    );`,
   },
   {
-    name: 'users_tenants.order_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_tenants_order_idx ON users_tenants (_order);`,
+    name: 'sites_seo_tracked_keywords.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS sites_seo_tracked_keywords_parent_idx ON sites_seo_tracked_keywords (_parent_id);`,
   },
-  // ── Users: Tenant permissions (Payload internal auth table) ──
+  // ── Products: Array tables ──
   {
-    name: 'users_tenants_permissions.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS users_tenants_permissions (
-      id serial PRIMARY KEY,
-      _order integer NOT NULL,
-      _parent_id integer NOT NULL REFERENCES users_tenants(id) ON DELETE CASCADE,
+    name: 'products_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_images (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      image_id integer,
+      alt varchar
+    );`,
+  },
+  {
+    name: 'products_tags.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_tags (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tag varchar
+    );`,
+  },
+  {
+    name: 'products_variant_configs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_variant_configs (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar
+    );`,
+  },
+  {
+    name: 'products_variant_configs_options.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_variant_configs_options (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       value varchar
     );`,
   },
   {
-    name: 'users_tenants_permissions.parent_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_tenants_permissions_parent_idx ON users_tenants_permissions (_parent_id);`,
-  },
-  // ── Users: Sessions (Payload auth sessions table) ──
-  {
-    name: 'users_sessions.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS users_sessions (
-      id serial PRIMARY KEY,
-      _order integer NOT NULL,
-      _parent_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      created_at timestamptz DEFAULT now(),
-      expires_at timestamptz
+    name: 'products_variants.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_variants (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar,
+      sku varchar,
+      price numeric,
+      compare_at_price numeric,
+      stock numeric
     );`,
   },
   {
-    name: 'users_sessions.parent_idx',
-    sql: `CREATE INDEX IF NOT EXISTS users_sessions_parent_idx ON users_sessions (_parent_id);`,
+    name: 'products_attributes.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_attributes (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      key varchar,
+      value varchar
+    );`,
   },
+  // ── Products: Rels table (hasMany relationship → category) ──
+  {
+    name: 'products_rels.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS products_rels (
+      id serial PRIMARY KEY,
+      "order" integer,
+      parent_id integer NOT NULL,
+      path varchar NOT NULL,
+      categories_id integer
+    );`,
+  },
+  {
+    name: 'products_rels.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS products_rels_parent_idx ON products_rels (parent_id);`,
+  },
+  // ── Orders: Items array table ──
+  {
+    name: 'orders_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS orders_items (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      product_id integer,
+      product_name varchar,
+      variant varchar,
+      quantity numeric,
+      unit_price numeric
+    );`,
+  },
+  {
+    name: 'orders_items.parent_idx',
+    sql: `CREATE INDEX IF NOT EXISTS orders_items_parent_idx ON orders_items (_parent_id);`,
+  },
+  // ── ALTER TABLE fallbacks ──────────────────────────────────────────────
+  // pushDevSchema may create array tables with only metadata columns (id, _order, _parent_id, _uuid).
+  // CREATE TABLE IF NOT EXISTS skips if table already exists → field columns missing.
+  // ALTER TABLE ADD COLUMN IF NOT EXISTS ensures columns exist regardless of creation order.
+  // orders_items
+  { name: 'orders_items.product_id', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS product_id integer;` },
+  { name: 'orders_items.product_name', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS product_name varchar;` },
+  { name: 'orders_items.variant', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS variant varchar;` },
+  { name: 'orders_items.quantity', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS quantity numeric;` },
+  { name: 'orders_items.unit_price', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS unit_price numeric;` },
+  // products_images
+  { name: 'products_images.image_id', sql: `ALTER TABLE products_images ADD COLUMN IF NOT EXISTS image_id integer;` },
+  { name: 'products_images.alt', sql: `ALTER TABLE products_images ADD COLUMN IF NOT EXISTS alt varchar;` },
+  // products_tags
+  { name: 'products_tags.tag', sql: `ALTER TABLE products_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
+  // products_variant_configs
+  { name: 'products_variant_configs.name', sql: `ALTER TABLE products_variant_configs ADD COLUMN IF NOT EXISTS name varchar;` },
+  // products_variant_configs_options
+  { name: 'products_variant_configs_options.value', sql: `ALTER TABLE products_variant_configs_options ADD COLUMN IF NOT EXISTS value varchar;` },
+  // products_variants
+  { name: 'products_variants.name', sql: `ALTER TABLE products_variants ADD COLUMN IF NOT EXISTS name varchar;` },
+  { name: 'products_variants.sku', sql: `ALTER TABLE products_variants ADD COLUMN IF NOT EXISTS sku varchar;` },
+  { name: 'products_variants.price', sql: `ALTER TABLE products_variants ADD COLUMN IF NOT EXISTS price numeric;` },
+  { name: 'products_variants.compare_at_price', sql: `ALTER TABLE products_variants ADD COLUMN IF NOT EXISTS compare_at_price numeric;` },
+  { name: 'products_variants.stock', sql: `ALTER TABLE products_variants ADD COLUMN IF NOT EXISTS stock numeric;` },
+  // products_attributes
+  { name: 'products_attributes.key', sql: `ALTER TABLE products_attributes ADD COLUMN IF NOT EXISTS key varchar;` },
+  { name: 'products_attributes.value', sql: `ALTER TABLE products_attributes ADD COLUMN IF NOT EXISTS value varchar;` },
+  // products_rels
+  // products.deleted_at — soft delete (used in WHERE filter)
+  { name: 'products.deleted_at', sql: `ALTER TABLE products ADD COLUMN IF NOT EXISTS deleted_at timestamptz;` },
+  { name: 'products_rels.parent_id', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS parent_id integer;` },
+  { name: 'products_rels.order', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS "order" integer;` },
+  { name: 'products_rels.path', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS path varchar;` },
+  { name: 'products_rels.categories_id', sql: `ALTER TABLE products_rels ADD COLUMN IF NOT EXISTS categories_id integer;` },
+  // tenants_custom_domains
+  { name: 'tenants_custom_domains.domain', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS domain varchar;` },
+  { name: 'tenants_custom_domains.status', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS status varchar DEFAULT \'pending\';` },
+  { name: 'tenants_custom_domains.is_primary', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS is_primary boolean DEFAULT false;` },
+  // sites_seo_tracked_keywords
+  { name: 'sites_seo_tracked_keywords.keyword', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS keyword varchar;` },
+  { name: 'sites_seo_tracked_keywords.current_rank', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS current_rank numeric;` },
+  { name: 'sites_seo_tracked_keywords.previous_rank', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS previous_rank numeric;` },
+  { name: 'sites_seo_tracked_keywords.last_checked_at', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS last_checked_at timestamptz;` },
+  // templates_tags
+  { name: 'templates_tags.tag', sql: `ALTER TABLE templates_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
+  // ── Templates: Tags array table ──
+  {
+    name: 'templates_tags.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS templates_tags (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      tag varchar
+    );`,
+  },
+  // ── Pages: Block tables (Payload blocks field → separate table per block type) ──
+  // Each block has metadata + block-specific field columns (per Codex P1 review)
+  {
+    name: 'pages_blocks_navigation.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_navigation" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      style varchar, logo_id integer, logo_text varchar,
+      cta_button_show boolean DEFAULT false, cta_button_label varchar, cta_button_url varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_hero.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_hero" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      image_id integer, background_image_id integer, video_url varchar,
+      badge_show boolean DEFAULT false, badge_text varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_about.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_about" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      layout varchar, section_label varchar, headline varchar, body jsonb, image_id integer
+    );`,
+  },
+  {
+    name: 'pages_blocks_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_features" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      section_label varchar, headline varchar, subheadline varchar, layout varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_testimonials.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_testimonials" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar, variant varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_contact.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_contact" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar, subtext varchar, email varchar, phone varchar,
+      address varchar, show_map boolean DEFAULT false, map_embed_url varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_gallery.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_gallery" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar, layout varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_footer.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_footer" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      logo_text varchar, logo_id integer, tagline varchar,
+      copyright_text varchar, show_social_links boolean DEFAULT false
+    );`,
+  },
+  {
+    name: 'pages_blocks_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_stats" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_pricing.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_pricing" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_faq.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_faq" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_team.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_team" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      headline varchar
+    );`,
+  },
+  // Navigation links
+  {
+    name: 'pages_blocks_navigation_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_navigation_links" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      label varchar, url varchar, open_in_new_tab boolean DEFAULT false
+    );`,
+  },
+  // Hero CTA buttons
+  {
+    name: 'pages_blocks_hero_cta_buttons.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_hero_cta_buttons" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      label varchar, url varchar, style varchar DEFAULT 'primary'
+    );`,
+  },
+  // About stats
+  {
+    name: 'pages_blocks_about_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_about_stats" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      value varchar, label varchar
+    );`,
+  },
+  // Contact form fields
+  {
+    name: 'pages_blocks_contact_form_fields.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_contact_form_fields" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      field_name varchar, label varchar, field_type varchar, required boolean DEFAULT false, placeholder varchar
+    );`,
+  },
+  // Footer columns + nested links
+  {
+    name: 'pages_blocks_footer_columns.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_footer_columns" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_footer_columns_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_footer_columns_links" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      label varchar, url varchar
+    );`,
+  },
+  // Features items
+  {
+    name: 'pages_blocks_features_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_features_features" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      icon varchar, title varchar, description varchar
+    );`,
+  },
+  // Testimonials items
+  {
+    name: 'pages_blocks_testimonials_testimonials.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_testimonials_testimonials" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      quote varchar, name varchar, title varchar, company varchar, avatar_id integer, rating numeric
+    );`,
+  },
+  // Gallery images
+  {
+    name: 'pages_blocks_gallery_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_gallery_images" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      image_id integer, caption varchar
+    );`,
+  },
+  // Stats items
+  {
+    name: 'pages_blocks_stats_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_stats_stats" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      value varchar, label varchar
+    );`,
+  },
+  // Pricing plans + nested features
+  {
+    name: 'pages_blocks_pricing_plans.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_pricing_plans" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, price varchar, description varchar, is_popular boolean DEFAULT false, cta_label varchar, cta_url varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_pricing_plans_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_pricing_plans_features" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      text varchar, included boolean DEFAULT true
+    );`,
+  },
+  // FAQ items
+  {
+    name: 'pages_blocks_faq_faqs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_faq_faqs" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      question varchar, answer varchar
+    );`,
+  },
+  // Team members
+  {
+    name: 'pages_blocks_team_members.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_team_members" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, role varchar, bio varchar, image_id integer
+    );`,
+  },
+  // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
+  // These tables are created by Payload pushDevSchema (runs every deploy).
+  // DO NOT add manual CREATE TABLE migrations — they create wrong column types.
+  // pushDevSchema handles correct Drizzle ORM schema (types, constraints, _uuid, indexes).
   // ── Users: Language preference ──
   {
     name: 'users.prefer_lang',
@@ -302,6 +814,15 @@ const MIGRATIONS = [
     name: 'users.otp_attempts',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_attempts numeric DEFAULT 0;`,
   },
+  // ── Users: Onboarding fields ──
+  {
+    name: 'users.has_seen_ai_wizard',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS has_seen_ai_wizard boolean DEFAULT false;`,
+  },
+  {
+    name: 'users.has_seen_ai_wizard.backfill_legacy',
+    sql: `UPDATE users SET has_seen_ai_wizard = true WHERE id IN (SELECT _parent_id::varchar FROM users_tenants WHERE _parent_id IS NOT NULL);`,
+  },
   // ── Payload locked documents rels: FK columns for new collections ──
   {
     name: 'payload_locked_documents_rels.blogs_id',
@@ -310,6 +831,14 @@ const MIGRATIONS = [
   {
     name: 'payload_locked_documents_rels.blog_categories_id',
     sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS blog_categories_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.seo_meta_jobs_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS seo_meta_jobs_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.categories_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS categories_id integer;`,
   },
   // ── Tenants: Payment Methods ──
   {
@@ -324,6 +853,36 @@ const MIGRATIONS = [
     name: 'tenants.payments_qr_image_id',
     sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS payments_qr_image_id integer;`,
   },
+  // ── Tenants: SSO Provisioning fields (F02) ──
+  {
+    name: 'tenants.customer_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS customer_id varchar;`,
+  },
+  {
+    name: 'tenants.service_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS service_id varchar;`,
+  },
+  {
+    name: 'tenants.pack_code',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS pack_code varchar;`,
+  },
+  {
+    name: 'tenants.order_id',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS order_id varchar;`,
+  },
+  {
+    name: 'tenants.address',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS address jsonb;`,
+  },
+  {
+    name: 'tenants.meta_data',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS meta_data jsonb;`,
+  },
+  // ── Users: Phone field (F02) ──
+  {
+    name: 'users.phone',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone varchar;`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -337,6 +896,48 @@ async function runMigrations(pool) {
       console.warn(`[db-setup] ⚠️ ${m.name}: ${e.message}`);
     }
   }
+}
+
+/**
+ * All collection slugs in the project (source of truth).
+ * When adding a new collection, add its slug here.
+ * Hyphens are converted to underscores for DB column naming.
+ */
+const COLLECTION_SLUGS = [
+  'tenants', 'users', 'sites', 'pages', 'media',
+  'templates', 'subscriptions', 'products', 'orders',
+  'analytics', 'blogs', 'blog_categories', 'categories',
+  'seo_meta_jobs',
+];
+
+/**
+ * Auto-sync FK columns in Payload system rels tables.
+ * Payload CMS requires a `{slug}_id` column in payload_locked_documents_rels
+ * and payload_preferences_rels for every collection. This ensures no collection
+ * is missed — just add the slug to COLLECTION_SLUGS above.
+ */
+async function syncPayloadRelsTables(pool) {
+  const RELS_TABLES = [
+    'payload_locked_documents_rels',
+    'payload_preferences_rels',
+  ];
+
+  console.log(`[db-setup] Syncing Payload rels tables for ${COLLECTION_SLUGS.length} collections...`);
+
+  for (const table of RELS_TABLES) {
+    for (const slug of COLLECTION_SLUGS) {
+      const col = `${slug.replace(/-/g, '_')}_id`;
+      try {
+        await pool.query(
+          `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} integer;`
+        );
+      } catch (e) {
+        // Table might not exist yet (first deploy) — ignore
+      }
+    }
+  }
+
+  console.log(`[db-setup] ✅ Payload rels tables synced`);
 }
 
 async function checkDB() {
@@ -357,13 +958,16 @@ async function checkDB() {
     // Run direct SQL migrations (idempotent — always safe)
     if (tableCount > 0) {
       await runMigrations(pool);
+      await syncPayloadRelsTables(pool);
     }
 
     await pool.end();
 
-    // Only need Payload pushDevSchema for fresh DB (0 tables)
+    // ALWAYS run pushDevSchema — idempotent, handles new fields/tables
+    // Payload Drizzle creates correct schema (types, constraints, indexes)
+    // Manual SQL migrations may create wrong column types → query fails
     return {
-      needsPush: tableCount === 0,
+      needsPush: true,
       tableCount,
     };
   } catch (e) {

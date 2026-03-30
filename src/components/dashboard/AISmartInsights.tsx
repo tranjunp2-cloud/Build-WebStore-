@@ -11,7 +11,7 @@ export function AISmartInsights({ views, prevViews }: Props) {
     if (views === 0 && prevViews === 0) return null
     
     let message = ''
-    let type: 'up' | 'down' | 'neutral' = 'neutral'
+    let type: 'up' | 'down' | 'neutral'
     
     if (prevViews === 0 && views > 0) {
         message = "Traffic is picking up! You have new visitors compared to the previous period."

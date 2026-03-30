@@ -2,16 +2,12 @@
 
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { useI18n, syncLocaleFromDB } from '@/i18n'
+import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Globe } from 'lucide-react'
+import { useI18n } from '@/i18n'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 
 const loginSchema = z.object({
@@ -47,12 +43,30 @@ function getRedirectByRole(
     return returnUrl
 }
 
+/* ─── Figma Design Token Constants ─── */
+const INPUT_STYLE = {
+    background: 'rgba(30, 41, 59, 0.6)',
+    border: '1px solid rgba(59, 130, 246, 0.15)',
+    boxShadow: '0px 8px 32px rgba(0,0,0,0.3), inset 0px 1px 0px rgba(255,255,255,0.05)',
+} as const
+
+const CHECKBOX_STYLE = {
+    background: 'rgba(30, 41, 59, 0.4)',
+    border: '1px solid rgba(59, 130, 246, 0.07)',
+    boxShadow: '0px 1px 2px rgba(0,0,0,0.05)',
+} as const
+
 function LoginFormContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const returnUrl = searchParams.get('returnUrl') || '/dashboard'
+    let returnUrl = searchParams.get('returnUrl') || '/dashboard'
+    if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) {
+        returnUrl = '/dashboard'
+    }
     const [showPassword, setShowPassword] = useState(false)
-    const { t, setLocale } = useI18n()
+    const [checkingReset, setCheckingReset] = useState(false)
+    const [rememberMe, setRememberMe] = useState(false)
+    const { t } = useI18n()
 
     const {
         register,
@@ -60,10 +74,46 @@ function LoginFormContent() {
         formState: { errors, isSubmitting },
         setError: setFormError,
         resetField,
+        getValues,
     } = useForm<LoginForm>({
         resolver: zodResolver(loginSchema),
         defaultValues: { email: '', password: '' },
     })
+
+    // FR-07/FR-08: Smart forgot-password — Owner → SSO direct, Staff → internal
+    const handleForgotPassword = async (e: React.MouseEvent) => {
+        e.preventDefault()
+        const email = getValues('email')?.trim()
+
+        // No email typed → go to forgot-password form as usual
+        if (!email) {
+            router.push('/forgot-password')
+            return
+        }
+
+        setCheckingReset(true)
+        try {
+            const res = await fetch('/api/auth/check-reset-flow', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            })
+            const data = await res.json()
+
+            if (data.flow === 'sso' && data.redirectUrl) {
+                // Owner → redirect straight to SSO portal
+                window.location.href = data.redirectUrl
+                // Return here without resetting state to keep loading active while browser redirects
+                return
+            }
+        } catch {
+            // On error, fall through to internal page
+        }
+
+        // Staff or unknown → internal forgot-password page
+        setCheckingReset(false)
+        router.push('/forgot-password')
+    }
 
     const onSubmit = async (data: LoginForm) => {
         const controller = new AbortController()
@@ -79,7 +129,7 @@ function LoginFormContent() {
                         email: data.email.trim(),
                         password: data.password.trim(),
                     }),
-                    credentials: 'include',
+                    credentials: 'omit', // Prevent browser from storing the partial payload-token HTTPOnly cookie
                     signal: controller.signal,
                 })
             } catch (err) {
@@ -103,7 +153,7 @@ function LoginFormContent() {
                 return
             }
 
-            // Parse user data — but DON'T set cookie yet (need OTP)
+            // Parse user data
             const responseData = await res.json().catch(() => ({ user: null }))
             const user = responseData?.user
             const userEmail = user?.email || data.email.trim()
@@ -119,6 +169,10 @@ function LoginFormContent() {
                 // Non-blocking — OTP may still arrive
             }
 
+            // Clear previous OTP countdowns so verify-otp starts fresh
+            sessionStorage.removeItem('otp_resend_end')
+            sessionStorage.removeItem('otp_expiry_end')
+
             toast.success('Verification code sent!', {
                 description: 'Check your email for the 6-digit code.',
             })
@@ -133,17 +187,27 @@ function LoginFormContent() {
     }
 
     return (
-        <div className="animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="mb-6 text-center">
-                <h1 className="text-2xl font-bold text-white">{t.auth.welcomeBack}</h1>
-                <p className="mt-1.5 text-sm text-gray-400">{t.auth.signInSubtitle}</p>
+        <div className="animate-in fade-in duration-500 flex flex-col gap-6" style={{ gap: 24 }}>
+            {/* ─── Header: "Welcome back" + subtitle ─── */}
+            <div className="flex flex-col text-center" style={{ gap: 8 }}>
+                <h1
+                    className="text-2xl font-semibold text-[#F8FAFC]"
+                    style={{ fontFamily: 'Inter, sans-serif', lineHeight: '32px', margin: 0 }}
+                >
+                    {t.auth.welcomeBack}
+                </h1>
+                <p
+                    className="text-sm text-[#94A3B8]"
+                    style={{ fontFamily: 'Inter, sans-serif', lineHeight: '20px', margin: 0 }}
+                >
+                    {t.auth.signInSubtitle}
+                </p>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col w-full">
                 {/* Root error */}
                 {errors.root && (
-                    <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                    <div className="flex items-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
                         <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                         </svg>
@@ -151,110 +215,168 @@ function LoginFormContent() {
                     </div>
                 )}
 
-                {/* Email */}
-                <div>
-                    <Label htmlFor="email" className="text-gray-300">{t.auth.email}</Label>
-                    <div className="relative mt-1.5">
-                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                        <Input
+                {/* ─── Email Field ─── */}
+                <div className="flex flex-col" style={{ gap: 3 }}>
+                    <label
+                        htmlFor="email"
+                        className="text-sm font-medium text-[#94A3B8]"
+                        style={{ lineHeight: '1.43' }}
+                    >
+                        {t.auth.email}
+                    </label>
+                    <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                        <input
                             id="email"
                             type="email"
                             placeholder="you@example.com"
-                            className={`pl-10 bg-white/[0.06] border-white/[0.08] text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors ${errors.email ? 'border-red-500/50' : ''}`}
+                            className={`
+                                w-full h-11 rounded-2xl pl-10 pr-4 text-sm text-white
+                                placeholder:text-[#94A3B8] outline-none
+                                focus:ring-2 focus:ring-blue-500/30 transition-all
+                                ${errors.email ? 'ring-2 ring-red-500/50' : ''}
+                            `}
+                            style={{
+                                ...INPUT_STYLE,
+                                fontFamily: 'Inter, sans-serif',
+                                lineHeight: '1.21',
+                            }}
                             {...register('email')}
                         />
                     </div>
                     {errors.email && (
-                        <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>
+                        <p className="text-xs text-red-400">{errors.email.message}</p>
                     )}
                 </div>
 
-                {/* Password */}
-                <div>
-                    <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-gray-300">{t.auth.password}</Label>
-                        <Link
-                            href="/forgot-password"
-                            className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                            {t.auth.forgotPassword}
-                        </Link>
-                    </div>
-                    <div className="relative mt-1.5">
-                        <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                        <Input
+                {/* ─── Password Field ─── */}
+                <div className="flex flex-col" style={{ gap: 3, marginTop: 24 }}>
+                    <label
+                        htmlFor="password"
+                        className="text-sm font-medium text-[#94A3B8]"
+                        style={{ lineHeight: '1.43' }}
+                    >
+                        {t.auth.password}
+                    </label>
+                    <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                        <input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
-                            placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
-                            className={`pl-10 pr-10 bg-white/[0.06] border-white/[0.08] text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors ${errors.password ? 'border-red-500/50' : ''}`}
+                            placeholder="••••••••"
+                            className={`
+                                w-full h-11 rounded-2xl pl-10 pr-10 text-sm text-white
+                                placeholder:text-[#94A3B8] outline-none
+                                focus:ring-2 focus:ring-blue-500/30 transition-all
+                                ${errors.password ? 'ring-2 ring-red-500/50' : ''}
+                            `}
+                            style={{
+                                ...INPUT_STYLE,
+                                fontFamily: 'Inter, sans-serif',
+                                lineHeight: '1.21',
+                            }}
                             {...register('password')}
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-white transition-colors bg-transparent border-none p-0 cursor-pointer"
                             tabIndex={-1}
                         >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                     </div>
                     {errors.password && (
-                        <p className="mt-1 text-xs text-red-400">{errors.password.message}</p>
+                        <p className="text-xs text-red-400">{errors.password.message}</p>
                     )}
                 </div>
 
-                {/* Submit */}
-                <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-medium h-11 shadow-lg shadow-blue-500/25 transition-all hover:shadow-blue-500/40 disabled:opacity-50"
-                >
-                    {isSubmitting ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {t.auth.signingIn}
-                        </>
-                    ) : (
-                        <>
-                            {t.auth.signIn}
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                        </>
-                    )}
-                </Button>
+                {/* ─── Remember me / Forgot password row ─── */}
+                <div className="flex items-center justify-between" style={{ marginTop: 16 }}>
+                    <label className="flex items-center gap-2 cursor-pointer select-none" style={{ background: 'transparent' }}>
+                        <input
+                            type="checkbox"
+                            className="hidden"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                        />
+                        <div
+                            className="flex h-4 w-4 items-center justify-center rounded-[4px] transition-colors border-none p-0 cursor-pointer"
+                            style={{
+                                ...CHECKBOX_STYLE,
+                                background: rememberMe ? '#2DD4BF' : 'rgba(30, 41, 59, 0.4)',
+                            }}
+                        >
+                            {rememberMe && (
+                                <svg className="h-3 w-3 text-[#0B1120]" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="2 6 5 9 10 3" />
+                                </svg>
+                            )}
+                        </div>
+                        <span className="text-sm font-medium text-[#94A3B8]" style={{ lineHeight: '1.43' }}>
+                            Remember me
+                        </span>
+                    </label>
+                    <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        disabled={checkingReset}
+                        className="text-sm font-medium text-[#3B82F6] hover:text-blue-400 transition-colors disabled:opacity-50 bg-transparent border-none p-0 cursor-pointer"
+                        style={{ lineHeight: '1.43' }}
+                    >
+                        {checkingReset ? 'Checking...' : t.auth.forgotPassword}
+                    </button>
+                </div>
 
-                {/* Inline Language Switcher */}
-                <div className="pt-2">
+                {/* ─── Bottom Actions (Button & Lang) ─── */}
+                <div className="flex flex-col w-full" style={{ gap: 16, marginTop: 40 }}>
+                    {/* ─── Sign In Button — Figma devmode CSS exact ─── */}
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="relative w-full transition-all disabled:opacity-50 hover:brightness-110 active:scale-[0.99]"
+                        style={{
+                            display: 'flex',
+                            padding: '14px 0',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            gap: 16.313,
+                            borderRadius: 16,
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: 'linear-gradient(90deg, #3B82F6 0%, #3989F3 7.14%, #378FEF 14.29%, #3596EC 21.43%, #339CE9 28.57%, #32A2E5 35.71%, #30A8E1 42.86%, #2FAEDE 50%, #2EB3DA 57.14%, #2DB9D6 64.29%, #2DBFD1 71.43%, #2CC4CD 78.57%, #2CC9C9 85.71%, #2DCFC4 92.86%, #2DD4BF 100%)',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.10), 0 4px 6px -4px rgba(0, 0, 0, 0.10)',
+                            fontFamily: 'Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            lineHeight: '20px',
+                            color: '#FFFFFF',
+                        }}
+                    >
+                        {isSubmitting ? (
+                            <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                {t.auth.signingIn}
+                            </>
+                        ) : (
+                            <>
+                                {t.auth.signIn}
+                                <ArrowRight className="h-4 w-4" />
+                            </>
+                        )}
+                    </button>
+
+                    {/* ─── Language Switcher — Figma: globe + segmented pill ─── */}
                     <LanguageSwitcher variant="segmented" />
                 </div>
             </form>
-
-            {/* Divider */}
-            <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/[0.06]" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                    <span className="bg-[#101726] px-3 text-gray-400">{t.auth.or}</span>
-                </div>
-            </div>
-
-            {/* Register link */}
-            <p className="text-center text-sm text-gray-400">
-                {t.auth.noAccount}{' '}
-                <Link
-                    href="/register"
-                    className="font-medium text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                    {t.auth.createOneFree}
-                </Link>
-            </p>
         </div>
     )
 }
 
 export default function LoginPage() {
     return (
-        <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center text-gray-400">Loading...</div>}>
+        <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center text-[#94A3B8]">Loading...</div>}>
             <LoginFormContent />
         </Suspense>
     )

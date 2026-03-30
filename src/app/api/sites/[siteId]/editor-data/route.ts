@@ -24,7 +24,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
             return NextResponse.json({ error: 'Site not found' }, { status: 404 })
         }
 
-        // Fetch homepage
+        // Fetch homepage (including drafts)
         let pagesResult = await payload.find({
             collection: 'pages',
             where: {
@@ -32,14 +32,16 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
                 isHomepage: { equals: true },
             },
             limit: 1,
+            draft: true,
         })
 
-        // Fallback: get first page for this site
+        // Fallback: get first page (including drafts)
         if (pagesResult.docs.length === 0) {
             pagesResult = await payload.find({
                 collection: 'pages',
                 where: { site: { equals: numericSiteId } },
                 limit: 1,
+                draft: true,
             })
         }
 
@@ -59,13 +61,15 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
                 id: page.id,
                 title: (page as any).title || 'Homepage',
                 layout: (page as any).layout || [],
+                _status: (page as any)._status || 'published',
+                updatedAt: (page as any).updatedAt,
             } : null,
         })
 
     } catch (error: any) {
         console.error('[Editor Data Error]', error)
         return NextResponse.json(
-            { error: error?.message || 'Failed to load editor data' },
+            { error: 'Failed to load editor data' },
             { status: 500 },
         )
     }

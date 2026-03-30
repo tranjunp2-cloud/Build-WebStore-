@@ -7,9 +7,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { Mail, Loader2, ArrowLeft, CheckCircle2, RefreshCw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { useI18n } from '@/i18n'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 
@@ -65,6 +62,21 @@ export default function ForgotPasswordPage() {
 
     const onSubmit = async (data: ForgotForm) => {
         try {
+            // ── FR-07/FR-08: Check if user is Owner (SSO) or Staff (internal) ──
+            const checkRes = await fetch('/api/auth/check-reset-flow', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: data.email }),
+            })
+            const checkData = await checkRes.json()
+
+            if (checkData.flow === 'sso' && checkData.redirectUrl) {
+                // Owner → redirect straight to SSO portal (no intermediate screen)
+                window.location.href = checkData.redirectUrl
+                return
+            }
+
+            // Staff → internal reset flow
             const success = await sendResetLink(data.email)
 
             if (success) {
@@ -106,81 +118,138 @@ export default function ForgotPasswordPage() {
         }
     }
 
-    // Success state
+    // Success state — Email Sent (Figma node 30726-111)
     if (submitted) {
         return (
-            <div className="animate-in fade-in duration-500 text-center py-4">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
-                    <CheckCircle2 className="h-8 w-8 text-emerald-400" />
-                </div>
-                <h2 className="text-xl font-bold text-white">{t.auth.forgot.checkEmail}</h2>
-                <p className="mt-2 text-sm text-gray-400">
-                    {t.auth.forgot.sentTo}{' '}
-                    <span className="text-gray-300 font-medium">{getValues('email')}</span>
-                </p>
-                <div className="mt-6 space-y-3">
-                    {/* Resend button with cooldown */}
-                    <div className="flex flex-col items-center gap-2">
-                        <p className="text-xs text-gray-500">
-                            {t.auth.forgot.notReceive}
-                        </p>
-                        <button
-                            type="button"
-                            onClick={handleResend}
-                            disabled={cooldown > 0 || resending}
-                            className={`inline-flex items-center gap-1.5 text-sm font-medium transition-colors ${cooldown > 0 || resending
-                                    ? 'text-gray-600 cursor-not-allowed'
-                                    : 'text-blue-400 hover:text-blue-300'
-                                }`}
+            <div className="animate-in fade-in duration-500 w-full flex flex-col items-center">
+                {/* Main Content — matches Figma Container gap: 32px */}
+                <div
+                    className="flex flex-col items-stretch w-full"
+                    style={{ gap: '32px' }}
+                >
+                    {/* Top block: Icon + Title + Description (gap: 16px, align-items: center) */}
+                    <div
+                        className="flex flex-col items-center w-full"
+                        style={{ gap: '16px' }}
+                    >
+                        {/* Icon Container — 64×64, rounded-full, bg: rgba(0,201,80,0.1), padding: 0 16px */}
+                        <div
+                            className="flex items-center justify-center rounded-full"
+                            style={{
+                                width: '64px',
+                                height: '64px',
+                                background: 'rgba(0, 201, 80, 0.1)',
+                                padding: '0 16px',
+                            }}
                         >
-                            {resending ? (
-                                <>
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    Sending...
-                                </>
-                            ) : cooldown > 0 ? (
-                                <>
-                                    <RefreshCw className="h-3.5 w-3.5" />
-                                    Resend email ({cooldown}s)
-                                </>
-                            ) : (
-                                <>
-                                    <RefreshCw className="h-3.5 w-3.5" />
-                                    Resend email
-                                </>
-                            )}
-                        </button>
+                            <CheckCircle2
+                                style={{
+                                    width: '26.67px',
+                                    height: '26.67px',
+                                    color: '#05DF72',
+                                    strokeWidth: 2.67,
+                                }}
+                            />
+                        </div>
+
+                        {/* Text Block — column, gap: 8px, width: 382px */}
+                        <div
+                            className="flex flex-col items-stretch"
+                            style={{ gap: '8px', width: '382px', maxWidth: '100%' }}
+                        >
+                            {/* Title: "Email Sent" — Inter 600, 20px, 1.4em, center, #F8FAFC */}
+                            <h2
+                                style={{
+                                    fontFamily: 'Inter, sans-serif',
+                                    fontWeight: 600,
+                                    fontSize: '20px',
+                                    lineHeight: '1.4em',
+                                    textAlign: 'center',
+                                    color: '#F8FAFC',
+                                    margin: 0,
+                                }}
+                            >
+                                {t.auth.forgot.emailSentTitle}
+                            </h2>
+
+                            {/* Description — Inter 400, 14px, 1.625em, center, rgba(248,250,252,0.7) */}
+                            <p
+                                style={{
+                                    fontFamily: 'Inter, sans-serif',
+                                    fontWeight: 400,
+                                    fontSize: '14px',
+                                    lineHeight: '1.625em',
+                                    textAlign: 'center',
+                                    color: 'rgba(248, 250, 252, 0.7)',
+                                    margin: 0,
+                                }}
+                            >
+                                {t.auth.forgot.emailSentDesc}
+                            </p>
+                        </div>
                     </div>
 
-                    <Link
-                        href="/login"
-                        className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
+                    {/* Bottom text — Inter 400, 12px, 1.333em, center, rgba(248,250,252,0.5) */}
+                    <p
+                        className="w-full"
+                        style={{
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 400,
+                            fontSize: '12px',
+                            lineHeight: '1.333em',
+                            textAlign: 'center',
+                            color: 'rgba(248, 250, 252, 0.5)',
+                            margin: 0,
+                        }}
                     >
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                        {t.auth.forgot.backLogin}
-                    </Link>
+                        {t.auth.forgot.emailSentBottom}
+                    </p>
+                </div>
+
+                {/* Language Switcher */}
+                <div className="w-full" style={{ marginTop: '24px' }}>
+                    <LanguageSwitcher variant="segmented" />
                 </div>
             </div>
         )
     }
 
     return (
-        <div className="animate-in fade-in duration-500">
+        <div className="animate-in fade-in duration-500 flex flex-col items-center w-full">
             {/* Header */}
-            <div className="mb-6 text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/10 ring-1 ring-blue-500/20">
-                    <Mail className="h-6 w-6 text-blue-400" />
-                </div>
-                <h1 className="text-2xl font-bold text-white">{t.auth.forgot.title}</h1>
-                <p className="mt-1.5 text-sm text-gray-400">
+            <div className="flex flex-col items-center justify-center text-center mx-auto" style={{ gap: 8, maxWidth: 382 }}>
+                <h1
+                    className="text-[#F8FAFC]"
+                    style={{
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 24,
+                        fontWeight: 700,
+                        lineHeight: '32px',
+                        margin: 0,
+                    }}
+                >
+                    {t.auth.forgot.title}
+                </h1>
+                <p
+                    className="text-center"
+                    style={{
+                        color: 'rgba(248, 250, 252, 0.70)',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 400,
+                        lineHeight: '20px',
+                        width: '100%',
+                        margin: 0,
+                    }}
+                >
                     {t.auth.forgot.subtitle}
                 </p>
             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col w-full mx-auto" style={{ maxWidth: 382 }}>
                 {/* Root error */}
                 {errors.root && (
-                    <div className="flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                    <div className="flex items-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 mt-6 text-sm text-red-400">
                         <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                         </svg>
@@ -189,28 +258,67 @@ export default function ForgotPasswordPage() {
                 )}
 
                 {/* Email */}
-                <div>
-                    <Label htmlFor="email" className="text-gray-300">{t.auth.email}</Label>
-                    <div className="relative mt-1.5">
-                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                        <Input
+                <div className="flex flex-col w-full" style={{ gap: 8, marginTop: 24 }}>
+                    <label
+                        htmlFor="email"
+                        style={{
+                            color: 'rgba(248, 250, 252, 0.8)',
+                            fontFamily: 'Inter, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 500,
+                            lineHeight: '20px',
+                        }}
+                    >
+                        {t.auth.forgot.emailLabel}
+                    </label>
+                    <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
+                        <input
                             id="email"
                             type="email"
-                            placeholder="you@example.com"
-                            className={`pl-10 bg-white/[0.06] border-white/[0.08] text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors ${errors.email ? 'border-red-500/50' : ''}`}
+                            placeholder={t.auth.forgot.emailPlaceholder}
+                            className={`
+                                w-full h-11 rounded-2xl pl-10 pr-4 text-sm text-white
+                                placeholder:text-[#94A3B8] outline-none
+                                focus:ring-2 focus:ring-blue-500/30 transition-all
+                                ${errors.email ? 'ring-2 ring-red-500/50' : ''}
+                            `}
+                            style={{
+                                background: '#1E293B',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                boxShadow: '0px 0px 0px 0.057px rgba(59, 130, 246, 0)',
+                                fontFamily: 'Inter, sans-serif',
+                                lineHeight: '1.21',
+                            }}
                             {...register('email')}
-                            autoFocus
                         />
                     </div>
                     {errors.email && (
-                        <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>
+                        <p className="text-xs text-red-400">{errors.email.message}</p>
                     )}
                 </div>
 
-                <Button
+                <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-medium h-11 shadow-lg shadow-blue-500/25 transition-all hover:shadow-blue-500/40 disabled:opacity-50"
+                    className="relative w-full transition-all disabled:opacity-50 hover:brightness-110 active:scale-[0.99]"
+                    style={{
+                        display: 'flex',
+                        padding: '14px 0',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderRadius: 16,
+                        marginTop: 20,
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: 'linear-gradient(90deg, #3B82F6 0%, #3989F3 7.14%, #378FEF 14.29%, #3596EC 21.43%, #339CE9 28.57%, #32A2E5 35.71%, #30A8E1 42.86%, #2FAEDE 50%, #2EB3DA 57.14%, #2DB9D6 64.29%, #2DBFD1 71.43%, #2CC4CD 78.57%, #2CC9C9 85.71%, #2DCFC4 92.86%, #2DD4BF 100%)',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.10), 0 4px 6px -4px rgba(0, 0, 0, 0.10)',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        lineHeight: '20px',
+                        color: '#FFFFFF',
+                    }}
                 >
                     {isSubmitting ? (
                         <>
@@ -218,25 +326,31 @@ export default function ForgotPasswordPage() {
                             {t.auth.forgot.submitting}
                         </>
                     ) : (
-                        t.auth.forgot.submit
+                        t.auth.forgot.sendButton
                     )}
-                </Button>
-
-                {/* Inline Language Switcher */}
-                <div className="pt-2">
-                    <LanguageSwitcher variant="segmented" />
-                </div>
+                </button>
             </form>
 
-            {/* Back to login */}
-            <div className="mt-6 text-center">
+            {/* Bottom Actions */}
+            <div className="flex flex-col w-full items-center" style={{ gap: 24, marginTop: 32 }}>
                 <Link
                     href="/login"
-                    className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-300 transition-colors"
+                    className="inline-flex items-center justify-center gap-[8px] text-[#3B82F6] hover:text-blue-400 transition-colors"
+                    style={{
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        lineHeight: '20px',
+                        textDecoration: 'none',
+                    }}
                 >
-                    <ArrowLeft className="h-3.5 w-3.5" />
+                    <ArrowLeft className="h-4 w-4 text-[#3B82F6]" />
                     {t.auth.forgot.backLogin}
                 </Link>
+
+                <div className="w-full">
+                    <LanguageSwitcher variant="segmented" />
+                </div>
             </div>
         </div>
     )

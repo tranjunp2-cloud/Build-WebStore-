@@ -4,8 +4,9 @@ import { Suspense, useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ShieldCheck, Loader2, RefreshCw, ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Loader2 } from 'lucide-react'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { useI18n } from '@/i18n'
 
 const OTP_LENGTH = 6
 const RESEND_COOLDOWN_S = 60
@@ -15,14 +16,36 @@ function VerifyOTPContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const email = searchParams.get('email') || ''
+    const { t } = useI18n()
 
     const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''))
     const [isVerifying, setIsVerifying] = useState(false)
     const [isResending, setIsResending] = useState(false)
     const [error, setError] = useState('')
-    const [resendCooldown, setResendCooldown] = useState(0)
+    const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_S)
     const [countdown, setCountdown] = useState(COUNTDOWN_INITIAL_S)
+    const [isMounted, setIsMounted] = useState(false)
     const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+    // Hydrate timers from sessionStorage on mount (survives F5)
+    useEffect(() => {
+        setIsMounted(true)
+        const resendEnd = sessionStorage.getItem('otp_resend_end')
+        if (resendEnd) {
+            const remaining = Math.ceil((Number(resendEnd) - Date.now()) / 1000)
+            setResendCooldown(remaining > 0 ? remaining : 0)
+        } else {
+            sessionStorage.setItem('otp_resend_end', String(Date.now() + RESEND_COOLDOWN_S * 1000))
+        }
+
+        const expiryEnd = sessionStorage.getItem('otp_expiry_end')
+        if (expiryEnd) {
+            const remaining = Math.ceil((Number(expiryEnd) - Date.now()) / 1000)
+            setCountdown(remaining > 0 ? remaining : 0)
+        } else {
+            sessionStorage.setItem('otp_expiry_end', String(Date.now() + COUNTDOWN_INITIAL_S * 1000))
+        }
+    }, [])
 
     // Countdown timer for OTP expiry
     useEffect(() => {
@@ -44,23 +67,21 @@ function VerifyOTPContent() {
     }, [])
 
     const handleInputChange = (index: number, value: string) => {
-        // Only allow digits
         const digit = value.replace(/\D/g, '').slice(-1)
         const newOtp = [...otp]
         newOtp[index] = digit
         setOtp(newOtp)
         setError('')
 
-        // Auto-advance to next input
         if (digit && index < OTP_LENGTH - 1) {
             inputRefs.current[index + 1]?.focus()
         }
 
-        // Auto-submit when all 6 digits filled
         if (digit && index === OTP_LENGTH - 1) {
             const fullOtp = newOtp.join('')
             if (fullOtp.length === OTP_LENGTH) {
-                handleVerify(fullOtp)
+                // Allow the UI to render the last digit before freezing the inputs
+                setTimeout(() => handleVerify(fullOtp), 50)
             }
         }
     }
@@ -73,23 +94,24 @@ function VerifyOTPContent() {
 
     const handlePaste = (e: React.ClipboardEvent) => {
         e.preventDefault()
-        const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH)
+        const clipData = e.clipboardData.getData('text/plain') || e.clipboardData.getData('text')
+        const pasted = clipData.replace(/\D/g, '').slice(0, OTP_LENGTH)
         if (!pasted) return
 
         const newOtp = [...otp]
+        // If they paste "123456" in the first box, it fills all boxes
         for (let i = 0; i < pasted.length; i++) {
             newOtp[i] = pasted[i]
         }
         setOtp(newOtp)
         setError('')
 
-        // Focus last filled or next empty
         const focusIdx = Math.min(pasted.length, OTP_LENGTH - 1)
         inputRefs.current[focusIdx]?.focus()
 
-        // Auto-submit if all digits pasted
         if (pasted.length === OTP_LENGTH) {
-            handleVerify(pasted)
+            // Allow the UI to render the pasted digits before freezing the inputs
+            setTimeout(() => handleVerify(pasted), 50)
         }
     }
 
@@ -108,31 +130,41 @@ function VerifyOTPContent() {
 
             if (!res.ok) {
                 const data = await res.json().catch(() => null)
-                const message = data?.errors?.[0]?.message || 'Verification failed'
+                const rawMsg = data?.errors?.[0]?.message
+
+                let message = t.auth.otp?.verificationFailed || 'Verification failed'
+                if (rawMsg?.includes('Invalid')) message = t.auth.otp?.invalidCode || 'Invalid verification code.'
+                else if (rawMsg?.includes('expired')) message = t.auth.otp?.codeExpired || 'Code has expired. Please request a new one.'
+                else if (rawMsg?.includes('Too many')) message = t.auth.otp?.tooManyAttempts || 'Too many attempts. Please request a new code.'
+                else if (rawMsg?.includes('No verification')) message = t.auth.otp?.noCodeFound || 'No verification code found. Please request a new one.'
+                else if (rawMsg) message = rawMsg
+
                 setError(message)
                 toast.error(message)
 
-                // Clear OTP fields on error
                 setOtp(Array(OTP_LENGTH).fill(''))
                 inputRefs.current[0]?.focus()
                 return
             }
 
             const data = await res.json()
-            toast.success('Verification successful!', {
-                description: 'Redirecting to dashboard...',
+            toast.success(t.auth.otp?.successTitle || 'Verification successful!', {
+                description: t.auth.otp?.successDesc || 'Redirecting to dashboard...',
             })
 
-            // Set token cookie if returned
             if (data.token) {
                 document.cookie = `payload-token=${data.token}; path=/; max-age=${60 * 60 * 24}; samesite=lax`
             }
 
-            router.push('/dashboard')
-            router.refresh()
+            let returnUrl = searchParams.get('returnUrl') || '/dashboard'
+            // Prevent Open Redirect (URL must start with / and not //)
+            if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) {
+                returnUrl = '/dashboard'
+            }
+            window.location.href = returnUrl
         } catch {
-            setError('Connection error. Please try again.')
-            toast.error('Connection error. Please try again.')
+            setError(t.auth.otp?.connectionError || 'Connection error. Please try again.')
+            toast.error(t.auth.otp?.connectionError || 'Connection error. Please try again.')
         } finally {
             setIsVerifying(false)
         }
@@ -151,60 +183,163 @@ function VerifyOTPContent() {
 
             if (!res.ok) {
                 const data = await res.json().catch(() => null)
-                const message = data?.errors?.[0]?.message || 'Failed to resend code'
+                const message = data?.errors?.[0]?.message || (t.auth.otp?.resendFailed || 'Failed to resend code')
                 toast.error(message)
                 return
             }
 
-            toast.success('New code sent!', { description: 'Check your email inbox.' })
+            toast.success(t.auth.otp?.newCodeSent || 'New code sent!', { description: t.auth.otp?.newCodeDesc || 'Check your email inbox.' })
+            sessionStorage.setItem('otp_resend_end', String(Date.now() + RESEND_COOLDOWN_S * 1000))
+            sessionStorage.setItem('otp_expiry_end', String(Date.now() + COUNTDOWN_INITIAL_S * 1000))
             setResendCooldown(RESEND_COOLDOWN_S)
             setCountdown(COUNTDOWN_INITIAL_S)
             setOtp(Array(OTP_LENGTH).fill(''))
             setError('')
             inputRefs.current[0]?.focus()
         } catch {
-            toast.error('Failed to resend. Please try again.')
+            toast.error(t.auth.otp?.resendFailedRetry || 'Failed to resend. Please try again.')
         } finally {
             setIsResending(false)
         }
     }
 
-    // No email in params → redirect to login
+    // No email → error state
     if (!email) {
         return (
-            <div className="animate-in fade-in duration-500 text-center">
-                <ShieldCheck className="mx-auto h-12 w-12 text-gray-500 mb-4" />
-                <h1 className="text-xl font-bold text-white mb-2">No email provided</h1>
-                <p className="text-sm text-gray-400 mb-6">Please log in first to verify your identity.</p>
-                <Link href="/login">
-                    <Button className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Login
-                    </Button>
-                </Link>
+            <div className="animate-in fade-in duration-500 w-full flex flex-col items-center text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 ring-1 ring-red-500/20">
+                    <svg className="h-8 w-8 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                    </svg>
+                </div>
+                <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'Inter, sans-serif' }}>{t.auth.otp?.noEmail || 'No email provided'}</h2>
+                <p className="mt-2 text-sm" style={{ color: 'rgba(248, 250, 252, 0.70)', fontFamily: 'Inter, sans-serif' }}>
+                    {t.auth.otp?.noEmailDesc || 'Please log in first to verify your identity.'}
+                </p>
+                <div className="mt-8 w-full flex flex-col items-center" style={{ gap: 24 }}>
+                    <Link
+                        href="/login"
+                        className="inline-flex items-center justify-center gap-[8px] text-[#3B82F6] hover:text-blue-400 transition-colors"
+                        style={{
+                            fontFamily: 'Inter, sans-serif',
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            lineHeight: '20px',
+                            textDecoration: 'none',
+                        }}
+                    >
+                        <svg className="h-4 w-4 text-[#3B82F6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5" /><path d="M12 19l-7-7 7-7" /></svg>
+                        {t.auth.otp?.backLogin || 'Back to Login'}
+                    </Link>
+                    <div className="w-full">
+                        <LanguageSwitcher variant="segmented" />
+                    </div>
+                </div>
             </div>
         )
     }
 
     const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
+    const isOtpComplete = otp.join('').length === OTP_LENGTH
+
+    // Mask email: "yangtest@yopmail.com" → "y***@yopmail.com"
+    const maskEmail = (e: string) => {
+        const [local, domain] = e.split('@')
+        if (!local || !domain) return e
+        return `${local[0]}***@${domain}`
+    }
 
     return (
-        <div className="animate-in fade-in duration-500">
-            {/* Header */}
-            <div className="mb-6 text-center">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20 ring-1 ring-blue-500/30">
-                    <ShieldCheck className="h-7 w-7 text-blue-400" />
+        <div className="animate-in fade-in duration-500 w-full flex flex-col items-center">
+            {/* Header: Icon + Title + Description */}
+            {/* Figma: x:33, y:33, width:382 */}
+            <div className="flex flex-col items-center w-full" style={{ gap: '12px', maxWidth: 382 }}>
+                {/* Icon — exact SVG from Figma node 30726:135 */}
+                <svg width="64" height="64" viewBox="12 2 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <filter id="otp_icon_shadow" x="0" y="0" width="88" height="88" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+                            <feFlood floodOpacity="0" result="BackgroundImageFix" />
+                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+                            <feMorphology radius="4" operator="erode" in="SourceAlpha" result="effect1" />
+                            <feOffset dy="4" />
+                            <feGaussianBlur stdDeviation="3" />
+                            <feComposite in2="hardAlpha" operator="out" />
+                            <feColorMatrix type="matrix" values="0 0 0 0 0.231373 0 0 0 0 0.509804 0 0 0 0 0.964706 0 0 0 0.3 0" />
+                            <feBlend mode="normal" in2="BackgroundImageFix" result="effect1" />
+                            <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+                            <feMorphology radius="3" operator="erode" in="SourceAlpha" result="effect2" />
+                            <feOffset dy="10" />
+                            <feGaussianBlur stdDeviation="7.5" />
+                            <feComposite in2="hardAlpha" operator="out" />
+                            <feColorMatrix type="matrix" values="0 0 0 0 0.231373 0 0 0 0 0.509804 0 0 0 0 0.964706 0 0 0 0.3 0" />
+                            <feBlend mode="normal" in2="effect1" result="effect2" />
+                            <feBlend mode="normal" in="SourceGraphic" in2="effect2" result="shape" />
+                        </filter>
+                        <linearGradient id="otp_icon_grad" x1="12" y1="2" x2="76" y2="66" gradientUnits="userSpaceOnUse">
+                            <stop stopColor="#3B82F6" />
+                            <stop offset="0.0714" stopColor="#3989F3" />
+                            <stop offset="0.1429" stopColor="#378FEF" />
+                            <stop offset="0.2143" stopColor="#3596EC" />
+                            <stop offset="0.2857" stopColor="#339CE9" />
+                            <stop offset="0.3571" stopColor="#32A2E5" />
+                            <stop offset="0.4286" stopColor="#30A8E1" />
+                            <stop offset="0.5" stopColor="#2FAEDE" />
+                            <stop offset="0.5714" stopColor="#2EB3DA" />
+                            <stop offset="0.6429" stopColor="#2DB9D6" />
+                            <stop offset="0.7143" stopColor="#2DBFD1" />
+                            <stop offset="0.7857" stopColor="#2CC4CD" />
+                            <stop offset="0.8571" stopColor="#2CC9C9" />
+                            <stop offset="0.9286" stopColor="#2DCFC4" />
+                            <stop offset="1" stopColor="#2DD4BF" />
+                        </linearGradient>
+                    </defs>
+                    <g filter="url(#otp_icon_shadow)">
+                        <path d="M12 18C12 9.16344 19.1634 2 28 2H60C68.8366 2 76 9.16344 76 18V50C76 58.8366 68.8366 66 60 66H28C19.1634 66 12 58.8366 12 50V18Z" fill="url(#otp_icon_grad)" shapeRendering="crispEdges" />
+                        <path d="M54.6666 35.3333C54.6666 41.9999 49.9999 45.3333 44.4533 47.2666C44.1628 47.365 43.8473 47.3603 43.5599 47.2533C37.9999 45.3333 33.3333 41.9999 33.3333 35.3333V25.9999C33.3333 25.6463 33.4737 25.3072 33.7238 25.0571C33.9738 24.8071 34.313 24.6666 34.6666 24.6666C37.3333 24.6666 40.6666 23.0666 42.9866 21.0399C43.2691 20.7986 43.6284 20.666 43.9999 20.666C44.3714 20.666 44.7308 20.7986 45.0133 21.0399C47.3466 23.0799 50.6666 24.6666 53.3333 24.6666C53.6869 24.6666 54.026 24.8071 54.2761 25.0571C54.5261 25.3072 54.6666 25.6463 54.6666 25.9999V35.3333Z" stroke="white" strokeWidth="2.66667" strokeLinecap="round" strokeLinejoin="round" />
+                    </g>
+                </svg>
+
+                {/* Text block — gap: 8px */}
+                <div className="flex flex-col items-center w-full" style={{ gap: '8px' }}>
+                    {/* Title: "Two-Step Verification" — Inter 700, 24px, 1.333em, center, #F8FAFC */}
+                    <h1
+                        style={{
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 700,
+                            fontSize: '24px',
+                            lineHeight: '1.333em',
+                            textAlign: 'center',
+                            color: '#F8FAFC',
+                            margin: 0,
+                        }}
+                    >
+                        {t.auth.otp?.title || 'Two-Step Verification'}
+                    </h1>
+
+                    {/* Description — Inter 400, 14px, 1.4286em, center, rgba(248,250,252,0.7) */}
+                    <p
+                        style={{
+                            fontFamily: 'Inter, sans-serif',
+                            fontWeight: 400,
+                            fontSize: '14px',
+                            lineHeight: '1.4286em',
+                            textAlign: 'center',
+                            color: 'rgba(248, 250, 252, 0.7)',
+                            margin: 0,
+                        }}
+                    >
+                        {t.auth.otp?.description || 'Please enter the 6-digit OTP that was sent to'}{' '}
+                        <span style={{ fontWeight: 500, color: '#F8FAFC' }}>{maskEmail(email)}</span>
+                    </p>
                 </div>
-                <h1 className="text-2xl font-bold text-white">Verify your identity</h1>
-                <p className="mt-1.5 text-sm text-gray-400">
-                    We sent a 6-digit code to{' '}
-                    <span className="font-medium text-gray-300">{email}</span>
-                </p>
             </div>
 
             {/* Error */}
             {error && (
-                <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                <div
+                    className="flex items-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 w-full"
+                    style={{ marginTop: '16px', maxWidth: 382 }}
+                >
                     <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                     </svg>
@@ -212,88 +347,114 @@ function VerifyOTPContent() {
                 </div>
             )}
 
-            {/* OTP Input */}
-            <div className="flex justify-center gap-3 mb-6" onPaste={handlePaste}>
-                {otp.map((digit, i) => (
-                    <input
-                        key={i}
-                        ref={(el) => { inputRefs.current[i] = el }}
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={1}
-                        value={digit}
-                        onChange={(e) => handleInputChange(i, e.target.value)}
-                        onKeyDown={(e) => handleKeyDown(i, e)}
-                        disabled={isVerifying}
-                        className={`w-12 h-14 text-center text-xl font-bold rounded-xl border transition-all duration-200 outline-none
-                            ${digit
-                                ? 'border-blue-500/50 bg-blue-500/10 text-white shadow-sm shadow-blue-500/10'
-                                : 'border-white/[0.08] bg-white/[0.04] text-white'
-                            }
-                            ${error ? 'border-red-500/40 bg-red-500/5' : ''}
-                            focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20
-                            disabled:opacity-50 disabled:cursor-not-allowed`}
-                    />
-                ))}
-            </div>
-
-            {/* Countdown */}
-            <div className="text-center mb-6">
-                {countdown > 0 ? (
-                    <p className="text-xs text-gray-500">
-                        Code expires in <span className="font-medium text-gray-400">{formatTime(countdown)}</span>
-                    </p>
-                ) : (
-                    <p className="text-xs text-amber-400">Code has expired. Please request a new one.</p>
-                )}
-            </div>
-
-            {/* Verify Button */}
-            <Button
-                onClick={() => handleVerify(otp.join(''))}
-                disabled={isVerifying || otp.join('').length < OTP_LENGTH}
-                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-medium h-11 shadow-lg shadow-blue-500/25 transition-all hover:shadow-blue-500/40 disabled:opacity-50 mb-4"
+            {/* Form: OTP Inputs + Button — Figma: gap: 24px, width: 382 */}
+            <div
+                className="flex flex-col items-stretch w-full"
+                style={{ gap: '24px', marginTop: '24px', maxWidth: 382 }}
             >
-                {isVerifying ? (
-                    <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Verifying...
-                    </>
-                ) : (
-                    <>
-                        <ShieldCheck className="mr-2 h-4 w-4" />
-                        Verify Code
-                    </>
-                )}
-            </Button>
-
-            {/* Resend */}
-            <div className="text-center">
-                <button
-                    onClick={handleResend}
-                    disabled={resendCooldown > 0 || isResending}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors disabled:text-gray-600 disabled:cursor-not-allowed"
+                {/* OTP Input Row — Figma: row, gap:12px, padding: 0 17px, center-justified */}
+                <div
+                    className="flex justify-center"
+                    style={{ gap: '12px', padding: '0 17px' }}
+                    onPaste={handlePaste}
                 >
-                    {isResending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {otp.map((digit, i) => (
+                        <input
+                            key={i}
+                            ref={(el) => { inputRefs.current[i] = el }}
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={1}
+                            value={digit}
+                            onChange={(e) => handleInputChange(i, e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(i, e)}
+                            disabled={isVerifying}
+                            className="outline-none transition-all duration-200 focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                                width: '48px',
+                                height: '56px',
+                                borderRadius: '16px',
+                                background: '#1E293B',
+                                border: digit
+                                    ? '2px solid rgba(59, 130, 246, 0.5)'
+                                    : error
+                                        ? '2px solid rgba(239, 68, 68, 0.4)'
+                                        : '2px solid rgba(255, 255, 255, 0.08)',
+                                textAlign: 'center',
+                                fontSize: '20px',
+                                fontWeight: 700,
+                                fontFamily: 'Inter, sans-serif',
+                                color: '#FFFFFF',
+                                caretColor: '#3B82F6',
+                            }}
+                        />
+                    ))}
+                </div>
+
+                {/* Confirm OTP Button — Figma: height:48, fill-width, radius:16px, gradient, opacity:0.5 disabled */}
+                <button
+                    type="button"
+                    onClick={() => handleVerify(otp.join(''))}
+                    disabled={isVerifying || !isOtpComplete}
+                    className="relative w-full transition-all hover:brightness-110 active:scale-[0.99]"
+                    style={{
+                        display: 'flex',
+                        height: '48px',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderRadius: '16px',
+                        border: 'none',
+                        cursor: isVerifying || !isOtpComplete ? 'not-allowed' : 'pointer',
+                        opacity: isVerifying || !isOtpComplete ? 0.5 : 1,
+                        background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(57,137,243,1) 7%, rgba(55,143,239,1) 14%, rgba(53,150,236,1) 21%, rgba(51,156,233,1) 29%, rgba(50,162,229,1) 36%, rgba(48,168,225,1) 43%, rgba(47,174,222,1) 50%, rgba(46,179,218,1) 57%, rgba(45,185,214,1) 64%, rgba(45,191,209,1) 71%, rgba(44,196,205,1) 79%, rgba(44,201,201,1) 86%, rgba(45,207,196,1) 93%, rgba(45,212,191,1) 100%)',
+                        boxShadow: '0px 4px 6px -4px rgba(0, 0, 0, 0.1), 0px 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                        fontFamily: 'Inter, sans-serif',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        lineHeight: '1.4286em',
+                        color: '#FFFFFF',
+                    }}
+                >
+                    {isVerifying ? (
+                        <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            {t.auth.otp?.verifying || 'Verifying...'}
+                        </>
                     ) : (
-                        <RefreshCw className="h-3.5 w-3.5" />
+                        t.auth.otp?.confirmButton || 'Confirm OTP'
                     )}
-                    {resendCooldown > 0
-                        ? `Resend code (${resendCooldown}s)`
-                        : 'Resend code'
-                    }
                 </button>
             </div>
 
-            {/* Back to login */}
-            <div className="mt-6 text-center">
-                <Link
-                    href="/login"
-                    className="text-xs text-gray-500 hover:text-gray-400 transition-colors"
+            {/* Bottom: Resend text + Language Switcher */}
+            <div className="flex flex-col w-full items-center" style={{ gap: '16px', marginTop: '24px' }}>
+                {/* Resend code — Figma: Inter 400, 14px, 1.4286em, center, rgba(248,250,252,0.6), plain text */}
+                <p
+                    onClick={resendCooldown <= 0 && !isResending ? handleResend : undefined}
+                    style={{
+                        fontFamily: 'Inter, sans-serif',
+                        fontWeight: 400,
+                        fontSize: '14px',
+                        lineHeight: '1.4286em',
+                        textAlign: 'center',
+                        color: 'rgba(248, 250, 252, 0.6)',
+                        margin: 0,
+                        cursor: resendCooldown <= 0 && !isResending ? 'pointer' : 'default',
+                    }}
                 >
-                    ← Back to login
-                </Link>
+                    {isResending
+                        ? (t.auth.otp?.resending || 'Sending...')
+                        : isMounted && resendCooldown > 0
+                            ? `${t.auth.otp?.resendCode || 'Resend code'} (${t.auth.otp?.after || 'After'} ${resendCooldown}s)`
+                            : (t.auth.otp?.resendCode || 'Resend code')
+                    }
+                </p>
+
+                {/* Language Switcher */}
+                <div className="w-full">
+                    <LanguageSwitcher variant="segmented" />
+                </div>
             </div>
         </div>
     )
@@ -301,7 +462,11 @@ function VerifyOTPContent() {
 
 export default function VerifyOTPPage() {
     return (
-        <Suspense fallback={<div className="flex min-h-[200px] items-center justify-center text-gray-400">Loading...</div>}>
+        <Suspense fallback={
+            <div className="w-full min-h-[300px] flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-400" />
+            </div>
+        }>
             <VerifyOTPContent />
         </Suspense>
     )

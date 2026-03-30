@@ -74,6 +74,54 @@ export const Tenants: CollectionConfig = {
                 { label: 'Business', value: 'business' },
             ],
         },
+        // ── SSO Integration Fields ──
+        {
+            name: 'customerId',
+            type: 'text',
+            unique: true,
+            index: true,
+            admin: {
+                description: 'Customer ID Number synced from SSO (customer_id_number)',
+            },
+        },
+        {
+            name: 'serviceId',
+            type: 'text',
+            unique: true,
+            index: true,
+            admin: {
+                description: 'Service ID from SSO. Must not be "NA" or empty.',
+            },
+        },
+        {
+            name: 'packCode',
+            type: 'text',
+            admin: {
+                description: 'Pack code from SSO payload (e.g. STARTER, PRO)',
+            },
+        },
+        {
+            name: 'orderId',
+            type: 'text',
+            admin: {
+                description: 'Unifi Order ID from SSO (unifi_order_id)',
+            },
+        },
+        {
+            name: 'address',
+            type: 'json',
+            admin: {
+                description: 'Structured address data from SSO payload',
+            },
+        },
+        {
+            name: 'metaData',
+            type: 'json',
+            admin: {
+                description: 'Full raw SSO payload stored for future analytics',
+            },
+        },
+        // ────────────────────────────
         {
             name: 'stripeCustomerId',
             type: 'text',

@@ -172,7 +172,7 @@ export const POST = withAuth(async (_user, request) => {
     } catch (error: any) {
         console.error('[Order Create Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Order creation failed' } },
             { status: 500 }
         )
     }

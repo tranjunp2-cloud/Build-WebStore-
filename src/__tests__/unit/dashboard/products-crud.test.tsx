@@ -28,72 +28,88 @@ describe('ProductImageFallback Component', () => {
     })
 })
 
-describe('Products CRUD Form Validation Logic', () => {
+import { productFormSchema } from '../../../components/dashboard/product-form/schema'
+
+describe('Products CRUD Form Zod Validation Logic', () => {
     
-    // Abstracted logic matching the component's handleSave
-    const validateForm = (formName: string, formPrice: string, formSku: string, formCategory: string, formCompareAt?: string, formWeight?: string) => {
-        const errors: Record<string, string> = {}
-        if (!formName.trim() || formName.length < 3) errors.name = 'Tên sản phẩm phải có ít nhất 3 ký tự'
-        if (!formPrice || parseFloat(formPrice) < 0) errors.price = 'Giá hợp lệ (≥ 0) là bắt buộc'
-        
-        // TC-F08.08c: Compare At < Price validation
-        if (formCompareAt && parseFloat(formCompareAt) < parseFloat(formPrice)) {
-            errors.compareAt = 'Giá Khuyến mãi (Compare At) phải LỚN HƠN Giá Thực Bán'
-        }
-
-        if (!formSku.trim()) errors.sku = 'SKU là bắt buộc'
-        
-        // TC-F08.03e: Category array empty
-        if (!formCategory.trim() || formCategory === '[]') errors.category = 'Sản phẩm phải thuộc tối thiểu 1 Danh Mục phân loại'
-        
-        // TC-F08.03d: Weight validation (<= 0)
-        if (formWeight !== undefined && parseFloat(formWeight) <= 0) {
-            errors.weight = 'Cân nặng phải lớn hơn 0 để làm mốc tính cước phí Vận Chuyển F14'
-        }
-
-        return errors
-    }
+    // Helper to generate a valid base object so we can test specific field failures
+    const getValidBaseData = () => ({
+        name: 'Valid Product Name',
+        categoryIds: ['cat-1'],
+        images: [],
+        hasVariants: false,
+        basePrice: 50,
+        baseSku: 'SKU-123',
+        baseInventory: 10,
+    })
 
     it('returns errors when required fields are empty', () => {
-        const errors = validateForm('', '', '', '')
-        expect(errors).toHaveProperty('name')
-        expect(errors).toHaveProperty('price')
-        expect(errors).toHaveProperty('sku')
-        expect(errors).toHaveProperty('category')
+        const result = productFormSchema.safeParse({})
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            const errors = result.error.flatten().fieldErrors
+            expect(errors.name).toBeDefined()
+            expect(errors.categoryIds).toBeDefined()
+        }
     })
 
     it('returns error when name is too short', () => {
-        const errors = validateForm('Ab', '10', 'SKU-1', 'Food')
-        expect(errors.name).toBe('Tên sản phẩm phải có ít nhất 3 ký tự')
+        const result = productFormSchema.safeParse({ ...getValidBaseData(), name: 'Ab' })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.flatten().fieldErrors.name?.[0]).toMatch(/at least 3 characters/)
+        }
     })
 
-    it('returns error when price is negative', () => {
-        const errors = validateForm('Valid Name', '-5', 'SKU-1', 'Food')
-        expect(errors.price).toBe('Giá hợp lệ (≥ 0) là bắt buộc')
+    it('returns error when price or inventory is negative (TC-F08.03c)', () => {
+        const result = productFormSchema.safeParse({ ...getValidBaseData(), basePrice: -5, baseInventory: -1 })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.flatten().fieldErrors.basePrice?.[0]).toMatch(/0 or greater/)
+            expect(result.error.flatten().fieldErrors.baseInventory?.[0]).toMatch(/cannot be negative/)
+        }
     })
 
     it('passes validation when all fields are valid', () => {
-        const errors = validateForm('Valid Product Name', '0', 'SKU-123', 'Category')
-        expect(Object.keys(errors).length).toBe(0)
+        const result = productFormSchema.safeParse(getValidBaseData())
+        expect(result.success).toBe(true)
     })
 
-    // --- New TC Implementations --- //
     it('returns error when category is omitted (TC-F08.03e)', () => {
-        const errors = validateForm('Valid Name', '10', 'SKU-1', '[]')
-        expect(errors.category).toBe('Sản phẩm phải thuộc tối thiểu 1 Danh Mục phân loại')
+        const result = productFormSchema.safeParse({ ...getValidBaseData(), categoryIds: [] })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.flatten().fieldErrors.categoryIds?.[0]).toMatch(/at least one category/)
+        }
     })
 
     it('returns error when compare at price is less than regular price (TC-F08.08c)', () => {
-        const errors = validateForm('Valid Name', '50', 'SKU-1', 'Category', '30')
-        expect(errors.compareAt).toBe('Giá Khuyến mãi (Compare At) phải LỚN HƠN Giá Thực Bán')
+        const result = productFormSchema.safeParse({ ...getValidBaseData(), basePrice: 50, compareAtPrice: 30 })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.flatten().fieldErrors.compareAtPrice?.[0]).toMatch(/strictly GREATER than base price/)
+        }
     })
 
     it('returns error when weight is zero or negative (TC-F08.03d)', () => {
-        const errorsZero = validateForm('Valid Name', '50', 'SKU-1', 'Category', undefined, '0')
-        expect(errorsZero.weight).toBe('Cân nặng phải lớn hơn 0 để làm mốc tính cước phí Vận Chuyển F14')
+        const resZero = productFormSchema.safeParse({ ...getValidBaseData(), shippingWeight: 0 })
+        expect(resZero.success).toBe(false)
+        
+        const resNeg = productFormSchema.safeParse({ ...getValidBaseData(), shippingWeight: -1.5 })
+        expect(resNeg.success).toBe(false)
+        
+        if (!resNeg.success) {
+            expect(resNeg.error.flatten().fieldErrors.shippingWeight?.[0]).toMatch(/greater than 0/)
+        }
+    })
 
-        const errorsNegative = validateForm('Valid Name', '50', 'SKU-1', 'Category', undefined, '-1.5')
-        expect(errorsNegative.weight).toBe('Cân nặng phải lớn hơn 0 để làm mốc tính cước phí Vận Chuyển F14')
+    it('returns error when uploading > 5 images (TC-F08.03g)', () => {
+        const tooManyImages = new Array(6).fill({ id: 'img', url: 'http' })
+        const result = productFormSchema.safeParse({ ...getValidBaseData(), images: tooManyImages })
+        expect(result.success).toBe(false)
+        if (!result.success) {
+            expect(result.error.flatten().fieldErrors.images?.[0]).toMatch(/Maximum 5 images/)
+        }
     })
 })
 
@@ -153,28 +169,23 @@ describe('US-F08-04 — buildSavePayload (AC-2: category included)', () => {
         variants: [],
     }
 
-    it('includes category in payload — AC-2 fix', () => {
-        const payload = buildSavePayload(baseProduct)
-        expect(payload.category).toEqual(['Footwear'])
-    })
-
     it('sets status to draft by default — AC-2', () => {
         const payload = buildSavePayload(baseProduct)
         expect(payload.status).toBe('draft')
     })
 
-    it('generates a slug from product name', () => {
+    it('generates a random slug from product name', () => {
         const payload = buildSavePayload(baseProduct)
         expect(payload.slug).toMatch(/^dep-to-ong-[a-z0-9]{5}$/)
     })
 
-    it('sets default stock=10 when no variants', () => {
+    it('sets default inventory=10 when no variants', () => {
         const payload = buildSavePayload({ ...baseProduct, variants: [] })
-        expect(payload.stock).toBe(10)
+        expect(payload.inventory).toBe(10)
         expect(payload.variants).toBeUndefined()
     })
 
-    it('sets stock=0 and includes variants when product has variants', () => {
+    it('sets inventory=0 and includes variants when product has variants', () => {
         const prodWithVariants = {
             ...baseProduct,
             variants: [
@@ -183,14 +194,16 @@ describe('US-F08-04 — buildSavePayload (AC-2: category included)', () => {
             ],
         }
         const payload = buildSavePayload(prodWithVariants)
-        expect(payload.stock).toBe(0)
+        expect(payload.inventory).toBe(0)
         expect(Array.isArray(payload.variants)).toBe(true)
-        expect(payload.variants).toHaveLength(2)
+        if (payload.variants) {
+            expect(payload.variants).toHaveLength(2)
+        }
     })
 
-    it('omits category when category is empty string', () => {
-        const payload = buildSavePayload({ ...baseProduct, category: '   ' })
-        expect(payload.category).toBeUndefined()
+    it('omits category from payload entirely as API requires relationship ID', () => {
+        const payload = buildSavePayload({ ...baseProduct, category: 'Food' })
+        expect((payload as any).category).toBeUndefined()
     })
 
     it('includes weight as fallback for F14 integration', () => {

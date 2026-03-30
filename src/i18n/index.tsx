@@ -41,18 +41,21 @@ const I18nContext = createContext<I18nContextType | null>(null)
 export function I18nProvider({ children, defaultLocale = 'en' }: { children: ReactNode; defaultLocale?: Locale }) {
     const [locale, setLocaleState] = useState<Locale>(defaultLocale)
 
-    // Hydrate from localStorage on mount
+    // Hydrate from localStorage on mount (and sync to cookie if missing)
     useEffect(() => {
         const saved = localStorage.getItem(LOCALE_KEY) as Locale | null
         if (saved && locales[saved]) {
             setLocaleState(saved)
             document.documentElement.lang = saved
+            // Sync to cookie so SSR can pick it up on next reload to prevent FOUC
+            document.cookie = `${LOCALE_KEY}=${saved}; path=/; max-age=31536000; samesite=lax`
         }
     }, [])
 
     const setLocale = useCallback((newLocale: Locale) => {
         setLocaleState(newLocale)
         localStorage.setItem(LOCALE_KEY, newLocale)
+        document.cookie = `${LOCALE_KEY}=${newLocale}; path=/; max-age=31536000; samesite=lax`
         document.documentElement.lang = newLocale
 
         // Sync to backend DB for logged-in users (FR-05 / US-F21-03 AC-2)

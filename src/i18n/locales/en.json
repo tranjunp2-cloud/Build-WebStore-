@@ -118,7 +118,39 @@
         "step2Title": "Choose a template",
         "step2Subtitle": "Pick a starting point — you can customize everything later.",
         "step3Title": "Customize your site",
-        "step3Subtitle": "Add your brand details to make it yours."
+        "step3Subtitle": "Add your brand details to make it yours.",
+        "welcome": {
+            "title": "Welcome to PrimeWeb",
+            "subtitle": "Start building your store. Complete it in just 5 minutes with our AI.",
+            "createStore": "🚀 Create My Store with AI",
+            "skip": "Skip & Go to Dashboard",
+            "step": "Step 1 of 2: Create Store"
+        },
+        "wizard": {
+            "title": "✨ Discover the Power of AI",
+            "slides": {
+                "editor": {
+                    "title": "AI Editor",
+                    "description": "Edit website interfaces through chat - no coding required. AI understands your requests and automatically updates the design in real-time."
+                },
+                "content": {
+                    "title": "AI Content",
+                    "description": "Create product descriptions, automatically generate SEO blog posts. AI writes professional content that attracts customers and is optimized for search engines."
+                },
+                "seo": {
+                    "title": "AI SEO",
+                    "description": "Automatically optimize your website to improve search rankings. AI analyzes and enhances SEO, making your website easier to find on Google."
+                }
+            },
+            "footer": {
+                "skip": "Skip",
+                "skipInstructions": "Skip instructions",
+                "skipGuide": "Skip the guide",
+                "goBack": "← Go back",
+                "continue": "Continue",
+                "explore": "Explore CMS"
+            }
+        }
     },
     "email": {
         "welcome": {
@@ -429,7 +461,39 @@
                 "product": "Product",
                 "price": "Price",
                 "status": "Status",
-                "stock": "Stock"
+                "stock": "Stock",
+                "filterActive": "Active",
+                "filterDraft": "Draft",
+                "filterArchived": "Archived",
+                "sortLatest": "Latest",
+                "sortOldest": "Oldest",
+                "advancedFilters": "Advanced Filters",
+                "clearAll": "Clear all",
+                "category": "Category",
+                "saleStatus": "Sale Status",
+                "allProducts": "All Products",
+                "onSale": "On Sale",
+                "regularPrice": "Regular Price",
+                "stockStatus": "Stock Status",
+                "showLowStock": "Show Low/Out of Stock",
+                "lowStockDesc": "Filters products with ≤5 stock",
+                "activeFilters": "Active filters:",
+                "colImg": "IMG",
+                "colName": "Name",
+                "colPrice": "Price (RM)",
+                "colStock": "Stock",
+                "colWeight": "Weight",
+                "colStatus": "Status",
+                "colActions": "Actions",
+                "edit": "Edit",
+                "delete": "Delete",
+                "sku": "SKU:",
+                "filterBtn": "Filter",
+                "failedToLoad": "Failed to load products",
+                "retry": "Retry",
+                "aiChatTitle": "AI Chat: Quickly create multiple products",
+                "aiChatPlaceholder": "Enter leather jacket 500k, hat 50k",
+                "aiChatBtn": "Create"
             },
             "form": {
                 "editTitle": "Edit Product",
@@ -466,7 +530,7 @@
                 "toastDeleted": "Product deleted.",
                 "undo": "Undo",
                 "toastRestored": "Product restored!",
-                "deleteFailed": "Delete failed",
+                "deleteFailed": "Failed to delete product",
                 "networkError": "Network error",
                 "errors": {
                     "nameMin": "Product name must be at least 3 characters",
@@ -514,7 +578,27 @@
                         "emptyMatrix": "Please create at least 1 variant or disable Variants.",
                         "incompleteMatrix": "Please input Price and Stock for all variants."
                     }
-                }
+                },
+                "successMarkedAs": "Product marked as",
+                "restored": "Product restored",
+                "failedRestore": "Failed to restore product",
+                "failedUpdateStatus": "Failed to update status",
+                "failedDelete": "Failed to delete product",
+                "productDeleted": "Product deleted.",
+                "size": "Size:",
+                "draftSaved": "Draft saved. Switch to Active to display on the web.",
+                "productCreated": "Product created successfully",
+                "productUpdated": "Product updated successfully",
+                "failedLoad": "Failed to load product",
+                "confirmDelete": "Are you sure you want to delete this product?",
+                "deleteSuccess": "Product deleted successfully",
+                "somethingWentWrong": "Something went wrong. Please try again.",
+                "checkFields": "Please check the following fields:",
+                "checkAllRequired": "Please check all required fields and try again.",
+                "editProduct": "Edit Product",
+                "fillInfo": "Fill in complete product information",
+                "saving": "Saving...",
+                "saveChanges": "Save Changes"
             },
             "bulkCreate": {
                 "title": "Fast AI Bulk Create",
@@ -544,12 +628,13 @@
                 "saveSuccess": "Created {count} draft products. Please add images before publishing.",
                 "saveFailed": "Failed to create products",
                 "saveError": "Error saving products"
-            }
+            },
+            "subtitle": "Manage store products"
         }
     },
     "auth": {
         "welcomeBack": "Welcome back",
-        "signInSubtitle": "Sign in to continue building",
+        "signInSubtitle": "Sign in to continue building your website",
         "email": "Email",
         "password": "Password",
         "forgotPassword": "Forgot password?",
@@ -589,15 +674,76 @@
             "signInLink": "Sign in →"
         },
         "forgot": {
-            "title": "Forgot password?",
-            "subtitle": "No worries, we'll send you a reset link",
-            "submit": "Send reset link",
-            "submitting": "Sending reset link...",
-            "backLogin": "Back to sign in",
+            "title": "Forgot password",
+            "subtitle": "Enter your email to receive a password reset link.",
+            "emailLabel": "Email Address",
+            "emailPlaceholder": "ad@gmail.com",
+            "sendButton": "Send Recovery Link",
+            "submitting": "Sending...",
+            "backLogin": "Back to Login",
+            "emailSentTitle": "Email Sent",
+            "emailSentDesc": "If the email exists in the system, a password reset link has been sent.",
+            "emailSentBottom": "Check your inbox and follow the instructions to reset your password.",
             "checkEmail": "Check your email",
             "sentTo": "We've sent a password reset link to",
             "notReceive": "Didn't receive the email? Check your spam folder or",
-            "tryAgain": "try again"
+            "tryAgain": "try again",
+            "submit": "Send reset link"
+        },
+        "reset": {
+            "title": "Reset Password",
+            "subtitle": "Your new password must be different from previous ones",
+            "newPassword": "New password",
+            "newPasswordPlaceholder": "Min. 8 characters",
+            "confirmPassword": "Confirm new password",
+            "confirmPlaceholder": "••••••••",
+            "submit": "Reset Password",
+            "submitting": "Resetting password...",
+            "backLogin": "Back to Login",
+            "reqLength": "At least 8 characters",
+            "reqUpper": "One uppercase letter",
+            "reqNumber": "One number",
+            "strengthTooWeak": "Too weak",
+            "strengthWeak": "Weak",
+            "strengthFair": "Fair",
+            "strengthGood": "Good",
+            "strengthStrong": "Strong",
+            "passwordMin": "Password must be at least 8 characters",
+            "passwordMismatch": "Passwords don't match",
+            "invalidLink": "Invalid reset link",
+            "invalidLinkDesc": "This password reset link is invalid or has expired.",
+            "requestNewLink": "Request new reset link",
+            "backToSignIn": "Back to sign in",
+            "linkExpired": "This reset link has expired. Please request a new one.",
+            "successTitle": "Password reset successful! 🔐",
+            "successDesc": "You can now sign in with your new password.",
+            "connectionError": "Connection error. Please try again."
+        },
+        "otp": {
+            "title": "Two-Step Verification",
+            "description": "Please enter the 6-digit OTP that was sent to",
+            "confirmButton": "Confirm OTP",
+            "verifying": "Verifying...",
+            "resendCode": "Resend code",
+            "resending": "Sending...",
+            "after": "After",
+            "expiresIn": "Code expires in",
+            "expired": "Code has expired. Please request a new one.",
+            "backLogin": "Back to Login",
+            "verificationFailed": "Verification failed",
+            "invalidCode": "Invalid verification code.",
+            "codeExpired": "Code has expired. Please request a new one.",
+            "tooManyAttempts": "Too many attempts. Please request a new code.",
+            "noCodeFound": "No verification code found. Please request a new one.",
+            "connectionError": "Connection error. Please try again.",
+            "successTitle": "Verification successful!",
+            "successDesc": "Redirecting to dashboard...",
+            "resendFailed": "Failed to resend code",
+            "resendFailedRetry": "Failed to resend. Please try again.",
+            "newCodeSent": "New code sent!",
+            "newCodeDesc": "Check your email inbox.",
+            "noEmail": "No email provided",
+            "noEmailDesc": "Please log in first to verify your identity."
         }
     },
     "cms": {

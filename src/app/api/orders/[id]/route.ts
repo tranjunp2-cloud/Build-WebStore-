@@ -86,7 +86,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
     } catch (error: any) {
         console.error('[Order Update Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Order operation failed' } },
             { status: 500 }
         )
     }
@@ -121,7 +121,7 @@ export const GET = withAuth<RouteContext>(async (user, _request, ctx) => {
     } catch (error: any) {
         console.error('[Order Detail Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Order operation failed' } },
             { status: 500 }
         )
     }
