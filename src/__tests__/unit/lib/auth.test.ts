@@ -16,7 +16,7 @@ vi.mock('payload', () => ({
 
 const mockJwtVerify = vi.fn()
 vi.mock('jose', () => ({
-    jwtVerify: (...args: any[]) => mockJwtVerify(...args)
+    jwtVerify: (...args: unknown[]) => mockJwtVerify(...args)
 }))
 
 vi.mock('@payload-config', () => ({ default: {} }))
