@@ -121,6 +121,9 @@ export async function PATCH(
             let page: PageDoc | null = null
 
             if (pageId) {
+                if (!/^\d+$/.test(pageId)) {
+                    return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
+                }
                 const requestedPage = await payload.findByID({
                     collection: 'pages',
                     id: pageId,
@@ -171,7 +174,7 @@ export async function PATCH(
             message: 'Saved successfully',
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Save Error]', error)
         return NextResponse.json(
             { error: 'Save failed' },

@@ -499,9 +499,10 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
     
     // Inject global header/footer from site level
     // Remove existing page-level navigation and footer to avoid duplicates, but keep them as fallback
-    const oldNav = blocks.find((b: any) => b.blockType === 'navigation')
-    const oldFooter = blocks.find((b: any) => b.blockType === 'footer')
-    const combinedBlocks = blocks.filter((b: any) => b.blockType !== 'navigation' && b.blockType !== 'footer')
+    type PreviewBlock = { blockType: string; [key: string]: unknown };
+    const oldNav = blocks.find((b: PreviewBlock) => b.blockType === 'navigation')
+    const oldFooter = blocks.find((b: PreviewBlock) => b.blockType === 'footer')
+    const combinedBlocks = blocks.filter((b: PreviewBlock) => b.blockType !== 'navigation' && b.blockType !== 'footer')
     
     const finalHeader = site.headerBlock || oldNav
     const finalFooter = site.footerBlock || oldFooter
@@ -537,7 +538,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
         'Pragma': 'no-cache',
       },
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('[Preview Error]', e)
     return new NextResponse('Failed to generate preview. Please try again later.', { status: 500 })
   }

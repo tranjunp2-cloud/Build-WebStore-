@@ -5,10 +5,12 @@ import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
+type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
+
 type SiteRendererProps = {
-    site: any
-    page: any
-    pages?: any[]
+    site: Record<string, any>
+    page: Record<string, any>
+    pages?: NavPage[]
 }
 
 export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
@@ -21,7 +23,8 @@ export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
         colorMode: site.theme?.colorMode || 'dark',
     }
 
-    const blocks: any[] = page.layout || []
+    type PreviewBlock = { blockType: string; links?: any; [key: string]: any }
+    const blocks: PreviewBlock[] = page?.layout || []
 
     return (
         <>
