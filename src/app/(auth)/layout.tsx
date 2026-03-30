@@ -11,7 +11,8 @@ export default async function AuthLayout({
     children: React.ReactNode
 }) {
     const cookieStore = await cookies()
-    const localeCookie = (cookieStore.get('prefer_lang')?.value as Locale) || 'en'
+    const cookieValue = cookieStore.get('prefer_lang')?.value
+    const localeCookie = (cookieValue === 'en' || cookieValue === 'ms') ? (cookieValue as Locale) : 'en'
 
     return (
         <AppShell>

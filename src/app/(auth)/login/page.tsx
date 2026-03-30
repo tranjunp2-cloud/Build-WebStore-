@@ -59,7 +59,10 @@ const CHECKBOX_STYLE = {
 function LoginFormContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const returnUrl = searchParams.get('returnUrl') || '/dashboard'
+    let returnUrl = searchParams.get('returnUrl') || '/dashboard'
+    if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) {
+        returnUrl = '/dashboard'
+    }
     const [showPassword, setShowPassword] = useState(false)
     const [checkingReset, setCheckingReset] = useState(false)
     const [rememberMe, setRememberMe] = useState(false)

@@ -156,7 +156,11 @@ function VerifyOTPContent() {
                 document.cookie = `payload-token=${data.token}; path=/; max-age=${60 * 60 * 24}; samesite=lax`
             }
 
-            const returnUrl = searchParams.get('returnUrl') || '/dashboard'
+            let returnUrl = searchParams.get('returnUrl') || '/dashboard'
+            // Prevent Open Redirect (URL must start with / and not //)
+            if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) {
+                returnUrl = '/dashboard'
+            }
             window.location.href = returnUrl
         } catch {
             setError(t.auth.otp?.connectionError || 'Connection error. Please try again.')
