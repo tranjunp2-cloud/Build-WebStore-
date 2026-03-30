@@ -118,7 +118,39 @@
         "step2Title": "Choose a template",
         "step2Subtitle": "Pick a starting point — you can customize everything later.",
         "step3Title": "Customize your site",
-        "step3Subtitle": "Add your brand details to make it yours."
+        "step3Subtitle": "Add your brand details to make it yours.",
+        "welcome": {
+            "title": "Welcome to PrimeWeb",
+            "subtitle": "Start building your store. Complete it in just 5 minutes with our AI.",
+            "createStore": "🚀 Create My Store with AI",
+            "skip": "Skip & Go to Dashboard",
+            "step": "Step 1 of 2: Create Store"
+        },
+        "wizard": {
+            "title": "✨ Discover the Power of AI",
+            "slides": {
+                "editor": {
+                    "title": "AI Editor",
+                    "description": "Edit website interfaces through chat - no coding required. AI understands your requests and automatically updates the design in real-time."
+                },
+                "content": {
+                    "title": "AI Content",
+                    "description": "Create product descriptions, automatically generate SEO blog posts. AI writes professional content that attracts customers and is optimized for search engines."
+                },
+                "seo": {
+                    "title": "AI SEO",
+                    "description": "Automatically optimize your website to improve search rankings. AI analyzes and enhances SEO, making your website easier to find on Google."
+                }
+            },
+            "footer": {
+                "skip": "Skip",
+                "skipInstructions": "Skip instructions",
+                "skipGuide": "Skip the guide",
+                "goBack": "← Go back",
+                "continue": "Continue",
+                "explore": "Explore CMS"
+            }
+        }
     },
     "email": {
         "welcome": {

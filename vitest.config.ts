@@ -81,13 +81,13 @@ export default defineConfig({
                 'src/app/sites/[slug]/sitemap.xml/**',
             ],
             thresholds: {
-                // Current baseline (2026-03-28): lines 18.9, branches 66.5, functions 41.7, statements 18.9
                 // CI fails if coverage drops below these minimums
-                // Target 15/04: lines 60, branches 50, functions 50, statements 60
-                lines: 55,
-                branches: 60,
-                functions: 50,
-                statements: 55,
+                // Current (2026-03-30): lines 64%, branches 73%, functions 64%
+                // Target 15/04: lines 95%, branches 85%, functions 90%
+                lines: 60,
+                branches: 65,
+                functions: 55,
+                statements: 60,
             },
         },
     },
