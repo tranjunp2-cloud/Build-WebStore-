@@ -510,8 +510,8 @@ const MIGRATIONS = [
   // ── Pages: Block tables (Payload blocks field → separate table per block type) ──
   // Each block has metadata + block-specific field columns (per Codex P1 review)
   {
-    name: 'pages__blocks_navigation.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_navigation" (
+    name: 'pages_blocks_navigation.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_navigation" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -521,8 +521,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_hero.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_hero" (
+    name: 'pages_blocks_hero.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_hero" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -533,8 +533,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_about.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_about" (
+    name: 'pages_blocks_about.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_about" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -543,8 +543,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_features.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_features" (
+    name: 'pages_blocks_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_features" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -553,8 +553,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_testimonials.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_testimonials" (
+    name: 'pages_blocks_testimonials.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_testimonials" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -563,8 +563,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_contact.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_contact" (
+    name: 'pages_blocks_contact.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_contact" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -574,8 +574,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_gallery.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_gallery" (
+    name: 'pages_blocks_gallery.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_gallery" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -584,8 +584,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_footer.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_footer" (
+    name: 'pages_blocks_footer.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_footer" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -595,8 +595,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_stats.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_stats" (
+    name: 'pages_blocks_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_stats" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -605,8 +605,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_pricing.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_pricing" (
+    name: 'pages_blocks_pricing.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_pricing" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -615,8 +615,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_faq.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_faq" (
+    name: 'pages_blocks_faq.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_faq" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -625,8 +625,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_team.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_team" (
+    name: 'pages_blocks_team.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_team" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
@@ -636,8 +636,8 @@ const MIGRATIONS = [
   },
   // Navigation links
   {
-    name: 'pages__blocks_navigation_links.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_navigation_links" (
+    name: 'pages_blocks_navigation_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_navigation_links" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -647,8 +647,8 @@ const MIGRATIONS = [
   },
   // Hero CTA buttons
   {
-    name: 'pages__blocks_hero_cta_buttons.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_hero_cta_buttons" (
+    name: 'pages_blocks_hero_cta_buttons.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_hero_cta_buttons" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -658,8 +658,8 @@ const MIGRATIONS = [
   },
   // About stats
   {
-    name: 'pages__blocks_about_stats.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_about_stats" (
+    name: 'pages_blocks_about_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_about_stats" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -669,8 +669,8 @@ const MIGRATIONS = [
   },
   // Contact form fields
   {
-    name: 'pages__blocks_contact_form_fields.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_contact_form_fields" (
+    name: 'pages_blocks_contact_form_fields.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_contact_form_fields" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -680,8 +680,8 @@ const MIGRATIONS = [
   },
   // Footer columns + nested links
   {
-    name: 'pages__blocks_footer_columns.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_footer_columns" (
+    name: 'pages_blocks_footer_columns.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_footer_columns" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -690,8 +690,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_footer_columns_links.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_footer_columns_links" (
+    name: 'pages_blocks_footer_columns_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_footer_columns_links" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -701,8 +701,8 @@ const MIGRATIONS = [
   },
   // Features items
   {
-    name: 'pages__blocks_features_features.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_features_features" (
+    name: 'pages_blocks_features_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_features_features" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -712,8 +712,8 @@ const MIGRATIONS = [
   },
   // Testimonials items
   {
-    name: 'pages__blocks_testimonials_testimonials.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_testimonials_testimonials" (
+    name: 'pages_blocks_testimonials_testimonials.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_testimonials_testimonials" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -723,8 +723,8 @@ const MIGRATIONS = [
   },
   // Gallery images
   {
-    name: 'pages__blocks_gallery_images.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_gallery_images" (
+    name: 'pages_blocks_gallery_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_gallery_images" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -734,8 +734,8 @@ const MIGRATIONS = [
   },
   // Stats items
   {
-    name: 'pages__blocks_stats_stats.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_stats_stats" (
+    name: 'pages_blocks_stats_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_stats_stats" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -745,8 +745,8 @@ const MIGRATIONS = [
   },
   // Pricing plans + nested features
   {
-    name: 'pages__blocks_pricing_plans.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_pricing_plans" (
+    name: 'pages_blocks_pricing_plans.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_pricing_plans" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -755,8 +755,8 @@ const MIGRATIONS = [
     );`,
   },
   {
-    name: 'pages__blocks_pricing_plans_features.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_pricing_plans_features" (
+    name: 'pages_blocks_pricing_plans_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_pricing_plans_features" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -766,8 +766,8 @@ const MIGRATIONS = [
   },
   // FAQ items
   {
-    name: 'pages__blocks_faq_faqs.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_faq_faqs" (
+    name: 'pages_blocks_faq_faqs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_faq_faqs" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
@@ -777,8 +777,8 @@ const MIGRATIONS = [
   },
   // Team members
   {
-    name: 'pages__blocks_team_members.create_table',
-    sql: `CREATE TABLE IF NOT EXISTS "pages__blocks_team_members" (
+    name: 'pages_blocks_team_members.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_team_members" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
       _parent_id varchar NOT NULL,
