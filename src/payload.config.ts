@@ -130,9 +130,11 @@ export default buildConfig({
   ],
   cors: [
     process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
+    'http://localhost:3005',
   ].filter(Boolean),
   csrf: [
     process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
+    'http://localhost:3005',
   ].filter(Boolean),
   upload: {
     limits: {

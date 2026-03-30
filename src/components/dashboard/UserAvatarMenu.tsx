@@ -30,7 +30,7 @@ export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarM
 
     const handleLogout = async () => {
         try {
-            const res = await fetch('/api/auth/logout', {
+            const res = await fetch('/api/users/logout', {
                 method: 'POST',
                 credentials: 'include',
             })
@@ -43,7 +43,6 @@ export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarM
         } catch {
             toast.error('Network error. You may need to refresh.')
         }
-
     }
 
     return (
