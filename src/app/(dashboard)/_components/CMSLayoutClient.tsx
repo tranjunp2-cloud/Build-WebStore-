@@ -8,10 +8,11 @@ import { Toaster } from '@/components/ui/sonner'
 type CMSLayoutClientProps = {
     userName: string
     userInitial: string
+    userEmail: string
     children: React.ReactNode
 }
 
-export function CMSLayoutClient({ userName, userInitial, children }: CMSLayoutClientProps) {
+export function CMSLayoutClient({ userName, userInitial, userEmail, children }: CMSLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
 
     return (
@@ -19,6 +20,7 @@ export function CMSLayoutClient({ userName, userInitial, children }: CMSLayoutCl
             <TopHeader
                 userName={userName}
                 userInitial={userInitial}
+                userEmail={userEmail}
                 sidebarOpen={sidebarOpen}
                 setSidebarOpen={setSidebarOpen}
             />
@@ -35,7 +37,7 @@ export function CMSLayoutClient({ userName, userInitial, children }: CMSLayoutCl
                     </div>
                 </main>
             </div>
-            <Toaster 
+            <Toaster
                 position="top-right"
                 style={{ '--width': '207px' } as React.CSSProperties}
                 toastOptions={{

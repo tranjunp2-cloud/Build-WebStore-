@@ -352,10 +352,10 @@ function VerifyOTPContent() {
                 className="flex flex-col items-stretch w-full"
                 style={{ gap: '24px', marginTop: '24px', maxWidth: 382 }}
             >
-                {/* OTP Input Row — Figma: row, gap:12px, padding: 0 17px, center-justified */}
+                {/* OTP Input Row — responsive: flex with clamp for gap/padding */}
                 <div
-                    className="flex justify-center"
-                    style={{ gap: '12px', padding: '0 17px' }}
+                    className="flex justify-center w-full"
+                    style={{ gap: 'clamp(6px, 2vw, 12px)', padding: '0 clamp(4px, 2vw, 17px)' }}
                     onPaste={handlePaste}
                 >
                     {otp.map((digit, i) => (
@@ -372,7 +372,9 @@ function VerifyOTPContent() {
                             disabled={isVerifying}
                             className="outline-none transition-all duration-200 focus:ring-2 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{
-                                width: '48px',
+                                flex: '1 1 0',
+                                maxWidth: '48px',
+                                minWidth: '36px',
                                 height: '56px',
                                 borderRadius: '16px',
                                 background: '#1E293B',

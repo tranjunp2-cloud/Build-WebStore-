@@ -4,13 +4,15 @@ import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, LogOut, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
+import { toast } from 'sonner'
 
 type UserAvatarMenuProps = {
     userName: string
     userInitial: string
+    userEmail: string
 }
 
-export function UserAvatarMenu({ userName, userInitial }: UserAvatarMenuProps) {
+export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarMenuProps) {
     const [open, setOpen] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
     const { t } = useI18n()
@@ -28,15 +30,19 @@ export function UserAvatarMenu({ userName, userInitial }: UserAvatarMenuProps) {
 
     const handleLogout = async () => {
         try {
-            await fetch('/api/users/logout', {
+            const res = await fetch('/api/auth/logout', {
                 method: 'POST',
                 credentials: 'include',
             })
+            if (res.ok) {
+                document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
+                window.location.href = '/login'
+            } else {
+                toast.error('Logout failed.')
+            }
         } catch {
-            // Ignore
+            toast.error('Network error. You may need to refresh.')
         }
-        document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
-        window.location.href = '/login'
     }
 
     return (
@@ -63,7 +69,7 @@ export function UserAvatarMenu({ userName, userInitial }: UserAvatarMenuProps) {
                             {userName}
                         </span>
                         <span className="text-[12px] leading-[1.33] text-[rgba(248,250,252,0.6)] truncate">
-                            {userName.toLowerCase().replace(' ', '')}@primeweb.my
+                            {userEmail || `${userName.toLowerCase().replace(' ', '')}@primeweb.my`}
                         </span>
                     </div>
 
