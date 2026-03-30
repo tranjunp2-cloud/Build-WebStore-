@@ -53,12 +53,13 @@ function sanitizeUrl(raw: string): string {
     }
 }
 
-export type RenderSocialWidgetBlock = Record<string, unknown> & { links?: any[]; variant?: string; headline?: string }
-export type SiteSocialLinks = { socialLinks?: any }
+export type SocialLink = { platform?: string; url?: string; enabled?: boolean; [key: string]: unknown }
+export type RenderSocialWidgetBlock = Record<string, unknown> & { links?: SocialLink[]; variant?: string; headline?: string }
+export type SiteSocialLinks = { socialLinks?: unknown }
 
 function renderSocialWidget(b: RenderSocialWidgetBlock, t: TemplateTheme, site?: SiteSocialLinks) {
-  const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(b, site?.socialLinks))
-  const links = normalizedBlock.links.filter((item: any) => item?.enabled !== false)
+  const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(b as Record<string, unknown>, site?.socialLinks as Record<string, unknown>))
+  const links = normalizedBlock.links.filter((item: SocialLink) => item?.enabled !== false)
   const isFloating = (normalizedBlock.variant || 'floating') !== 'inline'
 
   if (links.length === 0) return ''

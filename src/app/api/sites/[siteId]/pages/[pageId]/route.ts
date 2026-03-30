@@ -13,7 +13,7 @@ const updatePageSchema = z.object({
     seoTitle: z.string().optional(),
     seoDescription: z.string().optional(),
 })
-const KEBAB_SLUG_REGEX = /^[a-z0-9-]+$/
+
 
 type RouteContext = { params: Promise<{ siteId: string; pageId: string }> }
 
@@ -91,15 +91,12 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                 return NextResponse.json({ error: '404 page slug is read-only.' }, { status: 400 })
             }
 
-            const normalizedSlug = String(slug).trim().replace(/^\//, '').replace(/\/+$/, '')
-
+            let normalizedSlug = String(slug).trim()
             if (!normalizedSlug) {
                 return NextResponse.json({ error: 'URL slug is required.' }, { status: 400 })
             }
-
-            if (!KEBAB_SLUG_REGEX.test(normalizedSlug)) {
-                return NextResponse.json({ error: 'Invalid or duplicate URL slug.' }, { status: 400 })
-            }
+            normalizedSlug = normalizedSlug.startsWith('/') ? normalizedSlug : `/${normalizedSlug}`
+            if (normalizedSlug === '//') normalizedSlug = '/'
 
             const duplicatePages = await payload.find({
                 collection: 'pages',

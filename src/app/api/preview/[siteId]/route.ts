@@ -104,6 +104,12 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
   ${footerHtml}
 
   <script>
+    let parentOrigin;
+    try {
+      parentOrigin = new URL(document.referrer).origin;
+    } catch(e) {
+      parentOrigin = window.location.origin; // fallback
+    }
     (function() {
       const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
       const excludedBlockTypes = ['navigation', 'footer']
@@ -131,7 +137,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
         window.parent.postMessage({
           type: 'BLOCK_LAYOUT',
           layouts: getEditableLayouts()
-        }, '*')
+        }, parentOrigin)
       }
 
       const clearHoverState = () => {
@@ -142,7 +148,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
 
         hoveredEl = null
         hoveredBlock = null
-        window.parent.postMessage({ type: 'BLOCK_MOUSEOUT' }, '*')
+        window.parent.postMessage({ type: 'BLOCK_MOUSEOUT' }, parentOrigin)
       }
 
       document.addEventListener('mouseover', (e) => {
@@ -167,7 +173,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
               blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
               blockType
             }
-          }, '*')
+          }, parentOrigin)
         }
         
         if (target.tagName === 'IMG') {
@@ -181,7 +187,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
               src: target.src,
               blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
               blockType: blockContainer.getAttribute('data-block-type')
-            }, '*')
+            }, parentOrigin)
           }, 200)
           return
         }
@@ -209,7 +215,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
             text: text,
             blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
             blockType: blockContainer.getAttribute('data-block-type')
-          }, '*')
+          }, parentOrigin)
         }, 200)
       })
 
@@ -228,7 +234,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
       })
 
       document.addEventListener('pointerdown', () => {
-        window.parent.postMessage({ type: 'PREVIEW_POINTER_DOWN' }, '*')
+        window.parent.postMessage({ type: 'PREVIEW_POINTER_DOWN' }, parentOrigin)
       })
 
       // US-F05-06: WYSIWYG Text Editing
@@ -244,9 +250,9 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
           blockIndex: parseInt(currentEditingEl.closest('[data-block-index]')?.getAttribute('data-block-index')),
           oldText: originalText,
           newText: newText
-        }, '*')
+        }, parentOrigin)
         currentEditingEl = null
-        window.parent.postMessage({ type: 'TEXT_EDITING_STOPPED' }, '*')
+        window.parent.postMessage({ type: 'TEXT_EDITING_STOPPED' }, parentOrigin)
       }
 
       document.addEventListener('dblclick', (e) => {
@@ -270,7 +276,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
             type: 'TEXT_EDITING_STARTED',
             rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
             blockIndex: parseInt(blockContainer.getAttribute('data-block-index'))
-          }, '*')
+          }, parentOrigin)
         }
       })
 
@@ -302,7 +308,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
             rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
             blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
             blockType: blockContainer.getAttribute('data-block-type')
-          }, '*')
+          }, parentOrigin)
         } else if (currentEditingEl && target !== currentEditingEl) {
            // Clicking outside while editing will blur
         } else if (blockContainer && !excludedBlockTypes.includes(blockContainer.getAttribute('data-block-type'))) {
@@ -318,9 +324,9 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
               blockIndex: parseInt(blockContainer.getAttribute('data-block-index')),
               blockType: blockContainer.getAttribute('data-block-type')
             }
-          }, '*')
+          }, parentOrigin)
         } else {
-           window.parent.postMessage({ type: 'PREVIEW_CANVAS_CLICKED' }, '*')
+           window.parent.postMessage({ type: 'PREVIEW_CANVAS_CLICKED' }, parentOrigin)
         }
       })
 
@@ -391,7 +397,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
           window.parent.postMessage({
             type: 'EDITOR_BLOCK_DROP',
             payload: { index: targetIndex, blockData }
-          }, '*')
+          }, parentOrigin)
         } catch (err) {
           console.error('Drop error:', err)
         }

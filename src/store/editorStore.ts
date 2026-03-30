@@ -8,14 +8,14 @@ import { create } from 'zustand'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
-type BlockData = { blockType: string;[key: string]: any }
+type BlockData = { blockType: string;[key: string]: unknown }
 
 export type UndoActionSource = 'ai_chat' | 'inline_edit' | 'manual' | 'theme_change'
 
 type EditorSnapshot = {
     id: string
     blocks: BlockData[]
-    theme: any
+    theme: ThemeState
     headerBlock: BlockData | null
     footerBlock: BlockData | null
     timestamp: number
@@ -41,7 +41,7 @@ type EditorState = {
     // Data
     siteId: string | null
     blocks: BlockData[]
-    theme: any
+    theme: ThemeState
     siteName: string
 
     // Global Header/Footer (F-05-07)
@@ -70,9 +70,12 @@ type EditorState = {
     autoSaveIntervalMs: number
 }
 
+type ThemeState = Record<string, string | number | boolean | null | unknown>
+type BlockPatch = Record<string, unknown>
+
 type EditorActions = {
     // Init
-    init: (siteId: string, blocks: BlockData[], theme: any, siteName: string, headerBlock?: BlockData | null, footerBlock?: BlockData | null) => void
+    init: (siteId: string, blocks: BlockData[], theme: ThemeState, siteName: string, headerBlock?: BlockData | null, footerBlock?: BlockData | null) => void
 
     // Pages (F-05-02)
     setPages: (pages: PageData[]) => void
@@ -82,21 +85,21 @@ type EditorActions = {
     removePageFromState: (id: string) => void
 
     // Block operations (push to history)
-    updateBlock: (index: number, changes: Record<string, any>, label?: string) => void
+    updateBlock: (index: number, changes: BlockPatch, label?: string) => void
     addBlock: (afterIndex: number, block: BlockData, label?: string) => void
     deleteBlock: (index: number, label?: string) => void
     duplicateBlock: (index: number) => void
     reorderBlocks: (fromIndex: number, toIndex: number) => void
 
     // Theme
-    updateTheme: (changes: Record<string, any>, label?: string) => void
+    updateTheme: (changes: ThemeState, label?: string) => void
 
     // Header/Footer (F-05-07)
-    updateHeaderBlock: (changes: Record<string, any>) => void
-    updateFooterBlock: (changes: Record<string, any>) => void
+    updateHeaderBlock: (changes: BlockPatch) => void
+    updateFooterBlock: (changes: BlockPatch) => void
 
     // AI Batch (F-11) — push ALL AI changes as a single undoable action
-    pushBatch: (blocks: BlockData[], theme: any, label: string) => void
+    pushBatch: (blocks: BlockData[], theme: ThemeState, label: string) => void
 
     // Undo/Redo (F-06 / F-11)
     undo: () => void
@@ -123,7 +126,7 @@ const MAX_HISTORY = 50
 
 function createSnapshot(
     blocks: BlockData[],
-    theme: any,
+    theme: ThemeState,
     headerBlock: BlockData | null = null,
     footerBlock: BlockData | null = null,
     label?: string,
