@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * PATCH /api/sites/[siteId]/publish
@@ -14,10 +15,7 @@ export async function PATCH(
     { params }: { params: Promise<{ siteId: string }> }
 ) {
     try {
-        const payload = await getPayload({ config })
-
-        // Authenticate
-        const { user } = await payload.auth({ headers: req.headers })
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json(
                 { success: false, error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } },
@@ -25,6 +23,7 @@ export async function PATCH(
             )
         }
 
+        const payload = await getPayload({ config })
         const { siteId } = await params
 
         // Verify site exists
@@ -93,9 +92,7 @@ export async function DELETE(
     { params }: { params: Promise<{ siteId: string }> }
 ) {
     try {
-        const payload = await getPayload({ config })
-
-        const { user } = await payload.auth({ headers: req.headers })
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json(
                 { success: false, error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } },
@@ -103,6 +100,7 @@ export async function DELETE(
             )
         }
 
+        const payload = await getPayload({ config })
         const { siteId } = await params
 
         const existing = await payload.findByID({ collection: 'sites', id: siteId })
