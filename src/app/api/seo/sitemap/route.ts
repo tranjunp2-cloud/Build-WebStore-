@@ -77,7 +77,7 @@ ${urls}
     } catch (error: any) {
         console.error('[SEO Sitemap Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Sitemap generation failed' } },
             { status: 500 }
         )
     }

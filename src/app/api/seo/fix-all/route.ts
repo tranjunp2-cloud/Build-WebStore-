@@ -77,9 +77,9 @@ export const POST = withAuth(async (_user, request) => {
     } catch (error: any) {
         console.error('[AI Fix All Error]', error)
         // If timeout, return 504 to trigger the prompt/toast
-        const status = error.message.includes('time') ? 504 : 500
+        const status = error.message?.includes('time') ? 504 : 500
         return NextResponse.json(
-            { success: false, error: { code: 'AI_ERROR', message: error.message } },
+            { success: false, error: { code: 'AI_ERROR', message: 'AI fix failed' } },
             { status }
         )
     }

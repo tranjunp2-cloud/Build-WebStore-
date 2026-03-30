@@ -87,7 +87,7 @@ export const POST = withAuth(async (user, request) => {
     } catch (error: any) {
         console.error('[Bulk Update Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Bulk update failed' } },
             { status: 500 }
         )
     }

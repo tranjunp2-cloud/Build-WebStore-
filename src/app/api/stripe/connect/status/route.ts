@@ -76,7 +76,7 @@ export const GET = withAuth(async (user, request) => {
     } catch (error: any) {
         console.error('[Stripe Connect Status Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Stripe status check failed' } },
             { status: 500 },
         )
     }
