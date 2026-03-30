@@ -11,7 +11,7 @@ import { mergeContactInfoWithSite, mergeFooterSocialsWithSite, mergeSocialWidget
 let _category = 'business'
 export function setSectionCategory(cat: string) { _category = cat }
 
-type RenderBlock = {
+export type RenderBlock = {
     blockType?: string
     [key: string]: unknown
 }

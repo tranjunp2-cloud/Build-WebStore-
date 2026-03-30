@@ -7,8 +7,8 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { renderNav, renderHero, renderSections, THEMES, baseCSS, getGoogleFontsLink, TemplateTheme } from '../renderers'
-import { setHeroCategory } from '../renderers/hero'
-import { setSectionCategory } from '../renderers/sections'
+import { setHeroCategory, type RenderHeroBlock } from '../renderers/hero'
+import { setSectionCategory, type RenderBlock } from '../renderers/sections'
 import { detectCategory } from '@/lib/preview'
 import { withAuth } from '@/lib/auth'
 import { filterNavigationLinksByVisibility } from '@/lib/navigation'
@@ -65,10 +65,10 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
   }
 
   const navHtml = blocks.map((b, i) => b.blockType === 'navigation' ? addDataAttr(renderNav(b, t), i, b.blockType) : '').filter(Boolean).join('\n')
-  const heroHtml = blocks.map((b, i) => b.blockType === 'hero' ? addDataAttr(renderHero(b as any, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
-  const footerHtml = blocks.map((b, i) => b.blockType === 'footer' ? addDataAttr(renderSections(b as any, t, cat, site as any), i, b.blockType) : '').filter(Boolean).join('\n')
+  const heroHtml = blocks.map((b, i) => b.blockType === 'hero' ? addDataAttr(renderHero(b as RenderHeroBlock, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
+  const footerHtml = blocks.map((b, i) => b.blockType === 'footer' ? addDataAttr(renderSections(b as RenderBlock, t, cat, site as Record<string, unknown>), i, b.blockType) : '').filter(Boolean).join('\n')
   const mainHtml = blocks
-    .map((b, i) => !['navigation', 'hero', 'footer'].includes(b.blockType) ? addDataAttr(renderSections(b as any, t, cat, site as any), i, b.blockType) : '')
+    .map((b, i) => !['navigation', 'hero', 'footer'].includes(b.blockType) ? addDataAttr(renderSections(b as RenderBlock, t, cat, site as Record<string, unknown>), i, b.blockType) : '')
     .filter(Boolean)
     .join('\n')
 
