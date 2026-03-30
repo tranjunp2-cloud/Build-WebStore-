@@ -3,6 +3,10 @@
 Dựa trên PRD v2.1 (`F01-ai-builder.md`) — **Form-based Structured Input** (không còn Chat conversational).
 Bao gồm Desktop và Mobile wireframes, 4 trạng thái bắt buộc + Post-Publish.
 
+- **Prototype Link**: [Figma Prototype](https://www.figma.com/make/Y48xuOh2gMCid2UmqOAFys/F01-ai-chat-builder-demo?fullscreen=1&t=iwM7PR5a2viApvbg-1&preview-route=%2Fsignin)
+- **Figma Design Link**: [Figma Design](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30607-16452&t=fkzJdMXzmQQr0ppW-1)
+- **PRD Reference**: [F01-ai-builder.md](../prd/F01-ai-builder.md) (Version 2.1 — Form-based Input)
+
 ---
 
 ## 💻 1. DESKTOP WIREFRAME (≥ 768px)
