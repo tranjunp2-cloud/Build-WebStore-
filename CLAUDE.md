@@ -137,14 +137,49 @@ That's it! CI auto-syncs ALL GitHub Secrets to DO on deploy. No need to edit ci.
 - Check if secret exists: `gh secret list`
 - Missing secret on DO → feature silently fails (no crash, just logs error)
 
+## Git Flow
+
+**Merge thẳng staging.** Không dùng feature branch cha.
+
+```
+feat/F01-01-generate-site → PR → staging → QA test → Done
+feat/F01-02-store-setup   → PR → staging → QA test → Done
+feat/F08-01-product-crud  → PR → staging → QA test → Done
+→ Tất cả pass → PR staging → main (release v1.0)
+```
+
+- 1 User Story = 1 branch = 1 PR vào staging
+- Branch naming: `feat/FXX-YY-mô-tả` (ví dụ: `feat/F01-01-generate-site`)
+- PR title: `feat(F01): [US-F01-01] mô tả` → bot auto-link issue
+- Dùng `Relates to #N` (KHÔNG dùng `Closes #N` — issue phải qua QA trước khi close)
+
+Chi tiết: `.github/GIT_AND_CI_RULES.md` + `.github/CONTRIBUTING.md`
+
+## Testing
+
+Follow `docs/TEST_CONVENTION.md` for all test code. Key rules:
+
+- Every test MUST reference TC-ID from `docs/qa/F*.md`
+- Import from source code — NEVER re-implement logic in tests
+- AAA pattern: Arrange, Act, Assert
+- `vi.mock()` at top of file, never inside test functions
+- `beforeEach`/`afterEach` cleanup mandatory
+- Gold standard files to copy patterns from:
+  - `src/__tests__/unit/otp/otp-generate.test.ts` (pure function)
+  - `src/__tests__/unit/builder/builder-store.test.ts` (store)
+  - `src/__tests__/unit/localization/f21-localization.test.tsx` (component + TC-ID)
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `scripts/db-setup.js` | Migration executor + server orchestrator |
 | `scripts/check-migrations.js` | CI schema validation |
+| `scripts/check-env-vars.js` | CI env var validation |
 | `src/payload.config.ts` | Payload + DB config |
 | `src/collections/*.ts` | Collection definitions (schema source of truth) |
 | `.github/workflows/ci.yml` | CI pipeline |
 | `.github/scripts/sync-do-envs.py` | Sync GitHub Secrets → DO env vars |
+| `.github/GIT_AND_CI_RULES.md` | Git rules + issue lifecycle |
+| `.github/CONTRIBUTING.md` | Dev/QC workflow guide |
 | `Dockerfile` | Docker build (CMD = db-setup.js) |

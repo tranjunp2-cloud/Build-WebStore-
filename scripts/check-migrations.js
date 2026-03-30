@@ -316,7 +316,69 @@ function main() {
     }
   }
 
-  // ── Phase 4: Check for DROP TABLE (dangerous) ──
+  // ── Phase 4: Validate every collection has CREATE TABLE in db-setup.js ──
+  // Payload pushDevSchema is unreliable in Docker standalone — manual CREATE TABLE required.
+  // Payload-managed tables (users, media, pages, payload_*) are excluded — created by Payload init.
+  const PAYLOAD_MANAGED_TABLES = new Set([
+    'users', 'media', 'pages', 'tenants', 'sites', 'products', 'orders',
+    'templates', 'analytics', 'subscriptions',
+    // Payload system tables
+    'payload_preferences', 'payload_migrations', 'payload_locked_documents',
+  ])
+
+  for (const { slug, file } of collectionSlugs) {
+    const tableName = slug.replace(/-/g, '_')
+    if (PAYLOAD_MANAGED_TABLES.has(tableName)) continue
+    if (!createTables[tableName]) {
+      errors.push({
+        severity: '🔴 BLOCKER',
+        message: `Collection "${slug}" (${file}) has no CREATE TABLE in db-setup.js — table won't exist on staging`,
+        fix: `Add CREATE TABLE IF NOT EXISTS ${tableName} (...) to MIGRATIONS in scripts/db-setup.js`,
+      })
+    }
+  }
+
+  // Check array field tables exist for ALL collections
+  // NOTE: Only checks top-level array fields. Nested arrays (e.g. variantConfigs.options)
+  // and group-prefixed arrays (e.g. seo.trackedKeywords → sites_seo_tracked_keywords)
+  // are verified by checking db-setup.js has CREATE TABLE for any table starting with {slug}_
+  for (const file of allCollectionFiles) {
+    const fileContent = fs.readFileSync(path.join(COLLECTIONS_DIR, file), 'utf8')
+    const collectionMatch = fileContent.match(/(?:CollectionConfig|Collection)\s*=\s*\{[\s\S]*?slug:\s*['"]([^'"]+)['"]/)
+    if (!collectionMatch) continue
+    const collSlug = collectionMatch[1].replace(/-/g, '_')
+
+    // Skip Payload-managed collections (users, pages — complex array structures handled by Payload)
+    if (['users', 'pages'].includes(collSlug)) continue
+
+    // Find top-level array fields only (name directly followed by type on next line)
+    const arrayRegex = /name:\s*['"](\w+)['"],\s*\n\s*type:\s*['"]array['"]/g
+    let arrMatch
+    while ((arrMatch = arrayRegex.exec(fileContent)) !== null) {
+      const fieldName = arrMatch[1]
+      const snakeName = toSnakeCase(fieldName)
+      const possibleTableNames = [
+        `${collSlug}_${snakeName}`,           // Direct: products_images
+        `${collSlug}_${snakeName}s`,          // Pluralized: products_tag → products_tags (unlikely)
+      ]
+
+      // Also check if this is inside a group — look for group prefix in CREATE TABLEs
+      // Check if table exists — also check nested patterns (e.g. products_variant_configs_options)
+      const hasMatchingTable = possibleTableNames.some(t => createTables[t]) ||
+        Object.keys(createTables).some(t => t.startsWith(`${collSlug}_`) && t.includes(snakeName)) ||
+        Object.keys(createTables).some(t => t.endsWith(`_${snakeName}`) && t.startsWith(`${collSlug}_`))
+
+      if (!hasMatchingTable) {
+        errors.push({
+          severity: '🔴 BLOCKER',
+          message: `Array field "${collSlug}.${fieldName}" needs table but no matching CREATE TABLE found in db-setup.js`,
+          fix: `Add CREATE TABLE IF NOT EXISTS ${collSlug}_${snakeName} (id varchar PK, _order int, _parent_id int, _uuid varchar, ...) to db-setup.js`,
+        })
+      }
+    }
+  }
+
+  // ── Phase 5: Check for DROP TABLE (dangerous) ──
   const dropRegex = /DROP TABLE/gi
   if (dropRegex.test(content)) {
     const dropMatches = content.match(/DROP TABLE IF EXISTS\s+(\w+)/gi) || []
