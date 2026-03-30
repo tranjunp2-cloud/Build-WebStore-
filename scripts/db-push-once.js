@@ -2,20 +2,21 @@
 /**
  * One-time schema push to a fresh Postgres DB (e.g. staging on DO).
  * Payload only pushes schema when NODE_ENV !== 'production'. This script
- * starts the app in development mode, triggers a request so Payload connects
- * and pushes, then exits.
+ * starts the app in development mode on a separate port, triggers a request
+ * so Payload connects and pushes, then exits.
  *
  * Usage:
  *   DATABASE_URI="postgresql://..." node scripts/db-push-once.js
- *   # or
+ *   # or inside container:
  *   npm run db:push
  */
 const { spawn } = require('child_process')
 const http = require('http')
 
-const PORT = process.env.PORT || 3000
-const WAIT_MS = 25000
-const POLL_MS = 500
+// Use a non-standard port to avoid conflict with the running app (port 3000)
+const PORT = process.env.DB_PUSH_PORT || 3099
+const WAIT_MS = 60000
+const POLL_MS = 1000
 
 function waitForServer() {
   return new Promise((resolve, reject) => {
@@ -44,8 +45,8 @@ async function main() {
     process.env.NODE_OPTIONS = (process.env.NODE_OPTIONS || '') + ' --require ./node-polyfill.js'
   }
 
-  console.log('Starting app in development mode to push schema (NODE_ENV=development)...')
-  const child = spawn('node', ['node_modules/next/dist/bin/next', 'start'], {
+  console.log(`Starting app in development mode on port ${PORT} to push schema...`)
+  const child = spawn('node', ['node_modules/next/dist/bin/next', 'dev', '-p', String(PORT)], {
     stdio: 'inherit',
     env: { ...process.env, PORT: String(PORT) },
     cwd: process.cwd(),
@@ -53,8 +54,8 @@ async function main() {
 
   try {
     await waitForServer()
-    console.log('App is up; schema push runs on first connect. Waiting 8s then exiting...')
-    await new Promise((r) => setTimeout(r, 8000))
+    console.log('App is up; schema push runs on first connect. Waiting 10s then exiting...')
+    await new Promise((r) => setTimeout(r, 10000))
     child.kill()
     console.log('Done. Tables should exist. Redeploy with NODE_ENV=production.')
     process.exit(0)
