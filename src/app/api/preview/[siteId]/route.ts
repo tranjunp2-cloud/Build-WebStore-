@@ -399,6 +399,9 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
 
       // Parent command execution (for bold, italic etc from RichTextToolbar)
       window.addEventListener('message', (e) => {
+        const allowedOrigin = window.location.origin
+        if (e.origin !== allowedOrigin) return
+        
         if (e.data?.type === 'EXEC_COMMAND') {
           document.execCommand(e.data.command, false, e.data.value)
           currentEditingEl?.focus() // keep focus on the element
@@ -428,7 +431,9 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
     const site = await payload.findByID({ collection: 'sites', id: numericSiteId })
     if (!site) return new NextResponse('Not found', { status: 404 })
 
-    const tenantIds = user.tenants?.map((t: any) =>
+    interface TenantRef { tenant: string | number | { id: string | number } }
+
+    const tenantIds = user.tenants?.map((t: TenantRef) =>
       typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
     ) ?? []
 

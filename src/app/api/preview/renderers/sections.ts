@@ -53,7 +53,10 @@ function sanitizeUrl(raw: string): string {
     }
 }
 
-function renderSocialWidget(b: any, t: TemplateTheme, site?: any) {
+export type RenderSocialWidgetBlock = Record<string, unknown> & { links?: any[]; variant?: string; headline?: string }
+export type SiteSocialLinks = { socialLinks?: any }
+
+function renderSocialWidget(b: RenderSocialWidgetBlock, t: TemplateTheme, site?: SiteSocialLinks) {
   const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(b, site?.socialLinks))
   const links = normalizedBlock.links.filter((item: any) => item?.enabled !== false)
   const isFloating = (normalizedBlock.variant || 'floating') !== 'inline'

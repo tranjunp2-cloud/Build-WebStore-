@@ -41,11 +41,14 @@ export function normalizeSocialWidgetConfig<T extends Record<string, unknown>>(b
 
     return {
         ...block,
-        links: rawLinks.map(link => ({
-            platform: String(link?.platform || 'facebook') as SocialPlatform,
-            url: typeof link?.url === 'string' ? link.url : '',
-            enabled: link?.enabled !== false,
-        })),
+        links: rawLinks.map(link => {
+            const p = SocialPlatformSchema.safeParse(link?.platform)
+            return {
+                platform: p.success ? p.data : 'facebook',
+                url: typeof link?.url === 'string' ? link.url : '',
+                enabled: link?.enabled !== false,
+            }
+        }),
     }
 }
 
