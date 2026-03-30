@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { cookies } from 'next/headers'
-
+import { getCurrentUser } from '@/lib/auth'
 import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
 
@@ -16,39 +15,30 @@ export async function PATCH(
     { params }: { params: Promise<{ siteId: string }> }
 ) {
     try {
-        const payload = await getPayload({ config })
-
-        // Try standard Payload auth first
-        let user: any = null
-        try {
-            const authResult = await payload.auth({ headers: req.headers })
-            user = authResult.user
-        } catch (authErr) {
-            console.warn('[Save] Standard auth failed, trying cookie fallback')
-        }
-
-        // Fallback: read payload-token from cookies
-        if (!user) {
-            const cookieStore = await cookies()
-            const token = cookieStore.get('payload-token')?.value
-            if (token) {
-                try {
-                    // Create new headers with Authorization bearer token
-                    const authHeaders = new Headers(req.headers)
-                    authHeaders.set('Authorization', `JWT ${token}`)
-                    const authResult = await payload.auth({ headers: authHeaders })
-                    user = authResult.user
-                } catch (fallbackErr) {
-                    console.warn('[Save] Cookie fallback auth failed too')
-                }
-            }
-        }
-
+        // Authenticate — handles both Payload JWT and custom Jose JWT (from verify-otp)
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
+        const payload = await getPayload({ config })
+
         const { siteId } = await params
+
+        // Verify site exists and check ownership (tenant isolation)
+        const existingSite = await payload.findByID({ collection: 'sites', id: siteId })
+        if (!existingSite) {
+            return NextResponse.json({ error: 'Site not found' }, { status: 404 })
+        }
+        type TenantRef = string | number | { id: string | number } | null | undefined
+        const resolveTenantId = (t: TenantRef): string | null =>
+            t == null ? null : String(typeof t === 'object' ? t.id : t)
+        const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
+        const siteTenantId = resolveTenantId(existingSite.tenant as TenantRef)
+        if (!siteTenantId || !userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
 
