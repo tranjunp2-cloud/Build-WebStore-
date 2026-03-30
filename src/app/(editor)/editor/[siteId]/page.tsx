@@ -97,8 +97,8 @@ export default function EditorPage() {
             }
             if ((e.metaKey || e.ctrlKey) && e.key === 's') {
                 e.preventDefault()
-                editorStore.performSave(true).then(() => {
-                    toast.success('Changes saved')
+                editorStore.performSave(true).then((success) => {
+                    if (success) toast.success('Changes saved')
                 })
             }
         }

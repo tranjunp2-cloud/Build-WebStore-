@@ -58,7 +58,7 @@ type EditorActions = {
 
     // Save (F-07)
     handleContentChange: () => void
-    performSave: (isManual?: boolean) => Promise<void>
+    performSave: (isManual?: boolean) => Promise<boolean>
     markSaved: () => void
     setIsSaving: (saving: boolean) => void
 
@@ -262,17 +262,17 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
 
     performSave: async (isManual = false) => {
         const { siteId, autoSaveTimer, isSaving } = get()
-        if (!siteId) return
+        if (!siteId) return false
 
         // Anti-spam backpressure for manual save
-        if (isManual && isSaving) return
+        if (isManual && isSaving) return false
 
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
         set({ isSaving: true, saveStatus: 'saving', autoSaveTimer: null })
 
         const RETRY_DELAYS = [5000, 10000, 20000]
 
-        const attemptSave = async (retryCount = 0) => {
+        const attemptSave = async (retryCount = 0): Promise<boolean> => {
             const { blocks, theme } = get()
             try {
                 const res = await fetch(`/api/sites/${siteId}/save`, {
@@ -288,10 +288,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                         lastSavedAt: Date.now(),
                         isSaving: false,
                     })
+                    return true
                 } else {
                     if (res.status === 401) {
                         set({ saveStatus: 'error', isSaving: false })
-                        return
+                        return false
                     }
                     throw new Error('Save failed')
                 }
@@ -304,10 +305,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                     }, RETRY_DELAYS[retryCount])
                     set({ autoSaveTimer: timer })
                 }
+                return false
             }
         }
 
-        await attemptSave(0)
+        return await attemptSave(0)
     },
 
     markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now(), saveStatus: 'saved' }),
