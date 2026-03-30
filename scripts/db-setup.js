@@ -812,7 +812,7 @@ const MIGRATIONS = [
     sql: `CREATE TABLE IF NOT EXISTS "pages_layout_social_widget_links" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
       _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
+      _parent_id integer NOT NULL,
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       platform varchar,
       url varchar

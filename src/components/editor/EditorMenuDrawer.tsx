@@ -78,8 +78,8 @@ export function EditorMenuDrawer({ siteId, open, onClose }: EditorMenuDrawerProp
                 method: 'POST',
                 credentials: 'include',
             })
-        } catch {
-            // Ignore logout transport errors and still clear cookie client-side.
+        } catch (error) {
+            console.error('Logout request failed:', error)
         }
 
         document.cookie =

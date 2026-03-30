@@ -3,7 +3,13 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { withAuth } from '@/lib/auth'
+import { parseRequest } from '@/lib/validations/helpers'
+import { z } from 'zod'
 
+const newPageSchema = z.object({
+    title: z.string().min(1, 'Title is required'),
+    slug: z.string().regex(/^[a-z0-9-\/]+$/, 'Slug must be kebab-case or valid path').min(1, 'Slug is required'),
+})
 type RouteContext = { params: Promise<{ siteId: string }> }
 
 export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
@@ -92,12 +98,10 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             return new NextResponse('Unauthorized or Site Not Found', { status: 403 })
         }
 
-        const body = await request.json()
+        const { data, errorResponse } = await parseRequest(request, newPageSchema)
+        if (errorResponse) return errorResponse
 
-        const { title, slug } = body
-        if (!title || !slug) {
-            return new NextResponse('Missing title or slug', { status: 400 })
-        }
+        const { title, slug } = data!
 
         const newPage = await payload.create({
             collection: 'pages',

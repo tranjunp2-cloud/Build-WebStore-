@@ -3,7 +3,16 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 
 import { withAuth } from '@/lib/auth'
+import { parseRequest } from '@/lib/validations/helpers'
+import { z } from 'zod'
 
+const updatePageSchema = z.object({
+    isVisible: z.boolean().optional(),
+    deletedAt: z.string().nullable().optional(),
+    slug: z.string().regex(/^[a-z0-9-\/]+$/, 'Slug must be valid path').optional(),
+    seoTitle: z.string().optional(),
+    seoDescription: z.string().optional(),
+})
 const KEBAB_SLUG_REGEX = /^[a-z0-9-]+$/
 
 type RouteContext = { params: Promise<{ siteId: string; pageId: string }> }
@@ -43,18 +52,20 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             return new NextResponse('Unauthorized or Site Not Found', { status: 403 })
         }
 
-        const body = await request.json()
+        const { data, errorResponse } = await parseRequest(request, updatePageSchema)
+        if (errorResponse) return errorResponse
 
-        const { isVisible, deletedAt, slug, seoTitle, seoDescription } = body
+        const { isVisible, deletedAt, slug, seoTitle, seoDescription } = data!
 
         const updateData: PageUpdateData = {}
-        if (isVisible !== undefined) updateData.isVisible = Boolean(isVisible)
-        if (deletedAt !== undefined) updateData.deletedAt = deletedAt ? String(deletedAt) : null
+        if (isVisible !== undefined) updateData.isVisible = isVisible
+        if (deletedAt !== undefined) updateData.deletedAt = deletedAt
+        if (slug !== undefined) updateData.slug = slug
 
         if (seoTitle !== undefined || seoDescription !== undefined) {
             updateData.seo = {}
-            if (seoTitle !== undefined) updateData.seo.title = String(seoTitle ?? '').trim()
-            if (seoDescription !== undefined) updateData.seo.description = String(seoDescription ?? '').trim()
+            if (seoTitle !== undefined) updateData.seo.title = seoTitle.trim()
+            if (seoDescription !== undefined) updateData.seo.description = seoDescription.trim()
         }
 
         const page = await payload.findByID({
