@@ -2,15 +2,29 @@ name: Codex PR Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
 
 concurrency:
-  group: codex-review-${{ github.event.pull_request.number }}
+  group: codex-review-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
   codex-review:
-    if: github.event.pull_request.user.type != 'Bot'
+    # Auto-run khi PR mở/ready (không phải draft)
+    # Manual-run khi comment @codex review
+    if: |
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.user.type != 'Bot'
+      ) ||
+      (
+        github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@codex review') &&
+        github.event.issue.pull_request != null
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -19,14 +33,14 @@ jobs:
       final_message: ${{ steps.run_codex.outputs['final-message'] }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number }}/merge
           fetch-depth: 0
 
       - name: Generate PR diff
         run: |
-          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
+          git diff origin/${{ github.event.pull_request.base.ref || 'staging' }}...HEAD -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
           echo "Diff size: $(wc -l < pr-diff.txt) lines"
           head -20 pr-diff.txt
 
@@ -46,6 +60,7 @@ jobs:
     if: needs.codex-review.outputs.final_message != ''
     permissions:
       pull-requests: write
+      issues: write
     steps:
       - name: Post review
         uses: actions/github-script@v7
@@ -53,10 +68,13 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const raw = process.env.CODEX_FINAL_MESSAGE || '';
-            const pr = context.payload.pull_request;
-            const commitId = pr.head.sha;
+            const prNumber = context.payload.pull_request?.number || context.payload.issue?.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+
+            // Get PR head SHA
+            const pr = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+            const commitId = pr.data.head.sha;
 
             // Try to parse JSON
             let issues = [];
@@ -74,13 +92,13 @@ jobs:
               if (raw.trim() && !raw.includes('"issues":[]')) {
                 await github.rest.issues.createComment({
                   owner, repo,
-                  issue_number: pr.number,
-                  body: `### 🤖 Codex Review (API)\n\n${raw}\n\n---\n_Powered by OpenAI Codex API_`,
+                  issue_number: prNumber,
+                  body: `### 🤖 Codex Review\n\n${raw}\n\n---\n_Powered by OpenAI Codex API_`,
                 });
               } else {
                 await github.rest.reactions.createForIssue({
                   owner, repo,
-                  issue_number: pr.number,
+                  issue_number: prNumber,
                   content: '+1',
                 });
               }
@@ -106,14 +124,14 @@ jobs:
               });
             }
 
-            const reviewBody = `### 💡 Codex Review\n\nFound **${issues.length}** issue(s).\n\n**Reviewed commit:** \`${commitId.substring(0, 10)}\``;
+            const reviewBody = `### 💡 Codex Review\n\nFound **${issues.length}** issue(s).\n\n**Reviewed commit:** \`${commitId.substring(0, 10)}\`\n\n> Tip: Fix tất cả issues, sau đó comment \`@codex review\` để verify lại.`;
 
             // Try inline review first
             if (comments.length > 0) {
               try {
                 await github.rest.pulls.createReview({
                   owner, repo,
-                  pull_number: pr.number,
+                  pull_number: prNumber,
                   commit_id: commitId,
                   event: 'COMMENT',
                   body: reviewBody,
@@ -133,7 +151,7 @@ jobs:
             }
             await github.rest.issues.createComment({
               owner, repo,
-              issue_number: pr.number,
+              issue_number: prNumber,
               body,
             });
         env:
