@@ -54,6 +54,7 @@ export default function OrdersPage() {
         fetchOrders()
         const interval = setInterval(() => fetchOrders(true), 60000)
         return () => clearInterval(interval)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const handleStatusChange = async (id: string, newStatus: string) => {

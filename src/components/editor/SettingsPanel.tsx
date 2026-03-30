@@ -1,7 +1,8 @@
 'use client'
 
 import React, { memo, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, CircleDot, Copy, Globe2, MenuSquare, Search, Trash2, UploadCloud } from 'lucide-react'
+import * as Tooltip from '@radix-ui/react-tooltip'
+import { ChevronDown, Copy, Globe2, Trash2, UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { blockRegistry } from '@/blocks/registry'
 import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
@@ -10,6 +11,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
 import { LogoEditor } from './LogoEditor'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
+import type { PageData } from '@/store/editorStore'
+import { toast } from 'sonner'
 
 type SocialWidgetLink = {
     platform: 'facebook' | 'whatsapp' | 'instagram' | 'linkedin' | 'youtube'
@@ -72,6 +75,7 @@ interface SettingsPanelProps {
         id: string
         name: string
         status: string
+        domain?: string | null
         branding?: {
             logo?: string
             favicon?: string
@@ -99,7 +103,7 @@ interface SettingsPanelProps {
     siteStatus: string
     headerBlock?: BlockData | null
     footerBlock?: BlockData | null
-    pages?: { id: string; title: string; slug: string }[]
+    pages?: PageData[]
     onThemeChange: (key: string, value: string) => void
     onDeleteBlock: (idx: number) => void
     onDuplicateBlock: (idx: number) => void
@@ -117,13 +121,15 @@ interface SettingsPanelProps {
         headerBlock?: Record<string, unknown>
         footerBlock?: Record<string, unknown>
     }) => void | Promise<void>
+    currentPageId?: string | null
+    onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
 function SettingsPanelInner({
-    block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages,
+    block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages, currentPageId,
     onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
-    onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange,
+    onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate
 }: SettingsPanelProps) {
     const [activeTab, setActiveTab] = useState<SettingsTab>(block ? 'block' : 'global')
     const [openGlobalSections, setOpenGlobalSections] = useState({
@@ -131,6 +137,11 @@ function SettingsPanelInner({
         contact: true,
         social: true,
     })
+    const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
+    const [seoSlugInput, setSeoSlugInput] = useState('')
+    const [seoTitleInput, setSeoTitleInput] = useState('')
+    const [seoDescriptionInput, setSeoDescriptionInput] = useState('')
+    const [seoFieldError, setSeoFieldError] = useState<string | null>(null)
 
     useEffect(() => {
         if (block) {
@@ -277,40 +288,188 @@ function SettingsPanelInner({
         </div>
     )
 
-    const renderSeoContent = () => (
-        <div className="space-y-5">
-            <div>
-                <label className={labelCls}>Meta Title</label>
-                <Input
-                    defaultValue={siteSeo.metaTitle || siteName || 'Homepage'}
-                    key={`seo-title-${siteSeo.metaTitle || siteName || 'Homepage'}`}
-                    onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ seo: { ...siteSeo, metaTitle: e.target.value } })}
-                    variant="editor"
-                    className={editorInputClassName}
-                />
-            </div>
-            <div>
-                <label className={labelCls}>Meta Description</label>
-                <Textarea
-                    rows={4}
-                    defaultValue={siteSeo.metaDescription || ''}
-                    key={`seo-description-${siteSeo.metaDescription || ''}`}
-                    onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ seo: { ...siteSeo, metaDescription: e.target.value } })}
-                    variant="editor"
-                    className={editorTextareaClassName}
-                    placeholder="Tell search engines and social platforms what this site is about."
-                />
-            </div>
-            <div className={sectionCls}>
-                <label className="text-xs font-medium uppercase text-gray-500">Open Graph</label>
-                <div className="mt-3 rounded-2xl border border-dashed border-[#334155] bg-[#172033] px-4 py-5 text-center">
-                    <UploadCloud className="mx-auto h-5 w-5 text-slate-500" />
-                    <p className="mt-2 text-sm font-medium text-slate-200">Social Share Thumbnail</p>
-                    <p className="mt-1 text-xs text-slate-500">Upload support will be connected in the next step.</p>
+    const activePage = useMemo(() => {
+        if (!pages || !currentPageId) return null
+        return pages.find(p => p.id === currentPageId) || null
+    }, [pages, currentPageId])
+
+    useEffect(() => {
+        if (!activePage) {
+            setSeoSlugInput('')
+            setSeoTitleInput('')
+            setSeoDescriptionInput('')
+            setSeoFieldError(null)
+            return
+        }
+
+        setSeoSlugInput(activePage.isHomepage ? '/' : (activePage.slug || ''))
+        setSeoTitleInput(activePage.seoTitle || activePage.title || '')
+        setSeoDescriptionInput(activePage.seoDescription || '')
+        setSeoFieldError(activePage.error || null)
+    }, [activePage])
+
+    const handleSeoUpdate = async (field: keyof PageData, value: string) => {
+        if (!activePage || !currentPageId) return
+        if (activePage[field] === value) return
+
+        const updatedPage = await onPageUpdate?.(currentPageId, { [field]: value })
+        if (!updatedPage) {
+            if (field === 'slug') {
+                setSeoSlugInput(activePage.isHomepage ? '/' : (activePage.slug || ''))
+            } else if (field === 'seoTitle') {
+                setSeoTitleInput(activePage.seoTitle || activePage.title || '')
+            } else if (field === 'seoDescription') {
+                setSeoDescriptionInput(activePage.seoDescription || '')
+            }
+            return
+        }
+
+        setSeoFieldError(null)
+        setSeoSlugInput(updatedPage.isHomepage ? '/' : (updatedPage.slug || ''))
+        setSeoTitleInput(updatedPage.seoTitle || updatedPage.title || '')
+        setSeoDescriptionInput(updatedPage.seoDescription || '')
+    }
+
+    const seoTitleValue = seoTitleInput
+    const seoDescriptionValue = seoDescriptionInput
+    const seoSlugValue = seoSlugInput
+    const isHomepage = activePage?.isHomepage || activePage?.slug === 'home' || activePage?.slug === '/' || activePage?.slug === ''
+    const normalizedPreviewPath = isHomepage ? '' : seoSlugValue.replace(/^\//, '')
+    const previewDomain = (site?.domain || `${(siteName || site?.name || 'site').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}.primeweb.app`).replace(/^https?:\/\//, '')
+    const metaTitleWarning = seoTitleValue.length > 60 ? 'Title may be truncated on Google Search.' : null
+    const metaDescriptionWarning = seoDescriptionValue.length > 160 ? 'Description may be truncated on Google Search.' : null
+
+    const renderSeoContent = () => {
+        if (!activePage) {
+            return (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-400">
+                    Select a page to configure SEO settings.
+                </div>
+            )
+        }
+
+        return (
+            <div className="space-y-5">
+                <div>
+                    <label className={labelCls}>URL Slug</label>
+                    <Input
+                        value={isHomepage ? '/' : seoSlugValue}
+                        disabled={isHomepage}
+                        onChange={(e) => {
+                            setSeoSlugInput(e.target.value)
+                            setSeoFieldError(null)
+                        }}
+                        onBlur={(e: FieldBlurEvent) => {
+                            let val = e.target.value.trim()
+                            if (val.startsWith('/')) val = val.substring(1)
+                            void handleSeoUpdate('slug', val)
+                        }}
+                        variant="editor"
+                        className={editorInputClassName}
+                    />
+                    {seoFieldError ? (
+                        <p className="mt-1 text-[10px] text-rose-400">{seoFieldError}</p>
+                    ) : null}
+                </div>
+                <div>
+                    <label className={labelCls}>Meta Title</label>
+                    <Input
+                        value={seoTitleValue}
+                        onChange={(e) => setSeoTitleInput(e.target.value)}
+                        onBlur={(e: FieldBlurEvent) => void handleSeoUpdate('seoTitle', e.target.value)}
+                        variant="editor"
+                        className={cn(editorInputClassName, metaTitleWarning && 'border-amber-500/40 focus-visible:border-amber-400')}
+                    />
+                    <div className="mt-1 flex items-center justify-between gap-3">
+                        <span className={cn('text-[10px] text-slate-500', metaTitleWarning && 'text-amber-400')}>
+                            {metaTitleWarning || ' '}
+                        </span>
+                        <span className={cn('text-[10px] text-slate-500', metaTitleWarning && 'text-amber-400')}>{seoTitleValue.length}/60 characters</span>
+                    </div>
+                </div>
+                <div>
+                    <label className={labelCls}>Meta Description</label>
+                    <Textarea
+                        rows={4}
+                        value={seoDescriptionValue}
+                        onChange={(e) => setSeoDescriptionInput(e.target.value)}
+                        onBlur={(e: FieldBlurEvent) => void handleSeoUpdate('seoDescription', e.target.value)}
+                        variant="editor"
+                        className={cn(editorTextareaClassName, metaDescriptionWarning && 'border-amber-500/40 focus-visible:border-amber-400')}
+                        placeholder="Tell search engines and social platforms what this page is about."
+                    />
+                    <div className="mt-1 flex items-center justify-between gap-3">
+                        <span className={cn('text-[10px] text-slate-500', metaDescriptionWarning && 'text-amber-400')}>
+                            {metaDescriptionWarning || ' '}
+                        </span>
+                        <span className={cn('text-[10px] text-slate-500', metaDescriptionWarning && 'text-amber-400')}>{seoDescriptionValue.length}/160 characters</span>
+                    </div>
+                </div>
+                
+                <div className={sectionCls}>
+                    <label className="text-xs font-medium uppercase text-gray-500">Google Preview</label>
+                    <div className="mt-3 rounded-[8px] border border-[#25324A] bg-white p-4">
+                        <div className="text-[14px] text-[#202124] truncate" style={{fontFamily: 'arial,sans-serif'}}>
+                            <span className="text-[12px] text-[#202124] flex items-center gap-2">
+                                <Globe2 className="w-4 h-4 text-slate-400" />
+                                {siteName || 'Your Website'}
+                            </span>
+                        </div>
+                        <div className="text-[12px] text-[#006621] mt-1 truncate" style={{fontFamily: 'arial,sans-serif'}}>
+                            https://{previewDomain}/{normalizedPreviewPath}
+                        </div>
+                        <div className="text-[18px] text-[#1a0dab] font-normal mt-1 truncate hover:underline cursor-pointer leading-[1.2]" style={{fontFamily: 'arial,sans-serif'}}>
+                            {seoTitleValue || 'Page Title'}
+                        </div>
+                        <div className="text-[13px] text-[#4d5156] mt-1 line-clamp-2 leading-[1.4]" style={{fontFamily: 'arial,sans-serif'}}>
+                            {seoDescriptionValue || 'Provide a meta description to help users know what this page is about before they click on the search result.'}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="pt-2">
+                    <button
+                        type="button"
+                        disabled={isGeneratingSEO}
+                        onClick={async () => {
+                            if (!currentPageId || !site?.id) return
+                            setIsGeneratingSEO(true)
+                            const loadingToastId = toast.loading('Generating SEO optimization using AI...')
+                            try {
+                                const res = await fetch(`/api/sites/${site.id}/pages/${currentPageId}/generate-seo`, {
+                                    method: 'POST'
+                                })
+                                if (res.ok) {
+                                const data = await res.json()
+                                    if (data.title) setSeoTitleInput(data.title)
+                                    if (data.description) setSeoDescriptionInput(data.description)
+                                    if (data.slug && !isHomepage) setSeoSlugInput(data.slug)
+                                    if (data.title) await handleSeoUpdate('seoTitle', data.title)
+                                    if (data.description) await handleSeoUpdate('seoDescription', data.description)
+                                    if (data.slug && !isHomepage) await handleSeoUpdate('slug', data.slug)
+                                    toast.success('SEO optimization successfully generated!', { id: loadingToastId })
+                                } else {
+                                    toast.error('Failed to generate SEO', { id: loadingToastId })
+                                }
+                            } catch (error) {
+                                toast.error('Error generating SEO', { id: loadingToastId })
+                            } finally {
+                                setIsGeneratingSEO(false)
+                            }
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-[linear-gradient(90deg,#3B82F6_0%,#2DD4BF_100%)] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-50"
+                    >
+                        {isGeneratingSEO ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                            <span>✨</span>
+                        )}
+                        {isGeneratingSEO ? 'Generating...' : 'Automatic SEO Optimization'}
+                    </button>
                 </div>
             </div>
-        </div>
-    )
+        )
+    }
 
     const renderMenuContent = () => (
         <div className="space-y-5">
@@ -397,10 +556,10 @@ function SettingsPanelInner({
     }
 
     const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode; disabled?: boolean }> = [
-        { id: 'global', label: 'Global', icon: <Globe2 className="h-3.5 w-3.5" /> },
-        { id: 'seo', label: 'SEO', icon: <Search className="h-3.5 w-3.5" /> },
-        { id: 'menu', label: 'Menu', icon: <MenuSquare className="h-3.5 w-3.5" /> },
-        { id: 'block', label: 'Block', icon: <CircleDot className="h-3.5 w-3.5" />, disabled: !block },
+        { id: 'global', label: 'Global', icon: <span aria-hidden="true" className="text-[15px] leading-none">⚙️</span> },
+        { id: 'seo', label: 'SEO', icon: <span aria-hidden="true" className="text-[15px] leading-none">🔍</span> },
+        { id: 'menu', label: 'Menu', icon: <span aria-hidden="true" className="text-[15px] leading-none">🧭</span> },
+        { id: 'block', label: 'Block', icon: <span aria-hidden="true" className="text-[15px] leading-none">🎨</span>, disabled: !block },
     ]
 
     return (
@@ -408,22 +567,42 @@ function SettingsPanelInner({
             <div className="border-b border-white/5 px-4 py-4">
                 <div className="grid grid-cols-2 gap-2">
                     {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            type="button"
-                            disabled={tab.disabled}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={cn(
-                                'inline-flex items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-medium transition-colors',
-                                activeTab === tab.id
-                                    ? 'bg-[linear-gradient(90deg,rgba(37,99,235,0.28),rgba(34,211,238,0.2))] text-[#F8FAFC] shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]'
-                                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-200',
-                                tab.disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-500',
-                            )}
-                        >
-                            <span className="shrink-0">{tab.icon}</span>
-                            {tab.label}
-                        </button>
+                        <Tooltip.Provider key={tab.id} delayDuration={150}>
+                            <Tooltip.Root>
+                                <Tooltip.Trigger asChild>
+                                    <span className="block">
+                                        <button
+                                            type="button"
+                                            disabled={tab.disabled}
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className={cn(
+                                                'inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-medium transition-colors',
+                                                activeTab === tab.id
+                                                    ? 'bg-[linear-gradient(90deg,rgba(37,99,235,0.28),rgba(34,211,238,0.2))] text-[#F8FAFC] shadow-[inset_0_0_0_1px_rgba(59,130,246,0.25)]'
+                                                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-200',
+                                                tab.disabled && 'cursor-not-allowed opacity-40 hover:bg-transparent hover:text-slate-500',
+                                            )}
+                                        >
+                                            <span className="shrink-0">{tab.icon}</span>
+                                            {tab.label}
+                                        </button>
+                                    </span>
+                                </Tooltip.Trigger>
+                                {tab.disabled ? (
+                                    <Tooltip.Portal>
+                                        <Tooltip.Content
+                                            side="bottom"
+                                            sideOffset={8}
+                                            className="z-50 rounded-md border border-white/10 bg-[#0B1120] px-3 py-2 text-xs text-slate-100 shadow-xl"
+                                            style={{ fontFamily: 'var(--font-inter), system-ui, sans-serif' }}
+                                        >
+                                            Please select a block first
+                                            <Tooltip.Arrow className="fill-[#0B1120]" />
+                                        </Tooltip.Content>
+                                    </Tooltip.Portal>
+                                ) : null}
+                            </Tooltip.Root>
+                        </Tooltip.Provider>
                     ))}
                 </div>
             </div>

@@ -436,6 +436,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
                                     {proofPreview ? (
                                         <div style={{ position: 'relative', display: 'inline-block' }}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img src={proofPreview} alt="Payment proof"
                                                 style={{
                                                     maxWidth: '100%', maxHeight: '200px', borderRadius: '12px',
@@ -529,8 +530,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 }}>
                                     {item.imageUrl ? (
-                                        <img src={item.imageUrl} alt={item.name}
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        <>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={item.imageUrl} alt={item.name}
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        </>
                                     ) : (
                                         <span style={{ fontSize: '16px', opacity: 0.2 }}>📦</span>
                                     )}

@@ -18,7 +18,7 @@ import { mergeFooterSocialsWithSite, mergeNavigationBrandingWithSite } from '@/l
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string }, site?: any): string {
+export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string; ogTitle?: string; ogDescription?: string }, site?: any): string {
   const cat = category || 'business'
   const t = theme || THEMES[cat] || THEMES.business
 
@@ -27,6 +27,8 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
   const navBlock = blocks.find(b => b.blockType === 'navigation')
   const siteName = meta?.name || navBlock?.logoText || 'Website'
   const siteDesc = meta?.description || heroBlock?.subheadline || `${siteName} — Professional website`
+  const ogTitle = meta?.ogTitle || siteName
+  const ogDescription = meta?.ogDescription || siteDesc.substring(0, 160)
   const lang = meta?.lang || 'en'
 
   // Set category for image selection in renderers
@@ -53,8 +55,8 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${siteName}</title>
   <meta name="description" content="${siteDesc.substring(0, 160)}">
-  <meta property="og:title" content="${siteName}">
-  <meta property="og:description" content="${siteDesc.substring(0, 160)}">
+  <meta property="og:title" content="${ogTitle}">
+  <meta property="og:description" content="${ogDescription}">
   <meta property="og:type" content="website">
   <meta name="robots" content="index, follow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -472,8 +474,10 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
     const cat = detectCategory(combinedBlocks, site.name || '')
     const t = THEMES[cat] || THEMES.business
     const html = buildFullHTML(combinedBlocks, t, cat, {
-      name: site.seo?.metaTitle || site.name,
-      description: site.seo?.metaDescription || site.description,
+      name: page?.seo?.title || site.seo?.metaTitle || site.name,
+      description: page?.seo?.description || site.seo?.metaDescription || site.description,
+      ogTitle: page?.seo?.title || site.seo?.metaTitle || site.name,
+      ogDescription: page?.seo?.description || site.seo?.metaDescription || site.description,
       lang: site.locale || 'en',
     }, site)
 

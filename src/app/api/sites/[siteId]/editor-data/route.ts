@@ -79,6 +79,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
             site: {
                 id: site.id,
                 name: site.name || 'Untitled',
+                domain: site.domain || null,
                 status: site.status || 'draft',
                 theme: site.theme || {},
                 siteType: site.siteType || 'business',
