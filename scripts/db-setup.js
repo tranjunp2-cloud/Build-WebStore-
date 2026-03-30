@@ -183,6 +183,12 @@ const MIGRATIONS = [
     name: 'sites.footer_block',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS footer_block varchar;`,
   },
+  // ── Sites: Branding + Contact Info ──
+  { name: 'sites.logo', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS logo varchar;' },
+  { name: 'sites.favicon', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS favicon varchar;' },
+  { name: 'sites.phone', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS phone varchar;' },
+  { name: 'sites.email', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS email varchar;' },
+  { name: 'sites.address', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS address varchar;' },
   // ── Products: Halal + Weight ──
   {
     name: 'products.halal_certified',
