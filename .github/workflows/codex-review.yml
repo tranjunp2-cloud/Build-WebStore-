@@ -122,23 +122,33 @@ jobs:
               }
             }
 
-            // Create PR review with inline comments
+            // Try inline review first, fallback to comment if lines are outside diff
             if (comments.length > 0) {
-              await github.rest.pulls.createReview({
-                owner, repo,
-                pull_number: pr.number,
-                commit_id: commitId,
-                event: 'COMMENT',
-                body: reviewBody,
-                comments,
-              });
-            } else {
-              // All issues lack file/line — post as regular comment
-              await github.rest.issues.createComment({
-                owner, repo,
-                issue_number: pr.number,
-                body: reviewBody,
-              });
+              try {
+                await github.rest.pulls.createReview({
+                  owner, repo,
+                  pull_number: pr.number,
+                  commit_id: commitId,
+                  event: 'COMMENT',
+                  body: reviewBody,
+                  comments,
+                });
+                return;
+              } catch (e) {
+                console.log('Inline review failed (lines may be outside diff), falling back to comment:', e.message);
+              }
             }
+
+            // Fallback: post all issues as a single comment
+            let fallbackBody = reviewBody;
+            for (const issue of issues) {
+              const badge = badges[issue.severity] || badges.P2;
+              fallbackBody += `\n\n### \`${issue.file || 'General'}\`${issue.line ? ` (line ${issue.line})` : ''}\n${badge} **${issue.title || 'Issue'}**\n\n${issue.body}\n\nUseful? React with 👍 / 👎.`;
+            }
+            await github.rest.issues.createComment({
+              owner, repo,
+              issue_number: pr.number,
+              body: fallbackBody,
+            });
         env:
           CODEX_FINAL_MESSAGE: ${{ needs.codex-review.outputs.final_message }}
