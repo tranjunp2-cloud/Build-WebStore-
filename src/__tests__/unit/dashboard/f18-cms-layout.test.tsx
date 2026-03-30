@@ -179,7 +179,7 @@ describe('F18 CMS Core Layout', () => {
             // Click Logout
             fireEvent.click(screen.getByText('Logout'))
             
-            expect(global.fetch).toHaveBeenCalledWith('/api/users/logout', expect.any(Object))
+            expect(global.fetch).toHaveBeenCalledWith('/api/auth/logout', expect.any(Object))
             
             await waitFor(() => {
                 expect(window.location.href).toBe('/login')
