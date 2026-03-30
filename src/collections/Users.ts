@@ -419,6 +419,7 @@ export const Users: CollectionConfig = {
                     collection: 'users',
                     where: { email: { equals: email } },
                     limit: 1,
+                    overrideAccess: true, // Required to read protected fields like otpHash
                 })
 
                 if (!result.docs.length) {
@@ -486,6 +487,7 @@ export const Users: CollectionConfig = {
                     collection: 'users',
                     where: { email: { equals: email } },
                     limit: 1,
+                    overrideAccess: true, // Required to read protected fields like otpHash
                 })
 
                 if (!result.docs.length) {
@@ -563,6 +565,7 @@ export const Users: CollectionConfig = {
                     id: user.id,
                     email: user.email,
                     collection: 'users',
+                    mfa_verified: true,
                 })
                     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
                     .setIssuedAt(now)
@@ -572,11 +575,17 @@ export const Users: CollectionConfig = {
                 // Sanitize user object for response (remove sensitive fields)
                 const { otpHash: _h, otpExpiresAt: _e, otpAttempts: _a, ...safeUser } = user
 
-                return Response.json({
+                return new Response(JSON.stringify({
                     message: 'Verification successful',
                     token,
                     user: safeUser,
                     exp: now + expSeconds,
+                }), {
+                    status: 200,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Set-Cookie': `payload-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${expSeconds}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`,
+                    }
                 })
             },
         },
