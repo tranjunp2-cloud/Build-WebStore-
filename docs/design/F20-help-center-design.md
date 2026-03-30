@@ -2,7 +2,8 @@
 
 > **Epic:** Help & Support
 > **Feature Code:** F20
-> **Links:**
+> **Links figma:** https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=31225-3239&t=601og2GNCjvvkTka-4
+> Link localhost: http://localhost:3000/F20-help-center-ui-demo
 > - [PRD](../prd/F20-help-center.md)
 > - [User Stories](../stories/F20-help-center-stories.md)
 > - [QA Test Cases](../qa/F20-help-center.md)

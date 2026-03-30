@@ -1,99 +1,624 @@
-# Wireframe & User Flow: Auth (F02)
-> **Version:** 1.0 | **Feature:** Xác thực người dùng (F02)
-> **Reference PRD:** [F02-auth.md](../prd/F02-auth.md)
+# 📐 Low-fi Wireframes: F02 Auth Flow
+
+Dựa trên PRD v2.3 (`F02-auth.md`) — **Dual Auth Flows** (SSO cho Owner, Native cho Staff) + Mandatory 2FA.
+Bao gồm Desktop và Mobile wireframes, toàn bộ màn hình xác thực.
 
 ---
 
-## 1. Tóm Tắt Luồng Chạy (User Flow Summary)
+## 🔄 0. USER FLOW DIAGRAM
 
-Hệ thống Auth (F02) vận hành tập trung vào việc ưu tiên hiển thị đăng nhập, phân quyền tự động sau khi xác thực và bảo vệ an toàn các route nhạy cảm.
+### 0.1 Tổng Quan Luồng Auth (Full Auth Flow)
+```text
+                           ┌─────────────────┐
+                           │  User truy cập  │
+                           │  Protected Route │
+                           └────────┬────────┘
+                                    │
+                           ┌────────▼────────┐
+                           │  Auth Guard     │
+                           │  Kiểm tra       │
+                           │  Session/JWT    │
+                           └────────┬────────┘
+                                    │
+                        ┌───────────┴───────────┐
+                        │                       │
+                  Có Session               Không có
+                        │                       │
+                ┌───────▼───────┐       ┌───────▼───────────┐
+                │ Cho phép truy │       │ Redirect → /login │
+                │ cập route     │       │ ?redirect=[url]   │
+                └───────────────┘       └───────────────────┘
+```
 
-### 1.1. Luồng Chưa Đăng Nhập (Auth Guard Flow)
-- Người dùng vào trang chủ (`/`) hoặc bất kỳ protected route nào (vd. `/dashboard`, `/builder`).
-- Hệ thống kiểm tra session → Không có → **Redirect ép buộc** về trang `/login` cùng tham số `?redirect=[url]`.
+### 0.2 Luồng Đăng Nhập (Login Flow — Dual Auth)
+```text
+                              ┌────────────────┐
+                              │   /login Page  │
+                              └───────┬────────┘
+                                      │
+                         ┌────────────┴────────────┐
+                         │                         │
+                   ┌─────▼──────┐           ┌──────▼──────┐
+                   │  OWNER     │           │   STAFF     │
+                   │ "Đăng nhập │           │ Nhập Email  │
+                   │  với SSO"  │           │ + Password  │
+                   └─────┬──────┘           └──────┬──────┘
+                         │                         │
+                ┌────────▼────────┐       ┌────────▼────────┐
+                │ Redirect sang   │       │ Xác thực nội bộ │
+                │ SSO Login Page  │       │ Webstore 2.0    │
+                └────────┬────────┘       └────────┬────────┘
+                         │                         │
+                ┌────────▼────────┐       ┌────────▼────────┐
+                │ SSO Auth xong   │       │  Đúng Email/    │
+                │ Callback về     │       │  Password?      │
+                │ Webstore        │       └────────┬────────┘
+                └────────┬────────┘                │
+                         │               ┌────────┴────────┐
+                         │               │                  │
+                         │          SAI (401)          ĐÚNG
+                         │               │                  │
+                         │     ┌─────────▼──────┐          │
+                         │     │ Alert Banner    │          │
+                         │     │ "Sai thông tin" │          │
+                         │     └────────────────┘          │
+                         │                                  │
+                         └──────────┬───────────────────────┘
+                                    │
+                           ┌────────▼────────┐
+                           │ HỆ THỐNG GỬI   │
+                           │ OTP 6 SỐ QUA   │
+                           │ EMAIL (BẮT BUỘC)│
+                           └────────┬────────┘
+                                    │
+                           ┌────────▼────────┐
+                           │  /verify-otp    │
+                           │  Nhập OTP 6 số  │
+                           │  (Hạn 5 phút)   │
+                           └────────┬────────┘
+                                    │
+                        ┌───────────┴───────────┐
+                        │                       │
+                   SAI / HẾT HẠN           ĐÚNG
+                        │                       │
+                ┌───────▼───────┐       ┌───────▼───────┐
+                │ Báo lỗi /     │       │ Set Session   │
+                │ "Gửi lại mã" │       │ Cookie an toàn│
+                └───────────────┘       └───────┬───────┘
+                                                │
+                                   ┌────────────┴────────────┐
+                                   │                         │
+                             ┌─────▼──────┐           ┌──────▼──────┐
+                             │  OWNER     │           │   STAFF     │
+                             │ → /dashboard│           │ → /admin    │
+                             │ (hoặc      │           │ (Payload    │
+                             │ /onboarding)│           │  CMS)      │
+                             └────────────┘           └─────────────┘
+```
 
-### 1.2. Luồng Đăng Nhập (Login Flow)
-- User vào `/login` → Nhập **Email** và **Password** (hệ thống tự động cắt khoảng trống thừa).
-- Submit xác thực:
-  - Lỗi: Hiển thị Alert Banner báo lỗi (401).
-  - Đúng, nhưng **Có 2FA bật**: Chuyển sang màn hình `/verify-otp`. Nhập mã OTP 6 số nhận từ Email (hạn 5 phút).
-  - Đúng (Xác nhận thành công): Set Cookie an toàn, chuyển hướng dựa trên Role:
-    - Nếu là **Owner**: Chuyển hướng vào `/dashboard` (hoặc `/onboarding` nếu tài khoản mới).
-    - Nếu là **Staff**: Chuyển hướng vào `/admin` (Giao diện Payload CMS cấp quyền theo nhóm).
+### 0.3 Luồng Forgot / Reset Password (Dual Routing)
+```text
+                           ┌─────────────────┐
+                           │  /login Page    │
+                           │  Click "Quên    │
+                           │  mật khẩu?"     │
+                           └────────┬────────┘
+                                    │
+                           ┌────────▼──────────┐
+                           │ /forgot-password  │
+                           │ Nhập Email        │
+                           └────────┬──────────┘
+                                    │
+                        ┌───────────▼───────────┐
+                        │  Kiểm tra loại        │
+                        │  tài khoản (Email)    │
+                        └───────────┬───────────┘
+                                    │
+                   ┌────────────────┴────────────────┐
+                   │                                  │
+            ┌──────▼──────┐                    ┌──────▼──────┐
+            │   OWNER     │                    │   STAFF     │
+            └──────┬──────┘                    └──────┬──────┘
+                   │                                  │
+         ┌─────────▼─────────┐              ┌─────────▼─────────┐
+         │ Redirect sang SSO │              │ Gửi Email chứa    │
+         │ /forgot-password  │              │ Reset Link         │
+         │ (External domain) │              │ (Webstore native)  │
+         └───────────────────┘              └─────────┬─────────┘
+                                                      │
+                                                      │
+                                           ┌──────────▼──────────┐
+                                           │ Hiển thị thông báo  │
+                                           │ "Đã gửi link" (luôn │
+                                           │ hiện dù email có    │
+                                           │ tồn tại hay không)  │
+                                           └──────────┬──────────┘
+                                                      │
+                                           ┌──────────▼──────────┐
+                                           │ Staff click link    │
+                                           │ /reset-password     │
+                                           │ ?token=xxx          │
+                                           └──────────┬──────────┘
+                                                      │
+                                           ┌──────────▼──────────┐
+                                           │ Nhập mật khẩu mới   │
+                                           │ + Xác nhận           │
+                                           └──────────┬──────────┘
+                                                      │
+                                           ┌──────────▼──────────┐
+                                           │ ✅ Thành công         │
+                                           │ Redirect → /login   │
+                                           └─────────────────────┘
+```
 
-### 1.3. Luồng Đăng Ký (Register Flow - Chỉ dành cho Owner)
-- Chủ doanh nghiệp vào `/register` → Hiện form chi tiết.
-- **Trường bắt buộc**: Tên Công Ty (Company Name), Mã số doanh nghiệp (BRN), Tên người đại diện, Email, Password (≥8 ký tự, mix HOA-số-đặc biệt).
-- **Trường tùy chọn**: SĐT, Địa chỉ, TM Customer.
-- Submit Data:
-  - Check email trùng trên DB → Quét hợp lệ → Tạo User.
-  - Tự động tạo duy nhất 1 Tenant (Workspace) ngầm định gán cho User này.
-  - Gửi **Welcome Email** (kèm hình ảnh Banner, nút Login).
-  - Tự động login và chuyển thẳng tới trang **Onboarding** (`/onboarding`).
-
-### 1.4. Quên Mật Khẩu & Đặt Lại (Forgot/Reset Password Flow)
-- **Forgot Password**: Vào `/forgot-password` → Nhập Email → Bấm "Gửi" → Hệ thống **luôn hiển thị trạng thái thành công** (để không lộ email có tôn tại hay không). Gửi email chứa link.
-- **Reset Password**: Bấm link từ Email → Mở `/reset-password?token=xxx` → Nhập mật khẩu mới → Đặt lại → Redirect lại trang `/login` kèm thông báo thành công.
+### 0.4 Luồng Owner Provisioning (SSO Webhook)
+```text
+         ┌──────────────┐          ┌────────────────────┐          ┌─────────────────┐
+         │  SSO System  │          │   Webstore 2.0     │          │   Owner Email   │
+         │  (External)  │          │   (Backend API)    │          │                 │
+         └──────┬───────┘          └─────────┬──────────┘          └────────┬────────┘
+                │                            │                              │
+                │  POST /api/v1/tm/users     │                              │
+                │  (Payload: company_name,   │                              │
+                │   email, customer_id,      │                              │
+                │   service_id, first_name,  │                              │
+                │   last_name, pack_code)    │                              │
+                │ ──────────────────────────►│                              │
+                │                            │                              │
+                │                   ┌────────▼────────┐                     │
+                │                   │ Validate 6      │                     │
+                │                   │ trường Unique   │                     │
+                │                   │ + pack_code     │                     │
+                │                   └────────┬────────┘                     │
+                │                            │                              │
+                │              ┌─────────────┴─────────────┐                │
+                │              │                           │                │
+                │         INVALID                      VALID                │
+                │              │                           │                │
+                │    ┌─────────▼──────┐          ┌─────────▼──────┐         │
+                │    │ Return 400/409 │          │ Tạo Account    │         │
+                │    │ Error Response │          │ Owner + Tenant │         │
+                │    └────────────────┘          └─────────┬──────┘         │
+                │                                          │                │
+                │                                          │  Welcome Email │
+                │                                          │ ──────────────►│
+                │                                          │                │
+                │           Return 201 Created             │                │
+                │ ◄────────────────────────────────────────│                │
+                │                                          │                │
+```
 
 ---
 
-## 2. Gợi Ý Cấu Trúc Wireframe UI (Low-Fi)
+## 💻 1. DESKTOP WIREFRAME (≥ 768px)
 
-Toàn bộ Authentication sẽ sử dụng giao diện **Full Split Screen** trên Desktop.
+Cấu trúc: **Full Split Screen** — Brand Panel trái (50-60% width), Form Panel phải (40-50% width).
 
-### 2.1. Bố Cục Tổng Quan (Global Split Layout)
-- **Cột Trái (50% - 60% Width): Brand & Visuals**
-  - Hiển thị hỉnh ảnh nghệ thuật/Background (Midnight Tech/Dark Glassmorphism).
-  - Slogan / USP của PrimeWeb.
-- **Cột Phải (40% - 50% Width): Form Container**
-  - Nền mờ (Glassmorphism card).
-  - `Logo PrimeWeb` nằm ở giữa đỉnh.
-  - Form thay đổi tùy màn hình (Login/Register).
-  - Nằm góc dưới cùng là Text/Link: *Help / User Guideline*.
+### 1.1 Màn hình Login (`/login`) — Dual Auth
+```text
+┌──────────────────────────────────────────┐┌──────────────────────────────────────────┐
+│                                          ││                                          │
+│                                          ││            [Logo PrimeWeb]               │
+│                                          ││                                          │
+│     ┌──────────────────────────────┐     ││     ┌──────────────────────────────┐     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Chào mừng trở lại           │     │
+│     │    [Background Artwork]      │     ││     │  Welcome Back                │     │
+│     │    Dark Glassmorphism /      │     ││     │                              │     │
+│     │    Midnight Tech             │     ││     │  ─── ĐĂNG NHẬP NỘI BỘ ───   │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Email Address               │     │
+│     │    ┌────────────────────┐    │     ││     │  ┌──────────────────────┐    │     │
+│     │    │                    │    │     ││     │  │ staff@company.com    │    │     │
+│     │    │   "Xây dựng cửa   │    │     ││     │  └──────────────────────┘    │     │
+│     │    │    hàng trực tuyến │    │     ││     │                              │     │
+│     │    │    chỉ trong       │    │     ││     │  Password                    │     │
+│     │    │    vài phút"       │    │     ││     │  ┌──────────────────────┐    │     │
+│     │    │                    │    │     ││     │  │ ••••••••        [👁]  │    │     │
+│     │    │   — PrimeWeb —     │    │     ││     │  └──────────────────────┘    │     │
+│     │    └────────────────────┘    │     ││     │          Quên mật khẩu? ──► │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     └──────────────────────────────┘     ││     │  │   🔐 Đăng Nhập       │    │     │
+│                                          ││     │  └──────────────────────┘    │     │
+│                                          ││     │                              │     │
+│                                          ││     │  ──────── hoặc ────────     │     │
+│                                          ││     │                              │     │
+│                                          ││     │  ┌──────────────────────┐    │     │
+│                                          ││     │  │ 🌐 Đăng nhập với SSO │    │     │
+│                                          ││     │  └──────────────────────┘    │     │
+│                                          ││     │  (Dành cho Chủ doanh nghiệp)│     │
+│                                          ││     │                              │     │
+│                                          ││     └──────────────────────────────┘     │
+│                                          ││                                          │
+│                                          ││        Help / User Guideline             │
+│                                          ││                                          │
+└──────────────────────────────────────────┘└──────────────────────────────────────────┘
+```
+**Ghi chú:**
+- **Form Staff (Native):** Nhập Email + Password trực tiếp. Alert Banner đỏ phía trên form khi lỗi 401.
+- **Nút SSO Login:** Dành riêng cho Owner. Click → Redirect external sang SSO Login Page.
+- **Link "Quên mật khẩu?"** nằm dưới trường Password, căn phải.
 
-**Mobile Layout (≤ 768px):**
-- Đổi thành layout dọc (Stack column), ẩn hình ảnh đồ họa Trái đi (hoặc thu rất nhỏ).
-- Form Card chiếm full width màn hình. Tap targets to đảm bảo UX (nút bấm cao 44px).
+### 1.2 Màn hình Login — Trạng thái Lỗi (Error State)
+```text
+┌──────────────────────────────────────────┐┌──────────────────────────────────────────┐
+│                                          ││                                          │
+│                                          ││            [Logo PrimeWeb]               │
+│                                          ││                                          │
+│     ┌──────────────────────────────┐     ││     ┌──────────────────────────────┐     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ┌────────────────────────┐  │     │
+│     │    [Background Artwork]      │     ││     │  │ ⚠️ Email hoặc mật khẩu │  │     │
+│     │                              │     ││     │  │   không chính xác.     │  │     │
+│     │                              │     ││     │  └────────────────────────┘  │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Chào mừng trở lại           │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Email Address               │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │ staff@company.com    │    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Password                    │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │ ••••••••        [👁]  │    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │          Quên mật khẩu? ──► │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │   🔐 Đăng Nhập       │    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │                              │     │
+│     └──────────────────────────────┘     ││     └──────────────────────────────┘     │
+│                                          ││                                          │
+└──────────────────────────────────────────┘└──────────────────────────────────────────┘
+```
 
-### 2.2. Màn hình chi tiết
+### 1.3 Màn hình Xác thực OTP (`/verify-otp`) — Bắt buộc 2FA
+```text
+┌──────────────────────────────────────────┐┌──────────────────────────────────────────┐
+│                                          ││                                          │
+│                                          ││            [Logo PrimeWeb]               │
+│                                          ││                                          │
+│     ┌──────────────────────────────┐     ││     ┌──────────────────────────────┐     │
+│     │                              │     ││     │                              │     │
+│     │    [Background Artwork]      │     ││     │  🔒 Xác Thực 2 Bước          │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Vui lòng nhập 6 số OTP     │     │
+│     │                              │     ││     │  vừa được gửi tới           │     │
+│     │                              │     ││     │  e***@domain.com            │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ┌────┐┌────┐┌────┐┌────┐┌────┐┌────┐│
+│     │                              │     ││     │  │    ││    ││    ││    ││    ││    ││
+│     │                              │     ││     │  │    ││    ││    ││    ││    ││    ││
+│     │                              │     ││     │  └────┘└────┘└────┘└────┘└────┘└────┘│
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ⏱ Mã hết hạn sau: 04:59     │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │   ✅ Xác Nhận OTP    │    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Gửi lại mã (Sau 59s)       │     │
+│     │                              │     ││     │  ↑ Text link countdown       │     │
+│     │                              │     ││     │                              │     │
+│     └──────────────────────────────┘     ││     └──────────────────────────────┘     │
+│                                          ││                                          │
+│                                          ││        Help / User Guideline             │
+│                                          ││                                          │
+└──────────────────────────────────────────┘└──────────────────────────────────────────┘
+```
+**Ghi chú:**
+- **OTP 6 ô vuông rời rạc**: Auto-focus ô kế tiếp khi nhập xong 1 số. Paste mã tự động fill.
+- **Countdown**: Nút "Gửi lại mã" bị disabled trong 60s, hiện đếm ngược.
+- **OTP hết hạn**: Hiển thị timer 5 phút. Hết hạn → hiện thông báo + nút "Gửi lại mã".
 
-#### A. Màn hình Login (`/login`)
-- **Tiêu đề**: "Đăng Nhập" / "Welcome Back"
-- **Form**:
-  - `Email Address` (Input)
-  - `Password` (Input)
-  - Link điều hướng `Forgot Password?` rẽ phải dưới ô Password.
-- **Nút bấm**: 
-  - `[ Đăng Nhập ]` (Primary CTA)
-  - `[ Đăng Ký Tài Khoản PrimeWeb ]` (Secondary/Outline) -> chuyển tới /register.
+### 1.4 Màn hình Forgot Password (`/forgot-password`)
+```text
+┌──────────────────────────────────────────┐┌──────────────────────────────────────────┐
+│                                          ││                                          │
+│                                          ││            [Logo PrimeWeb]               │
+│                                          ││                                          │
+│     ┌──────────────────────────────┐     ││     ┌──────────────────────────────┐     │
+│     │                              │     ││     │                              │     │
+│     │    [Background Artwork]      │     ││     │  🔑 Khôi Phục Mật Khẩu       │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Nhập email của bạn để nhận  │     │
+│     │                              │     ││     │  hướng dẫn đặt lại mật khẩu │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Email Address               │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │ your@email.com       │    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │ 📧 Gửi Link Khôi Phục│    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ◄ Quay lại Đăng nhập       │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ┌────────────────────────┐  │     │
+│     │                              │     ││     │  │ ℹ️ Nếu bạn là Chủ DN,  │  │     │
+│     │                              │     ││     │  │ bạn sẽ được chuyển    │  │     │
+│     │                              │     ││     │  │ sang SSO để đổi MK.   │  │     │
+│     │                              │     ││     │  └────────────────────────┘  │     │
+│     │                              │     ││     │                              │     │
+│     └──────────────────────────────┘     ││     └──────────────────────────────┘     │
+│                                          ││                                          │
+└──────────────────────────────────────────┘└──────────────────────────────────────────┘
+```
+**Ghi chú:**
+- **Owner**: Khi nhập email Owner → hệ thống redirect sang SSO forgot-password page (`https://sso-dev.ech.primecommerce.asia/auth/forgot-password`).
+- **Staff**: Gửi email chứa reset link native. **Luôn hiển thị thông báo thành công** (bảo mật — không lộ email có tồn tại).
+- **Info banner**: Thông báo rằng Owner sẽ được redirect sang SSO.
 
-#### B. Màn hình Đăng ký (`/register`)
-- **Tiêu đề**: "Tạo Tài Khoản PrimeWeb"
-- **Form** (Có thể chia cột dọc/ngang để giảm dài, hoặc dùng Scroll):
-  - Khối Thông tin Doanh nghiệp: `Company Name*`, `BRN Number*`.
-  - Khối Chủ sở hữu: `First Name*`, `Last Name*`, `Email*`, `Phone`.
-  - Khối Mật khẩu: `Password*` (có ghi chú rule bảo mật bên dưới), `Confirm Password`.
-- **Nút bấm**:
-  - `[ Đăng Ký & Khởi Tạo Gian Hàng ]` (Primary CTA)
-  - Text link: `Đã có tài khoản? Trở về Đăng nhập`.
+### 1.5 Trạng thái "Đã Gửi Link" (Success Feedback)
+```text
+┌──────────────────────────────────────────┐┌──────────────────────────────────────────┐
+│                                          ││                                          │
+│                                          ││            [Logo PrimeWeb]               │
+│                                          ││                                          │
+│     ┌──────────────────────────────┐     ││     ┌──────────────────────────────┐     │
+│     │                              │     ││     │                              │     │
+│     │    [Background Artwork]      │     ││     │  ✅ Đã gửi hướng dẫn!        │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Nếu email s***@company.com  │     │
+│     │                              │     ││     │  tồn tại trong hệ thống,    │     │
+│     │                              │     ││     │  bạn sẽ nhận được link đặt  │     │
+│     │                              │     ││     │  lại mật khẩu trong vài     │     │
+│     │                              │     ││     │  phút.                      │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │  📧 Mở Email Client  │    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ◄ Quay lại Đăng nhập       │     │
+│     │                              │     ││     │                              │     │
+│     └──────────────────────────────┘     ││     └──────────────────────────────┘     │
+│                                          ││                                          │
+└──────────────────────────────────────────┘└──────────────────────────────────────────┘
+```
 
-#### C. Màn hình OTP (`/verify-otp`)
-- **Tiêu đề**: "Xác Thực 2 Bước"
-- **Nội dung**: "Vui lòng nhập 6 số OTP vừa được gửi tới e***@domain.com"
-- **Form**:
-  - Ô nhập số: `[ ] [ ] [ ] [ ] [ ] [ ]` (UI 6 ô vuông rời rạc).
-- **Nút bấm**:
-  - `[ Xác Nhận OTP ]` (Primary)
-  - `Gửi lại mã (Sau 59s)` (Text link countdown).
+### 1.6 Màn hình Reset Password (`/reset-password?token=xxx`) — Staff Only
+```text
+┌──────────────────────────────────────────┐┌──────────────────────────────────────────┐
+│                                          ││                                          │
+│                                          ││            [Logo PrimeWeb]               │
+│                                          ││                                          │
+│     ┌──────────────────────────────┐     ││     ┌──────────────────────────────┐     │
+│     │                              │     ││     │                              │     │
+│     │    [Background Artwork]      │     ││     │  🔐 Đặt Mật Khẩu Mới         │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Mật khẩu mới *              │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │ ••••••••        [👁]  │    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │  ✓ Ít nhất 8 ký tự          │     │
+│     │                              │     ││     │  ✓ Chứa chữ HOA             │     │
+│     │                              │     ││     │  ✓ Chứa số                  │     │
+│     │                              │     ││     │  ✗ Chứa ký tự đặc biệt     │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Xác nhận mật khẩu mới *    │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │ ••••••••        [👁]  │    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │  🔄 Cập Nhật Mật Khẩu│    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │                              │     │
+│     └──────────────────────────────┘     ││     └──────────────────────────────┘     │
+│                                          ││                                          │
+└──────────────────────────────────────────┘└──────────────────────────────────────────┘
+```
+**Ghi chú:**
+- **Password Strength Indicator**: Hiển thị realtime, checklist yêu cầu dưới ô password.
+- **Reset thành công** → Redirect về `/login` kèm Toast xanh "Mật khẩu đã được cập nhật thành công!".
+- **Token hết hạn / không hợp lệ** → Hiện thông báo lỗi + Link "Gửi lại link mới".
 
-#### D. Màn hình Forgot Password (`/forgot-password`)
-- **Tiêu đề**: "Khôi phục Mật khẩu"
-- **Nội dung**: "Nhập email của bạn để nhận link đặt lại mật khẩu"
-- **Form**: `Email Address` (Input)
-- **Nút bấm**: `[ Gửi Link Khôi Phục ]`
-- *(Thông báo mảng xanh báo lỗi/thành công luôn pop-up hiển thị bên trên khi ấn).*
+### 1.7 Trạng thái Token Hết Hạn (Reset Password Error)
+```text
+┌──────────────────────────────────────────┐┌──────────────────────────────────────────┐
+│                                          ││                                          │
+│                                          ││            [Logo PrimeWeb]               │
+│                                          ││                                          │
+│     ┌──────────────────────────────┐     ││     ┌──────────────────────────────┐     │
+│     │                              │     ││     │                              │     │
+│     │    [Background Artwork]      │     ││     │           ⚠️                  │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Link đã hết hạn hoặc       │     │
+│     │                              │     ││     │  không hợp lệ               │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  Vui lòng yêu cầu lại       │     │
+│     │                              │     ││     │  link đặt lại mật khẩu.     │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ┌──────────────────────┐    │     │
+│     │                              │     ││     │  │ 📧 Gửi Lại Link Mới  │    │     │
+│     │                              │     ││     │  └──────────────────────┘    │     │
+│     │                              │     ││     │                              │     │
+│     │                              │     ││     │  ◄ Quay lại Đăng nhập       │     │
+│     │                              │     ││     │                              │     │
+│     └──────────────────────────────┘     ││     └──────────────────────────────┘     │
+│                                          ││                                          │
+└──────────────────────────────────────────┘└──────────────────────────────────────────┘
+```
 
-#### E. Màn hình Reset Password (`/reset-password`)
-- **Tiêu đề**: "Đặt mật khẩu mới"
-- **Form**: `Mật khẩu mới*`, `Xác nhận Mật khẩu mới*`.
-- **Nút bấm**: `[ Cập Nhật Mật Khẩu ]`
+---
+
+## 📱 2. MOBILE WIREFRAME (< 768px)
+
+Layout dọc (Stack column), ẩn Brand Panel bên trái. Form Card chiếm full width. Tap targets tối thiểu 44px.
+
+### 2.1 Login — Mobile
+```text
+┌──────────────────────────┐
+│ [Logo PrimeWeb]          │
+├──────────────────────────┤
+│                          │
+│  Chào mừng trở lại       │
+│  Welcome Back            │
+│                          │
+│  ─── ĐĂNG NHẬP ───      │
+│                          │
+│  Email Address           │
+│  ┌──────────────────────┐│
+│  │ staff@company.com    ││
+│  └──────────────────────┘│
+│                          │
+│  Password                │
+│  ┌──────────────────────┐│
+│  │ ••••••••        [👁]  ││
+│  └──────────────────────┘│
+│        Quên mật khẩu? ──►│
+│                          │
+│  ┌──────────────────────┐│ ← Sticky bottom
+│  │   🔐 Đăng Nhập       ││    CTA buttons
+│  └──────────────────────┘│
+│                          │
+│  ──────── hoặc ────────  │
+│                          │
+│  ┌──────────────────────┐│
+│  │ 🌐 Đăng nhập với SSO ││
+│  └──────────────────────┘│
+│  (Dành cho Chủ DN)       │
+│                          │
+│      Help / Guideline    │
+└──────────────────────────┘
+```
+**Font ≥16px** để tránh Safari auto-zoom. Nút CTA **sticky đáy** không bị bàn phím che.
+
+### 2.2 OTP Verification — Mobile
+```text
+┌──────────────────────────┐
+│ [Logo]           [← Back]│
+├──────────────────────────┤
+│                          │
+│  🔒 Xác Thực 2 Bước      │
+│                          │
+│  Vui lòng nhập 6 số OTP │
+│  vừa được gửi tới       │
+│  e***@domain.com         │
+│                          │
+│  ┌──┐┌──┐┌──┐┌──┐┌──┐┌──┐│
+│  │  ││  ││  ││  ││  ││  ││
+│  └──┘└──┘└──┘└──┘└──┘└──┘│
+│                          │
+│  ⏱ Mã hết hạn sau: 04:59 │
+│                          │
+│  ┌──────────────────────┐│ ← Sticky bottom
+│  │   ✅ Xác Nhận OTP    ││
+│  └──────────────────────┘│
+│                          │
+│  Gửi lại mã (Sau 59s)   │
+│                          │
+└──────────────────────────┘
+```
+**Touch-safe:** Ô OTP kích thước lớn (48x48px), auto-focus ô kế tiếp. Keyboard type: numeric.
+
+### 2.3 Forgot Password — Mobile
+```text
+┌──────────────────────────┐
+│ [Logo]           [← Back]│
+├──────────────────────────┤
+│                          │
+│  🔑 Khôi Phục Mật Khẩu   │
+│                          │
+│  Nhập email của bạn để   │
+│  nhận hướng dẫn đặt lại │
+│  mật khẩu               │
+│                          │
+│  Email Address           │
+│  ┌──────────────────────┐│
+│  │ your@email.com       ││
+│  └──────────────────────┘│
+│                          │
+│  ┌──────────────────────┐│
+│  │ 📧 Gửi Link Khôi Phục││
+│  └──────────────────────┘│
+│                          │
+│  ◄ Quay lại Đăng nhập    │
+│                          │
+│  ┌────────────────────┐  │
+│  │ ℹ️ Owner → SSO Reset│  │
+│  └────────────────────┘  │
+│                          │
+└──────────────────────────┘
+```
+
+### 2.4 Reset Password — Mobile (Staff Only)
+```text
+┌──────────────────────────┐
+│ [Logo]                   │
+├──────────────────────────┤
+│                          │
+│  🔐 Đặt Mật Khẩu Mới     │
+│                          │
+│  Mật khẩu mới *          │
+│  ┌──────────────────────┐│
+│  │ ••••••••        [👁]  ││
+│  └──────────────────────┘│
+│  ✓ Ít nhất 8 ký tự      │
+│  ✓ Chứa chữ HOA         │
+│  ✓ Chứa số              │
+│  ✗ Chứa ký tự đặc biệt  │
+│                          │
+│  Xác nhận mật khẩu *    │
+│  ┌──────────────────────┐│
+│  │ ••••••••        [👁]  ││
+│  └──────────────────────┘│
+│                          │
+│  ┌──────────────────────┐│ ← Sticky bottom
+│  │ 🔄 Cập Nhật Mật Khẩu ││
+│  └──────────────────────┘│
+│                          │
+└──────────────────────────┘
+```
+
+---
+
+## 🛡 3. Ghi Chú UI Patterns
+
+### 3.1 General UI Rules
+- **Split Screen Layout:** Desktop sử dụng 2 cột. Cột trái hiện Brand/Visuals (Dark Glassmorphism), cột phải là Glassmorphism card chứa form.
+- **Mobile:** Layout dọc, ẩn Brand Visuals. Form card chiếm full width. CTA buttons sticky bottom.
+- **Logo PrimeWeb:** Luôn hiển thị ở đỉnh form panel.
+- **Help / Guideline Link:** Góc dưới cùng mọi màn hình Auth.
+
+### 3.2 Form Validation
+- **Inline Validation:** Hiển thị lỗi đỏ ngay dưới trường input khi thiếu hoặc sai format.
+- **Email auto-trim:** Tự động cắt khoảng trống thừa đầu/cuối trước khi submit.
+- **Password Visibility Toggle:** Icon 👁 bật/tắt hiển thị password.
+- **Password Strength:** Checklist realtime (≥8 ký tự, chữ HOA, số, ký tự đặc biệt).
+
+### 3.3 Error Handling
+- **Alert Banner:** Hiển thị phía trên form khi Auth fail (nền đỏ/cam, text trắng).
+- **Toast Notification:** Pop-up góc phải trên cho thông báo thành công (xanh lá) hoặc lỗi hệ thống (đỏ).
+- **Token Expired:** Màn hình riêng khi reset password token hết hạn.
+
+### 3.4 Security Patterns
+- **2FA Mandatory:** OTP qua Email bắt buộc 100% người dùng.
+- **OTP Input:** 6 ô vuông rời rạc, auto-advance, support paste.
+- **Rate Limit:** Lock tài khoản sau 5 lần nhập sai OTP liên tiếp.
+- **Resend Cooldown:** Nút "Gửi lại mã" disabled 60s, có countdown.
+- **Forgot Password Security:** Luôn hiện "Đã gửi" dù email có tồn tại hay không.
+
+### 3.5 Dual Auth Routing Rules
+- **Owner Login:** Click nút SSO → Redirect external SSO login page → Callback → OTP → `/dashboard`.
+- **Staff Login:** Nhập Email/Pass native → OTP → `/admin` (Payload CMS).
+- **Owner Reset PW:** Redirect sang SSO (`https://sso-dev.ech.primecommerce.asia/auth/forgot-password`).
+- **Staff Reset PW:** Native reset flow tại Webstore 2.0.
+
+---
+
+## 📋 4. Danh Sách Màn Hình (Screen Inventory)
+
+| # | Màn hình | Route | Desktop | Mobile | Roles |
+|---|----------|-------|---------|--------|-------|
+| 1 | Login (Dual Auth) | `/login` | ✅ 1.1 | ✅ 2.1 | Owner + Staff |
+| 2 | Login Error State | `/login` | ✅ 1.2 | ✅ (inline) | Owner + Staff |
+| 3 | OTP Verification | `/verify-otp` | ✅ 1.3 | ✅ 2.2 | Owner + Staff |
+| 4 | Forgot Password | `/forgot-password` | ✅ 1.4 | ✅ 2.3 | Owner + Staff |
+| 5 | Đã Gửi Link (Success) | `/forgot-password` | ✅ 1.5 | ✅ (inline) | Staff |
+| 6 | Reset Password | `/reset-password` | ✅ 1.6 | ✅ 2.4 | Staff only |
+| 7 | Token Expired Error | `/reset-password` | ✅ 1.7 | ✅ (inline) | Staff only |
