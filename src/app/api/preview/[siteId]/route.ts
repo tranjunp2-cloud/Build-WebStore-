@@ -451,6 +451,9 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
     let page: NonNullable<Awaited<ReturnType<typeof payload.findByID>>> | null = null
 
     if (pageId) {
+      if (!/^\d+$/.test(pageId)) {
+        return new NextResponse('Invalid pageId', { status: 400 })
+      }
       const requestedPage = await payload.findByID({
         collection: 'pages',
         id: pageId,

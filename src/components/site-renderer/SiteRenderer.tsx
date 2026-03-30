@@ -7,9 +7,24 @@ import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 
 type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
 
+type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null };
+
 type SiteRendererProps = {
-    site: Record<string, any>
-    page: Record<string, any>
+    site: {
+        theme?: {
+            primaryColor?: string
+            secondaryColor?: string
+            backgroundColor?: string
+            fontHeading?: string
+            fontBody?: string
+            colorMode?: 'dark' | 'light'
+        }
+        [key: string]: unknown
+    }
+    page: {
+        layout?: unknown[]
+        [key: string]: unknown
+    }
     pages?: NavPage[]
 }
 
@@ -23,8 +38,8 @@ export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
         colorMode: site.theme?.colorMode || 'dark',
     }
 
-    type PreviewBlock = { blockType: string; links?: any; [key: string]: any }
-    const blocks: PreviewBlock[] = page?.layout || []
+    type PreviewBlock = { blockType: string; links?: NavLinkItem[]; [key: string]: unknown }
+    const blocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
 
     return (
         <>
