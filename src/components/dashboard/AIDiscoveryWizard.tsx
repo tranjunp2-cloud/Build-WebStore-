@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import { toast } from 'sonner'
 
 import { useI18n } from '@/i18n'
 
@@ -41,17 +42,28 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
   const isLastStep = currentStep === WIZARD_STEPS.length - 1
 
   const dismissWizard = async () => {
-    setIsOpen(false)
-    if (userId) {
-      try {
-        await fetch(`/api/users/${userId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ has_seen_ai_wizard: true })
-        })
-      } catch (error) {
-        console.error('Failed to update wizard state', error)
+    if (!userId) {
+      setIsOpen(false)
+      return
+    }
+    
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ has_seen_ai_wizard: true })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update status')
       }
+
+      setIsOpen(false)
+    } catch (error) {
+      console.error('Failed to update wizard state', error)
+      toast.error('Lỗi kết nối', {
+        description: 'Vui lòng thử lại.'
+      })
     }
   }
 
