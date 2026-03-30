@@ -29,7 +29,7 @@ export default async function WelcomeScreen() {
     }
 
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-[#0B1120] relative">
+        <div className="flex min-h-[100dvh] w-full flex-col items-center justify-center bg-[#0B1120] m-0 p-0 relative">
             <WelcomeScreenClient />
         </div>
     )
