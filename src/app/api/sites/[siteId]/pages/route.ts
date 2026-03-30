@@ -56,7 +56,18 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
             sort: 'createdAt',
         })
 
-        const formattedPages = pages.map((p: any) => ({
+        type PageDoc = {
+            id: string | number
+            title: string
+            slug: string
+            _status?: string
+            isHomepage?: boolean | null
+            isVisible?: boolean | null
+            seo?: { title?: string; description?: string }
+            updatedAt: string
+        }
+
+        const formattedPages = (pages as unknown as PageDoc[]).map((p: PageDoc) => ({
             id: p.id,
             title: p.title,
             slug: p.slug,

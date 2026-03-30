@@ -40,6 +40,19 @@ function escapeAttr(str: string) {
     return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+function sanitizeUrl(raw: string): string {
+    let val = String(raw || '').trim()
+    if (!val || val === '#') return '#'
+    if (!/^https?:\/\//i.test(val)) val = `https://${val}`
+    try {
+        const parsed = new URL(val)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '#'
+        return escapeAttr(parsed.href)
+    } catch {
+        return '#'
+    }
+}
+
 function renderSocialWidget(b: any, t: TemplateTheme, site?: any) {
   const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(b, site?.socialLinks))
   const links = normalizedBlock.links.filter((item: any) => item?.enabled !== false)
@@ -335,12 +348,12 @@ function renderFooter(b: any, t: TemplateTheme, site?: any) {
         <div>
           <div style="font-family:'${t.fontHeading}',serif;font-size:22px;font-weight:700;margin-bottom:12px;color:${t.primary};">${mergedBlock.logoText || ''}</div>
           <p style="font-size:14px;color:${t.muted};max-width:280px;line-height:1.7;">${mergedBlock.tagline || ''}</p>
-          ${mergedBlock.socials && mergedBlock.socials.length > 0 ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">${mergedBlock.socials.map((social: any) => `<a href="${social.url || '#'}" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:${t.primary}10;border:1px solid ${t.primary}15;color:${t.primary};font-size:12px;font-weight:800;text-transform:uppercase;">${(social.platform || '•').slice(0,2)}</a>`).join('')}</div>` : ''}
+          ${mergedBlock.socials && mergedBlock.socials.length > 0 ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">${mergedBlock.socials.map((social: any) => `<a href="${sanitizeUrl(social.url)}" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:${t.primary}10;border:1px solid ${t.primary}15;color:${t.primary};font-size:12px;font-weight:800;text-transform:uppercase;">${(social.platform || '•').slice(0,2)}</a>`).join('')}</div>` : ''}
         </div>
         ${cols.map((c: any) => `
           <div>
             <h4 style="font-size:14px;font-weight:700;margin-bottom:16px;">${c.title}</h4>
-            ${(c.links || []).map((l: any) => `<div style="margin-bottom:10px;"><a href="${l.url || '#'}" style="font-size:13px;color:${t.muted};transition:color .2s;">${l.label}</a></div>`).join('')}
+            ${(c.links || []).map((l: any) => `<div style="margin-bottom:10px;"><a href="${sanitizeUrl(l.url)}" style="font-size:13px;color:${t.muted};transition:color .2s;">${l.label}</a></div>`).join('')}
           </div>
         `).join('')}
       </div>

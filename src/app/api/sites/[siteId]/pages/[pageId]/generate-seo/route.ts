@@ -34,7 +34,8 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const numericSiteId = Number(siteId)
 
         // Extract tenant IDs from the current user
-        const tenantIds = user.tenants?.map((t: any) =>
+        interface TenantRef { tenant: string | number | { id: string | number } }
+        const tenantIds = user.tenants?.map((t: TenantRef) =>
             typeof t.tenant === 'object' ? t.tenant.id : t.tenant
         ) ?? []
 
