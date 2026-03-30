@@ -164,7 +164,7 @@ export const POST = withAuth(async (_user, request) => {
     } catch (error: any) {
         console.error('[SEO Analyze Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'SEO analysis failed' } },
             { status: 500 }
         )
     }

@@ -103,7 +103,7 @@ export const POST = withAuth(async (user, request) => {
     } catch (error: any) {
         console.error('[Stripe Connect Onboard Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Stripe onboarding failed' } },
             { status: 500 },
         )
     }
