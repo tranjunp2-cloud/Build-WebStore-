@@ -44,7 +44,10 @@ async function getTenantAndPage(slug: string, pagePath: string) {
             return { isMaintenance: true, site }
         }
 
-        const tenantIds = user.tenants?.map((t: any) =>
+        interface TenantRef {
+            tenant: string | number | { id: string | number }
+        }
+        const tenantIds = user.tenants?.map((t: TenantRef) =>
             typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
         ) ?? []
         

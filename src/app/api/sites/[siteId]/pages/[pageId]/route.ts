@@ -32,8 +32,11 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         const numericSiteId = Number(siteId)
         
         // Extract tenant IDs from the current user
-        const tenantIds = user.tenants?.map((t: any) =>
-            typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        interface TenantRef {
+            tenant: string | number | { id: string | number }
+        }
+        const tenantIds = user.tenants?.map((t: TenantRef) =>
+            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
         ) ?? []
 
         const { docs: sites } = await payload.find({

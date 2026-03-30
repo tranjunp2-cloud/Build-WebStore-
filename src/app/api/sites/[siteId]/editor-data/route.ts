@@ -8,8 +8,11 @@ function normalizeEditorLayout(layout: unknown) {
     if (!Array.isArray(layout)) return []
 
     return layout.map(block => {
-        if (block && typeof block === 'object' && (block as any).blockType === 'socialWidget') {
-            return normalizeSocialWidgetConfig(block as Record<string, unknown>)
+        if (block && typeof block === 'object') {
+            const b = block as Record<string, unknown>
+            if (b.blockType === 'socialWidget') {
+                return normalizeSocialWidgetConfig(b)
+            }
         }
 
         return block

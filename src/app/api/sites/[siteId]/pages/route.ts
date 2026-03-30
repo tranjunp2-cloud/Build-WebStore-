@@ -12,6 +12,10 @@ const newPageSchema = z.object({
 })
 type RouteContext = { params: Promise<{ siteId: string }> }
 
+export interface TenantRef {
+    tenant: string | number | { id: string | number }
+}
+
 export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const payload = await getPayload({ config })
@@ -19,8 +23,8 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
         const siteId = resolvedParams.siteId
 
         // Extract tenant IDs from the current user
-        const tenantIds = user.tenants?.map((t: any) =>
-            typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        const tenantIds = user.tenants?.map((t: TenantRef) =>
+            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
         ) ?? []
 
         const { docs: sites } = await payload.find({
@@ -78,8 +82,8 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const siteId = resolvedParams.siteId
         
         // Extract tenant IDs from the current user
-        const tenantIds = user.tenants?.map((t: any) =>
-            typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        const tenantIds = user.tenants?.map((t: TenantRef) =>
+            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
         ) ?? []
 
         const { docs: sites } = await payload.find({
@@ -103,11 +107,29 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
 
         const { title, slug } = data!
 
+        let normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`
+        if (normalizedSlug === '//') normalizedSlug = '/'
+
+        const existingPages = await payload.find({
+            collection: 'pages',
+            where: {
+                and: [
+                    { site: { equals: siteId } },
+                    { slug: { equals: normalizedSlug } }
+                ]
+            },
+            limit: 1
+        })
+
+        if (existingPages.docs.length > 0) {
+            return new NextResponse('Page slug already exists in this site', { status: 409 })
+        }
+
         const newPage = await payload.create({
             collection: 'pages',
             data: {
                 title,
-                slug,
+                slug: normalizedSlug,
                 site: siteId,
                 isVisible: true,
                 layout: [],

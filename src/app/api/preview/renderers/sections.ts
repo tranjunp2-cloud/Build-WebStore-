@@ -11,7 +11,12 @@ import { mergeContactInfoWithSite, mergeFooterSocialsWithSite, mergeSocialWidget
 let _category = 'business'
 export function setSectionCategory(cat: string) { _category = cat }
 
-export function renderSections(block: any, t: TemplateTheme, category?: string, site?: any): string {
+type RenderBlock = {
+    blockType?: string
+    [key: string]: unknown
+}
+
+export function renderSections(block: RenderBlock, t: TemplateTheme, category?: string, site?: Record<string, unknown>): string {
   if (category) _category = category
   switch (block.blockType) {
     case 'features': return renderFeatures(block, t)
@@ -31,6 +36,10 @@ export function renderSections(block: any, t: TemplateTheme, category?: string, 
   }
 }
 
+function escapeAttr(str: string) {
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 function renderSocialWidget(b: any, t: TemplateTheme, site?: any) {
   const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(b, site?.socialLinks))
   const links = normalizedBlock.links.filter((item: any) => item?.enabled !== false)
@@ -47,14 +56,25 @@ function renderSocialWidget(b: any, t: TemplateTheme, site?: any) {
   }
 
   const normalizeUrl = (platform: string, value: string) => {
-    const trimmed = String(value || '').trim()
-    if (!trimmed) return '#'
-    if (/^https?:\/\//i.test(trimmed)) return trimmed
-    if (platform === 'whatsapp') {
-      const digits = trimmed.replace(/[^\d]/g, '')
-      return digits ? `https://wa.me/${digits}` : '#'
+    let raw = String(value || '').trim()
+    if (!raw) return '#'
+    if (!/^https?:\/\//i.test(raw) && platform !== 'whatsapp') {
+      raw = `https://${raw}`
     }
-    return `https://${trimmed}`
+    if (platform === 'whatsapp') {
+      const digits = raw.replace(/[^\d]/g, '')
+      raw = digits ? `https://wa.me/${digits}` : '#'
+    }
+
+    try {
+      const parsedUrl = new URL(raw)
+      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+        return '#'
+      }
+      return escapeAttr(parsedUrl.href)
+    } catch {
+      return '#'
+    }
   }
 
   return `<section style="${isFloating ? 'position:fixed;right:24px;bottom:24px;z-index:50;' : 'padding:40px 0;'}">
