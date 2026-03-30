@@ -29,7 +29,14 @@ function escapeHtml(unsafe: string) {
          .replace(/'/g, "&#039;")
 }
 
-export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string; ogTitle?: string; ogDescription?: string }, site?: any): string {
+type BlockData = {
+    blockType: string;
+    subheadline?: string;
+    logoText?: string;
+    [key: string]: unknown;
+}
+
+export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string; ogTitle?: string; ogDescription?: string }, site?: Record<string, unknown>): string {
   const cat = category || 'business'
   const t = theme || THEMES[cat] || THEMES.business
 
@@ -38,15 +45,15 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
   const navBlock = blocks.find(b => b.blockType === 'navigation')
   const siteName = meta?.name || navBlock?.logoText || 'Website'
   const siteDesc = meta?.description || heroBlock?.subheadline || `${siteName} — Professional website`
-  const ogTitle = meta?.ogTitle || siteName
-  const ogDescription = meta?.ogDescription || siteDesc.substring(0, 160)
+  const ogTitle = meta?.ogTitle || String(siteName)
+  const ogDescription = meta?.ogDescription || String(siteDesc).substring(0, 160)
   const lang = meta?.lang || 'en'
 
   const escLang = escapeHtml(lang)
-  const escSiteName = escapeHtml(siteName)
-  const escSiteDesc = escapeHtml(siteDesc.substring(0, 160))
-  const escOgTitle = escapeHtml(ogTitle)
-  const escOgDescription = escapeHtml(ogDescription)
+  const escSiteName = escapeHtml(String(siteName))
+  const escSiteDesc = escapeHtml(String(siteDesc).substring(0, 160))
+  const escOgTitle = escapeHtml(String(ogTitle))
+  const escOgDescription = escapeHtml(String(ogDescription))
 
   // Set category for image selection in renderers
   setHeroCategory(cat)
@@ -58,10 +65,10 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
   }
 
   const navHtml = blocks.map((b, i) => b.blockType === 'navigation' ? addDataAttr(renderNav(b, t), i, b.blockType) : '').filter(Boolean).join('\n')
-  const heroHtml = blocks.map((b, i) => b.blockType === 'hero' ? addDataAttr(renderHero(b, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
-  const footerHtml = blocks.map((b, i) => b.blockType === 'footer' ? addDataAttr(renderSections(b, t, cat, site), i, b.blockType) : '').filter(Boolean).join('\n')
+  const heroHtml = blocks.map((b, i) => b.blockType === 'hero' ? addDataAttr(renderHero(b as any, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
+  const footerHtml = blocks.map((b, i) => b.blockType === 'footer' ? addDataAttr(renderSections(b as any, t, cat, site as any), i, b.blockType) : '').filter(Boolean).join('\n')
   const mainHtml = blocks
-    .map((b, i) => !['navigation', 'hero', 'footer'].includes(b.blockType) ? addDataAttr(renderSections(b, t, cat, site), i, b.blockType) : '')
+    .map((b, i) => !['navigation', 'hero', 'footer'].includes(b.blockType) ? addDataAttr(renderSections(b as any, t, cat, site as any), i, b.blockType) : '')
     .filter(Boolean)
     .join('\n')
 

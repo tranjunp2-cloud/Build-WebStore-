@@ -21,7 +21,7 @@ function normalizeEditorLayout(layout: unknown) {
  * Returns site + homepage data for the editor.
  * Uses Payload's Local API (no REST auth issues).
  */
-export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_user, req, ctx) => {
+export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user, req, ctx) => {
     try {
         const payload = await getPayload({ config })
         const { siteId } = await ctx.params
@@ -29,7 +29,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
         const pageId = new URL(req.url).searchParams.get('pageId')
 
         // Fetch site
-        const site: any = await payload.findByID({
+        const site = await payload.findByID({
             collection: 'sites',
             id: siteId,
         })
@@ -38,7 +38,16 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_use
             return NextResponse.json({ error: 'Site not found' }, { status: 404 })
         }
 
-        let page: any = null
+        const tenantIds = user.tenants?.map((t: any) =>
+            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+        ) ?? []
+
+        const siteTenantId = typeof site.tenant === 'object' ? String(site.tenant.id) : String(site.tenant)
+        if (!tenantIds.includes(siteTenantId)) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
+        let page: NonNullable<Awaited<ReturnType<typeof payload.findByID>>> | null = null
 
         if (pageId) {
             const requestedPage = await payload.findByID({

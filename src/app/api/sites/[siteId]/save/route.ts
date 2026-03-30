@@ -60,6 +60,21 @@ export async function PATCH(
         }
 
         const { siteId } = await params
+
+        const site = await payload.findByID({
+            collection: 'sites',
+            id: siteId,
+        })
+        if (!site) return NextResponse.json({ error: 'Site not found' }, { status: 404 })
+
+        const tenantIds = user.tenants?.map((t: any) =>
+            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+        ) ?? []
+        const siteTenantId = typeof site.tenant === 'object' ? String(site.tenant.id) : String(site.tenant)
+        if (!tenantIds.includes(siteTenantId)) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
         const pageId = req.nextUrl.searchParams.get('pageId')
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
