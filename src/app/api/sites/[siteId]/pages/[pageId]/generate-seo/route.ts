@@ -22,15 +22,21 @@ function extractTextContent(value: unknown, acc: string[] = []): string[] {
     return acc
 }
 
-export async function POST(
-    request: Request,
-    { params }: { params: { siteId: string; pageId: string } }
-) {
+import { withAuth } from '@/lib/auth'
+
+type RouteContext = { params: Promise<{ siteId: string; pageId: string }> }
+
+export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const payload = await getPayload({ config: configPromise })
-        const resolvedParams = await Promise.resolve(params)
+        const resolvedParams = await Promise.resolve(ctx.params)
         const { siteId, pageId } = resolvedParams
         const numericSiteId = Number(siteId)
+
+        // Extract tenant IDs from the current user
+        const tenantIds = user.tenants?.map((t: any) =>
+            typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        ) ?? []
 
         const page = await payload.findByID({
             collection: 'pages',
@@ -40,7 +46,23 @@ export async function POST(
         const pageSiteId = typeof page?.site === 'object' ? page.site?.id : page?.site
 
         if (!page || Number(pageSiteId) !== numericSiteId) {
-            return new NextResponse('Not found', { status: 404 })
+            return new NextResponse('Page not found on this site', { status: 404 })
+        }
+
+        const { docs: sites } = await payload.find({
+            collection: 'sites',
+            where: {
+                id: {
+                    equals: numericSiteId,
+                },
+                tenant: {
+                    in: tenantIds,
+                },
+            },
+        })
+
+        if (!sites || sites.length === 0) {
+            return new NextResponse('Unauthorized or Site Not Found', { status: 403 })
         }
 
         const site = await payload.findByID({
@@ -81,4 +103,4 @@ export async function POST(
         console.error('Error generating SEO:', error)
         return new NextResponse('Internal Error', { status: 500 })
     }
-}
+})

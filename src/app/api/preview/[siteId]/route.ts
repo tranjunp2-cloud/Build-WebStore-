@@ -19,6 +19,16 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 
+function escapeHtml(unsafe: string) {
+    if (!unsafe) return ''
+    return String(unsafe)
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;")
+}
+
 export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string; ogTitle?: string; ogDescription?: string }, site?: any): string {
   const cat = category || 'business'
   const t = theme || THEMES[cat] || THEMES.business
@@ -31,6 +41,12 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
   const ogTitle = meta?.ogTitle || siteName
   const ogDescription = meta?.ogDescription || siteDesc.substring(0, 160)
   const lang = meta?.lang || 'en'
+
+  const escLang = escapeHtml(lang)
+  const escSiteName = escapeHtml(siteName)
+  const escSiteDesc = escapeHtml(siteDesc.substring(0, 160))
+  const escOgTitle = escapeHtml(ogTitle)
+  const escOgDescription = escapeHtml(ogDescription)
 
   // Set category for image selection in renderers
   setHeroCategory(cat)
@@ -50,14 +66,14 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
     .join('\n')
 
   return `<!DOCTYPE html>
-<html lang="${lang}">
+<html lang="${escLang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${siteName}</title>
-  <meta name="description" content="${siteDesc.substring(0, 160)}">
-  <meta property="og:title" content="${ogTitle}">
-  <meta property="og:description" content="${ogDescription}">
+  <title>${escSiteName}</title>
+  <meta name="description" content="${escSiteDesc}">
+  <meta property="og:title" content="${escOgTitle}">
+  <meta property="og:description" content="${escOgDescription}">
   <meta property="og:type" content="website">
   <meta name="robots" content="index, follow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -69,7 +85,7 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
     "@type": "Organization",
     "name": siteName,
     "description": siteDesc.substring(0, 160),
-  })}
+  }).replace(/</g, '\\u003c')}
   </script>
 </head>
 <body>

@@ -177,18 +177,18 @@ const MIGRATIONS = [
   },
   {
     name: 'sites.header_block',
-    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS header_block varchar;`,
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS header_block jsonb;`,
   },
   {
     name: 'sites.footer_block',
-    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS footer_block varchar;`,
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS footer_block jsonb;`,
   },
   // ── Sites: Branding + Contact Info ──
-  { name: 'sites.logo', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS logo varchar;' },
-  { name: 'sites.favicon', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS favicon varchar;' },
-  { name: 'sites.phone', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS phone varchar;' },
-  { name: 'sites.email', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS email varchar;' },
-  { name: 'sites.address', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS address varchar;' },
+  { name: 'sites.branding_logo', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding_logo varchar;' },
+  { name: 'sites.branding_favicon', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding_favicon varchar;' },
+  { name: 'sites.contact_info_phone', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_phone varchar;' },
+  { name: 'sites.contact_info_email', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_email varchar;' },
+  { name: 'sites.contact_info_address', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_address varchar;' },
   // ── Products: Halal + Weight ──
   {
     name: 'products.halal_certified',
@@ -806,6 +806,27 @@ const MIGRATIONS = [
       name varchar, role varchar, bio varchar, image_id integer
     );`,
   },
+  // ── Pages: Social Widget Links array table ──
+  {
+    name: 'pages_layout_social_widget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_layout_social_widget_links" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      platform varchar,
+      url varchar
+    );`,
+  },
+  // ── Pages: Fields required for Soft Delete & Visibility ──
+  {
+    name: 'pages.is_visible',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS is_visible boolean DEFAULT true;`,
+  },
+  {
+    name: 'pages.deleted_at',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS deleted_at timestamptz;`,
+  },
   // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
   // These tables are created by Payload pushDevSchema (runs every deploy).
   // DO NOT add manual CREATE TABLE migrations — they create wrong column types.
@@ -1179,6 +1200,13 @@ async function main() {
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS current_rank
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS previous_rank
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS last_checked_at
+
+  -- F05 Sites Group Bypass
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS logo
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS favicon
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS phone
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS email
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS address
 
   -- F08 Array/Nested Bypass
   ALTER TABLE products ADD COLUMN IF NOT EXISTS description_b_m

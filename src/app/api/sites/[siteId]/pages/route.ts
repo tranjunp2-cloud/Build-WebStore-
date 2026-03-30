@@ -2,14 +2,36 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
-export async function GET(
-    request: Request,
-    { params }: { params: { siteId: string } }
-) {
+import { withAuth } from '@/lib/auth'
+
+type RouteContext = { params: Promise<{ siteId: string }> }
+
+export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const payload = await getPayload({ config })
-        const resolvedParams = await Promise.resolve(params)
+        const resolvedParams = await Promise.resolve(ctx.params)
         const siteId = resolvedParams.siteId
+
+        // Extract tenant IDs from the current user
+        const tenantIds = user.tenants?.map((t: any) =>
+            typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        ) ?? []
+
+        const { docs: sites } = await payload.find({
+            collection: 'sites',
+            where: {
+                id: {
+                    equals: siteId,
+                },
+                tenant: {
+                    in: tenantIds,
+                },
+            },
+        })
+
+        if (!sites || sites.length === 0) {
+            return new NextResponse('Unauthorized or Site Not Found', { status: 403 })
+        }
 
         const { docs: pages } = await payload.find({
             collection: 'pages',
@@ -41,16 +63,35 @@ export async function GET(
         console.error('Error fetching pages:', error)
         return new NextResponse('Internal Error', { status: 500 })
     }
-}
+})
 
-export async function POST(
-    request: Request,
-    { params }: { params: { siteId: string } }
-) {
+export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
     try {
         const payload = await getPayload({ config })
-        const resolvedParams = await Promise.resolve(params)
+        const resolvedParams = await Promise.resolve(ctx.params)
         const siteId = resolvedParams.siteId
+        
+        // Extract tenant IDs from the current user
+        const tenantIds = user.tenants?.map((t: any) =>
+            typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        ) ?? []
+
+        const { docs: sites } = await payload.find({
+            collection: 'sites',
+            where: {
+                id: {
+                    equals: siteId,
+                },
+                tenant: {
+                    in: tenantIds,
+                },
+            },
+        })
+
+        if (!sites || sites.length === 0) {
+            return new NextResponse('Unauthorized or Site Not Found', { status: 403 })
+        }
+
         const body = await request.json()
 
         const { title, slug } = body
@@ -87,4 +128,4 @@ export async function POST(
         console.error('Error creating page:', error)
         return new NextResponse('Internal Error', { status: 500 })
     }
-}
+})

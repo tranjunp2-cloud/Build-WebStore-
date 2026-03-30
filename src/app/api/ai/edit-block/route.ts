@@ -258,7 +258,7 @@ export const POST = withAuth(async (user, req) => {
                     send('done', result)
                 } catch (error: any) {
                     console.error('[AI Edit Block Stream Error]', error)
-                    send('error', { error: error?.message || 'AI editing failed' })
+                    send('error', { error: 'Failed to process AI request. Please try again.' })
                 } finally {
                     controller.close()
                 }
@@ -276,7 +276,7 @@ export const POST = withAuth(async (user, req) => {
     } catch (error: any) {
         console.error('[AI Edit Block Error]', error)
         return NextResponse.json(
-            { error: error?.message || 'AI editing failed' },
+            { error: 'AI editing failed. Please try again later.' },
             { status: 500 },
         )
     }
