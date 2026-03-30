@@ -27,6 +27,7 @@ export type PageData = {
     isVisible: boolean
     seoTitle?: string | null
     seoDescription?: string | null
+    error?: string | null
     deletedAt?: string | null
     updatedAt: string
 }

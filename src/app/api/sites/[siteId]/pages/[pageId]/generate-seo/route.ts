@@ -3,6 +3,25 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { generateAutoSEOMeta } from '@/lib/ai/generate-meta'
 
+function extractTextContent(value: unknown, acc: string[] = []): string[] {
+    if (typeof value === 'string') {
+        const trimmed = value.trim()
+        if (trimmed) acc.push(trimmed)
+        return acc
+    }
+
+    if (Array.isArray(value)) {
+        value.forEach(item => extractTextContent(item, acc))
+        return acc
+    }
+
+    if (value && typeof value === 'object') {
+        Object.values(value).forEach(entry => extractTextContent(entry, acc))
+    }
+
+    return acc
+}
+
 export async function POST(
     request: Request,
     { params }: { params: { siteId: string; pageId: string } }
@@ -31,11 +50,9 @@ export async function POST(
         const siteName = site?.businessName || site?.name || 'Website'
 
         // Extract context
-        let textContext = ''
-        if (Array.isArray(page.layout)) {
-            const texts = page.layout.map((block: { headline?: string; sectionLabel?: string; [key: string]: unknown }) => block.headline || block.sectionLabel || '').filter(Boolean)
-            textContext = texts.join('. ')
-        }
+        const textContext = Array.isArray(page.layout)
+            ? extractTextContent(page.layout).join('. ')
+            : ''
 
         const { title, description } = await generateAutoSEOMeta(
             'page',

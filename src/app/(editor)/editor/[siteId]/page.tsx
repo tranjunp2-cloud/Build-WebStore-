@@ -20,6 +20,7 @@ import { UnpublishModal } from '@/components/editor/UnpublishModal'
 type SiteData = {
     id: string
     name: string
+    domain?: string | null
     status: string
     theme: Record<string, unknown>
     siteType: string
@@ -554,16 +555,40 @@ export default function EditorPage() {
     }, [router, searchParams, siteId])
 
     const handlePageUpdate = useCallback(async (pageId: string, changes: Partial<PageData>) => {
-        updatePageInState(pageId, changes)
         try {
-            await fetch(`/api/sites/${siteId}/pages/${pageId}`, {
+            const res = await fetch(`/api/sites/${siteId}/pages/${pageId}`, {
                 method: 'PATCH',
                 headers: { 'Content-type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify(changes),
             })
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => null)
+                throw new Error(data?.error || 'Failed to update page settings')
+            }
+
+            const data = await res.json()
+            if (data?.page) {
+                updatePageInState(pageId, {
+                    title: data.page.title,
+                    slug: data.page.slug,
+                    status: data.page.status,
+                    isVisible: data.page.isVisible,
+                    seoTitle: data.page.seoTitle,
+                    seoDescription: data.page.seoDescription,
+                    updatedAt: data.page.updatedAt,
+                    error: null,
+                })
+                if (changes.slug || changes.seoTitle || changes.seoDescription) {
+                    setIframeKey(key => key + 1)
+                }
+                return data.page as PageData
+            }
+            return null
         } catch {
             toast.error('Failed to update page settings')
+            return null
         }
     }, [siteId, updatePageInState])
 

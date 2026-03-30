@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+const KEBAB_SLUG_REGEX = /^[a-z0-9-]+$/
+
 export async function PATCH(
     request: Request,
     { params }: { params: { siteId: string; pageId: string } }
@@ -18,12 +20,11 @@ export async function PATCH(
         const updateData: Record<string, any> = {}
         if (isVisible !== undefined) updateData.isVisible = isVisible
         if (deletedAt !== undefined) updateData.deletedAt = deletedAt
-        if (slug !== undefined) updateData.slug = slug
 
         if (seoTitle !== undefined || seoDescription !== undefined) {
             updateData.seo = {}
-            if (seoTitle !== undefined) updateData.seo.title = seoTitle
-            if (seoDescription !== undefined) updateData.seo.description = seoDescription
+            if (seoTitle !== undefined) updateData.seo.title = String(seoTitle ?? '').trim()
+            if (seoDescription !== undefined) updateData.seo.description = String(seoDescription ?? '').trim()
         }
 
         if (Object.keys(updateData).length === 0) {
@@ -39,6 +40,45 @@ export async function PATCH(
 
         if (!page || Number(pageSiteId) !== numericSiteId) {
             return new NextResponse('Not found', { status: 404 })
+        }
+
+        const currentSlug = String(page.slug || '').replace(/^\//, '')
+        const is404Page =
+            currentSlug === '404' ||
+            String(page.title || '').toLowerCase().includes('404')
+
+        if (slug !== undefined) {
+            if (is404Page) {
+                return NextResponse.json({ error: '404 page slug is read-only.' }, { status: 400 })
+            }
+
+            const normalizedSlug = String(slug).trim().replace(/^\//, '').replace(/\/+$/, '')
+
+            if (!normalizedSlug) {
+                return NextResponse.json({ error: 'URL slug is required.' }, { status: 400 })
+            }
+
+            if (!KEBAB_SLUG_REGEX.test(normalizedSlug)) {
+                return NextResponse.json({ error: 'Invalid or duplicate URL slug.' }, { status: 400 })
+            }
+
+            const duplicatePages = await payload.find({
+                collection: 'pages',
+                where: {
+                    and: [
+                        { site: { equals: numericSiteId } },
+                        { slug: { equals: normalizedSlug } },
+                    ],
+                },
+                limit: 1,
+            })
+
+            const duplicate = duplicatePages.docs.find((doc: any) => String(doc.id) !== String(pageId))
+            if (duplicate) {
+                return NextResponse.json({ error: 'Invalid or duplicate URL slug.' }, { status: 400 })
+            }
+
+            updateData.slug = normalizedSlug
         }
 
         const updatedPage = await payload.update({

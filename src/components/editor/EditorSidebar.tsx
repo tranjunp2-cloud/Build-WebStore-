@@ -47,7 +47,7 @@ export function EditorSidebar({
                                     )}
                                 >
                                     <span className="shrink-0">{tab.icon}</span>
-                                    <span className={cn('truncate', tab.id === 'chat' && 'max-w-[44px] leading-4 text-left')}>
+                                    <span className={cn('truncate', tab.id === 'chat' && 'max-w-[64px] leading-4 text-left')}>
                                         {tab.id === 'chat' ? 'AI CHAT' : tab.label.toUpperCase()}
                                     </span>
                                     {isActive ? (
@@ -84,7 +84,7 @@ export function EditorSidebar({
                                 )}
                             >
                                 <span className="shrink-0 text-base leading-none">{tab.icon}</span>
-                                <span className={cn('truncate', tab.id === 'chat' && 'max-w-[44px] leading-5 text-left')}>
+                                <span className={cn('truncate', tab.id === 'chat' && 'max-w-[72px] leading-5 text-left')}>
                                     {tab.id === 'chat' ? 'AI CHAT' : tab.label.toUpperCase()}
                                 </span>
                                 {isActive ? (
