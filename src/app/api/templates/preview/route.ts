@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { buildFullHTML } from '../../preview/[siteId]/route'
+import { buildFullHTML } from '@/lib/htmlBuilder'
 import { THEMES } from '../../preview/renderers'
 import { withAuth } from '@/lib/auth'
 

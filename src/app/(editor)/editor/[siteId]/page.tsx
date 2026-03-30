@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import {
-    ArrowLeft, Undo2, Redo2, ExternalLink, Upload,
+    ArrowLeft, Save, ExternalLink, Upload,
     Check, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -13,7 +13,9 @@ import { useEditorStore } from '@/store/editorStore'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
-import { SaveStatusIndicator } from '@/components/editor/SaveStatusIndicator'
+import { UndoRedoButtons } from '@/components/editor/UndoRedoButtons'
+import { MobileUndoRedoButtons } from '@/components/editor/MobileUndoRedoButtons'
+import { useUndoRedo } from '@/hooks/useUndoRedo'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 type BlockData = { blockType: string } & Record<string, unknown>
@@ -29,17 +31,38 @@ export default function EditorPage() {
     const [isChatOpen, setIsChatOpen] = useState(true)
     const [selectedBlock, setSelectedBlock] = useState(0)
     const [site, setSite] = useState<SiteData | null>(null)
-    const [page, setPage] = useState<PageData | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isPublishing, setIsPublishing] = useState(false)
     const [publishSuccess, setPublishSuccess] = useState(false)
-    const [iframeKey, setIframeKey] = useState(0)
+    const [isSaving, setIsSaving] = useState(false)
+    const [saveSuccess, setSaveSuccess] = useState(false)
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
-    // Editor store (F-06 Undo/Redo + F-07 Auto-Save)
+    // Editor store (F-11 Undo/Redo + F-07 Auto-Save)
     const editorStore = useEditorStore()
 
+    // F-11: Keyboard shortcuts Ctrl+Z / Ctrl+Y (safe: skips contentEditable/inputs)
+    useUndoRedo()
+
+    // F-11: Sync local React state when store undo/redo changes historyIndex
+    // Skip the first trigger (historyIndex -1 → 0 on init — not a real undo/redo)
+    const storeHistoryIndex = useEditorStore((s) => s.historyIndex)
+    const storeBlocks = useEditorStore((s) => s.blocks)
+    const storeTheme = useEditorStore((s) => s.theme)
+    const isInitialized = useRef(false)
+    useEffect(() => {
+
+        if (!isInitialized.current) {
+            if (storeHistoryIndex >= 0) isInitialized.current = true
+            return // skip initial load
+        }
+        setSite(prev => prev ? { ...prev, theme: storeTheme } : prev)
+        setHasUnsavedChanges(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [storeHistoryIndex])
+
     // ── Derived / Memoized values ────────────────────────────────────────
-    const blocks = useMemo(() => page?.layout || [], [page?.layout])
+    const blocks = useMemo(() => storeBlocks || [], [storeBlocks])
     const currentBlock = useMemo(() => blocks[selectedBlock] || null, [blocks, selectedBlock])
     const isPublished = useMemo(() => site?.status === 'published', [site?.status])
 
@@ -53,7 +76,6 @@ export default function EditorPage() {
                     const data = await res.json()
                     if (data.site) setSite(data.site)
                     if (data.page) {
-                        setPage(data.page)
                         // US-F12-02: Show recovery toast if loading a draft
                         if (data.page._status === 'draft' && data.page.updatedAt) {
                             const date = new Date(data.page.updatedAt)
@@ -63,6 +85,7 @@ export default function EditorPage() {
                             })
                         }
                     }
+                    editorStore.init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '')
                     editorStore.init(siteId, data.page?.layout || [], data.site?.theme || {}, data.site?.name || '')
                 }
             } catch (err) {
@@ -74,146 +97,124 @@ export default function EditorPage() {
         loadData()
     }, [siteId])
 
-    // ── F-06: Keyboard shortcuts (Cmd+Z / Cmd+Shift+Z / Cmd+S) ──────────
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-                e.preventDefault()
-                if (e.shiftKey) {
-                    if (editorStore.canRedo()) {
-                        editorStore.redo()
-                        setPage(prev => prev ? { ...prev, layout: editorStore.blocks } : prev)
-                        setSite(prev => prev ? { ...prev, theme: editorStore.theme } : prev)
-                        setIframeKey(k => k + 1)
-                    }
-                } else {
-                    if (editorStore.canUndo()) {
-                        editorStore.undo()
-                        setPage(prev => prev ? { ...prev, layout: editorStore.blocks } : prev)
-                        setSite(prev => prev ? { ...prev, theme: editorStore.theme } : prev)
-                        setIframeKey(k => k + 1)
-                    }
-                }
-            }
-            if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-                e.preventDefault()
-                editorStore.performSave(true).then((success) => {
-                    if (success) toast.success('Changes saved')
-                })
-            }
-        }
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [editorStore])
+    // Note: Ctrl+Z / Ctrl+Y are handled by useUndoRedo() hook above
 
     // ── F-07: Auto-refresh preview on save
     useEffect(() => {
-        if (editorStore.lastSavedAt) {
-            setIframeKey(k => k + 1)
+        if (!hasUnsavedChanges || !siteId) return
+        const timer = setTimeout(() => { handleSave() }, 30000)
+        return () => clearTimeout(timer)
+    }, [hasUnsavedChanges, siteId])
+
+    // ── Memoized Handlers ────────────────────────────────────────────────
+    const handleSave = useCallback(async () => {
+        if (!siteId || !storeBlocks) return
+        setIsSaving(true)
+        try {
+            const res = await fetch(`/api/sites/${siteId}/save`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ blocks: storeBlocks, theme: site?.theme }),
+            })
+            if (res.ok) {
+                setSaveSuccess(true)
+                setHasUnsavedChanges(false)
+                toast.success('Changes saved')
+                setTimeout(() => setSaveSuccess(false), 2000)
+            } else {
+                toast.error('Save failed', { description: `Server returned ${res.status}` })
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Save failed'
+            toast.error('Save failed', { description: message })
         }
-    }, [editorStore.lastSavedAt, editorStore.siteId])
+        finally { setIsSaving(false) }
+    }, [siteId, storeBlocks, site?.theme])
 
-    // ── Handlers ─────────────────────────────────────────────────────────
-
+    // ── Ctrl+S: Save shortcut (placed after handleSave to avoid TDZ) ─────
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+                e.preventDefault()
+                handleSave()
+            }
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [handleSave])
 
     const handleThemeChange = useCallback((key: string, value: string) => {
-        editorStore.updateTheme({ [key]: value })
-        setSite(prev => prev ? { ...prev, theme: { ...prev.theme, [key]: value } } : prev)
-    }, [editorStore])
+        const newTheme = { ...(site?.theme || {}), [key]: value }
+        editorStore.updateTheme({ [key]: value }, `Changed theme: ${key}`)
+        setSite(prev => prev ? { ...prev, theme: newTheme } : prev)
+        setHasUnsavedChanges(true)
+    }, [site?.theme, editorStore])
 
     const handleDeleteBlock = useCallback((idx: number) => {
         editorStore.deleteBlock(idx)
-        setPage(prev => {
-            if (!prev) return prev
-            const newLayout = prev.layout.filter((_, i) => i !== idx)
-            return { ...prev, layout: newLayout }
-        })
         setSelectedBlock(prev => Math.max(0, idx < prev ? prev - 1 : Math.min(prev, idx - 1)))
+        setHasUnsavedChanges(true)
     }, [editorStore])
 
     const handleDuplicateBlock = useCallback((idx: number) => {
         editorStore.duplicateBlock(idx)
-        setPage(prev => {
-            if (!prev) return prev
-            const blockCopy = JSON.parse(JSON.stringify(prev.layout[idx]))
-            const newLayout = [...prev.layout]
-            newLayout.splice(idx + 1, 0, blockCopy)
-            return { ...prev, layout: newLayout }
-        })
         setSelectedBlock(idx + 1)
+        setHasUnsavedChanges(true)
     }, [editorStore])
 
     const handleBlockFieldChange = useCallback((idx: number, field: string, value: string) => {
-        editorStore.updateBlock(idx, { [field]: value })
-        setPage(prev => {
-            if (!prev) return prev
-            const newLayout = [...prev.layout]
-            newLayout[idx] = { ...newLayout[idx], [field]: value }
-            return { ...prev, layout: newLayout }
-        })
+
+        editorStore.updateBlock(idx, { [field]: value }, `Edited ${field}`)
+        setHasUnsavedChanges(true)
     }, [editorStore])
 
     const handleBlockUpdate = useCallback((idx: number, changes: Record<string, unknown>) => {
-        editorStore.updateBlock(idx, changes)
-        setPage(prev => {
-            if (!prev) return prev
-            const newLayout = [...prev.layout]
-            newLayout[idx] = { ...newLayout[idx], ...changes }
-            return { ...prev, layout: newLayout }
-        })
+        editorStore.updateBlock(idx, changes, 'Updated block')
+        setHasUnsavedChanges(true)
     }, [editorStore])
 
     const handleAIAction = useCallback((action: Record<string, unknown>) => {
-        if (!page) return
+        if (!storeBlocks) return
+
+        // F-11: Compute next state, then push as a SINGLE batch action (BR-02)
+        let newLayout = [...storeBlocks]
+        let newTheme = { ...(site?.theme || {}) }
+        let label = 'AI change'
 
         switch (action.action) {
             case 'update_block': {
                 const idx = (action.blockIndex as number) ?? selectedBlock
-                const changes = action.changes as Record<string, unknown>
-                editorStore.updateBlock(idx, changes)
-                setPage(prev => {
-                    if (!prev) return prev
-                    const newLayout = [...prev.layout]
-                    newLayout[idx] = { ...newLayout[idx], ...changes }
-                    return { ...prev, layout: newLayout }
-                })
+                newLayout[idx] = { ...newLayout[idx], ...(action.changes as Record<string, unknown>) }
+                label = `AI: updated ${newLayout[idx].blockType}`
                 break
             }
             case 'update_theme': {
-                const changes = action.changes as Record<string, unknown>
-                editorStore.updateTheme(changes)
-                setSite(prev => prev ? { ...prev, theme: { ...prev.theme, ...changes } } : prev)
+                newTheme = { ...newTheme, ...(action.changes as Record<string, unknown>) }
+                label = 'AI: updated theme'
                 break
             }
             case 'add_block': {
-                const afterIdx = (action.afterIndex as number) ?? blocks.length - 1
-                const block = action.block as BlockData
-                editorStore.addBlock(afterIdx, block)
-                setPage(prev => {
-                    if (!prev) return prev
-                    const newLayout = [...prev.layout]
-                    newLayout.splice(afterIdx + 1, 0, block)
-                    return { ...prev, layout: newLayout }
-                })
+                const afterIdx = (action.afterIndex as number) ?? newLayout.length - 1
+                newLayout.splice(afterIdx + 1, 0, action.block as BlockData)
                 setSelectedBlock(afterIdx + 1)
+                label = `AI: added ${(action.block as BlockData)?.blockType}`
                 break
             }
             case 'delete_block': {
                 const idx = (action.blockIndex as number) ?? selectedBlock
-                editorStore.deleteBlock(idx)
-                setPage(prev => {
-                    if (!prev) return prev
-                    const newLayout = prev.layout.filter((_, i) => i !== idx)
-                    return { ...prev, layout: newLayout }
-                })
+                label = `AI: deleted ${newLayout[idx]?.blockType}`
+                newLayout = newLayout.filter((_, i) => i !== idx)
                 setSelectedBlock(Math.max(0, idx - 1))
                 break
             }
         }
 
-        // Refresh preview
-        setIframeKey(k => k + 1)
-    }, [page, selectedBlock, blocks.length])
+        // Push entire AI response as 1 undoable action (F-11 FR-06)
+        editorStore.pushBatch(newLayout, newTheme, label)
+        setSite(prev => prev ? { ...prev, theme: newTheme } : prev)
+        setHasUnsavedChanges(true)
+    }, [storeBlocks, selectedBlock, site?.theme, editorStore])
 
     const handlePublish = useCallback(async () => {
         if (!siteId || isPublishing) return
@@ -241,19 +242,7 @@ export default function EditorPage() {
 
     const handleToggleChat = useCallback(() => setIsChatOpen(prev => !prev), [])
 
-    const handleUndo = useCallback(() => {
-        editorStore.undo()
-        setPage(p => p ? { ...p, layout: editorStore.blocks } : p)
-        setSite(s => s ? { ...s, theme: editorStore.theme } : s)
-        setIframeKey(k => k + 1)
-    }, [editorStore])
 
-    const handleRedo = useCallback(() => {
-        editorStore.redo()
-        setPage(p => p ? { ...p, layout: editorStore.blocks } : p)
-        setSite(s => s ? { ...s, theme: editorStore.theme } : s)
-        setIframeKey(k => k + 1)
-    }, [editorStore])
 
     // ── Render ───────────────────────────────────────────────────────────
     return (
@@ -266,22 +255,18 @@ export default function EditorPage() {
                     </Link>
                     <div className="mx-2 h-5 w-px bg-white/10" />
                     {site && <span className="text-sm font-medium text-white">{site.name}</span>}
+                    <div className="mx-2 h-5 w-px bg-white/10" />
+                    {/* F-11: Undo/Redo — bên trái toolbar */}
+                    <UndoRedoButtons className="hidden md:flex" />
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {/* F-06: Undo/Redo buttons */}
-                    <button onClick={handleUndo}
-                        disabled={!editorStore.canUndo()}
-                        className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-20" title="Undo (⌘Z)">
-                        <Undo2 className="h-4 w-4" />
-                    </button>
-                    <button onClick={handleRedo}
-                        disabled={!editorStore.canRedo()}
-                        className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-20" title="Redo (⌘⇧Z)">
-                        <Redo2 className="h-4 w-4" />
-                    </button>
-                    <div className="mx-1 h-5 w-px bg-white/10" />
-                    <SaveStatusIndicator />
+                    {hasUnsavedChanges && <span className="text-[10px] text-yellow-400 animate-pulse">● Auto-save in 30s</span>}
+                    <button onClick={handleSave} disabled={isSaving || saveSuccess || !hasUnsavedChanges}
+                        className={cn('flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                            saveSuccess ? 'bg-green-600/20 text-green-400' : hasUnsavedChanges ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-white/5 text-gray-500 cursor-default')}>
+                        {isSaving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...</> : saveSuccess ? <><Check className="h-3.5 w-3.5" /> Saved!</> : <><Save className="h-3.5 w-3.5" /> Save</>}
+                    </button
                     <a href={`/api/preview/${siteId}`} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-sm text-gray-300 hover:bg-white/10 transition-colors">
                         <ExternalLink className="h-3.5 w-3.5" /> Preview
@@ -310,13 +295,15 @@ export default function EditorPage() {
                 {/* Center: Live Preview via iframe */}
                 <div className="flex flex-1 flex-col">
                     <PreviewFrame
-                        siteId={siteId}
-                        iframeKey={iframeKey}
+                        siteName={site?.name || ''}
+                        blocks={blocks}
+                        theme={site?.theme}
                         isLoading={isLoading}
                     />
                 </div>
 
                 <SettingsPanel
+                    key={storeHistoryIndex}
                     block={currentBlock}
                     blockIndex={selectedBlock}
                     theme={site?.theme}
@@ -345,6 +332,9 @@ export default function EditorPage() {
                     </span>
                 </div>
             </div>
+
+            {/* F-11: Undo/Redo Floating Toolbar for Mobile */}
+            <MobileUndoRedoButtons className="md:hidden flex" />
         </div>
     )
 }
