@@ -10,7 +10,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  * TC-BOOT-05: Idempotency — running twice produces same result
  */
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const { bootstrapSeed } = require('../../../../scripts/bootstrap-seed') as {
     bootstrapSeed: (
         pool: { query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> },
