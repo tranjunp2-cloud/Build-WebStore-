@@ -292,7 +292,7 @@ function LoginFormContent() {
                 </div>
 
                 {/* ─── Remember me / Forgot password row ─── */}
-                <div className="flex items-center justify-between" style={{ marginTop: 16 }}>
+                <div className="flex flex-wrap items-center justify-between gap-2" style={{ marginTop: 16 }}>
                     <label className="flex items-center gap-2 cursor-pointer select-none" style={{ background: 'transparent' }}>
                         <input
                             type="checkbox"
