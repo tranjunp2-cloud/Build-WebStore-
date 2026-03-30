@@ -84,11 +84,12 @@ jobs:
         id: test
         run: |
           npm run test -- --coverage 2>&1 | tee test-output.log
-          # Parse test counts from vitest summary: "Tests  590 passed (590)" or "Tests  1 passed | 1 skipped (2)"
-          # Total from parenthesized number at end of Tests line (includes passed + failed + skipped)
-          TOTAL=$(grep '^ *Tests' test-output.log | grep -oP '\((\d+)\)' | grep -oP '\d+' | head -1 || echo "0")
-          PASSED=$(grep '^ *Tests' test-output.log | grep -oP '\d+(?= passed)' | head -1 || echo "0")
-          FAILED=$(grep '^ *Tests' test-output.log | grep -oP '\d+(?= failed)' | head -1 || echo "0")
+          # Strip ANSI color codes before parsing (vitest outputs colored text)
+          sed 's/\x1b\[[0-9;]*m//g' test-output.log > test-output-clean.log
+          # Parse test counts from vitest summary: "Tests  1217 passed (1217)"
+          TOTAL=$(grep '^ *Tests' test-output-clean.log | grep -oP '\((\d+)\)' | grep -oP '\d+' | head -1 || echo "0")
+          PASSED=$(grep '^ *Tests' test-output-clean.log | grep -oP '\d+(?= passed)' | head -1 || echo "0")
+          FAILED=$(grep '^ *Tests' test-output-clean.log | grep -oP '\d+(?= failed)' | head -1 || echo "0")
           echo "test_total=$TOTAL" >> "$GITHUB_OUTPUT"
           echo "test_passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
           echo "test_failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
@@ -201,10 +202,10 @@ jobs:
             };
             const testStatus = tests.failed !== '0' ? `❌ ${tests.failed} failed` : '✅ All passed';
 
-            // Target 15/04/2026 — keep in sync with vitest.config.ts
-            const targets = { lines: 60, branches: 50, functions: 50, statements: 60 };
-            // Current CI thresholds (minimum to pass)
-            const minimums = { lines: 18, branches: 50, functions: 40, statements: 18 };
+            // Target 15/04/2026 — aggressive targets, already exceeded
+            const targets = { lines: 95, branches: 85, functions: 90, statements: 95 };
+            // Current CI thresholds (minimum to pass) — sync with vitest.config.ts
+            const minimums = { lines: 55, branches: 60, functions: 50, statements: 55 };
 
             function badge(val, min, target) {
               const v = parseFloat(val);
