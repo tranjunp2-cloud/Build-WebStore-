@@ -261,35 +261,53 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     performSave: async (isManual = false) => {
-        const { siteId, blocks, theme, autoSaveTimer } = get()
+        const { siteId, autoSaveTimer, isSaving } = get()
         if (!siteId) return
+
+        // Anti-spam backpressure for manual save
+        if (isManual && isSaving) return
 
         if (autoSaveTimer) clearTimeout(autoSaveTimer)
         set({ isSaving: true, saveStatus: 'saving', autoSaveTimer: null })
 
-        try {
-            const res = await fetch(`/api/sites/${siteId}/save`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ blocks, theme, isDraft: true }),
-            })
+        const RETRY_DELAYS = [5000, 10000, 20000]
 
-            if (res.ok) {
-                set({
-                    hasUnsavedChanges: false,
-                    saveStatus: 'saved',
-                    lastSavedAt: Date.now(),
-                    isSaving: false,
+        const attemptSave = async (retryCount = 0) => {
+            const { blocks, theme } = get()
+            try {
+                const res = await fetch(`/api/sites/${siteId}/save`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ blocks, theme, isDraft: true }),
                 })
-                // Only show toast for manual save (optional, based on requirement)
-                // if (isManual) { /* toast handled in component */ }
-            } else {
+
+                if (res.ok) {
+                    set({
+                        hasUnsavedChanges: false,
+                        saveStatus: 'saved',
+                        lastSavedAt: Date.now(),
+                        isSaving: false,
+                    })
+                } else {
+                    if (res.status === 401) {
+                        set({ saveStatus: 'error', isSaving: false })
+                        return
+                    }
+                    throw new Error('Save failed')
+                }
+            } catch (err) {
                 set({ saveStatus: 'error', isSaving: false })
+                if (retryCount < RETRY_DELAYS.length) {
+                    const timer = setTimeout(() => {
+                        set({ isSaving: true, saveStatus: 'saving' })
+                        attemptSave(retryCount + 1)
+                    }, RETRY_DELAYS[retryCount])
+                    set({ autoSaveTimer: timer })
+                }
             }
-        } catch (err) {
-            set({ saveStatus: 'error', isSaving: false })
-            // Potential retry logic could be added here
         }
+
+        await attemptSave(0)
     },
 
     markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now(), saveStatus: 'saved' }),
