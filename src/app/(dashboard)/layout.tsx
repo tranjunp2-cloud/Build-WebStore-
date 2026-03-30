@@ -11,14 +11,17 @@ export default async function DashboardLayout({
     children: React.ReactNode
 }) {
     const user = await getCurrentUser()
+    // Middleware already handles auth redirects (token check + MFA verification)
+    // Do NOT redirect here — it causes redirect loops with middleware
     const typedUser = user as PlatformUser | null
     const userName = typedUser?.firstName || typedUser?.email?.split('@')[0] || 'User'
+    const userEmail = typedUser?.email || ''
     const userInitial = userName.charAt(0).toUpperCase()
 
     return (
         <AppShell>
             <I18nProvider defaultLocale="en">
-                <CMSLayoutClient userName={userName} userInitial={userInitial}>
+                <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail}>
                     {children}
                 </CMSLayoutClient>
                 {/* Only evaluate and render if the user hasn't seen the wizard yet */}
