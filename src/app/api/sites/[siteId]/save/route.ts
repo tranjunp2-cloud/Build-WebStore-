@@ -30,8 +30,8 @@ export async function PATCH(
         if (!existingSite) {
             return NextResponse.json({ error: 'Site not found' }, { status: 404 })
         }
-        type TenantRef = string | number | { id: string | number }
-        const resolveTenantId = (t: TenantRef) => String(typeof t === 'object' ? t.id : t)
+        type TenantRef = string | number | { id: string | number } | null | undefined
+        const resolveTenantId = (t: TenantRef) => t == null ? '' : String(typeof t === 'object' ? t.id : t)
         const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
         const siteTenantId = resolveTenantId(existingSite.tenant as TenantRef)
         if (!userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {

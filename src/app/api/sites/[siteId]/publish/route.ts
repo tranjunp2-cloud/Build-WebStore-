@@ -36,8 +36,8 @@ export async function PATCH(
         }
 
         // Verify ownership (tenant isolation)
-        type TenantRef = string | number | { id: string | number }
-        const resolveTenantId = (t: TenantRef) => String(typeof t === 'object' ? t.id : t)
+        type TenantRef = string | number | { id: string | number } | null | undefined
+        const resolveTenantId = (t: TenantRef) => t == null ? '' : String(typeof t === 'object' ? t.id : t)
         const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
         const siteTenantId = resolveTenantId(existing.tenant as TenantRef)
         if (!userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
@@ -124,8 +124,8 @@ export async function DELETE(
         }
 
         // Verify ownership (tenant isolation)
-        type TenantRef = string | number | { id: string | number }
-        const resolveTenantId = (t: TenantRef) => String(typeof t === 'object' ? t.id : t)
+        type TenantRef = string | number | { id: string | number } | null | undefined
+        const resolveTenantId = (t: TenantRef) => t == null ? '' : String(typeof t === 'object' ? t.id : t)
         const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
         const siteTenantId = resolveTenantId(existing.tenant as TenantRef)
         if (!userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
