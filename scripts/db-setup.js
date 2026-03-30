@@ -828,6 +828,27 @@ const MIGRATIONS = [
     name: 'pages.deleted_at',
     sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS deleted_at timestamptz;`,
   },
+  // ── Pages: Layout Block properties (social/cart widgets) ──
+  {
+    name: 'pages_layout.social_widget_variant',
+    sql: `ALTER TABLE pages_layout ADD COLUMN IF NOT EXISTS social_widget_variant varchar;`,
+  },
+  {
+    name: 'pages_layout.social_widget_headline',
+    sql: `ALTER TABLE pages_layout ADD COLUMN IF NOT EXISTS social_widget_headline varchar;`,
+  },
+  {
+    name: 'pages_layout.cart_widget_variant',
+    sql: `ALTER TABLE pages_layout ADD COLUMN IF NOT EXISTS cart_widget_variant varchar;`,
+  },
+  {
+    name: 'pages_layout.cart_widget_label',
+    sql: `ALTER TABLE pages_layout ADD COLUMN IF NOT EXISTS cart_widget_label varchar;`,
+  },
+  {
+    name: 'pages_layout.cart_widget_show_label',
+    sql: `ALTER TABLE pages_layout ADD COLUMN IF NOT EXISTS cart_widget_show_label boolean;`,
+  },
   // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
   // These tables are created by Payload pushDevSchema (runs every deploy).
   // DO NOT add manual CREATE TABLE migrations — they create wrong column types.
