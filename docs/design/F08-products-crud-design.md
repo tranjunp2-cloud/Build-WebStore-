@@ -190,3 +190,102 @@ Tài liệu này cung cấp bản vẽ Wireframe chi tiết cho bộ tính năng
 1. **Low Stock / Out of Stock (🔴):** Nếu tồn kho (Stock) = 0, ô text sẽ highlight chói (Đỏ) trên Dashboard quản trị để thu hút cự chú ý. *Lưu ý: Không tự động chuyển SP thành Draft.*
 2. **Missing Validations:** Nếu bấm lưu mà thiếu Tên, Giá, Stock hoặc SKU của Biến thể, Input sẽ viền Đỏ kèm dòng chữ: `Trường này là bắt buộc`.
 3. **Draft Fallback:** Tất cả các hành động Create (Thủ công hoặc Bulk AI) sẽ mặc định sinh ra trạng thái **[📝 Draft]**. Nút *Publish* ở Form Edit phải do thao tác ấn chủ động để bật SP lên F09 Storefront.
+
+---
+
+## 6. Quản Lý Danh Mục (Category Management — 3 Cấp)
+
+*Truy cập bằng nút [📁 Quản lý Danh mục] trên Toolbar của màn hình Product List. Mở ra một trang/modal riêng biệt hiển thị cây danh mục lồng nhau tối đa 3 cấp (L1 > L2 > L3). Hỗ trợ CRUD đầy đủ cho từng node.*
+
+### 6.1 Desktop — Trang Quản lý Danh Mục
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ [≡ Logo]  Search...                             [👤 Admin]  │
+├──────────────┬──────────────────────────────────────────────┤
+│ 🏠 Dashboard │ 📁 Quản Lý Danh Mục                          │
+│ 📦 Products  │                                              │
+│ 🛒 Orders    │ [🔍 Tìm danh mục...]        [+ Thêm Danh Mục]│
+│ ⚙️ Settings  │ ──────────────────────────────────────────── │
+│              │                                              │
+│              │ 📂 Thời Trang (L1)              [✏️] [🗑️]   │
+│              │ ├── 📂 Nữ (L2)                  [✏️] [🗑️]   │
+│              │ │   ├── 📄 Áo Khoác (L3)        [✏️] [🗑️]   │
+│              │ │   ├── 📄 Váy Đầm (L3)         [✏️] [🗑️]   │
+│              │ │   └── [+ Thêm danh mục con]               │
+│              │ ├── 📂 Nam (L2)                  [✏️] [🗑️]   │
+│              │ │   ├── 📄 Áo Thun (L3)          [✏️] [🗑️]   │
+│              │ │   └── [+ Thêm danh mục con]               │
+│              │ └── [+ Thêm danh mục con]                   │
+│              │                                              │
+│              │ 📂 Đồ Ăn & Thức Uống (L1)       [✏️] [🗑️]   │
+│              │ ├── 📄 Trà Sữa (L2)              [✏️] [🗑️]   │
+│              │ ├── 📄 Cà Phê (L2)               [✏️] [🗑️]   │
+│              │ └── [+ Thêm danh mục con]                   │
+│              │                                              │
+│              │ 📂 Mỹ Phẩm (L1)                  [✏️] [🗑️]   │
+│              │ └── [+ Thêm danh mục con]                   │
+│              │                                              │
+└──────────────┴──────────────────────────────────────────────┘
+```
+
+### 6.2 Modal — Thêm / Sửa Danh Mục
+
+*Khi bấm [+ Thêm Danh Mục] hoặc [✏️ Sửa], hệ thống mở Modal nhập liệu.*
+
+```text
+       ┌── 📁 Thêm Danh Mục Mới ─────────────────[X]┐
+       │                                             │
+       │ Tên Danh Mục (*)                            │
+       │ [ Nhập tên danh mục...                   ]  │
+       │                                             │
+       │ Danh Mục Cha (Tuỳ chọn)                    │
+       │ [ -- Không (Root Level 1) -- ▼ ]            │
+       │   ├ Thời Trang                              │
+       │   │  ├ Thời Trang > Nữ                      │
+       │   │  └ Thời Trang > Nam                     │
+       │   ├ Đồ Ăn & Thức Uống                      │
+       │   └ Mỹ Phẩm                                │
+       │                                             │
+       │ Mô Tả (Tuỳ chọn)                           │
+       │ [ Mô tả ngắn cho danh mục...            ]  │
+       │                                             │
+       │ 🖼️ Ảnh Đại Diện (Tuỳ chọn)                  │
+       │ [ 📤 Tải ảnh lên ]                           │
+       │                                             │
+       │ ⚠️ Lưu ý: Tối đa 3 cấp lồng nhau.          │
+       │ Nếu danh mục cha đã ở L2 thì con sẽ là L3. │
+       │                                             │
+       │                    [ Hủy bỏ ] [ 💾 Lưu ]    │
+       └─────────────────────────────────────────────┘
+```
+
+### 6.3 Mobile — Danh Mục dạng Accordion
+
+```text
+📱 Mobile View (Category Management)
+┌───────────────────────────────┐
+│ ☰  Quản Lý Danh Mục      [+] │
+├───────────────────────────────┤
+│ [🔍 Tìm danh mục...        ] │
+│                               │
+│ ┌─ 📂 Thời Trang        [▼] ┐│ ◄── Bấm mở ra con
+│ │ ┌─ 📂 Nữ              [▼]││
+│ │ │  📄 Áo Khoác    [✏️][🗑️]││
+│ │ │  📄 Váy Đầm     [✏️][🗑️]││
+│ │ │  [+ Thêm con]           ││
+│ │ └─────────────────────────┘│
+│ │ ┌─ 📂 Nam              [▶]││
+│ │ └─────────────────────────┘│
+│ └────────────────────────────┘│
+│                               │
+│ ┌─ 📂 Đồ Ăn & TU        [▶] ┐│
+│ └────────────────────────────┘│
+└───────────────────────────────┘
+```
+
+### 6.4 Quy tắc Nghiệp vụ Danh Mục
+1. **Tối đa 3 cấp** (L1 → L2 → L3). Nếu danh mục cha đã ở L2, nút [+ Thêm con] sẽ tạo L3. Nếu đã là L3 thì **ẩn** nút thêm con.
+2. **Xóa mềm (Soft Delete):** Khi xóa 1 danh mục cha, tất cả danh mục con sẽ được gỡ liên kết (Unlink) khỏi cây, không bị xóa cứng.
+3. **Gán nhiều danh mục:** Một sản phẩm có thể thuộc nhiều danh mục cùng lúc (Multi-select tại Form sản phẩm).
+4. **Không cho phép trùng tên** cùng cấp dưới cùng 1 danh mục cha.
