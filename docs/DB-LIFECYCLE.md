@@ -32,19 +32,29 @@ CI tự block PR nếu thiếu migration.
 
 Chạy **mỗi lần Docker container start**. Tạo accounts bắt buộc nếu chưa có.
 
-| Account | Env var email | Env var password | Role |
-|---------|--------------|-----------------|------|
-| Admin | `BOOTSTRAP_ADMIN_EMAIL` | `BOOTSTRAP_ADMIN_PASSWORD` | super-admin |
-| SSO Service | `SSO_SERVICE_EMAIL` | `SSO_SERVICE_PASSWORD` | super-admin |
+| Account | Env var email | Role |
+|---------|--------------|------|
+| Admin | `BOOTSTRAP_ADMIN_EMAIL` | super-admin |
+| SSO Service | `SSO_SERVICE_EMAIL` | super-admin |
 
 **Rules:**
-- Credentials từ env vars — **KHÔNG hardcode**
-- Idempotent — user đã tồn tại thì skip
+- Email từ env vars — **KHÔNG hardcode**
+- Idempotent — user đã tồn tại thì **skip, KHÔNG sửa roles** (tránh privilege escalation)
+- Chỉ tạo user mới (email + role) — **KHÔNG set password** (SQL không hash được)
 - Env var trống → skip (không crash)
 
+**Security:**
+- Existing user trùng email → chỉ log, không auto-nâng quyền
+- Password PHẢI set qua Payload API (scrypt hash)
+
 **Lần deploy đầu tiên:**
-1. Set GitHub Secrets: `gh secret set SSO_SERVICE_PASSWORD -b "strong-password"`
-2. Deploy → `db-setup.js` tự tạo accounts
+1. Set GitHub Secrets:
+   ```bash
+   gh secret set BOOTSTRAP_ADMIN_EMAIL -b "admin@primeweb.app"
+   gh secret set SSO_SERVICE_EMAIL -b "sso-service@primeweb.app"
+   gh secret set SSO_SERVICE_PASSWORD -b "strong-password"
+   ```
+2. Deploy → `db-setup.js` tự tạo user rows (email + role)
 3. Chạy `npm run db:seed-sso` để set password đúng (Payload hash)
 
 ---
