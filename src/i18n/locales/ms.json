@@ -118,7 +118,39 @@
         "step2Title": "Pilih templat",
         "step2Subtitle": "Pilih titik permulaan — anda boleh menyesuaikan semua nanti.",
         "step3Title": "Sesuaikan laman anda",
-        "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda."
+        "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda.",
+        "welcome": {
+            "title": "Selamat datang ke PrimeWeb",
+            "subtitle": "Mula bina kedai anda. Siapkannya dalam hanya 5 minit dengan AI kami.",
+            "createStore": "🚀 Cipta Kedai Saya dengan AI",
+            "skip": "Langkau & Pergi ke Papan Pemuka",
+            "step": "Langkah 1 dari 2: Cipta Kedai"
+        },
+        "wizard": {
+            "title": "✨ Terokai Kuasa AI",
+            "slides": {
+                "editor": {
+                    "title": "Editor AI",
+                    "description": "Sunting antara muka laman web melalui sembang - tiada kod diperlukan. AI memahami permintaan anda dan mengemas kini reka bentuk secara automatik."
+                },
+                "content": {
+                    "title": "Kandungan AI",
+                    "description": "Cipta penerangan produk, jana catatan blog SEO secara automatik. AI menulis kandungan profesional yang menarik pelanggan dan dioptimumkan untuk enjin carian."
+                },
+                "seo": {
+                    "title": "SEO AI",
+                    "description": "Optimumkan laman web anda secara automatik untuk meningkatkan kedudukan carian. AI menganalisis dan meningkatkan SEO, menjadikan laman web anda lebih mudah dicari di Google."
+                }
+            },
+            "footer": {
+                "skip": "Langkau",
+                "skipInstructions": "Langkau arahan",
+                "skipGuide": "Langkau panduan",
+                "goBack": "← Kembali",
+                "continue": "Seterusnya",
+                "explore": "Teroka CMS"
+            }
+        }
     },
     "email": {
         "welcome": {
