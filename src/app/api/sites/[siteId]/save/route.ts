@@ -31,10 +31,11 @@ export async function PATCH(
             return NextResponse.json({ error: 'Site not found' }, { status: 404 })
         }
         type TenantRef = string | number | { id: string | number } | null | undefined
-        const resolveTenantId = (t: TenantRef) => t == null ? '' : String(typeof t === 'object' ? t.id : t)
+        const resolveTenantId = (t: TenantRef): string | null =>
+            t == null ? null : String(typeof t === 'object' ? t.id : t)
         const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
         const siteTenantId = resolveTenantId(existingSite.tenant as TenantRef)
-        if (!userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
+        if (!siteTenantId || !userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
