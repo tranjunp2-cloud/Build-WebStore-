@@ -1,5 +1,6 @@
 'use client'
 
+
 import React, { memo, useEffect, useRef, useState } from 'react'
 import { RotateCcw, Send, WandSparkles } from 'lucide-react'
 import { AddSectionPromptChips } from './AddSectionPromptChips'
@@ -47,6 +48,7 @@ function AIChatPanelInner({
     externalActivity,
     compact = false,
 }: AIChatPanelProps) {
+
     const [input, setInput] = useState('')
     const [isProcessing, setIsProcessing] = useState(false)
     const [messages, setMessages] = useState<ChatMessage[]>([

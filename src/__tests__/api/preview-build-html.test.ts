@@ -25,7 +25,7 @@ vi.mock('@/app/api/preview/renderers/sections', () => ({
     setSectionCategory: vi.fn(),
 }))
 
-import { buildFullHTML } from '@/app/api/preview/[siteId]/route'
+import { buildFullHTML } from '@/lib/htmlBuilder'
 
 // ─── TC-F05: Preview HTML rendering ──────────────────────────────────
 

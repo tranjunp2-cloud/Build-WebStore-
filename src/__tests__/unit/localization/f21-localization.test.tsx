@@ -282,7 +282,7 @@ describe('[TC-F21.01] LanguageSwitcher renders inside Auth Form Card', () => {
             </I18nProvider>
         )
         const myBtn = screen.getByText('MY')
-        expect(myBtn.className).toContain('2DD4BF')
+        expect(myBtn.getAttribute('style')).toContain('rgb(45, 212, 191)')
     })
 })
 

@@ -18,6 +18,7 @@ import { mergeFooterSocialsWithSite, mergeNavigationBrandingWithSite } from '@/l
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+
 export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string; ogTitle?: string; ogDescription?: string }, site?: any): string {
   const cat = category || 'business'
   const t = theme || THEMES[cat] || THEMES.business
@@ -391,6 +392,7 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
 </body>
 </html>`
 }
+
 
 export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (_user, req, ctx) => {
   try {
