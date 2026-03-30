@@ -11,7 +11,7 @@ import type { BlockData, AIAction, ThemeData } from '@/types/editor'
 import { useEditorStore } from '@/store/editorStore'
 
 // ─── Types ──────────────────────────────────────────────────────────────
-type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string; historyIndex?: number }
+type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string; snapshotId?: string }
 
 function getBlockInfo(blockType: string) {
     const meta = blockRegistry.getBlockMeta(blockType)
@@ -35,6 +35,7 @@ function AIChatPanelInner({
     isOpen, onToggle, blocks, onBlockSelect, selectedBlock,
     onAIAction, siteName, theme,
 }: AIChatPanelProps) {
+    const storeHistory = useEditorStore((s) => s.history)
     const storeHistoryIndex = useEditorStore((s) => s.historyIndex)
     const [tab, setTab] = useState<'chat' | 'blocks'>('blocks')
     const [input, setInput] = useState('')
@@ -88,10 +89,12 @@ function AIChatPanelInner({
                         : data.action === 'delete_block' ? '🗑️ Block deleted'
                             : '✅ Done'
 
+            const currentStore = useEditorStore.getState()
+            
             setMessages(prev => [...prev, {
                 id: (Date.now() + 1).toString(), role: 'assistant',
                 content: `${actionDesc}\n${data.message || ''}`,
-                historyIndex: useEditorStore.getState().historyIndex
+                snapshotId: currentStore.history[currentStore.historyIndex]?.id
             }])
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Unknown error'
@@ -181,8 +184,9 @@ function AIChatPanelInner({
                     {/* AI Chat Messages */}
                     <div className="flex-1 overflow-y-auto p-3 space-y-3" role="log" aria-label="AI chat messages">
                         {messages.map(msg => {
-                            const isUndone = msg.historyIndex !== undefined && storeHistoryIndex < msg.historyIndex;
-                            const isCurrent = msg.historyIndex !== undefined && storeHistoryIndex === msg.historyIndex;
+                            const msgHistoryIndex = msg.snapshotId ? storeHistory.findIndex(s => s.id === msg.snapshotId) : -1;
+                            const isUndone = msg.snapshotId !== undefined && (msgHistoryIndex === -1 || msgHistoryIndex > storeHistoryIndex);
+                            const isCurrent = msg.snapshotId !== undefined && msgHistoryIndex === storeHistoryIndex;
                             const canUndoMsg = isCurrent && useEditorStore.getState().canUndo();
 
                             return (

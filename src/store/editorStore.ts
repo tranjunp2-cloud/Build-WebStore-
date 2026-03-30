@@ -13,6 +13,7 @@ type BlockData = { blockType: string;[key: string]: any }
 export type UndoActionSource = 'ai_chat' | 'inline_edit' | 'manual' | 'theme_change'
 
 type EditorSnapshot = {
+    id: string
     blocks: BlockData[]
     theme: any
     timestamp: number
@@ -88,6 +89,7 @@ function createSnapshot(
     source?: UndoActionSource,
 ): EditorSnapshot {
     return {
+        id: crypto.randomUUID(),
         blocks: JSON.parse(JSON.stringify(blocks)),
         theme: JSON.parse(JSON.stringify(theme)),
         timestamp: Date.now(),
