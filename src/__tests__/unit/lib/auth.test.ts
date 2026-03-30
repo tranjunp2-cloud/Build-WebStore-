@@ -9,8 +9,14 @@ vi.mock('next/headers', () => ({
 
 // Mock payload
 const mockAuth = vi.fn()
+const mockFindByID = vi.fn()
 vi.mock('payload', () => ({
-    getPayload: vi.fn(() => Promise.resolve({ auth: mockAuth })),
+    getPayload: vi.fn(() => Promise.resolve({ auth: mockAuth, findByID: mockFindByID })),
+}))
+
+const mockJwtVerify = vi.fn()
+vi.mock('jose', () => ({
+    jwtVerify: (...args: unknown[]) => mockJwtVerify(...args)
 }))
 
 vi.mock('@payload-config', () => ({ default: {} }))
@@ -62,6 +68,82 @@ describe('getCurrentUser [TC-F02.33]', () => {
 
         const user = await getCurrentUser()
         expect(user).toBeNull()
+    })
+
+    // Custom JWT Fallback Tests
+    it('returns null when payload-token is present but PAYLOAD_SECRET is missing', async () => {
+        mockGet.mockReturnValue({ value: 'custom-jwt' })
+        mockAuth.mockResolvedValue({ user: null })
+        const oldSecret = process.env.PAYLOAD_SECRET
+        delete process.env.PAYLOAD_SECRET
+        
+        const user = await getCurrentUser()
+        expect(user).toBeNull()
+        
+        process.env.PAYLOAD_SECRET = oldSecret // restore
+    })
+
+    it('returns user when fallback custom JWT is valid (mfa_verified = true)', async () => {
+        mockGet.mockReturnValue({ value: 'custom-jwt' })
+        mockAuth.mockResolvedValue({ user: null })
+        const oldSecret = process.env.PAYLOAD_SECRET
+        process.env.PAYLOAD_SECRET = 'test-secret'
+        mockJwtVerify.mockResolvedValue({
+            payload: { id: 'user-123', collection: 'users', mfa_verified: true }
+        })
+        mockFindByID.mockResolvedValue({ id: 'user-123', email: 'test@example.com' })
+
+        const user = await getCurrentUser()
+        expect(user).toEqual({ id: 'user-123', email: 'test@example.com' })
+        expect(mockFindByID).toHaveBeenCalledWith({ collection: 'users', id: 'user-123' })
+        
+        process.env.PAYLOAD_SECRET = oldSecret // restore
+    })
+
+    it('returns null when custom JWT has invalid claims (mfa_verified = false)', async () => {
+        mockGet.mockReturnValue({ value: 'custom-jwt' })
+        mockAuth.mockResolvedValue({ user: null })
+        const oldSecret = process.env.PAYLOAD_SECRET
+        process.env.PAYLOAD_SECRET = 'test-secret'
+        mockJwtVerify.mockResolvedValue({
+            payload: { id: 'user-123', collection: 'users', mfa_verified: false }
+        })
+
+        const user = await getCurrentUser()
+        expect(user).toBeNull()
+        expect(mockFindByID).not.toHaveBeenCalled()
+        
+        process.env.PAYLOAD_SECRET = oldSecret // restore
+    })
+
+    it('returns null when custom JWT id is invalid format', async () => {
+        mockGet.mockReturnValue({ value: 'custom-jwt' })
+        mockAuth.mockResolvedValue({ user: null })
+        const oldSecret = process.env.PAYLOAD_SECRET
+        process.env.PAYLOAD_SECRET = 'test-secret'
+        mockJwtVerify.mockResolvedValue({
+            payload: { id: 'invalid id format!', collection: 'users', mfa_verified: true }
+        })
+
+        const user = await getCurrentUser()
+        expect(user).toBeNull()
+        expect(mockFindByID).not.toHaveBeenCalled()
+        
+        process.env.PAYLOAD_SECRET = oldSecret // restore
+    })
+
+    it('returns null when jwtVerify throws an error', async () => {
+        mockGet.mockReturnValue({ value: 'custom-jwt' })
+        mockAuth.mockResolvedValue({ user: null })
+        const oldSecret = process.env.PAYLOAD_SECRET
+        process.env.PAYLOAD_SECRET = 'test-secret'
+        mockJwtVerify.mockRejectedValue(new Error('Invalid token signature'))
+
+        const user = await getCurrentUser()
+        expect(user).toBeNull()
+        expect(mockFindByID).not.toHaveBeenCalled()
+        
+        process.env.PAYLOAD_SECRET = oldSecret // restore
     })
 })
 
