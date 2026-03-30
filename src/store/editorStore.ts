@@ -141,7 +141,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const { blocks, theme, history, historyIndex, maxHistory } = get()
         const newBlocks = [...blocks]
         newBlocks[index] = { ...newBlocks[index], ...changes }
-        console.log('[Store updateBlock] index:', index, 'changes:', changes, 'label:', label)
+
 
         const snapshot = createSnapshot(newBlocks, theme, label ?? `Edited ${newBlocks[index].blockType}`, 'inline_edit')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
@@ -261,7 +261,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         if (isAIStreaming || historyIndex <= 0) return
         const newIndex = historyIndex - 1
         const snapshot = history[newIndex]
-        console.log('[Store undo] restoring snapshot at index:', newIndex, snapshot.blocks[0])
+
         set({
             blocks: JSON.parse(JSON.stringify(snapshot.blocks)),
             theme: JSON.parse(JSON.stringify(snapshot.theme)),
@@ -275,7 +275,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         if (isAIStreaming || historyIndex >= history.length - 1) return
         const newIndex = historyIndex + 1
         const snapshot = history[newIndex]
-        console.log('[Store redo] restoring snapshot at index:', newIndex)
+
         set({
             blocks: JSON.parse(JSON.stringify(snapshot.blocks)),
             theme: JSON.parse(JSON.stringify(snapshot.theme)),

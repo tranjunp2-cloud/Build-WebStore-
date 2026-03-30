@@ -51,7 +51,7 @@ export default function EditorPage() {
     const storeTheme = useEditorStore((s) => s.theme)
     const isInitialized = useRef(false)
     useEffect(() => {
-        console.log('[Page] storeHistoryIndex changed to:', storeHistoryIndex, 'storeBlocks[0]:', storeBlocks[0])
+
         if (!isInitialized.current) {
             if (storeHistoryIndex >= 0) isInitialized.current = true
             return // skip initial load
@@ -155,7 +155,7 @@ export default function EditorPage() {
     }, [editorStore])
 
     const handleBlockFieldChange = useCallback((idx: number, field: string, value: string) => {
-        console.log('[Page handleBlockFieldChange]', { idx, field, value })
+
         editorStore.updateBlock(idx, { [field]: value }, `Edited ${field}`)
         setHasUnsavedChanges(true)
     }, [editorStore])

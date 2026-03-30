@@ -194,6 +194,7 @@ describe('EditorStore — F11 Undo/Redo Enhancements', () => {
         const nestedData = { menu: [{ label: 'Home' }, { label: 'Shop', sub: [{ label: 'Shoes' }] }] }
         useEditorStore.getState().updateBlock(0, { nestedField: nestedData })
         
+        // Note: Using "as any" since the store's BlockType definition natively doesn't know about dynamic tested fields like menu
         // Ensure state captured it
         expect((useEditorStore.getState().blocks[0] as any).nestedField.menu[1].sub[0].label).toBe('Shoes')
         
@@ -207,7 +208,7 @@ describe('EditorStore — F11 Undo/Redo Enhancements', () => {
         expect((useEditorStore.getState().blocks[0] as any).nestedField.menu[1].sub[0].label).toBe('Shoes')
         
         // Mutate original arrays intentionally to see if store history is corrupted
-        nestedData.menu[1].sub[0].label = 'Corrupted'
+        nestedData.menu[1].sub![0].label = 'Corrupted'
         
         // State must STILL be Shoes from history
         expect((useEditorStore.getState().blocks[0] as any).nestedField.menu[1].sub[0].label).toBe('Shoes')

@@ -3,7 +3,9 @@ import { setHeroCategory } from '@/app/api/preview/renderers/hero'
 import { setSectionCategory } from '@/app/api/preview/renderers/sections'
 
 export function buildFullHTML(
+    // Using any since block schemas are highly dynamic and unstructured
     blocks: any[],
+    // Theme may contain custom dynamic overrides from the dashboard
     theme?: TemplateTheme | any,
     category?: string,
     meta?: { name?: string; description?: string; lang?: string }
