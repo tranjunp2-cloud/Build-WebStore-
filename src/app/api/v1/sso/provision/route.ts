@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import crypto from 'crypto'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * POST /api/v1/sso/provision
@@ -17,56 +18,9 @@ export async function POST(req: NextRequest) {
         const payload = await getPayload({ config })
 
         // ── 1. Auth Check ──
-        const authHeader = req.headers.get('authorization')
-        if (!authHeader?.startsWith('Bearer ')) {
-            return NextResponse.json(
-                { message: 'Authorization required' },
-                { status: 401 },
-            )
-        }
+        const callerUser = await getCurrentUser(req)
 
-        const token = authHeader.split(' ')[1]
-
-        let callerUser: any
-        try {
-            const authResult = await payload.auth({
-                headers: new Headers({
-                    Authorization: `JWT ${token}`,
-                }),
-            })
-            callerUser = authResult?.user || null
-
-            // Fallback for custom jose-signed JWT (SSO service token)
-            if (!callerUser) {
-                const payloadSecret = process.env.PAYLOAD_SECRET
-                if (payloadSecret) {
-                    const { jwtVerify } = await (import('jose'))
-                    const secret = new TextEncoder().encode(payloadSecret)
-                    try {
-                        const { payload: decoded } = await jwtVerify(token, secret)
-
-                        const isIdValid =
-                            typeof decoded.id === 'number' ||
-                            (typeof decoded.id === 'string' && /^[a-zA-Z0-9-]+$/.test(decoded.id))
-
-                        if (isIdValid && decoded.collection === 'users') {
-                            const user = await payload.findByID({
-                                collection: 'users',
-                                id: decoded.id as string | number,
-                            })
-                            callerUser = user || null
-                        }
-                    } catch (e) {
-                        // jose verification failed
-                    }
-                }
-            }
-
-            if (!callerUser) {
-                return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
-            }
-        } catch (error) {
-            console.error('[SSO Auth Error]', error)
+        if (!callerUser) {
             return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
         }
 
