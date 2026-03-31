@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -68,6 +68,15 @@ function LoginFormContent() {
     const [rememberMe, setRememberMe] = useState(false)
     const { t } = useI18n()
 
+    useEffect(() => {
+        const errorMsg = searchParams.get('error')
+        if (errorMsg === 'serviceAccountUI') {
+            toast.error(t.auth.errors.serviceAccountUI || 'Service accounts cannot access the web UI.')
+        } else if (errorMsg && errorMsg !== 'Service accounts cannot access the UI.') {
+            toast.error(errorMsg)
+        }
+    }, [searchParams, t])
+
     const {
         register,
         handleSubmit,
@@ -116,6 +125,13 @@ function LoginFormContent() {
     }
 
     const onSubmit = async (data: LoginForm) => {
+        if (data.email.trim().toLowerCase() === 'sso-service@primeweb.app') {
+            const message = (t.auth.errors as any).serviceAccountUI || 'Service accounts cannot access the web UI.'
+            setFormError('root', { message })
+            toast.error(message)
+            return
+        }
+
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 45000)
 
@@ -145,7 +161,16 @@ function LoginFormContent() {
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => null)
-                const message = errorData?.errors?.[0]?.message || t.auth.errors.incorrect
+                let message = errorData?.errors?.[0]?.message || t.auth.errors.incorrect
+
+                // Map known Payload CMS backend English errors to i18n
+                if (message === 'Email and password are required' || message === 'Missing credentials') {
+                    message = (t.auth.errors as any).missingCredentials || message
+                } else if (message.includes('locked due to having too many failed login attempts')) {
+                    message = (t.auth.errors as any).accountLocked || message
+                } else if (message === 'Email or password incorrect' || message === 'Login failed') {
+                    message = t.auth.errors.incorrect
+                }
 
                 setFormError('root', { message })
                 resetField('password')
@@ -292,7 +317,7 @@ function LoginFormContent() {
                 </div>
 
                 {/* ─── Remember me / Forgot password row ─── */}
-                <div className="flex items-center justify-between" style={{ marginTop: 16 }}>
+                <div className="flex flex-wrap items-center justify-between gap-2" style={{ marginTop: 16 }}>
                     <label className="flex items-center gap-2 cursor-pointer select-none" style={{ background: 'transparent' }}>
                         <input
                             type="checkbox"

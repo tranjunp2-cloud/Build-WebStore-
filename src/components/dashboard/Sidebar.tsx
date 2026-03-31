@@ -23,7 +23,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
     LayoutDashboard,
     Globe,
@@ -113,6 +113,7 @@ type SidebarProps = {
 
 export function DashboardSidebar({ userName, userInitial, mobileOpen, setMobileOpen }: SidebarProps) {
     const pathname = usePathname()
+    const router = useRouter()
     const { locale, toggleLocale } = useI18n()
     const [expandedGroups, setExpandedGroups] = useState<string[]>(() => {
         const expanded: string[] = []
@@ -314,12 +315,13 @@ export function DashboardSidebar({ userName, userInitial, mobileOpen, setMobileO
                 <button
                     onClick={async () => {
                         try {
-                            await fetch('/api/users/logout', {
+                            await fetch('/api/auth/logout', {
                                 method: 'POST',
-                                credentials: 'include',
                             })
-                        } catch {
-                            // Ignore
+                            router.push('/login')
+                            router.refresh()
+                        } catch (error) {
+                            console.error('Logout failed:', error)
                         }
                         document.cookie =
                             'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'

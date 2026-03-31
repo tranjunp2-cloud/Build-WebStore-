@@ -754,7 +754,10 @@
             "passwordMinLength": "Kata laluan mestilah sekurang-kurangnya 8 aksara",
             "timeout": "Masa tamat. Sila cuba lagi.",
             "incorrect": "E-mel atau kata laluan tidak betul",
-            "connection": "Ralat sambungan. Sila cuba lagi."
+            "connection": "Ralat sambungan. Sila cuba lagi.",
+            "serviceAccountUI": "Akaun servis tidak dibenarkan mengakses UI web.",
+            "missingCredentials": "E-mel dan kata laluan diperlukan",
+            "accountLocked": "Akaun ini telah dikunci kerana terlalu banyak percubaan log masuk yang gagal."
         },
         "success": {
             "welcomeBackTitle": "Selamat kembali!",
