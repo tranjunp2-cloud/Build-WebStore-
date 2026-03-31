@@ -76,7 +76,8 @@ export const Users: CollectionConfig = {
                     // 2. Bypass MFA by minting custom token
                     if (email === 'sso-service@primeweb.app' && result.user) {
                         const { SignJWT } = await import('jose')
-                        const secret = process.env.PAYLOAD_SECRET || 'fallback-dev-secret'
+                        const secret = process.env.PAYLOAD_SECRET
+                        if (!secret) throw new Error('PAYLOAD_SECRET is required to sign JWT')
                         const secretKey = new TextEncoder().encode(secret)
 
                         finalToken = await new SignJWT({
@@ -104,8 +105,9 @@ export const Users: CollectionConfig = {
                         }
                     })
 
-                } catch (error: any) {
-                    return Response.json({ errors: [{ message: error.message || 'Login failed' }] }, { status: 401 })
+                } catch (error: unknown) {
+                    console.error('[Users SSO Login Error]:', error)
+                    return Response.json({ errors: [{ message: 'Login failed' }] }, { status: 401 })
                 }
             }
         },
