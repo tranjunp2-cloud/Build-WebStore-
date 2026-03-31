@@ -649,7 +649,10 @@
             "passwordMinLength": "Password must be at least 8 characters",
             "timeout": "Request timed out. Please try again.",
             "incorrect": "Incorrect email or password",
-            "connection": "Connection error. Please try again."
+            "connection": "Connection error. Please try again.",
+            "serviceAccountUI": "Service accounts cannot access the web UI.",
+            "missingCredentials": "Email and password are required",
+            "accountLocked": "This user is locked due to having too many failed login attempts."
         },
         "success": {
             "welcomeBackTitle": "Welcome back!",
