@@ -136,10 +136,9 @@ describe('AIDiscoveryWizard', () => {
 
         // Assert: It should trigger API
         await waitFor(() => {
-            expect(global.fetch).toHaveBeenCalledWith('/api/users/u-123', expect.objectContaining({
-                method: 'PATCH',
-                body: JSON.stringify({ has_seen_ai_wizard: true }),
-                headers: { 'Content-Type': 'application/json' }
+            expect(global.fetch).toHaveBeenCalledWith('/api/user/dismiss-wizard', expect.objectContaining({
+                method: 'POST',
+                credentials: 'include'
             }))
         })
         

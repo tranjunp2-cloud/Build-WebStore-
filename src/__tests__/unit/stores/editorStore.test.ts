@@ -22,6 +22,7 @@ describe('EditorStore', () => {
             expect(state.theme.primaryColor).toBe('#0d9488')
             expect(state.siteName).toBe('Test Site')
             expect(state.history).toHaveLength(1)
+            expect(state.autoSaveIntervalMs).toBe(3000)
         })
     })
 

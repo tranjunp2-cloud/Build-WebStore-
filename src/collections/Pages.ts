@@ -188,6 +188,61 @@ const FooterBlock = {
     ],
 }
 
+const SocialWidgetBlock = {
+    slug: 'socialWidget',
+    labels: { singular: 'Social Widget', plural: 'Social Widgets' },
+    fields: [
+        {
+            name: 'variant',
+            type: 'select',
+            defaultValue: 'floating',
+            options: [
+                { label: 'Floating', value: 'floating' },
+                { label: 'Inline', value: 'inline' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        {
+            name: 'links',
+            type: 'array',
+            fields: [
+                {
+                    name: 'platform',
+                    type: 'select',
+                    required: true,
+                    options: [
+                        { label: 'Facebook', value: 'facebook' },
+                        { label: 'WhatsApp', value: 'whatsapp' },
+                        { label: 'Instagram', value: 'instagram' },
+                        { label: 'LinkedIn', value: 'linkedin' },
+                        { label: 'YouTube', value: 'youtube' },
+                    ],
+                },
+                { name: 'url', type: 'text' },
+                { name: 'enabled', type: 'checkbox', defaultValue: true },
+            ],
+        },
+    ],
+}
+
+const CartWidgetBlock = {
+    slug: 'cartWidget',
+    labels: { singular: 'Cart Widget', plural: 'Cart Widgets' },
+    fields: [
+        {
+            name: 'variant',
+            type: 'select',
+            defaultValue: 'floating',
+            options: [
+                { label: 'Floating', value: 'floating' },
+                { label: 'Inline', value: 'inline' },
+            ],
+        },
+        { name: 'label', type: 'text', defaultValue: 'Cart' },
+        { name: 'showLabel', type: 'checkbox', defaultValue: false },
+    ],
+}
+
 const FeaturesBlock = {
     slug: 'features',
     labels: { singular: 'Features Section', plural: 'Features Sections' },
@@ -287,7 +342,7 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
         // Collect text content for context (very basic extraction)
         let textContext = ''
         if (Array.isArray(doc.layout)) {
-            const texts = doc.layout.map((block: any) => block.headline || block.sectionLabel || '').filter(Boolean)
+            const texts = doc.layout.map((block: Record<string, unknown>) => block.headline || block.sectionLabel || '').filter(Boolean)
             textContext = texts.join('. ')
         }
         
@@ -441,6 +496,8 @@ export const Pages: CollectionConfig = {
                 PricingBlock,
                 FAQBlock,
                 TeamBlock,
+                SocialWidgetBlock,
+                CartWidgetBlock,
             ] as Block[],
         },
         {
@@ -456,6 +513,22 @@ export const Pages: CollectionConfig = {
         {
             name: 'publishedAt',
             type: 'date',
+        },
+        {
+            name: 'isVisible',
+            type: 'checkbox',
+            defaultValue: true,
+            admin: {
+                description: 'Show this page on live site and in navigation.',
+            },
+        },
+        {
+            name: 'deletedAt',
+            type: 'date',
+            admin: {
+                position: 'sidebar',
+                description: 'Soft delete timestamp. If set, the page is considered deleted.',
+            },
         },
     ],
     timestamps: true,

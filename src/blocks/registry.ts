@@ -22,6 +22,8 @@ import { BlogListBlock } from './blog-list'
 import { ProductsGridBlock } from './products-grid'
 import { ProductsFeaturedBlock } from './products-featured'
 import { CustomHtmlBlock } from './custom-html'
+import { SocialWidgetBlock } from './social-widget'
+import { CartWidgetBlock } from './cart-widget'
 
 // ── Block Configs (Schemas + Meta) ───────────────────────────────────────────
 import { NavigationConfigSchema, navigationMeta } from './navigation/config'
@@ -44,10 +46,13 @@ import { BlogListConfigSchema, blogListMeta } from './blog-list/config'
 import { ProductsGridConfigSchema, productsGridMeta } from './products-grid/config'
 import { ProductsFeaturedConfigSchema, productsFeaturedMeta } from './products-featured/config'
 import { CustomHtmlConfigSchema, customHtmlMeta } from './custom-html/config'
+import { SocialWidgetConfigSchema, socialWidgetMeta } from './social-widget/config'
+import { CartWidgetConfigSchema, cartWidgetMeta } from './cart-widget/config'
 
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 type BlockRegistryEntry = {
+    // Required 'any' because block components have highly varied generic prop signatures
     component: React.ComponentType<any>
     schema: ZodSchema
     meta: BlockMeta
@@ -74,12 +79,15 @@ const REGISTRY: Record<string, BlockRegistryEntry> = {
     'products-grid': { component: ProductsGridBlock, schema: ProductsGridConfigSchema, meta: productsGridMeta },
     'products-featured': { component: ProductsFeaturedBlock, schema: ProductsFeaturedConfigSchema, meta: productsFeaturedMeta },
     'custom-html': { component: CustomHtmlBlock, schema: CustomHtmlConfigSchema, meta: customHtmlMeta },
+    socialWidget: { component: SocialWidgetBlock, schema: SocialWidgetConfigSchema, meta: socialWidgetMeta },
+    cartWidget: { component: CartWidgetBlock, schema: CartWidgetConfigSchema, meta: cartWidgetMeta },
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
 export const blockRegistry = {
     /** Get the React component for a block type */
+    // Required 'any' because block components have highly varied generic prop signatures
     getComponent(blockType: string): React.ComponentType<any> | null {
         return REGISTRY[blockType]?.component ?? null
     },

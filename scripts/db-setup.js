@@ -176,6 +176,22 @@ const MIGRATIONS = [
     name: 'sites.shipping_config_free_above',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_free_above numeric;`,
   },
+  {
+    name: 'sites.header_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS header_block jsonb;`,
+  },
+  {
+    name: 'sites.footer_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS footer_block jsonb;`,
+  },
+  // ── Sites: Branding + Contact Info ──
+  { name: 'sites.branding', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding varchar;' },
+  { name: 'sites.contact_info', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info varchar;' },
+  { name: 'sites.branding_logo', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding_logo varchar;' },
+  { name: 'sites.branding_favicon', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding_favicon varchar;' },
+  { name: 'sites.contact_info_phone', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_phone varchar;' },
+  { name: 'sites.contact_info_email', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_email varchar;' },
+  { name: 'sites.contact_info_address', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_address varchar;' },
   // ── Products: Halal + Weight ──
   {
     name: 'products.halal_certified',
@@ -793,6 +809,56 @@ const MIGRATIONS = [
       name varchar, role varchar, bio varchar, image_id integer
     );`,
   },
+  // ── Pages: Fields required for Soft Delete & Visibility ──
+  {
+    name: 'pages.is_visible',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS is_visible boolean DEFAULT true;`,
+  },
+  {
+    name: 'pages.deleted_at',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS deleted_at timestamptz;`,
+  },
+  // ── Pages: Social Widget Block ──
+  {
+    name: 'pages_blocks_socialWidget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_socialWidget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _path varchar NOT NULL DEFAULT 'layout',
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      block_name varchar,
+      variant varchar,
+      headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_socialWidget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_socialWidget_links" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      platform varchar,
+      url varchar,
+      enabled boolean DEFAULT true
+    );`,
+  },
+  // ── Pages: Cart Widget Block ──
+  {
+    name: 'pages_blocks_cartWidget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_cartWidget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _path varchar NOT NULL DEFAULT 'layout',
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      block_name varchar,
+      variant varchar,
+      label varchar,
+      show_label boolean
+    );`,
+  },
   // ── Pages Versions: _pages_v_blocks_* tables ──
   // Required for Payload draft/versioning (editor loads _pages_v not pages).
   // Types match Payload's Drizzle ORM output:
@@ -914,6 +980,24 @@ const MIGRATIONS = [
       headline varchar
     );`,
   },
+  {
+    name: '_pages_v_blocks_socialWidget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_socialWidget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_cartWidget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_cartWidget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, label varchar, show_label boolean
+    );`,
+  },
   // _pages_v sub-tables (nested arrays inside version blocks)
   // _parent_id integer references the parent block's serial id
   {
@@ -923,6 +1007,15 @@ const MIGRATIONS = [
       _order integer NOT NULL, _parent_id integer NOT NULL,
       _uuid varchar,
       label varchar, url varchar, open_in_new_tab boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_socialWidget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_socialWidget_links" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      platform varchar, url varchar, enabled boolean DEFAULT true
     );`,
   },
   {
@@ -1452,6 +1545,13 @@ async function main() {
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS current_rank
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS previous_rank
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS last_checked_at
+
+  -- F05 Sites Group Bypass
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS logo
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS favicon
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS phone
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS email
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS address
 
   -- F08 Array/Nested Bypass
   ALTER TABLE products ADD COLUMN IF NOT EXISTS description_b_m

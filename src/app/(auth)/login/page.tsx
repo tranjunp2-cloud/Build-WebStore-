@@ -70,10 +70,20 @@ function LoginFormContent() {
 
     useEffect(() => {
         const errorMsg = searchParams.get('error')
+        if (!errorMsg) return
+
+        const authErrors = t.auth.errors as Record<string, string | undefined>
+
         if (errorMsg === 'serviceAccountUI') {
-            toast.error(t.auth.errors.serviceAccountUI || 'Service accounts cannot access the web UI.')
-        } else if (errorMsg && errorMsg !== 'Service accounts cannot access the UI.') {
-            toast.error(errorMsg)
+            toast.error(authErrors.serviceAccountUI || 'Service accounts cannot access the web UI.')
+        } else if (errorMsg === 'accountLocked') {
+            toast.error(authErrors.accountLocked || 'Account is locked.')
+        } else if (errorMsg === 'missingCredentials') {
+            toast.error(authErrors.missingCredentials || 'Missing credentials.')
+        } else if (errorMsg === 'sessionExpired') {
+            toast.error(authErrors.sessionExpired || 'Your session has expired. Please log in again.')
+        } else {
+            toast.error(t.auth.errors.connection || 'An error occurred.')
         }
     }, [searchParams, t])
 
@@ -126,7 +136,8 @@ function LoginFormContent() {
 
     const onSubmit = async (data: LoginForm) => {
         if (data.email.trim().toLowerCase() === 'sso-service@primeweb.app') {
-            const message = (t.auth.errors as any).serviceAccountUI || 'Service accounts cannot access the web UI.'
+            const authErrors = t.auth.errors as Record<string, string | undefined>
+            const message = authErrors.serviceAccountUI || 'Service accounts cannot access the web UI.'
             setFormError('root', { message })
             toast.error(message)
             return
@@ -164,10 +175,12 @@ function LoginFormContent() {
                 let message = errorData?.errors?.[0]?.message || t.auth.errors.incorrect
 
                 // Map known Payload CMS backend English errors to i18n
+                const authErrors = t.auth.errors as Record<string, string | undefined>
+                
                 if (message === 'Email and password are required' || message === 'Missing credentials') {
-                    message = (t.auth.errors as any).missingCredentials || message
+                    message = authErrors.missingCredentials || message
                 } else if (message.includes('locked due to having too many failed login attempts')) {
-                    message = (t.auth.errors as any).accountLocked || message
+                    message = authErrors.accountLocked || message
                 } else if (message === 'Email or password incorrect' || message === 'Login failed') {
                     message = t.auth.errors.incorrect
                 }
