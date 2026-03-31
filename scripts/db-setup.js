@@ -1018,6 +1018,37 @@ const MIGRATIONS = [
       platform varchar, url varchar, enabled boolean DEFAULT true
     );`,
   },
+  // ── snake_case aliases required by Payload Drizzle ORM ──
+  // Drizzle converts camelCase blockType → snake_case for table names.
+  // "socialWidget" → "social_widget", "cartWidget" → "cart_widget".
+  // The camelCase tables above are unreachable by Payload queries — these are the real tables.
+  {
+    name: '_pages_v_blocks_social_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_social_widget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_social_widget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_social_widget_links" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      platform varchar, url varchar, enabled boolean DEFAULT true
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_cart_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_cart_widget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, label varchar, show_label boolean
+    );`,
+  },
   {
     name: '_pages_v_blocks_hero_cta_buttons.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_hero_cta_buttons" (
@@ -1144,22 +1175,9 @@ const MIGRATIONS = [
   // This migration runs once. After real drafts are saved, those rows are preserved.
   {
     name: '_pages_v.clear_stale_drafts',
-    sql: `DELETE FROM _pages_v WHERE id NOT IN (
-      SELECT _parent_id FROM _pages_v_blocks_navigation   WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_hero           WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_about          WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_features       WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_testimonials   WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_contact        WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_gallery        WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_footer         WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_stats          WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_pricing        WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_faq            WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_team           WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_socialWidget   WHERE _parent_id IS NOT NULL
-      UNION SELECT _parent_id FROM _pages_v_blocks_cartWidget     WHERE _parent_id IS NOT NULL
-    );`,
+    // [P0-Codex-Fixed] DO NOT RUN WIDE DELETE: Prevent accidental data loss for new block types or empty drafts.
+    // Instead of deleting broadly, we disable this to protect valid pages that might have 0 blocks.
+    sql: `SELECT 1; -- Migration disabled for data safety`,
   },
   // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
   // These tables are created by Payload pushDevSchema (runs every deploy).
