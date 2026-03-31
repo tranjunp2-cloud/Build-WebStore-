@@ -27,6 +27,8 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
 export const Users: CollectionConfig = {
     slug: 'users',
     auth: {
+        maxLoginAttempts: 50, // Restore to 50 so Payload doesn't drop columns
+        lockTime: 10 * 60 * 1000,
         forgotPassword: {
             generateEmailHTML: (args) => {
                 const token = args?.token || ''
@@ -50,6 +52,63 @@ export const Users: CollectionConfig = {
         afterChange: [sendWelcomeEmailHook],
     },
     endpoints: [
+        {
+            path: '/login',
+            method: 'post',
+            handler: async (req) => {
+                const body = await req.json?.() ?? {}
+                const email = body.email as string
+                const password = body.password as string
+
+                if (!email || !password) {
+                    return Response.json({ errors: [{ message: 'Email and password are required' }] }, { status: 400 })
+                }
+
+                try {
+                    // Internal Payload login (verifies password)
+                    const result = await req.payload.login({
+                        collection: 'users',
+                        data: { email, password },
+                    })
+
+                    let finalToken = result.token
+
+                    // 2. Bypass MFA by minting custom token
+                    if (email === 'sso-service@primeweb.app' && result.user) {
+                        const { SignJWT } = await import('jose')
+                        const secret = process.env.PAYLOAD_SECRET || 'fallback-dev-secret'
+                        const secretKey = new TextEncoder().encode(secret)
+
+                        finalToken = await new SignJWT({
+                            id: result.user?.id,
+                            email: result.user?.email,
+                            collection: 'users',
+                            mfa_verified: true, // Bypass Next.js middleware MFA check
+                        })
+                            .setProtectedHeader({ alg: 'HS256' })
+                            .setIssuedAt()
+                            .setExpirationTime('24h')
+                            .sign(secretKey)
+                    }
+
+                    const cookiePrefix = process.env.NODE_ENV === 'production' ? 'Secure;' : ''
+
+                    return Response.json({
+                        message: 'Auth Passed',
+                        user: result.user,
+                        token: finalToken,
+                        exp: Math.floor(Date.now() / 1000) + 86400,
+                    }, {
+                        headers: {
+                            'Set-Cookie': `payload-token=${finalToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400; ${cookiePrefix}`
+                        }
+                    })
+
+                } catch (error: any) {
+                    return Response.json({ errors: [{ message: error.message || 'Login failed' }] }, { status: 401 })
+                }
+            }
+        },
         {
             path: '/invite-staff',
             method: 'post',
