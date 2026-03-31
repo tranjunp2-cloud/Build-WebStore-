@@ -8,7 +8,7 @@ import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
-import { checkRateLimit } from '@/lib/rateLimit'
+import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -86,12 +86,21 @@ export async function POST(req: NextRequest) {
 
         const payload = await getPayload({ config })
 
-        // Rate Limit: 20 AI tasks per hour
-        const rateLimit = checkRateLimit(String(user.id), 20)
+        // Rate Limit: 5 requests/min (burst) + 20 requests/hour (sustained)
+        const rateLimit = checkTwoTierRateLimit(String(user.id), 5, 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
-                { error: 'Rate limit exceeded. Try again later.' },
-                { status: 429 }
+                {
+                    error: 'Rate limit exceeded. Please wait before trying again.',
+                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+                        'X-RateLimit-Remaining': '0',
+                    },
+                }
             )
         }
 

@@ -1208,7 +1208,7 @@ const MIGRATIONS = [
   },
   {
     name: 'users.has_seen_ai_wizard.backfill_legacy',
-    sql: `UPDATE users SET has_seen_ai_wizard = true WHERE id IN (SELECT _parent_id::varchar FROM users_tenants WHERE _parent_id IS NOT NULL);`,
+    sql: `UPDATE users SET has_seen_ai_wizard = true WHERE id IN (SELECT _parent_id FROM users_tenants WHERE _parent_id IS NOT NULL);`,
   },
   // ── Payload locked documents rels: FK columns for new collections ──
   {

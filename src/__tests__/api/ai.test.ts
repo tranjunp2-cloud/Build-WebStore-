@@ -31,8 +31,14 @@ let mockRateLimitAllowed = true
 vi.mock('@/lib/rateLimit', () => ({
     checkRateLimit: vi.fn().mockImplementation(() => ({
         allowed: mockRateLimitAllowed,
-        remaining: 10
-    }))
+        remaining: 10,
+        resetAt: Date.now() + 60000,
+    })),
+    checkTwoTierRateLimit: vi.fn().mockImplementation(() => ({
+        allowed: mockRateLimitAllowed,
+        remaining: 10,
+        resetAt: Date.now() + 60000,
+    })),
 }))
 
 // Mock Database (PayloadCMS)

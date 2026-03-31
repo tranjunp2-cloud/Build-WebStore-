@@ -11,9 +11,9 @@ const CLEANUP_INTERVAL = 3600000 // 1 hour
 if (typeof setInterval !== 'undefined') {
     setInterval(() => {
         const now = Date.now()
-        for (const [userId, entry] of rateLimitMap.entries()) {
+        for (const [key, entry] of rateLimitMap.entries()) {
             if (now > entry.resetAt) {
-                rateLimitMap.delete(userId)
+                rateLimitMap.delete(key)
             }
         }
     }, CLEANUP_INTERVAL)
@@ -27,28 +27,27 @@ export interface RateLimitResult {
 
 /**
  * Checks if a user has exceeded the rate limit.
- * 
- * @param userId Unique identifier for the user (usually user.id)
- * @param limit Maximum number of requests allowed in the window (default: 10)
+ *
+ * @param key    Unique key (userId, IP, or composite key like `${userId}:minute`)
+ * @param limit  Maximum number of requests allowed in the window (default: 20)
  * @param windowMs Time window in milliseconds (default: 1 hour)
  * @returns RateLimitResult
  */
 export function checkRateLimit(
-    userId: string,
+    key: string,
     limit: number = 20,
     windowMs: number = 3600000 // 1 hour
 ): RateLimitResult {
     const now = Date.now()
-    const entry = rateLimitMap.get(userId)
+    const entry = rateLimitMap.get(key)
 
-    // Clear expired entries periodically or on check
     if (!entry || now > entry.resetAt) {
         const newEntry = { count: 1, resetAt: now + windowMs }
-        rateLimitMap.set(userId, newEntry)
+        rateLimitMap.set(key, newEntry)
         return {
             allowed: true,
             remaining: limit - 1,
-            resetAt: newEntry.resetAt
+            resetAt: newEntry.resetAt,
         }
     }
 
@@ -56,7 +55,7 @@ export function checkRateLimit(
         return {
             allowed: false,
             remaining: 0,
-            resetAt: entry.resetAt
+            resetAt: entry.resetAt,
         }
     }
 
@@ -64,7 +63,40 @@ export function checkRateLimit(
     return {
         allowed: true,
         remaining: limit - entry.count,
-        resetAt: entry.resetAt
+        resetAt: entry.resetAt,
+    }
+}
+
+/**
+ * Two-tier rate limit check: burst (per minute) + sustained (per hour).
+ * Returns the first failing tier, or allowed if both pass.
+ *
+ * @param userId         Unique user ID
+ * @param burstLimit     Max requests per minute (default: 5)
+ * @param sustainedLimit Max requests per hour (default: 20)
+ */
+export function checkTwoTierRateLimit(
+    userId: string,
+    burstLimit: number = 5,
+    sustainedLimit: number = 20
+): RateLimitResult {
+    // Check per-minute burst limit first
+    const minuteResult = checkRateLimit(`${userId}:minute`, burstLimit, 60_000)
+    if (!minuteResult.allowed) {
+        return minuteResult
+    }
+
+    // Then check per-hour sustained limit
+    const hourResult = checkRateLimit(`${userId}:hour`, sustainedLimit, 3_600_000)
+    if (!hourResult.allowed) {
+        return hourResult
+    }
+
+    // Return the more restrictive remaining count
+    return {
+        allowed: true,
+        remaining: Math.min(minuteResult.remaining, hourResult.remaining),
+        resetAt: minuteResult.resetAt, // burst resets sooner — more relevant to user
     }
 }
 
