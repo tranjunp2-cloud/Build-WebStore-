@@ -72,32 +72,57 @@ function main() {
       const diff = execSync(`git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" || true`, { encoding: 'utf8' }).trim()
       if (!diff) continue
       
-      const newFields = [...diff.matchAll(/name:\s*['"](\w+)['"]/g)].map(m => m[1])
-      const hasArray = diff.includes(`type: 'array'`) || diff.includes('type: "array"')
-      const hasGroup = diff.includes(`type: 'group'`) || diff.includes('type: "group"')
+      const lines = diff.split('\n')
+      const newFields = []
+      let lastMatch = null
+      
+      for (const line of lines) {
+         const nameMatch = /name:\s*['"](\w+)['"]/.exec(line)
+         if (nameMatch) {
+             lastMatch = { name: nameMatch[1], type: 'unknown', isArray: false, isGroup: false }
+             newFields.push(lastMatch)
+         }
+         const typeMatch = /type:\s*['"](\w+)['"]/.exec(line)
+         if (typeMatch && lastMatch) {
+             lastMatch.type = typeMatch[1]
+             lastMatch.isArray = typeMatch[1] === 'array'
+             lastMatch.isGroup = typeMatch[1] === 'group'
+         }
+      }
 
-      for (const field of newFields) {
+      for (const fieldObj of newFields) {
+        const { name: field, isArray: hasArray, isGroup: hasGroup } = fieldObj
         const snakeField = toSnakeCase(field)
 
         if (hasArray) {
            const arrayTableName = `${tableName}_${snakeField}`
-           if (!createTables.has(arrayTableName)) {
-              console.error(`❌ ERROR: Missing CREATE TABLE IF NOT EXISTS "${arrayTableName}" for array field '${field}' inside ${file}`)
+           // Allow nested block tables (e.g. pages_blocks_social_widget_links)
+           const hasArrayTable = Array.from(createTables).some(t => t === arrayTableName || t.endsWith(`_${snakeField}`))
+           if (!hasArrayTable) {
+              console.error(`❌ ERROR: Missing CREATE TABLE IF NOT EXISTS "${arrayTableName}" (or similar) for array field '${field}' inside ${file}`)
               hasErrors = true
            }
         }
         
         if (hasGroup) {
-           // Cannot easily guess group subfields through diff, ensure at least one ALTER is present
-           const groupRegex = new RegExp(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${snakeField}_`, 'i')
-           if (!groupRegex.test(setupContent)) {
+           const hasGroupTable = Array.from(alterColumns).some(col => col.includes(`${snakeField}_`))
+           if (!hasGroupTable) {
               console.warn(`⚠️  WARNING: Check group field '${field}'. Requires ALTER TABLE ADD COLUMN ... ${snakeField}_{subfield}`)
            }
         }
         
         // Basic check for simple fields
-        if (!alterColumns.has(`${tableName}.${snakeField}`) && !hasArray && !hasGroup && !createTables.has(tableName)) {
-          console.warn(`⚠️  WARNING: Possible missing ALTER TABLE for field '${field}' (${tableName}.${snakeField})`)
+        if (!hasArray && !hasGroup) {
+           // Allow nested columns e.g. pages_layout.social_widget_variant
+           const hasAlter = Array.from(alterColumns).some(col => 
+               col === `${tableName}.${snakeField}` || 
+               col.endsWith(`.${snakeField}`) || 
+               col.endsWith(`_${snakeField}`)
+           )
+           
+           if (!hasAlter && !createTables.has(tableName)) {
+              console.warn(`⚠️  WARNING: Possible missing ALTER TABLE for field '${field}' (${tableName}.${snakeField} or nested)`)
+           }
         }
       }
       
