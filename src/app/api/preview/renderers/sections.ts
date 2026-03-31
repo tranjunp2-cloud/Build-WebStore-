@@ -374,7 +374,7 @@ function renderContact(b: RenderBlock, t: TemplateTheme, site?: SiteSocialLinks)
         ${(mergedBlock.formFields || []).map((f: FormField) => `
           <div style="margin-bottom:16px;">
             <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">${f.label}</label>
-            ${(f as any).fieldType === 'textarea'
+            ${f.fieldType === 'textarea'
         ? `<textarea placeholder="${f.placeholder || ''}" style="width:100%;padding:12px;border:1px solid ${t.text}12;border-radius:10px;background:transparent;color:${t.text};font-size:14px;resize:vertical;min-height:80px;font-family:inherit;"></textarea>`
         : `<input type="${f.fieldType || 'text'}" placeholder="${f.placeholder || ''}" style="width:100%;padding:12px;border:1px solid ${t.text}12;border-radius:10px;background:transparent;color:${t.text};font-size:14px;" />`
       }
