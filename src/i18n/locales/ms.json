@@ -812,6 +812,83 @@
             "needHelpTitle": "📞 Perlukan lebih bantuan?",
             "needHelpDesc": "Jika anda tidak menjumpai jawapan, hubungi pasukan sokongan kami melalui WhatsApp atau e-mel "
         },
+        "modules": {
+            "lazyScreenshot": {
+                "screenshot": "Tangkapan skrin: {title}",
+                "clickToZoom": "🔍 Klik untuk zum"
+            },
+            "tab": {
+                "escToClose": "ESC untuk tutup · Cubit untuk zum di mudah alih",
+                "fullResolution": "Tangkapan skrin resolusi penuh"
+            },
+            "data": {
+                "products": {
+                    "label": "Produk",
+                    "steps": [
+                        {
+                            "title": "Akses Menu Produk",
+                            "desc": "Dari Bar Sisi kiri, klik pada <strong>\"📦 Produk\"</strong> untuk membuka senarai produk semasa anda.",
+                            "imgTitle": "Paparan Senarai Produk"
+                        },
+                        {
+                            "title": "Cipta Produk Baru",
+                            "desc": "Klik butang <strong>[+ Tambah Produk]</strong> di bahagian atas kanan. Isi borang:<ul class=\"text-[#9CA3AF] mb-4 mt-1 ml-5 text-[14px] leading-[24px] list-disc marker:text-[#9CA3AF]\"><li>Nama produk, harga RM, penerangan terperinci</li><li>Muat naik imej produk (WebP dicadangkan, ≤ 5MB/imej)</li><li>Aktifkan Lencana Halal jika produk mempunyai pensijilan JAKIM</li><li>Tetapkan inventori dan berat penghantaran</li></ul>",
+                            "imgTitle": "Borang Cipta Produk"
+                        },
+                        {
+                            "title": "Urus Imej Produk",
+                            "desc": "Seret dan lepas atau klik <strong>Semak Imbas Fail</strong> untuk memuat naik pelbagai imej. Seret dan lepas untuk susun semula. Imej pertama akan menjadi imej utama di Storefront.",
+                            "imgTitle": "Pengurus Galeri Imej"
+                        }
+                    ]
+                },
+                "orders": {
+                    "label": "Pesanan",
+                    "steps": [
+                        {
+                            "title": "Lihat Senarai Pesanan",
+                            "desc": "Pergi ke <strong>\"🛒 Pesanan\"</strong> untuk melihat semua pesanan. Gunakan penapis Status untuk mencari pesanan yang perlu diproses.",
+                            "imgTitle": "Senarai Pesanan"
+                        },
+                        {
+                            "title": "Proses Pesanan",
+                            "desc": "Klik pada pesanan untuk lihat butiran. Kemas kini status: <strong>Disahkan → Dihantar → Diterima</strong>. Masukkan kod penjejakan J&T/Pos Laju.",
+                            "imgTitle": "Butiran Pesanan"
+                        }
+                    ]
+                },
+                "dashboard": {
+                    "label": "Papan Pemuka",
+                    "steps": [
+                        {
+                            "title": "Gambaran Keseluruhan Papan Pemuka",
+                            "desc": "Papan pemuka memaparkan metrik utama: jumlah hasil, bilangan pesanan, pelawat, dan Tindakan Pantas.",
+                            "imgTitle": "Gambaran Keseluruhan"
+                        }
+                    ]
+                },
+                "blog": {
+                    "label": "Blog",
+                    "steps": [
+                        {
+                            "title": "Cipta Artikel Blog Baru",
+                            "desc": "Pergi ke <strong>\"📝 Blog\"</strong> → klik <strong>[+ Artikel Baru]</strong>. Tulis kandungan menggunakan Editor Teks Kaya, tambah imej, dan tetapkan meta SEO.",
+                            "imgTitle": "Editor Blog"
+                        }
+                    ]
+                },
+                "settings": {
+                    "label": "Tetapan",
+                    "steps": [
+                        {
+                            "title": "Konfigurasi Domain",
+                            "desc": "Pergi ke <strong>\"⚙️ Tetapan → Domain\"</strong>. Tambah domain khas, konfigurasi DNS (A Record, CNAME), dan sahkan sambungan.",
+                            "imgTitle": "Tetapan Domain"
+                        }
+                    ]
+                }
+            }
+        },
         "qna": {
             "searchPlaceholder": "Cari soalan...",
             "emptyTitle": "Tiada jawapan dijumpai",
