@@ -191,7 +191,7 @@ describe('[TC-F20.02] Auth Guard — /help protected route (unit boundary)', () 
         vi.clearAllMocks()
     })
 
-    it('Guideline page component does NOT render content for unauthenticated — pre-render guard assertion', () => {
+    it('Guideline page component renders successfully when mounted on client', () => {
         // The auth guard is handled by Next.js middleware / DashboardLayout,
         // NOT inside the page component itself. This test verifies the
         // component tree is structured correctly (children are rendered
@@ -226,6 +226,6 @@ describe('[TC-F20.02] Auth Guard — /help protected route (unit boundary)', () 
 
         // Check that 6 skeleton items exist
         const gridItems = document.querySelectorAll('.animate-pulse .rounded-xl')
-        expect(gridItems.length).toBeGreaterThan(0)
+        expect(gridItems.length).toBe(6)
     })
 })

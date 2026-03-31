@@ -63,9 +63,9 @@ export default function GuidelinePage() {
             className="grid gap-[16px]"
             style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}
           >
-            {features.map((item, idx) => (
+            {features.map((item) => (
               <div
-                key={idx}
+                key={item.title}
                 className={[
                   'flex flex-row items-start gap-[12px] p-[16px]',
                   'bg-[#1F2937] border border-[#1F2937] rounded-[8px]',
