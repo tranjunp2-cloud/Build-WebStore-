@@ -38,7 +38,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                         {/* Social icons placeholder */}
                         {mergedBlock.socials && Array.isArray(mergedBlock.socials) && mergedBlock.socials.length > 0 && (
                             <div className="flex gap-3 mt-6">
-                                {mergedBlock.socials.map((social: any, i: number) => (
+                                {mergedBlock.socials.map((social: { url?: string; platform?: string; label?: string }, i: number) => (
                                     <a
                                         key={i}
                                         href={social.url || '#'}

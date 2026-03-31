@@ -154,7 +154,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             }
 
             // Step 2: Create order
-            const payload: any = {
+            const payload: Record<string, unknown> = {
                 siteId,
                 items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
                 customer: {
@@ -192,9 +192,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                 // AC-2: Cart preserved on error
                 setError(data.error?.message || 'Failed to place order')
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             // AC-2: Cart preserved on error
-            setError(err.message || 'Network error. Please try again.')
+            setError(err instanceof Error ? err.message : 'Network error. Please try again.')
         } finally {
             setIsPlacing(false)
         }

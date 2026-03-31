@@ -342,7 +342,7 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
         // Collect text content for context (very basic extraction)
         let textContext = ''
         if (Array.isArray(doc.layout)) {
-            const texts = doc.layout.map((block: any) => block.headline || block.sectionLabel || '').filter(Boolean)
+            const texts = doc.layout.map((block: Record<string, unknown>) => block.headline || block.sectionLabel || '').filter(Boolean)
             textContext = texts.join('. ')
         }
         

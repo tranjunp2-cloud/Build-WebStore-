@@ -779,7 +779,7 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                 if (Array.isArray(plan.features)) {
                     plan.features = plan.features.map((f: AIBlock | string) =>
                         typeof f === 'string' ? { text: f, included: true } : (f as { text?: string; included?: boolean })
-                    ) as any
+                    ) as Array<{ text?: string; included?: boolean }>
                 }
                 return plan
             })
