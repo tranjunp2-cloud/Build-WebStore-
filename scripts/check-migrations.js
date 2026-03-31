@@ -15,6 +15,13 @@
  * Forgetting _pages_v_blocks_* causes the editor to show "0 blocks" with
  * "relation does not exist" DB errors.
  *
+ * VERSION COLUMN RULE (Pages.ts top-level fields):
+ * When a new top-level field is added to the Pages collection (not inside blocks),
+ * a matching `version_*` column must exist in `_pages_v` table:
+ *   - pages.isVisible → _pages_v.version_is_visible
+ *   - pages.deletedAt → _pages_v.version_deleted_at
+ * Forgetting this causes Payload draft queries to crash with 42703 (column does not exist).
+ *
  * Usage: node scripts/check-migrations.js [base-branch]
  * Default base branch: staging
  *
@@ -131,6 +138,69 @@ function getNewBlockSlugsFromDiff() {
   return slugs
 }
 
+/**
+ * Check 3: New top-level fields added to Pages collection need `_pages_v.version_*` migrations.
+ *
+ * When Payload CMS runs versioning/drafts, it queries `_pages_v` for every
+ * column that exists in `pages`. If a new top-level field is added to the
+ * Pages collection WITHOUT a corresponding `_pages_v.version_*` column,
+ * the editor shows "0 blocks" and logs 42703 (column does not exist).
+ *
+ * This check detects new fields at the Pages collection level (12-space indent
+ * in Pages.ts) and verifies `ALTER TABLE _pages_v ADD COLUMN version_* ...`
+ * exists in db-setup.js.
+ *
+ * Skips: relationship fields (*_id already in _pages_v via FK), blocks/groups
+ * which are handled differently by Payload, and standard Payload auto-columns
+ * (title, slug, site, isHomepage, layout, publishedAt, seo, timestamps).
+ */
+const PAGES_AUTO_COLUMNS = new Set([
+  'title', 'slug', 'site', 'isHomepage', 'layout',
+  'seo', 'publishedAt', 'updatedAt', 'createdAt',
+])
+
+function checkPagesVersionColumns() {
+  const filePath = 'src/collections/Pages.ts'
+  const missing = []
+
+  try {
+    const diff = execSync(
+      `git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" || true`,
+      { encoding: 'utf8' }
+    ).trim()
+
+    if (!diff) return missing
+
+    // Collection-level fields in Pages.ts have exactly 12 spaces of indentation.
+    // Block-level fields have 16+ spaces. This distinguishes the two.
+    // Pattern: +            name: 'fieldName'  (12 spaces)
+    const collectionFieldRegex = /^\+            name:\s*['"]([a-zA-Z0-9_]+)['"]/gm
+    const columns = getMigrationColumns()
+    const seen = new Set()
+    let match
+
+    while ((match = collectionFieldRegex.exec(diff)) !== null) {
+      const fieldName = match[1]
+      const snake = toSnakeCase(fieldName)
+      const versionCol = `version_${snake}`
+
+      if (seen.has(fieldName)) continue
+      seen.add(fieldName)
+
+      // Skip fields that Payload auto-manages in _pages_v or handles specially
+      if (PAGES_AUTO_COLUMNS.has(fieldName)) continue
+
+      if (!columns.has(`_pages_v.${versionCol}`)) {
+        missing.push({ field: fieldName, snake, versionCol })
+      }
+    }
+  } catch {
+    // No diff or file missing
+  }
+
+  return missing
+}
+
 function checkNewBlocks() {
   const newSlugs = getNewBlockSlugsFromDiff()
   if (newSlugs.length === 0) return []
@@ -191,7 +261,24 @@ function main() {
     console.error('   _pages_v_blocks_{slug} — drafts/editor (id serial, _path text)\n')
   }
 
-  // ── Check 2: New fields in tracked collections ───────────────────────
+  // ── Check 2: New Pages.ts top-level fields need _pages_v version columns ──
+  const missingVersionCols = checkPagesVersionColumns()
+  if (missingVersionCols.length > 0) {
+    hasErrors = true
+    console.error(`\n❌ New Pages collection field(s) detected without _pages_v version column migrations:\n`)
+    for (const v of missingVersionCols) {
+      console.error(`   Missing: _pages_v.${v.versionCol}  (from field "${v.field}")`)
+      console.error(`   → Add to scripts/db-setup.js MIGRATIONS:`)
+      console.error(`     { name: '_pages_v.${v.versionCol}',`)
+      console.error(`       sql: \`ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS ${v.versionCol} varchar;\` },`)
+      console.error()
+    }
+    console.error('💡 RULE: Every new top-level Pages field needs a _pages_v version column.')
+    console.error('   Without it, Payload draft queries (editor) will crash with 42703.')
+    console.error('   Adjust the column type (boolean/timestamptz/jsonb/integer) as needed.\n')
+  }
+
+  // ── Check 3: New fields in tracked collections ───────────────────────
   const newFields = getNewFieldsFromDiff()
 
   if (newFields.length > 0) {
@@ -216,7 +303,7 @@ function main() {
     } else {
       console.log('[migration-check] ✅ All new fields have matching migrations')
     }
-  } else if (missingBlockTables.length === 0) {
+  } else if (missingBlockTables.length === 0 && missingVersionCols.length === 0) {
     console.log('[migration-check] ✅ No new collection fields or block types detected')
   }
 
