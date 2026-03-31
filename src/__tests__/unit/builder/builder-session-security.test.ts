@@ -17,6 +17,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useBuilderStore } from '@/store/builderStore'
+import type { ThemeConfig } from '@/blocks/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ function populateStoreAsUser(userId: string) {
         products: 'SaaS',
     })
     s.addBlock({ blockType: 'hero', headline: `Welcome from ${userId}` })
-    s.setTheme({ primaryColor: '#000' } as any)
+    s.setTheme({ primaryColor: '#000' } as ThemeConfig)
     s.setSiteId(`site-of-${userId}`)
     s.setSiteName(`${userId}'s Site`)
 }

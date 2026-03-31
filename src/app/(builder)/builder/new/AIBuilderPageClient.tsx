@@ -24,23 +24,25 @@ export interface AIBuilderPageClientProps {
 const BUILDER_SESSION_META_KEY = 'prime-builder-session-meta'
 const BUILDER_SESSION_TTL_MS = 24 * 60 * 60 * 1000
 
-function getGenerationErrorMessage(errorData: any) {
-    if (typeof errorData?.error === 'string') {
-        return errorData.error
+function getGenerationErrorMessage(errorData: unknown) {
+    if (typeof errorData !== 'object' || errorData === null) return 'Generation failed'
+
+    const data = errorData as Record<string, unknown>
+
+    if (typeof data.error === 'string') {
+        return data.error
     }
 
-    if (typeof errorData?.error?.details === 'string') {
-        return errorData.error.details
-    }
+    if (typeof data.error === 'object' && data.error !== null) {
+        const err = data.error as Record<string, unknown>
+        if (typeof err.details === 'string') return err.details
 
-    const fieldErrors = errorData?.error?.details?.fieldErrors
-    if (fieldErrors && typeof fieldErrors === 'object') {
-        const firstFieldError = Object.values(fieldErrors).find(
-            (messages): messages is string[] => Array.isArray(messages) && messages.length > 0,
-        )
-
-        if (firstFieldError?.[0]) {
-            return firstFieldError[0]
+        const fieldErrors = (err.details as Record<string, unknown> | undefined)?.fieldErrors
+        if (fieldErrors && typeof fieldErrors === 'object') {
+            const firstFieldError = Object.values(fieldErrors).find(
+                (messages): messages is string[] => Array.isArray(messages) && messages.length > 0,
+            )
+            if (firstFieldError?.[0]) return firstFieldError[0]
         }
     }
 
@@ -436,7 +438,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                         const data = JSON.parse(line.slice(6))
                         handleSSEEvent(currentEvent, data)
                     } catch {
-                        // Ignore malformed SSE payloads.
+                        // Malformed SSE payload — log for diagnostics but do not crash stream.
+                        console.warn('[SSE] malformed payload, skipping event:', currentEvent)
                     }
 
                     currentEvent = ''
