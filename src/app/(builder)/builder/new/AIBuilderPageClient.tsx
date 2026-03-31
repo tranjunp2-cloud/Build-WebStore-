@@ -189,10 +189,20 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     // Security: clear persisted session if it belongs to a different user.
     // Prevents cross-user localStorage contamination when sharing a browser.
+    //
+    // Two cases to clear:
+    //   1. isDifferentUser  — stored.userId exists but doesn't match current user
+    //   2. isUnownedSession — session was created before this fix (no userId stored)
+    //                         but already has data (blocks/siteId). Must clear because
+    //                         we can't verify who owns it.
     useEffect(() => {
         if (!userId) return
         const stored = useBuilderStore.getState()
-        if (stored.userId && stored.userId !== userId) {
+        const hasStaleData = stored.blocks.length > 0 || stored.siteId !== null
+        const isDifferentUser = stored.userId !== null && stored.userId !== userId
+        const isUnownedSession = stored.userId === null && hasStaleData
+
+        if (isDifferentUser || isUnownedSession) {
             reset()
             clearBuilderSessionStorage()
         }
