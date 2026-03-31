@@ -161,7 +161,7 @@ jobs:
 
             const targetStatus = labelMap[label];
 
-            // ── Helper: remove labels safely ──
+            // ── Helper: remove labels safely (ignore 404, log real errors) ──
             async function removeLabels(labels) {
               for (const name of labels) {
                 try {
@@ -171,7 +171,13 @@ jobs:
                     name,
                   });
                   console.log(`Removed ${name} from #${issue.number}`);
-                } catch (e) { /* label might not exist */ }
+                } catch (e) {
+                  if (e.status === 404) {
+                    console.log(`Label ${name} not present on #${issue.number}, skipping`);
+                  } else {
+                    console.warn(`Failed to remove ${name} from #${issue.number}: ${e.message}`);
+                  }
+                }
               }
             }
 

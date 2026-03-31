@@ -327,7 +327,9 @@ jobs:
                   name: label,
                 });
                 console.log(`Removed ${label} from PR #${prNumber}`);
-              } catch (e) { /* label might not exist */ }
+              } catch (e) {
+                if (e.status !== 404) console.warn(`Failed to remove ${label} from PR #${prNumber}: ${e.message}`);
+              }
             }
 
       - name: Notify Lark (Changes Requested)
@@ -416,7 +418,9 @@ jobs:
                       name: oldLabel,
                     });
                     console.log(`Removed ${oldLabel} from #${issueNumber}`);
-                  } catch (e) { /* label might not exist */ }
+                  } catch (e) {
+                    if (e.status !== 404) console.warn(`Failed to remove ${oldLabel} from #${issueNumber}: ${e.message}`);
+                  }
                 }
 
                 // Comment on issue
