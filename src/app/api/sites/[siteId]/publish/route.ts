@@ -94,7 +94,7 @@ export async function PATCH(
     } catch (error: unknown) {
         console.error('[Publish Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : 'Failed to publish' } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to publish' } },
             { status: 500 },
         )
     }
@@ -165,7 +165,7 @@ export async function DELETE(
     } catch (error: unknown) {
         console.error('[Unpublish Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : 'Failed to unpublish' } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to unpublish' } },
             { status: 500 },
         )
     }

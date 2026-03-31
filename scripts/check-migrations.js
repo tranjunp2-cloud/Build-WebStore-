@@ -97,7 +97,7 @@ function main() {
         if (hasArray) {
            const arrayTableName = `${tableName}_${snakeField}`
            // Allow nested block tables (e.g. pages_blocks_social_widget_links)
-           const hasArrayTable = Array.from(createTables).some(t => t === arrayTableName || t.endsWith(`_${snakeField}`))
+           const hasArrayTable = Array.from(createTables).some(t => t === arrayTableName || (t.startsWith(`${tableName}_`) && t.endsWith(`_${snakeField}`)))
            if (!hasArrayTable) {
               console.error(`❌ ERROR: Missing CREATE TABLE IF NOT EXISTS "${arrayTableName}" (or similar) for array field '${field}' inside ${file}`)
               hasErrors = true
@@ -105,9 +105,10 @@ function main() {
         }
         
         if (hasGroup) {
-           const hasGroupTable = Array.from(alterColumns).some(col => col.includes(`${snakeField}_`))
+           const hasGroupTable = Array.from(alterColumns).some(col => col.startsWith(`${tableName}.`) && col.includes(`${snakeField}_`))
            if (!hasGroupTable) {
-              console.warn(`⚠️  WARNING: Check group field '${field}'. Requires ALTER TABLE ADD COLUMN ... ${snakeField}_{subfield}`)
+              console.error(`❌ ERROR: Check group field '${field}'. Requires ALTER TABLE ADD COLUMN ... ${snakeField}_{subfield}`)
+              hasErrors = true
            }
         }
         
@@ -116,12 +117,18 @@ function main() {
            // Allow nested columns e.g. pages_layout.social_widget_variant
            const hasAlter = Array.from(alterColumns).some(col => 
                col === `${tableName}.${snakeField}` || 
-               col.endsWith(`.${snakeField}`) || 
-               col.endsWith(`_${snakeField}`)
+               (col.startsWith(`${tableName}_`) && col.endsWith(`.${snakeField}`)) || 
+               (col.startsWith(`${tableName}.`) && col.endsWith(`_${snakeField}`)) ||
+               (col.startsWith(`${tableName}_`) && col.endsWith(`_${snakeField}`))
            )
+           const inNewTable = Array.from(createTables).some(t => {
+               const regex = new RegExp(`CREATE TABLE IF NOT EXISTS ["']?${t}["']?[^;]+${snakeField}\\s+(varchar|boolean|integer|timestamp|json)`, 'i')
+               return regex.test(setupContent)
+           })
            
-           if (!hasAlter && !createTables.has(tableName)) {
-              console.warn(`⚠️  WARNING: Possible missing ALTER TABLE for field '${field}' (${tableName}.${snakeField} or nested)`)
+           if (!hasAlter && !createTables.has(tableName) && !inNewTable) {
+              console.error(`❌ ERROR: Possible missing ALTER TABLE for field '${field}' (${tableName}.${snakeField} or nested)`)
+              hasErrors = true
            }
         }
       }
