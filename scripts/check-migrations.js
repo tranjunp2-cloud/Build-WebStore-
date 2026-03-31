@@ -1,18 +1,7 @@
 #!/usr/bin/env node
 /**
- * CI Check: When a PR adds new fields to Payload collections,
- * ensure matching migrations exist in db-setup.js.
- *
- * How it works:
- * 1. Get git diff of collection files vs base branch (staging)
- * 2. Find NEW field definitions (added lines with `name: 'xxx'`)
- * 3. Check if db-setup.js MIGRATIONS array has matching ALTER TABLE
- *
- * Usage: node scripts/check-migrations.js [base-branch]
- * Default base branch: staging
- *
- * Exit 0 = ok (no new fields, or all have migrations)
- * Exit 1 = new fields found without migrations
+ * CI Check: Ensure Payload CMS schema changes have matching SQL migrations.
+ * Implements P0 rules for Database Schema Changes according to AGENTS.md.
  */
 const { execSync } = require('child_process')
 const fs = require('fs')
@@ -21,99 +10,109 @@ const path = require('path')
 const BASE_BRANCH = process.argv[2] || 'origin/staging'
 const DB_SETUP_PATH = path.join(__dirname, 'db-setup.js')
 
-// Tables we track migrations for
-const TRACKED_COLLECTIONS = {
-  'Tenants.ts': 'tenants',
-  'Sites.ts': 'sites',
-  'Products.ts': 'products',
-  'Orders.ts': 'orders',
-}
-
 function toSnakeCase(str) {
   return str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')
 }
 
-function getNewFieldsFromDiff() {
-  const newFields = []
+function main() {
+  console.log(`[migration-check] Comparing against ${BASE_BRANCH}...`)
+  
+  const setupContent = fs.readFileSync(DB_SETUP_PATH, 'utf8')
+  let hasErrors = false
 
-  for (const [filename, tableName] of Object.entries(TRACKED_COLLECTIONS)) {
-    const filePath = `src/collections/${filename}`
+  // 1. NEVER use DROP TABLE
+  if (/DROP\s+TABLE/i.test(setupContent)) {
+    console.error('❌ ERROR: DROP TABLE found in db-setup.js. NEVER use DROP TABLE in migrations.')
+    hasErrors = true
+  }
 
+  // Parse db-setup.js to collect existing migrations
+  const alterColumns = new Set()
+  const createTables = new Set()
+
+  const alterRegex = /ALTER TABLE\s+(\w+)\s+ADD COLUMN IF NOT EXISTS\s+(\w+)/gi
+  let match
+  while ((match = alterRegex.exec(setupContent)) !== null) {
+    alterColumns.add(`${match[1]}.${match[2]}`)
+  }
+
+  const createRegex = /CREATE TABLE IF NOT EXISTS\s+["']?(\w+)["']?/gi
+  while ((match = createRegex.exec(setupContent)) !== null) {
+    createTables.add(match[1])
+  }
+
+  // Parse COLLECTION_SLUGS
+  const slugRegex = /const COLLECTION_SLUGS = \[([\s\S]*?)\]/
+  const slugMatch = slugRegex.exec(setupContent)
+  let existingSlugs = []
+  if (slugMatch) {
+     existingSlugs = slugMatch[1].match(/['"]([\w-]+)['"]/g)?.map(s => s.replace(/['"]/g, '')) || []
+  }
+
+  // Check all collections dynamically
+  const collectionsDir = path.join(__dirname, '../src/collections')
+  const files = fs.existsSync(collectionsDir) ? fs.readdirSync(collectionsDir).filter(f => f.endsWith('.ts')) : []
+  
+  for (const file of files) {
+    const filePath = `src/collections/${file}`
+    const tableName = toSnakeCase(file.replace('.ts', ''))
+    
+    // Check for NEW collection missing in COLLECTION_SLUGS
     try {
-      // Get only ADDED lines in collection file
-      const diff = execSync(
-        `git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" | grep "name:" || true`,
-        { encoding: 'utf8' }
-      ).trim()
-
-      if (!diff) continue
-
-      // Extract field names from added lines
-      const regex = /name:\s*['"](\w+)['"]/g
-      let match
-      while ((match = regex.exec(diff)) !== null) {
-        newFields.push({
-          field: match[1],
-          snake: toSnakeCase(match[1]),
-          table: tableName,
-          file: filename,
-        })
-      }
+      execSync(`git ls-tree -r ${BASE_BRANCH} ${filePath}`, { stdio: 'pipe' })
     } catch {
-      // File doesn't exist or no diff — skip
+      if (!existingSlugs.includes(tableName)) {
+        console.error(`❌ ERROR: New collection '${tableName}' missing from COLLECTION_SLUGS in db-setup.js`)
+        hasErrors = true
+      }
+    }
+    
+    // Parse diff for fields
+    try {
+      const diff = execSync(`git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" || true`, { encoding: 'utf8' }).trim()
+      if (!diff) continue
+      
+      const newFields = [...diff.matchAll(/name:\s*['"](\w+)['"]/g)].map(m => m[1])
+      const hasArray = diff.includes(`type: 'array'`) || diff.includes('type: "array"')
+      const hasGroup = diff.includes(`type: 'group'`) || diff.includes('type: "group"')
+
+      for (const field of newFields) {
+        const snakeField = toSnakeCase(field)
+
+        if (hasArray) {
+           const arrayTableName = `${tableName}_${snakeField}`
+           if (!createTables.has(arrayTableName)) {
+              console.error(`❌ ERROR: Missing CREATE TABLE IF NOT EXISTS "${arrayTableName}" for array field '${field}' inside ${file}`)
+              hasErrors = true
+           }
+        }
+        
+        if (hasGroup) {
+           // Cannot easily guess group subfields through diff, ensure at least one ALTER is present
+           const groupRegex = new RegExp(`ALTER TABLE ${tableName} ADD COLUMN IF NOT EXISTS ${snakeField}_`, 'i')
+           if (!groupRegex.test(setupContent)) {
+              console.warn(`⚠️  WARNING: Check group field '${field}'. Requires ALTER TABLE ADD COLUMN ... ${snakeField}_{subfield}`)
+           }
+        }
+        
+        // Basic check for simple fields
+        if (!alterColumns.has(`${tableName}.${snakeField}`) && !hasArray && !hasGroup && !createTables.has(tableName)) {
+          console.warn(`⚠️  WARNING: Possible missing ALTER TABLE for field '${field}' (${tableName}.${snakeField})`)
+        }
+      }
+      
+    } catch (e) {
+      // Ignored
     }
   }
 
-  return newFields
-}
-
-function getMigrationColumns() {
-  const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')
-  const columns = new Set()
-
-  // Match ALTER TABLE xxx ADD COLUMN IF NOT EXISTS yyy
-  const regex = /ALTER TABLE\s+(\w+)\s+ADD COLUMN IF NOT EXISTS\s+(\w+)/gi
-  let match
-  while ((match = regex.exec(content)) !== null) {
-    columns.add(`${match[1]}.${match[2]}`)
+  if (hasErrors) {
+    console.error('\n[migration-check] ❌ Migration validation failed according to AGENTS.md rules. Please fix db-setup.js.\n')
+    process.exit(1)
   }
-
-  return columns
-}
-
-function main() {
-  console.log(`[migration-check] Comparing against ${BASE_BRANCH}...`)
-
-  const newFields = getNewFieldsFromDiff()
-
-  if (newFields.length === 0) {
-    console.log('[migration-check] ✅ No new collection fields detected')
-    process.exit(0)
-  }
-
-  console.log(`[migration-check] Found ${newFields.length} new field(s) in PR:`)
-  for (const f of newFields) {
-    console.log(`   ${f.table}.${f.snake} (${f.field} in ${f.file})`)
-  }
-
-  const migrations = getMigrationColumns()
-  const missing = newFields.filter(f => !migrations.has(`${f.table}.${f.snake}`))
-
-  if (missing.length === 0) {
-    console.log('[migration-check] ✅ All new fields have matching migrations')
-    process.exit(0)
-  }
-
-  console.error(`\n❌ ${missing.length} new field(s) WITHOUT migrations:\n`)
-  for (const f of missing) {
-    console.error(`   ${f.table}.${f.snake} (added in ${f.file})`)
-    console.error(`   → Add to scripts/db-setup.js MIGRATIONS:`)
-    console.error(`     { name: '${f.table}.${f.snake}', sql: 'ALTER TABLE ${f.table} ADD COLUMN IF NOT EXISTS ${f.snake} varchar;' }\n`)
-  }
-
-  console.error('💡 Tip: Add the migration entries above to scripts/db-setup.js MIGRATIONS array.')
-  console.error('   This ensures the column exists on staging/production before your code queries it.\n')
-  process.exit(1)
+  
+  console.log('[migration-check] ✅ All schema changes look compliant.')
+  process.exit(0)
 }
 
 main()

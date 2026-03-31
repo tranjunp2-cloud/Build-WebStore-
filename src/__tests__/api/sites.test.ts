@@ -41,13 +41,12 @@ vi.mock('payload', () => {
                 }
                 return { user: null }
             }),
-            findByID: vi.fn().mockResolvedValue({ id: 'site-123', status: 'draft' }),
+            findByID: vi.fn().mockResolvedValue({ id: 'site-123', status: 'draft', tenant: 'tenant-1' }),
             find: vi.fn().mockResolvedValue({
                 docs: [
                     { id: 'page-home', isHomepage: true, layout: [] }
                 ]
             }),
-            findByID: vi.fn().mockResolvedValue({ id: 'site-123', tenant: 'tenant-1' }),
             update: vi.fn().mockResolvedValue({ id: 'site-123' })
         })
     }

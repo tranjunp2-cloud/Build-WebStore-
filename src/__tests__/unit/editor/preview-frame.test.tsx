@@ -9,8 +9,10 @@ vi.mock('@/store/editorStore', () => ({
     })
 }))
 
+type PreviewFrameProps = React.ComponentProps<typeof PreviewFrame>
+
 describe('PreviewFrame', () => {
-    const defaultProps: any = {
+    const defaultProps: PreviewFrameProps = {
         siteId: 'site-123',
         pageId: null,
         iframeKey: 1,
