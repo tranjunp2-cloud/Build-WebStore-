@@ -311,6 +311,27 @@ jobs:
             🎉 **Ready to merge!**
           buttons: '[{"text":"🔗 View PR","url":"${{ github.event.pull_request.html_url }}","type":"primary"}]'
 
+      - name: Remove approved labels on changes requested
+        if: github.event.review.state == 'changes_requested'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumber = context.payload.pull_request.number;
+            for (const label of ['approved', 'ready-to-merge']) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo,
+                  issue_number: prNumber,
+                  name: label,
+                });
+                console.log(`Removed ${label} from PR #${prNumber}`);
+              } catch (e) {
+                if (e.status !== 404) console.warn(`Failed to remove ${label} from PR #${prNumber}: ${e.message}`);
+              }
+            }
+
       - name: Notify Lark (Changes Requested)
         if: github.event.review.state == 'changes_requested'
         uses: ./.github/actions/lark-notify
@@ -387,6 +408,20 @@ jobs:
                   issue_number: issueNumber,
                   labels: ['qa:pending'],
                 });
+
+                // Remove stale QA labels from previous test cycle
+                for (const oldLabel of ['qa:failed', 'qa:passed']) {
+                  try {
+                    await github.rest.issues.removeLabel({
+                      owner, repo,
+                      issue_number: issueNumber,
+                      name: oldLabel,
+                    });
+                    console.log(`Removed ${oldLabel} from #${issueNumber}`);
+                  } catch (e) {
+                    if (e.status !== 404) console.warn(`Failed to remove ${oldLabel} from #${issueNumber}: ${e.message}`);
+                  }
+                }
 
                 // Comment on issue
                 await github.rest.issues.createComment({

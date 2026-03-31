@@ -250,21 +250,21 @@ CI chạy: Lint → Typecheck → Test → Build
 ```
 PR merged → staging auto-deploy
   ↓
-Bot tự: gắn label `qa:pending` + chuyển board "QA Testing"
+Bot tự: gắn `qa:pending` + XÓA `qa:failed`/`qa:passed` cũ + board "QA Testing"
   ↓
 🔔 Lark thông báo QC: "🧪 QA Ready — Issue #98 chờ test"
   ↓
 QC mở Issue #98 → đọc AC → test trên staging
   ↓
-  ├── ✅ Pass → QC close issue → Done ✅ (milestone % tăng)
+  ├── ✅ Pass → QC gắn `qa:passed` → bot xóa `qa:pending`+`qa:failed` → board "Done"
   │
-  └── ❌ Fail → QC gắn label `qa:failed` + comment mô tả bug
+  └── ❌ Fail → QC gắn `qa:failed` → bot xóa `qa:pending`+`qa:passed` → board "Re-Open"
         ↓
-      Bot tự: tạo bug report template + chuyển board "Re-Open" + assign dev
+      Bot tự: tạo bug report template + assign dev
         ↓
       🔔 Lark thông báo Dev: "🔴 QA Failed — #98 — @dev fix"
         ↓
-      Dev fix → tạo PR mới → merge → lại vào QA Testing → loop
+      Dev fix → tạo PR mới → merge → bot reset labels → QA Testing → loop
 ```
 
 ---
