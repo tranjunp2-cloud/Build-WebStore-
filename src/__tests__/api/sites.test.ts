@@ -10,8 +10,9 @@ import { getCurrentUser } from '@/lib/auth'
 vi.mock('@/lib/auth', () => {
     const user = { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1' }] }
     return {
-        withAuth: vi.fn().mockImplementation((handler: any) => {
-            return async (req: any, ctx: any) => handler(user, req, ctx)
+        // vi.mock factory runs before imports — types unavailable, use unknown
+        withAuth: vi.fn().mockImplementation((handler: unknown) => {
+            return async (req: unknown, ctx: unknown) => (handler as Function)(user, req, ctx)
         }),
         getCurrentUser: vi.fn().mockResolvedValue(user),
     }
