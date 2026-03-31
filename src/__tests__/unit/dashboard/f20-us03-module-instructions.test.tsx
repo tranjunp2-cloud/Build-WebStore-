@@ -5,7 +5,7 @@ import '@testing-library/jest-dom'
 
 // ── Mock next/image & windows functions ────────────────────────────────────────
 vi.mock('next/image', () => ({
-    default: (props: any) => {
+    default: (props: React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean; quality?: number | string; onLoadingComplete?: () => void }) => {
         const { fill, sizes, quality, onLoadingComplete, onError, ...rest } = props
         return (
             <img 
