@@ -1135,6 +1135,30 @@ const MIGRATIONS = [
       name varchar, role varchar, bio varchar, image_id integer
     );`,
   },
+  // ── One-time cleanup: remove stale _pages_v draft rows ──────────────────────
+  // After creating _pages_v_blocks_* tables above, existing _pages_v rows still
+  // point to block data that was never written (inserts failed when tables were missing).
+  // Payload's draft: true query returns these empty drafts → editor shows "0 blocks".
+  // Fix: delete stale draft versions that have no blocks in any _pages_v_blocks_* table.
+  // Payload will then fall back to published data from pages_blocks_* → blocks appear.
+  // This migration runs once. After real drafts are saved, those rows are preserved.
+  {
+    name: '_pages_v.clear_stale_drafts',
+    sql: `DELETE FROM _pages_v WHERE id NOT IN (
+      SELECT _parent_id FROM _pages_v_blocks_navigation   WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_hero           WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_about          WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_features       WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_testimonials   WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_contact        WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_gallery        WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_footer         WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_stats          WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_pricing        WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_faq            WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_team           WHERE _parent_id IS NOT NULL
+    );`,
+  },
   // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
   // These tables are created by Payload pushDevSchema (runs every deploy).
   // DO NOT add manual CREATE TABLE migrations — they create wrong column types.
