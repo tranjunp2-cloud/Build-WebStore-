@@ -42,13 +42,17 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             return NextResponse.json({ error: 'Site not found' }, { status: 404 })
         }
 
-        interface TenantRef { tenant: string | number | { id: string | number } }
-        const tenantIds = user.tenants?.map((t: TenantRef) =>
-            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
-        ) ?? []
+        type TenantRef = string | number | { id: string | number } | null | undefined
+        const resolveTenantId = (t: TenantRef): string | null =>
+            t == null ? null : String(typeof t === 'object' ? t.id : t)
 
-        const siteTenantId = typeof site.tenant === 'object' ? String(site.tenant.id) : String(site.tenant)
-        if (!tenantIds.includes(siteTenantId)) {
+        interface UserTenantRef { tenant: TenantRef }
+        const tenantIds = (user as unknown as { tenants?: UserTenantRef[] }).tenants
+            ?.map(t => resolveTenantId(t.tenant))
+            .filter((id): id is string => id !== null) ?? []
+
+        const siteTenantId = resolveTenantId(site.tenant as TenantRef)
+        if (!siteTenantId || !tenantIds.includes(siteTenantId)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
