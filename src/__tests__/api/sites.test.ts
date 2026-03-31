@@ -38,7 +38,7 @@ vi.mock('payload', () => {
                 const token = headers.get('Authorization')
                 // Nếu header auth hợp lệ (mocked ở trên) -> Cho phép user đi tiếp
                 if (token === 'JWT mock-valid-token') {
-                    return { user: { id: 'user-1', email: 'admin@example.com' } }
+                    return { user: { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1' }] } }
                 }
                 return { user: null }
             }),
@@ -137,7 +137,7 @@ describe('Sites APIs', () => {
         it('returns 404 if site is not found when publishing', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1' } }),
+                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] } }),
                 findByID: vi.fn().mockResolvedValue(null) // Mock Not found
             })
 
@@ -149,7 +149,7 @@ describe('Sites APIs', () => {
         it('returns 200 and successfully publishes the site', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1' } }),
+                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] } }),
                 findByID: vi.fn().mockResolvedValue({ id: '123', status: 'draft', tenant: 'tenant-1' }),
                 update: vi.fn().mockResolvedValue({ id: '123', status: 'published', publishedAt: new Date().toISOString() })
             })
@@ -165,7 +165,7 @@ describe('Sites APIs', () => {
         it('returns 200 and successfully unpublishes the site', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1' } }),
+                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] } }),
                 findByID: vi.fn().mockResolvedValue({ id: '123', status: 'published', tenant: 'tenant-1' }),
                 update: vi.fn().mockResolvedValue({ id: '123', status: 'draft' })
             })
@@ -202,6 +202,7 @@ describe('Sites APIs', () => {
                     id: '123', 
                     name: 'Test Site', 
                     status: 'draft', 
+                    tenant: 'tenant-1',
                     siteType: 'business',
                     locale: 'ms',
                     shippingConfig: { westRate: 800, eastRate: 1500 }

@@ -8,27 +8,51 @@ import { create } from 'zustand'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
-type BlockData = { blockType: string;[key: string]: any }
+export type BlockData = { blockType: string;[key: string]: unknown }
 
 export type UndoActionSource = 'ai_chat' | 'inline_edit' | 'manual' | 'theme_change'
 
 type EditorSnapshot = {
     id: string
     blocks: BlockData[]
-    theme: any
+    theme: ThemeState
+    headerBlock: BlockData | null
+    footerBlock: BlockData | null
     timestamp: number
     label?: string           // "Changed hero title"
     source?: UndoActionSource
+}
+
+export type PageData = {
+    id: string
+    title: string
+    slug: string
+    status: 'published' | 'draft'
+    isHomepage?: boolean
+    isVisible: boolean
+    seoTitle?: string | null
+    seoDescription?: string | null
+    error?: string | null
+    deletedAt?: string | null
+    updatedAt: string
 }
 
 type EditorState = {
     // Data
     siteId: string | null
     blocks: BlockData[]
-    theme: any
+    theme: ThemeState
     siteName: string
 
-    // History (F-11)
+    // Global Header/Footer (F-05-07)
+    headerBlock: BlockData | null
+    footerBlock: BlockData | null
+
+    // Pages (F-05-02)
+    pages: PageData[]
+    currentPageId: string | null
+
+    // History (F-06 / F-11)
     history: EditorSnapshot[]
     historyIndex: number
     maxHistory: number
@@ -42,26 +66,42 @@ type EditorState = {
     isSaving: boolean
     saveStatus: 'idle' | 'saving' | 'saved' | 'error'
     autoSaveTimer: NodeJS.Timeout | null
+    autoSaveEnabled: boolean
+    autoSaveIntervalMs: number
 }
+
+type ThemeState = Record<string, string | number | boolean | null | unknown>
+type BlockPatch = Record<string, unknown>
 
 type EditorActions = {
     // Init
-    init: (siteId: string, blocks: BlockData[], theme: any, siteName: string) => void
+    init: (siteId: string, blocks: BlockData[], theme: ThemeState, siteName: string, headerBlock?: BlockData | null, footerBlock?: BlockData | null) => void
+
+    // Pages (F-05-02)
+    setPages: (pages: PageData[]) => void
+    setCurrentPageId: (pageId: string) => void
+    addPageToState: (page: PageData) => void
+    updatePageInState: (id: string, data: Partial<PageData>) => void
+    removePageFromState: (id: string) => void
 
     // Block operations (push to history)
-    updateBlock: (index: number, changes: Record<string, any>, label?: string) => void
+    updateBlock: (index: number, changes: BlockPatch, label?: string) => void
     addBlock: (afterIndex: number, block: BlockData, label?: string) => void
     deleteBlock: (index: number, label?: string) => void
     duplicateBlock: (index: number) => void
     reorderBlocks: (fromIndex: number, toIndex: number) => void
 
     // Theme
-    updateTheme: (changes: Record<string, any>, label?: string) => void
+    updateTheme: (changes: ThemeState, label?: string) => void
+
+    // Header/Footer (F-05-07)
+    updateHeaderBlock: (changes: BlockPatch) => void
+    updateFooterBlock: (changes: BlockPatch) => void
 
     // AI Batch (F-11) — push ALL AI changes as a single undoable action
-    pushBatch: (blocks: BlockData[], theme: any, label: string) => void
+    pushBatch: (blocks: BlockData[], theme: ThemeState, label: string) => void
 
-    // Undo/Redo (F-11)
+    // Undo/Redo (F-06 / F-11)
     undo: () => void
     redo: () => void
     canUndo: () => boolean
@@ -86,7 +126,9 @@ const MAX_HISTORY = 50
 
 function createSnapshot(
     blocks: BlockData[],
-    theme: any,
+    theme: ThemeState,
+    headerBlock: BlockData | null = null,
+    footerBlock: BlockData | null = null,
     label?: string,
     source?: UndoActionSource,
 ): EditorSnapshot {
@@ -94,6 +136,8 @@ function createSnapshot(
         id: crypto.randomUUID(),
         blocks: JSON.parse(JSON.stringify(blocks)),
         theme: JSON.parse(JSON.stringify(theme)),
+        headerBlock: headerBlock ? JSON.parse(JSON.stringify(headerBlock)) : null,
+        footerBlock: footerBlock ? JSON.parse(JSON.stringify(footerBlock)) : null,
         timestamp: Date.now(),
         label,
         source,
@@ -119,6 +163,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     blocks: [],
     theme: {},
     siteName: '',
+    headerBlock: null,
+    footerBlock: null,
+    pages: [],
+    currentPageId: null,
     history: [],
     historyIndex: -1,
     maxHistory: MAX_HISTORY,
@@ -126,28 +174,53 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     hasUnsavedChanges: false,
     lastSavedAt: null,
     isSaving: false,
+    autoSaveEnabled: true,
+    autoSaveIntervalMs: 3000,
     saveStatus: 'idle',
     autoSaveTimer: null,
 
-    init: (siteId, blocks, theme, siteName) => {
-        const snapshot = createSnapshot(blocks, theme, 'Initial state', 'manual')
+    init: (siteId, blocks, theme, siteName, headerBlock = null, footerBlock = null) => {
+        const fallbackHeader = blocks.find(b => b.blockType === 'navigation')
+        const fallbackFooter = blocks.find(b => b.blockType === 'footer')
+
+        const effectiveHeader = headerBlock || (fallbackHeader ? JSON.parse(JSON.stringify(fallbackHeader)) : { blockType: 'navigation', links: [] })
+        const effectiveFooter = footerBlock || (fallbackFooter ? JSON.parse(JSON.stringify(fallbackFooter)) : { blockType: 'footer' })
+
+        const snapshot = createSnapshot(blocks, theme, effectiveHeader, effectiveFooter, 'Initial state', 'manual')
         set({
-            siteId, blocks, theme, siteName,
+            siteId,
+            blocks,
+            theme,
+            siteName,
+            headerBlock: effectiveHeader,
+            footerBlock: effectiveFooter,
             history: [snapshot],
             historyIndex: 0,
             hasUnsavedChanges: false,
+            lastSavedAt: null,
         })
     },
+
+    // ── Pages Operations ──────────────────────────────────────────────────
+
+    setPages: (pages) => set({ pages }),
+    setCurrentPageId: (currentPageId) => set({ currentPageId }),
+    addPageToState: (page) => set((state) => ({ pages: [...state.pages, page] })),
+    updatePageInState: (id, data) => set((state) => ({
+        pages: state.pages.map((p) => p.id === id ? { ...p, ...data } : p)
+    })),
+    removePageFromState: (id) => set((state) => ({
+        pages: state.pages.filter((p) => p.id !== id)
+    })),
 
     // ── Block Operations ─────────────────────────────────────────────────
 
     updateBlock: (index, changes, label) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
         const newBlocks = [...blocks]
         newBlocks[index] = { ...newBlocks[index], ...changes }
 
-
-        const snapshot = createSnapshot(newBlocks, theme, label ?? `Edited ${newBlocks[index].blockType}`, 'inline_edit')
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Edited ${newBlocks[index].blockType}`, 'inline_edit')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -159,11 +232,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     addBlock: (afterIndex, block, label) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
         const newBlocks = [...blocks]
         newBlocks.splice(afterIndex + 1, 0, block)
 
-        const snapshot = createSnapshot(newBlocks, theme, label ?? `Added ${block.blockType}`, 'manual')
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Added ${block.blockType}`, 'manual')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -175,11 +248,11 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     deleteBlock: (index, label) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
         const blockType = blocks[index]?.blockType ?? 'block'
         const newBlocks = blocks.filter((_, i) => i !== index)
 
-        const snapshot = createSnapshot(newBlocks, theme, label ?? `Deleted ${blockType}`, 'manual')
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, label ?? `Deleted ${blockType}`, 'manual')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -191,12 +264,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     duplicateBlock: (index) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
         const blockCopy = JSON.parse(JSON.stringify(blocks[index]))
         const newBlocks = [...blocks]
         newBlocks.splice(index + 1, 0, blockCopy)
 
-        const snapshot = createSnapshot(newBlocks, theme, `Duplicated ${blocks[index]?.blockType}`, 'manual')
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Duplicated ${blocks[index]?.blockType}`, 'manual')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -208,12 +281,12 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     reorderBlocks: (fromIndex, toIndex) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
         const newBlocks = [...blocks]
         const [moved] = newBlocks.splice(fromIndex, 1)
         newBlocks.splice(toIndex, 0, moved)
 
-        const snapshot = createSnapshot(newBlocks, theme, `Moved ${moved?.blockType}`, 'manual')
+        const snapshot = createSnapshot(newBlocks, theme, headerBlock, footerBlock, `Moved ${moved?.blockType}`, 'manual')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -227,10 +300,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     // ── Theme ────────────────────────────────────────────────────────────
 
     updateTheme: (changes, label) => {
-        const { blocks, theme, history, historyIndex, maxHistory } = get()
+        const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
         const newTheme = { ...theme, ...changes }
 
-        const snapshot = createSnapshot(blocks, newTheme, label ?? 'Updated theme', 'theme_change')
+        const snapshot = createSnapshot(blocks, newTheme, headerBlock, footerBlock, label ?? 'Updated theme', 'theme_change')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -245,8 +318,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     // Groups an entire AI response into EXACTLY 1 undoable action (BR-02)
 
     pushBatch: (blocks, theme, label) => {
-        const { history, historyIndex, maxHistory } = get()
-        const snapshot = createSnapshot(blocks, theme, label, 'ai_chat')
+        const { headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
+        const snapshot = createSnapshot(blocks, theme, headerBlock, footerBlock, label, 'ai_chat')
         const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
 
         set({
@@ -269,6 +342,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         set({
             blocks: JSON.parse(JSON.stringify(snapshot.blocks)),
             theme: JSON.parse(JSON.stringify(snapshot.theme)),
+            headerBlock: snapshot.headerBlock ? JSON.parse(JSON.stringify(snapshot.headerBlock)) : null,
+            footerBlock: snapshot.footerBlock ? JSON.parse(JSON.stringify(snapshot.footerBlock)) : null,
             historyIndex: newIndex,
         })
         get().handleContentChange()
@@ -283,6 +358,8 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         set({
             blocks: JSON.parse(JSON.stringify(snapshot.blocks)),
             theme: JSON.parse(JSON.stringify(snapshot.theme)),
+            headerBlock: snapshot.headerBlock ? JSON.parse(JSON.stringify(snapshot.headerBlock)) : null,
+            footerBlock: snapshot.footerBlock ? JSON.parse(JSON.stringify(snapshot.footerBlock)) : null,
             historyIndex: newIndex,
         })
         get().handleContentChange()
@@ -384,10 +461,46 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now(), saveStatus: 'saved' }),
     setIsSaving: (saving) => set({ isSaving: saving }),
 
+    // ── Header/Footer (F-05-07) ──────────────────────────────────────────
+
+    updateHeaderBlock: (changes) => {
+        const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
+        const newHeader = headerBlock ? { ...headerBlock, ...changes } : { blockType: 'navigation', ...changes }
+
+        const snapshot = createSnapshot(blocks, theme, newHeader, footerBlock, 'Updated Header', 'inline_edit')
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
+
+        set({
+            headerBlock: newHeader,
+            history: newHistory,
+            historyIndex: newHistory.length - 1,
+            hasUnsavedChanges: true,
+        })
+    },
+
+    updateFooterBlock: (changes) => {
+        const { blocks, theme, headerBlock, footerBlock, history, historyIndex, maxHistory } = get()
+        const newFooter = footerBlock ? { ...footerBlock, ...changes } : { blockType: 'footer', ...changes }
+
+        const snapshot = createSnapshot(blocks, theme, headerBlock, newFooter, 'Updated Footer', 'inline_edit')
+        const newHistory = pushSnapshot(history, historyIndex, maxHistory, snapshot)
+
+        set({
+            footerBlock: newFooter,
+            history: newHistory,
+            historyIndex: newHistory.length - 1,
+            hasUnsavedChanges: true,
+        })
+    },
+
     reset: () => set({
         siteId: null, blocks: [], theme: {}, siteName: '',
+        headerBlock: null, footerBlock: null,
+        pages: [], currentPageId: null,
         history: [], historyIndex: -1,
         isAIStreaming: false,
         hasUnsavedChanges: false, lastSavedAt: null, isSaving: false,
+        autoSaveEnabled: true, autoSaveIntervalMs: 3000,
+        saveStatus: 'idle', autoSaveTimer: null,
     }),
 }))

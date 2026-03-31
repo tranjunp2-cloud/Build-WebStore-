@@ -125,6 +125,7 @@ export default function ProductsPage() {
 
     useEffect(() => {
         loadProducts()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const loadProducts = async () => {
@@ -177,7 +178,7 @@ export default function ProductsPage() {
             }
             if (selectedCategories.length > 0) {
                 if (!p.category || p.category.length === 0) return false
-                const catNames = p.category.map((c: any) => typeof c === 'object' ? c.name : c)
+                const catNames = p.category.map((c: Category | string) => typeof c === 'object' && c ? c.name : c)
                 const hasMatch = selectedCategories.some(selected => catNames.includes(selected))
                 if (!hasMatch) return false
             }
@@ -211,7 +212,7 @@ export default function ProductsPage() {
         setShowBulkCreate(true)
     }
 
-    const handleUpdateStatus = async (prod: any, e: React.MouseEvent) => {
+    const handleUpdateStatus = async (prod: Product | DetailedProduct, e: React.MouseEvent) => {
         e.stopPropagation()
         const newStatus = prod.status === 'active' ? 'archived' : 'active'
         // Optimistic update
@@ -225,7 +226,7 @@ export default function ProductsPage() {
             })
             if (!res.ok) throw new Error()
             toast.success(`${t.dashboard.products.form.successMarkedAs} ${newStatus}`)
-        } catch (e) {
+        } catch (e: unknown) {
             toast.error(t.dashboard.products.form.failedUpdateStatus)
             setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: prod.status } : p))
         }
@@ -242,15 +243,15 @@ export default function ProductsPage() {
             if (!res.ok) throw new Error()
             toast.success(t.dashboard.products.form.restored)
             loadProducts()
-        } catch(e) {
+        } catch(e: unknown) {
             toast.error(t.dashboard.products.form.failedRestore)
         }
     }
 
-    const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+    const [productToDelete, setProductToDelete] = useState<Product | DetailedProduct | null>(null)
     const [isDeletingProduct, setIsDeletingProduct] = useState(false)
 
-    const handleDelete = (prod: any, e?: React.MouseEvent) => {
+    const handleDelete = (prod: Product | DetailedProduct, e?: React.MouseEvent) => {
         if (e) e.stopPropagation()
         setProductToDelete(prod)
     }
@@ -282,7 +283,7 @@ export default function ProductsPage() {
                 },
                 duration: 5000,
             })
-        } catch(e) {
+        } catch(e: unknown) {
             toast.error(t.dashboard.products.form.failedDelete)
             setProductToDelete(null)
             loadProducts()
@@ -737,7 +738,7 @@ export default function ProductsPage() {
                                                 <p className="m-0 truncate text-[14px] leading-[20px] font-medium text-[#F8FAFC]">{product.name}</p>
                                                 {product.category && product.category.length > 0 && (
                                                     <p className="m-0 text-[12px] leading-[16px] font-normal text-[#2DD4BF] truncate">
-                                                        {product.category.map((c: any) => typeof c === 'object' ? c.name : c).join(', ')}
+                                                        {product.category.map((c: Category | string) => typeof c === 'object' && c ? c.name : c).join(', ')}
                                                     </p>
                                                 )}
                                                 {product.sku && (
@@ -789,17 +790,17 @@ export default function ProductsPage() {
                                                     onClick={(e) => handleUpdateStatus(product, e)}
                                                     className={cn(
                                                         "w-[56px] h-[32px] rounded-full p-[4px] flex items-center shrink-0 transition-all duration-300 cursor-pointer overflow-hidden relative",
-                                                        (product as any).status === 'active' ? "border-transparent" : "bg-[#1E293B]"
+                                                        product.status === 'active' ? "border-transparent" : "bg-[#1E293B]"
                                                     )}
                                                     style={{
-                                                        border: (product as any).status === 'active' ? 'none' : '1px solid rgba(255, 255, 255, 0.12)',
-                                                        background: (product as any).status === 'active' ? "linear-gradient(90deg, #3B82F6 0%, #3989F3 7%, #378FEF 14%, #3596EC 21%, #339CE9 29%, #32A2E5 36%, #30A8E1 43%, #2FAEDE 50%, #2EB3DA 57%, #2DB9D6 64%, #2DBFD1 71%, #2CC4CD 79%, #2CC9C9 86%, #2DCFC4 93%, #2DD4BF 100%)" : undefined,
-                                                        boxShadow: (product as any).status === 'active' ? "0px 0px 12px 0px rgba(59, 130, 246, 0.4)" : undefined
+                                                        border: product.status === 'active' ? 'none' : '1px solid rgba(255, 255, 255, 0.12)',
+                                                        background: product.status === 'active' ? "linear-gradient(90deg, #3B82F6 0%, #3989F3 7%, #378FEF 14%, #3596EC 21%, #339CE9 29%, #32A2E5 36%, #30A8E1 43%, #2FAEDE 50%, #2EB3DA 57%, #2DB9D6 64%, #2DBFD1 71%, #2CC4CD 79%, #2CC9C9 86%, #2DCFC4 93%, #2DD4BF 100%)" : undefined,
+                                                        boxShadow: product.status === 'active' ? "0px 0px 12px 0px rgba(59, 130, 246, 0.4)" : undefined
                                                     }}
                                                 >
                                                     <div className={cn(
                                                         "w-[24px] h-[24px] bg-white rounded-full shrink-0 transition-transform duration-300 drop-shadow-md",
-                                                        (product as any).status === 'active' ? "translate-x-[24px]" : "translate-x-0"
+                                                        product.status === 'active' ? "translate-x-[24px]" : "translate-x-0"
                                                     )} />
                                                 </div>
                                             </div>

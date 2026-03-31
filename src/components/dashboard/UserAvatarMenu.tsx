@@ -43,6 +43,7 @@ export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarM
         } catch {
             toast.error('Network error. You may need to refresh.')
         }
+
     }
 
     return (

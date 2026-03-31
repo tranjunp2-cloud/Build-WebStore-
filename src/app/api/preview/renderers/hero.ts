@@ -6,10 +6,25 @@ import { TemplateTheme } from './styles'
 import { getHeroImage } from './images'
 
 // Category is injected at render time
+export type RenderHeroBlock = Record<string, unknown> & {
+  headline?: string;
+  subheadline?: string;
+  ctaButtons?: { label?: string; url?: string; style?: string }[];
+  variant?: string;
+  image?: { url?: string; alt?: string };
+  alignment?: string;
+  fullWidth?: boolean;
+  showRating?: boolean;
+  extraText?: string;
+  smallText?: string;
+  tags?: string;
+  highlightText?: string;
+}
+
 let _category = 'business'
 export function setHeroCategory(cat: string) { _category = cat }
 
-export function renderHero(block: any, t: TemplateTheme, category?: string): string {
+export function renderHero(block: RenderHeroBlock, t: TemplateTheme, category?: string): string {
   if (category) _category = category
   const h = block.headline || ''
   const sub = block.subheadline || ''

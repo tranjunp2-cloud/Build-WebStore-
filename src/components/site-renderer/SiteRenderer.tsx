@@ -1,15 +1,34 @@
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
+import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
-type SiteRendererProps = {
-    site: any
-    page: any
+export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
+
+export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null };
+
+export type SiteRendererProps = {
+    site: {
+        theme?: {
+            primaryColor?: string
+            secondaryColor?: string
+            backgroundColor?: string
+            fontHeading?: string
+            fontBody?: string
+            colorMode?: 'dark' | 'light'
+        }
+        [key: string]: unknown
+    }
+    page: {
+        layout?: unknown[]
+        [key: string]: unknown
+    }
+    pages?: NavPage[]
 }
 
-export function SiteRenderer({ site, page }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
     const theme: ThemeConfig = {
         primaryColor: site.theme?.primaryColor || '#0ea5e9',
         secondaryColor: site.theme?.secondaryColor || '#d946ef',
@@ -19,7 +38,8 @@ export function SiteRenderer({ site, page }: SiteRendererProps) {
         colorMode: site.theme?.colorMode || 'dark',
     }
 
-    const blocks: any[] = page.layout || []
+    type PreviewBlock = { blockType: string; links?: NavLinkItem[]; [key: string]: unknown }
+    const blocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
 
     return (
         <>
@@ -52,13 +72,19 @@ export function SiteRenderer({ site, page }: SiteRendererProps) {
                     return null
                 }
 
+                const normalizedBlock = block.blockType === 'navigation'
+                    ? {
+                        ...block,
+                        links: filterNavigationLinksByVisibility(block.links, pages),
+                    }
+                    : block
+
                 return (
                     <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
-                        <BlockComponent block={block} theme={theme} />
+                        <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
                     </BlockErrorBoundary>
                 )
             })}
         </>
     )
 }
-

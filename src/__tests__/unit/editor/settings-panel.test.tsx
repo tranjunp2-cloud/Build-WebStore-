@@ -48,12 +48,12 @@ describe('SettingsPanel', () => {
 
     // ── Empty state ──────────────────────────────────────────────────────
 
-    it('renders empty state when no block is selected', () => {
+    it('defaults to Global Site Settings when no block is selected', () => {
         // Arrange & Act
         render(<SettingsPanel {...defaultProps} block={null} />)
 
         // Assert
-        expect(screen.getByText('Select a block to edit')).toBeInTheDocument()
+        expect(screen.getByText('Global Site Settings')).toBeInTheDocument()
     })
 
     // ── Block info header ────────────────────────────────────────────────
