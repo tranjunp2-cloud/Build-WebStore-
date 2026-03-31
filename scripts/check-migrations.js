@@ -115,7 +115,7 @@ function getNewBlockSlugsFromDiff() {
     if (!diff) return slugs
 
     // Detect new block slug definitions: +    slug: 'hero',
-    const regex = /^\+.*slug:\s*['"](\w+)['"]/gm
+    const regex = /^\+.*slug:\s*['"]([a-zA-Z0-9_-]+)['"]/gm
     let match
     while ((match = regex.exec(diff)) !== null) {
       const slug = match[1]

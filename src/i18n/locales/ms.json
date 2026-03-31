@@ -782,5 +782,59 @@
             "one": "{count} keputusan",
             "other": "{count} keputusan"
         }
+    },
+    "help": {
+        "nav": {
+            "overview": "📋 Gambaran Keseluruhan",
+            "qna": "❓ S&J",
+            "modules": "📚 Panduan Modul"
+        },
+        "overview": {
+            "title": "Pusat Bantuan",
+            "subtitle": "Ketahui cara menggunakan sistem pengurusan kedai dalam talian anda.",
+            "welcomeTitle": "👋 Selamat datang ke EchPrime!",
+            "welcomeDesc": "EchPrime CMS membantu anda menguruskan keseluruhan kedai dalam talian anda — daripada mencipta laman web, menguruskan produk, memproses pesanan hingga menganalisis hasil. Berikut adalah gambaran keseluruhan ciri utama.",
+            "featuresTitle": "🚀 Ciri Utama",
+            "features": {
+                "dashboardTitle": "Papan Pemuka",
+                "dashboardDesc": "Lihat gambaran masa nyata tentang hasil, pesanan, dan pelawat.",
+                "aiBuilderTitle": "Pembina Laman Web AI",
+                "aiBuilderDesc": "Cipta laman web jualan profesional dalam hanya 5 minit dengan AI.",
+                "productsTitle": "Produk",
+                "productsDesc": "Uruskan produk, harga RM, inventori, Lencana Halal, dan imej produk.",
+                "ordersTitle": "Pesanan",
+                "ordersDesc": "Proses pesanan COD, Pindahan Bank, DuitNow. Cetak invois dengan satu klik.",
+                "blogTitle": "Blog",
+                "blogDesc": "Tulis artikel blog mesra SEO untuk menarik lebih ramai pelanggan.",
+                "settingsTitle": "Tetapan Kedai",
+                "settingsDesc": "Konfigurasikan domain, pembayaran, dan jemput staf pentadbir."
+            },
+            "needHelpTitle": "📞 Perlukan lebih bantuan?",
+            "needHelpDesc": "Jika anda tidak menjumpai jawapan, hubungi pasukan sokongan kami melalui WhatsApp atau e-mel "
+        },
+        "qna": {
+            "searchPlaceholder": "Cari soalan...",
+            "emptyTitle": "Tiada jawapan dijumpai",
+            "emptyDesc": "Cuba kata kunci lain atau hubungi sokongan melalui WhatsApp.",
+            "categories": {
+                "productsTitle": "🛍️ Pengurusan Produk",
+                "qAddProduct": "Bagaimana cara menambah produk baru?",
+                "aAddProduct": "Pergi ke menu <strong>Produk</strong> → klik <strong>[+ Tambah Produk]</strong> di bahagian atas kanan. Isi nama, harga RM, penerangan, muat naik imej produk (maksimum 10, dicadangkan format WebP). Klik <strong>Simpan</strong>.",
+                "qMultipleImages": "Bagaimana memuat naik pelbagai imej?",
+                "aMultipleImages": "Seret dan lepas imej ke kawasan muat naik, atau gunakan <strong>Semak Imbas Fail</strong>. Maksimum 10 imej, ≤ 5MB setiap satu. Format: JPG, PNG, WebP.",
+                "qHalal": "Di manakah Lencana Halal dipaparkan?",
+                "aHalal": "Lencana Halal (JAKIM) dipaparkan pada <strong>Kad Produk</strong> dan <strong>Halaman Perincian Produk</strong> di kedai. Aktifkannya dalam borang produk → bahagian <strong>Pensijilan Halal</strong>.",
+                "ordersTitle": "🛒 Pengurusan Pesanan",
+                "qCod": "Bagaimana pesanan COD diproses?",
+                "aCod": "Pesanan COD akan mempunyai status <strong>Menunggu Pembayaran</strong> sehingga penghantar mengesahkan kutipan. Anda boleh mengemas kini status secara manual dalam perincian pesanan → <strong>Tandakan sebagai Dibayar</strong>.",
+                "qInvoice": "Bagaimana mencetak slip pembungkusan / invois?",
+                "aInvoice": "Pergi ke <strong>Pesanan</strong> → pilih pesanan → klik <strong>Cetak Invois</strong> atau <strong>Cetak Slip Pembungkusan</strong>. Sistem akan menjana PDF untuk dicetak.",
+                "paymentsTitle": "💳 Pembayaran",
+                "qFpx": "Apakah kaedah pembayaran yang disokong?",
+                "aFpx": "EchPrime menyokong: <strong>FPX</strong> (perbankan dalam talian Malaysia), <strong>Kad Kredit/Debit</strong> (Visa, Mastercard), <strong>DuitNow QR</strong>, <strong>COD</strong> (Tunai Semasa Penghantaran), dan <strong>Pemindahan Bank</strong> manual.",
+                "qSst": "Adakah SST 6% dikira secara automatik?",
+                "aSst": "Ya, apabila anda mengaktifkan <strong>SST</strong> dalam <strong>Tetapan Kedai → Konfigurasi Cukai</strong>, sistem mengira 6% SST secara automatik dan memaparkannya dengan jelas kepada pembeli."
+            }
+        }
     }
 }

@@ -782,5 +782,59 @@
             "one": "{count} result",
             "other": "{count} results"
         }
+    },
+    "help": {
+        "nav": {
+            "overview": "📋 Overview",
+            "qna": "❓ Q&A",
+            "modules": "📚 Module Guides"
+        },
+        "overview": {
+            "title": "Help Center",
+            "subtitle": "Learn how to use your online store management system.",
+            "welcomeTitle": "👋 Welcome to EchPrime!",
+            "welcomeDesc": "EchPrime CMS helps you manage your entire online store — from creating websites, managing products, processing orders to analyzing revenue. Here is an overview of the main features.",
+            "featuresTitle": "🚀 Key Features",
+            "features": {
+                "dashboardTitle": "Dashboard",
+                "dashboardDesc": "View real-time overview of revenue, orders, and visitors.",
+                "aiBuilderTitle": "AI Website Builder",
+                "aiBuilderDesc": "Create a professional sales website in just 5 minutes with AI.",
+                "productsTitle": "Products",
+                "productsDesc": "Manage products, RM prices, inventory, Halal Badge, and product images.",
+                "ordersTitle": "Orders",
+                "ordersDesc": "Process COD, Bank Transfer, DuitNow orders. Print invoices with one click.",
+                "blogTitle": "Blog",
+                "blogDesc": "Write SEO-friendly blog posts to attract more customers.",
+                "settingsTitle": "Store Settings",
+                "settingsDesc": "Configure domain, payments, and invite admin staff."
+            },
+            "needHelpTitle": "📞 Need more help?",
+            "needHelpDesc": "If you can't find the answer, contact our support team via WhatsApp or email "
+        },
+        "qna": {
+            "searchPlaceholder": "Search questions...",
+            "emptyTitle": "No answers found",
+            "emptyDesc": "Try different keywords or contact support via WhatsApp.",
+            "categories": {
+                "productsTitle": "🛍️ Product Management",
+                "qAddProduct": "How to add new products?",
+                "aAddProduct": "Go to <strong>Products</strong> menu → click <strong>[+ Add Product]</strong> at top right. Fill in name, RM price, description, upload product images (max 10, WebP recommended). Click <strong>Save</strong>.",
+                "qMultipleImages": "How to upload multiple images?",
+                "aMultipleImages": "Drag and drop images into upload area, or use <strong>Browse Files</strong>. Max 10 images, ≤ 5MB each. Formats: JPG, PNG, WebP.",
+                "qHalal": "Where does Halal Badge display?",
+                "aHalal": "Halal Badge (JAKIM) shows on <strong>Product Card</strong> and <strong>Product Detail Page</strong> at storefront. Enable it in product form → <strong>Halal Certification</strong> section.",
+                "ordersTitle": "🛒 Order Management",
+                "qCod": "How are COD orders processed?",
+                "aCod": "COD orders will have a <strong>Pending Payment</strong> status until shipper confirms collection. You can manually update status in order details → <strong>Mark as Paid</strong>.",
+                "qInvoice": "How to print packing slips/invoices?",
+                "aInvoice": "Go to <strong>Orders</strong> → select order → click <strong>Print Invoice</strong> or <strong>Print Packing Slip</strong>. The system will generate a PDF for printing.",
+                "paymentsTitle": "💳 Payments",
+                "qFpx": "Which payment methods are supported?",
+                "aFpx": "EchPrime supports: <strong>FPX</strong> (Malaysia online banking), <strong>Credit/Debit Card</strong> (Visa, Mastercard), <strong>DuitNow QR</strong>, <strong>COD</strong> (Cash on Delivery), and manual <strong>Bank Transfer</strong>.",
+                "qSst": "Is SST 6% calculated automatically?",
+                "aSst": "Yes, when you enable <strong>SST</strong> in <strong>Store Settings → Tax Configuration</strong>, the system calculates 6% SST automatically and displays it clearly to the buyer."
+            }
+        }
     }
 }
