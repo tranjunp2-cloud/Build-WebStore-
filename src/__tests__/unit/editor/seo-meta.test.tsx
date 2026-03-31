@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
 import { toast } from 'sonner'
@@ -21,7 +21,7 @@ vi.mock('sonner', () => ({
     },
 }))
 
-global.fetch = vi.fn() as any
+global.fetch = vi.fn() as Mock
 
 describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
 
@@ -35,9 +35,9 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
                 <SettingsPanel 
                     block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
                     onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
-                    site={{ id: 'site-1', name: 'My Site' } as any}
+                    site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
                     currentPageId="page-1"
-                    pages={[{ id: 'page-1', title: 'Home', slug: '/', isHomepage: true, seoTitle: 'SEO Title', seoDescription: 'SEO Desc' } as any]}
+                    pages={[{ id: 'page-1', title: 'Home', slug: '/', isHomepage: true, seoTitle: 'SEO Title', seoDescription: 'SEO Desc' }] as unknown as React.ComponentProps<typeof SettingsPanel>['pages']}
                     onPageUpdate={vi.fn().mockImplementation(async (id, changes) => {
                         return { id: 'page-1', title: 'Home', slug: '/', isHomepage: true, seoTitle: 'SEO Title', seoDescription: 'SEO Desc', ...changes }
                     })}
@@ -63,9 +63,9 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
                 <SettingsPanel 
                     block={null} blockIndex={null} theme={undefined} siteName="Test" siteStatus="draft"
                     onThemeChange={vi.fn()} onDeleteBlock={vi.fn()} onDuplicateBlock={vi.fn()} onBlockFieldChange={vi.fn()} onBlockUpdate={vi.fn()}
-                    site={{ id: 'site-1', name: 'My Site' } as any}
+                    site={{ id: 'site-1', name: 'My Site' } as unknown as React.ComponentProps<typeof SettingsPanel>['site']}
                     currentPageId="page-1"
-                    pages={[mockPage as any]}
+                    pages={[mockPage as unknown as React.ComponentProps<typeof SettingsPanel>['pages'][0]]}
                     onPageUpdate={vi.fn().mockImplementation(async (id, changes) => {
                         mockPage = { ...mockPage, ...changes }
                         return mockPage
@@ -76,7 +76,7 @@ describe('SEO & Meta Data Logic (TC-F05.29a to TC-F05.30)', () => {
             
             const aiButton = screen.getByText('Automatic SEO Optimization')
             
-            ;(global.fetch as any).mockResolvedValueOnce({
+            ;(global.fetch as Mock).mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({
                     title: 'Generated Title',
