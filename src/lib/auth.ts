@@ -43,15 +43,18 @@ export async function getCurrentUser() {
         const secret = new TextEncoder().encode(payloadSecret)
         const { payload: decoded } = await jwtVerify(token, secret)
 
+        const isIdValid =
+            typeof decoded.id === 'number' ||
+            (typeof decoded.id === 'string' && /^[a-zA-Z0-9-]+$/.test(decoded.id))
+
         if (
-            typeof decoded.id === 'string' &&
-            /^[a-zA-Z0-9-]+$/.test(decoded.id) &&
+            isIdValid &&
             decoded.collection === 'users' &&
             decoded.mfa_verified === true
         ) {
             const user = await payload.findByID({
                 collection: 'users',
-                id: decoded.id as string,
+                id: decoded.id as string | number,
             })
             return user || null
         }

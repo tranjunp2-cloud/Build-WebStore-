@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -8,6 +9,55 @@ import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+
+
+// Flexible interface to handle unpredictable AI JSON structures
+interface AIBlock {
+    blockType?: string;
+    id?: string;
+    name?: string;
+    url?: string;
+    href?: string;
+    link?: string;
+    label?: string;
+    text?: string;
+    title?: string;
+    heading?: string;
+    description?: string;
+    desc?: string;
+    show?: boolean;
+    style?: string;
+    icon?: string;
+    quote?: string;
+    content?: string;
+    review?: string;
+    author?: string;
+    customer?: string;
+    role?: string;
+    position?: string;
+    company?: string;
+    organization?: string;
+    rating?: number;
+    price?: string;
+    included?: boolean;
+    fieldName?: string;
+    fieldType?: string;
+    type?: string;
+    required?: boolean;
+    placeholder?: string;
+    backgroundImage?: unknown;
+    links?: AIBlock[];
+    navLinks?: AIBlock[];
+    ctaButton?: AIBlock;
+    ctaButtons?: AIBlock[];
+    columns?: AIBlock[];
+    formFields?: AIBlock[];
+    features?: AIBlock[];
+    items?: AIBlock[];
+    testimonials?: AIBlock[];
+    plans?: AIBlock[];
+    [key: string]: unknown;
+}
 
 /**
  * POST /api/ai/generate-site
@@ -46,8 +96,8 @@ export async function POST(req: NextRequest) {
         }
 
         // Get tenant ID — auto-create if missing (legacy accounts)
-        let tenantId = (user as any).tenants?.[0]?.tenant
-        let resolvedTenantId = typeof tenantId === 'object' ? tenantId.id : tenantId
+        let tenantId = (user as { tenants?: Array<{ tenant: unknown }> }).tenants?.[0]?.tenant
+        let resolvedTenantId = typeof tenantId === 'object' && tenantId ? (tenantId as { id: string }).id : (tenantId as string)
 
         if (!resolvedTenantId) {
             const fallbackSlug = `store-${user.id}`
@@ -67,14 +117,13 @@ export async function POST(req: NextRequest) {
                     id: user.id,
                     data: {
                         tenants: [{ tenant: recoveredTenant.id, role: 'owner' }],
-                    } as any,
+                    } as Record<string, unknown>,
                 })
 
-                resolvedTenantId = recoveredTenant.id
-                console.log(`[AI Generate] Re-attached tenant ${recoveredTenant.id} to user ${user.id}`)
-            } else {
+                resolvedTenantId = String(recoveredTenant.id)
+                            } else {
                 // Auto-create tenant for legacy users without one
-                const firstName = (user as any).firstName || (user as any).name || 'My'
+                const firstName = (user as { firstName?: string }).firstName || (user as { name?: string }).name || 'My'
                 const newTenant = await payload.create({
                     collection: 'tenants',
                     data: {
@@ -89,11 +138,10 @@ export async function POST(req: NextRequest) {
                     id: user.id,
                     data: {
                         tenants: [{ tenant: newTenant.id, role: 'owner' }],
-                    } as any,
+                    } as Record<string, unknown>,
                 })
-                resolvedTenantId = newTenant.id
-                console.log(`[AI Generate] Auto-created tenant ${newTenant.id} for user ${user.id}`)
-            }
+                resolvedTenantId = String(newTenant.id)
+                            }
         }
 
         // FR-15: Rate Limit - Free tier is limited to 1 AI generation
@@ -136,7 +184,7 @@ export async function POST(req: NextRequest) {
         const { result, events } = await generateSiteWithAI(businessInfo, extraInstructions, language)
 
         // Wait for hero image if it hasn't finished yet
-        let heroMedia: any = null
+        let heroMedia: { id: string } | null = null
         try {
             heroMedia = await heroImagePromise
         } catch (e) {
@@ -152,7 +200,7 @@ export async function POST(req: NextRequest) {
             limit: 1,
         })
 
-        let site: any
+        let site: Record<string, unknown>
 
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
@@ -236,9 +284,9 @@ export async function POST(req: NextRequest) {
                 heroBlock.backgroundImage = heroMedia.id
                 
                 // Update the corresponding SSE event so the frontend preview gets the full image object immediately
-                const heroEvent = events.find((e: any) => e.event === 'block_complete' && (e.data as any).block?.blockType === 'hero')
-                if (heroEvent) {
-                    (heroEvent.data as any).block.backgroundImage = heroMedia
+                const heroEvent = events.find((e) => e.event === 'block_complete' && (e.data as { block?: AIBlock })?.block?.blockType === 'hero')
+                if (heroEvent && heroEvent.data && (heroEvent.data as { block?: AIBlock }).block) {
+                    (heroEvent.data as { block: AIBlock }).block.backgroundImage = heroMedia
                 }
             }
         }
@@ -249,7 +297,7 @@ export async function POST(req: NextRequest) {
             result,
         })
 
-        const createdPages: any[] = []
+        const createdPages: Record<string, unknown>[] = []
 
         for (const pageDefinition of pageDefinitions) {
             const createdPage = await payload.create({
@@ -336,7 +384,7 @@ export async function POST(req: NextRequest) {
             timeMs,
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[AI Generate Site Error]', error)
         return NextResponse.json(
             { error: 'Failed to generate website. Please try again.' },
@@ -358,7 +406,7 @@ function normalizeInternalUrl(url: unknown): string {
     return url
 }
 
-function applyGeneratedSiteNavigation(blocks: any[], businessName: string): any[] {
+function applyGeneratedSiteNavigation(blocks: AIBlock[], businessName: string): AIBlock[] {
     const normalizedBlocks = cloneBlockData(blocks)
     const pageLinks = [
         { label: 'Home', url: '/' },
@@ -385,10 +433,13 @@ function applyGeneratedSiteNavigation(blocks: any[], businessName: string): any[
         if (block.blockType === 'hero' && Array.isArray(block.ctaButtons)) {
             return {
                 ...block,
-                ctaButtons: block.ctaButtons.map((button: any) => ({
-                    ...button,
-                    url: normalizeInternalUrl(button.url),
-                })),
+                ctaButtons: block.ctaButtons.map((button: AIBlock | string) => {
+                    if (typeof button === 'string') return { label: button, url: '#' }
+                    return {
+                        ...button,
+                        url: normalizeInternalUrl(button.url),
+                    }
+                }),
             }
         }
 
@@ -396,15 +447,22 @@ function applyGeneratedSiteNavigation(blocks: any[], businessName: string): any[
             return {
                 ...block,
                 logoText: block.logoText || businessName,
-                columns: block.columns.map((column: any) => ({
-                    ...column,
-                    links: Array.isArray(column.links)
-                        ? column.links.map((link: any) => ({
-                            ...link,
-                            url: normalizeInternalUrl(link.url),
-                        }))
-                        : column.links,
-                })),
+                columns: block.columns.map((column: AIBlock | string) => {
+                    if (typeof column === 'string') return { title: column, links: [] }
+                    
+                    return {
+                        ...column,
+                        links: Array.isArray(column.links)
+                            ? column.links.map((link: AIBlock | string) => {
+                                if (typeof link === 'string') return { label: link, url: '#' }
+                                return {
+                                    ...link,
+                                    url: normalizeInternalUrl(link.url),
+                                }
+                            })
+                            : column.links,
+                    }
+                }),
             }
         }
 
@@ -412,7 +470,7 @@ function applyGeneratedSiteNavigation(blocks: any[], businessName: string): any[
     })
 }
 
-function createPageHero(baseHero: any, options: {
+function createPageHero(baseHero: AIBlock | null, options: {
     headline: string
     subheadline: string
     primaryLabel?: string
@@ -420,7 +478,7 @@ function createPageHero(baseHero: any, options: {
     secondaryLabel?: string
     secondaryUrl?: string
     badgeText?: string
-}): any {
+}): AIBlock {
     const hero = cloneBlockData(baseHero || {
         blockType: 'hero',
         variant: 'centered',
@@ -458,9 +516,9 @@ function buildGeneratedPages({
     businessInfo,
     result,
 }: {
-    blocks: any[]
+    blocks: AIBlock[]
     businessInfo: { businessName: string; shortDescription: string; products: string }
-    result: any
+    result: Record<string, unknown>
 }) {
     const navigation = blocks.find((block) => block.blockType === 'navigation') || null
     const hero = blocks.find((block) => block.blockType === 'hero') || null
@@ -470,23 +528,23 @@ function buildGeneratedPages({
     const contact = blocks.find((block) => block.blockType === 'contact') || null
     const footer = blocks.find((block) => block.blockType === 'footer') || null
 
-    const compact = (pageBlocks: Array<any | null>) =>
+    const compact = (pageBlocks: Array<AIBlock | null>) =>
         pageBlocks.filter(Boolean).map((block) => cloneBlockData(block))
 
     return [
         {
             title: 'Homepage',
-            slug: '/',
+            slug: 'home',
             isHomepage: true,
             layout: cloneBlockData(blocks),
             seo: {
-                title: result.seo.title,
-                description: result.seo.description,
+                title: String((result.seo as Record<string, unknown>).title || ''),
+                description: String((result.seo as Record<string, unknown>).description || ''),
             },
         },
         {
             title: 'About',
-            slug: '/about',
+            slug: 'about',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -510,7 +568,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Products',
-            slug: '/products',
+            slug: 'products',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -534,7 +592,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Contact',
-            slug: '/contact',
+            slug: 'contact',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -566,19 +624,19 @@ function buildGeneratedPages({
  * 
  * This function normalizes ALL block types to match the Pages collection schema.
  */
-function sanitizeBlocksForPayload(blocks: any[]): any[] {
+function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
     return blocks.map(block => {
         const sanitized = { ...block }
 
         // Helper: normalize a link object → { label, url }
-        const normalizeLink = (link: any): { label: string; url: string; openInNewTab?: boolean } => {
+        const normalizeLink = (link: AIBlock | string): { label: string; url: string; openInNewTab?: boolean } => {
             if (typeof link === 'string') {
                 return { label: link, url: '#' }
             }
             return {
                 label: String(link.label || link.text || link.title || link.name || 'Link'),
                 url: String(link.url || link.href || link.link || '#'),
-                ...(link.openInNewTab !== undefined ? { openInNewTab: link.openInNewTab } : {}),
+                ...(link.openInNewTab !== undefined ? { openInNewTab: typeof link.openInNewTab === 'boolean' ? link.openInNewTab : undefined } : {}),
             }
         }
 
@@ -587,7 +645,7 @@ function sanitizeBlocksForPayload(blocks: any[]): any[] {
             // AI may use "navLinks" or "links" — normalize to "links"
             const rawLinks = sanitized.links || sanitized.navLinks || []
             sanitized.links = Array.isArray(rawLinks)
-                ? rawLinks.map(normalizeLink).filter((l: any) => l.label && l.label !== 'Link')
+                ? rawLinks.map(normalizeLink).filter((l: AIBlock) => l.label && l.label !== 'Link')
                 : []
             // Clean up wrong field name
             delete sanitized.navLinks
@@ -611,7 +669,7 @@ function sanitizeBlocksForPayload(blocks: any[]): any[] {
         // ── Hero: ctaButtons[] requires { label (required), url (required) } ──
         if (sanitized.blockType === 'hero') {
             if (Array.isArray(sanitized.ctaButtons)) {
-                sanitized.ctaButtons = sanitized.ctaButtons.map((btn: any) => {
+                sanitized.ctaButtons = sanitized.ctaButtons.map((btn: AIBlock | string) => {
                     if (typeof btn === 'string') {
                         return { label: btn, url: '#', style: 'primary' }
                     }
@@ -630,7 +688,7 @@ function sanitizeBlocksForPayload(blocks: any[]): any[] {
 
         // ── Contact/Form: formFields[] requires { fieldName, label, fieldType } ──
         if (sanitized.formFields && Array.isArray(sanitized.formFields)) {
-            sanitized.formFields = sanitized.formFields.map((field: any) => {
+            sanitized.formFields = sanitized.formFields.map((field: AIBlock | string) => {
                 if (typeof field === 'string') {
                     const name = field.toLowerCase()
                     let fieldType = 'text'
@@ -651,7 +709,7 @@ function sanitizeBlocksForPayload(blocks: any[]): any[] {
 
         // ── Footer: columns[].links[] requires { label, url } ──
         if (sanitized.blockType === 'footer' && Array.isArray(sanitized.columns)) {
-            sanitized.columns = sanitized.columns.map((col: any) => {
+            sanitized.columns = sanitized.columns.map((col: AIBlock | string) => {
                 if (typeof col === 'string') {
                     return { title: col, links: [] }
                 }
@@ -667,7 +725,7 @@ function sanitizeBlocksForPayload(blocks: any[]): any[] {
             // AI may use "items" instead of "features"
             const rawFeatures = sanitized.features || sanitized.items || []
             sanitized.features = Array.isArray(rawFeatures)
-                ? rawFeatures.map((item: any) => {
+                ? rawFeatures.map((item: AIBlock | string) => {
                     if (typeof item === 'string') {
                         return { title: item, description: '', icon: '✨' }
                     }
@@ -690,7 +748,7 @@ function sanitizeBlocksForPayload(blocks: any[]): any[] {
             // AI may use "items" instead of "testimonials"
             const rawTestimonials = sanitized.testimonials || sanitized.items || []
             sanitized.testimonials = Array.isArray(rawTestimonials)
-                ? rawTestimonials.map((item: any) => {
+                ? rawTestimonials.map((item: AIBlock | string) => {
                     if (typeof item === 'string') {
                         return { quote: item, name: 'Customer', rating: 5 }
                     }
@@ -715,14 +773,14 @@ function sanitizeBlocksForPayload(blocks: any[]): any[] {
 
         // ── Pricing: plans[] normalization ──
         if (sanitized.blockType === 'pricing' && Array.isArray(sanitized.plans)) {
-            sanitized.plans = sanitized.plans.map((plan: any) => {
+            sanitized.plans = sanitized.plans.map((plan: AIBlock | string) => {
                 if (typeof plan === 'string') {
                     return { name: plan, price: 'RM 0', features: [] }
                 }
                 if (Array.isArray(plan.features)) {
-                    plan.features = plan.features.map((f: any) =>
-                        typeof f === 'string' ? { text: f, included: true } : f
-                    )
+                    plan.features = plan.features.map((f: AIBlock | string) =>
+                        typeof f === 'string' ? { text: f, included: true } : (f as { text?: string; included?: boolean })
+                    ) as Array<{ text?: string; included?: boolean }>
                 }
                 return plan
             })

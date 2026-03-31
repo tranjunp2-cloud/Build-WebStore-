@@ -2,6 +2,7 @@
 
 import { useCartStore, type CartItem } from '@/store/cartStore'
 import { X, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react'
+import { toast } from 'sonner'
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -11,6 +12,7 @@ function formatPrice(price: number, currency: string) {
 
 export function CartDrawer({ siteSlug }: { siteSlug: string }) {
     const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, itemCount } = useCartStore()
+    const hasCheckoutRoute = Boolean(siteSlug)
 
     if (!isOpen) return null
 
@@ -127,14 +129,28 @@ export function CartDrawer({ siteSlug }: { siteSlug: string }) {
                             <span style={{ fontSize: '16px', fontWeight: 600 }}>Subtotal</span>
                             <span style={{ fontSize: '20px', fontWeight: 700 }}>{formatPrice(subtotal(), currency)}</span>
                         </div>
-                        <a href={`/sites/${siteSlug}/checkout`}
-                            style={{
-                                display: 'block', background: '#111', color: 'white', textAlign: 'center',
-                                padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: 600,
-                                textDecoration: 'none',
-                            }}>
-                            Proceed to Checkout
-                        </a>
+                        {hasCheckoutRoute ? (
+                            <a href={`/sites/${siteSlug}/checkout`}
+                                style={{
+                                    display: 'block', background: '#111', color: 'white', textAlign: 'center',
+                                    padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: 600,
+                                    textDecoration: 'none',
+                                }}>
+                                Proceed to Checkout
+                            </a>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => toast.info('Tính năng Checkout đang được phát triển')}
+                                style={{
+                                    display: 'block', width: '100%', background: '#111', color: 'white', textAlign: 'center',
+                                    padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: 600,
+                                    border: 'none', cursor: 'pointer',
+                                }}
+                            >
+                                Proceed to Checkout
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

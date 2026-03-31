@@ -66,6 +66,21 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next()
     }
 
+    // ── Local Direct Access (e.g. /sites/{slug}/...) ──────────────────
+    // This ensures local testing bypasses subdomain logic but still sets the header
+    // so that dynamic routes like not-found.tsx can extract the correct tenant.
+    if (pathname.startsWith('/sites/')) {
+        const parts = pathname.split('/')
+        if (parts.length >= 3) {
+            const tenantSlug = parts[2]
+            const response = NextResponse.next()
+            response.headers.set('x-tenant-slug', tenantSlug)
+            response.headers.set('x-tenant-type', 'local')
+            // Auth Guard paths do not overlap with /sites/, so early return is safe.
+            return response
+        }
+    }
+
     // ── Tenant subdomain: {slug}.primeweb.app ───────────────────────────
     const isSubdomain =
         hostname.endsWith(`.${PLATFORM_DOMAIN}`) &&
@@ -149,6 +164,15 @@ export async function middleware(req: NextRequest) {
     // 1. Must have token
     // 2. Token MUST have mfa_verified === true (stops curl/API bypass where users get payload default token)
     if (isProtectedRoute) {
+        // Prevent M2M service accounts from accessing the Frontend UI
+        if (hasToken && tokenEmail === 'sso-service@primeweb.app') {
+            url.pathname = '/login'
+            url.searchParams.set('error', 'serviceAccountUI')
+            const res = NextResponse.redirect(url)
+            res.cookies.delete('payload-token')
+            return res
+        }
+
         if (!hasToken) {
             url.pathname = '/login'
             url.searchParams.set('returnUrl', pathname)

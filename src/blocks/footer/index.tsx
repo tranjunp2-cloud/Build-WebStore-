@@ -3,9 +3,11 @@
 import type { BlockProps } from '../types'
 import type { FooterConfig } from './config'
 import { GradientLine } from '../shared/decorative'
+import { mergeFooterSocialsWithSite } from '@/lib/site-settings'
 
-export function FooterBlock({ block, theme }: BlockProps<FooterConfig>) {
-    const { logoText, tagline, columns = [], copyrightText } = block
+export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
+    const mergedBlock = mergeFooterSocialsWithSite(block, site)
+    const { logoText, tagline, columns = [], copyrightText } = mergedBlock
     const pc = theme.primaryColor
 
     return (
@@ -18,8 +20,8 @@ export function FooterBlock({ block, theme }: BlockProps<FooterConfig>) {
                     {/* Brand Column */}
                     <div className="md:col-span-1">
                         <div className="font-bold text-2xl font-heading mb-4">
-                            {block.logo?.url ? (
-                                <img src={block.logo.url} alt={logoText} className="h-8 w-auto" />
+                            {mergedBlock.logo?.url ? (
+                                <img src={mergedBlock.logo.url} alt={logoText} className="h-8 w-auto" />
                             ) : (
                                 <span style={{
                                     background: `linear-gradient(135deg, ${pc}, ${pc}80)`,
@@ -34,9 +36,9 @@ export function FooterBlock({ block, theme }: BlockProps<FooterConfig>) {
                         {tagline && <p className="opacity-40 text-sm leading-relaxed max-w-xs">{tagline}</p>}
 
                         {/* Social icons placeholder */}
-                        {block.socials && Array.isArray(block.socials) && block.socials.length > 0 && (
+                        {mergedBlock.socials && Array.isArray(mergedBlock.socials) && mergedBlock.socials.length > 0 && (
                             <div className="flex gap-3 mt-6">
-                                {block.socials.map((social: any, i: number) => (
+                                {mergedBlock.socials.map((social: { url?: string; platform?: string; label?: string }, i: number) => (
                                     <a
                                         key={i}
                                         href={social.url || '#'}

@@ -5,7 +5,7 @@ export type BlockData = { blockType: string } & Record<string, unknown>
 export type ThemeData = Record<string, unknown>
 
 export type AIAction = {
-    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block'
+    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block'
     changes?: Record<string, unknown>
     blockIndex?: number
     afterIndex?: number

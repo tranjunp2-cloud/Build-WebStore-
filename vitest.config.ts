@@ -79,6 +79,9 @@ export default defineConfig({
                 'src/components/dashboard/DashboardBanner.tsx',
                 // Storefront sitemap XML route — tested via E2E
                 'src/app/sites/[slug]/sitemap.xml/**',
+                // Editor and AI components — heavy DOM/events, tested via E2E
+                'src/components/editor/**',
+                'src/components/ai/**',
             ],
             thresholds: {
                 // CI fails if coverage drops below these minimums

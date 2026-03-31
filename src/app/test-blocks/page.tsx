@@ -12,7 +12,7 @@ export default function TestBlocksPage() {
             backgroundColor: '#09090b',
             fontHeading: 'Outfit',
             fontBody: 'Inter',
-            colorMode: 'dark',
+            colorMode: 'dark' as const,
         }
     }
 

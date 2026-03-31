@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -30,10 +31,10 @@ export const POST = withAuth(async (user, req) => {
         const { templateId } = data!
 
         // Find template
-        const template: any = await payload.findByID({
+        const template = await payload.findByID({
             collection: 'templates',
             id: templateId,
-        })
+        }) as Record<string, unknown>
 
         if (!template) {
             return NextResponse.json({ error: 'Template not found' }, { status: 404 })
@@ -51,14 +52,14 @@ export const POST = withAuth(async (user, req) => {
         }
 
         // Create site from template
-        const site: any = await payload.create({
+        const site = await payload.create({
             collection: 'sites',
             data: {
-                name: template.name,
+                name: String(template.name || 'Untitled'),
                 tenant: tenant.id,
                 status: 'draft',
-                siteType: Array.isArray(template.category) ? template.category[0] : (template.category || 'business'),
-                theme: template.defaultTheme || {
+                siteType: Array.isArray(template.category) ? String(template.category[0]) : String(template.category || 'business'),
+                theme: (template.defaultTheme as Record<string, unknown>) || {
                     primaryColor: '#0ea5e9',
                     fontHeading: 'Outfit',
                     fontBody: 'Inter',
@@ -67,8 +68,10 @@ export const POST = withAuth(async (user, req) => {
             },
         })
 
-        // Create homepage with template blocks
-        const blocks = template.defaultBlocks || []
+        // Create homepage and 404 page with template blocks
+        const blocks = (template.defaultBlocks as Record<string, unknown>[]) || []
+        
+        // Homepage
         await payload.create({
             collection: 'pages',
             data: {
@@ -82,11 +85,30 @@ export const POST = withAuth(async (user, req) => {
             },
         })
 
+        // 404 Page
+        await payload.create({
+            collection: 'pages',
+            data: {
+                title: '404 Not Found',
+                slug: '404',
+                site: site.id,
+                tenant: tenant.id,
+                isHomepage: false,
+                status: 'draft',
+                layout: blocks,
+                seo: {
+                    title: '404 - Page Not Found',
+                    description: 'The page you are looking for does not exist.',
+                    noIndex: true,
+                },
+            },
+        })
+
         // Increment template usage count
         await payload.update({
             collection: 'templates',
             id: templateId,
-            data: { usageCount: (template.usageCount || 0) + 1 },
+            data: { usageCount: (Number(template.usageCount) || 0) + 1 },
         })
 
         return NextResponse.json({
@@ -96,10 +118,10 @@ export const POST = withAuth(async (user, req) => {
             templateName: template.name,
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Apply Template Error]', error)
         return NextResponse.json(
-            { error: error?.message || 'Failed to apply template' },
+            { error: 'Failed to apply template' },
             { status: 500 },
         )
     }

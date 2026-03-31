@@ -7,15 +7,16 @@ import { getPayload } from 'payload'
 import { getCurrentUser } from '@/lib/auth'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
-vi.mock('@/lib/auth', () => ({
-    withAuth: vi.fn().mockImplementation((handler: any) => {
-        return async (req: any, ctx: any) => {
-            const user = { id: 'user-1', email: 'admin@example.com' }
-            return handler(user, req, ctx)
-        }
-    }),
-    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
-}))
+vi.mock('@/lib/auth', () => {
+    const user = { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1' }] }
+    return {
+        // vi.mock factory runs before imports — types unavailable, use unknown
+        withAuth: vi.fn().mockImplementation((handler: unknown) => {
+            return async (req: unknown, ctx: unknown) => (handler as Function)(user, req, ctx)
+        }),
+        getCurrentUser: vi.fn().mockResolvedValue(user),
+    }
+})
 
 // Mock cookies từ next/headers
 vi.mock('next/headers', () => {
@@ -37,11 +38,11 @@ vi.mock('payload', () => {
                 const token = headers.get('Authorization')
                 // Nếu header auth hợp lệ (mocked ở trên) -> Cho phép user đi tiếp
                 if (token === 'JWT mock-valid-token') {
-                    return { user: { id: 'user-1', email: 'admin@example.com' } }
+                    return { user: { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1' }] } }
                 }
                 return { user: null }
             }),
-            findByID: vi.fn().mockResolvedValue({ id: 'site-123', status: 'draft' }),
+            findByID: vi.fn().mockResolvedValue({ id: 'site-123', status: 'draft', tenant: 'tenant-1' }),
             find: vi.fn().mockResolvedValue({
                 docs: [
                     { id: 'page-home', isHomepage: true, layout: [] }
@@ -136,7 +137,7 @@ describe('Sites APIs', () => {
         it('returns 404 if site is not found when publishing', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1' } }),
+                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] } }),
                 findByID: vi.fn().mockResolvedValue(null) // Mock Not found
             })
 
@@ -148,8 +149,8 @@ describe('Sites APIs', () => {
         it('returns 200 and successfully publishes the site', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1' } }),
-                findByID: vi.fn().mockResolvedValue({ id: '123', status: 'draft' }),
+                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] } }),
+                findByID: vi.fn().mockResolvedValue({ id: '123', status: 'draft', tenant: 'tenant-1' }),
                 update: vi.fn().mockResolvedValue({ id: '123', status: 'published', publishedAt: new Date().toISOString() })
             })
 
@@ -164,8 +165,8 @@ describe('Sites APIs', () => {
         it('returns 200 and successfully unpublishes the site', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1' } }),
-                findByID: vi.fn().mockResolvedValue({ id: '123', status: 'published' }),
+                auth: vi.fn().mockResolvedValue({ user: { id: 'user-1', tenants: [{ tenant: 'tenant-1' }] } }),
+                findByID: vi.fn().mockResolvedValue({ id: '123', status: 'published', tenant: 'tenant-1' }),
                 update: vi.fn().mockResolvedValue({ id: '123', status: 'draft' })
             })
 
@@ -201,6 +202,7 @@ describe('Sites APIs', () => {
                     id: '123', 
                     name: 'Test Site', 
                     status: 'draft', 
+                    tenant: 'tenant-1',
                     siteType: 'business',
                     locale: 'ms',
                     shippingConfig: { westRate: 800, eastRate: 1500 }

@@ -1,5 +1,6 @@
 import { AppShell } from '@/components/AppShell'
 import { Toaster } from '@/components/ui/sonner'
+import { I18nProvider } from '@/i18n'
 
 export default function EditorLayout({
     children,
@@ -9,8 +10,10 @@ export default function EditorLayout({
     // Editor has its own full-screen layout (no dashboard sidebar)
     return (
         <AppShell>
-            {children}
-            <Toaster position="bottom-right" />
+            <I18nProvider defaultLocale="en">
+                {children}
+                <Toaster position="bottom-right" />
+            </I18nProvider>
         </AppShell>
     )
 }

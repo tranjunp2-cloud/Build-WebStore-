@@ -1,14 +1,26 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
+import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+
+function normalizeBlocksForPersistence(blocks: Record<string, unknown>[]) {
+    return blocks.map(block => {
+        if (block?.blockType === 'socialWidget') {
+            return normalizeSocialWidgetConfig(block)
+        }
+
+        return block
+    })
+}
 
 /**
  * PATCH /api/sites/[siteId]/save
  * Saves updated blocks (layout) and/or theme for a site.
- * Body: { blocks?: any[], theme?: any }
+ * Body: { blocks?: unknown[], theme?: unknown }
  */
 export async function PATCH(
     req: NextRequest,
@@ -39,16 +51,35 @@ export async function PATCH(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
+        const pageId = req.nextUrl.searchParams.get('pageId')
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
+        const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
 
-        const { blocks, theme, locale, shippingConfig } = data!
-
-        // Update site-level fields if provided
-        const siteUpdateData: any = {}
+        type SiteUpdateData = Partial<{
+            theme: unknown;
+            name: unknown;
+            locale: "en" | "ms";
+            shippingConfig: unknown;
+            headerBlock: unknown;
+            footerBlock: unknown;
+            contactInfo: unknown;
+            socialLinks: unknown;
+            branding: unknown;
+            seo: unknown;
+        }>;
+        const siteUpdateData: SiteUpdateData = {}
         if (theme) siteUpdateData.theme = theme
+        if (siteName) siteUpdateData.name = siteName
         if (locale) siteUpdateData.locale = locale
         if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
+        if (headerBlock !== undefined) siteUpdateData.headerBlock = headerBlock
+        if (footerBlock !== undefined) siteUpdateData.footerBlock = footerBlock
+        if (contactInfo) siteUpdateData.contactInfo = contactInfo
+        if (socialLinks) siteUpdateData.socialLinks = socialLinks
+        if (branding) siteUpdateData.branding = branding
+        if (seo) siteUpdateData.seo = seo
 
         if (Object.keys(siteUpdateData).length > 0) {
             await payload.update({
@@ -58,33 +89,57 @@ export async function PATCH(
             })
         }
 
-        // Update blocks on homepage if provided
-        if (blocks) {
+        // Update blocks on the selected page if provided
+        if (normalizedBlocks) {
             const numericSiteId = Number(siteId)
-            let pagesResult = await payload.find({
-                collection: 'pages',
-                where: {
-                    site: { equals: numericSiteId },
-                    isHomepage: { equals: true },
-                },
-                limit: 1,
-            })
+            type PageDoc = NonNullable<Awaited<ReturnType<typeof payload.findByID>>>
+            let page: PageDoc | null = null
 
-            if (pagesResult.docs.length === 0) {
-                pagesResult = await payload.find({
+            if (pageId) {
+                if (!/^\d+$/.test(pageId)) {
+                    return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
+                }
+                const requestedPage = await payload.findByID({
                     collection: 'pages',
-                    where: { site: { equals: numericSiteId } },
-                    limit: 1,
+                    id: pageId,
                 })
+                const requestedPageSiteId =
+                    typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
+
+                if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
+                    page = requestedPage
+                } else {
+                    return NextResponse.json({ error: 'Page not found or does not belong to site' }, { status: 404 })
+                }
             }
 
-            const page = pagesResult.docs[0]
+            if (!page) {
+                let pagesResult = await payload.find({
+                    collection: 'pages',
+                    where: {
+                        site: { equals: numericSiteId },
+                        isHomepage: { equals: true },
+                    },
+                    limit: 1,
+                })
+
+                if (pagesResult.docs.length === 0) {
+                    pagesResult = await payload.find({
+                        collection: 'pages',
+                        where: { site: { equals: numericSiteId } },
+                        limit: 1,
+                    })
+                }
+
+                page = pagesResult.docs[0]
+            }
+
             if (page) {
                 await payload.update({
                     collection: 'pages',
                     id: page.id,
-                    data: { layout: blocks },
-                    draft: true,
+                    data: { layout: normalizedBlocks },
+                    draft: isDraft ?? false,
                 })
             }
         }
@@ -94,7 +149,7 @@ export async function PATCH(
             message: 'Saved successfully',
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Save Error]', error)
         return NextResponse.json(
             { error: 'Save failed' },

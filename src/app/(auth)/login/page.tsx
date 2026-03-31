@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -68,6 +68,25 @@ function LoginFormContent() {
     const [rememberMe, setRememberMe] = useState(false)
     const { t } = useI18n()
 
+    useEffect(() => {
+        const errorMsg = searchParams.get('error')
+        if (!errorMsg) return
+
+        const authErrors = t.auth.errors as Record<string, string | undefined>
+
+        if (errorMsg === 'serviceAccountUI') {
+            toast.error(authErrors.serviceAccountUI || 'Service accounts cannot access the web UI.')
+        } else if (errorMsg === 'accountLocked') {
+            toast.error(authErrors.accountLocked || 'Account is locked.')
+        } else if (errorMsg === 'missingCredentials') {
+            toast.error(authErrors.missingCredentials || 'Missing credentials.')
+        } else if (errorMsg === 'sessionExpired') {
+            toast.error(authErrors.sessionExpired || 'Your session has expired. Please log in again.')
+        } else {
+            toast.error(t.auth.errors.connection || 'An error occurred.')
+        }
+    }, [searchParams, t])
+
     const {
         register,
         handleSubmit,
@@ -116,6 +135,14 @@ function LoginFormContent() {
     }
 
     const onSubmit = async (data: LoginForm) => {
+        if (data.email.trim().toLowerCase() === 'sso-service@primeweb.app') {
+            const authErrors = t.auth.errors as Record<string, string | undefined>
+            const message = authErrors.serviceAccountUI || 'Service accounts cannot access the web UI.'
+            setFormError('root', { message })
+            toast.error(message)
+            return
+        }
+
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 45000)
 
@@ -145,7 +172,18 @@ function LoginFormContent() {
 
             if (!res.ok) {
                 const errorData = await res.json().catch(() => null)
-                const message = errorData?.errors?.[0]?.message || t.auth.errors.incorrect
+                let message = errorData?.errors?.[0]?.message || t.auth.errors.incorrect
+
+                // Map known Payload CMS backend English errors to i18n
+                const authErrors = t.auth.errors as Record<string, string | undefined>
+                
+                if (message === 'Email and password are required' || message === 'Missing credentials') {
+                    message = authErrors.missingCredentials || message
+                } else if (message.includes('locked due to having too many failed login attempts')) {
+                    message = authErrors.accountLocked || message
+                } else if (message === 'Email or password incorrect' || message === 'Login failed') {
+                    message = t.auth.errors.incorrect
+                }
 
                 setFormError('root', { message })
                 resetField('password')

@@ -4,30 +4,176 @@
  */
 import { TemplateTheme } from './styles'
 import { getGalleryImages, getAboutImage, getTeamAvatar } from './images'
+import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
+import { mergeContactInfoWithSite, mergeFooterSocialsWithSite, mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
 
 // Category for image selection
 let _category = 'business'
 export function setSectionCategory(cat: string) { _category = cat }
 
-export function renderSections(block: any, t: TemplateTheme, category?: string): string {
+export type SocialLink = { platform: string; url: string; enabled?: boolean; [key: string]: unknown }
+export type RenderSocialWidgetBlock = Record<string, unknown> & { links?: SocialLink[]; variant?: string; headline?: string }
+
+export type SiteSocialLinks = {
+    contactInfo?: { email?: string; phone?: string; address?: string }
+    socials?: { platform: string; url: string; enabled?: boolean }[]
+    socialLinks?: Record<string, unknown> // Still some internal opaque types but I specified fields above
+    logoText?: string
+    name?: string
+    branding?: { logo?: string }
+    [key: string]: unknown
+}
+
+export type FeatureItem = { title: string; description?: string; icon?: string }
+export type TestimonialItem = { name: string; quote: string; rating?: number; title?: string; avatar?: string }
+export type StatItem = { label: string; value: string }
+export type PricingPlan = { name: string; price: string; description?: string; features?: (string | { text: string })[]; isPopular?: boolean; ctaUrl?: string; ctaLabel?: string }
+export type FaqItem = { question: string; answer: string }
+export type MemberItem = { name: string; role?: string; image?: string }
+export type FormField = { label: string; fieldType?: string; placeholder?: string }
+export type FooterLink = { label: string; url: string }
+export type FooterColumn = { title: string; links?: FooterLink[] }
+
+export type RenderBlock = {
+    blockType?: string
+    features?: FeatureItem[]
+    testimonials?: TestimonialItem[]
+    stats?: StatItem[]
+    plans?: PricingPlan[]
+    faqs?: FaqItem[]
+    members?: MemberItem[]
+    variant?: string
+    label?: string
+    showLabel?: boolean
+    headline?: string
+    subtext?: string
+    email?: string
+    phone?: string
+    address?: string
+    formFields?: FormField[]
+    columns?: FooterColumn[]
+    tagline?: string
+    copyrightText?: string
+    socials?: SocialLink[]
+    [key: string]: unknown
+}
+
+
+export function renderSections(block: RenderBlock, t: TemplateTheme, category?: string, site?: SiteSocialLinks): string {
   if (category) _category = category
   switch (block.blockType) {
     case 'features': return renderFeatures(block, t)
     case 'about': return renderAbout(block, t)
     case 'testimonials': return renderTestimonials(block, t)
-    case 'contact': return renderContact(block, t)
-    case 'footer': return renderFooter(block, t)
+    case 'contact': return renderContact(block, t, site)
+    case 'footer': return renderFooter(block, t, site)
     case 'stats': return renderStats(block, t)
     case 'pricing': return renderPricing(block, t)
     case 'faq': return renderFaq(block, t)
     case 'gallery': return renderGallery(block, t)
     case 'team': return renderTeam(block, t)
     case 'cta': return renderCta(block, t)
+    case 'socialWidget': return renderSocialWidget(block, t, site)
+    case 'cartWidget': return renderCartWidget(block, t)
     default: return ''
   }
 }
 
-function renderFeatures(b: any, t: TemplateTheme) {
+function escapeAttr(str: string) {
+    return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function sanitizeUrl(raw: string): string {
+    let val = String(raw || '').trim()
+    if (!val || val === '#') return '#'
+    if (!/^https?:\/\//i.test(val)) val = `https://${val}`
+    try {
+        const parsed = new URL(val)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '#'
+        return escapeAttr(parsed.href)
+    } catch (error: unknown) {
+        console.error('URL parse error:', error)
+        return '#'
+    }
+}
+
+// Shared utility types are now at the top
+
+function renderSocialWidget(b: RenderSocialWidgetBlock, t: TemplateTheme, site?: SiteSocialLinks) {
+  const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(b as Record<string, unknown>, site?.socialLinks as Record<string, unknown>))
+  const links = normalizedBlock.links.filter((item: SocialLink) => item?.enabled !== false)
+  const isFloating = (normalizedBlock.variant || 'floating') !== 'inline'
+
+  if (links.length === 0) return ''
+
+  const platformMeta: Record<string, { label: string; mark: string; accent: string }> = {
+    facebook: { label: 'Facebook', mark: 'f', accent: '#2563eb' },
+    whatsapp: { label: 'WhatsApp', mark: 'wa', accent: '#16a34a' },
+    instagram: { label: 'Instagram', mark: 'ig', accent: '#db2777' },
+    linkedin: { label: 'LinkedIn', mark: 'in', accent: '#0284c7' },
+    youtube: { label: 'YouTube', mark: '▶', accent: '#dc2626' },
+  }
+
+  const normalizeUrl = (platform: string, value: string) => {
+    let raw = String(value || '').trim()
+    if (!raw) return '#'
+    if (!/^https?:\/\//i.test(raw) && platform !== 'whatsapp') {
+      raw = `https://${raw}`
+    }
+    if (platform === 'whatsapp') {
+      const digits = raw.replace(/[^\d]/g, '')
+      raw = digits ? `https://wa.me/${digits}` : '#'
+    }
+
+    try {
+      const parsedUrl = new URL(raw)
+      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+        return '#'
+      }
+      return escapeAttr(parsedUrl.href)
+    } catch (error: unknown) {
+      console.error('URL parse error:', error)
+      return '#'
+    }
+  }
+
+  return `<section style="${isFloating ? 'position:fixed;right:24px;bottom:24px;z-index:50;' : 'padding:40px 0;'}">
+    <div class="${isFloating ? '' : 'container'}" style="${isFloating ? 'display:flex;flex-direction:column;align-items:flex-end;gap:12px;' : ''}">
+      ${normalizedBlock.headline ? `<p style="font-size:14px;color:${t.muted};font-weight:600;">${normalizedBlock.headline}</p>` : ''}
+      <div style="display:flex;${isFloating ? 'flex-direction:column;' : 'flex-wrap:wrap;'}gap:12px;">
+        ${links.map((item: SocialLink) => {
+          const platform = item.platform || 'social'
+          const url = item.url || '#'
+          const meta = platformMeta[platform] || { label: platform, mark: '•', accent: t.primary }
+          return `<a href="${normalizeUrl(platform, url)}" target="_blank" rel="noreferrer" aria-label="${meta.label}"
+            style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;border:1px solid ${meta.accent}33;background:linear-gradient(135deg, ${meta.accent}22, ${t.primary}15);box-shadow:0 14px 32px rgba(15,23,42,0.16);">
+            <span style="display:inline-flex;width:36px;height:36px;border-radius:999px;align-items:center;justify-content:center;background:rgba(255,255,255,.92);color:${meta.accent};font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;border:1px solid ${meta.accent}22;">${meta.mark}</span>
+            ${isFloating ? '' : `<span style="font-size:14px;font-weight:600;color:${t.text};">${meta.label}</span>`}
+          </a>`
+        }).join('')}
+      </div>
+    </div>
+  </section>`
+}
+
+function renderCartWidget(b: RenderBlock, t: TemplateTheme) {
+  const isFloating = (b.variant || 'floating') !== 'inline'
+  const label = b.label || 'Cart'
+  const showLabel = Boolean(b.showLabel)
+
+  return `<section style="${isFloating ? 'position:fixed;left:24px;bottom:24px;z-index:50;' : 'padding:40px 0;'}">
+    <div class="${isFloating ? '' : 'container'}">
+      <button type="button"
+        style="position:relative;display:inline-flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;border:1px solid ${t.primary}55;background:linear-gradient(135deg, ${t.primary}, ${t.secondary});color:#fff;font-weight:600;box-shadow:0 16px 32px rgba(2,6,23,0.22);">
+        <span style="font-size:18px;">🛒</span>
+        ${showLabel ? `<span>${label}</span>` : ''}
+        <span style="position:absolute;right:-8px;top:-8px;display:inline-flex;min-width:24px;min-height:24px;padding:0 6px;align-items:center;justify-content:center;border-radius:999px;background:#fff;color:#0f172a;font-size:12px;font-weight:800;">0</span>
+      </button>
+    </div>
+  </section>`
+}
+
+function renderFeatures(b: RenderBlock, t: TemplateTheme) {
   const items = b.features || []
   const cardBg = `${t.text}05`
   const cardBorder = `${t.text}08`
@@ -39,7 +185,7 @@ function renderFeatures(b: any, t: TemplateTheme) {
         <p class="section-subtitle fade-up fade-up-d2" style="margin:0 auto;">${b.subheadline || ''}</p>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;">
-        ${items.map((f: any, i: number) => `
+        ${items.map((f: FeatureItem, i: number) => `
           <div class="fade-up fade-up-d${Math.min(i + 1, 4)} card-hover" style="padding:36px 28px;background:${cardBg};border:1px solid ${cardBorder};border-radius:16px;position:relative;overflow:hidden;">
             <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,${t.primary},${t.secondary});opacity:0;transition:opacity .3s;"></div>
             <div style="width:52px;height:52px;border-radius:14px;background:${t.primary}15;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:20px;">${f.icon || '✦'}</div>
@@ -52,7 +198,7 @@ function renderFeatures(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderAbout(b: any, t: TemplateTheme) {
+function renderAbout(b: RenderBlock, t: TemplateTheme) {
   const aboutImg = getAboutImage(_category)
   return `<section class="section" style="background:${t.primary}06;">
     <div class="container" style="display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;">
@@ -68,7 +214,7 @@ function renderAbout(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderTestimonials(b: any, t: TemplateTheme) {
+function renderTestimonials(b: RenderBlock, t: TemplateTheme) {
   const items = b.testimonials || []
   return `<section class="section">
     <div class="container">
@@ -76,7 +222,7 @@ function renderTestimonials(b: any, t: TemplateTheme) {
         <h2 class="section-title fade-up">${b.headline || ''}</h2>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;">
-        ${items.map((t2: any, i: number) => {
+        ${items.map((t2: TestimonialItem, i: number) => {
     const avatar = getTeamAvatar(_category, i)
     return `
           <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="padding:32px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:16px;">
@@ -96,13 +242,13 @@ function renderTestimonials(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderStats(b: any, t: TemplateTheme) {
+function renderStats(b: RenderBlock, t: TemplateTheme) {
   const items = b.stats || []
   return `<section style="padding:60px 0;background:linear-gradient(135deg,${t.primary}08,${t.secondary}05);">
     <div class="container">
       ${b.headline ? `<h2 style="text-align:center;font-size:24px;font-weight:700;margin-bottom:40px;" class="fade-up">${b.headline}</h2>` : ''}
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:24px;text-align:center;">
-        ${items.map((s: any, i: number) => `
+        ${items.map((s: StatItem, i: number) => `
           <div class="fade-up fade-up-d${Math.min(i + 1, 4)}" style="animation:countUp .6s ease both;animation-delay:${i * .15}s;">
             <div style="font-size:clamp(28px,4vw,40px);font-weight:800;color:${t.primary};margin-bottom:4px;">${s.value}</div>
             <div style="font-size:13px;color:${t.muted};font-weight:500;">${s.label}</div>
@@ -113,7 +259,7 @@ function renderStats(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderPricing(b: any, t: TemplateTheme) {
+function renderPricing(b: RenderBlock, t: TemplateTheme) {
   const plans = b.plans || []
   return `<section class="section">
     <div class="container">
@@ -122,14 +268,14 @@ function renderPricing(b: any, t: TemplateTheme) {
         <p class="section-subtitle fade-up fade-up-d1" style="margin:0 auto;">${b.subheadline || ''}</p>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;max-width:900px;margin:0 auto;">
-        ${plans.map((p: any, i: number) => `
+        ${plans.map((p: PricingPlan, i: number) => `
           <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="padding:36px 28px;border-radius:20px;border:${p.isPopular ? `2px solid ${t.primary}` : `1px solid ${t.text}10`};background:${p.isPopular ? `${t.primary}08` : `${t.text}03`};position:relative;${p.isPopular ? `box-shadow:0 20px 40px ${t.primary}15;transform:scale(1.03);` : ''}">
             ${p.isPopular ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 16px;background:${t.primary};color:#fff;border-radius:100px;font-size:11px;font-weight:700;">POPULAR</div>` : ''}
             <h3 style="font-size:18px;font-weight:700;margin-bottom:4px;">${p.name}</h3>
             <p style="font-size:13px;color:${t.muted};margin-bottom:16px;">${p.description || ''}</p>
             <div style="font-size:32px;font-weight:800;color:${t.primary};margin-bottom:24px;">${p.price}</div>
             <ul style="list-style:none;margin-bottom:28px;">
-              ${(p.features || []).map((f: any) => `<li style="padding:8px 0;font-size:14px;color:${t.muted};border-bottom:1px solid ${t.text}06;display:flex;align-items:center;gap:8px;"><span style="color:${t.primary};">✓</span> ${f.text || f}</li>`).join('')}
+              ${(p.features || []).map((f: string | { text: string }) => `<li style="padding:8px 0;font-size:14px;color:${t.muted};border-bottom:1px solid ${t.text}06;display:flex;align-items:center;gap:8px;"><span style="color:${t.primary};">✓</span> ${typeof f === 'string' ? f : (f.text || '')}</li>`).join('')}
             </ul>
             <a href="${p.ctaUrl || '#'}" class="${p.isPopular ? 'btn-primary' : 'btn-outline'}" style="display:block;text-align:center;width:100%;">${p.ctaLabel || 'Choose Plan'}</a>
           </div>
@@ -139,12 +285,12 @@ function renderPricing(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderFaq(b: any, t: TemplateTheme) {
+function renderFaq(b: RenderBlock, t: TemplateTheme) {
   const items = b.faqs || []
   return `<section class="section">
     <div class="container" style="max-width:700px;">
       <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
-      ${items.map((f: any, i: number) => `
+      ${items.map((f: FaqItem, i: number) => `
         <div class="fade-up fade-up-d${Math.min(i + 1, 3)}" style="border-bottom:1px solid ${t.text}10;padding:24px 0;">
           <h3 style="font-size:16px;font-weight:600;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">${f.question} <span style="color:${t.primary};font-size:20px;">+</span></h3>
           <p style="font-size:14px;color:${t.muted};line-height:1.7;">${f.answer}</p>
@@ -154,7 +300,7 @@ function renderFaq(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderGallery(b: any, t: TemplateTheme) {
+function renderGallery(b: RenderBlock, t: TemplateTheme) {
   const galleryImages = getGalleryImages(_category, 6)
   return `<section class="section">
     <div class="container">
@@ -171,13 +317,13 @@ function renderGallery(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderTeam(b: any, t: TemplateTheme) {
+function renderTeam(b: RenderBlock, t: TemplateTheme) {
   const members = b.members || []
   return `<section class="section" style="background:${t.primary}04;">
     <div class="container">
       <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px;max-width:800px;margin:0 auto;">
-        ${members.map((m: any, i: number) => {
+        ${members.map((m: MemberItem, i: number) => {
     const avatar = getTeamAvatar(_category, i)
     return `
           <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="text-align:center;padding:32px 20px;background:${t.text}04;border-radius:16px;border:1px solid ${t.text}06;">
@@ -191,7 +337,7 @@ function renderTeam(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderCta(b: any, t: TemplateTheme) {
+function renderCta(b: RenderBlock, t: TemplateTheme) {
   const img = getAboutImage(_category)
   return `<section style="padding:80px 0;">
     <div class="container">
@@ -206,17 +352,18 @@ function renderCta(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderContact(b: any, t: TemplateTheme) {
+function renderContact(b: RenderBlock, t: TemplateTheme, site?: SiteSocialLinks) {
+  const mergedBlock = mergeContactInfoWithSite(b, site?.contactInfo) as RenderBlock
   return `<section class="section">
     <div class="container" style="display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start;">
       <div>
-        <h2 class="section-title fade-up">${b.headline || ''}</h2>
-        <p class="fade-up fade-up-d1" style="font-size:15px;color:${t.muted};margin-bottom:32px;">${b.subtext || ''}</p>
+        <h2 class="section-title fade-up">${mergedBlock.headline || ''}</h2>
+        <p class="fade-up fade-up-d1" style="font-size:15px;color:${t.muted};margin-bottom:32px;">${mergedBlock.subtext || ''}</p>
         <div style="display:flex;flex-direction:column;gap:20px;">
           ${[
-      { icon: '📧', label: 'Email', value: b.email },
-      { icon: '📞', label: 'Phone', value: b.phone },
-      { icon: '📍', label: 'Address', value: b.address },
+      { icon: '📧', label: 'Email', value: mergedBlock.email },
+      { icon: '📞', label: 'Phone', value: mergedBlock.phone },
+      { icon: '📍', label: 'Address', value: mergedBlock.address },
     ].filter(c => c.value).map((c, i) => `
             <div class="fade-up fade-up-d${i + 2} card-hover" style="display:flex;align-items:center;gap:16px;padding:16px;background:${t.text}04;border-radius:12px;border:1px solid ${t.text}06;">
               <div style="width:44px;height:44px;border-radius:10px;background:${t.primary}12;display:flex;align-items:center;justify-content:center;font-size:20px;">${c.icon}</div>
@@ -226,7 +373,7 @@ function renderContact(b: any, t: TemplateTheme) {
         </div>
       </div>
       <div class="fade-up fade-up-d2" style="padding:32px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:20px;">
-        ${(b.formFields || []).map((f: any) => `
+        ${(mergedBlock.formFields || []).map((f: FormField) => `
           <div style="margin-bottom:16px;">
             <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">${f.label}</label>
             ${f.fieldType === 'textarea'
@@ -241,24 +388,26 @@ function renderContact(b: any, t: TemplateTheme) {
   </section>`
 }
 
-function renderFooter(b: any, t: TemplateTheme) {
-  const cols = b.columns || []
+function renderFooter(b: RenderBlock, t: TemplateTheme, site?: SiteSocialLinks) {
+  const mergedBlock = mergeFooterSocialsWithSite(b, site) as RenderBlock
+  const cols = mergedBlock.columns || []
   return `<footer style="padding:60px 0 30px;background:${t.text}04;border-top:1px solid ${t.text}08;">
     <div class="container">
       <div style="display:grid;grid-template-columns:2fr ${cols.map(() => '1fr').join(' ')};gap:40px;margin-bottom:40px;">
         <div>
-          <div style="font-family:'${t.fontHeading}',serif;font-size:22px;font-weight:700;margin-bottom:12px;color:${t.primary};">${b.logoText || ''}</div>
-          <p style="font-size:14px;color:${t.muted};max-width:280px;line-height:1.7;">${b.tagline || ''}</p>
+          <div style="font-family:'${t.fontHeading}',serif;font-size:22px;font-weight:700;margin-bottom:12px;color:${t.primary};">${mergedBlock.logoText || ''}</div>
+          <p style="font-size:14px;color:${t.muted};max-width:280px;line-height:1.7;">${mergedBlock.tagline || ''}</p>
+          ${mergedBlock.socials && mergedBlock.socials.length > 0 ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;">${mergedBlock.socials.map((social: SocialLink) => `<a href="${sanitizeUrl(social.url)}" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:${t.primary}10;border:1px solid ${t.primary}15;color:${t.primary};font-size:12px;font-weight:800;text-transform:uppercase;">${(social.platform || '•').slice(0,2)}</a>`).join('')}</div>` : ''}
         </div>
-        ${cols.map((c: any) => `
+        ${cols.map((c: FooterColumn) => `
           <div>
             <h4 style="font-size:14px;font-weight:700;margin-bottom:16px;">${c.title}</h4>
-            ${(c.links || []).map((l: any) => `<div style="margin-bottom:10px;"><a href="${l.url || '#'}" style="font-size:13px;color:${t.muted};transition:color .2s;">${l.label}</a></div>`).join('')}
+            ${(c.links || []).map((l: FooterLink) => `<div style="margin-bottom:10px;"><a href="${sanitizeUrl(l.url)}" style="font-size:13px;color:${t.muted};transition:color .2s;">${l.label}</a></div>`).join('')}
           </div>
         `).join('')}
       </div>
       <div style="border-top:1px solid ${t.text}08;padding-top:20px;text-align:center;">
-        <p style="font-size:12px;color:${t.muted};">${b.copyrightText || ''}</p>
+        <p style="font-size:12px;color:${t.muted};">${mergedBlock.copyrightText || ''}</p>
       </div>
     </div>
   </footer>`
