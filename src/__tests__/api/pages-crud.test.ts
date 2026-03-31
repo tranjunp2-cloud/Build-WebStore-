@@ -43,7 +43,7 @@ describe('GET /api/sites/[siteId]/pages [TC-F05.02]', () => {
 
         // Act
         const req = new Request('http://localhost/api/sites/site-1/pages')
-        const res = await GET(req, ctx as any)
+        const res = await GET(req, ctx as { params: Promise<{ siteId: string }> })
         const body = await res.json()
 
         // Assert
@@ -57,7 +57,7 @@ describe('GET /api/sites/[siteId]/pages [TC-F05.02]', () => {
         mockFind.mockResolvedValueOnce({ docs: [] }) // no matching site
 
         const req = new Request('http://localhost/api/sites/other-site/pages')
-        const res = await GET(req, ctx as any)
+        const res = await GET(req, ctx as { params: Promise<{ siteId: string }> })
 
         expect(res.status).toBe(403)
     })
@@ -77,7 +77,7 @@ describe('POST /api/sites/[siteId]/pages [TC-F05.02]', () => {
         })
 
         const req = { json: () => Promise.resolve({ title: 'Contact', slug: 'contact' }) } as unknown as Request
-        const res = await POST(req, ctx as any)
+        const res = await POST(req, ctx as { params: Promise<{ siteId: string }> })
         const body = await res.json()
 
         expect(res.status).toBe(200)
@@ -91,7 +91,7 @@ describe('POST /api/sites/[siteId]/pages [TC-F05.02]', () => {
             .mockResolvedValueOnce({ docs: [{ id: 'existing' }] }) // duplicate
 
         const req = { json: () => Promise.resolve({ title: 'About', slug: 'about' }) } as unknown as Request
-        const res = await POST(req, ctx as any)
+        const res = await POST(req, ctx as { params: Promise<{ siteId: string }> })
 
         expect(res.status).toBe(409)
     })
@@ -100,7 +100,7 @@ describe('POST /api/sites/[siteId]/pages [TC-F05.02]', () => {
         mockFind.mockResolvedValueOnce({ docs: [{ id: 'site-1', tenant: 'tenant-1' }] })
 
         const req = { json: () => Promise.resolve({ title: 'Bad', slug: 'Bad Slug!!!' }) } as unknown as Request
-        const res = await POST(req, ctx as any)
+        const res = await POST(req, ctx as { params: Promise<{ siteId: string }> })
 
         expect(res.status).toBe(400)
     })
@@ -109,7 +109,7 @@ describe('POST /api/sites/[siteId]/pages [TC-F05.02]', () => {
         mockFind.mockResolvedValueOnce({ docs: [] })
 
         const req = { json: () => Promise.resolve({ title: 'X', slug: 'x' }) } as unknown as Request
-        const res = await POST(req, ctx as any)
+        const res = await POST(req, ctx as { params: Promise<{ siteId: string }> })
 
         expect(res.status).toBe(403)
     })

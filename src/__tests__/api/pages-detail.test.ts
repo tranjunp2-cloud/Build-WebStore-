@@ -37,7 +37,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         })
 
         const req = { json: () => Promise.resolve({ isVisible: false }) } as unknown as Request
-        const res = await PATCH(req, ctx as any)
+        const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
         const body = await res.json()
 
         expect(res.status).toBe(200)
@@ -55,7 +55,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         })
 
         const req = { json: () => Promise.resolve({ seoTitle: 'New SEO', seoDescription: 'New desc' }) } as unknown as Request
-        const res = await PATCH(req, ctx as any)
+        const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
         const body = await res.json()
 
         expect(res.status).toBe(200)
@@ -66,7 +66,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         mockFind.mockResolvedValueOnce({ docs: [] })
 
         const req = { json: () => Promise.resolve({ isVisible: true }) } as unknown as Request
-        const res = await PATCH(req, ctx as any)
+        const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
 
         expect(res.status).toBe(403)
     })
@@ -76,7 +76,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         mockFindByID.mockResolvedValueOnce({ id: '10', site: 999 }) // wrong site
 
         const req = { json: () => Promise.resolve({ isVisible: true }) } as unknown as Request
-        const res = await PATCH(req, ctx as any)
+        const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
 
         expect(res.status).toBe(404)
     })
@@ -84,7 +84,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
     it('returns 400 for invalid params', async () => {
         const badCtx = { params: Promise.resolve({ siteId: 'abc', pageId: 'xyz' }) }
         const req = { json: () => Promise.resolve({ isVisible: true }) } as unknown as Request
-        const res = await PATCH(req, badCtx as any)
+        const res = await PATCH(req, badCtx as { params: Promise<{ siteId: string; pageId: string }> })
 
         expect(res.status).toBe(400)
     })
@@ -94,7 +94,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         mockFindByID.mockResolvedValueOnce({ id: '10', site: 1, slug: '/404', title: '404 Not Found' })
 
         const req = { json: () => Promise.resolve({ slug: 'new-slug' }) } as unknown as Request
-        const res = await PATCH(req, ctx as any)
+        const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
         const body = await res.json()
 
         expect(res.status).toBe(400)
@@ -108,7 +108,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         mockFindByID.mockResolvedValueOnce({ id: '10', site: 1, slug: '/old', title: 'Old' })
 
         const req = { json: () => Promise.resolve({ slug: 'existing' }) } as unknown as Request
-        const res = await PATCH(req, ctx as any)
+        const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
         const body = await res.json()
 
         expect(res.status).toBe(400)
@@ -120,7 +120,7 @@ describe('PATCH /api/sites/[siteId]/pages/[pageId] [TC-F05.02]', () => {
         mockFindByID.mockResolvedValueOnce({ id: '10', site: 1, slug: '/about', title: 'About' })
 
         const req = { json: () => Promise.resolve({}) } as unknown as Request
-        const res = await PATCH(req, ctx as any)
+        const res = await PATCH(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
 
         expect(res.status).toBe(400)
     })

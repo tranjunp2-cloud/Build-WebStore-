@@ -39,7 +39,7 @@ describe('POST /api/sites/[siteId]/pages/[pageId]/generate-seo [TC-F05.13]', () 
         mockFind.mockResolvedValueOnce({ docs: [{ id: '1', tenant: 'tenant-1' }] }) // auth
 
         const req = new Request('http://localhost')
-        const res = await POST(req, ctx as any)
+        const res = await POST(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
         const body = await res.json()
 
         expect(res.status).toBe(200)
@@ -54,7 +54,7 @@ describe('POST /api/sites/[siteId]/pages/[pageId]/generate-seo [TC-F05.13]', () 
         mockFind.mockResolvedValueOnce({ docs: [{ id: '1', tenant: 'tenant-1' }] })
 
         const req = new Request('http://localhost')
-        const res = await POST(req, ctx as any)
+        const res = await POST(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
         const body = await res.json()
 
         expect(body.slug).toBeDefined()
@@ -65,7 +65,7 @@ describe('POST /api/sites/[siteId]/pages/[pageId]/generate-seo [TC-F05.13]', () 
         mockFindByID.mockResolvedValueOnce({ id: '10', site: 999, title: 'X' }) // wrong site
 
         const req = new Request('http://localhost')
-        const res = await POST(req, ctx as any)
+        const res = await POST(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
 
         expect(res.status).toBe(404)
     })
@@ -77,7 +77,7 @@ describe('POST /api/sites/[siteId]/pages/[pageId]/generate-seo [TC-F05.13]', () 
         mockFind.mockResolvedValueOnce({ docs: [] }) // no matching tenant
 
         const req = new Request('http://localhost')
-        const res = await POST(req, ctx as any)
+        const res = await POST(req, ctx as { params: Promise<{ siteId: string; pageId: string }> })
 
         expect(res.status).toBe(403)
     })
@@ -85,7 +85,7 @@ describe('POST /api/sites/[siteId]/pages/[pageId]/generate-seo [TC-F05.13]', () 
     it('returns 400 for invalid params', async () => {
         const badCtx = { params: Promise.resolve({ siteId: 'abc', pageId: 'xyz' }) }
         const req = new Request('http://localhost')
-        const res = await POST(req, badCtx as any)
+        const res = await POST(req, badCtx as { params: Promise<{ siteId: string; pageId: string }> })
 
         expect(res.status).toBe(400)
     })
