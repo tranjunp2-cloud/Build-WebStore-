@@ -41,7 +41,7 @@ export default function OrdersPage() {
             if (!res.ok) throw new Error('Failed to load')
             const data = await res.json()
             setOrders(data.docs || [])
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('[Load Orders]', err)
             if (!silent) toast.error(o.toast.loadFailed)
         } finally {
@@ -76,12 +76,12 @@ export default function OrdersPage() {
             toast.success(o.toast.updated)
 
             // Sync local state
-            setOrders(prev => prev.map(order => order.id === id ? { ...order, status: newStatus as any } : order))
+            setOrders(prev => prev.map(order => order.id === id ? { ...order, status: newStatus as Order['status'] } : order))
             if (selectedOrder?.id === id) {
-                setSelectedOrder(prev => prev ? { ...prev, status: newStatus as any } : null)
+                setSelectedOrder(prev => prev ? { ...prev, status: newStatus as Order['status'] } : null)
             }
-        } catch (error: any) {
-            toast.error(o.toast.updateFailed.replace('{message}', error.message))
+        } catch (error: unknown) {
+            toast.error(o.toast.updateFailed.replace('{message}', error instanceof Error ? error.message : 'Unknown error'))
         } finally {
             setUpdatingId(null)
         }
@@ -107,8 +107,8 @@ export default function OrdersPage() {
                 setSelectedOrder(prev => prev ? { ...prev, status: 'cancelled', cancelReason: reason } : null)
             }
             setCancellingOrderId(null)
-        } catch (error: any) {
-            toast.error(error.message)
+        } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : String(error))
         } finally {
             setIsCancelling(false)
         }
@@ -135,8 +135,8 @@ export default function OrdersPage() {
 
             setSelectedIds(new Set())
             fetchOrders(true)
-        } catch (error: any) {
-            toast.error(o.toast.updateFailed.replace('{message}', error.message))
+        } catch (error: unknown) {
+            toast.error(o.toast.updateFailed.replace('{message}', error instanceof Error ? error.message : 'Unknown error'))
         } finally {
             setIsBulkConfirming(false)
         }

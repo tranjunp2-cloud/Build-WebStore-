@@ -3,13 +3,15 @@
  */
 import { TemplateTheme } from './styles'
 
-export function renderNav(block: any, t: TemplateTheme): string {
-    const links = (block.links || []).map((l: any) => `<a href="${l.url || '#'}">${l.label}</a>`).join('')
-    const cta = block.ctaButton?.show !== false ? `<a href="${block.ctaButton?.url || '#'}" class="nav-cta">${block.ctaButton?.label || 'Contact'}</a>` : ''
+export function renderNav(block: Record<string, unknown>, t: TemplateTheme): string {
+    const links = ((block.links as Record<string, unknown>[]) || []).map((l: Record<string, unknown>) => `<a href="${(l.url as string) || '#'}">${l.label as string}</a>`).join('')
+    const ctaButton = block.ctaButton as Record<string, unknown>
+    const cta = ctaButton?.show !== false ? `<a href="${(ctaButton?.url as string) || '#'}" class="nav-cta">${(ctaButton?.label as string) || 'Contact'}</a>` : ''
 
-    const logoText = block.logoText || 'Logo'
-    const logoImage = block.logo?.url
-        ? `<img src="${block.logo.url}" alt="${logoText}" style="height:32px;width:auto;object-fit:contain;" />`
+    const logoText = (block.logoText as string) || 'Logo'
+    const logoBlock = block.logo as Record<string, string>
+    const logoImage = logoBlock?.url
+        ? `<img src="${logoBlock.url}" alt="${logoText}" style="height:32px;width:auto;object-fit:contain;" />`
         : null
 
     switch (t.navStyle) {

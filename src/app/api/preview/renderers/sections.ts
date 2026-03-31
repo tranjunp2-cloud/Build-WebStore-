@@ -17,7 +17,7 @@ export type RenderSocialWidgetBlock = Record<string, unknown> & { links?: Social
 export type SiteSocialLinks = {
     contactInfo?: { email?: string; phone?: string; address?: string }
     socials?: { platform: string; url: string; enabled?: boolean }[]
-    socialLinks?: any // Still some internal opaque types but I specified fields above
+    socialLinks?: Record<string, unknown> // Still some internal opaque types but I specified fields above
     logoText?: string
     name?: string
     branding?: { logo?: string }
@@ -91,7 +91,8 @@ function sanitizeUrl(raw: string): string {
         const parsed = new URL(val)
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '#'
         return escapeAttr(parsed.href)
-    } catch {
+    } catch (error: unknown) {
+        console.error('URL parse error:', error)
         return '#'
     }
 }
@@ -130,7 +131,8 @@ function renderSocialWidget(b: RenderSocialWidgetBlock, t: TemplateTheme, site?:
         return '#'
       }
       return escapeAttr(parsedUrl.href)
-    } catch {
+    } catch (error: unknown) {
+      console.error('URL parse error:', error)
       return '#'
     }
   }
