@@ -19,7 +19,7 @@ function normalizeBlocksForPersistence(blocks: Record<string, unknown>[]) {
 /**
  * PATCH /api/sites/[siteId]/save
  * Saves updated blocks (layout) and/or theme for a site.
- * Body: { blocks?: any[], theme?: any }
+ * Body: { blocks?: unknown[], theme?: unknown }
  */
 export async function PATCH(
     req: NextRequest,

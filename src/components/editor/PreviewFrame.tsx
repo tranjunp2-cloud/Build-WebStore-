@@ -111,24 +111,24 @@ function updateValueAtPath(
     path: Array<string | number>,
     nextValue: string,
 ): Record<string, unknown> {
-    const clone: any = JSON.parse(JSON.stringify(source))
-    let cursor: any = clone
+    const clone = JSON.parse(JSON.stringify(source)) as Record<string, unknown>
+    let cursor: Record<string, unknown> | Array<unknown> = clone
 
     for (let index = 0; index < path.length - 1; index += 1) {
-        cursor = cursor[path[index]]
+        cursor = (cursor as Record<string, unknown>)[path[index] as string] as Record<string, unknown> | Array<unknown>
     }
 
     const finalKey = path[path.length - 1]
-    cursor[finalKey] = nextValue
+    ;(cursor as Record<string, unknown>)[finalKey as string] = nextValue
 
     return clone
 }
 
 function getValueAtPath(source: Record<string, unknown>, path: Array<string | number>): unknown {
-    let cursor: any = source
+    let cursor: unknown = source
 
     for (const segment of path) {
-        cursor = cursor?.[segment]
+        cursor = (cursor as Record<string, unknown>)?.[segment as string]
     }
 
     return cursor
@@ -396,7 +396,7 @@ function PreviewFrameInner({
                 const clone = JSON.parse(JSON.stringify(blocks))
                 // Try finding with partial match
                 let foundPath = null
-                const findPartialPath = (obj: any, target: string, path: any[] = []): any[] | null => {
+                const findPartialPath = (obj: unknown, target: string, path: Array<string | number> = []): Array<string | number> | null => {
                     if (typeof obj === 'string' && (target.includes(obj) || obj.includes(target))) return path
                     if (Array.isArray(obj)) {
                         for (let i=0; i<obj.length; i++) {
@@ -405,7 +405,7 @@ function PreviewFrameInner({
                         }
                     } else if (obj && typeof obj === 'object') {
                         for (const k in obj) {
-                            const p = findPartialPath(obj[k], target, [...path, k])
+                            const p = findPartialPath((obj as Record<string, unknown>)[k], target, [...path, k])
                             if (p) return p
                         }
                     }

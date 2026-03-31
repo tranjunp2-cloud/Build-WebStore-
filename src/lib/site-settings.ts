@@ -68,7 +68,7 @@ export function mergeFooterSocialsWithSite<T extends { socials?: Array<{ platfor
     return {
         ...block,
         logoText: block.logoText || site?.name || '',
-        logo: (block as any).logo || (site?.branding?.logo ? { url: site.branding.logo, alt: site?.name || 'Logo' } : undefined),
+        logo: (block as Record<string, unknown>).logo || (site?.branding?.logo ? { url: site.branding.logo, alt: site?.name || 'Logo' } : undefined),
         socials,
     }
 }

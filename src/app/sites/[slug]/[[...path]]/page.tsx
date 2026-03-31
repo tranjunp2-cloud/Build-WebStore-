@@ -3,7 +3,9 @@ import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Metadata } from 'next'
-import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
+import { SiteRenderer, type NavPage } from '@/components/site-renderer/SiteRenderer'
+import type { SiteData } from '@/blocks/types'
+import type { PageData } from '@/store/editorStore'
 
 // Force dynamic — uses getPayload() + SiteRenderer (jsdom chain) at runtime
 export const dynamic = 'force-dynamic'
@@ -153,9 +155,9 @@ export default async function TenantSitePage({ params }: Props) {
 
     return (
         <SiteRenderer
-            site={site as any}
-            page={page as any}
-            pages={pages as any[]}
+            site={site as unknown as SiteData}
+            page={page as unknown as PageData}
+            pages={pages as unknown as NavPage[]}
         />
     )
 }

@@ -231,10 +231,10 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
     } as BlockData
 
     if (mergedBlock.blockType === 'faq') {
-        const items = Array.isArray((block as any).faqs)
-            ? (block as any).faqs
-            : Array.isArray((block as any).items)
-                ? (block as any).items
+        const items = Array.isArray((block as Record<string, unknown>).faqs)
+            ? (block as Record<string, unknown>).faqs
+            : Array.isArray((block as Record<string, unknown>).items)
+                ? (block as Record<string, unknown>).items
                 : fallbackBlock.faqs
 
         delete mergedBlock.items
@@ -246,7 +246,7 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
     }
 
     if (mergedBlock.blockType === 'testimonials') {
-        const rawTestimonials = Array.isArray((block as any).testimonials) ? (block as any).testimonials : fallbackBlock.testimonials
+        const rawTestimonials = (Array.isArray((block as Record<string, unknown>).testimonials) ? (block as Record<string, unknown>).testimonials : fallbackBlock.testimonials) as Record<string, unknown>[]
         
         let safeVariant = mergedBlock.variant
         if (!['carousel', 'grid', 'masonry', 'single'].includes(String(safeVariant))) safeVariant = 'grid'
@@ -254,7 +254,7 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         return {
             ...mergedBlock,
             variant: safeVariant,
-            testimonials: rawTestimonials.map((t: any) => {
+            testimonials: rawTestimonials.map((t: Record<string, unknown>) => {
                 const newT = { ...t }
                 delete newT.avatar
                 return newT
@@ -264,27 +264,27 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
 
     if (mergedBlock.blockType === 'features') {
         delete mergedBlock.variant
-        let safeLayout = (block as any).layout || fallbackBlock.layout
+        let safeLayout = (block as Record<string, unknown>).layout || fallbackBlock.layout
         if (!['grid-3', 'grid-2', 'alternating', 'centered-list'].includes(String(safeLayout))) safeLayout = 'grid-3'
 
         return {
             ...mergedBlock,
             layout: safeLayout,
-            features: Array.isArray((block as any).features)
-                ? (block as any).features
-                : Array.isArray((block as any).items)
-                    ? (block as any).items
+            features: Array.isArray((block as Record<string, unknown>).features)
+                ? (block as Record<string, unknown>).features
+                : Array.isArray((block as Record<string, unknown>).items)
+                    ? (block as Record<string, unknown>).items
                     : fallbackBlock.features,
         }
     }
 
     if (mergedBlock.blockType === 'gallery') {
         delete mergedBlock.variant
-        let safeLayout = (block as any).layout || fallbackBlock.layout
+        let safeLayout = (block as Record<string, unknown>).layout || fallbackBlock.layout
         if (!['masonry', 'grid', 'carousel', 'lightbox'].includes(String(safeLayout))) safeLayout = 'grid'
 
-        const rawImages = Array.isArray((block as any).images) ? (block as any).images : fallbackBlock.images
-        const cleanedImages = rawImages.map((item: any) => {
+        const rawImages = (Array.isArray((block as Record<string, unknown>).images) ? (block as Record<string, unknown>).images : fallbackBlock.images) as Record<string, unknown>[]
+        const cleanedImages = rawImages.map((item: Record<string, unknown>) => {
             const newItem = { ...item }
             delete newItem.image
             return newItem
@@ -298,10 +298,10 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
 
     if (mergedBlock.blockType === 'team') {
         delete mergedBlock.variant
-        const rawMembers = Array.isArray((block as any).members) ? (block as any).members : fallbackBlock.members
+        const rawMembers = (Array.isArray((block as Record<string, unknown>).members) ? (block as Record<string, unknown>).members : fallbackBlock.members) as Record<string, unknown>[]
         return {
             ...mergedBlock,
-            members: rawMembers.map((m: any) => {
+            members: rawMembers.map((m: Record<string, unknown>) => {
                 const newM = { ...m }
                 delete newM.image
                 return newM

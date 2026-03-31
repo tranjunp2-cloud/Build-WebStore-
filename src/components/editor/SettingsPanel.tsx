@@ -212,9 +212,9 @@ function SettingsPanelInner({
                         <label className="text-[12px] font-medium text-[#A5B4CF]">Upload Logo</label>
                         <div className="mt-2">
                             <LogoEditor
-                                currentLogo={(siteBranding.logo as string) || ((headerBlock as any)?.logo as string) || null}
+                                currentLogo={(siteBranding.logo as string) || ((headerBlock as Record<string, unknown>)?.logo as string) || null}
                                 onLogoChange={(logoUrl, faviconUrl) => {
-                                    const siteBrandingChanges: any = { logo: logoUrl }
+                                    const siteBrandingChanges: Record<string, unknown> = { logo: logoUrl }
                                     if (faviconUrl) siteBrandingChanges.favicon = faviconUrl
                                     onHeaderUpdate?.(siteBrandingChanges)
                                     onFooterUpdate?.(siteBrandingChanges)
@@ -475,9 +475,9 @@ function SettingsPanelInner({
         <div className="space-y-5">
             {/* Logo Editor (AC-2) */}
             <LogoEditor
-                currentLogo={(headerBlock as any)?.logo || null}
+                currentLogo={((headerBlock as Record<string, unknown>)?.logo as string) || null}
                 onLogoChange={(logoUrl, faviconUrl) => {
-                    const changes: any = { logo: logoUrl }
+                    const changes: Record<string, unknown> = { logo: logoUrl }
                     if (faviconUrl) changes.favicon = faviconUrl
                     onHeaderUpdate?.(changes)
                     if (onLogoChange) onLogoChange(logoUrl, faviconUrl)
@@ -494,7 +494,7 @@ function SettingsPanelInner({
                             onClick={() => onHeaderUpdate?.({ navStyle: style })}
                             className={cn(
                                 'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
-                                (headerBlock as any)?.navStyle === style || (!((headerBlock as any)?.navStyle) && style === 'standard')
+                                (headerBlock as Record<string, unknown>)?.navStyle === style || (!((headerBlock as Record<string, unknown>)?.navStyle) && style === 'standard')
                                     ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
                                     : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
                             )}
@@ -508,7 +508,7 @@ function SettingsPanelInner({
             {/* Navigation Editor (AC-1) */}
             <div className={sectionCls}>
                 <NavigationEditor
-                    links={((headerBlock as any)?.links as NavLinkItem[]) || []}
+                    links={((headerBlock as Record<string, unknown>)?.links as NavLinkItem[]) || []}
                     onUpdate={(links) => onHeaderUpdate?.({ links })}
                     pages={pages}
                 />
@@ -816,7 +816,7 @@ function SettingsPanelInner({
                 {bt === 'navigation' && (
                     <div className={sectionCls}>
                         <NavigationEditor
-                            links={((block.links || []) as NavLinkItem[]).map((link: any, i: number) => ({
+                            links={((block.links || []) as NavLinkItem[]).map((link: NavLinkItem, i: number) => ({
                                 id: link.id || `legacy_${i}`,
                                 label: link.label || '',
                                 url: link.url || '#',

@@ -74,7 +74,7 @@ export async function PATCH(
         })
         
         if (fullSite.tenant && typeof fullSite.tenant === 'object') {
-            tenantSlug = (fullSite.tenant as any).slug || 'site'
+            tenantSlug = ((fullSite.tenant as Record<string, unknown>).slug as string) || 'site'
         }
 
         const domainUrl = `${tenantSlug}.primeweb.app`
@@ -91,10 +91,10 @@ export async function PATCH(
             },
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Publish Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error?.message || 'Failed to publish' } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : 'Failed to publish' } },
             { status: 500 },
         )
     }
@@ -162,10 +162,10 @@ export async function DELETE(
             },
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Unpublish Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error?.message || 'Failed to unpublish' } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : 'Failed to unpublish' } },
             { status: 500 },
         )
     }

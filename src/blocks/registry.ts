@@ -52,6 +52,7 @@ import { CartWidgetConfigSchema, cartWidgetMeta } from './cart-widget/config'
 // ── Registry ─────────────────────────────────────────────────────────────────
 
 type BlockRegistryEntry = {
+    // Required 'any' because block components have highly varied generic prop signatures
     component: React.ComponentType<any>
     schema: ZodSchema
     meta: BlockMeta
@@ -86,6 +87,7 @@ const REGISTRY: Record<string, BlockRegistryEntry> = {
 
 export const blockRegistry = {
     /** Get the React component for a block type */
+    // Required 'any' because block components have highly varied generic prop signatures
     getComponent(blockType: string): React.ComponentType<any> | null {
         return REGISTRY[blockType]?.component ?? null
     },
