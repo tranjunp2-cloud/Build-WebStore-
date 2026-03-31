@@ -1270,6 +1270,60 @@ const MIGRATIONS = [
     name: 'users.phone',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone varchar;`,
   },
+  // ── _pages_v: mirror columns added to pages (versioning) ──
+  // Whenever a column is added to `pages`, the corresponding version_* column
+  // must be added to `_pages_v` or Payload's draft queries will 500.
+  {
+    name: '_pages_v.version_is_visible',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_is_visible boolean DEFAULT true;`,
+  },
+  {
+    name: '_pages_v.version_deleted_at',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_deleted_at timestamptz;`,
+  },
+  // ── pages_blocks: snake_case aliases for socialWidget / cartWidget ──
+  // Payload Drizzle queries snake_case table names at runtime.
+  // The camelCase tables (pages_blocks_socialWidget) were created first but
+  // Payload also generates references to pages_blocks_social_widget (snake_case).
+  {
+    name: 'pages_blocks_social_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_social_widget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _path varchar NOT NULL DEFAULT 'layout',
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      block_name varchar,
+      variant varchar,
+      headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_social_widget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_social_widget_links" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      platform varchar,
+      url varchar,
+      enabled boolean DEFAULT true
+    );`,
+  },
+  {
+    name: 'pages_blocks_cart_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_cart_widget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _path varchar NOT NULL DEFAULT 'layout',
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      block_name varchar,
+      variant varchar,
+      label varchar,
+      show_label boolean
+    );`,
+  },
 ];
 
 async function runMigrations(pool) {
