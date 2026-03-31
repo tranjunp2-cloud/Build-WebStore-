@@ -7,15 +7,15 @@ import { getPayload } from 'payload'
 import { getCurrentUser } from '@/lib/auth'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
-vi.mock('@/lib/auth', () => ({
-    withAuth: vi.fn().mockImplementation((handler: any) => {
-        return async (req: any, ctx: any) => {
-            const user = { id: 'user-1', email: 'admin@example.com' }
-            return handler(user, req, ctx)
-        }
-    }),
-    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com' }),
-}))
+vi.mock('@/lib/auth', () => {
+    const user = { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1' }] }
+    return {
+        withAuth: vi.fn().mockImplementation((handler: any) => {
+            return async (req: any, ctx: any) => handler(user, req, ctx)
+        }),
+        getCurrentUser: vi.fn().mockResolvedValue(user),
+    }
+})
 
 // Mock cookies từ next/headers
 vi.mock('next/headers', () => {
@@ -41,7 +41,7 @@ vi.mock('payload', () => {
                 }
                 return { user: null }
             }),
-            findByID: vi.fn().mockResolvedValue({ id: 'site-123', status: 'draft' }),
+            findByID: vi.fn().mockResolvedValue({ id: 'site-123', status: 'draft', tenant: 'tenant-1' }),
             find: vi.fn().mockResolvedValue({
                 docs: [
                     { id: 'page-home', isHomepage: true, layout: [] }
@@ -149,7 +149,7 @@ describe('Sites APIs', () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
                 auth: vi.fn().mockResolvedValue({ user: { id: 'user-1' } }),
-                findByID: vi.fn().mockResolvedValue({ id: '123', status: 'draft' }),
+                findByID: vi.fn().mockResolvedValue({ id: '123', status: 'draft', tenant: 'tenant-1' }),
                 update: vi.fn().mockResolvedValue({ id: '123', status: 'published', publishedAt: new Date().toISOString() })
             })
 
@@ -165,7 +165,7 @@ describe('Sites APIs', () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
                 auth: vi.fn().mockResolvedValue({ user: { id: 'user-1' } }),
-                findByID: vi.fn().mockResolvedValue({ id: '123', status: 'published' }),
+                findByID: vi.fn().mockResolvedValue({ id: '123', status: 'published', tenant: 'tenant-1' }),
                 update: vi.fn().mockResolvedValue({ id: '123', status: 'draft' })
             })
 
