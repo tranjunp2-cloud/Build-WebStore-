@@ -150,52 +150,69 @@ function getNewBlockSlugsFromDiff() {
  * in Pages.ts) and verifies `ALTER TABLE _pages_v ADD COLUMN version_* ...`
  * exists in db-setup.js.
  *
- * Skips: relationship fields (*_id already in _pages_v via FK), blocks/groups
- * which are handled differently by Payload, and standard Payload auto-columns
- * (title, slug, site, isHomepage, layout, publishedAt, seo, timestamps).
+ * Skips:
+ * - Fields Payload auto-manages: title, slug, site, isHomepage, layout, seo, timestamps
+ * - Field types handled differently by Payload: group (flattened columns),
+ *   array (separate table), blocks (separate table), relationship/upload (FK column)
+ *   — these do NOT create a simple version_* column in _pages_v.
  */
 const PAGES_AUTO_COLUMNS = new Set([
   'title', 'slug', 'site', 'isHomepage', 'layout',
   'seo', 'publishedAt', 'updatedAt', 'createdAt',
 ])
 
+// Field types that do NOT produce a simple version_* column in _pages_v.
+// group → Payload flattens sub-fields directly (version_group_field)
+// array/blocks → separate _pages_v_{field} or _pages_v_blocks_{slug} tables
+// relationship/upload → version_{field}_id FK column (Payload auto-manages)
+const SKIP_FIELD_TYPES = new Set(['group', 'array', 'blocks', 'relationship', 'upload'])
+
 function checkPagesVersionColumns() {
   const filePath = 'src/collections/Pages.ts'
   const missing = []
 
+  let diff
   try {
-    const diff = execSync(
-      `git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" || true`,
+    diff = execSync(
+      `git diff ${BASE_BRANCH} -- ${filePath}`,
       { encoding: 'utf8' }
     ).trim()
+  } catch (err) {
+    console.error(`[migration-check] Warning: could not diff ${filePath}:`, err.message)
+    return missing
+  }
 
-    if (!diff) return missing
+  if (!diff) return missing
 
-    // Collection-level fields in Pages.ts have exactly 12 spaces of indentation.
-    // Block-level fields have 16+ spaces. This distinguishes the two.
-    // Pattern: +            name: 'fieldName'  (12 spaces)
-    const collectionFieldRegex = /^\+            name:\s*['"]([a-zA-Z0-9_]+)['"]/gm
-    const columns = getMigrationColumns()
-    const seen = new Set()
-    let match
+  // Collection-level fields in Pages.ts have exactly 12 spaces of indentation.
+  // Block-level fields have 16+ spaces. This distinguishes the two.
+  // Pattern: +            name: 'fieldName'  (12 spaces)
+  const collectionFieldRegex = /^\+            name:\s*['"]([a-zA-Z0-9_]+)['"]/gm
+  const columns = getMigrationColumns()
+  const seen = new Set()
+  let match
 
-    while ((match = collectionFieldRegex.exec(diff)) !== null) {
-      const fieldName = match[1]
-      const snake = toSnakeCase(fieldName)
-      const versionCol = `version_${snake}`
+  while ((match = collectionFieldRegex.exec(diff)) !== null) {
+    const fieldName = match[1]
+    const snake = toSnakeCase(fieldName)
+    const versionCol = `version_${snake}`
 
-      if (seen.has(fieldName)) continue
-      seen.add(fieldName)
+    if (seen.has(fieldName)) continue
+    seen.add(fieldName)
 
-      // Skip fields that Payload auto-manages in _pages_v or handles specially
-      if (PAGES_AUTO_COLUMNS.has(fieldName)) continue
+    // Skip fields that Payload auto-manages in _pages_v or handles specially
+    if (PAGES_AUTO_COLUMNS.has(fieldName)) continue
 
-      if (!columns.has(`_pages_v.${versionCol}`)) {
-        missing.push({ field: fieldName, snake, versionCol })
-      }
+    // Skip field types that do not produce a simple version_* column.
+    // Look for `type: '...'` within the next ~5 added lines after this name.
+    const afterMatch = diff.slice(match.index)
+    const nextFewLines = afterMatch.split('\n').slice(0, 6).join('\n')
+    const typeMatch = nextFewLines.match(/type:\s*['"]([a-zA-Z]+)['"]/)
+    if (typeMatch && SKIP_FIELD_TYPES.has(typeMatch[1])) continue
+
+    if (!columns.has(`_pages_v.${versionCol}`)) {
+      missing.push({ field: fieldName, snake, versionCol })
     }
-  } catch {
-    // No diff or file missing
   }
 
   return missing
