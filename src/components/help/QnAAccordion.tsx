@@ -1,5 +1,6 @@
 import React, { KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import DOMPurify from 'isomorphic-dompurify';
 
 interface QnAAccordionProps {
     question: string;
@@ -59,7 +60,12 @@ export const QnAAccordion: React.FC<QnAAccordionProps> = ({
                     >
                         <div
                             className="px-5 pb-4 text-[14px] text-[#9CA3AF] leading-[22px] [&_strong]:text-white [&_strong]:font-semibold"
-                            dangerouslySetInnerHTML={{ __html: answer }}
+                            dangerouslySetInnerHTML={{ 
+                                __html: DOMPurify.sanitize(answer, { 
+                                    ALLOWED_TAGS: ['strong', 'br', 'a', 'p', 'ul', 'ol', 'li', 'em', 'u'], 
+                                    ALLOWED_ATTR: ['href', 'target', 'rel'] 
+                                }) 
+                            }}
                         />
                     </motion.div>
                 )}
