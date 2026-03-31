@@ -19,6 +19,8 @@ interface ImageUploaderProps {
     className?: string
     label?: string
     description?: string
+    variant?: 'square' | 'wide'
+    placeholderText?: string
 }
 
 export function ImageUploader({
@@ -28,7 +30,9 @@ export function ImageUploader({
     maxSizeMB = 5,
     className,
     label = 'Product Images',
-    description = `Upload up to 5 images (Max ${maxSizeMB}MB each. JPG, PNG, WEBP)`
+    description = `Upload up to 5 images (Max ${maxSizeMB}MB each. JPG, PNG, WEBP)`,
+    variant = 'square',
+    placeholderText = 'Upload'
 }: ImageUploaderProps) {
     const [isUploading, setIsUploading] = useState(false)
     const [dragActive, setDragActive] = useState(false)
@@ -135,7 +139,7 @@ export function ImageUploader({
                 </span>
             </div>
 
-            <div className="flex flex-wrap gap-4 mt-2">
+            <div className={cn("flex flex-wrap gap-4 mt-2", variant === 'wide' && value.length === 0 ? "" : "")}>
                 {value.map((img, idx) => {
                     const safeUrl = (() => {
                         try {
@@ -165,8 +169,11 @@ export function ImageUploader({
                 {value.length < maxImages && (
                     <div
                         className={cn(
-                            "relative w-[147px] h-[147px] shrink-0 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center p-4 transition-colors text-center cursor-pointer bg-[#0B1120]",
-                            dragActive ? "border-blue-500 bg-blue-500/10" : "border-white/[0.08] hover:border-white/20 hover:bg-white/5",
+                            "relative shrink-0 flex flex-col items-center justify-center p-4 transition-colors text-center cursor-pointer bg-[#0B1120]",
+                            variant === 'square' 
+                                ? "w-[147px] h-[147px] rounded-2xl border-2 border-dashed" 
+                                : "w-full h-[92px] rounded-[12px] border border-solid gap-[6px]",
+                            dragActive ? "border-blue-500 bg-blue-500/10" : "border-white/10 hover:border-white/20 hover:bg-white/5",
                             isUploading && "pointer-events-none opacity-50"
                         )}
                         onDragEnter={handleDrag}
@@ -178,10 +185,12 @@ export function ImageUploader({
                         {isUploading ? (
                             <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
                         ) : (
-                            <div className="flex flex-col items-center justify-center gap-2">
+                            <div className={cn("flex items-center justify-center", variant === 'square' ? "flex-col gap-2" : "flex-col gap-[6px]")}>
                                 <Upload className={cn("w-6 h-6", dragActive ? "text-blue-500" : "text-[#F8FAFC]/40")} />
-                                <span className={cn("text-[12px] font-medium leading-[1.33]", dragActive ? "text-blue-400" : "text-[#F8FAFC]/40")}>
-                                    Upload
+                                <span className={cn("font-medium", 
+                                    variant === 'square' ? "text-[12px] leading-[1.33]" : "text-[12px] leading-[1.21]",
+                                    dragActive ? "text-blue-400" : (variant === 'wide' ? "text-[#374151]" : "text-[#F8FAFC]/40"))}>
+                                    {placeholderText}
                                 </span>
                             </div>
                         )}

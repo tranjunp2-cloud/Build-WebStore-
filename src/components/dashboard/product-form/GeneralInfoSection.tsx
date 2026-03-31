@@ -4,6 +4,7 @@ import { useFormContext } from 'react-hook-form'
 import { ProductFormValues } from './schema'
 import { CategorySelect, Category } from '../CategorySelect'
 import { ImageUploader } from '../ImageUploader'
+import { useI18n } from '@/i18n'
 
 interface Props {
     categories: Category[]
@@ -11,22 +12,23 @@ interface Props {
 
 export function GeneralInfoSection({ categories }: Props) {
     const { register, watch, setValue, formState: { errors } } = useFormContext<ProductFormValues>()
+    const { t } = useI18n()
     
     const categoryIds = watch('categoryIds')
     const images = watch('images')
 
     return (
         <div className="rounded-2xl border border-white/[0.08] bg-[#1E293B]/60 p-[25px] flex flex-col gap-6">
-            <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.56] font-outfit m-0">General Information</h2>
+            <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.general || 'General Information'}</h2>
             
             {/* Product Name */}
             <div className="flex flex-col gap-2">
                 <label className="text-[14px] font-medium text-[#F8FAFC] flex items-center gap-1 leading-[1.43]">
-                    Product Name *
+                    {t.dashboard.products.form.sections?.productName || 'Product Name *'}
                 </label>
                 <input
                     {...register('name')}
-                    placeholder="Enter product name"
+                    placeholder={t.dashboard.products.form.sections?.productNamePlaceholder || 'Enter product name'}
                     className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:border-white focus:ring-1 focus:ring-white focus:outline-none transition-colors"
                 />
                 {errors.name && (
@@ -37,7 +39,7 @@ export function GeneralInfoSection({ categories }: Props) {
             {/* Category */}
             <div className="flex flex-col gap-2" id="categoryIds">
                 <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43]">
-                    Category
+                    {t.dashboard.products.form.sections?.category || 'Category'}
                 </label>
                 <CategorySelect 
                     categories={categories}
@@ -53,7 +55,7 @@ export function GeneralInfoSection({ categories }: Props) {
             {/* Images */}
             <div className="flex flex-col gap-2" id="images">
                 <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43]">
-                    Images (Up to 5 images, each &lt; 5MB)
+                    {t.dashboard.products.form.sections?.images || 'Images (Up to 5 images, each < 5MB)'}
                 </label>
                 <ImageUploader 
                     value={images || []}

@@ -389,7 +389,126 @@ function enrichWithDefaultPages(tpl: any) {
     console.log(`  ✓ Pages already exist (${existingPages.totalDocs})`)
   }
 
-  console.log('\n✅ Seeded: 1 user, 1 tenant, 1 site, 5 products, 3 orders, 10 templates, 3 pages')
+  // 8. Tạo categories (3 cấp)
+  const existingCategories = await payload.find({
+    collection: 'categories',
+    where: { site: { equals: site.id as number } },
+  })
+
+  if (existingCategories.totalDocs === 0) {
+    // Level 1: Fesyen Wanita
+    const fesyenWanita = await payload.create({
+      collection: 'categories',
+      data: {
+        name: 'Fesyen Wanita',
+        slug: 'fesyen-wanita',
+        site: site.id as number,
+        tenant: tenant.id as number,
+        description: 'Pakaian dan aksesori untuk wanita',
+      },
+    })
+
+    // Level 2: Pakaian (under Fesyen Wanita)
+    const pakaian = await payload.create({
+      collection: 'categories',
+      data: {
+        name: 'Pakaian',
+        slug: 'fesyen-wanita-pakaian',
+        parent: fesyenWanita.id as number,
+        site: site.id as number,
+        tenant: tenant.id as number,
+      },
+    })
+
+    // Level 3: Baju Kurung (under Pakaian)
+    await payload.create({
+      collection: 'categories',
+      data: {
+        name: 'Baju Kurung',
+        slug: 'baju-kurung',
+        parent: pakaian.id as number,
+        site: site.id as number,
+        tenant: tenant.id as number,
+      },
+    })
+
+    // Level 3: Tudung (under Pakaian)
+    await payload.create({
+      collection: 'categories',
+      data: {
+        name: 'Tudung',
+        slug: 'tudung',
+        parent: pakaian.id as number,
+        site: site.id as number,
+        tenant: tenant.id as number,
+      },
+    })
+
+    // Level 2: Kasut (under Fesyen Wanita)
+    const kasut = await payload.create({
+      collection: 'categories',
+      data: {
+        name: 'Kasut',
+        slug: 'fesyen-wanita-kasut',
+        parent: fesyenWanita.id as number,
+        site: site.id as number,
+        tenant: tenant.id as number,
+      },
+    })
+
+    // Level 3: Sneaker (under Kasut)
+    await payload.create({
+      collection: 'categories',
+      data: {
+        name: 'Sneaker Wanita',
+        slug: 'sneaker-wanita',
+        parent: kasut.id as number,
+        site: site.id as number,
+        tenant: tenant.id as number,
+      },
+    })
+
+    // Level 1: Makanan & Minuman
+    const makanan = await payload.create({
+      collection: 'categories',
+      data: {
+        name: 'Makanan & Minuman',
+        slug: 'makanan-minuman',
+        site: site.id as number,
+        tenant: tenant.id as number,
+      },
+    })
+
+    // Level 2: Snek (under Makanan & Minuman)
+    const snek = await payload.create({
+      collection: 'categories',
+      data: {
+        name: 'Snek',
+        slug: 'snek',
+        parent: makanan.id as number,
+        site: site.id as number,
+        tenant: tenant.id as number,
+      },
+    })
+
+    // Level 3: Kerepek (under Snek)
+    await payload.create({
+      collection: 'categories',
+      data: {
+        name: 'Kerepek',
+        slug: 'kerepek',
+        parent: snek.id as number,
+        site: site.id as number,
+        tenant: tenant.id as number,
+      },
+    })
+
+    console.log('  ✓ Created hierarchical categories (up to 3 levels)')
+  } else {
+    console.log(`  ✓ Categories already exist (${existingCategories.totalDocs})`)
+  }
+
+  console.log('\n✅ Seeded: 1 user, 1 tenant, 1 site, 5 products, 3 orders, 10 templates, 3 pages, categories')
   process.exit(0)
 }
 

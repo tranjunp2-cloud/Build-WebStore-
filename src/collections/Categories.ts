@@ -8,7 +8,9 @@ export const Categories: CollectionConfig = {
         description: 'Quản lý Danh mục (Tối đa 3 cấp độ)',
     },
     access: {
-        create: ({ req }) => Boolean(req.user),
+        create: ({ req }) => {
+            return Boolean(req.user);
+        },
         read: ({ req }) => {
             if (!req.user) return true // Public read for storefront
             if (req.user.roles?.includes('super-admin')) return true
@@ -142,6 +144,11 @@ export const Categories: CollectionConfig = {
                 return true
             },
             admin: { description: 'Danh mục cha (Tối đa 3 level)' },
+        },
+        {
+            name: 'description',
+            type: 'textarea',
+            admin: { description: 'Mô tả ngắn gọn cho SEO' },
         },
         {
             name: 'breadcrumbs',

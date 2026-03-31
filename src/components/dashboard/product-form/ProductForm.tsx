@@ -109,16 +109,16 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
             }
 
             // Create a user-friendly error message list
-            const errorMessages = errorKeys.map(key => {
+            const errorMessages = errorKeys.map((key) => {
                 const map: Record<string, string> = {
-                    name: 'Product Name',
-                    categoryIds: 'Category',
-                    images: 'Images',
-                    variants: 'Variants Matrix',
-                    tiers: 'Variant Options',
-                    basePrice: 'Price',
-                    baseSku: 'SKU Code',
-                    baseInventory: 'Inventory'
+                    name: t.dashboard.products.form.fields.name || 'Product Name',
+                    categoryIds: t.dashboard.products.form.fields.categoryIds || 'Category',
+                    images: t.dashboard.products.form.fields.images || 'Images',
+                    variants: t.dashboard.products.form.fields.variants || 'Variants Matrix',
+                    tiers: t.dashboard.products.form.fields.tiers || 'Variant Options',
+                    basePrice: t.dashboard.products.form.fields.basePrice || 'Price',
+                    baseSku: t.dashboard.products.form.fields.baseSku || 'SKU Code',
+                    baseInventory: t.dashboard.products.form.fields.baseInventory || 'Inventory'
                 }
                 return map[key] || key
             })

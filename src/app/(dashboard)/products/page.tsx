@@ -358,9 +358,14 @@ export default function ProductsPage() {
                             <h1 className="text-[24px] font-bold leading-none text-[#F8FAFC]">{t.dashboard.products.title}</h1>
                             <span className="block text-[14px] leading-none text-[#F8FAFC]/60">{t.dashboard.products.subtitle}</span>
                         </div>
-                        <Link href="/products/new" className="flex items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-blue-500 to-teal-400 px-6 h-[48px] text-[16px] font-semibold text-white shadow-md hover:opacity-90 hover:no-underline no-underline transition-opacity whitespace-nowrap w-full md:w-auto">
-                            <Image src="/images/figma/add-product.svg" alt="Add" width={20} height={20} className="shrink-0 brightness-0 invert" /> {t.dashboard.products.addProduct}
-                        </Link>
+                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                            <Link href="/products/categories" className="flex items-center justify-center rounded-[16px] border border-white/[0.08] px-6 h-[48px] text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 no-underline transition-colors w-full sm:w-auto md:w-[148px]">
+                                {t.dashboard.products.list.category}
+                            </Link>
+                            <Link href="/products/new" className="flex items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-blue-500 to-teal-400 px-6 h-[48px] text-[16px] font-semibold text-white shadow-md hover:opacity-90 hover:no-underline no-underline transition-opacity whitespace-nowrap w-full sm:w-auto">
+                                <Image src="/images/figma/add-product.svg" alt="Add" width={20} height={20} className="shrink-0 brightness-0 invert" /> {t.dashboard.products.addProduct}
+                            </Link>
+                        </div>
                     </div>
 
                     {/* Status Tabs */}
