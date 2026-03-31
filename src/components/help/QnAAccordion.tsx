@@ -2,6 +2,13 @@ import React, { KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import DOMPurify from 'isomorphic-dompurify';
 
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    // Check if the element is an anchor tag with target="_blank"
+    if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
+        node.setAttribute('rel', 'noopener noreferrer');
+    }
+});
+
 interface QnAAccordionProps {
     question: string;
     answer: string;
