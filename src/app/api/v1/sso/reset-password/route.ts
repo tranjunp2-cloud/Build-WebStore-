@@ -23,6 +23,14 @@ export async function PUT(req: NextRequest) {
         const payload = await getPayload({ config })
 
         // ── 1. Auth Check ──
+        const authHeader = req.headers.get('authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+            return NextResponse.json(
+                { message: 'Authorization required' },
+                { status: 401 },
+            )
+        }
+
         const callerUser = await getCurrentUser(req)
 
         if (!callerUser) {
