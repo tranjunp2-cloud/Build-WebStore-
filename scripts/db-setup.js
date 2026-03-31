@@ -795,270 +795,250 @@ const MIGRATIONS = [
   },
   // ── Pages Versions: _pages_v_blocks_* tables ──
   // Required for Payload draft/versioning (editor loads _pages_v not pages).
-  // Mirror of pages_blocks_* with _path = 'version_layout'.
+  // Types match Payload's Drizzle ORM output:
+  //   - id: serial (integer auto-increment) — NOT varchar
+  //   - _path: text NOT NULL — NOT varchar with DEFAULT
+  //   - sub-table _parent_id: integer (ref parent block serial id)
+  // CREATE TABLE IF NOT EXISTS is safe — pushDevSchema may already create
+  // some of these, migrations fill in blocks added after initial schema push.
   {
     name: '_pages_v_blocks_navigation.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_navigation" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       style varchar, logo_id integer, logo_text varchar,
-      cta_button_show boolean DEFAULT false, cta_button_label varchar, cta_button_url varchar
+      cta_button_show boolean, cta_button_label varchar, cta_button_url varchar
     );`,
   },
   {
     name: '_pages_v_blocks_hero.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_hero" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       variant varchar, headline varchar, subheadline varchar,
       image_id integer, background_image_id integer, video_url varchar,
-      badge_show boolean DEFAULT false, badge_text varchar
+      badge_show boolean, badge_text varchar
     );`,
   },
   {
     name: '_pages_v_blocks_about.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_about" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       layout varchar, section_label varchar, headline varchar, body jsonb, image_id integer
     );`,
   },
   {
     name: '_pages_v_blocks_features.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_features" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       section_label varchar, headline varchar, subheadline varchar, layout varchar
     );`,
   },
   {
     name: '_pages_v_blocks_testimonials.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_testimonials" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       headline varchar, variant varchar
     );`,
   },
   {
     name: '_pages_v_blocks_contact.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_contact" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       headline varchar, subtext varchar, email varchar, phone varchar,
-      address varchar, show_map boolean DEFAULT false, map_embed_url varchar
+      address varchar, show_map boolean, map_embed_url varchar
     );`,
   },
   {
     name: '_pages_v_blocks_gallery.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_gallery" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       headline varchar, layout varchar
     );`,
   },
   {
     name: '_pages_v_blocks_footer.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_footer" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       logo_text varchar, logo_id integer, tagline varchar,
-      copyright_text varchar, show_social_links boolean DEFAULT false
+      copyright_text varchar, show_social_links boolean
     );`,
   },
   {
     name: '_pages_v_blocks_stats.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_stats" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       headline varchar
     );`,
   },
   {
     name: '_pages_v_blocks_pricing.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       headline varchar, subheadline varchar
     );`,
   },
   {
     name: '_pages_v_blocks_faq.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_faq" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       headline varchar
     );`,
   },
   {
     name: '_pages_v_blocks_team.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_team" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      _path varchar NOT NULL DEFAULT 'version_layout', block_name varchar,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
       headline varchar
     );`,
   },
-  // _pages_v sub-tables (nested arrays inside blocks)
+  // _pages_v sub-tables (nested arrays inside version blocks)
+  // _parent_id integer references the parent block's serial id
   {
     name: '_pages_v_blocks_navigation_links.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_navigation_links" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      label varchar, url varchar, open_in_new_tab boolean DEFAULT false
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      label varchar, url varchar, open_in_new_tab boolean
     );`,
   },
   {
     name: '_pages_v_blocks_hero_cta_buttons.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_hero_cta_buttons" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      label varchar, url varchar, style varchar DEFAULT 'primary'
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      label varchar, url varchar, style varchar
     );`,
   },
   {
     name: '_pages_v_blocks_about_stats.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_about_stats" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
       value varchar, label varchar
     );`,
   },
   {
     name: '_pages_v_blocks_contact_form_fields.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_contact_form_fields" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      field_name varchar, label varchar, field_type varchar, required boolean DEFAULT false, placeholder varchar
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      field_name varchar, label varchar, field_type varchar, required boolean, placeholder varchar
     );`,
   },
   {
     name: '_pages_v_blocks_footer_columns.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_footer_columns" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
       title varchar
     );`,
   },
   {
     name: '_pages_v_blocks_footer_columns_links.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_footer_columns_links" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
       label varchar, url varchar
     );`,
   },
   {
     name: '_pages_v_blocks_features_features.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_features_features" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
       icon varchar, title varchar, description varchar
     );`,
   },
   {
     name: '_pages_v_blocks_testimonials_testimonials.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_testimonials_testimonials" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
       quote varchar, name varchar, title varchar, company varchar, avatar_id integer, rating numeric
     );`,
   },
   {
     name: '_pages_v_blocks_gallery_images.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_gallery_images" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
       image_id integer, caption varchar
     );`,
   },
   {
     name: '_pages_v_blocks_stats_stats.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_stats_stats" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
       value varchar, label varchar
     );`,
   },
   {
     name: '_pages_v_blocks_pricing_plans.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing_plans" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      name varchar, price varchar, description varchar, is_popular boolean DEFAULT false, cta_label varchar, cta_url varchar
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, price varchar, description varchar, is_popular boolean, cta_label varchar, cta_url varchar
     );`,
   },
   {
     name: '_pages_v_blocks_pricing_plans_features.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing_plans_features" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
-      text varchar, included boolean DEFAULT true
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      text varchar, included boolean
     );`,
   },
   {
     name: '_pages_v_blocks_faq_faqs.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_faq_faqs" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
       question varchar, answer varchar
     );`,
   },
   {
     name: '_pages_v_blocks_team_members.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_team_members" (
-      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
-      _order integer NOT NULL DEFAULT 0,
-      _parent_id varchar NOT NULL,
-      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
       name varchar, role varchar, bio varchar, image_id integer
     );`,
   },
