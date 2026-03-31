@@ -26,13 +26,17 @@ export function OrdersActionBar() {
                     {/* Dropdown 1 (30955:5710) - All dates */}
                     <button className="flex items-center justify-between w-[143px] h-[50px] pl-[15px] pr-[12px] bg-[#1E293B] border border-[rgba(255,255,255,0.08)] rounded-[16px] hover:bg-white/5 transition-colors shrink-0">
                         <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-[#F8FAFC] truncate">All dates</span>
-                        <ChevronDown strokeWidth={1.6666666269302368} className="w-[20px] h-[20px] text-[#F8FAFC] shrink-0" />
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                            <path d="M5 7.5L10 12.5L15 7.5" stroke="#F8FAFC" strokeWidth="1.6666666269302368" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
                     </button>
 
                     {/* Dropdown 2 (30955:5719) - All status */}
                     <button className="flex items-center justify-between w-[138px] h-[50px] pl-[15px] pr-[12px] bg-[#1E293B] border border-[rgba(255,255,255,0.08)] rounded-[16px] hover:bg-white/5 transition-colors shrink-0">
                         <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-[#F8FAFC] truncate">All status</span>
-                        <ChevronDown strokeWidth={1.6666666269302368} className="w-[20px] h-[20px] text-[#F8FAFC] shrink-0" />
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                            <path d="M5 7.5L10 12.5L15 7.5" stroke="#F8FAFC" strokeWidth="1.6666666269302368" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
                     </button>
                 </div>
             </div>
