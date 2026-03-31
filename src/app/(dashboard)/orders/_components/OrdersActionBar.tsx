@@ -1,7 +1,23 @@
-import React from 'react'
-import { Search, ChevronDown } from 'lucide-react'
+"use client"
+
+import React, { useState, useRef, useEffect } from 'react'
+import { Search } from 'lucide-react'
 
 export function OrdersActionBar() {
+    const [isDatesOpen, setIsDatesOpen] = useState(false)
+    const datesRef = useRef<HTMLDivElement>(null)
+
+    // Click outside handler
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (datesRef.current && !datesRef.current.contains(event.target as Node)) {
+                setIsDatesOpen(false)
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside)
+        return () => document.removeEventListener("mousedown", handleClickOutside)
+    }, [])
+
     return (
         <div className="flex flex-col gap-[22px] w-full">
             {/* Top Row (Figma Node 30955:250) */}
@@ -24,12 +40,52 @@ export function OrdersActionBar() {
                 {/* Dropdowns Container (30955:5708) */}
                 <div className="flex items-center gap-[12px] h-[50px]">
                     {/* Dropdown 1 (30955:5710) - All dates */}
-                    <button className="flex items-center justify-between w-[143px] h-[50px] pl-[15px] pr-[12px] bg-[#1E293B] border border-[rgba(255,255,255,0.08)] rounded-[16px] hover:bg-white/5 transition-colors shrink-0">
-                        <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-[#F8FAFC] truncate">All dates</span>
-                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
-                            <path d="M5 7.5L10 12.5L15 7.5" stroke="#F8FAFC" strokeWidth="1.6666666269302368" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                    </button>
+                    <div className="relative" ref={datesRef}>
+                        <button
+                            onClick={() => setIsDatesOpen(!isDatesOpen)}
+                            className="flex items-center justify-between w-[143px] h-[50px] pl-[15px] pr-[12px] bg-[#1E293B] border border-[rgba(255,255,255,0.08)] rounded-[16px] hover:bg-white/5 transition-colors shrink-0"
+                        >
+                            <span className="text-[16px] font-normal leading-[1.2102272510528564em] text-[#F8FAFC] truncate">All dates</span>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className={`shrink-0 transition-transform ${isDatesOpen ? 'rotate-180' : ''}`}>
+                                <path d="M5 7.5L10 12.5L15 7.5" stroke="#F8FAFC" strokeWidth="1.6666666269302368" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+
+                        {/* Dropdown Popover (31137:5911) */}
+                        {isDatesOpen && (
+                            <div className="absolute top-[calc(100%+4px)] left-0 z-50 flex flex-col items-stretch w-[143px] py-[4px] drop-shadow-[0px_8px_24px_rgba(25,32,56,0.1)]">
+                                {/* Arrow Top (30955:3041) */}
+                                <div className="flex flex-col w-full items-start px-[22px]">
+                                    <svg width="12" height="6" viewBox="16 0 12 6" fill="none" xmlns="http://www.w3.org/2000/svg" className="block">
+                                        <path d="M28 6L22 0L16 6H28Z" fill="#1F2937" />
+                                    </svg>
+                                </div>
+                                {/* List (30955:3044) */}
+                                <div className="flex flex-col w-full bg-[#1F2937] py-[8px] rounded-[2px]">
+                                    {/* Item Active: All Dates */}
+                                    <button className="flex items-center w-full px-[12px] py-[5px] bg-[#0B1120] text-left hover:bg-[#0B1120]/80 transition-colors">
+                                        <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-[#FFFFFF]">All Dates</span>
+                                    </button>
+                                    {/* Item: Today */}
+                                    <button className="flex items-center w-full px-[12px] py-[5px] text-left hover:bg-[#0B1120]/50 transition-colors">
+                                        <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-[#FFFFFF]">Today</span>
+                                    </button>
+                                    {/* Item: This Week */}
+                                    <button className="flex items-center w-full px-[12px] py-[5px] text-left hover:bg-[#0B1120]/50 transition-colors">
+                                        <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-[#FFFFFF]">This Week</span>
+                                    </button>
+                                    {/* Item: This Month */}
+                                    <button className="flex items-center w-full px-[12px] py-[5px] text-left hover:bg-[#0B1120]/50 transition-colors">
+                                        <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-[#FFFFFF]">This Month</span>
+                                    </button>
+                                    {/* Item: Past 30 Days (Extrapolated from Items=5) */}
+                                    <button className="flex items-center w-full px-[12px] py-[5px] text-left hover:bg-[#0B1120]/50 transition-colors">
+                                        <span className="text-[14px] leading-[1.5714285714285714em] font-normal text-[#FFFFFF]">Past 30 Days</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Dropdown 2 (30955:5719) - All status */}
                     <button className="flex items-center justify-between w-[138px] h-[50px] pl-[15px] pr-[12px] bg-[#1E293B] border border-[rgba(255,255,255,0.08)] rounded-[16px] hover:bg-white/5 transition-colors shrink-0">
