@@ -1157,6 +1157,8 @@ const MIGRATIONS = [
       UNION SELECT _parent_id FROM _pages_v_blocks_pricing        WHERE _parent_id IS NOT NULL
       UNION SELECT _parent_id FROM _pages_v_blocks_faq            WHERE _parent_id IS NOT NULL
       UNION SELECT _parent_id FROM _pages_v_blocks_team           WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_socialWidget   WHERE _parent_id IS NOT NULL
+      UNION SELECT _parent_id FROM _pages_v_blocks_cartWidget     WHERE _parent_id IS NOT NULL
     );`,
   },
   // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
