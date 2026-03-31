@@ -46,10 +46,10 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
         const resolveTenantId = (t: TenantRef): string | null =>
             t == null ? null : String(typeof t === 'object' ? t.id : t)
 
-        interface UserTenantRef { tenant: TenantRef }
-        const tenantIds = (user as unknown as { tenants?: UserTenantRef[] }).tenants
-            ?.map(t => resolveTenantId(t.tenant))
-            .filter((id): id is string => id !== null) ?? []
+        const rawTenants = Array.isArray(user.tenants) ? user.tenants : []
+        const tenantIds = rawTenants
+            .map((t: { tenant: TenantRef }) => resolveTenantId(t.tenant))
+            .filter((id): id is string => id !== null)
 
         const siteTenantId = resolveTenantId(site.tenant as TenantRef)
         if (!siteTenantId || !tenantIds.includes(siteTenantId)) {
