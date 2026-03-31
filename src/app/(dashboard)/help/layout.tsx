@@ -1,0 +1,30 @@
+import { ReactNode } from 'react'
+import { HelpCenterNav } from '@/components/help/HelpCenterNav'
+import { Metadata } from 'next'
+
+export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Help Center | EchPrime',
+  description: 'Learn how to use your online store management system.'
+}
+
+export default function HelpCenterLayout({ children }: { children: ReactNode }) {
+  return (
+    <div className="max-w-[1660px] mx-auto w-full">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-white mb-2">Help Center</h1>
+        <p className="text-slate-400 text-base">
+          Learn how to use your online store management system.
+        </p>
+      </div>
+      
+      <div className="w-full">
+        <HelpCenterNav />
+        <div className="w-full">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}

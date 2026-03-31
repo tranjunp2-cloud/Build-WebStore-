@@ -7,15 +7,16 @@ import { getPayload } from 'payload'
 import { getCurrentUser } from '@/lib/auth'
 
 // Bypass withAuth HOC — inject mock user trực tiếp
-vi.mock('@/lib/auth', () => ({
-    withAuth: vi.fn().mockImplementation((handler: any) => {
-        return async (req: any, ctx: any) => {
-            const user = { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1' }] }
-            return handler(user, req, ctx)
-        }
-    }),
-    getCurrentUser: vi.fn().mockResolvedValue({ id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1' }] }),
-}))
+vi.mock('@/lib/auth', () => {
+    const user = { id: 'user-1', email: 'admin@example.com', tenants: [{ tenant: 'tenant-1' }] }
+    return {
+        // vi.mock factory runs before imports — types unavailable, use unknown
+        withAuth: vi.fn().mockImplementation((handler: unknown) => {
+            return async (req: unknown, ctx: unknown) => (handler as Function)(user, req, ctx)
+        }),
+        getCurrentUser: vi.fn().mockResolvedValue(user),
+    }
+})
 
 // Mock cookies từ next/headers
 vi.mock('next/headers', () => {
