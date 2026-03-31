@@ -41,6 +41,32 @@ export async function PUT(req: NextRequest) {
             })
             callerUser = authResult?.user || null
 
+            // Fallback for custom jose-signed JWT (SSO service token)
+            if (!callerUser) {
+                const payloadSecret = process.env.PAYLOAD_SECRET
+                if (payloadSecret) {
+                    const { jwtVerify } = await (import('jose'))
+                    const secret = new TextEncoder().encode(payloadSecret)
+                    try {
+                        const { payload: decoded } = await jwtVerify(token, secret)
+
+                        const isIdValid =
+                            typeof decoded.id === 'number' ||
+                            (typeof decoded.id === 'string' && /^[a-zA-Z0-9-]+$/.test(decoded.id))
+
+                        if (isIdValid && decoded.collection === 'users') {
+                            const user = await payload.findByID({
+                                collection: 'users',
+                                id: decoded.id as string | number,
+                            })
+                            callerUser = user || null
+                        }
+                    } catch (e) {
+                        // jose verification failed
+                    }
+                }
+            }
+
             if (!callerUser) {
                 return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
             }
