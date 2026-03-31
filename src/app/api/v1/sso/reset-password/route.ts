@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * PUT /api/v1/sso/reset-password
@@ -30,22 +31,9 @@ export async function PUT(req: NextRequest) {
             )
         }
 
-        const token = authHeader.split(' ')[1]
+        const callerUser = await getCurrentUser(req)
 
-        let callerUser: any
-        try {
-            const authResult = await payload.auth({
-                headers: new Headers({
-                    Authorization: `JWT ${token}`,
-                }),
-            })
-            callerUser = authResult?.user || null
-
-            if (!callerUser) {
-                return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
-            }
-        } catch (error) {
-            console.error('[SSO Auth Error]', error)
+        if (!callerUser) {
             return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
         }
 

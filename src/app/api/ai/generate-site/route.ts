@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
                 })
 
                 resolvedTenantId = String(recoveredTenant.id)
-                            } else {
+            } else {
                 // Auto-create tenant for legacy users without one
                 const firstName = (user as { firstName?: string }).firstName || (user as { name?: string }).name || 'My'
                 const newTenant = await payload.create({
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
                     } as Record<string, unknown>,
                 })
                 resolvedTenantId = String(newTenant.id)
-                            }
+            }
         }
 
         // FR-15: Rate Limit - Free tier is limited to 1 AI generation
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
             const currentCount = tenant.aiGenerationsCount || 0
             if (currentCount >= 1) {
                 return NextResponse.json(
-                    { 
+                    {
                         error: 'Tài khoản Free chỉ được tạo website bằng AI 1 lần duy nhất. Vui lòng nâng cấp gói cước để tiếp tục.',
                         code: 'PAYMENT_REQUIRED'
                     },
@@ -282,7 +282,7 @@ export async function POST(req: NextRequest) {
             if (heroBlock) {
                 // Attach the payload block's backgroundImage field to the uploaded media ID (for DB save)
                 heroBlock.backgroundImage = heroMedia.id
-                
+
                 // Update the corresponding SSE event so the frontend preview gets the full image object immediately
                 const heroEvent = events.find((e) => e.event === 'block_complete' && (e.data as { block?: AIBlock })?.block?.blockType === 'hero')
                 if (heroEvent && heroEvent.data && (heroEvent.data as { block?: AIBlock }).block) {
@@ -449,7 +449,7 @@ function applyGeneratedSiteNavigation(blocks: AIBlock[], businessName: string): 
                 logoText: block.logoText || businessName,
                 columns: block.columns.map((column: AIBlock | string) => {
                     if (typeof column === 'string') return { title: column, links: [] }
-                    
+
                     return {
                         ...column,
                         links: Array.isArray(column.links)
