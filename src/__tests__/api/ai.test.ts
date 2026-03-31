@@ -128,7 +128,7 @@ describe('AI Streaming APIs', () => {
              expect(mockSiteDB.length).toBe(1) // A site was created
              expect(mockPageDB.length).toBe(5) // Homepage, About, Products, Contact, 404
              expect(result.totalPages).toBe(5)
-             expect(mockPageDB.map((page) => page.slug)).toEqual(['home', 'about', 'products', 'contact', '404'])
+             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', '/about', 'products', 'contact', '404'])
         })
 
         it('returns text/event-stream response for SSE mode when stream=true', async () => {

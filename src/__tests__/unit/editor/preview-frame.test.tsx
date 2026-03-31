@@ -1,27 +1,22 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-
-// Mock dependencies
-vi.mock('@/lib/htmlBuilder', () => ({
-    buildFullHTML: vi.fn().mockReturnValue('<html><body>Preview</body></html>'),
-}))
-vi.mock('@/lib/preview', () => ({
-    detectCategory: vi.fn().mockReturnValue('business'),
-}))
-
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
-import { buildFullHTML } from '@/lib/htmlBuilder'
 
-const mockBuildFullHTML = vi.mocked(buildFullHTML)
-
-// ─── TC-F05.01: Editor preview frame ──────────────────────────────────
+vi.mock('@/store/editorStore', () => ({
+    useEditorStore: vi.fn().mockReturnValue({
+        blocks: [],
+        updateBlock: vi.fn(),
+    })
+}))
 
 describe('PreviewFrame', () => {
-    const defaultProps = {
-        siteName: 'Test Site',
-        blocks: [{ blockType: 'hero', headline: 'Welcome' }],
-        theme: { primaryColor: '#3B82F6' },
+    const defaultProps: any = {
+        siteId: 'site-123',
+        pageId: null,
+        iframeKey: 1,
         isLoading: false,
+        viewport: 'desktop',
+        selectedBlock: null,
     }
 
     it('renders loading skeleton when isLoading is true', () => {
@@ -30,11 +25,11 @@ describe('PreviewFrame', () => {
         expect(screen.queryByTitle('Site Preview')).not.toBeInTheDocument()
     })
 
-    it('renders iframe with srcdoc when not loading', () => {
+    it('renders iframe with correct src when not loading', () => {
         render(<PreviewFrame {...defaultProps} />)
         const iframe = screen.getByTitle('Site Preview') as HTMLIFrameElement
         expect(iframe).toBeInTheDocument()
-        expect(iframe.getAttribute('srcdoc')).toContain('Preview')
+        expect(iframe.getAttribute('src')).toContain('/api/preview/site-123?v=1')
     })
 
     it('switches from loading to iframe when isLoading changes', () => {
@@ -54,13 +49,9 @@ describe('PreviewFrame', () => {
         expect(iframe.className).toContain('border-0')
     })
 
-    it('calls buildFullHTML with blocks, theme, category, and siteName', () => {
-        render(<PreviewFrame {...defaultProps} />)
-        expect(mockBuildFullHTML).toHaveBeenCalledWith(
-            defaultProps.blocks,
-            defaultProps.theme,
-            'business',
-            { name: 'Test Site' },
-        )
+    it('appends pageId to src if provided', () => {
+        render(<PreviewFrame {...defaultProps} pageId="page-456" />)
+        const iframe = screen.getByTitle('Site Preview') as HTMLIFrameElement
+        expect(iframe.getAttribute('src')).toContain('pageId=page-456')
     })
 })
