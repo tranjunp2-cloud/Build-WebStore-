@@ -1018,6 +1018,37 @@ const MIGRATIONS = [
       platform varchar, url varchar, enabled boolean DEFAULT true
     );`,
   },
+  // ── snake_case aliases required by Payload Drizzle ORM ──
+  // Drizzle converts camelCase blockType → snake_case for table names.
+  // "socialWidget" → "social_widget", "cartWidget" → "cart_widget".
+  // The camelCase tables above are unreachable by Payload queries — these are the real tables.
+  {
+    name: '_pages_v_blocks_social_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_social_widget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_social_widget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_social_widget_links" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      platform varchar, url varchar, enabled boolean DEFAULT true
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_cart_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_cart_widget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, label varchar, show_label boolean
+    );`,
+  },
   {
     name: '_pages_v_blocks_hero_cta_buttons.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_hero_cta_buttons" (
