@@ -198,10 +198,10 @@ describe('Sites APIs', () => {
         it('returns 200 with site and page data (including locale and shippingConfig)', async () => {
             // @ts-ignore
             getPayload.mockResolvedValueOnce({
-                findByID: vi.fn().mockResolvedValue({ 
-                    id: '123', 
-                    name: 'Test Site', 
-                    status: 'draft', 
+                findByID: vi.fn().mockResolvedValue({
+                    id: '123',
+                    name: 'Test Site',
+                    status: 'draft',
                     tenant: 'tenant-1',
                     siteType: 'business',
                     locale: 'ms',
@@ -216,11 +216,34 @@ describe('Sites APIs', () => {
             const res = await EditorDataGET(req, { params: Promise.resolve({ siteId: '123' }) })
             expect(res.status).toBe(200)
             const result = await res.json()
-            
+
             expect(result.site.name).toBe('Test Site')
             expect(result.site.locale).toBe('ms')
             expect(result.site.shippingConfig.westRate).toBe(800)
             expect(result.page.layout[0].blockType).toBe('hero')
+        })
+
+        it('[TC-editor-data-null-tenant] returns 403 (not 500) when site.tenant is null', async () => {
+            // Regression test: typeof null === 'object' → accessing null.id used to throw TypeError → 500
+            // After fix: resolveTenantId(null) returns null → siteTenantId is null → 403 Forbidden
+            // @ts-ignore
+            getPayload.mockResolvedValueOnce({
+                findByID: vi.fn().mockResolvedValue({
+                    id: '123',
+                    name: 'Orphan Site',
+                    status: 'draft',
+                    tenant: null, // ← root cause of the 500 bug
+                }),
+                find: vi.fn().mockResolvedValue({ docs: [] }),
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/sites/123/editor-data')
+            const res = await EditorDataGET(req, { params: Promise.resolve({ siteId: '123' }) })
+
+            // Must return 403, not 500
+            expect(res.status).toBe(403)
+            const result = await res.json()
+            expect(result.error).toBe('Forbidden')
         })
     })
 
