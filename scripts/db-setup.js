@@ -1281,10 +1281,11 @@ const MIGRATIONS = [
     name: '_pages_v.version_deleted_at',
     sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_deleted_at timestamptz;`,
   },
-  // ── pages_blocks: snake_case aliases for socialWidget / cartWidget ──
-  // Payload Drizzle queries snake_case table names at runtime.
-  // The camelCase tables (pages_blocks_socialWidget) were created first but
-  // Payload also generates references to pages_blocks_social_widget (snake_case).
+  // ── pages_blocks: snake_case tables for socialWidget / cartWidget ──
+  // Payload Drizzle ORM converts camelCase block slugs to snake_case at runtime
+  // (socialWidget → social_widget, cartWidget → cart_widget). These blocks are
+  // new in this PR so there is no existing camelCase data to backfill.
+  // No INSERT...SELECT needed: staging DB had no rows in any camelCase variant.
   {
     name: 'pages_blocks_social_widget.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_social_widget" (
@@ -1299,6 +1300,10 @@ const MIGRATIONS = [
     );`,
   },
   {
+    // _parent_id is varchar (not integer): sub-tables reference the parent block UUID.
+    // Top-level block tables → _parent_id integer (ref pages.id).
+    // Block sub-tables → _parent_id varchar (ref parent block's uuid PK).
+    // This matches the CLAUDE.md migration convention for array sub-tables inside blocks.
     name: 'pages_blocks_social_widget_links.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_social_widget_links" (
       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,

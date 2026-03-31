@@ -73,8 +73,8 @@ function getNewFieldsFromDiff() {
           file: filename,
         })
       }
-    } catch {
-      // File doesn't exist or no diff — skip
+    } catch (err) {
+      console.error(`[migration-check] Warning: could not diff ${filePath}:`, err.message)
     }
   }
 
@@ -131,8 +131,8 @@ function getNewBlockSlugsFromDiff() {
         slugs.push(slug)
       }
     }
-  } catch {
-    // No diff or file missing
+  } catch (err) {
+    console.error(`[migration-check] Warning: could not diff ${filePath}:`, err.message)
   }
 
   return slugs
@@ -187,15 +187,22 @@ function checkPagesVersionColumns() {
   // Collection-level fields in Pages.ts have exactly 12 spaces of indentation.
   // Block-level fields have 16+ spaces. This distinguishes the two.
   // Pattern: +            name: 'fieldName'  (12 spaces)
+  // Collect all collection-level field matches first so we know each field's
+  // exact text boundary (from its name: to the next name: at the same indent).
   const collectionFieldRegex = /^\+            name:\s*['"]([a-zA-Z0-9_]+)['"]/gm
+  const fieldMatches = []
+  let m
+  while ((m = collectionFieldRegex.exec(diff)) !== null) {
+    fieldMatches.push({ name: m[1], index: m.index })
+  }
+
   const columns = getMigrationColumns()
   const seen = new Set()
-  let match
 
-  while ((match = collectionFieldRegex.exec(diff)) !== null) {
-    const fieldName = match[1]
-    const snake = toSnakeCase(fieldName)
-    const versionCol = `version_${snake}`
+  for (let i = 0; i < fieldMatches.length; i++) {
+    const { name: fieldName, index: startIdx } = fieldMatches[i]
+    const endIdx = i + 1 < fieldMatches.length ? fieldMatches[i + 1].index : diff.length
+    const fieldBlock = diff.slice(startIdx, endIdx)
 
     if (seen.has(fieldName)) continue
     seen.add(fieldName)
@@ -204,12 +211,13 @@ function checkPagesVersionColumns() {
     if (PAGES_AUTO_COLUMNS.has(fieldName)) continue
 
     // Skip field types that do not produce a simple version_* column.
-    // Look for `type: '...'` within the next ~5 added lines after this name.
-    const afterMatch = diff.slice(match.index)
-    const nextFewLines = afterMatch.split('\n').slice(0, 6).join('\n')
-    const typeMatch = nextFewLines.match(/type:\s*['"]([a-zA-Z]+)['"]/)
+    // Parse type: from the field's own block (between this name: and the next one),
+    // so we never accidentally read a sibling field's type.
+    const typeMatch = fieldBlock.match(/type:\s*['"]([a-zA-Z]+)['"]/)
     if (typeMatch && SKIP_FIELD_TYPES.has(typeMatch[1])) continue
 
+    const snake = toSnakeCase(fieldName)
+    const versionCol = `version_${snake}`
     if (!columns.has(`_pages_v.${versionCol}`)) {
       missing.push({ field: fieldName, snake, versionCol })
     }
