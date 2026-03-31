@@ -1,37 +1,43 @@
-const features = [
-  {
-    emoji: '📊',
-    title: 'Dashboard',
-    desc: 'View real-time overview of revenue, orders, and visitors.'
-  },
-  {
-    emoji: '🤖',
-    title: 'AI Website Builder',
-    desc: 'Create a professional sales website in just 5 minutes with AI.'
-  },
-  {
-    emoji: '📦',
-    title: 'Products',
-    desc: 'Manage products, RM prices, inventory, Halal Badge, and product images.'
-  },
-  {
-    emoji: '🛒',
-    title: 'Orders',
-    desc: 'Process COD, Bank Transfer, DuitNow orders. Print invoices with one click.'
-  },
-  {
-    emoji: '📝',
-    title: 'Blog',
-    desc: 'Write SEO-friendly blog posts to attract more customers.'
-  },
-  {
-    emoji: '⚙️',
-    title: 'Store Settings',
-    desc: 'Configure domain, payments, and invite admin staff.'
-  }
-]
+'use client';
+
+import { useI18n } from '@/i18n';
 
 export default function GuidelinePage() {
+  const { t } = useI18n();
+
+  const features = [
+    {
+      emoji: '📊',
+      title: t.help.overview.features.dashboardTitle,
+      desc: t.help.overview.features.dashboardDesc
+    },
+    {
+      emoji: '🤖',
+      title: t.help.overview.features.aiBuilderTitle,
+      desc: t.help.overview.features.aiBuilderDesc
+    },
+    {
+      emoji: '📦',
+      title: t.help.overview.features.productsTitle,
+      desc: t.help.overview.features.productsDesc
+    },
+    {
+      emoji: '🛒',
+      title: t.help.overview.features.ordersTitle,
+      desc: t.help.overview.features.ordersDesc
+    },
+    {
+      emoji: '📝',
+      title: t.help.overview.features.blogTitle,
+      desc: t.help.overview.features.blogDesc
+    },
+    {
+      emoji: '⚙️',
+      title: t.help.overview.features.settingsTitle,
+      desc: t.help.overview.features.settingsDesc
+    }
+  ];
+
   return (
     // PANEL: OVERVIEW — bg:#161E2E, border:1px #1F2937, border-radius:12px, padding:24px
     <div className="w-full bg-[#161E2E] border border-[#1F2937] rounded-xl shadow-[0_1px_3px_0_rgba(0,0,0,0.5)] p-6">
@@ -40,10 +46,10 @@ export default function GuidelinePage() {
         {/* Section 1: Welcome */}
         <div className="flex flex-col gap-[8px]">
           <h2 className="text-[24px] font-bold text-white leading-[32px] m-0 p-0 tracking-tight">
-            👋 Welcome to EchPrime!
+            {t.help.overview.welcomeTitle}
           </h2>
           <p className="text-[14px] font-normal text-[#9CA3AF] leading-[22px] m-0 p-0">
-            EchPrime CMS helps you manage your entire online store — from creating websites, managing products, processing orders to analyzing revenue. Here is an overview of the main features.
+            {t.help.overview.welcomeDesc}
           </p>
         </div>
 
@@ -51,7 +57,7 @@ export default function GuidelinePage() {
         <div className="flex flex-col gap-[12px]">
           <div className="pt-[8px]">
             <h3 className="text-[20px] font-bold text-white leading-[26px] m-0 p-0 tracking-tight">
-              🚀 Key Features
+              {t.help.overview.featuresTitle}
             </h3>
           </div>
 
@@ -100,11 +106,11 @@ export default function GuidelinePage() {
         <div className="flex flex-col gap-[8px]">
           <div className="pt-[8px]">
             <h3 className="text-[20px] font-bold text-white leading-[26px] m-0 p-0 tracking-tight">
-              📞 Need more help?
+              {t.help.overview.needHelpTitle}
             </h3>
           </div>
           <p className="text-[16px] font-normal text-[#9CA3AF] leading-[24px] m-0 p-0">
-            If you can&apos;t find the answer, contact our support team via WhatsApp or email{' '}
+            {t.help.overview.needHelpDesc}
             <a
               href="mailto:support@echprime.com"
               className="text-blue-400 hover:text-blue-300 transition-colors"
