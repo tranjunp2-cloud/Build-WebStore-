@@ -17,6 +17,7 @@
  * the container during schema push.
  */
 const { spawn } = require('child_process');
+const { bootstrapSeed } = require('./bootstrap-seed');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -999,6 +1000,42 @@ async function syncPayloadRelsTables(pool) {
   console.log(`[db-setup] ✅ Payload rels tables synced`);
 }
 
+/**
+ * Bootstrap Seed — create essential accounts on startup.
+ *
+ * Creates admin + SSO service users if they don't exist.
+ * Email from env vars — NEVER hardcoded.
+ * Idempotent — safe to run on every startup.
+ *
+ * Runs via raw SQL (not Payload API) because this executes
+ * before server.js starts.
+ *
+ * IMPORTANT — this only creates user ROWS (email + role).
+ * Password CANNOT be set here (Payload uses scrypt hash internally).
+ * After bootstrap, run one of:
+ *   - npm run db:seed-sso   (Payload Local API — hashes password properly)
+ *   - Payload admin UI      (/admin first-user flow)
+ *
+ * SECURITY: Does NOT auto-upgrade existing users to super-admin.
+ * If user already exists, only logs a message — no role changes.
+ * To change roles of existing users, use admin UI or Payload API.
+ */
+async function runBootstrapSeed(pool) {
+  console.log('[db-setup] Bootstrap: checking essential accounts...');
+  const results = await bootstrapSeed(pool, process.env);
+  for (const r of results) {
+    if (r.action === 'skipped') {
+      console.log(`[db-setup]   ⏭  ${r.label}: SKIPPED (email env var not set)`);
+    } else if (r.action === 'exists') {
+      console.log(`[db-setup]   ✅ ${r.label}: EXISTS — no changes`);
+    } else if (r.action === 'created') {
+      console.log(`[db-setup]   ✅ ${r.label}: CREATED — run "npm run db:seed-sso" to set password`);
+    } else {
+      console.warn(`[db-setup]   ⚠️  ${r.label}: error during bootstrap`);
+    }
+  }
+}
+
 async function checkDB() {
   const pool = createPool();
   if (!pool) {
@@ -1018,6 +1055,7 @@ async function checkDB() {
     if (tableCount > 0) {
       await runMigrations(pool);
       await syncPayloadRelsTables(pool);
+      await runBootstrapSeed(pool);
     }
 
     await pool.end();

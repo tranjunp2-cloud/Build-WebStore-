@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import configPromise from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function PATCH(req: NextRequest) {
     try {
-        const payload = await getPayload({ config: configPromise })
-
-        // Verify auth via Payload's built-in token
-        const { user } = await payload.auth({ headers: req.headers })
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
+
+        const payload = await getPayload({ config: configPromise })
 
         const body = await req.json()
         const { prefer_lang } = body
@@ -35,14 +35,14 @@ export async function PATCH(req: NextRequest) {
     }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
     try {
-        const payload = await getPayload({ config: configPromise })
-
-        const { user } = await payload.auth({ headers: req.headers })
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
+
+        const payload = await getPayload({ config: configPromise })
 
         const doc = await payload.findByID({
             collection: 'users',

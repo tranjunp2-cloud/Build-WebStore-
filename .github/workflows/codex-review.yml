@@ -2,50 +2,126 @@ name: Codex PR Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
 
 concurrency:
-  group: codex-review-${{ github.event.pull_request.number }}
+  group: codex-review-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 jobs:
   codex-review:
-    if: github.event.pull_request.user.type != 'Bot'
+    # Bỏ qua Draft PR và Bot PRs
+    # Manual trigger qua @codex review comment
+    if: |
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.user.type != 'Bot'
+      ) ||
+      (
+        github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@codex review') &&
+        github.event.issue.pull_request != null
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
     outputs:
-      final_message: ${{ steps.run_codex.outputs['final-message'] }}
+      final_message_full: ${{ steps.run_codex_full.outputs['final-message'] }}
+      final_message_incremental: ${{ steps.run_codex_incremental.outputs['final-message'] }}
+      review_mode: ${{ steps.gen_diff.outputs.review_mode }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          ref: refs/pull/${{ github.event.pull_request.number || github.event.issue.number }}/merge
           fetch-depth: 0
 
-      - name: Generate PR diff
+      - name: Generate PR diff and build runtime prompts
+        id: gen_diff
         run: |
-          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
-          echo "Diff size: $(wc -l < pr-diff.txt) lines"
-          head -20 pr-diff.txt
+          EVENT="${{ github.event_name }}"
+          ACTION="${{ github.event.action }}"
 
-      - name: Run Codex Review
-        id: run_codex
+          BASE="${{ github.event.pull_request.base.ref || 'staging' }}"
+
+          if [ "$EVENT" = "pull_request" ] && [ "$ACTION" = "synchronize" ]; then
+            BEFORE="${{ github.event.before }}"
+            AFTER="${{ github.event.after }}"
+            # Fallback về full nếu BEFORE không tồn tại (force-push)
+            if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+              echo "📦 Incremental review: $BEFORE → $AFTER"
+              git diff "${BEFORE}...${AFTER}" -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
+              echo "review_mode=incremental" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ BEFORE SHA not found (force-push?), fallback to full diff"
+              git diff "origin/${BASE}...HEAD" -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
+              echo "review_mode=full" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Full review: toàn bộ thay đổi trong PR
+            echo "🔍 Full review: origin/$BASE → HEAD"
+            git diff "origin/${BASE}...HEAD" -- . ':!package-lock.json' ':!*.lock' > pr-diff.txt
+            echo "review_mode=full" >> $GITHUB_OUTPUT
+          fi
+
+          DIFF_LINES=$(wc -l < pr-diff.txt)
+          echo "Diff size: $DIFF_LINES lines"
+
+          # Inject diff vào prompt runtime — Codex nhận diff qua context,
+          # không cần dùng tool đọc file → không scan được full source
+          MAX_DIFF_LINES=3000
+          build_runtime_prompt() {
+            local base_prompt="$1"
+            local out="$2"
+            cat "$base_prompt" > "$out"
+            if [ "$DIFF_LINES" -gt "$MAX_DIFF_LINES" ]; then
+              printf '\n---\n## Nội dung diff cần review (%s lines — hiển thị %s dòng đầu, phần còn lại bị cắt)\n\n```diff\n' "$DIFF_LINES" "$MAX_DIFF_LINES" >> "$out"
+              head -"$MAX_DIFF_LINES" pr-diff.txt >> "$out"
+              printf '```\n\n⚠️ Diff chỉ hiển thị một phần (%s/%s dòng). KHÔNG dùng tool đọc thêm file — chỉ review phần đã hiển thị.\n' "$MAX_DIFF_LINES" "$DIFF_LINES" >> "$out"
+            else
+              printf '\n---\n## Nội dung diff cần review (%s lines — đầy đủ)\n\n```diff\n' "$DIFF_LINES" >> "$out"
+              cat pr-diff.txt >> "$out"
+              printf '```\n\nDiff đầy đủ. KHÔNG dùng tool đọc thêm file nào khác.\n' >> "$out"
+            fi
+          }
+
+          build_runtime_prompt .github/codex/prompts/review.md .github/codex/prompts/review-runtime.md
+          build_runtime_prompt .github/codex/prompts/review-incremental.md .github/codex/prompts/review-incremental-runtime.md
+
+      - name: Run Codex Review (Full — lần đầu, review toàn bộ PR)
+        id: run_codex_full
+        if: steps.gen_diff.outputs.review_mode == 'full'
         uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: .github/codex/prompts/review.md
+          prompt-file: .github/codex/prompts/review-runtime.md
           output-file: codex-output.md
           safety-strategy: drop-sudo
           sandbox: workspace-write
 
+      - name: Run Codex Review (Incremental — verify fix + check code mới)
+        id: run_codex_incremental
+        if: steps.gen_diff.outputs.review_mode == 'incremental'
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/prompts/review-incremental-runtime.md
+          output-file: codex-output.md
+          safety-strategy: drop-sudo
+          sandbox: workspace-write
+
+
   post-review:
     runs-on: ubuntu-latest
     needs: codex-review
-    if: needs.codex-review.outputs.final_message != ''
+    if: needs.codex-review.outputs.final_message_full != '' || needs.codex-review.outputs.final_message_incremental != ''
     permissions:
       pull-requests: write
+      issues: write
     steps:
       - name: Post review
         uses: actions/github-script@v7
@@ -53,10 +129,15 @@ jobs:
           github-token: ${{ github.token }}
           script: |
             const raw = process.env.CODEX_FINAL_MESSAGE || '';
-            const pr = context.payload.pull_request;
-            const commitId = pr.head.sha;
+            const reviewMode = process.env.REVIEW_MODE || 'full';
+            const isIncremental = reviewMode === 'incremental';
+            const prNumber = context.payload.pull_request?.number || context.payload.issue?.number;
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+
+            // Get PR head SHA
+            const pr = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+            const commitId = pr.data.head.sha;
 
             // Try to parse JSON
             let issues = [];
@@ -69,19 +150,38 @@ jobs:
               console.log('JSON parse failed:', e.message);
             }
 
-            // No issues
+            const modeIcon = isIncremental ? '🔄' : '🔍';
+            const modeLabel = isIncremental ? 'Incremental Review' : 'Full Review';
+
+            // No issues — APPROVE!
             if (issues.length === 0) {
-              if (raw.trim() && !raw.includes('"issues":[]')) {
+              const approveBody = raw.trim() && !raw.includes('"issues":[]')
+                ? `### 🤖 Codex ${modeIcon} ${modeLabel}\n\n${raw}\n\n---\n_Powered by OpenAI Codex API_`
+                : `### ✅ Codex ${modeIcon} ${modeLabel} — LGTM!\n\nKhông tìm thấy issue nào trong commit \`${commitId.substring(0, 10)}\`.\n\n_Powered by OpenAI Codex API_`;
+
+              // 1. React 👍 trên PR
+              await github.rest.reactions.createForIssue({
+                owner, repo,
+                issue_number: prNumber,
+                content: '+1',
+              }).catch(e => console.log('React failed:', e.message));
+
+              // 2. Submit Approved review — hiện trong Reviewers section
+              try {
+                await github.rest.pulls.createReview({
+                  owner, repo,
+                  pull_number: prNumber,
+                  commit_id: commitId,
+                  event: 'APPROVE',
+                  body: approveBody,
+                });
+              } catch (e) {
+                // Fallback: comment nếu không approve được (VD: author tự approve)
+                console.log('Approve failed, falling back to comment:', e.message);
                 await github.rest.issues.createComment({
                   owner, repo,
-                  issue_number: pr.number,
-                  body: `### 🤖 Codex Review (API)\n\n${raw}\n\n---\n_Powered by OpenAI Codex API_`,
-                });
-              } else {
-                await github.rest.reactions.createForIssue({
-                  owner, repo,
-                  issue_number: pr.number,
-                  content: '+1',
+                  issue_number: prNumber,
+                  body: approveBody,
                 });
               }
               return;
@@ -106,14 +206,18 @@ jobs:
               });
             }
 
-            const reviewBody = `### 💡 Codex Review\n\nFound **${issues.length}** issue(s).\n\n**Reviewed commit:** \`${commitId.substring(0, 10)}\``;
+            const tip = isIncremental
+              ? '> Còn issues — fix xong push lại để Incremental Review kiểm tra tiếp.'
+              : '> Fix tất cả issues trong 1 lần, push → Incremental Review sẽ verify các fix đó.';
+
+            const reviewBody = `### 💡 Codex ${modeIcon} ${modeLabel}\n\nFound **${issues.length}** issue(s).\n\n**Reviewed commit:** \`${commitId.substring(0, 10)}\`\n\n${tip}`;
 
             // Try inline review first
             if (comments.length > 0) {
               try {
                 await github.rest.pulls.createReview({
                   owner, repo,
-                  pull_number: pr.number,
+                  pull_number: prNumber,
                   commit_id: commitId,
                   event: 'COMMENT',
                   body: reviewBody,
@@ -133,8 +237,9 @@ jobs:
             }
             await github.rest.issues.createComment({
               owner, repo,
-              issue_number: pr.number,
+              issue_number: prNumber,
               body,
             });
         env:
-          CODEX_FINAL_MESSAGE: ${{ needs.codex-review.outputs.final_message }}
+          CODEX_FINAL_MESSAGE: ${{ needs.codex-review.outputs.final_message_full || needs.codex-review.outputs.final_message_incremental }}
+          REVIEW_MODE: ${{ needs.codex-review.outputs.review_mode }}
