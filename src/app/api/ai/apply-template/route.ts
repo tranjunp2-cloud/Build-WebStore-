@@ -120,7 +120,7 @@ export const POST = withAuth(async (user, req) => {
     } catch (error: unknown) {
         console.error('[Apply Template Error]', error)
         return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'Failed to apply template' },
+            { error: 'Failed to apply template' },
             { status: 500 },
         )
     }

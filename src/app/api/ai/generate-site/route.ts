@@ -533,7 +533,7 @@ function buildGeneratedPages({
     return [
         {
             title: 'Homepage',
-            slug: '/',
+            slug: 'home',
             isHomepage: true,
             layout: cloneBlockData(blocks),
             seo: {
@@ -543,7 +543,7 @@ function buildGeneratedPages({
         },
         {
             title: 'About',
-            slug: '/about',
+            slug: 'about',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -567,7 +567,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Products',
-            slug: '/products',
+            slug: 'products',
             isHomepage: false,
             layout: compact([
                 navigation,
@@ -591,7 +591,7 @@ function buildGeneratedPages({
         },
         {
             title: 'Contact',
-            slug: '/contact',
+            slug: 'contact',
             isHomepage: false,
             layout: compact([
                 navigation,

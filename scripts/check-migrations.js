@@ -107,7 +107,7 @@ function main() {
         if (hasGroup) {
            const hasGroupTable = Array.from(alterColumns).some(col => col.startsWith(`${tableName}.`) && col.includes(`${snakeField}_`))
            if (!hasGroupTable) {
-              console.error(`❌ ERROR: Check group field '${field}'. Requires ALTER TABLE ADD COLUMN ... ${snakeField}_{subfield}`)
+              console.error(`❌ ERROR: Check group field '${field}'. Requires ALTER TABLE ADD COLUMN ... ${snakeField}_<subfield>`)
               hasErrors = true
            }
         }
