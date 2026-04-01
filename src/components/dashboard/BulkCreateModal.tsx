@@ -95,7 +95,7 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
             stock: v.stock || 0,
             sku: v.sku || ''
         })) : undefined,
-        inventory: hasVariants ? prod.variants!.reduce((acc, v) => acc + (v.stock || 0), 0) : 10, // Top-level stock is mapped to `inventory` in schema
+        inventory: hasVariants ? 0 : 10, // Top-level stock is mapped to `inventory` in schema
         weight: prod.weight || 1, // Fallback for F14 dimension requirements
     }
 }

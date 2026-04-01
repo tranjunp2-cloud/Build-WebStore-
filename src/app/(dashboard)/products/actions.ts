@@ -11,7 +11,7 @@ export async function getProductsAction() {
     const payload = await getPayload({ config: configPromise })
     const res = await payload.find({
         collection: 'products',
-        user: user as any,
+        user,
         where: { deletedAt: { exists: false } },
         limit: 100,
         depth: 1
@@ -27,7 +27,7 @@ export async function getProductAction(id: string | number) {
     const res = await payload.findByID({
         collection: 'products',
         id,
-        user: user as any,
+        user,
         depth: 1
     })
     return JSON.parse(JSON.stringify(res))
@@ -37,10 +37,13 @@ import { z } from 'zod'
 
 const ProductServerSchema = z.object({
     name: z.string().min(1, "Name is required"),
-    images: z.array(z.any()).optional(),
+    images: z.array(z.object({
+        image: z.union([z.string(), z.number(), z.record(z.unknown())]).optional(),
+        alt: z.string().optional()
+    })).optional(),
 }).passthrough();
 
-export async function saveProductAction(rawData: any, id?: string | number) {
+export async function saveProductAction(rawData: unknown, id?: string | number) {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
@@ -66,20 +69,20 @@ export async function saveProductAction(rawData: any, id?: string | number) {
             collection: 'products',
             id,
             data,
-            user: user as any,
+            user,
         })
         return JSON.parse(JSON.stringify(res))
     } else {
         const res = await payload.create({
             collection: 'products',
             data,
-            user: user as any,
+            user,
         })
         return JSON.parse(JSON.stringify(res))
     }
 }
 
-export async function updateProductFieldAction(id: string | number, data: any) {
+export async function updateProductFieldAction(id: string | number, data: unknown) {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
@@ -87,8 +90,8 @@ export async function updateProductFieldAction(id: string | number, data: any) {
     const res = await payload.update({
         collection: 'products',
         id,
-        data,
-        user: user as any,
+        data: data as Record<string, unknown>,
+        user,
     })
     return JSON.parse(JSON.stringify(res))
 }
@@ -104,7 +107,7 @@ export async function deleteProductAction(id: string | number) {
         data: {
             deletedAt: new Date().toISOString(),
         },
-        user: user as any,
+        user,
     })
     return JSON.parse(JSON.stringify(res))
 }

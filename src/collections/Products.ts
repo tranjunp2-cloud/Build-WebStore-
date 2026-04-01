@@ -1,8 +1,8 @@
-import type { CollectionConfig, Where, CollectionAfterChangeHook } from 'payload'
+import type { CollectionConfig, Where, CollectionAfterChangeHook, FieldHook, CollectionBeforeChangeHook } from 'payload'
 import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
 import slugify from 'slugify'
 
-const formatSlug = (fallback: string) => async ({ value, originalDoc, data, req }: any) => {
+const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc, data, req }) => {
     // If client supplied a value, use it (or slugify it)
     let baseSlug = ''
     if (typeof value === 'string' && value.trim().length > 0) {
@@ -56,7 +56,7 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
 }
 
 // Auto-inject tenant and site from logged-in user if not provided by client
-const beforeChangeHook = async ({ data, req, operation }: any) => {
+const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation }) => {
     if (operation === 'create' && req.user) {
         // If client didn't specify tenant, try to grab the first active tenant from user
         if (!data.tenant && req.user.tenants?.length > 0) {
@@ -80,7 +80,7 @@ const beforeChangeHook = async ({ data, req, operation }: any) => {
 
     // Auto-calculate total inventory if it has variants
     if (data.hasVariants && Array.isArray(data.variants)) {
-        data.inventory = data.variants.reduce((acc: number, v: any) => acc + (Number(v.stock) || 0), 0)
+        data.inventory = data.variants.reduce((acc: number, v: Record<string, unknown>) => acc + (Number(v.stock) || 0), 0)
     }
 
     return data
@@ -108,7 +108,7 @@ export const Products: CollectionConfig = {
             }
             // Authenticated: tenant-scoped read (dashboard)
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
@@ -116,7 +116,7 @@ export const Products: CollectionConfig = {
         update: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
@@ -124,7 +124,7 @@ export const Products: CollectionConfig = {
         delete: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }

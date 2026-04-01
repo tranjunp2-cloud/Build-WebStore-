@@ -14,13 +14,13 @@ export async function getCategoriesAction() {
     
     const res = await payload.find({
         collection: 'categories',
-        user: user as any,
+        user,
         where: { deletedAt: { exists: false } },
         depth: 1,
         limit: 1000,
     })
 
-    const getDescendantIds = (parentId: string | number, allCats: any[]): (string | number)[] => {
+    const getDescendantIds = (parentId: string | number, allCats: Array<{ id: string | number; parent?: string | number | { id: string | number } | null }>): (string | number)[] => {
         const children = allCats.filter(c => {
             const pId = typeof c.parent === 'object' && c.parent !== null ? c.parent.id : c.parent;
             return pId === parentId;
@@ -30,22 +30,29 @@ export async function getCategoriesAction() {
         return [...childIds, ...descendantIds];
     };
 
-    // Solve N+1: Lấy trước toàn bộ Product id + category để đếm trong RAM
-    const allProducts = await payload.find({
-        collection: 'products',
-        where: { deletedAt: { exists: false } },
-        depth: 0,
-        pagination: false,
-        select: { category: true },
-        user: user as any,
-    })
+    // Solve N+1 & Compute Efficiently: Group by in Database to prevent loading all Product records to RAM
+    const { sql } = await import('drizzle-orm')
+    const countResult = await (payload.db as any).drizzle.execute(
+        sql`SELECT r.categories_id as category_id, COUNT(DISTINCT r.parent_id)::int as count 
+            FROM products_rels r
+            JOIN products p ON p.id = r.parent_id
+            WHERE r.path = 'category' AND p.deleted_at IS NULL 
+            GROUP BY r.categories_id`
+    )
+
+    const categoryCountMap: Record<string | number, number> = {}
+    for (const row of countResult.rows as Array<{ category_id?: number | string | null; count: number }>) {
+        if (row.category_id) {
+            categoryCountMap[row.category_id] = row.count;
+        }
+    }
 
     const categoriesWithCount = res.docs.map((cat) => {
         const allIds = [cat.id, ...getDescendantIds(cat.id, res.docs)]
-        const productCount = allProducts.docs.filter((p: any) => {
-            const pCatId = typeof p.category === 'object' && p.category !== null ? p.category.id : p.category;
-            return allIds.includes(pCatId);
-        }).length;
+        let productCount = 0;
+        for (const id of allIds) {
+            productCount += categoryCountMap[id] || 0;
+        }
         
         return {
             ...cat,
@@ -61,11 +68,11 @@ import { z } from 'zod';
 const CategoryServerSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     slug: z.string().optional(),
-    parent: z.union([z.number(), z.string(), z.record(z.any())]).nullable().optional(),
+    parent: z.union([z.number(), z.string(), z.record(z.unknown())]).nullable().optional(),
     depth: z.number().optional()
 }).passthrough();
 
-export async function saveCategoryAction(rawData: any, id?: string | number) {
+export async function saveCategoryAction(rawData: unknown, id?: string | number) {
     const user = await getCurrentUser()
     if (!user) {
         throw new Error('Unauthorized')
@@ -80,14 +87,14 @@ export async function saveCategoryAction(rawData: any, id?: string | number) {
             collection: 'categories',
             id,
             data,
-            user: user as any,
+            user,
         })
         return JSON.parse(JSON.stringify(res));
     } else {
         const res = await payload.create({
             collection: 'categories',
             data,
-            user: user as any,
+            user,
         })
         return JSON.parse(JSON.stringify(res));
     }
@@ -107,7 +114,7 @@ export async function deleteCategoryAction(id: string | number) {
         data: {
             deletedAt: new Date().toISOString(),
         },
-        user: user as any,
+        user,
     })
     return JSON.parse(JSON.stringify(res));
 }

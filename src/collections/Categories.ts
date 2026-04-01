@@ -17,7 +17,7 @@ export const Categories: CollectionConfig = {
                 return query; // Public read for storefront
             }
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
@@ -25,7 +25,7 @@ export const Categories: CollectionConfig = {
         update: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
@@ -33,7 +33,7 @@ export const Categories: CollectionConfig = {
         delete: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
