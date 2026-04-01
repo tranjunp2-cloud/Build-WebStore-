@@ -6,11 +6,23 @@ import { CategorySelect, Category } from '../CategorySelect'
 import { ImageUploader } from '../ImageUploader'
 import { useI18n } from '@/i18n'
 
-interface Props {
-    categories: Category[]
+const generateSlug = (text: string) => {
+    return text
+        .toString()
+        .toLowerCase()
+        .normalize('NFD') // Remove diacritics
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[đĐ]/g, 'd')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
 }
 
-export function GeneralInfoSection({ categories }: Props) {
+interface Props {
+    categories: Category[]
+    isEdit?: boolean
+}
+
+export function GeneralInfoSection({ categories, isEdit }: Props) {
     const { register, watch, setValue, formState: { errors } } = useFormContext<ProductFormValues>()
     const { t } = useI18n()
     
@@ -27,7 +39,13 @@ export function GeneralInfoSection({ categories }: Props) {
                     {t.dashboard.products.form.sections?.productName || 'Product Name *'}
                 </label>
                 <input
-                    {...register('name')}
+                    {...register('name', {
+                        onChange: (e) => {
+                            if (!isEdit) {
+                                setValue('urlSlug', generateSlug(e.target.value), { shouldDirty: true, shouldValidate: true });
+                            }
+                        }
+                    })}
                     placeholder={t.dashboard.products.form.sections?.productNamePlaceholder || 'Enter product name'}
                     className="w-full rounded-2xl border border-white/[0.08] bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:border-white focus:ring-1 focus:ring-white focus:outline-none transition-colors"
                 />

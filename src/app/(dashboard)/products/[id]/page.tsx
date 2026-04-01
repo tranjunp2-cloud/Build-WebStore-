@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { ProductForm } from '@/components/dashboard/product-form/ProductForm'
 import { ProductFormValues } from '@/components/dashboard/product-form/schema'
 import { useI18n } from '@/i18n'
+import { getProductAction, saveProductAction, deleteProductAction } from '../actions'
 
 const lexicalToText = (data: any): string => {
     if (!data || !data.root || !data.root.children) return typeof data === 'string' ? data : '';
@@ -63,9 +64,8 @@ export default function ProductEditPage() {
         
         async function loadProduct() {
             try {
-                const res = await fetch(`/api/products/${productId}`, { credentials: 'include' })
-                if (res.ok) {
-                    const data = await res.json()
+                const data = await getProductAction(productId)
+                if (data) {
                     const mappedData: Partial<ProductFormValues> = {
                         name: data.name || '',
                         urlSlug: data.slug || '',
@@ -91,11 +91,11 @@ export default function ProductEditPage() {
                             options: (t.options || []).map((o: any) => o.value)
                         })),
                         variants: (data.variants || []).map((v: any, index: number) => ({
-                            id: v.id || v.skuCode || `var-${index}`,
-                            variantName: v.options ? v.options.join(' / ') : '',
-                            skuCode: v.skuCode || '',
+                            id: v.id || v.sku || `var-${index}`,
+                            variantName: v.name || '',
+                            skuCode: v.sku || '',
                             price: v.price ? parseFloat(v.price) : 0,
-                            discount: v.compareAtPrice ? parseFloat(v.compareAtPrice) : undefined,
+                            compareAtPrice: v.compareAtPrice ? parseFloat(v.compareAtPrice) : undefined,
                             stock: v.stock !== undefined ? parseInt(v.stock) : 0,
                         })),
 
@@ -129,7 +129,7 @@ export default function ProductEditPage() {
                 price: data.hasVariants ? 0 : data.basePrice || 0,
                 compareAtPrice: data.hasVariants ? undefined : data.compareAtPrice || undefined,
                 category: data.categoryIds,
-                inventory: data.hasVariants ? 0 : data.baseInventory || 0,
+                inventory: data.hasVariants ? (data.variants?.reduce((acc, v) => acc + (v.stock || 0), 0) || 0) : (data.baseInventory || 0),
                 sku: data.hasVariants ? '' : data.baseSku || '',
                 weight: data.shippingWeight || 0,
                 dimensions: {
@@ -147,7 +147,7 @@ export default function ProductEditPage() {
                     name: v.variantName,          // Payload schema field: 'name'
                     sku: v.skuCode,               // Payload schema field: 'sku'
                     price: v.price,
-                    compareAtPrice: v.discount,
+                    compareAtPrice: v.compareAtPrice,
                     stock: v.stock,
                 })) || [] : [],
                 seo: {
@@ -158,26 +158,15 @@ export default function ProductEditPage() {
                 currency: 'MYR'
             }
 
-            const url = isNew ? '/api/products' : `/api/products/${productId}`
             const method = isNew ? 'POST' : 'PATCH'
 
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(body),
-            })
+            await saveProductAction(body, isNew ? undefined : productId)
 
-            if (res.ok) {
-                toast.success(isNew ? t.dashboard.products.form.productCreated : t.dashboard.products.form.productUpdated)
-                setTimeout(() => {
-                    router.push('/products')
-                }, 1500)
-            } else {
-                const errData = await res.json()
-                throw new Error(errData.error?.message || t.dashboard.products.form.somethingWentWrong)
-            }
-        } catch (err) {
+            toast.success(isNew ? t.dashboard.products.form.productCreated : t.dashboard.products.form.productUpdated)
+            setTimeout(() => {
+                router.push('/products')
+            }, 1500)
+        } catch (err: any) {
             const message = err instanceof Error ? err.message : t.dashboard.products.form.networkError
             toast.error(message)
             throw err; // throw to let ProductForm know it failed (so it stops isSaving state if it had one)
@@ -187,16 +176,9 @@ export default function ProductEditPage() {
     const handleDelete = async () => {
         if (!confirm(t.dashboard.products.form.confirmDelete)) return;
         try {
-            const res = await fetch(`/api/products/${productId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-            if (res.ok) {
-                toast.success(t.dashboard.products.form.deleteSuccess);
-                router.push('/products');
-            } else {
-                toast.error(t.dashboard.products.form.deleteFailed);
-            }
+            await deleteProductAction(productId);
+            toast.success(t.dashboard.products.form.deleteSuccess);
+            router.push('/products');
         } catch (err) {
             toast.error(t.dashboard.products.form.networkError);
         }

@@ -77,6 +77,12 @@ const beforeChangeHook = async ({ data, req, operation }: any) => {
             }
         }
     }
+
+    // Auto-calculate total inventory if it has variants
+    if (data.hasVariants && Array.isArray(data.variants)) {
+        data.inventory = data.variants.reduce((acc: number, v: any) => acc + (Number(v.stock) || 0), 0)
+    }
+
     return data
 }
 

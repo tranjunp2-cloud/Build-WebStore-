@@ -62,11 +62,9 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
 
         const fetchCategories = async () => {
             try {
-                const res = await fetch('/api/categories?limit=100', { credentials: 'include' })
-                if (res.ok) {
-                    const data = await res.json()
-                    setCategories(data.docs || [])
-                }
+                const { getCategoriesAction } = await import('@/app/(dashboard)/products/categories/actions')
+                const docs = await getCategoriesAction()
+                setCategories(docs || [])
             } catch (err) {
                 console.error('Failed to fetch categories:', err)
             }
@@ -152,7 +150,7 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
 
                 {/* Form sections */}
                 <div className="flex flex-col gap-6 pb-24">
-                    <GeneralInfoSection categories={categories} />
+                    <GeneralInfoSection categories={categories} isEdit={isEdit} />
                     <VariantsInventorySection />
                     <ShippingDimensionsSection />
                     <DescriptionSeoSection />
@@ -164,7 +162,7 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
                         <button
                             type="button"
                             onClick={() => router.push('/products')}
-                            className="flex-1 h-12 rounded-2xl border border-white/[0.08] bg-transparent text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 transition-colors flex items-center justify-center"
+                            className="flex-1 h-12 rounded-2xl border border-solid border-[#F8FAFC]/30 bg-transparent text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 transition-colors flex items-center justify-center"
                         >
                             {t.dashboard.products.form.cancel}
                         </button>

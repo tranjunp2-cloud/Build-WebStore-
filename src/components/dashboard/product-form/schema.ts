@@ -11,7 +11,7 @@ export const skuVariantSchema = z.object({
     variantName: z.string(),
     skuCode: z.string().min(1, 'SKU Code is required'),
     price: z.coerce.number().min(0, 'Price must be 0 or greater'),
-    discount: z.coerce.number().min(0).optional(),
+    compareAtPrice: z.coerce.number().min(0, 'Compare price must be 0 or greater').optional(),
     stock: z.coerce.number().min(0, 'Stock must be 0 or greater'),
 })
 

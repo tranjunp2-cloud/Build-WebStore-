@@ -20,7 +20,7 @@ export const POST = withAuth(async (user, req) => {
             )
         }
 
-        const { promptText } = await req.json()
+        const { promptText, locale } = await req.json()
         if (!promptText) {
             return NextResponse.json({ error: 'promptText is required' }, { status: 400 })
         }
@@ -44,14 +44,32 @@ export const POST = withAuth(async (user, req) => {
             })
         }
 
+        const languageMap: Record<string, string> = {
+            en: 'English',
+            ms: 'Bahasa Melayu'
+        }
+        const targetLanguage = languageMap[locale as string] || 'English'
+
         const systemPrompt = `
-You are an e-commerce product assistant for the Malaysia/Vietnamese market. The user will provide a casual text listing multiple products to create.
+You are an e-commerce product assistant. The user will provide a casual text listing multiple products to create.
+
+CRITICAL INSTRUCTION: All text fields (name, description, seoTitle, seoDescription) MUST be written entirely in: ${targetLanguage.toUpperCase()}. 
+You MUST TRANSLATE the user's input into ${targetLanguage.toUpperCase()} if they type in another language. For example, if the user types in Vietnamese "Muối tiêu" but target language is ENGLISH, you must output "Pepper Salt".
 
 Parse the text and return a JSON object with a single "products" array.
 Each product item MUST have:
 - name: (string) The product name in Vietnamese or Malay as provided
 - price: (number) The price in full VND or MYR (e.g. "45k" = 45000, "RM 89" = 89). Default to 0 if not specified.
+- compareAtPrice: (number) A sensible simulated original price (e.g. 20-30% higher than price) if realistic, or omit if not applicable.
 - category: (string) Best-fit single category. Use one of: Fashion, F&B, Beauty, Home, Electronics, Footwear, Accessories, Sports, Books, Health, Toys, Automotive, Others
+- description: (string) A comprehensive, engaging product description. Write at least 2 paragraphs separated by \\n\\n.
+- weight: (number) Estimated logical shipping weight in kg. Minimum 0.1.
+- length: (number) Estimated length in cm.
+- width: (number) Estimated width in cm.
+- height: (number) Estimated height in cm.
+- seoTitle: (string) A catchy SEO-friendly title under 70 characters.
+- seoDescription: (string) A compelling SEO meta description under 160 characters.
+- slug: (string) URL-friendly lowercase slug (e.g. "ao-khoac-da").
 - variants: (array) Generate flat 1D array of variant objects if color/size/options are mentioned (2-tier Cartesian flattened).
   Each variant object MUST have:
     - name: (string) The full combination, e.g. "Đỏ - M", "Nâu - Size L", or just "Xanh" if 1-tier only
@@ -64,6 +82,7 @@ Rules:
 - Extract prices correctly: k/K = x1000, eg. 45k = 45000
 - Detect 2-tier variants: if BOTH color AND size are mentioned, create the full Cartesian product (e.g. Đỏ+Xanh × M+L = 4 variants)
 - If only 1 dimension of options (e.g. only colors), create 1 variant per option
+- The category name MUST be in English.
 - Output ONLY valid JSON matching this exact schema, no other text
 `
 

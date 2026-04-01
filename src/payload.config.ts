@@ -5,6 +5,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
 import sharp from 'sharp'
+import { s3Storage } from '@payloadcms/storage-s3'
 
 import { Tenants } from './collections/Tenants'
 import { Users } from './collections/Users'
@@ -125,8 +126,43 @@ export default buildConfig({
   }),
   sharp,
   plugins: [
+    ...(process.env.S3_BUCKET && process.env.S3_ENDPOINT
+      ? [
+          s3Storage({
+            collections: {
+              media: {
+                disableLocalStorage: true,
+                disablePayloadAccessControl: true,
+                generateFileURL: ({ filename, prefix }) => {
+                  const s3Endpoint = process.env.S3_ENDPOINT || ''
+                  const publicEndpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || s3Endpoint
+                  const bucket = process.env.S3_BUCKET || ''
+                  
+                  // Handle DigitalOcean Spaces (Virtual Host style) vs MinIO (Path style)
+                  if (publicEndpoint.includes('digitaloceanspaces')) {
+                    const host = publicEndpoint.replace('https://', '').replace('http://', '')
+                    return `https://${bucket}.${host}/${prefix ? `${prefix}/` : ''}${filename}`
+                  }
+                  
+                  return `${publicEndpoint}/${bucket}/${prefix ? `${prefix}/` : ''}${filename}`
+                }
+              },
+            },
+            bucket: process.env.S3_BUCKET as string,
+            config: {
+              endpoint: process.env.S3_ENDPOINT,
+              region: process.env.S3_REGION || 'us-east-1',
+              credentials: {
+                accessKeyId: process.env.S3_ACCESS_KEY_ID as string,
+                secretAccessKey: process.env.S3_SECRET_ACCESS_KEY as string,
+              },
+              forcePathStyle: true, // Required for MinIO
+            },
+          }),
+        ]
+      : []),
     // Multi-tenant isolation handled via custom access control + middleware
-    // Will add more plugins as needed (cloud-storage, seo, etc.)
+    // Will add more plugins as needed (seo, etc.)
   ],
   cors: [
     process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',

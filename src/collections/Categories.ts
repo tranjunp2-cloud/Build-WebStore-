@@ -12,7 +12,11 @@ export const Categories: CollectionConfig = {
             return Boolean(req.user);
         },
         read: ({ req }) => {
-            if (!req.user) return true // Public read for storefront
+            if (!req.user) {
+                return {
+                    deletedAt: { exists: false },
+                } as any // Public read for storefront
+            }
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: any) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
@@ -160,6 +164,11 @@ export const Categories: CollectionConfig = {
             type: 'upload',
             relationTo: 'media',
             admin: { description: 'Ảnh danh mục (Tùy chọn)' }
+        },
+        {
+            name: 'deletedAt',
+            type: 'date',
+            admin: { readOnly: true, description: 'Soft delete timestamp' },
         }
     ],
     timestamps: true,

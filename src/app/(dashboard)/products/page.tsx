@@ -16,6 +16,8 @@ import { ProductQuickViewModal, DetailedProduct } from '@/components/dashboard/P
 import { ProductDetailsMobile } from '@/components/dashboard/product-form/ProductDetailsMobile'
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
 import { useI18n } from '@/i18n'
+import { getProductsAction, updateProductFieldAction } from './actions'
+import { getCategoriesAction } from './categories/actions'
 
 type ProductImage = {
     url?: string
@@ -64,15 +66,17 @@ function formatPrice(price: number, currency: string) {
 
 function getImageUrl(image: ProductImage | string | null): string | null {
     if (!image || typeof image === 'string') return null
-    const url = image.url || image.thumbnailURL || null
+    let url = image.url || image.thumbnailURL || null
     if (!url) return null
-    // Next.js Image component throws an error on unconfigured domains. 
-    // Since images are hosted internally on /api/media, we just strip the domain.
-    try {
-        return new URL(url, 'http://localhost').pathname
-    } catch {
-        return url
+    
+    // Fix existing broken local URLs directly to S3 because MinIO stores them
+    if (url.includes('/api/media/file/')) {
+        const filename = url.split('/').pop()
+        const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
+        url = `${s3Endpoint}/primeweb-media/${filename}`
     }
+    
+    return url
 }
 
 export default function ProductsPage() {
@@ -132,19 +136,15 @@ export default function ProductsPage() {
         setIsLoading(true)
         setError(null)
         try {
-            const res = await fetch('/api/products?limit=100&where[deletedAt][exists]=false', { credentials: 'include' })
-            if (!res.ok) throw new Error(`Server returned ${res.status}`)
-            const data = await res.json()
-            const fetchedDocs = data.docs || []
+            const fetchedDocs = await getProductsAction()
             
             // Fetch categories for filter panel
-            const catRes = await fetch('/api/categories?limit=100', { credentials: 'include' })
-            if (catRes.ok) {
-                const catData = await catRes.json()
-                setCategories(catData.docs || [])
-            }
+            try {
+                const catDocs = await getCategoriesAction()
+                setCategories(catDocs as Category[] || [])
+            } catch (ignore) {}
 
-            setProducts(fetchedDocs)
+            setProducts(fetchedDocs as Product[])
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to load products'
             setError(message)
@@ -218,13 +218,7 @@ export default function ProductsPage() {
         // Optimistic update
         setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, status: newStatus } : p))
         try {
-            const res = await fetch(`/api/products/${prod.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: newStatus }),
-                credentials: 'include'
-            })
-            if (!res.ok) throw new Error()
+            await updateProductFieldAction(prod.id, { status: newStatus })
             toast.success(`${t.dashboard.products.form.successMarkedAs} ${newStatus}`)
         } catch (e: unknown) {
             toast.error(t.dashboard.products.form.failedUpdateStatus)
@@ -234,13 +228,7 @@ export default function ProductsPage() {
 
     const handleRestore = async (id: string) => {
         try {
-            const res = await fetch(`/api/products/${id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ deletedAt: null }),
-                credentials: 'include'
-            })
-            if (!res.ok) throw new Error()
+            await updateProductFieldAction(id, { deletedAt: null })
             toast.success(t.dashboard.products.form.restored)
             loadProducts()
         } catch(e: unknown) {
@@ -265,13 +253,7 @@ export default function ProductsPage() {
         setProducts(prev => prev.filter(p => p.id !== prod.id))
         
         try {
-            const res = await fetch(`/api/products/${prod.id}`, { 
-                method: 'PATCH', 
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ deletedAt: new Date().toISOString() }),
-                credentials: 'include' 
-            })
-            if (!res.ok) throw new Error()
+            await updateProductFieldAction(prod.id, { deletedAt: new Date().toISOString() })
             
             // Wait for transition before unmounting modal completely if we want, but closing immediately is also fine
             setProductToDelete(null)
@@ -360,7 +342,7 @@ export default function ProductsPage() {
                             <span className="block text-[14px] leading-none text-[#F8FAFC]/60">{t.dashboard.products.subtitle}</span>
                         </div>
                         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                            <Link href="/products/categories" className="flex items-center justify-center rounded-[16px] border border-white/[0.08] px-6 h-[48px] text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 no-underline transition-colors w-full sm:w-auto md:w-[148px]">
+                            <Link href="/products/categories" className="flex items-center justify-center rounded-[16px] border border-solid border-[#F8FAFC]/30 px-6 h-[48px] text-[16px] font-medium text-[#F8FAFC] hover:bg-white/5 no-underline transition-colors w-full sm:w-auto md:w-[148px]">
                                 {t.dashboard.products.list.category}
                             </Link>
                             <Link href="/products/new" className="flex items-center justify-center gap-2 rounded-[16px] bg-gradient-to-r from-blue-500 to-teal-400 px-6 h-[48px] text-[16px] font-semibold text-white shadow-md hover:opacity-90 hover:no-underline no-underline transition-opacity whitespace-nowrap w-full sm:w-auto">

@@ -477,6 +477,7 @@ const MIGRATIONS = [
   // Use these for adding columns to existing tables where recreating is not an option.
   // ALTER TABLE ADD COLUMN IF NOT EXISTS ensures columns exist regardless of creation order.
   { name: 'categories.description', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS description varchar;` },
+  { name: 'categories.deleted_at', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS deleted_at timestamptz;` },
   // orders_items
   { name: 'orders_items.product_id', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS product_id integer;` },
   { name: 'orders_items.product_name', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS product_name varchar;` },

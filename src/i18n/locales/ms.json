@@ -495,6 +495,15 @@
                 "aiChatPlaceholder": "Cth: jaket kulit 500k, topi 50k",
                 "aiChatBtn": "Cipta"
             },
+            "messages": {
+                "nameRequired": "Sila masukkan nama produk terlebih dahulu!",
+                "aiWritingDesc": "AI sedang menulis penerangan...",
+                "descSuccess": "Penerangan berjaya dijana!",
+                "aiOptimizingSeo": "AI sedang mengoptimumkan SEO...",
+                "seoSuccess": "SEO berjaya dioptimumkan!",
+                "generateFailed": "Gagal menjana",
+                "networkError": "Ralat rangkaian"
+            },
             "form": {
                 "editTitle": "Sunting Produk",
                 "newTitle": "Tambah Produk Baru",
@@ -634,7 +643,7 @@
                     "colVariant": "Varian",
                     "colSku": "Kod SKU",
                     "colPrice": "Harga",
-                    "colDiscount": "Diskaun",
+                    "colComparePrice": "Harga Asal",
                     "colStock": "Stok",
                     "shipping": "Konfigurasi Penghantaran",
                     "weight": "Berat (kg)",
@@ -703,7 +712,8 @@
                     "name": "Nama Kategori *",
                     "namePlaceholder": "cth. Elektronik, Fesyen",
                     "slug": "Slug URL",
-                    "slugPlaceholder": "Biarkan kosong untuk auto-jana",
+                    "slugPlaceholder": "category-url",
+                    "slugHelp": "Auto-jana dari nama kategori.",
                     "parent": "Kategori Induk",
                     "parentNone": "Tiada (Tahap Atas)",
                     "description": "Penerangan",

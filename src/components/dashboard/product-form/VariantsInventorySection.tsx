@@ -66,7 +66,7 @@ export function VariantsInventorySection() {
                 skuCode,
                 price: 0,
                 stock: 0,
-                discount: 0,
+                compareAtPrice: 0,
             }
         })
 
@@ -114,15 +114,17 @@ export function VariantsInventorySection() {
 
                 {!hasVariants ? (
                     /* Base Information (No Variants) */
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">{t.dashboard.products.form.sections?.price || 'Price (RM)'}</label>
+                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                    {t.dashboard.products.form.sections?.price || 'Price (RM)'} <span className="text-[#F8FAFC]">*</span>
+                                </label>
                                 <input
                                     type="number"
                                     step="0.01"
                                     {...register('basePrice')}
-                                    placeholder="0.00"
+                                    placeholder="0"
                                     className={cn(
                                         "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
                                         errors.basePrice ? "border-red-500" : "border-white/[0.08] focus:border-white"
@@ -131,24 +133,42 @@ export function VariantsInventorySection() {
                                 {errors.basePrice && <p className="text-xs text-red-500">{errors.basePrice.message}</p>}
                             </div>
                             <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">{t.dashboard.products.form.sections?.comparePrice || 'Compare at Price (RM)'}</label>
+                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                    {t.dashboard.products.form.sections?.comparePrice || 'Compare price (RM)'}
+                                </label>
                                 <input
                                     type="number"
                                     step="0.01"
                                     {...register('compareAtPrice')}
-                                    placeholder="0.00"
+                                    placeholder="0"
                                     className={cn(
                                         "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
                                         errors.compareAtPrice ? "border-red-500" : "border-white/[0.08] focus:border-white"
                                     )}
                                 />
                                 {errors.compareAtPrice && <p className="text-xs text-red-500">{errors.compareAtPrice.message}</p>}
-                                <p className="text-[11px] text-[#F8FAFC]/40 m-0">{t.dashboard.products.form.sections?.comparePriceHelp || 'Original price before discount (optional)'}</p>
                             </div>
                         </div>
+                        
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">{t.dashboard.products.form.sections?.inventory || 'Inventory'}</label>
+                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                    {t.dashboard.products.form.sections?.sku || 'SKU code'} <span className="text-[#F8FAFC]">*</span>
+                                </label>
+                                <input
+                                    {...register('baseSku')}
+                                    placeholder="SKU-001"
+                                    className={cn(
+                                        "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
+                                        errors.baseSku ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                                    )}
+                                />
+                                {errors.baseSku && <p className="text-xs text-red-500">{errors.baseSku.message}</p>}
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                    {t.dashboard.products.form.sections?.inventory || 'Inventory'} <span className="text-[#F8FAFC]">*</span>
+                                </label>
                                 <input
                                     type="number"
                                     {...register('baseInventory')}
@@ -159,18 +179,6 @@ export function VariantsInventorySection() {
                                     )}
                                 />
                                 {errors.baseInventory && <p className="text-xs text-red-500">{errors.baseInventory.message}</p>}
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">{t.dashboard.products.form.sections?.sku || 'SKU Code'}</label>
-                                <input
-                                    {...register('baseSku')}
-                                    placeholder="SKU-001"
-                                    className={cn(
-                                        "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                        errors.baseSku ? "border-red-500" : "border-white/[0.08] focus:border-white"
-                                    )}
-                                />
-                                {errors.baseSku && <p className="text-xs text-red-500">{errors.baseSku.message}</p>}
                             </div>
                         </div>
                     </div>
@@ -270,9 +278,9 @@ export function VariantsInventorySection() {
                                             <tr>
                                                 <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colVariant || 'Variant'}</th>
                                                 <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colSku || 'SKU Code'}</th>
-                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colPrice || 'Price'}</th>
-                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colDiscount || 'Discount'}</th>
-                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colStock || 'Stock'}</th>
+                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colPrice || 'PRICE'}</th>
+                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colComparePrice || 'COMPARE PRICE'}</th>
+                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colStock || 'STOCK'}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -303,11 +311,16 @@ export function VariantsInventorySection() {
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
-                                                        <input 
-                                                            type="number" 
-                                                            {...register(`variants.${i}.discount`)} 
-                                                            className="w-full rounded-xl border border-white/[0.08] bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:border-white focus:ring-1 focus:ring-white transition-colors" 
-                                                        />
+                                                        <div className="flex flex-col gap-1">
+                                                            <input 
+                                                                type="number" 
+                                                                {...register(`variants.${i}.compareAtPrice`)} 
+                                                                className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                                    errors.variants?.[i]?.compareAtPrice ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                                                )} 
+                                                            />
+                                                            {errors.variants?.[i]?.compareAtPrice && <span className="text-[10px] text-red-500">{errors.variants[i]?.compareAtPrice?.message}</span>}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">

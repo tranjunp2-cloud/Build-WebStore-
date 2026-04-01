@@ -495,6 +495,15 @@
                 "aiChatPlaceholder": "Enter leather jacket 500k, hat 50k",
                 "aiChatBtn": "Create"
             },
+            "messages": {
+                "nameRequired": "Please enter a product name first!",
+                "aiWritingDesc": "AI is writing description...",
+                "descSuccess": "Description generated successfully!",
+                "aiOptimizingSeo": "AI is optimizing SEO...",
+                "seoSuccess": "SEO optimized successfully!",
+                "generateFailed": "Failed to generate",
+                "networkError": "Network error"
+            },
             "form": {
                 "editTitle": "Edit Product",
                 "newTitle": "Add New Product",
@@ -634,7 +643,7 @@
                     "colVariant": "Variant",
                     "colSku": "SKU Code",
                     "colPrice": "Price",
-                    "colDiscount": "Discount",
+                    "colComparePrice": "Compare Price",
                     "colStock": "Stock",
                     "shipping": "Shipping Configuration",
                     "weight": "Weight (kg)",
@@ -703,7 +712,8 @@
                     "name": "Category Name",
                     "namePlaceholder": "e.g. Electronics, Fashion",
                     "slug": "URL Slug",
-                    "slugPlaceholder": "Leave blank to auto-generate",
+                    "slugPlaceholder": "category-url",
+                    "slugHelp": "Auto-suggested from category name.",
                     "parent": "Parent Category",
                     "parentNone": "None (Top Level)",
                     "description": "Description",

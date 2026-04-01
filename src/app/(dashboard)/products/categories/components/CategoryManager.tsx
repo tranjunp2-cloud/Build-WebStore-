@@ -23,6 +23,7 @@ import {
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { ImageUploader, UploadedImage } from '@/components/dashboard/ImageUploader'
+import { getCategoriesAction, saveCategoryAction, deleteCategoryAction } from '../actions'
 
 // Types
 export type Category = {
@@ -37,6 +38,19 @@ export type Category = {
     updatedAt?: string
     children?: Category[]
     level?: number
+    productCount?: number
+}
+
+// Helper to generate slug from name
+const generateSlug = (text: string) => {
+    return text
+        .toString()
+        .toLowerCase()
+        .normalize('NFD') // Remove diacritics
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[đĐ]/g, 'd') // Handle Vietnamese 'đ'
+        .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric chars with hyphens
+        .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
 }
 
 // Helper to calculate depth of a category before saving
@@ -92,12 +106,8 @@ export default function CategoryManager() {
     const fetchCategories = async () => {
         try {
             setIsLoading(true)
-            const res = await fetch('/api/categories?limit=1000&depth=1', {
-                credentials: 'include'
-            })
-            if (!res.ok) throw new Error('Failed to fetch categories')
-            const data = await res.json()
-            setCategories(data.docs || [])
+            const docs = await getCategoriesAction()
+            setCategories(docs as Category[] || [])
         } catch (error) {
             console.error(error)
             toast.error(t.dashboard.products.categories.toast.loadError)
@@ -198,20 +208,7 @@ export default function CategoryManager() {
             if (formData.image) payload.image = formData.image.id
             else payload.image = null
 
-            const method = formData.id ? 'PATCH' : 'POST'
-            const url = formData.id ? `/api/categories/${formData.id}` : '/api/categories'
-
-            const res = await fetch(url, {
-                method,
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            })
-
-            if (!res.ok) {
-                const err = await res.json()
-                throw new Error(err?.errors?.[0]?.message || 'Failed to save category')
-            }
+            await saveCategoryAction(payload, formData.id)
 
             const msg = formData.id 
                 ? t.dashboard.products.categories.toast.updated.replace('{name}', formData.name)
@@ -230,11 +227,7 @@ export default function CategoryManager() {
         if (!categoryToDelete) return
         try {
             setIsDeleting(true)
-            const res = await fetch(`/api/categories/${categoryToDelete.id}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            })
-            if (!res.ok) throw new Error('Failed to delete')
+            await deleteCategoryAction(categoryToDelete.id)
             
             toast.success(t.dashboard.products.categories.toast.deleted.replace('{name}', categoryToDelete.name))
             setIsDeleteOpen(false)
@@ -296,8 +289,7 @@ export default function CategoryManager() {
                             </div>
                         </div>
                         <div className="w-[100px] text-[12px] text-[#64748B] text-left hidden sm:flex items-center">
-                            {/* Dummy product count layout exact to Figma */}
-                            {Math.floor(Math.random() * 20) + 5} products
+                            {node.productCount || 0} products
                         </div>
                         <div className="w-auto sm:w-[120px] flex items-center justify-end gap-1 opacity-100">
                             {!isLevel3 && (
@@ -466,21 +458,15 @@ export default function CategoryManager() {
                                         type="text"
                                         required
                                         value={formData.name}
-                                        onChange={e => setFormData({...formData, name: e.target.value})}
+                                        onChange={e => {
+                                            const newName = e.target.value;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                name: newName,
+                                                slug: !prev.id ? generateSlug(newName) : prev.slug
+                                            }));
+                                        }}
                                         placeholder={t.dashboard.products.categories.form.namePlaceholder}
-                                        className="bg-[#0B1120]/50 border border-white/10 rounded-[12px] px-4 py-3 text-[16px] text-white placeholder-[#374151] outline-none focus:border-blue-500 transition-colors"
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-2">
-                                    <label className="text-[14px] font-medium text-[#F8FAFC]">
-                                        {t.dashboard.products.categories.form.slug || 'URL Slug'}
-                                    </label>
-                                    <input 
-                                        type="text"
-                                        value={formData.slug}
-                                        onChange={e => setFormData({...formData, slug: e.target.value})}
-                                        placeholder={t.dashboard.products.categories.form.slugPlaceholder}
                                         className="bg-[#0B1120]/50 border border-white/10 rounded-[12px] px-4 py-3 text-[16px] text-white placeholder-[#374151] outline-none focus:border-blue-500 transition-colors"
                                     />
                                 </div>
@@ -520,7 +506,7 @@ export default function CategoryManager() {
                                     />
                                 </div>
 
-                                <div className="space-y-2 pb-2">
+                                <div className="space-y-2">
                                     <label className="text-[14px] font-semibold text-[#F1F5F9] m-0 block">
                                     {t.dashboard.products.categories.form.image || 'Category Image'} <span className="text-[#94A3B8]">{t.dashboard.products.categories.form.optional || '(Optional)'}</span>
                                     </label>
@@ -531,6 +517,19 @@ export default function CategoryManager() {
                                         variant="wide"
                                         placeholderText="Click to upload or drag and drop"
                                         className="mt-1"
+                                    />
+                                </div>
+
+                                <div className="flex flex-col gap-2 pt-2">
+                                    <label className="text-[14px] font-medium text-[#F8FAFC]">
+                                        {t.dashboard.products.categories.form.slug || 'URL Slug'}
+                                    </label>
+                                    <input 
+                                        type="text"
+                                        value={formData.slug}
+                                        onChange={e => setFormData({...formData, slug: e.target.value})}
+                                        placeholder={t.dashboard.products.categories.form.slugPlaceholder || 'category-url'}
+                                        className="bg-[#0B1120]/50 border border-white/10 rounded-[12px] px-4 py-3 text-[16px] text-white placeholder-[#374151] outline-none focus:border-blue-500 transition-colors"
                                     />
                                 </div>
                             </form>

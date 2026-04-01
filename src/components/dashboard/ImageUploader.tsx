@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Upload, X, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 
 export type UploadedImage = {
     id: string | number
@@ -65,31 +66,17 @@ export function ImageUploader({
             try {
                 const formData = new FormData()
                 formData.append('file', file)
-                formData.append('_payload', JSON.stringify({ alt: file.name }))
+                // Payload parses _payload for extra data, but we pass alt directly in the action.
 
-                const res = await fetch('/api/media', {
-                    method: 'POST',
-                    credentials: 'include',
-                    body: formData,
-                })
-
-                if (!res.ok) throw new Error('Failed to upload image')
-
-                const data = await res.json()
-                const uploadedDoc = data?.doc || data
+                const data = await uploadMediaAction(formData)
+                const uploadedDoc = data
 
                 if (!uploadedDoc?.id || !uploadedDoc?.url) {
                     throw new Error('Invalid response format from server')
                 }
 
-                // Convert absolute URL to relative path to avoid Next.js unconfigured host errors
+                // Keep the absolute URL as returned from the backend (MinIO or Local)
                 let relativeUrl = String(uploadedDoc.url)
-                try {
-                    const parsedUrl = new URL(relativeUrl)
-                    relativeUrl = parsedUrl.pathname + parsedUrl.search
-                } catch (e) {
-                    // if it's not a valid absolute URL, it's already relative
-                }
 
                 newImages.push({
                     id: uploadedDoc.id,
@@ -142,11 +129,14 @@ export function ImageUploader({
             <div className={cn("flex flex-wrap gap-4 mt-2", variant === 'wide' && value.length === 0 ? "" : "")}>
                 {value.map((img, idx) => {
                     const safeUrl = (() => {
-                        try {
-                            return new URL(img.url, 'http://localhost').pathname
-                        } catch {
-                            return img.url
+                        let url = img.url || ''
+                        if (!url) return ''
+                        if (url.includes('/api/media/file/')) {
+                            const filename = url.split('/').pop()
+                            const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
+                            url = `${s3Endpoint}/primeweb-media/${filename}`
                         }
+                        return url
                     })()
                     
                     return (
