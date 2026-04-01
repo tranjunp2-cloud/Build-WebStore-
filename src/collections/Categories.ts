@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Where } from 'payload'
 import slugify from 'slugify'
 
 export const Categories: CollectionConfig = {
@@ -13,9 +13,8 @@ export const Categories: CollectionConfig = {
         },
         read: ({ req }) => {
             if (!req.user) {
-                return {
-                    deletedAt: { exists: false },
-                } as any // Public read for storefront
+                const query: Where = { deletedAt: { exists: false } };
+                return query; // Public read for storefront
             }
             if (req.user.roles?.includes('super-admin')) return true
             const tenantIds = req.user.tenants?.map((t: any) =>

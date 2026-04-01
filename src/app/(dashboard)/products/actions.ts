@@ -33,10 +33,19 @@ export async function getProductAction(id: string | number) {
     return JSON.parse(JSON.stringify(res))
 }
 
-export async function saveProductAction(data: any, id?: string | number) {
+import { z } from 'zod'
+
+const ProductServerSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    images: z.array(z.any()).optional(),
+}).passthrough();
+
+export async function saveProductAction(rawData: any, id?: string | number) {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
+    const data = ProductServerSchema.parse(rawData);
+    
     const payload = await getPayload({ config: configPromise })
     
     // Automatically attach default placeholder image if none provided

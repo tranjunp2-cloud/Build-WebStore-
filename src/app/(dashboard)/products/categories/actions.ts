@@ -30,35 +30,48 @@ export async function getCategoriesAction() {
         return [...childIds, ...descendantIds];
     };
 
-    const categoriesWithCount = await Promise.all(
-        res.docs.map(async (cat) => {
-            const allIds = [cat.id, ...getDescendantIds(cat.id, res.docs)];
-            
-            const countRes = await payload.count({
-                collection: 'products',
-                where: {
-                    and: [
-                        { category: { in: allIds } },
-                        { deletedAt: { exists: false } } // Do not count soft-deleted products
-                    ]
-                },
-                user: user as any,
-            })
-            return {
-                ...cat,
-                productCount: countRes.totalDocs,
-            }
-        })
-    )
+    // Solve N+1: Lấy trước toàn bộ Product id + category để đếm trong RAM
+    const allProducts = await payload.find({
+        collection: 'products',
+        where: { deletedAt: { exists: false } },
+        depth: 0,
+        pagination: false,
+        select: { category: true },
+        user: user as any,
+    })
+
+    const categoriesWithCount = res.docs.map((cat) => {
+        const allIds = [cat.id, ...getDescendantIds(cat.id, res.docs)]
+        const productCount = allProducts.docs.filter((p: any) => {
+            const pCatId = typeof p.category === 'object' && p.category !== null ? p.category.id : p.category;
+            return allIds.includes(pCatId);
+        }).length;
+        
+        return {
+            ...cat,
+            productCount,
+        }
+    })
 
     return JSON.parse(JSON.stringify(categoriesWithCount));
 }
 
-export async function saveCategoryAction(data: any, id?: string | number) {
+import { z } from 'zod';
+
+const CategoryServerSchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    slug: z.string().optional(),
+    parent: z.union([z.number(), z.string(), z.record(z.any())]).nullable().optional(),
+    depth: z.number().optional()
+}).passthrough();
+
+export async function saveCategoryAction(rawData: any, id?: string | number) {
     const user = await getCurrentUser()
     if (!user) {
         throw new Error('Unauthorized')
     }
+
+    const data = CategoryServerSchema.parse(rawData);
 
     const payload = await getPayload({ config: configPromise })
     
