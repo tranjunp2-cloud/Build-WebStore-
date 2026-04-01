@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, ReactNode } from 'react'
+import Image from 'next/image'
 import { LazyScreenshot } from './LazyScreenshot'
 import { X, Camera } from 'lucide-react'
 import { useI18n } from '@/i18n'
@@ -239,15 +240,17 @@ export function ModuleGuidesTab() {
            
            {/* Prevent zoom-out click when hitting image core container */}
            <div 
-             className="max-w-[90vw] max-h-[85vh] rounded-xl overflow-hidden cursor-default touch-pan-x touch-pan-y touch-pinch-zoom relative"
+             className="relative w-[90vw] max-w-6xl h-[85vh] rounded-xl overflow-hidden cursor-default touch-pan-x touch-pan-y touch-pinch-zoom"
              onClick={(e) => e.stopPropagation()}
            >
-             <div className="w-[700px] max-w-[90vw] h-[450px] bg-[#1e293b] rounded-xl flex flex-col items-center justify-center text-[#94a3b8]">
-                {/* Dummy fallback in Lightbox when real high-res missing */}
-                <span className="text-[48px] leading-none mb-2">🖼️</span>
-                <span className="text-[16px] font-semibold text-white drop-shadow">{lightboxImg.title}</span>
-                <span className="text-[12px] opacity-70 mt-1">{t.help.modules.tab.fullResolution}</span>
-             </div>
+             <Image 
+               src={lightboxImg.src}
+               alt={lightboxImg.title}
+               fill
+               className="object-contain"
+               quality={100}
+               sizes="90vw"
+             />
            </div>
 
            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-[12px]">
