@@ -9,11 +9,37 @@ import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
 
 function normalizeBlocksForPersistence(blocks: Record<string, unknown>[]) {
     return blocks.map(block => {
-        if (block?.blockType === 'socialWidget') {
-            return normalizeSocialWidgetConfig(block)
+        let b = { ...block }
+        
+        if (b.blockType === 'socialWidget') {
+            b = normalizeSocialWidgetConfig(b) as Record<string, unknown>
         }
 
-        return block
+        // Defensively sanitize navigation links (legacy drafts might lack 'label')
+        if (b.blockType === 'navigation' && Array.isArray(b.links)) {
+            b.links = b.links.map((link: Record<string, unknown>) => ({
+                ...link,
+                label: String(link.label || link.text || link.title || link.name || 'Link'),
+                url: String(link.url || link.href || link.link || '#')
+            }))
+        }
+
+        // Defensively sanitize footer links
+        if (b.blockType === 'footer' && Array.isArray(b.columns)) {
+            b.columns = b.columns.map((col: Record<string, unknown>) => {
+                if (!col || typeof col !== 'object') return col
+                return {
+                    ...col,
+                    links: Array.isArray(col.links) ? col.links.map((link: Record<string, unknown>) => ({
+                        ...link,
+                        label: String(link.label || link.text || link.title || link.name || 'Link'),
+                        url: String(link.url || link.href || link.link || '#')
+                    })) : col.links
+                }
+            })
+        }
+
+        return b
     })
 }
 
