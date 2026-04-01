@@ -203,7 +203,7 @@ export function sanitizeBlockData(block: Record<string, unknown>): Record<string
     // VARIANT VALIDATION: Ensure variant is a valid enum value
     // ═══════════════════════════════════════════════════════════════════════
     const VARIANT_ENUMS: Record<string, string[]> = {
-        about: ['simple', 'split', 'story'],
+        about: ['image-right', 'image-left', 'centered', 'cards'],
         contact: ['form', 'info-only', 'split'],
         cta: ['banner', 'inline', 'floating'],
         faq: ['accordion', 'grid', 'simple'],

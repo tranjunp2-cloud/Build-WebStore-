@@ -17,11 +17,14 @@ function normalizeBlocksForPersistence(blocks: Record<string, unknown>[]) {
 
         // Defensively sanitize navigation links (legacy drafts might lack 'label')
         if (b.blockType === 'navigation' && Array.isArray(b.links)) {
-            b.links = b.links.map((link: Record<string, unknown>) => ({
-                ...link,
-                label: String(link.label || link.text || link.title || link.name || 'Link'),
-                url: String(link.url || link.href || link.link || '#')
-            }))
+            b.links = b.links.map((linkRaw: unknown) => {
+                const link = (typeof linkRaw === 'object' && linkRaw !== null) ? linkRaw as Record<string, unknown> : {}
+                return {
+                    ...link,
+                    label: String(link.label || link.text || link.title || link.name || 'Link'),
+                    url: String(link.url || link.href || link.link || '#')
+                }
+            })
         }
 
         // Defensively sanitize footer links
@@ -30,11 +33,14 @@ function normalizeBlocksForPersistence(blocks: Record<string, unknown>[]) {
                 if (!col || typeof col !== 'object') return col
                 return {
                     ...col,
-                    links: Array.isArray(col.links) ? col.links.map((link: Record<string, unknown>) => ({
-                        ...link,
-                        label: String(link.label || link.text || link.title || link.name || 'Link'),
-                        url: String(link.url || link.href || link.link || '#')
-                    })) : col.links
+                    links: Array.isArray(col.links) ? col.links.map((linkRaw: unknown) => {
+                        const link = (typeof linkRaw === 'object' && linkRaw !== null) ? linkRaw as Record<string, unknown> : {}
+                        return {
+                            ...link,
+                            label: String(link.label || link.text || link.title || link.name || 'Link'),
+                            url: String(link.url || link.href || link.link || '#')
+                        }
+                    }) : col.links
                 }
             })
         }
