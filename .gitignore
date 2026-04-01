@@ -56,4 +56,7 @@ _agent/
 ## Worktrees
 .worktrees/
 .gitnexus
+
+# Playwright auth state
+e2e/.auth/
 coverage/
