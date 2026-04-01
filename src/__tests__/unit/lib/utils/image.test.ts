@@ -84,6 +84,7 @@ function setupBrowserApiMocks(compressedSizeBytes = 50_000) {
         drawImage: vi.fn(),
     }))
 
+    const originalCreateElement = document.createElement.bind(document)
     vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
         if (tagName === 'canvas') {
             return {
@@ -93,7 +94,7 @@ function setupBrowserApiMocks(compressedSizeBytes = 50_000) {
                 toBlob: mockToBlob,
             } as unknown as HTMLCanvasElement
         }
-        return document.createElement(tagName)
+        return originalCreateElement(tagName)
     })
 
     return { mockReadAsDataURL, mockToBlob, mockGetContext }
@@ -272,6 +273,7 @@ describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () =
             return instance
         })
 
+        const origCreateElement = document.createElement.bind(document)
         vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
             if (tag === 'canvas') {
                 return {
@@ -281,7 +283,7 @@ describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () =
                     toBlob: vi.fn(),
                 } as unknown as HTMLCanvasElement
             }
-            return document.createElement(tag)
+            return origCreateElement(tag)
         })
 
         const file = makeFile('photo.jpg', sizeInMB(3), 'image/jpeg')
@@ -330,6 +332,7 @@ describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () =
             return instance
         })
 
+        const origCreateElement = document.createElement.bind(document)
         vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
             if (tag === 'canvas') {
                 return {
@@ -339,7 +342,7 @@ describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () =
                     toBlob: vi.fn((cb: BlobCallback) => setTimeout(() => cb(null), 0)), // null blob
                 } as unknown as HTMLCanvasElement
             }
-            return document.createElement(tag)
+            return origCreateElement(tag)
         })
 
         const file = makeFile('photo.jpg', sizeInMB(3), 'image/jpeg')
@@ -405,6 +408,7 @@ describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)',
             setTimeout(() => cb(new Blob([new Uint8Array(1000)], { type: 'image/webp' })), 0)
         })
 
+        const origCreateElement = document.createElement.bind(document)
         vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
             if (tag === 'canvas') {
                 const canvas = {
@@ -416,7 +420,7 @@ describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)',
                 capturedCanvas = canvas as unknown as { width: number; height: number }
                 return canvas
             }
-            return document.createElement(tag)
+            return origCreateElement(tag)
         })
 
         const file = makeFile('4k-photo.jpg', sizeInMB(5), 'image/jpeg')
@@ -470,6 +474,7 @@ describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)',
             return instance
         })
 
+        const origCreateElement = document.createElement.bind(document)
         vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
             if (tag === 'canvas') {
                 const canvas = {
@@ -481,7 +486,7 @@ describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)',
                 capturedCanvas = canvas
                 return canvas
             }
-            return document.createElement(tag)
+            return origCreateElement(tag)
         })
 
         const file = makeFile('portrait.jpg', sizeInMB(3), 'image/jpeg')
@@ -533,6 +538,7 @@ describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)',
             return instance
         })
 
+        const origCreateElement = document.createElement.bind(document)
         vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
             if (tag === 'canvas') {
                 const canvas = {
@@ -544,7 +550,7 @@ describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)',
                 capturedCanvas = canvas
                 return canvas
             }
-            return document.createElement(tag)
+            return origCreateElement(tag)
         })
 
         const file = makeFile('small-but-heavy.jpg', sizeInMB(3), 'image/jpeg')

@@ -1,4 +1,6 @@
 import { test as setup, expect } from '@playwright/test'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 
 const AUTH_FILE = './e2e/.auth/user.json'
 
@@ -49,5 +51,6 @@ setup('authenticate', async ({ page }) => {
     }
 
     // Save authentication state
+    await fs.mkdir(path.dirname(AUTH_FILE), { recursive: true })
     await page.context().storageState({ path: AUTH_FILE })
 })

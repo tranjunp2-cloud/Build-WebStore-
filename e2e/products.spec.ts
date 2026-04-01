@@ -26,7 +26,7 @@ test.describe('Products Management', () => {
         // Either product cards/rows or "no products" message
         const hasProducts = await page.locator('table tr, [data-testid="product-card"], [data-testid="product-row"]').count()
         const hasEmptyState = await page.locator('text=/no products|create your first|get started/i').count()
-        expect(hasProducts + hasEmptyState).toBeGreaterThanOrEqual(0)
+        expect(hasProducts + hasEmptyState).toBeGreaterThan(0)
     })
 
     test('[TC-F08.02] navigate to create product page', async ({ page }) => {

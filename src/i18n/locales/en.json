@@ -812,6 +812,83 @@
             "needHelpTitle": "📞 Need more help?",
             "needHelpDesc": "If you can't find the answer, contact our support team via WhatsApp or email "
         },
+        "modules": {
+            "lazyScreenshot": {
+                "screenshot": "Screenshot: {title}",
+                "clickToZoom": "🔍 Click to zoom"
+            },
+            "tab": {
+                "escToClose": "ESC to close · Pinch to zoom on mobile",
+                "fullResolution": "Full resolution screenshot"
+            },
+            "data": {
+                "products": {
+                    "label": "Products",
+                    "steps": [
+                        {
+                            "title": "Access Products Menu",
+                            "desc": "From the left Sidebar, click on <strong>\"📦 Products\"</strong> to open your current product list.",
+                            "imgTitle": "Product List View"
+                        },
+                        {
+                            "title": "Create New Product",
+                            "desc": "Click the <strong>[+ Add Product]</strong> button at the top right. Fill out the form:<ul class=\"text-[#9CA3AF] mb-4 mt-1 ml-5 text-[14px] leading-[24px] list-disc marker:text-[#9CA3AF]\"><li>Product name, RM price, detailed description</li><li>Upload product images (WebP recommended, ≤ 5MB/image)</li><li>Enable Halal Badge if the product has JAKIM certification</li><li>Set inventory and shipping weight</li></ul>",
+                            "imgTitle": "Product Create Form"
+                        },
+                        {
+                            "title": "Manage Product Images",
+                            "desc": "Drag and drop or click <strong>Browse Files</strong> to upload multiple images. Drag and drop to reorder. The first image will be the primary image on the Storefront.",
+                            "imgTitle": "Image Gallery Manager"
+                        }
+                    ]
+                },
+                "orders": {
+                    "label": "Orders",
+                    "steps": [
+                        {
+                            "title": "View Order List",
+                            "desc": "Go to <strong>\"🛒 Orders\"</strong> to view all orders. Use the Status filter to find orders that need processing.",
+                            "imgTitle": "Orders List"
+                        },
+                        {
+                            "title": "Process Orders",
+                            "desc": "Click on an order to view details. Update status: <strong>Confirmed → Shipped → Delivered</strong>. Enter J&T/Pos Laju tracking code.",
+                            "imgTitle": "Order Detail"
+                        }
+                    ]
+                },
+                "dashboard": {
+                    "label": "Dashboard",
+                    "steps": [
+                        {
+                            "title": "Dashboard Overview",
+                            "desc": "The dashboard displays key metrics: total revenue, number of orders, visitors, and Quick Actions.",
+                            "imgTitle": "Dashboard Overview"
+                        }
+                    ]
+                },
+                "blog": {
+                    "label": "Blog",
+                    "steps": [
+                        {
+                            "title": "Create New Blog Post",
+                            "desc": "Go to <strong>\"📝 Blog\"</strong> → click <strong>[+ New Post]</strong>. Write content using the Rich Text Editor, add images, and set SEO meta.",
+                            "imgTitle": "Blog Editor"
+                        }
+                    ]
+                },
+                "settings": {
+                    "label": "Settings",
+                    "steps": [
+                        {
+                            "title": "Domain Configuration",
+                            "desc": "Go to <strong>\"⚙️ Settings → Domains\"</strong>. Add custom domain, configure DNS (A Record, CNAME), and verify connection.",
+                            "imgTitle": "Domain Settings"
+                        }
+                    ]
+                }
+            }
+        },
         "qna": {
             "searchPlaceholder": "Search questions...",
             "emptyTitle": "No answers found",

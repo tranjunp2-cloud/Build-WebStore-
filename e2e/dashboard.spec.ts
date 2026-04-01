@@ -44,7 +44,7 @@ test.describe('Dashboard', () => {
         if (await sidebar.count() > 0) {
             // Verify at least some nav links exist
             const links = await page.locator('a[href*="/products"], a[href*="/orders"], a[href*="/blog"]').count()
-            expect(links).toBeGreaterThanOrEqual(0)
+            expect(links).toBeGreaterThan(0)
         }
     })
 
