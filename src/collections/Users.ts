@@ -569,12 +569,16 @@ export const Users: CollectionConfig = {
                     )
                 }
 
-                // E2E test bypass — only when E2E_TEST_OTP_CODE is explicitly set
-                // Production does NOT set this env var → bypass impossible
+                // E2E test bypass — requires all 3 conditions:
+                // 1. E2E_TEST_OTP_CODE env var set (production never sets this)
+                // 2. Exact TEST_EMAIL match
+                // 3. APP_ENV explicitly not 'production' (hard block)
                 const testOtpCode = process.env.E2E_TEST_OTP_CODE
                 const testEmail = process.env.TEST_EMAIL
+                const appEnv = process.env.APP_ENV || process.env.NEXT_PUBLIC_APP_ENV
                 const isTestBypass = !!(testOtpCode && testEmail
-                    && email === testEmail && otp === testOtpCode)
+                    && email === testEmail && otp === testOtpCode
+                    && appEnv && appEnv !== 'production')
 
                 // Check expiry (skip for test bypass)
                 if (!isTestBypass && (!user.otpHash || !user.otpExpiresAt)) {
