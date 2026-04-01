@@ -730,10 +730,11 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                 })
             }
             if (Array.isArray(sanitized.socials)) {
-                sanitized.socials = sanitized.socials.map((social: any) => {
-                    if (typeof social === 'string') {
-                        return { platform: social.toLowerCase(), url: '#' }
+                sanitized.socials = sanitized.socials.map((socialRaw: unknown) => {
+                    if (typeof socialRaw === 'string') {
+                        return { platform: socialRaw.toLowerCase(), url: '#' }
                     }
+                    const social = (typeof socialRaw === 'object' && socialRaw !== null) ? socialRaw as Record<string, unknown> : {};
                     return {
                         platform: String(social.platform || social.name || 'twitter').toLowerCase(),
                         url: String(social.url || social.link || '#'),
@@ -788,13 +789,15 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
 
         // ── Team: members[].socials[] requires { platform, url } ──
         if (sanitized.blockType === 'team' && Array.isArray(sanitized.members)) {
-            sanitized.members = sanitized.members.map((member: any) => {
+            sanitized.members = sanitized.members.map((memberRaw: unknown) => {
+                const member = (typeof memberRaw === 'object' && memberRaw !== null) ? memberRaw as Record<string, unknown> : {};
                 const safeMember = { ...member }
                 if (Array.isArray(safeMember.socials)) {
-                    safeMember.socials = safeMember.socials.map((social: any) => {
-                        if (typeof social === 'string') {
-                            return { platform: social.toLowerCase(), url: '#' }
+                    safeMember.socials = safeMember.socials.map((socialRaw: unknown) => {
+                        if (typeof socialRaw === 'string') {
+                            return { platform: socialRaw.toLowerCase(), url: '#' }
                         }
+                        const social = (typeof socialRaw === 'object' && socialRaw !== null) ? socialRaw as Record<string, unknown> : {};
                         return {
                             platform: String(social.platform || social.name || 'twitter').toLowerCase(),
                             url: String(social.url || social.link || '#'),
@@ -814,20 +817,23 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
 
         // ── Pricing: plans[] normalization ──
         if (sanitized.blockType === 'pricing' && Array.isArray(sanitized.plans)) {
-            sanitized.plans = sanitized.plans.map((plan: any) => {
-                if (typeof plan === 'string') {
-                    return { name: plan, price: 'RM 0', features: [], ctaLabel: 'Buy', ctaUrl: '#' }
+            sanitized.plans = sanitized.plans.map((planRaw: unknown) => {
+                if (typeof planRaw === 'string') {
+                    return { name: planRaw, price: 'RM 0', features: [], ctaLabel: 'Buy', ctaUrl: '#' }
                 }
-                const safePlan = { ...plan }
+                const plan = (typeof planRaw === 'object' && planRaw !== null) ? planRaw as Record<string, unknown> : {};
+                const safePlan = { ...plan } as Record<string, unknown>
                 safePlan.name = String(plan.name || plan.title || 'Plan')
                 safePlan.price = String(plan.price || plan.cost || '$0')
                 safePlan.ctaLabel = String(plan.ctaLabel || plan.buttonText || 'Buy Now')
                 safePlan.ctaUrl = String(plan.ctaUrl || plan.url || '#')
                 
                 if (Array.isArray(plan.features)) {
-                    safePlan.features = plan.features.map((f: any) =>
-                        typeof f === 'string' ? f : String(f.text || f.name || f.feature || '')
-                    )
+                    safePlan.features = plan.features.map((fRaw: unknown) => {
+                        if (typeof fRaw === 'string') return fRaw;
+                        const f = (typeof fRaw === 'object' && fRaw !== null) ? fRaw as Record<string, unknown> : {};
+                        return String(f.text || f.name || f.feature || '')
+                    })
                 } else {
                     safePlan.features = []
                 }
@@ -837,10 +843,11 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
 
         // ── FAQ: items[] normalization ──
         if (sanitized.blockType === 'faq' && Array.isArray(sanitized.items)) {
-            sanitized.items = sanitized.items.map((item: any) => {
-                if (typeof item === 'string') {
-                    return { question: item, answer: '...' }
+            sanitized.items = sanitized.items.map((itemRaw: unknown) => {
+                if (typeof itemRaw === 'string') {
+                    return { question: itemRaw, answer: '...' }
                 }
+                const item = (typeof itemRaw === 'object' && itemRaw !== null) ? itemRaw as Record<string, unknown> : {};
                 return {
                     question: String(item.question || item.title || item.q || 'Question?'),
                     answer: String(item.answer || item.description || item.a || 'Answer.'),

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 
 // Mock OpenAI
 vi.mock('openai', () => ({ default: vi.fn() }))
@@ -235,5 +235,61 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
         // nonexistent_block should be skipped
         expect(result.blocks.length).toBe(1)
         expect(result.blocks[0].blockType).toBe('hero')
+    })
+})
+
+// ─── TC-F05.XX: Test sanitizeBlockData ───────────────────────────────
+import { sanitizeBlockData } from '@/lib/ai/openai-generator'
+
+describe('sanitizeBlockData - Normalize AI outputs', () => {
+    it('normalizes legacy/hallucinated string variants to fallback valid enums', () => {
+        const input = { blockType: 'features', variant: 'grid-5' } // invalid
+        const output = sanitizeBlockData(input)
+        expect(output.variant).toBe('grid-2') // fallback for 'features'
+    })
+
+    it('forces footer socials into array of object format', () => {
+        const input = { blockType: 'footer', socials: ['facebook', 'twitter'] }
+        const output = sanitizeBlockData(input)
+        expect(output.socials).toEqual([
+            { platform: 'facebook', url: '#' },
+            { platform: 'twitter', url: '#' }
+        ])
+    })
+
+    it('forces team member socials into array of object format', () => {
+        const input = { 
+            blockType: 'team', 
+            members: [
+                { name: 'Alice', socials: ['linkedin'] },
+                { name: 'Bob', socials: [{ name: 'twitter', link: 'https://tw' }] }
+            ] 
+        }
+        const output = sanitizeBlockData(input)
+        expect((output.members as any)[0].socials).toEqual([{ platform: 'linkedin', url: '#' }])
+        expect((output.members as any)[1].socials).toEqual([{ platform: 'twitter', url: 'https://tw' }])
+    })
+
+    it('normalizes pricing plans with string plans array to full object layout', () => {
+        const input = { blockType: 'pricing', plans: ['Basic', 'Pro'] }
+        const output = sanitizeBlockData(input)
+        expect((output.plans as any)[0].name).toBe('Basic')
+        expect((output.plans as any)[0].features).toEqual([])
+        expect((output.plans as any)[1].price).toBe('RM 0')
+    })
+
+    it('cleans up logo-cloud blocks', () => {
+        const input = { blockType: 'logo-cloud', logos: ['logo1', 'logo2'] }
+        const output = sanitizeBlockData(input)
+        expect(output.logos).toEqual([])
+    })
+
+    it('handles nulls or completely broken objects safely', () => {
+        const input = { blockType: 'faq', items: [{ q: 'Huh?' }, 'What?', null] }
+        const output = sanitizeBlockData(input)
+        expect((output.items as any)[0].question).toBe('Huh?')
+        expect((output.items as any)[1].question).toBe('What?')
+        // The null will be handled by our new type guards correctly if updated, or mapped to Question?
+        expect((output.items as any)[2].question).toBe('Question?')
     })
 })

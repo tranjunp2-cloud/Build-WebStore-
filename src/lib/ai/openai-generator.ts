@@ -180,7 +180,7 @@ function generateWithFallback(prompt: string, events: SSEEvent[]): { result: Gen
  * Removes hallucinated fields, enforces exact variant enums, and recursively normalizes
  * objects into the strictly required keys to prevent validation failures.
  */
-function sanitizeBlockData(block: Record<string, unknown>): Record<string, unknown> {
+export function sanitizeBlockData(block: Record<string, unknown>): Record<string, unknown> {
     const s = { ...block }
 
     // Helper: normalize array where strings should be objects
