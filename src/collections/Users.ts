@@ -569,12 +569,12 @@ export const Users: CollectionConfig = {
                     )
                 }
 
-                // E2E test bypass — staging/dev only, exact test email match
+                // E2E test bypass — non-production only, exact test email match
                 const testOtpCode = process.env.E2E_TEST_OTP_CODE
                 const testEmail = process.env.TEST_EMAIL
                 const isTestBypass = testOtpCode && testEmail
                     && email === testEmail && otp === testOtpCode
-                    && process.env.NEXT_PUBLIC_APP_ENV !== 'production'
+                    && process.env.NODE_ENV !== 'production'
 
                 // Check expiry (skip for test bypass)
                 if (!isTestBypass && (!user.otpHash || !user.otpExpiresAt)) {
