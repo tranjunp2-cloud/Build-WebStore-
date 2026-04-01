@@ -34,7 +34,7 @@ test.describe('Storefront', () => {
 
     test('[TC-F09.18] checkout requires cart items', async ({ page }) => {
         // Navigate directly to checkout without items — should show empty state or redirect
-        await page.goto('/login') // Need a valid site slug for checkout
+        await page.goto('/checkout') 
         await page.waitForLoadState('networkidle')
         // Verify page doesn't crash
         await expect(page.locator('text=Internal Server Error')).not.toBeVisible()
