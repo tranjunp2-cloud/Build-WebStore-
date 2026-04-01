@@ -266,16 +266,18 @@ describe('sanitizeBlockData - Normalize AI outputs', () => {
             ] 
         }
         const output = sanitizeBlockData(input)
-        expect((output.members as any)[0].socials).toEqual([{ platform: 'linkedin', url: '#' }])
-        expect((output.members as any)[1].socials).toEqual([{ platform: 'twitter', url: 'https://tw' }])
+        const members = output.members as Array<{ socials: Array<{ platform: string, url: string }> }>
+        expect(members[0].socials).toEqual([{ platform: 'linkedin', url: '#' }])
+        expect(members[1].socials).toEqual([{ platform: 'twitter', url: 'https://tw' }])
     })
 
     it('normalizes pricing plans with string plans array to full object layout', () => {
         const input = { blockType: 'pricing', plans: ['Basic', 'Pro'] }
         const output = sanitizeBlockData(input)
-        expect((output.plans as any)[0].name).toBe('Basic')
-        expect((output.plans as any)[0].features).toEqual([])
-        expect((output.plans as any)[1].price).toBe('RM 0')
+        const plans = output.plans as Array<{ name: string, price: string, features: string[] }>
+        expect(plans[0].name).toBe('Basic')
+        expect(plans[0].features).toEqual([])
+        expect(plans[1].price).toBe('RM 0')
     })
 
     it('cleans up logo-cloud blocks', () => {
@@ -287,9 +289,10 @@ describe('sanitizeBlockData - Normalize AI outputs', () => {
     it('handles nulls or completely broken objects safely', () => {
         const input = { blockType: 'faq', items: [{ q: 'Huh?' }, 'What?', null] }
         const output = sanitizeBlockData(input)
-        expect((output.items as any)[0].question).toBe('Huh?')
-        expect((output.items as any)[1].question).toBe('What?')
+        const items = output.items as Array<{ question: string }>
+        expect(items[0].question).toBe('Huh?')
+        expect(items[1].question).toBe('What?')
         // The null will be handled by our new type guards correctly if updated, or mapped to Question?
-        expect((output.items as any)[2].question).toBe('Question?')
+        expect(items[2].question).toBe('Question?')
     })
 })
