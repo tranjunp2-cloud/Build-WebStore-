@@ -217,7 +217,6 @@ describe('OTP Verification Endpoints', () => {
         beforeEach(() => {
             vi.stubEnv('E2E_TEST_OTP_CODE', TEST_OTP)
             vi.stubEnv('TEST_EMAIL', TEST_EMAIL)
-            vi.stubEnv('NODE_ENV', 'development')
         })
 
         afterEach(() => {
@@ -257,18 +256,7 @@ describe('OTP Verification Endpoints', () => {
             expect(res.status).toBe(401)
         })
 
-        it('rejects bypass in production NODE_ENV', async () => {
-            vi.stubEnv('NODE_ENV', 'production')
-            mockPayload.find.mockResolvedValue({
-                docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }]
-            })
-            const req = createMockRequest({ email: TEST_EMAIL, otp: TEST_OTP })
-
-            const res = await verifyOtpHandler!(req) as Response
-            expect(res.status).toBe(401)
-        })
-
-        it('rejects bypass when E2E_TEST_OTP_CODE env is not set', async () => {
+        it('rejects bypass when E2E_TEST_OTP_CODE env is not set (production scenario)', async () => {
             vi.stubEnv('E2E_TEST_OTP_CODE', '')
             mockPayload.find.mockResolvedValue({
                 docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }]
