@@ -240,17 +240,25 @@ export function ModuleGuidesTab() {
            
            {/* Prevent zoom-out click when hitting image core container */}
            <div 
-             className="relative w-[90vw] max-w-6xl h-[85vh] rounded-xl overflow-hidden cursor-default touch-pan-x touch-pan-y touch-pinch-zoom"
+             className="relative w-[90vw] max-w-6xl h-[85vh] rounded-xl overflow-hidden cursor-default touch-pan-x touch-pan-y touch-pinch-zoom bg-[#1e293b] flex items-center justify-center"
              onClick={(e) => e.stopPropagation()}
            >
-             <Image 
-               src={lightboxImg.src}
-               alt={lightboxImg.title}
-               fill
-               className="object-contain"
-               quality={100}
-               sizes="90vw"
-             />
+             {lightboxImg.src ? (
+               <Image 
+                 src={lightboxImg.src}
+                 alt={lightboxImg.title}
+                 fill
+                 className="object-contain"
+                 quality={100}
+                 sizes="90vw"
+               />
+             ) : (
+               <div className="flex flex-col items-center justify-center text-[#94a3b8] w-full h-full p-6 text-center">
+                  <span className="text-[48px] leading-none mb-2">🖼️</span>
+                  <span className="text-[16px] font-semibold text-white drop-shadow">{lightboxImg.title}</span>
+                  <span className="text-[12px] opacity-70 mt-1">{t.help.modules.tab.fullResolution}</span>
+               </div>
+             )}
            </div>
 
            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/60 text-[12px]">
