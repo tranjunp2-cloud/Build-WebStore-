@@ -217,7 +217,7 @@ describe('OTP Verification Endpoints', () => {
         beforeEach(() => {
             vi.stubEnv('E2E_TEST_OTP_CODE', TEST_OTP)
             vi.stubEnv('TEST_EMAIL', TEST_EMAIL)
-            vi.stubEnv('NEXT_PUBLIC_APP_ENV', 'staging')
+            vi.stubEnv('APP_ENV', 'staging')
         })
 
         afterEach(() => {
@@ -258,7 +258,7 @@ describe('OTP Verification Endpoints', () => {
         })
 
         it('rejects bypass when APP_ENV is production (hard block)', async () => {
-            vi.stubEnv('NEXT_PUBLIC_APP_ENV', 'production')
+            vi.stubEnv('APP_ENV', 'production')
             mockPayload.find.mockResolvedValue({
                 docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }]
             })
