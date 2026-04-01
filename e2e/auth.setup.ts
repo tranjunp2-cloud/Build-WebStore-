@@ -8,10 +8,10 @@ const AUTH_FILE = './e2e/.auth/user.json'
  * Auth Setup — Login once, save session for all subsequent tests.
  *
  * Uses E2E test credentials from environment variables.
- * Handles the OTP flow by checking if OTP page appears.
+ * Handles OTP 2FA via E2E_TEST_OTP_CODE bypass.
  *
  * TC-F02.19: Login happy path
- * TC-F02.33: Auth middleware redirect
+ * TC-F02.23: OTP verification
  */
 setup('authenticate', async ({ page }) => {
     const email = process.env.TEST_EMAIL
@@ -33,20 +33,51 @@ setup('authenticate', async ({ page }) => {
 
     // Wait for navigation — either OTP page or dashboard
     await page.waitForURL(url => {
-        const path = url.pathname
-        return path.includes('/verify-otp') || path.includes('/dashboard') || path.includes('/builder')
+        const p = url.pathname
+        return p.includes('/verify-otp') || p.includes('/dashboard') || p.includes('/builder')
     }, { timeout: 15_000 })
 
-    // If OTP page — need manual intervention or skip in CI
+    // Handle OTP verification
     const currentUrl = page.url()
     if (currentUrl.includes('/verify-otp')) {
-        // In CI, OTP is auto-verified or skipped via test account
-        // Wait for redirect to dashboard (test account may auto-verify)
+        const otpCode = process.env.E2E_TEST_OTP_CODE
+        if (!otpCode) {
+            console.warn('[Auth Setup] OTP page reached but E2E_TEST_OTP_CODE not set — cannot auto-verify')
+            await page.context().storageState({ path: AUTH_FILE })
+            return
+        }
+
+        // Fill OTP digits — try individual inputs first, then single input
+        const otpInputs = page.locator('input[inputmode="numeric"], input[data-otp="true"]')
+        const inputCount = await otpInputs.count()
+
+        if (inputCount >= 6) {
+            // Individual digit inputs (common OTP UI pattern)
+            for (let i = 0; i < 6; i++) {
+                await otpInputs.nth(i).fill(otpCode[i])
+            }
+        } else {
+            // Single input field
+            const singleInput = page.locator('input[name="otp"], input[placeholder*="code" i], input[type="text"]').first()
+            if (await singleInput.isVisible()) {
+                await singleInput.fill(otpCode)
+            }
+        }
+
+        // Submit OTP — click verify button or wait for auto-submit
+        const verifyBtn = page.locator('button[type="submit"], button:has-text("Verify"), button:has-text("Submit")').first()
+        if (await verifyBtn.isVisible()) {
+            await verifyBtn.click()
+        }
+
+        // Wait for redirect to dashboard
         try {
-            await page.waitForURL('**/dashboard**', { timeout: 30_000 })
+            await page.waitForURL(url => {
+                const p = url.pathname
+                return p.includes('/dashboard') || p.includes('/builder') || p.includes('/onboarding')
+            }, { timeout: 15_000 })
         } catch {
-            // If OTP blocks us, save state anyway — some tests can run without full auth
-            console.warn('[Auth Setup] OTP verification required — some tests may be skipped')
+            console.warn('[Auth Setup] OTP submitted but did not redirect to dashboard')
         }
     }
 
