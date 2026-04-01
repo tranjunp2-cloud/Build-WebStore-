@@ -208,4 +208,75 @@ describe('OTP Verification Endpoints', () => {
             expect(setCookie).toContain('Path=/')
         })
     })
+
+    // ── TC-F02.19: E2E Test OTP Bypass ──────────────────────────────
+    describe('E2E test OTP bypass', () => {
+        const TEST_EMAIL = 'e2e@test.com'
+        const TEST_OTP = '999999'
+
+        beforeEach(() => {
+            vi.stubEnv('E2E_TEST_OTP_CODE', TEST_OTP)
+            vi.stubEnv('TEST_EMAIL', TEST_EMAIL)
+            vi.stubEnv('APP_ENV', 'staging')
+        })
+
+        afterEach(() => {
+            vi.unstubAllEnvs()
+        })
+
+        it('bypasses OTP hash check for matching test email + code in non-production', async () => {
+            mockPayload.find.mockResolvedValue({
+                docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }] // no otpHash
+            })
+            const req = createMockRequest({ email: TEST_EMAIL, otp: TEST_OTP })
+
+            const res = (await verifyOtpHandler!(req)) as unknown as Response
+            expect(res.status).toBe(200)
+
+            const setCookie = res.headers.get('Set-Cookie')
+            expect(setCookie).toContain('payload-token=')
+        })
+
+        it('rejects bypass when OTP code does not match', async () => {
+            mockPayload.find.mockResolvedValue({
+                docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }]
+            })
+            const req = createMockRequest({ email: TEST_EMAIL, otp: 'wrong' })
+
+            const res = await verifyOtpHandler!(req) as Response
+            expect(res.status).toBe(401)
+        })
+
+        it('rejects bypass when email does not match TEST_EMAIL', async () => {
+            mockPayload.find.mockResolvedValue({
+                docs: [{ id: 1, email: 'other@test.com', otpAttempts: 0 }]
+            })
+            const req = createMockRequest({ email: 'other@test.com', otp: TEST_OTP })
+
+            const res = await verifyOtpHandler!(req) as Response
+            expect(res.status).toBe(401)
+        })
+
+        it('rejects bypass when APP_ENV is production (hard block)', async () => {
+            vi.stubEnv('APP_ENV', 'production')
+            mockPayload.find.mockResolvedValue({
+                docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }]
+            })
+            const req = createMockRequest({ email: TEST_EMAIL, otp: TEST_OTP })
+
+            const res = await verifyOtpHandler!(req) as Response
+            expect(res.status).toBe(401)
+        })
+
+        it('rejects bypass when E2E_TEST_OTP_CODE env is not set', async () => {
+            vi.stubEnv('E2E_TEST_OTP_CODE', '')
+            mockPayload.find.mockResolvedValue({
+                docs: [{ id: 1, email: TEST_EMAIL, otpAttempts: 0 }]
+            })
+            const req = createMockRequest({ email: TEST_EMAIL, otp: TEST_OTP })
+
+            const res = await verifyOtpHandler!(req) as Response
+            expect(res.status).toBe(401)
+        })
+    })
 })
