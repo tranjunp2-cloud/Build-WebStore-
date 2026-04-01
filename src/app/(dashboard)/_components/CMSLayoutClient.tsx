@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
 import { TopHeader } from '@/components/dashboard/TopHeader'
 import { Toaster } from '@/components/ui/sonner'
@@ -14,6 +15,14 @@ type CMSLayoutClientProps = {
 
 export function CMSLayoutClient({ userName, userInitial, userEmail, children }: CMSLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    const pathname = usePathname()
+
+    // Lắng nghe sự thay đổi của URL và reset scroll bar về đỉnh trang (QA Bug TC-F18.13)
+    useEffect(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+        // Tương tự, để chắc chắn thêm với documentElement
+        document.documentElement.scrollTop = 0
+    }, [pathname])
 
     return (
         <div className="min-h-screen bg-[#0B1120] flex flex-col">
