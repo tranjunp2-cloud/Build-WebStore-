@@ -30,7 +30,11 @@ function simulateSessionGuard(currentUserId: string | null) {
     const stored = useBuilderStore.getState()
     if (!currentUserId) return
 
-    if (stored.userId && stored.userId !== currentUserId) {
+    const hasStaleData = stored.blocks.length > 0 || stored.siteId !== null
+    const isDifferentUser = stored.userId !== null && stored.userId !== currentUserId
+    const isUnownedSession = stored.userId === null && hasStaleData
+
+    if (isDifferentUser || isUnownedSession) {
         stored.reset()
         // localStorage.removeItem is tested separately
     }
@@ -177,5 +181,47 @@ describe('[TC-F01-security] Builder session cross-user contamination guard', () 
         expect(removeItemSpy).toHaveBeenCalledWith('prime-builder-session-meta')
 
         removeItemSpy.mockRestore()
+    })
+
+    // ── TC-F01-sec-08 ─────────────────────────────────────────────────────
+    // BUG REGRESSION: issue #415 QA still failed after first fix.
+    // Root cause: old sessions (before fix) have userId=null in localStorage.
+    // Guard condition `stored.userId && stored.userId !== userId` evaluates to
+    // false when stored.userId is null → data from previous user not cleared.
+
+    it('[TC-F01-sec-08] legacy session (no userId) with data is cleared for any logged-in user', () => {
+        // Arrange: simulate a legacy session created before the userId fix.
+        // It has blocks + siteId but userId was never stored (null).
+        const s = useBuilderStore.getState()
+        s.addBlock({ blockType: 'hero', headline: 'Legacy site' })
+        s.setSiteId('legacy-site-123')
+        s.setSiteName('Legacy Site')
+        // Deliberately do NOT call setUserId — simulates pre-fix session
+        expect(getState().userId).toBeNull()
+        expect(getState().blocks).toHaveLength(1)
+
+        // Act: a new user logs in and opens /builder/new
+        simulateSessionGuard('user-new')
+
+        // Assert: legacy unowned data must be cleared
+        expect(getState().blocks).toHaveLength(0)
+        expect(getState().siteId).toBeNull()
+        expect(getState().siteName).toBeNull()
+    })
+
+    // ── TC-F01-sec-09 ─────────────────────────────────────────────────────
+
+    it('[TC-F01-sec-09] fresh empty session (no userId, no data) is not cleared on first visit', () => {
+        // Arrange: completely empty store — brand new browser, no prior session
+        expect(getState().userId).toBeNull()
+        expect(getState().blocks).toHaveLength(0)
+        expect(getState().siteId).toBeNull()
+
+        // Act: user opens /builder/new for the first time
+        simulateSessionGuard('user-first')
+
+        // Assert: nothing to clear, userId is stamped correctly
+        expect(getState().userId).toBe('user-first')
+        expect(getState().blocks).toHaveLength(0)
     })
 })
