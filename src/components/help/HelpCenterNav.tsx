@@ -4,17 +4,19 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-
-const TABS = [
-  { name: '📋 Overview', href: '/help' },
-  { name: '❓ Q&A', href: '/help/qna' },
-  { name: '📚 Module Guides', href: '/help/modules' }
-]
+import { useI18n } from '@/i18n'
 
 export function HelpCenterNav() {
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
+  const { t } = useI18n()
+
+  const TABS = [
+    { name: t.help.nav.overview, href: '/help' },
+    { name: t.help.nav.qna, href: '/help/qna' },
+    { name: t.help.nav.modules, href: '/help/modules' }
+  ]
 
   const activeTab =
     TABS.find((t) =>

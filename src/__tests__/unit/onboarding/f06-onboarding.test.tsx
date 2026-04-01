@@ -134,11 +134,11 @@ describe('AIDiscoveryWizard', () => {
         // Act
         fireEvent.click(skipBtn)
 
-        // Assert: It should trigger API
+        // Assert: It should trigger API (POST /api/user/dismiss-wizard)
         await waitFor(() => {
             expect(global.fetch).toHaveBeenCalledWith('/api/user/dismiss-wizard', expect.objectContaining({
                 method: 'POST',
-                credentials: 'include'
+                credentials: 'include',
             }))
         })
         

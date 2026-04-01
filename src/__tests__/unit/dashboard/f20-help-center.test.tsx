@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
+import { I18nProvider } from '@/i18n'
+import '@testing-library/jest-dom'
 
 // ── Mock next/navigation (MUST be at top before imports) ─────────────────────
 vi.mock('next/navigation', () => ({
@@ -36,9 +38,17 @@ describe('[TC-F20.01] Default Help Center Overview Page', () => {
         vi.mocked(navigation.usePathname).mockReturnValue('/help')
     })
 
+    const renderPage = () => {
+        return render(
+            <I18nProvider>
+                <GuidelinePage />
+            </I18nProvider>
+        );
+    };
+
     it('renders Welcome heading with correct text', () => {
         // Arrange + Act
-        render(<GuidelinePage />)
+        renderPage()
 
         // Assert
         expect(
@@ -47,14 +57,14 @@ describe('[TC-F20.01] Default Help Center Overview Page', () => {
     })
 
     it('renders Key Features heading', () => {
-        render(<GuidelinePage />)
+        renderPage()
         expect(
             screen.getByRole('heading', { level: 3, name: /Key Features/i })
         ).toBeInTheDocument()
     })
 
     it('renders all 6 feature cards with correct titles', () => {
-        render(<GuidelinePage />)
+        renderPage()
 
         const expectedTitles = [
             'Dashboard',
@@ -71,7 +81,7 @@ describe('[TC-F20.01] Default Help Center Overview Page', () => {
     })
 
     it('renders all 6 feature card icon containers (emoji-based, aria-hidden)', () => {
-        render(<GuidelinePage />)
+        renderPage()
 
         // Icons are now emoji divs with aria-hidden="true".
         // Verify all 6 feature titles exist to confirm cards rendered correctly.
@@ -89,7 +99,7 @@ describe('[TC-F20.01] Default Help Center Overview Page', () => {
     })
 
     it('renders Need more help section with support email link', () => {
-        render(<GuidelinePage />)
+        renderPage()
 
         // Assert heading
         expect(
@@ -110,12 +120,20 @@ describe('[TC-F20.01] HelpCenterNav — Active tab highlight on /help', () => {
         vi.clearAllMocks()
     })
 
+    const renderNav = () => {
+        return render(
+            <I18nProvider>
+                <HelpCenterNav />
+            </I18nProvider>
+        );
+    };
+
     it('marks Overview tab as active on /help route (desktop)', () => {
         // Arrange
         vi.mocked(navigation.usePathname).mockReturnValue('/help')
 
         // Act
-        render(<HelpCenterNav />)
+        renderNav()
 
         // Assert — active tab link exists with /help href
         const overviewLinks = screen.getAllByRole('link', { name: /Overview/i })
@@ -125,7 +143,7 @@ describe('[TC-F20.01] HelpCenterNav — Active tab highlight on /help', () => {
 
     it('does not mark Q&A tab as active when on /help route', () => {
         vi.mocked(navigation.usePathname).mockReturnValue('/help')
-        render(<HelpCenterNav />)
+        renderNav()
 
         // The Q&A link should exist but not be the selected (active) one
         const qnaLinks = screen.getAllByRole('link', { name: /Q&A/i })
@@ -136,7 +154,7 @@ describe('[TC-F20.01] HelpCenterNav — Active tab highlight on /help', () => {
 
     it('marks Q&A tab as active on /help/qna route', () => {
         vi.mocked(navigation.usePathname).mockReturnValue('/help/qna')
-        render(<HelpCenterNav />)
+        renderNav()
 
         const qnaLinks = screen.getAllByRole('link', { name: /Q&A/i })
         expect(qnaLinks[0].className).toContain('text-blue-500')
@@ -153,7 +171,14 @@ describe('[TC-F20.01] HelpCenterNav — Mobile Dropdown exists', () => {
     })
 
     it('renders a dropdown button on mobile (aria-haspopup=listbox)', () => {
-        render(<HelpCenterNav />)
+        const renderNav = () => {
+            return render(
+                <I18nProvider>
+                    <HelpCenterNav />
+                </I18nProvider>
+            );
+        };
+        renderNav()
 
         // The mobile dropdown button with aria attributes
         const dropdownBtn = screen.getByRole('button', { name: /Overview/i })
@@ -162,7 +187,14 @@ describe('[TC-F20.01] HelpCenterNav — Mobile Dropdown exists', () => {
     })
 
     it('opens the dropdown options list when the mobile button is clicked', () => {
-        render(<HelpCenterNav />)
+        const renderNav = () => {
+            return render(
+                <I18nProvider>
+                    <HelpCenterNav />
+                </I18nProvider>
+            );
+        };
+        renderNav()
 
         const dropdownBtn = screen.getByRole('button', { name: /Overview/i })
 
@@ -191,12 +223,20 @@ describe('[TC-F20.02] Auth Guard — /help protected route (unit boundary)', () 
         vi.clearAllMocks()
     })
 
+    const renderPage = () => {
+        return render(
+            <I18nProvider>
+                <GuidelinePage />
+            </I18nProvider>
+        );
+    };
+
     it('Guideline page component renders successfully when mounted on client', () => {
         // The auth guard is handled by Next.js middleware / DashboardLayout,
         // NOT inside the page component itself. This test verifies the
         // component tree is structured correctly (children are rendered
         // only when the parent layout allows).
-        render(<GuidelinePage />)
+        renderPage()
 
         // The page should render — but in production the layout/middleware
         // blocks before this component is reached for anonymous users.

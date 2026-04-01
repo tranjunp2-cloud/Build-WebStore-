@@ -77,11 +77,19 @@ export default defineConfig({
                 'src/components/dashboard/AnalyticsEmptyState.tsx',
                 'src/components/dashboard/AnalyticsHeader.tsx',
                 'src/components/dashboard/DashboardBanner.tsx',
-                // Storefront sitemap XML route — tested via E2E
-                'src/app/sites/[slug]/sitemap.xml/**',
+                // Storefront pages — public-facing, tested via E2E
+                'src/app/sites/**',
                 // Editor and AI components — heavy DOM/events, tested via E2E
                 'src/components/editor/**',
                 'src/components/ai/**',
+                // Builder page client — heavy SSE + state, tested via E2E
+                'src/app/(builder)/**/AIBuilderPageClient.tsx',
+                // Preview route — HTML template composition, tested via E2E
+                'src/app/api/preview/[siteId]/route.ts',
+                // Onboarding client — form delegation, tested via E2E
+                'src/app/(frontend)/onboarding/OnboardingClient.tsx',
+                // Hooks requiring React render context — tested via component/E2E
+                'src/hooks/**',
             ],
             thresholds: {
                 // CI fails if coverage drops below these minimums

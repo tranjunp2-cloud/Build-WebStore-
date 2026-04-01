@@ -8,7 +8,7 @@ import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
-import { checkRateLimit } from '@/lib/rateLimit'
+import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -86,12 +86,21 @@ export async function POST(req: NextRequest) {
 
         const payload = await getPayload({ config })
 
-        // Rate Limit: 20 AI tasks per hour
-        const rateLimit = checkRateLimit(String(user.id), 20)
+        // Rate Limit: 5 requests/min (burst) + 20 requests/hour (sustained)
+        const rateLimit = checkTwoTierRateLimit(String(user.id), 5, 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
-                { error: 'Rate limit exceeded. Try again later.' },
-                { status: 429 }
+                {
+                    error: 'Rate limit exceeded. Please wait before trying again.',
+                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+                        'X-RateLimit-Remaining': '0',
+                    },
+                }
             )
         }
 
@@ -121,7 +130,7 @@ export async function POST(req: NextRequest) {
                 })
 
                 resolvedTenantId = String(recoveredTenant.id)
-                            } else {
+            } else {
                 // Auto-create tenant for legacy users without one
                 const firstName = (user as { firstName?: string }).firstName || (user as { name?: string }).name || 'My'
                 const newTenant = await payload.create({
@@ -141,7 +150,7 @@ export async function POST(req: NextRequest) {
                     } as Record<string, unknown>,
                 })
                 resolvedTenantId = String(newTenant.id)
-                            }
+            }
         }
 
         // FR-15: Rate Limit - Free tier is limited to 1 AI generation
@@ -152,7 +161,7 @@ export async function POST(req: NextRequest) {
             const currentCount = tenant.aiGenerationsCount || 0
             if (currentCount >= 1) {
                 return NextResponse.json(
-                    { 
+                    {
                         error: 'Tài khoản Free chỉ được tạo website bằng AI 1 lần duy nhất. Vui lòng nâng cấp gói cước để tiếp tục.',
                         code: 'PAYMENT_REQUIRED'
                     },
@@ -282,7 +291,7 @@ export async function POST(req: NextRequest) {
             if (heroBlock) {
                 // Attach the payload block's backgroundImage field to the uploaded media ID (for DB save)
                 heroBlock.backgroundImage = heroMedia.id
-                
+
                 // Update the corresponding SSE event so the frontend preview gets the full image object immediately
                 const heroEvent = events.find((e) => e.event === 'block_complete' && (e.data as { block?: AIBlock })?.block?.blockType === 'hero')
                 if (heroEvent && heroEvent.data && (heroEvent.data as { block?: AIBlock }).block) {
@@ -449,7 +458,7 @@ function applyGeneratedSiteNavigation(blocks: AIBlock[], businessName: string): 
                 logoText: block.logoText || businessName,
                 columns: block.columns.map((column: AIBlock | string) => {
                     if (typeof column === 'string') return { title: column, links: [] }
-                    
+
                     return {
                         ...column,
                         links: Array.isArray(column.links)
