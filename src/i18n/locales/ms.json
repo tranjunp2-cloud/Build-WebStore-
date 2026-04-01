@@ -118,7 +118,39 @@
         "step2Title": "Pilih templat",
         "step2Subtitle": "Pilih titik permulaan — anda boleh menyesuaikan semua nanti.",
         "step3Title": "Sesuaikan laman anda",
-        "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda."
+        "step3Subtitle": "Tambah butiran jenama anda untuk menjadikannya milik anda.",
+        "welcome": {
+            "title": "Selamat datang ke PrimeWeb",
+            "subtitle": "Mula bina kedai anda. Siapkannya dalam hanya 5 minit dengan AI kami.",
+            "createStore": "🚀 Cipta Kedai Saya dengan AI",
+            "skip": "Langkau & Pergi ke Papan Pemuka",
+            "step": "Langkah 1 dari 2: Cipta Kedai"
+        },
+        "wizard": {
+            "title": "✨ Terokai Kuasa AI",
+            "slides": {
+                "editor": {
+                    "title": "Editor AI",
+                    "description": "Sunting antara muka laman web melalui sembang - tiada kod diperlukan. AI memahami permintaan anda dan mengemas kini reka bentuk secara automatik."
+                },
+                "content": {
+                    "title": "Kandungan AI",
+                    "description": "Cipta penerangan produk, jana catatan blog SEO secara automatik. AI menulis kandungan profesional yang menarik pelanggan dan dioptimumkan untuk enjin carian."
+                },
+                "seo": {
+                    "title": "SEO AI",
+                    "description": "Optimumkan laman web anda secara automatik untuk meningkatkan kedudukan carian. AI menganalisis dan meningkatkan SEO, menjadikan laman web anda lebih mudah dicari di Google."
+                }
+            },
+            "footer": {
+                "skip": "Langkau",
+                "skipInstructions": "Langkau arahan",
+                "skipGuide": "Langkau panduan",
+                "goBack": "← Kembali",
+                "continue": "Seterusnya",
+                "explore": "Teroka CMS"
+            }
+        }
     },
     "email": {
         "welcome": {
@@ -602,7 +634,7 @@
     },
     "auth": {
         "welcomeBack": "Selamat kembali",
-        "signInSubtitle": "Log masuk untuk terus membina",
+        "signInSubtitle": "Log masuk untuk terus membina laman web anda",
         "email": "E-mel",
         "password": "Kata laluan",
         "forgotPassword": "Lupa kata laluan?",
@@ -617,7 +649,10 @@
             "passwordMinLength": "Kata laluan mestilah sekurang-kurangnya 8 aksara",
             "timeout": "Masa tamat. Sila cuba lagi.",
             "incorrect": "E-mel atau kata laluan tidak betul",
-            "connection": "Ralat sambungan. Sila cuba lagi."
+            "connection": "Ralat sambungan. Sila cuba lagi.",
+            "serviceAccountUI": "Akaun servis tidak dibenarkan mengakses UI web.",
+            "missingCredentials": "E-mel dan kata laluan diperlukan",
+            "accountLocked": "Akaun ini telah dikunci kerana terlalu banyak percubaan log masuk yang gagal."
         },
         "success": {
             "welcomeBackTitle": "Selamat kembali!",
@@ -642,15 +677,76 @@
             "signInLink": "Log masuk →"
         },
         "forgot": {
-            "title": "Lupa kata laluan?",
-            "subtitle": "Jangan risau, kami akan hantar pautan tetapan semula",
-            "submit": "Hantar pautan",
-            "submitting": "Menghantar pautan...",
-            "backLogin": "Kembali ke log masuk",
+            "title": "Lupa kata laluan",
+            "subtitle": "Masukkan e-mel anda untuk menerima pautan tetapan semula kata laluan.",
+            "emailLabel": "Alamat E-mel",
+            "emailPlaceholder": "ad@gmail.com",
+            "sendButton": "Hantar Pautan Pemulihan",
+            "submitting": "Menghantar...",
+            "backLogin": "Kembali ke Log Masuk",
+            "emailSentTitle": "E-mel Dihantar",
+            "emailSentDesc": "Jika e-mel wujud dalam sistem, pautan tetapan semula kata laluan telah dihantar.",
+            "emailSentBottom": "Semak peti masuk anda dan ikuti arahan untuk menetapkan semula kata laluan.",
             "checkEmail": "Semak e-mel anda",
             "sentTo": "Kami telah menghantar pautan tetapan semula ke",
             "notReceive": "Tidak menerima e-mel? Semak folder spam atau",
-            "tryAgain": "cuba lagi"
+            "tryAgain": "cuba lagi",
+            "submit": "Hantar pautan"
+        },
+        "reset": {
+            "title": "Tetapkan Semula Kata Laluan",
+            "subtitle": "Kata laluan baharu anda mestilah berbeza daripada yang sebelumnya",
+            "newPassword": "Kata laluan baharu",
+            "newPasswordPlaceholder": "Min. 8 aksara",
+            "confirmPassword": "Sahkan kata laluan baharu",
+            "confirmPlaceholder": "••••••••",
+            "submit": "Tetapkan Semula Kata Laluan",
+            "submitting": "Menetapkan semula kata laluan...",
+            "backLogin": "Kembali ke Log Masuk",
+            "reqLength": "Sekurang-kurangnya 8 aksara",
+            "reqUpper": "Satu huruf besar",
+            "reqNumber": "Satu nombor",
+            "strengthTooWeak": "Terlalu lemah",
+            "strengthWeak": "Lemah",
+            "strengthFair": "Sederhana",
+            "strengthGood": "Baik",
+            "strengthStrong": "Kuat",
+            "passwordMin": "Kata laluan mestilah sekurang-kurangnya 8 aksara",
+            "passwordMismatch": "Kata laluan tidak sepadan",
+            "invalidLink": "Pautan tetapan semula tidak sah",
+            "invalidLinkDesc": "Pautan tetapan semula kata laluan ini tidak sah atau telah tamat tempoh.",
+            "requestNewLink": "Minta pautan tetapan semula baharu",
+            "backToSignIn": "Kembali ke log masuk",
+            "linkExpired": "Pautan tetapan semula ini telah tamat tempoh. Sila minta pautan baharu.",
+            "successTitle": "Kata laluan berjaya ditetapkan semula! 🔐",
+            "successDesc": "Anda kini boleh log masuk dengan kata laluan baharu anda.",
+            "connectionError": "Ralat sambungan. Sila cuba lagi."
+        },
+        "otp": {
+            "title": "Pengesahan Dua Langkah",
+            "description": "Sila masukkan 6 digit OTP yang telah dihantar ke",
+            "confirmButton": "Sahkan OTP",
+            "verifying": "Mengesahkan...",
+            "resendCode": "Hantar semula kod",
+            "resending": "Menghantar...",
+            "after": "Selepas",
+            "expiresIn": "Kod tamat tempoh dalam",
+            "expired": "Kod telah tamat tempoh. Sila minta yang baharu.",
+            "backLogin": "Kembali ke Log Masuk",
+            "verificationFailed": "Pengesahan gagal",
+            "invalidCode": "Kod pengesahan tidak sah.",
+            "codeExpired": "Kod telah tamat tempoh. Sila minta yang baharu.",
+            "tooManyAttempts": "Terlalu banyak percubaan. Sila minta kod baharu.",
+            "noCodeFound": "Tiada kod pengesahan ditemui. Sila minta yang baharu.",
+            "connectionError": "Ralat sambungan. Sila cuba lagi.",
+            "successTitle": "Pengesahan berjaya!",
+            "successDesc": "Mengalihkan ke papan pemuka...",
+            "resendFailed": "Gagal menghantar semula kod",
+            "resendFailedRetry": "Gagal menghantar semula. Sila cuba lagi.",
+            "newCodeSent": "Kod baharu dihantar!",
+            "newCodeDesc": "Semak peti masuk e-mel anda.",
+            "noEmail": "Tiada e-mel disediakan",
+            "noEmailDesc": "Sila log masuk terlebih dahulu untuk mengesahkan identiti anda."
         }
     },
     "cms": {
@@ -685,6 +781,60 @@
         "result": {
             "one": "{count} keputusan",
             "other": "{count} keputusan"
+        }
+    },
+    "help": {
+        "nav": {
+            "overview": "📋 Gambaran Keseluruhan",
+            "qna": "❓ S&J",
+            "modules": "📚 Panduan Modul"
+        },
+        "overview": {
+            "title": "Pusat Bantuan",
+            "subtitle": "Ketahui cara menggunakan sistem pengurusan kedai dalam talian anda.",
+            "welcomeTitle": "👋 Selamat datang ke EchPrime!",
+            "welcomeDesc": "EchPrime CMS membantu anda menguruskan keseluruhan kedai dalam talian anda — daripada mencipta laman web, menguruskan produk, memproses pesanan hingga menganalisis hasil. Berikut adalah gambaran keseluruhan ciri utama.",
+            "featuresTitle": "🚀 Ciri Utama",
+            "features": {
+                "dashboardTitle": "Papan Pemuka",
+                "dashboardDesc": "Lihat gambaran masa nyata tentang hasil, pesanan, dan pelawat.",
+                "aiBuilderTitle": "Pembina Laman Web AI",
+                "aiBuilderDesc": "Cipta laman web jualan profesional dalam hanya 5 minit dengan AI.",
+                "productsTitle": "Produk",
+                "productsDesc": "Uruskan produk, harga RM, inventori, Lencana Halal, dan imej produk.",
+                "ordersTitle": "Pesanan",
+                "ordersDesc": "Proses pesanan COD, Pindahan Bank, DuitNow. Cetak invois dengan satu klik.",
+                "blogTitle": "Blog",
+                "blogDesc": "Tulis artikel blog mesra SEO untuk menarik lebih ramai pelanggan.",
+                "settingsTitle": "Tetapan Kedai",
+                "settingsDesc": "Konfigurasikan domain, pembayaran, dan jemput staf pentadbir."
+            },
+            "needHelpTitle": "📞 Perlukan lebih bantuan?",
+            "needHelpDesc": "Jika anda tidak menjumpai jawapan, hubungi pasukan sokongan kami melalui WhatsApp atau e-mel "
+        },
+        "qna": {
+            "searchPlaceholder": "Cari soalan...",
+            "emptyTitle": "Tiada jawapan dijumpai",
+            "emptyDesc": "Cuba kata kunci lain atau hubungi sokongan melalui WhatsApp.",
+            "categories": {
+                "productsTitle": "🛍️ Pengurusan Produk",
+                "qAddProduct": "Bagaimana cara menambah produk baru?",
+                "aAddProduct": "Pergi ke menu <strong>Produk</strong> → klik <strong>[+ Tambah Produk]</strong> di bahagian atas kanan. Isi nama, harga RM, penerangan, muat naik imej produk (maksimum 10, dicadangkan format WebP). Klik <strong>Simpan</strong>.",
+                "qMultipleImages": "Bagaimana memuat naik pelbagai imej?",
+                "aMultipleImages": "Seret dan lepas imej ke kawasan muat naik, atau gunakan <strong>Semak Imbas Fail</strong>. Maksimum 10 imej, ≤ 5MB setiap satu. Format: JPG, PNG, WebP.",
+                "qHalal": "Di manakah Lencana Halal dipaparkan?",
+                "aHalal": "Lencana Halal (JAKIM) dipaparkan pada <strong>Kad Produk</strong> dan <strong>Halaman Perincian Produk</strong> di kedai. Aktifkannya dalam borang produk → bahagian <strong>Pensijilan Halal</strong>.",
+                "ordersTitle": "🛒 Pengurusan Pesanan",
+                "qCod": "Bagaimana pesanan COD diproses?",
+                "aCod": "Pesanan COD akan mempunyai status <strong>Menunggu Pembayaran</strong> sehingga penghantar mengesahkan kutipan. Anda boleh mengemas kini status secara manual dalam perincian pesanan → <strong>Tandakan sebagai Dibayar</strong>.",
+                "qInvoice": "Bagaimana mencetak slip pembungkusan / invois?",
+                "aInvoice": "Pergi ke <strong>Pesanan</strong> → pilih pesanan → klik <strong>Cetak Invois</strong> atau <strong>Cetak Slip Pembungkusan</strong>. Sistem akan menjana PDF untuk dicetak.",
+                "paymentsTitle": "💳 Pembayaran",
+                "qFpx": "Apakah kaedah pembayaran yang disokong?",
+                "aFpx": "EchPrime menyokong: <strong>FPX</strong> (perbankan dalam talian Malaysia), <strong>Kad Kredit/Debit</strong> (Visa, Mastercard), <strong>DuitNow QR</strong>, <strong>COD</strong> (Tunai Semasa Penghantaran), dan <strong>Pemindahan Bank</strong> manual.",
+                "qSst": "Adakah SST 6% dikira secara automatik?",
+                "aSst": "Ya, apabila anda mengaktifkan <strong>SST</strong> dalam <strong>Tetapan Kedai → Konfigurasi Cukai</strong>, sistem mengira 6% SST secara automatik dan memaparkannya dengan jelas kepada pembeli."
+            }
         }
     }
 }

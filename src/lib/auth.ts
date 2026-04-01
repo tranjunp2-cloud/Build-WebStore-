@@ -10,22 +10,69 @@ import type { User } from 'payload'
  *
  * @returns The user object or null if not authenticated
  */
-export async function getCurrentUser() {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('payload-token')?.value
+export async function getCurrentUser(req?: Request) {
+    let token: string | undefined
+
+    // 1. Try Authorization header first (for API calls)
+    if (req) {
+        const authHeader = req.headers.get('authorization')
+        if (authHeader?.startsWith('Bearer ') || authHeader?.startsWith('JWT ')) {
+            token = authHeader.split(' ')[1]
+        }
+    }
+
+    // 2. Fallback to cookie (for Web UI)
+    if (!token) {
+        const cookieStore = await cookies()
+        token = cookieStore.get('payload-token')?.value
+    }
 
     if (!token) return null
 
     try {
         const payload = await getPayload({ config })
 
+        // Try standard Payload auth first
         const authResult = await payload.auth({
             headers: new Headers({
                 Authorization: `JWT ${token}`,
             }),
         })
 
-        return authResult?.user || null
+        if (authResult?.user) {
+            return authResult.user
+        }
+
+        // Fallback: decode custom JWT (from verify-otp endpoint)
+        // The verify-otp creates a jose-signed JWT with {id, email, collection, mfa_verified}
+        // which payload.auth() cannot verify — so we decode it manually
+        const payloadSecret = process.env.PAYLOAD_SECRET
+        if (!payloadSecret) {
+            console.error('getCurrentUser: PAYLOAD_SECRET is not defined. Cannot decode custom JWT.')
+            return null
+        }
+
+        const { jwtVerify } = await import('jose')
+        const secret = new TextEncoder().encode(payloadSecret)
+        const { payload: decoded } = await jwtVerify(token, secret)
+
+        const isIdValid =
+            typeof decoded.id === 'number' ||
+            (typeof decoded.id === 'string' && /^[a-zA-Z0-9-]+$/.test(decoded.id))
+
+        if (
+            isIdValid &&
+            decoded.collection === 'users' &&
+            decoded.mfa_verified === true
+        ) {
+            const user = await payload.findByID({
+                collection: 'users',
+                id: decoded.id as string | number,
+            })
+            return user || null
+        }
+
+        return null
     } catch (error) {
         console.error('getCurrentUser error:', error)
         return null
@@ -54,7 +101,7 @@ export function withAuth<TContext extends { params: Promise<any> } = never>(
     handler: (user: User, req: Request, ctx: TContext) => Promise<NextResponse>,
 ) {
     return async (req: Request, ctx: TContext): Promise<NextResponse> => {
-        const user = await getCurrentUser()
+        const user = await getCurrentUser(req)
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }

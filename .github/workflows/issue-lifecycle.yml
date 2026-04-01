@@ -22,7 +22,7 @@ jobs:
     name: 'Board: Auto-manage'
     if: >-
       github.event_name == 'issues' &&
-      (github.event.action == 'opened' || github.event.action == 'assigned' || github.event.action == 'closed')
+      (github.event.action == 'opened' || github.event.action == 'assigned' || github.event.action == 'closed' || github.event.action == 'reopened')
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -83,6 +83,7 @@ jobs:
             if (action === 'opened') targetStatus = 'Backlog';
             else if (action === 'assigned') targetStatus = 'In Progress';
             else if (action === 'closed') targetStatus = 'Done';
+            else if (action === 'reopened') targetStatus = 'Re-Open';
 
             const statusOption = statusField.options.find(o => o.name === targetStatus);
             if (!statusOption) {
@@ -154,47 +155,45 @@ jobs:
             const labelMap = {
               'status:ready': 'In Progress',
               'qa:failed': 'Re-Open',
+              'qa:passed': 'Done',
               'review:rejected': 'Backlog',
             };
 
             const targetStatus = labelMap[label];
 
-            // ── Handle qa:passed: remove qa:pending label ──
-            if (label === 'qa:passed') {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner, repo,
-                  issue_number: issue.number,
-                  name: 'qa:pending',
-                });
-                console.log(`Removed qa:pending from #${issue.number}`);
-              } catch (e) {
-                console.log(`Could not remove qa:pending: ${e.message}`);
+            // ── Helper: remove labels safely (ignore 404, log real errors) ──
+            async function removeLabels(labels) {
+              for (const name of labels) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner, repo,
+                    issue_number: issue.number,
+                    name,
+                  });
+                  console.log(`Removed ${name} from #${issue.number}`);
+                } catch (e) {
+                  if (e.status === 404) {
+                    console.log(`Label ${name} not present on #${issue.number}, skipping`);
+                  } else {
+                    console.warn(`Failed to remove ${name} from #${issue.number}: ${e.message}`);
+                  }
+                }
               }
+            }
 
+            // ── Handle qa:passed: remove conflicting labels + comment ──
+            if (label === 'qa:passed') {
+              await removeLabels(['qa:pending', 'qa:failed']);
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,
                 body: `✅ **QA Passed!** Issue sẵn sàng close → Done.`,
               });
-              return;
             }
 
-            if (!targetStatus) {
-              console.log(`Label "${label}" has no status mapping, skipping`);
-              return;
-            }
-
-            // ── Handle qa:failed: re-assign dev + auto bug report template ──
+            // ── Handle qa:failed: remove conflicting labels + bug report ──
             if (label === 'qa:failed') {
-              // Remove qa:pending if present
-              try {
-                await github.rest.issues.removeLabel({
-                  owner, repo,
-                  issue_number: issue.number,
-                  name: 'qa:pending',
-                });
-              } catch (e) { /* label might not exist */ }
+              await removeLabels(['qa:pending', 'qa:passed']);
 
               // Find linked PRs for context
               const timeline = await github.rest.issues.listEventsForTimeline({
@@ -278,8 +277,9 @@ jobs:
               console.log(`Issue #${issue.number} → QA Failed → bug report template posted`);
             }
 
-            // ── Handle review:rejected: notify PM ──
+            // ── Handle review:rejected: notify PM + clean status:ready ──
             if (label === 'review:rejected') {
+              await removeLabels(['status:ready']);
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,
@@ -290,6 +290,7 @@ jobs:
 
             // ── Handle status:ready: UIUX+BA approved ──
             if (label === 'status:ready') {
+              await removeLabels(['review:rejected']);
               await github.rest.issues.createComment({
                 owner, repo,
                 issue_number: issue.number,

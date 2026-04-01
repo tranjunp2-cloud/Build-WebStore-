@@ -76,6 +76,25 @@ describe('builderStore (Zustand)', () => {
         it('has null error', () => {
             expect(getState().error).toBeNull()
         })
+
+        it('[TC-builder-store-01] has null userId (no session owner by default)', () => {
+            expect(getState().userId).toBeNull()
+        })
+    })
+
+    // ── setUserId ────────────────────────────────────────────────────────
+
+    describe('setUserId', () => {
+        it('[TC-builder-store-02] stores session owner userId', () => {
+            act('setUserId', 'user-abc-123')
+            expect(getState().userId).toBe('user-abc-123')
+        })
+
+        it('[TC-builder-store-03] overwrites userId when called again', () => {
+            act('setUserId', 'user-a')
+            act('setUserId', 'user-b')
+            expect(getState().userId).toBe('user-b')
+        })
     })
 
     // ── setBusinessInfo ──────────────────────────────────────────────────
@@ -292,6 +311,7 @@ describe('builderStore (Zustand)', () => {
             expect(getState().siteName).toBeNull()
             expect(getState().progress).toEqual({ step: '', label: '', progress: 0 })
             expect(getState().error).toBeNull()
+            expect(getState().userId).toBeNull()
         })
 
         it('allows re-use after reset', () => {

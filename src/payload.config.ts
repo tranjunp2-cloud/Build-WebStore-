@@ -3,6 +3,7 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { createRequire } from 'module'
 import sharp from 'sharp'
 
 import { Tenants } from './collections/Tenants'
@@ -23,6 +24,7 @@ import { Categories } from './collections/Categories'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+const require = createRequire(import.meta.url)
 
 /** Trả về connection string (bỏ sslmode để tránh parse ghi đè pool.ssl). */
 function getDatabaseConnectionString(): string {
@@ -41,6 +43,14 @@ function isRemoteDatabase(): boolean {
     !raw.includes('postgres:')
   )
 }
+
+/** Schema push is expensive in dev Docker and can block auth/API requests.
+ * Enable it explicitly only when you intend to sync schema changes.
+ */
+function shouldPushSchema(): boolean {
+  return process.env.PAYLOAD_PUSH_SCHEMA === 'true'
+}
+
 
 export default buildConfig({
   serverURL: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
@@ -108,9 +118,10 @@ export default buildConfig({
       // Truyền rõ ở đây vì parse(connectionString) có thể ghi đè nếu URL còn sslmode.
       ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: false } } : {}),
     },
-    // push: true auto-creates tables when NODE_ENV !== 'production'.
-    // For staging (NODE_ENV=development via DO env var), this creates tables on first run.
-    push: true,
+    // Push schema only when explicitly requested to avoid expensive sync on every
+    // local Docker request. Use `PAYLOAD_PUSH_SCHEMA=true` or the db push script
+    // when you intentionally need a schema update.
+    push: shouldPushSchema(),
   }),
   sharp,
   plugins: [

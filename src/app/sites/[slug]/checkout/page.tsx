@@ -154,7 +154,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             }
 
             // Step 2: Create order
-            const payload: any = {
+            const payload: Record<string, unknown> = {
                 siteId,
                 items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
                 customer: {
@@ -192,9 +192,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                 // AC-2: Cart preserved on error
                 setError(data.error?.message || 'Failed to place order')
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             // AC-2: Cart preserved on error
-            setError(err.message || 'Network error. Please try again.')
+            setError(err instanceof Error ? err.message : 'Network error. Please try again.')
         } finally {
             setIsPlacing(false)
         }
@@ -436,6 +436,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
                                     {proofPreview ? (
                                         <div style={{ position: 'relative', display: 'inline-block' }}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img src={proofPreview} alt="Payment proof"
                                                 style={{
                                                     maxWidth: '100%', maxHeight: '200px', borderRadius: '12px',
@@ -529,8 +530,11 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 }}>
                                     {item.imageUrl ? (
-                                        <img src={item.imageUrl} alt={item.name}
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        <>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={item.imageUrl} alt={item.name}
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        </>
                                     ) : (
                                         <span style={{ fontSize: '16px', opacity: 0.2 }}>📦</span>
                                     )}

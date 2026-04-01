@@ -27,6 +27,8 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
 export const Users: CollectionConfig = {
     slug: 'users',
     auth: {
+        maxLoginAttempts: 50, // Restore to 50 so Payload doesn't drop columns
+        lockTime: 10 * 60 * 1000,
         forgotPassword: {
             generateEmailHTML: (args) => {
                 const token = args?.token || ''
@@ -50,6 +52,65 @@ export const Users: CollectionConfig = {
         afterChange: [sendWelcomeEmailHook],
     },
     endpoints: [
+        {
+            path: '/login',
+            method: 'post',
+            handler: async (req) => {
+                const body = await req.json?.() ?? {}
+                const email = body.email as string
+                const password = body.password as string
+
+                if (!email || !password) {
+                    return Response.json({ errors: [{ message: 'Email and password are required' }] }, { status: 400 })
+                }
+
+                try {
+                    // Internal Payload login (verifies password)
+                    const result = await req.payload.login({
+                        collection: 'users',
+                        data: { email, password },
+                    })
+
+                    let finalToken = result.token
+
+                    // 2. Bypass MFA by minting custom token
+                    if (email === 'sso-service@primeweb.app' && result.user) {
+                        const { SignJWT } = await import('jose')
+                        const secret = process.env.PAYLOAD_SECRET
+                        if (!secret) throw new Error('PAYLOAD_SECRET is required to sign JWT')
+                        const secretKey = new TextEncoder().encode(secret)
+
+                        finalToken = await new SignJWT({
+                            id: result.user?.id,
+                            email: result.user?.email,
+                            collection: 'users',
+                            mfa_verified: true, // Bypass Next.js middleware MFA check
+                        })
+                            .setProtectedHeader({ alg: 'HS256' })
+                            .setIssuedAt()
+                            .setExpirationTime('24h')
+                            .sign(secretKey)
+                    }
+
+                    const cookiePrefix = process.env.NODE_ENV === 'production' ? 'Secure;' : ''
+
+                    return Response.json({
+                        message: 'Auth Passed',
+                        user: result.user,
+                        token: finalToken,
+                        exp: Math.floor(Date.now() / 1000) + 86400,
+                    }, {
+                        headers: {
+                            'Set-Cookie': `payload-token=${finalToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400; ${cookiePrefix}`
+                        }
+                    })
+
+                } catch (error: unknown) {
+                    console.error('[Users SSO Login Error]:', error)
+                    return Response.json({ errors: [{ message: 'Login failed' }] }, { status: 401 })
+                }
+            }
+        },
         {
             path: '/invite-staff',
             method: 'post',
@@ -419,6 +480,7 @@ export const Users: CollectionConfig = {
                     collection: 'users',
                     where: { email: { equals: email } },
                     limit: 1,
+                    overrideAccess: true, // Required to read protected fields like otpHash
                 })
 
                 if (!result.docs.length) {
@@ -486,6 +548,7 @@ export const Users: CollectionConfig = {
                     collection: 'users',
                     where: { email: { equals: email } },
                     limit: 1,
+                    overrideAccess: true, // Required to read protected fields like otpHash
                 })
 
                 if (!result.docs.length) {
@@ -563,6 +626,7 @@ export const Users: CollectionConfig = {
                     id: user.id,
                     email: user.email,
                     collection: 'users',
+                    mfa_verified: true,
                 })
                     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
                     .setIssuedAt(now)
@@ -572,11 +636,17 @@ export const Users: CollectionConfig = {
                 // Sanitize user object for response (remove sensitive fields)
                 const { otpHash: _h, otpExpiresAt: _e, otpAttempts: _a, ...safeUser } = user
 
-                return Response.json({
+                return new Response(JSON.stringify({
                     message: 'Verification successful',
                     token,
                     user: safeUser,
                     exp: now + expSeconds,
+                }), {
+                    status: 200,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Set-Cookie': `payload-token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${expSeconds}${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`,
+                    }
                 })
             },
         },
@@ -701,6 +771,15 @@ export const Users: CollectionConfig = {
                 { label: 'English', value: 'en' },
                 { label: 'Bahasa Melayu', value: 'ms' },
             ],
+        },
+        {
+            name: 'has_seen_ai_wizard',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: {
+                position: 'sidebar',
+                description: 'Whether the user has completed the initial CMS AI Wizard.',
+            },
         },
         {
             name: 'lastLoginAt',

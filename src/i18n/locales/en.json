@@ -118,7 +118,39 @@
         "step2Title": "Choose a template",
         "step2Subtitle": "Pick a starting point — you can customize everything later.",
         "step3Title": "Customize your site",
-        "step3Subtitle": "Add your brand details to make it yours."
+        "step3Subtitle": "Add your brand details to make it yours.",
+        "welcome": {
+            "title": "Welcome to PrimeWeb",
+            "subtitle": "Start building your store. Complete it in just 5 minutes with our AI.",
+            "createStore": "🚀 Create My Store with AI",
+            "skip": "Skip & Go to Dashboard",
+            "step": "Step 1 of 2: Create Store"
+        },
+        "wizard": {
+            "title": "✨ Discover the Power of AI",
+            "slides": {
+                "editor": {
+                    "title": "AI Editor",
+                    "description": "Edit website interfaces through chat - no coding required. AI understands your requests and automatically updates the design in real-time."
+                },
+                "content": {
+                    "title": "AI Content",
+                    "description": "Create product descriptions, automatically generate SEO blog posts. AI writes professional content that attracts customers and is optimized for search engines."
+                },
+                "seo": {
+                    "title": "AI SEO",
+                    "description": "Automatically optimize your website to improve search rankings. AI analyzes and enhances SEO, making your website easier to find on Google."
+                }
+            },
+            "footer": {
+                "skip": "Skip",
+                "skipInstructions": "Skip instructions",
+                "skipGuide": "Skip the guide",
+                "goBack": "← Go back",
+                "continue": "Continue",
+                "explore": "Explore CMS"
+            }
+        }
     },
     "email": {
         "welcome": {
@@ -602,7 +634,7 @@
     },
     "auth": {
         "welcomeBack": "Welcome back",
-        "signInSubtitle": "Sign in to continue building",
+        "signInSubtitle": "Sign in to continue building your website",
         "email": "Email",
         "password": "Password",
         "forgotPassword": "Forgot password?",
@@ -617,7 +649,10 @@
             "passwordMinLength": "Password must be at least 8 characters",
             "timeout": "Request timed out. Please try again.",
             "incorrect": "Incorrect email or password",
-            "connection": "Connection error. Please try again."
+            "connection": "Connection error. Please try again.",
+            "serviceAccountUI": "Service accounts cannot access the web UI.",
+            "missingCredentials": "Email and password are required",
+            "accountLocked": "This user is locked due to having too many failed login attempts."
         },
         "success": {
             "welcomeBackTitle": "Welcome back!",
@@ -642,15 +677,76 @@
             "signInLink": "Sign in →"
         },
         "forgot": {
-            "title": "Forgot password?",
-            "subtitle": "No worries, we'll send you a reset link",
-            "submit": "Send reset link",
-            "submitting": "Sending reset link...",
-            "backLogin": "Back to sign in",
+            "title": "Forgot password",
+            "subtitle": "Enter your email to receive a password reset link.",
+            "emailLabel": "Email Address",
+            "emailPlaceholder": "ad@gmail.com",
+            "sendButton": "Send Recovery Link",
+            "submitting": "Sending...",
+            "backLogin": "Back to Login",
+            "emailSentTitle": "Email Sent",
+            "emailSentDesc": "If the email exists in the system, a password reset link has been sent.",
+            "emailSentBottom": "Check your inbox and follow the instructions to reset your password.",
             "checkEmail": "Check your email",
             "sentTo": "We've sent a password reset link to",
             "notReceive": "Didn't receive the email? Check your spam folder or",
-            "tryAgain": "try again"
+            "tryAgain": "try again",
+            "submit": "Send reset link"
+        },
+        "reset": {
+            "title": "Reset Password",
+            "subtitle": "Your new password must be different from previous ones",
+            "newPassword": "New password",
+            "newPasswordPlaceholder": "Min. 8 characters",
+            "confirmPassword": "Confirm new password",
+            "confirmPlaceholder": "••••••••",
+            "submit": "Reset Password",
+            "submitting": "Resetting password...",
+            "backLogin": "Back to Login",
+            "reqLength": "At least 8 characters",
+            "reqUpper": "One uppercase letter",
+            "reqNumber": "One number",
+            "strengthTooWeak": "Too weak",
+            "strengthWeak": "Weak",
+            "strengthFair": "Fair",
+            "strengthGood": "Good",
+            "strengthStrong": "Strong",
+            "passwordMin": "Password must be at least 8 characters",
+            "passwordMismatch": "Passwords don't match",
+            "invalidLink": "Invalid reset link",
+            "invalidLinkDesc": "This password reset link is invalid or has expired.",
+            "requestNewLink": "Request new reset link",
+            "backToSignIn": "Back to sign in",
+            "linkExpired": "This reset link has expired. Please request a new one.",
+            "successTitle": "Password reset successful! 🔐",
+            "successDesc": "You can now sign in with your new password.",
+            "connectionError": "Connection error. Please try again."
+        },
+        "otp": {
+            "title": "Two-Step Verification",
+            "description": "Please enter the 6-digit OTP that was sent to",
+            "confirmButton": "Confirm OTP",
+            "verifying": "Verifying...",
+            "resendCode": "Resend code",
+            "resending": "Sending...",
+            "after": "After",
+            "expiresIn": "Code expires in",
+            "expired": "Code has expired. Please request a new one.",
+            "backLogin": "Back to Login",
+            "verificationFailed": "Verification failed",
+            "invalidCode": "Invalid verification code.",
+            "codeExpired": "Code has expired. Please request a new one.",
+            "tooManyAttempts": "Too many attempts. Please request a new code.",
+            "noCodeFound": "No verification code found. Please request a new one.",
+            "connectionError": "Connection error. Please try again.",
+            "successTitle": "Verification successful!",
+            "successDesc": "Redirecting to dashboard...",
+            "resendFailed": "Failed to resend code",
+            "resendFailedRetry": "Failed to resend. Please try again.",
+            "newCodeSent": "New code sent!",
+            "newCodeDesc": "Check your email inbox.",
+            "noEmail": "No email provided",
+            "noEmailDesc": "Please log in first to verify your identity."
         }
     },
     "cms": {
@@ -685,6 +781,60 @@
         "result": {
             "one": "{count} result",
             "other": "{count} results"
+        }
+    },
+    "help": {
+        "nav": {
+            "overview": "📋 Overview",
+            "qna": "❓ Q&A",
+            "modules": "📚 Module Guides"
+        },
+        "overview": {
+            "title": "Help Center",
+            "subtitle": "Learn how to use your online store management system.",
+            "welcomeTitle": "👋 Welcome to EchPrime!",
+            "welcomeDesc": "EchPrime CMS helps you manage your entire online store — from creating websites, managing products, processing orders to analyzing revenue. Here is an overview of the main features.",
+            "featuresTitle": "🚀 Key Features",
+            "features": {
+                "dashboardTitle": "Dashboard",
+                "dashboardDesc": "View real-time overview of revenue, orders, and visitors.",
+                "aiBuilderTitle": "AI Website Builder",
+                "aiBuilderDesc": "Create a professional sales website in just 5 minutes with AI.",
+                "productsTitle": "Products",
+                "productsDesc": "Manage products, RM prices, inventory, Halal Badge, and product images.",
+                "ordersTitle": "Orders",
+                "ordersDesc": "Process COD, Bank Transfer, DuitNow orders. Print invoices with one click.",
+                "blogTitle": "Blog",
+                "blogDesc": "Write SEO-friendly blog posts to attract more customers.",
+                "settingsTitle": "Store Settings",
+                "settingsDesc": "Configure domain, payments, and invite admin staff."
+            },
+            "needHelpTitle": "📞 Need more help?",
+            "needHelpDesc": "If you can't find the answer, contact our support team via WhatsApp or email "
+        },
+        "qna": {
+            "searchPlaceholder": "Search questions...",
+            "emptyTitle": "No answers found",
+            "emptyDesc": "Try different keywords or contact support via WhatsApp.",
+            "categories": {
+                "productsTitle": "🛍️ Product Management",
+                "qAddProduct": "How to add new products?",
+                "aAddProduct": "Go to <strong>Products</strong> menu → click <strong>[+ Add Product]</strong> at top right. Fill in name, RM price, description, upload product images (max 10, WebP recommended). Click <strong>Save</strong>.",
+                "qMultipleImages": "How to upload multiple images?",
+                "aMultipleImages": "Drag and drop images into upload area, or use <strong>Browse Files</strong>. Max 10 images, ≤ 5MB each. Formats: JPG, PNG, WebP.",
+                "qHalal": "Where does Halal Badge display?",
+                "aHalal": "Halal Badge (JAKIM) shows on <strong>Product Card</strong> and <strong>Product Detail Page</strong> at storefront. Enable it in product form → <strong>Halal Certification</strong> section.",
+                "ordersTitle": "🛒 Order Management",
+                "qCod": "How are COD orders processed?",
+                "aCod": "COD orders will have a <strong>Pending Payment</strong> status until shipper confirms collection. You can manually update status in order details → <strong>Mark as Paid</strong>.",
+                "qInvoice": "How to print packing slips/invoices?",
+                "aInvoice": "Go to <strong>Orders</strong> → select order → click <strong>Print Invoice</strong> or <strong>Print Packing Slip</strong>. The system will generate a PDF for printing.",
+                "paymentsTitle": "💳 Payments",
+                "qFpx": "Which payment methods are supported?",
+                "aFpx": "EchPrime supports: <strong>FPX</strong> (Malaysia online banking), <strong>Credit/Debit Card</strong> (Visa, Mastercard), <strong>DuitNow QR</strong>, <strong>COD</strong> (Cash on Delivery), and manual <strong>Bank Transfer</strong>.",
+                "qSst": "Is SST 6% calculated automatically?",
+                "aSst": "Yes, when you enable <strong>SST</strong> in <strong>Store Settings → Tax Configuration</strong>, the system calculates 6% SST automatically and displays it clearly to the buyer."
+            }
         }
     }
 }

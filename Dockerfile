@@ -50,6 +50,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # DB setup script: checks permissions, creates schema/tables, then starts server
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/db-setup.js ./db-setup.js
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/bootstrap-seed.js ./bootstrap-seed.js
 # Runtime polyfill for File/Blob (required by Payload/undici for RSC rendering)
 COPY --from=builder --chown=nextjs:nodejs /app/node-polyfill.js ./node-polyfill.js
 

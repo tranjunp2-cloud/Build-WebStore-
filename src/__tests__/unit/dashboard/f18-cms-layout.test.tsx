@@ -34,6 +34,10 @@ vi.mock('@/components/dashboard/NotificationBell', () => ({
     NotificationBell: () => <div data-testid="notification-bell">Bell</div>,
 }))
 
+vi.mock('@/app/(dashboard)/actions', () => ({
+    logoutAction: vi.fn(() => Promise.resolve({ success: true })),
+}))
+
 // ── Imports ─────────────────────────────────────────────────────────────
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
 import { TopHeader } from '@/components/dashboard/TopHeader'
@@ -179,7 +183,7 @@ describe('F18 CMS Core Layout', () => {
             // Click Logout
             fireEvent.click(screen.getByText('Logout'))
             
-            expect(global.fetch).toHaveBeenCalledWith('/api/users/logout', expect.any(Object))
+            expect(global.fetch).toHaveBeenCalledWith('/api/auth/logout', expect.any(Object))
             
             await waitFor(() => {
                 expect(window.location.href).toBe('/login')

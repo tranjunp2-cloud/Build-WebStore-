@@ -34,6 +34,9 @@ export type BusinessInfo = {
 }
 
 type BuilderState = {
+    // Session owner — used to detect cross-user localStorage contamination
+    userId: string | null
+
     // Business Info (Step 1)
     businessInfo: BusinessInfo | null
     step: 'info' | 'chat' | 'done'
@@ -70,6 +73,8 @@ type BuilderActions = {
     setSiteName: (name: string) => void
     setBlocks: (blocks: any[]) => void
 
+    // Session
+    setUserId: (userId: string) => void
 
     // Error
     setError: (error: BuilderState['error']) => void
@@ -79,6 +84,7 @@ type BuilderActions = {
 }
 
 const INITIAL_STATE: BuilderState = {
+    userId: null,
     businessInfo: null,
     step: 'info',
     status: 'idle',
@@ -156,6 +162,8 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
 
             setBlocks: (blocks) => set({ blocks }),
 
+            setUserId: (userId) => set({ userId }),
+
             setError: (error) => set({ error, status: 'error' }),
 
             reset: () => set(INITIAL_STATE),
@@ -165,6 +173,7 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
             storage: createJSONStorage(getSafeStorage),
             // Only persist necessary state, reset streaming status and progress
             partialize: (state) => ({
+                userId: state.userId,
                 businessInfo: state.businessInfo,
                 step: state.step,
                 status: state.status === 'error' ? 'idle' : state.status,
@@ -177,6 +186,13 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                 // Never persist error — it may contain sensitive server details
                 error: null,
             }),
+            // Clear old cached errors from localStorage (before this fix)
+            onRehydrateStorage: () => (state) => {
+                if (state?.error) {
+                    state.error = null
+                    state.status = state.status === 'error' ? 'idle' : state.status
+                }
+            },
         }
     )
 )

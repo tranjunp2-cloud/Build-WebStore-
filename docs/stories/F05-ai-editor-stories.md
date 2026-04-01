@@ -2,7 +2,6 @@
 
 > **Feature:** F05 — AI Editor (Split Screen)
 > **Wave:** 3 | **Priority:** P0 🌟 | **Ref PRD:** [F05-ai-editor.md](../prd/F05-ai-editor.md)
-> *Lưu ý: UX/UI Mobile Web Responsive/Adaptive được tách tại [F05-mobile-responsive-ai-editor-stories.md](./F05-mobile-responsive-ai-editor-stories.md).*
 
 ---
 
@@ -622,5 +621,53 @@ THEN  AI sẽ phân tích toàn bộ text content hiện có trên trang
 ### Definition of Done
 - [ ] 9-Point Checklist pass.
 - [ ] Dữ liệu SEO lưu thành công vào Database field của riêng page đó (`pages.metaTitle`, `pages.metaDescription`).
+
+---
+
+## US-F05-14: Mobile Web UX — Adaptive Editor Interface
+
+**Wave 3** | **P0** | **M** | **Status:** Ready
+
+### Story
+
+```
+As a   store owner on mobile
+I want to edit my website with an optimized mobile interface
+So that I can effectively build and tweak my store using my phone without the cluttered split-screen layout
+```
+
+### Acceptance Criteria
+
+#### AC-1: Live Preview Fullscreen & FAB Chat
+```gherkin
+GIVEN user truy cập Editor qua điện thoại di động
+WHEN  tải trang
+THEN  giao diện Split-Screen bị vô hiệu hóa
+  AND phần Live Preview của website chiếm 100% tỷ lệ khung hình
+  AND nút mở AI Chat xuất hiện dưới dạng Floating Action Button (FAB) ở góc phải dưới
+```
+
+#### AC-2: Tap-to-Add Component (No Drag & Drop)
+```gherkin
+GIVEN user đang ở chế độ xem Mobile Editor
+WHEN  mở thư viện Component (Component Library)
+THEN  tính năng kéo thả (Drag & Drop) bị tắt
+WHEN  chạm (Tap) vào một Block bất kỳ trong thư viện
+THEN  Block đó tự động được Insert (chèn) xuống dưới cùng của giao diện
+  AND màn hình tự động cuộn (scroll) tới vị trí block vừa được thêm
+```
+
+#### AC-3: Bottom Sheet Formatting & Commands
+```gherkin
+GIVEN user đang xem Preview trên mobile
+WHEN  chạm (Tap) vào một element muốn Edit (text, ảnh)
+THEN  công cụ Formatting (Rich text) và AI command hiện lên dưới dạng Bottom Sheet (vuốt từ dưới lên)
+  AND không sử dụng floating popup như giao diện Desktop để đảm bảo công thái học
+```
+
+### Definition of Done
+- [ ] 9-Point Checklist pass cho Mobile layout.
+- [ ] Không có trigger scroll gãy nát khi mở Bottom Sheet.
+- [ ] Các tính năng Undo/Redo/Auto-save hoạt động mượt không block UI.
 
 

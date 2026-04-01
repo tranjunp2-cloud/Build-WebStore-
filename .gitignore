@@ -59,3 +59,4 @@ _agent/
 
 # Playwright auth state
 e2e/.auth/
+coverage/

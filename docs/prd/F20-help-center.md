@@ -88,7 +88,7 @@ SO THAT I can quickly learn how to use the system and troubleshoot issues indepe
 | FR-03 | Mỗi module phải có trang hướng dẫn riêng kèm text và screenshots | US-F20-03 | P1 | |
 | FR-04 | User có thể click vào screenshot để phóng to (Lightbox) | US-F20-03 | P2 | Tăng trải nghiệm nhìn |
 | FR-05 | **[Mobile]** Khung Lightbox cho phép Pinch-to-zoom và double-tap zoom trên mobile. | US-F20-04 | P2 | Tối ưu đọc text nhỏ |
-| FR-06 | **[Mobile]** Thanh điều hướng Sidebar chuyển thành sticky top dropdown hoặc tab-bar | US-F20-04 | P2 | Tối ưu không gian đọc |
+| FR-06 | **[Mobile]** Sidebar navigation chuyển thành sticky top dropdown hoặc horizontal scrollable tab-bar khi màn hình ≤ 768px. | US-F20-04 | P2 | Bảo toàn không gian đọc dọc |
 
 ---
 
@@ -171,9 +171,7 @@ Step 2: User selects a tab / menu item:
 ### 10.4. Mobile View (Pinch-to-zoom Lightbox)
 - **Mô tả:** Do screenshot trên mobile khá bé và khó đọc text, Lightbox mở ra phải chiếm full-screen và cho phép user chụm 2 ngón tay lại để Zoom chữ (Pinch-to-zoom) để đọc detail dễ dàng. Sidebar navigation chuyển thành sticky top dropdown.
 - **Design / Wireframe:**
-```text
-  - [Link tới file wireframe/design trong thư mục docs/design/...]
-```
+  - 📐 [F20 Help Center Design & Wireframe Report](../design/F20-help-center-design.md)
 
 ---
 

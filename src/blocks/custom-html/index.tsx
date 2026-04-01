@@ -1,6 +1,5 @@
 'use client'
 
-import DOMPurify from 'isomorphic-dompurify'
 import { useState, useEffect } from 'react'
 import type { BlockProps } from '../types'
 import type { CustomHtmlConfig } from './config'
@@ -10,9 +9,21 @@ export function CustomHtmlBlock({ block }: BlockProps<CustomHtmlConfig>) {
     const [sanitizedHtml, setSanitizedHtml] = useState('')
 
     useEffect(() => {
-        // Sanitize the HTML to prevent XSS only on the client
-        // This avoids `enoent` jsdom errors during Next.js SSR
-        setSanitizedHtml(DOMPurify.sanitize(html))
+        let isMounted = true
+
+        async function sanitize() {
+            const { default: createDOMPurify } = await import('dompurify')
+            const DOMPurify = createDOMPurify(window)
+
+            if (!isMounted) return
+            setSanitizedHtml(DOMPurify.sanitize(html))
+        }
+
+        void sanitize()
+
+        return () => {
+            isMounted = false
+        }
     }, [html])
 
     return (

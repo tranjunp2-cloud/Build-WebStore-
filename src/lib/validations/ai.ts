@@ -13,8 +13,8 @@ export const generateSiteSchema = z.object({
 
 export const editBlockSchema = z.object({
     instruction: z.string().min(1),
-    block: z.record(z.unknown()).optional(),
-    blockIndex: z.number().optional(),
+    block: z.record(z.unknown()).nullable().optional(),
+    blockIndex: z.number().nullable().optional(),
     allBlocks: z.array(z.record(z.unknown())).optional(),
     theme: z.record(z.unknown()).optional(),
     siteName: z.string().optional(),

@@ -13,7 +13,7 @@ export const Sites: CollectionConfig = {
         read: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
@@ -22,7 +22,7 @@ export const Sites: CollectionConfig = {
         update: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
@@ -31,7 +31,7 @@ export const Sites: CollectionConfig = {
         delete: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
@@ -220,6 +220,23 @@ export const Sites: CollectionConfig = {
             ],
         },
         {
+            name: 'branding',
+            type: 'group',
+            fields: [
+                { name: 'logo', type: 'text' },
+                { name: 'favicon', type: 'text' },
+            ],
+        },
+        {
+            name: 'contactInfo',
+            type: 'group',
+            fields: [
+                { name: 'phone', type: 'text' },
+                { name: 'email', type: 'text' },
+                { name: 'address', type: 'textarea' },
+            ],
+        },
+        {
             name: 'aiGenerationMetadata',
             type: 'group',
             label: 'AI Generation Info',
@@ -271,6 +288,16 @@ export const Sites: CollectionConfig = {
                     admin: { description: 'Free shipping above X sen (null = no free shipping)' },
                 },
             ],
+        },
+        {
+            name: 'headerBlock',
+            type: 'json',
+            admin: { description: 'Global header/navigation block for all pages' },
+        },
+        {
+            name: 'footerBlock',
+            type: 'json',
+            admin: { description: 'Global footer block for all pages' },
         },
     ],
     timestamps: true,

@@ -1,6 +1,8 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * PATCH /api/sites/[siteId]/publish
@@ -14,10 +16,7 @@ export async function PATCH(
     { params }: { params: Promise<{ siteId: string }> }
 ) {
     try {
-        const payload = await getPayload({ config })
-
-        // Authenticate
-        const { user } = await payload.auth({ headers: req.headers })
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json(
                 { success: false, error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } },
@@ -25,6 +24,7 @@ export async function PATCH(
             )
         }
 
+        const payload = await getPayload({ config })
         const { siteId } = await params
 
         // Verify site exists
@@ -33,6 +33,19 @@ export async function PATCH(
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
                 { status: 404 }
+            )
+        }
+
+        // Verify ownership (tenant isolation)
+        type TenantRef = string | number | { id: string | number } | null | undefined
+        const resolveTenantId = (t: TenantRef): string | null =>
+            t == null ? null : String(typeof t === 'object' ? t.id : t)
+        const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
+        const siteTenantId = resolveTenantId(existing.tenant as TenantRef)
+        if (!siteTenantId || !userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Not your site' } },
+                { status: 403 }
             )
         }
 
@@ -62,7 +75,7 @@ export async function PATCH(
         })
         
         if (fullSite.tenant && typeof fullSite.tenant === 'object') {
-            tenantSlug = (fullSite.tenant as any).slug || 'site'
+            tenantSlug = ((fullSite.tenant as Record<string, unknown>).slug as string) || 'site'
         }
 
         const domainUrl = `${tenantSlug}.primeweb.app`
@@ -79,10 +92,10 @@ export async function PATCH(
             },
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Publish Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error?.message || 'Failed to publish' } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to publish' } },
             { status: 500 },
         )
     }
@@ -93,9 +106,7 @@ export async function DELETE(
     { params }: { params: Promise<{ siteId: string }> }
 ) {
     try {
-        const payload = await getPayload({ config })
-
-        const { user } = await payload.auth({ headers: req.headers })
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json(
                 { success: false, error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } },
@@ -103,6 +114,7 @@ export async function DELETE(
             )
         }
 
+        const payload = await getPayload({ config })
         const { siteId } = await params
 
         const existing = await payload.findByID({ collection: 'sites', id: siteId })
@@ -110,6 +122,19 @@ export async function DELETE(
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
                 { status: 404 }
+            )
+        }
+
+        // Verify ownership (tenant isolation)
+        type TenantRef = string | number | { id: string | number } | null | undefined
+        const resolveTenantId = (t: TenantRef): string | null =>
+            t == null ? null : String(typeof t === 'object' ? t.id : t)
+        const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
+        const siteTenantId = resolveTenantId(existing.tenant as TenantRef)
+        if (!siteTenantId || !userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Not your site' } },
+                { status: 403 }
             )
         }
 
@@ -138,10 +163,10 @@ export async function DELETE(
             },
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Unpublish Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error?.message || 'Failed to unpublish' } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to unpublish' } },
             { status: 500 },
         )
     }

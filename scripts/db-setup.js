@@ -17,6 +17,7 @@
  * the container during schema push.
  */
 const { spawn } = require('child_process');
+const { bootstrapSeed } = require('./bootstrap-seed');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -175,6 +176,22 @@ const MIGRATIONS = [
     name: 'sites.shipping_config_free_above',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS shipping_config_free_above numeric;`,
   },
+  {
+    name: 'sites.header_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS header_block jsonb;`,
+  },
+  {
+    name: 'sites.footer_block',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS footer_block jsonb;`,
+  },
+  // ── Sites: Branding + Contact Info ──
+  { name: 'sites.branding', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding varchar;' },
+  { name: 'sites.contact_info', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info varchar;' },
+  { name: 'sites.branding_logo', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding_logo varchar;' },
+  { name: 'sites.branding_favicon', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS branding_favicon varchar;' },
+  { name: 'sites.contact_info_phone', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_phone varchar;' },
+  { name: 'sites.contact_info_email', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_email varchar;' },
+  { name: 'sites.contact_info_address', sql: 'ALTER TABLE sites ADD COLUMN IF NOT EXISTS contact_info_address varchar;' },
   // ── Products: Halal + Weight ──
   {
     name: 'products.halal_certified',
@@ -792,6 +809,376 @@ const MIGRATIONS = [
       name varchar, role varchar, bio varchar, image_id integer
     );`,
   },
+  // ── Pages: Fields required for Soft Delete & Visibility ──
+  {
+    name: 'pages.is_visible',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS is_visible boolean DEFAULT true;`,
+  },
+  {
+    name: 'pages.deleted_at',
+    sql: `ALTER TABLE pages ADD COLUMN IF NOT EXISTS deleted_at timestamptz;`,
+  },
+  // ── Pages: Social Widget Block ──
+  {
+    name: 'pages_blocks_socialWidget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_socialWidget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _path varchar NOT NULL DEFAULT 'layout',
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      block_name varchar,
+      variant varchar,
+      headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_socialWidget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_socialWidget_links" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      platform varchar,
+      url varchar,
+      enabled boolean DEFAULT true
+    );`,
+  },
+  // ── Pages: Cart Widget Block ──
+  {
+    name: 'pages_blocks_cartWidget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_cartWidget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _path varchar NOT NULL DEFAULT 'layout',
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      block_name varchar,
+      variant varchar,
+      label varchar,
+      show_label boolean
+    );`,
+  },
+  // ── Pages Versions: _pages_v_blocks_* tables ──
+  // Required for Payload draft/versioning (editor loads _pages_v not pages).
+  // Types match Payload's Drizzle ORM output:
+  //   - id: serial (integer auto-increment) — NOT varchar
+  //   - _path: text NOT NULL — NOT varchar with DEFAULT
+  //   - sub-table _parent_id: integer (ref parent block serial id)
+  // CREATE TABLE IF NOT EXISTS is safe — pushDevSchema may already create
+  // some of these, migrations fill in blocks added after initial schema push.
+  {
+    name: '_pages_v_blocks_navigation.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_navigation" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      style varchar, logo_id integer, logo_text varchar,
+      cta_button_show boolean, cta_button_label varchar, cta_button_url varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_hero.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_hero" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      image_id integer, background_image_id integer, video_url varchar,
+      badge_show boolean, badge_text varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_about.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_about" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      layout varchar, section_label varchar, headline varchar, body jsonb, image_id integer
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_features" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      section_label varchar, headline varchar, subheadline varchar, layout varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_testimonials.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_testimonials" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      headline varchar, variant varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_contact.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_contact" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      headline varchar, subtext varchar, email varchar, phone varchar,
+      address varchar, show_map boolean, map_embed_url varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_gallery.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_gallery" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      headline varchar, layout varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_footer.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_footer" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      logo_text varchar, logo_id integer, tagline varchar,
+      copyright_text varchar, show_social_links boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_stats" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_pricing.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_faq.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_faq" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_team.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_team" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_socialWidget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_socialWidget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_cartWidget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_cartWidget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, label varchar, show_label boolean
+    );`,
+  },
+  // _pages_v sub-tables (nested arrays inside version blocks)
+  // _parent_id integer references the parent block's serial id
+  {
+    name: '_pages_v_blocks_navigation_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_navigation_links" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      label varchar, url varchar, open_in_new_tab boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_socialWidget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_socialWidget_links" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      platform varchar, url varchar, enabled boolean DEFAULT true
+    );`,
+  },
+  // ── snake_case aliases required by Payload Drizzle ORM ──
+  // Drizzle converts camelCase blockType → snake_case for table names.
+  // "socialWidget" → "social_widget", "cartWidget" → "cart_widget".
+  // The camelCase tables above are unreachable by Payload queries — these are the real tables.
+  {
+    name: '_pages_v_blocks_social_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_social_widget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_social_widget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_social_widget_links" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      platform varchar, url varchar, enabled boolean DEFAULT true
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_cart_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_cart_widget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, label varchar, show_label boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_hero_cta_buttons.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_hero_cta_buttons" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      label varchar, url varchar, style varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_about_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_about_stats" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      value varchar, label varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_contact_form_fields.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_contact_form_fields" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      field_name varchar, label varchar, field_type varchar, required boolean, placeholder varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_footer_columns.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_footer_columns" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      title varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_footer_columns_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_footer_columns_links" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      label varchar, url varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_features_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_features_features" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      icon varchar, title varchar, description varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_testimonials_testimonials.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_testimonials_testimonials" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      quote varchar, name varchar, title varchar, company varchar, avatar_id integer, rating numeric
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_gallery_images.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_gallery_images" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      image_id integer, caption varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_stats_stats.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_stats_stats" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      value varchar, label varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_pricing_plans.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing_plans" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, price varchar, description varchar, is_popular boolean, cta_label varchar, cta_url varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_pricing_plans_features.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_pricing_plans_features" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      text varchar, included boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_faq_faqs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_faq_faqs" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      question varchar, answer varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_team_members.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_team_members" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      name varchar, role varchar, bio varchar, image_id integer
+    );`,
+  },
+  // ── One-time cleanup: remove stale _pages_v draft rows ──────────────────────
+  // After creating _pages_v_blocks_* tables above, existing _pages_v rows still
+  // point to block data that was never written (inserts failed when tables were missing).
+  // Payload's draft: true query returns these empty drafts → editor shows "0 blocks".
+  // Fix: delete stale draft versions that have no blocks in any _pages_v_blocks_* table.
+  // Payload will then fall back to published data from pages_blocks_* → blocks appear.
+  // This migration runs once. After real drafts are saved, those rows are preserved.
+  {
+    name: '_pages_v.clear_stale_drafts',
+    // [P0-Codex-Fixed] DO NOT RUN WIDE DELETE: Prevent accidental data loss for new block types or empty drafts.
+    // Instead of deleting broadly, we disable this to protect valid pages that might have 0 blocks.
+    sql: `SELECT 1; -- Migration disabled for data safety`,
+  },
   // ── Users: Payload-managed tables (tenants, permissions, sessions, roles) ──
   // These tables are created by Payload pushDevSchema (runs every deploy).
   // DO NOT add manual CREATE TABLE migrations — they create wrong column types.
@@ -813,6 +1200,15 @@ const MIGRATIONS = [
   {
     name: 'users.otp_attempts',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_attempts numeric DEFAULT 0;`,
+  },
+  // ── Users: Onboarding fields ──
+  {
+    name: 'users.has_seen_ai_wizard',
+    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS has_seen_ai_wizard boolean DEFAULT false;`,
+  },
+  {
+    name: 'users.has_seen_ai_wizard.backfill_legacy',
+    sql: `UPDATE users SET has_seen_ai_wizard = true WHERE id IN (SELECT _parent_id FROM users_tenants WHERE _parent_id IS NOT NULL);`,
   },
   // ── Payload locked documents rels: FK columns for new collections ──
   {
@@ -874,6 +1270,65 @@ const MIGRATIONS = [
     name: 'users.phone',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone varchar;`,
   },
+  // ── _pages_v: mirror columns added to pages (versioning) ──
+  // Whenever a column is added to `pages`, the corresponding version_* column
+  // must be added to `_pages_v` or Payload's draft queries will 500.
+  {
+    name: '_pages_v.version_is_visible',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_is_visible boolean DEFAULT true;`,
+  },
+  {
+    name: '_pages_v.version_deleted_at',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_deleted_at timestamptz;`,
+  },
+  // ── pages_blocks: snake_case tables for socialWidget / cartWidget ──
+  // Payload Drizzle ORM converts camelCase block slugs to snake_case at runtime
+  // (socialWidget → social_widget, cartWidget → cart_widget). These blocks are
+  // new in this PR so there is no existing camelCase data to backfill.
+  // No INSERT...SELECT needed: staging DB had no rows in any camelCase variant.
+  {
+    name: 'pages_blocks_social_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_social_widget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _path varchar NOT NULL DEFAULT 'layout',
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      block_name varchar,
+      variant varchar,
+      headline varchar
+    );`,
+  },
+  {
+    // _parent_id is varchar (not integer): sub-tables reference the parent block UUID.
+    // Top-level block tables → _parent_id integer (ref pages.id).
+    // Block sub-tables → _parent_id varchar (ref parent block's uuid PK).
+    // This matches the CLAUDE.md migration convention for array sub-tables inside blocks.
+    name: 'pages_blocks_social_widget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_social_widget_links" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      platform varchar,
+      url varchar,
+      enabled boolean DEFAULT true
+    );`,
+  },
+  {
+    name: 'pages_blocks_cart_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_cart_widget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _path varchar NOT NULL DEFAULT 'layout',
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      block_name varchar,
+      variant varchar,
+      label varchar,
+      show_label boolean
+    );`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -931,6 +1386,42 @@ async function syncPayloadRelsTables(pool) {
   console.log(`[db-setup] ✅ Payload rels tables synced`);
 }
 
+/**
+ * Bootstrap Seed — create essential accounts on startup.
+ *
+ * Creates admin + SSO service users if they don't exist.
+ * Email from env vars — NEVER hardcoded.
+ * Idempotent — safe to run on every startup.
+ *
+ * Runs via raw SQL (not Payload API) because this executes
+ * before server.js starts.
+ *
+ * IMPORTANT — this only creates user ROWS (email + role).
+ * Password CANNOT be set here (Payload uses scrypt hash internally).
+ * After bootstrap, run one of:
+ *   - npm run db:seed-sso   (Payload Local API — hashes password properly)
+ *   - Payload admin UI      (/admin first-user flow)
+ *
+ * SECURITY: Does NOT auto-upgrade existing users to super-admin.
+ * If user already exists, only logs a message — no role changes.
+ * To change roles of existing users, use admin UI or Payload API.
+ */
+async function runBootstrapSeed(pool) {
+  console.log('[db-setup] Bootstrap: checking essential accounts...');
+  const results = await bootstrapSeed(pool, process.env);
+  for (const r of results) {
+    if (r.action === 'skipped') {
+      console.log(`[db-setup]   ⏭  ${r.label}: SKIPPED (email env var not set)`);
+    } else if (r.action === 'exists') {
+      console.log(`[db-setup]   ✅ ${r.label}: EXISTS — no changes`);
+    } else if (r.action === 'created') {
+      console.log(`[db-setup]   ✅ ${r.label}: CREATED — run "npm run db:seed-sso" to set password`);
+    } else {
+      console.warn(`[db-setup]   ⚠️  ${r.label}: error during bootstrap`);
+    }
+  }
+}
+
 async function checkDB() {
   const pool = createPool();
   if (!pool) {
@@ -950,6 +1441,7 @@ async function checkDB() {
     if (tableCount > 0) {
       await runMigrations(pool);
       await syncPayloadRelsTables(pool);
+      await runBootstrapSeed(pool);
     }
 
     await pool.end();
@@ -1156,6 +1648,13 @@ async function main() {
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS current_rank
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS previous_rank
   ALTER TABLE sites ADD COLUMN IF NOT EXISTS last_checked_at
+
+  -- F05 Sites Group Bypass
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS logo
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS favicon
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS phone
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS email
+  ALTER TABLE sites ADD COLUMN IF NOT EXISTS address
 
   -- F08 Array/Nested Bypass
   ALTER TABLE products ADD COLUMN IF NOT EXISTS description_b_m
