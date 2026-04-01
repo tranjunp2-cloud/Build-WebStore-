@@ -569,18 +569,12 @@ export const Users: CollectionConfig = {
                     )
                 }
 
-                // E2E test bypass — requires ALL conditions:
-                // 1. E2E_TEST_OTP_CODE set (production MUST NOT set this)
-                // 2. Exact TEST_EMAIL match
-                // 3. APP_ENV explicitly set to non-production value
-                //    (staging sets APP_ENV=staging, production sets APP_ENV=production)
-                // Note: NODE_ENV is always 'production' on both staging and prod (Next.js build)
-                //       so we use APP_ENV which is team-controlled
+                // E2E test bypass — only when E2E_TEST_OTP_CODE is explicitly configured
+                // Security: production MUST NOT set E2E_TEST_OTP_CODE in GitHub Secrets
+                // CI_ONLY_SECRETS in sync-do-envs.py can exclude it if needed
                 const testOtpCode = process.env.E2E_TEST_OTP_CODE
                 const testEmail = process.env.TEST_EMAIL
-                const appEnv = process.env.APP_ENV
-                const isTestBypass = !!(testOtpCode && testEmail && appEnv
-                    && appEnv !== 'production'
+                const isTestBypass = !!(testOtpCode && testEmail
                     && email === testEmail && otp === testOtpCode)
 
                 // Check expiry (skip for test bypass)
