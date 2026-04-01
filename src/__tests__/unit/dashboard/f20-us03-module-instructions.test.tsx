@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import React from 'react'
 import '@testing-library/jest-dom'
 
@@ -162,10 +162,10 @@ describe('ModuleGuidesTab Component (US-F20-03)', () => {
         // Act: Click vô Overlay để Zoom mở Lightbox
         fireEvent.click(firstScreenshotOverlay.closest('div.cursor-pointer')!)
 
-        // Assert: Modal Lightbox hiện hình
-        expect(screen.getByText('Full resolution screenshot')).toBeInTheDocument()
-        const titles = screen.getAllByText('Product List View')
-        expect(titles.length).toBeGreaterThanOrEqual(1) // At least one in thumbnail, one in modal
+        // Assert: Modal Lightbox hiện hình — title phải xuất hiện bên trong dialog
+        const dialog = screen.getByRole('dialog')
+        expect(within(dialog).getByText('Product List View')).toBeInTheDocument()
+        expect(within(dialog).getByText('Full resolution screenshot')).toBeInTheDocument()
     })
 
     it('[TC-F20.10] Sử dụng Phím ESC để tắt Trình xem Modal', async () => {

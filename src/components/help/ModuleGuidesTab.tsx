@@ -221,6 +221,9 @@ export function ModuleGuidesTab() {
       {/* Lightbox / Modal View TC-F20.09 & TC-F20.16 */}
       {lightboxImg && (
         <div 
+           role="dialog"
+           aria-modal="true"
+           aria-label={lightboxImg.title}
            className="fixed inset-0 z-[1000] bg-black/85 flex items-center justify-center animate-in fade-in duration-200 cursor-zoom-out"
            onClick={() => setLightboxImg(null)}
          >
