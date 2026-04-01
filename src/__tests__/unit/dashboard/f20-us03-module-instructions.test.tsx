@@ -162,10 +162,12 @@ describe('ModuleGuidesTab Component (US-F20-03)', () => {
         // Act: Click vô Overlay để Zoom mở Lightbox
         fireEvent.click(firstScreenshotOverlay.closest('div.cursor-pointer')!)
 
-        // Assert: Modal Lightbox hiện hình — title phải xuất hiện bên trong dialog
+        // Assert: Modal Lightbox hiện hình — title (alt) phải xuất hiện bên trong dialog
         const dialog = screen.getByRole('dialog')
-        expect(within(dialog).getByText('Product List View')).toBeInTheDocument()
-        expect(within(dialog).getByText('Full resolution screenshot')).toBeInTheDocument()
+        const img = within(dialog).getByTestId('next-image')
+        expect(img).toBeInTheDocument()
+        expect(img).toHaveAttribute('alt', 'Product List View')
+        expect(img).toHaveAttribute('src', '/help/products-1-list.webp')
     })
 
     it('[TC-F20.10] Sử dụng Phím ESC để tắt Trình xem Modal', async () => {
@@ -180,16 +182,16 @@ describe('ModuleGuidesTab Component (US-F20-03)', () => {
         const screenshotContainer = screen.getAllByText(/Click to zoom/i)[0].closest('div.cursor-pointer')!
         fireEvent.click(screenshotContainer)
         
-        expect(screen.getByText('Full resolution screenshot')).toBeInTheDocument()
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
 
         // Act: Nhấn phím Mũi tên (Sai)
         fireEvent.keyDown(window, { key: 'ArrowRight' })
-        expect(screen.getByText('Full resolution screenshot')).toBeInTheDocument()
+        expect(screen.getByRole('dialog')).toBeInTheDocument()
 
         // Act: Nhấn phím 'Escape' (Đúng)
         fireEvent.keyDown(window, { key: 'Escape' })
 
         // Assert: Modal đã bị tắt (unmount/hide)
-        expect(screen.queryByText('Full resolution screenshot')).not.toBeInTheDocument()
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 })
