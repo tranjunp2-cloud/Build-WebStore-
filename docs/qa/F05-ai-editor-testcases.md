@@ -1,13 +1,13 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F05 - AI Editor (Split Screen)
-> **Phiên bản:** 2.0 (Professional Traceability Matrix) | **Cập nhật:** 2026-03-18 | **Thực hiện:** QA Team
+> **Phiên bản:** 6.0 (Formal Traceability Matrix) | **Cập nhật:** 2026-04-02 | **Thực hiện:** QA Team
 > **Tài liệu tham chiếu PRD:** [F05-ai-editor.md](../prd/F05-ai-editor.md) | **Tài liệu tham chiếu User Stories (13 US):** [F05-ai-editor-stories.md](../stories/F05-ai-editor-stories.md)
 
 ---
 
 ## 1. Mục Tiêu (Objective)
-Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lượng toàn diện cho tính năng AI Editor (F05). Mục tiêu cốt lõi là đạt độ phủ (Coverage) 100% cho 13 User Stories và các Acceptance Criteria (ACs) đã định nghĩa tại tài liệu đặc tả.
+Tài liệu Test Case này được xây dựng đạt quy chuẩn **Comprehensive QA Expert**, hướng đến Coverage 100% rủi ro (Risk-based Coverage) xuyên suốt 13 User Stories. 
 
-Bộ kiểm thử bao gồm **hơn 50 kịch bản chi tiết** (bao quát luồng chính, trường hợp ngoại lệ, kiểm thử biên, bảo mật, và tương tác iframe DND). Nhằm tối ưu hóa quá trình theo dõi và thực thi, toàn bộ kịch bản được tổng hợp trong một ma trận duy nhất (Unified Matrix).
+**Số lượng Testcase:** Tổng cộng **85 Kịch bản chi tiết** bao phủ: Kiểm thử luồng chính (Positive), Kiểm thử luồng ngoại lệ (Negative/Edge cases), Trạng thái giao diện (UI States), Tính hợp lệ dữ liệu (Form Validation), Xử lý tương tranh (Concurrency), và An toàn bảo mật (Security). Toàn bộ nội dung sử dụng ngôn ngữ kiểm thử phần mềm chuyên nghiệp, rõ ràng và khách quan.
 
 ---
 
@@ -16,90 +16,108 @@ Bộ kiểm thử bao gồm **hơn 50 kịch bản chi tiết** (bao quát luồ
 |---|---|
 | Môi trường (Env) | Staging / Pre-Production |
 | Browsers | Chrome (v110+), Firefox (v105+), Safari |
-| OS / Desktop | Windows 11, macOS |
-| Devices (Responsive) | Desktop (1920x1080), Mobile (iPhone 14 Pro 375px) |
-| Network | 4G (Fast/Slow), Wifi, Mạng ngắt kết nối giả lập (Offline Simulator) |
-| Automation Framework | Playwright (Java) |
+| Devices | Desktop (1920x1080), Mobile (iPhone 14 Pro 375px) |
+| Automation Framework | Playwright (BDD) |
+|URL |https://web-cms-v2.dev.ecommercehub.my/
 
 ---
 
 ## 3. Unified Test Cases (Traceability Matrix)
-_Bảng tổng hợp kịch bản kiểm thử, phân loại theo User Story nhằm đảm bảo khả năng truy vết._
 
-| ID | Tham chiếu | LOẠI (Type) | TIÊU ĐỀ (Scenario) | CÁC BƯỚC THỰC HIỆN (Steps) | KẾT QUẢ MONG ĐỢI (Expected) | MỨC ĐỘ | AUTO |
+
+| ID | Tham chiếu | LOẠI (Type) | TIÊU ĐỀ (Scenario) | CÁC BƯỚC THỰC HIỆN (Steps) | KẾT QUẢ MONG ĐỢI | MỨC ĐỘ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **[US-01: AI Editor — Split Screen Chat + Preview]** | | | | | | | |
-| **TC-F05.01** | `US-01/AC1` | `UI/UX` | **[Layout]** Khởi tạo Layout 3 vùng chức năng | 1. Truy cập `/editor/:siteId` hợp lệ. | Màn hình hiển thị 3 vùng (Chat, Iframe Preview, Settings). Toolbar chứa đủ nút chức năng. | Blocker | [x] |
-| **TC-F05.02** | `US-01/AC2` | `Func`  | **[SSE Chat]** Render giao diện realtime qua AI Chat | 1. Gõ Command vào AI Chat.<br>2. Nhấn Submit Enter. | Iframe update xong giao diện trong `< 3 giây` bằng luồng SSE. Hiện nút Hoàn tác ở Panel chat. | Blocker | [x] |
-| **TC-F05.03** | `US-01/AC3` | `Logic` | **[Undo]** Hoàn tác (Undo) sự kiện chỉnh sửa | 1. Hoàn tất edit text/AI gen.<br>2. Nhấn Ctrl+Z hoặc nút Undo trên Toolbar. | Phục hồi (Revert) lại trạng thái State liền kề trong `< 200ms`. | High | [x] |
-| **TC-F05.04** | `US-01/AC5` | `Edge`  | **[Auto-save]** Throttling Lưu Database (Debounce 3s) | 1. Gõ text phím liên tục 5s.<br>2. Ngừng tay > 3s. | Trạng thái hiển thị `Saving...` và chỉ gọi API PATCH 1 lần duy nhất sau khi ngừng gõ 3s, sau đó báo `Saved`. | High | [x] |
-| **TC-F05.04b** | `US-01/AC2` | `UX`    | **[Chat Shortcuts]** Gửi lệnh AI Chat bằng phím tắt | 1. Gõ lệnh vào TextArea Chat.<br>2. Nhấn phím Enter.<br>3. Bấm Shift+Enter. | Khung chat tự động Submit lệnh đi khi nhấn Enter. Con trỏ tự động xuống dòng không Submit khi bấm Shift+Enter đúng nguyên lý UX Messenger. | High | [ ] |
-| **TC-F05.04c** | `US-01/AC1` | `UI`    | **[Block Style]** Tùy chỉnh Block Settings Style trên Right Panel | 1. Click chọn 1 Block (VD: Hero).<br>2. Nhìn sang Right Panel, đổi Background Color (HEX) và Padding Top/Bottom về 40px. | Giao diện Iframe cập nhật thay đổi Layout + Màu nền ngay lập tức khớp 100% Figma Block Settings Panel. | Blocker | [ ] |
-| **TC-F05.05** | `US-01/Mob` | `Mobile`| **[Responsive]** Tương thích giao diện Mobile (Độ rộng < 768px) | 1. Resize viewport xuống 375px (iPhone 14). | Iframe Preview full width 100%. Chat Panel ghim thành Bottom Sheet (swipe up để mở). | High | [ ] |
-| **[US-02: Page Manager]** | | | | | | | |
-| **TC-F05.06** | `US-02/AC1` | `UI/DB` | **[List]** Hiển thị màn hình Grid Cấp Page | 1. Mở Tab Pages trên thanh công cụ Sidebar. | Trả đúng danh sách trang, có cờ Trạng Thái (Live/Draft), đếm Card/Blocks, Ngày update gần nhất. | High | [x] |
-| **TC-F05.07** | `US-02/AC2` | `Func`  | **[Add Page]** Thêm Trang Mới Đồng Bộ | 1. Bấm "Thêm trang mới".<br>2. Nhập Title: `Về Tổ Chức`. 3. Save | Tự động sinh `slug: ve-to-chuc`. Redirect Iframe I/O về khung trắng của Page mới. | Blocker | [x] |
-| **TC-F05.08** | `US-02/AC2` | `Bound` | **[Conflict]** Khóa Khung Tạo Page Trùng Slug | 1. Tiến hành Add một page có Title lặp lại: `Về Tổ Chức`. | Báo lỗi hoặc Tự đính kèm ID hậu tố (vd: `ve-to-chuc-1`). Ép không báo sập 500 do conflict Unique Index DB. | Medium | [x] |
-| **TC-F05.08b** | `BR-08.1` | `Limit` | **[Max Pages]** Giới hạn tối đa 100 trang/Site | 1. Seed DB 100 trang cho Website hiện tại.<br>2. Bấm "Thêm trang mới". | Nút Thêm Trang Disable hoặc Form Reject báo "You have reached the maximum limit of 100 pages." Ngăn lạm dụng tạo rác DB. | Medium | [ ] |
-| **TC-F05.09** | `US-02/AC3` | `Logic` | **[Soft Delete]** Mạng Xóa Mềm 1 Trang  | 1. Click Icon Thùng Rác (Delete).<br>2. Xác Nhận Modal Xóa. | Cập nhật trường `deletedAt`. Mất DOM ở danh mục Editor. Toast báo 5s: "Đã xóa. Hoàn tác?". | High | [x] |
-| **TC-F05.10** | `US-02/AC4` | `Flow`  | **[Hide Page]** Bật Tắt Tạm Ẩn Trang (Toggle Visibility) | 1. Bấm Nút Icon Con Mắt (Hide) của 1 trang. | Trang chuyển cờ `isVisible=false`. Gỡ ngay khỏi Navbar Header. Truy cập Domain live trả HTTP 404. | Blocker | [x] |
-| **TC-F05.10b** | `BR-05/06` | `Bound` | **[Hide/Delete]** Ràng buộc cấm Xóa/Ẩn Trang Hệ Thống (Home, 404) | 1. Nắm trỏ vào Nút Icon Tạm Ẩn / Xóa của Trang Chủ (Home) và 404. | Nút Ẩn và Xóa bị làm mờ (Disabled). Kèm Tooltip "Không thể chỉnh sửa trạng thái trang hệ thống". Field URL Slug của 404 bị khóa cứng (Read-only) (BR-05/06). | Blocker | [ ] |
-| **[US-03: Inline Click-to-Edit Element]** | | | | | | | |
-| **TC-F05.11** | `US-03/AC1` | `UX`    | **[Hover]** Nút gọi ✨ Edit With AI bằng Hover | 1. Đưa trỏ chuột đậu tại Text Block tĩnh Iframe (Delay 200ms). | Hiện popup "✨ Edit with AI" nằm tọa bên trên Góc Căn lề Phải (Top-Right) DOM Block đó. | Medium | [ ] |
-| **TC-F05.12** | `US-03/AC2` | `Func`  | **[Inline AI]** Gọi Tool AI thực thi Inline Edit | 1. Click nút "✨ Edit with AI".<br>2. Nhập prompt: "Làm nội dung này xúc tích hơn". | Component Text hiện tại (chỉ nó) được AI Stream nội dung mới vào. Không làm lệch Layout trang. | Blocker | [x] |
-| **TC-F05.12b** | `US-03/AC2` | `UX`    | **[Close Popup & Sync]** Đóng Inline Edit Popup & Đồng bộ lịch sử chat | 1. Mở Inline Edit Popup.<br>2. Nhấn Escape (Esc) hoặc Click Outline.<br>3. Sau đó sinh AI content mới và soi Chat Panel Left. | Bảng Pop-over Edit tắt lặn ngay. Dòng log thay đổi AI sinh Inline hiển thị lưu vết đẩy đủ bên cột AI Chat Panel bên trái cho User theo dõi. | Medium | [ ] |
-| **TC-F05.12c** | `FR-31`   | `Mobile`| **[Mobile Bottom Sheet]** Chạm sửa element trên UI Mobile | 1. Đổi sang giao diện Mobile (<768px).<br>2. Chạm (Tap) vào một text/hình ảnh bất kỳ trên Iframe. | Popup không lơ lửng (Floating) che màn hình. Công cụ Formatting (WYSIWYG) và TextBox gọi lệnh AI trồi lên êm mượt dạng Bottom Sheet vuốt từ dưới lên. | High | [ ] |
-| **[US-04: Add New Section via AI]** | | | | | | | |
-| **TC-F05.13** | `US-04/AC1` | `AI Logic`| **[Add Block]** Gọi thêm Fragment Component mới Qua Lệnh AI | 1. Quăng lệnh chat: "Thêm 1 section Testimonials có 3 đánh giá". | 1 khối Component `Testimonials` tự động gắn nhúng (Append) xuống dưới cùng trang Iframe kèm Mock Data 3 bài Text. | High | [x] |
-| **[US-05: Drag-and-Drop Block Reorder in Editor]** | | | | | | | |
-| **TC-F05.14** | `US-05/AC1` | `DND`   | **[Sort]** Thao tác kéo thả Reorder Swap Vị Trí | 1. Bắt lấy Hand-Grip (⠿) của Block P.<br>2. Kéo đè đè Lên trên Block Q. | Iframe Cập Nhật thứ tự DOM Render Phóng Tức Thì. Đã Push trạng thái Lên List Action Mảng của History Redo Stack. | Blocker | [ ] |
-| **TC-F05.15** | `US-05/AC2` | `Logic` | **[Undo DND]** Hoàn tác (Undo) tác vụ Reorder | 1. Sau khi thả Block thành công ở TC_F05.14.<br>2. Nhấn Undo. | Component trả ngược về index tọa độ ban đầu hoàn hảo. | High | [x] |
-| **TC-F05.15b** | `US-05/AC4` | `AI Logic`| **[AI Undo Swap]** Đảo ngược Reorder bằng lệnh Chat AI | 1. Vừa thực hiện Drag & Drop xong.<br>2. Gõ khung chat: "Hoàn tác lại vị trí cũ". | LLM hiểu mảng Object Action cuối, bắn Command Revert đổi Sort Order Component. Iframe render y vị trí cũ. | High | [ ] |
-| **[US-06: Manual Visual Editing (WYSIWYG Text & Image)]** | | | | | | | |
-| **TC-F05.16** | `US-06/AC1` | `Func`  | **[WYSIWYG]** Sửa Text trực tiếp (ContentEditable) | 1. Double Click Trực Diện 1 Node Đoạn Text (Heading/P).<br>2. Chọn In Đậm (Bold) từ Float Toolbar. 3. Blur khỏi box. | Box Text kích `contentEditable="true"`. Tự lưu thay đổi API PATCH DB (Sau 3 giây Blur Debounce). | High | [x] |
-| **TC-F05.16b** | `US-06/AC1` | `UX`    | **[Floating Toolbar]** Ứng dụng Format qua Text Toolbar | 1. Bôi đen (Highlight) một khúc text tĩnh Iframe.<br>2. Ở thanh Float Toolbar nhô lên -> Bấm Bold, Italic, Canh Giữa, Underline. | Dòng bôi đen bắt tag `<b>, <i>, <u>, text-center` chuẩn DOM React không nảy vỡ viền. Inline style apply chính xác. | High | [ ] |
-| **TC-F05.17** | `US-06/AC1` | `Neg`   | **[Empty Box]** Xóa Text Block WYSIWYG Về Null | 1. Đưa Text Editor Node Node Căn Về rỗng "". 2. Tiết Click Blur Đi Ngõ Khác. | DOM Block Không Đứt Chân Layout Sập Trang. Tự Bám Placeholder Lại Hiển Trạng Thái: `Type your text here`. | Medium | [x] |
-| **TC-F05.18** | `US-06/AC2` | `Bound` | **[Upload Img]** Auto Compress Image kích thước Siêu Dày (> 2MB) | 1. Tại Component Ảnh, ấn Thay Ảnh (Replace).<br>2. Vứt File Cỡ Bự JPEG Raw độ phân giải 10MB lên mạng. | Frontend ép Shrink Tự Nén Tệp Giảm Payload Nhỏ < 2MB Scale Khung (Object-Fit) Trước Lúc Dispatch Cho BackEnd Lưu Core Tránh Vỡ Render UI Mạng Yếu. | Blocker | [x] |
-| **TC-F05.18b** | `BR-08.1` | `Neg`   | **[Upload Limit]** Chặn Upload File ảnh kích thước > 10MB hoặc Sai Định Dạng | 1. Upload file `.exe` hoặc ảnh RAW dung lượng 15MB. | Form báo lỗi: "File is too large or invalid format. Max 10MB allowed." Không cho gọi API Save, giữ an toàn storage S3. | High | [ ] |
-| **[US-07: Global Header & Footer Management]** | | | | | | | |
-| **TC-F05.19** | `US-07/AC1` | `Func`  | **[Menu Tree]** Chỉnh Lên Menu Đa Cấp Tree (Nested Submenu) | 1. Focus Menu Header Element Tại Panel Settings.<br>2. Bổ Sub-menu Kéo Thụt Vào (Drag Item Con) 1 Menu Khác. | Dữ Liệu Apply Phóng Rộng Xuất Tràn Toàn Bô Các Trang (Global). Rê chuột Menu Frontend Iframe Nhả Lệnh Rơi Dropdown. | High | [ ] |
-| **TC-F05.19b** | `BR-08.1` | `Bound` | **[Max Dept Menu]** Chặn cấu trúc Menu lồng nhau cấp 3 | 1. Tạo liên tiếp 3 menu lồng nhau (Parent > Child 1 > Child 2) bằng Panel Settings. | Thao tác kéo (Drag) Child 2 vào trong Child 1 bị bật ngửa ra. Hệ thống Toast lỗi "Only 1 level of nested submenu is supported." | Medium | [ ] |
-| **TC-F05.20** | `US-07/AC2` | `Logic` | **[Logo Gen]** Tự Auto-Scale Logo & Trích Icon Favicon | 1. Component Click Header Nhấn Logo Upload 1 File Format Lớn Tỉ Lệ 1K. | AI Tính Toán Tự Fix Limit Scale Yếu Mức `max-height 60px` Ổn Phân Vùng Lõi. Code Tự Xuất Cắt Extract Base Lọt Vào Tag `<link rel="icon">` Header HTML. | High | [x] |
-| **[US-08: Drag-and-Drop Component Library]** | | | | | | | |
-| **TC-F05.21** | `US-08/AC1` | `UI`    | **[Library]** Mở Sidebar Component Library Bảng | 1. Chạy Nút Tab Menu Mở Kho Components Bên Trái Cột Nhánh. | Hiển thị Node List Phân Quần Khối: Base, Tĩnh Sản Phẩm (Ecommerce), Nội Phẩm (Bài Viết), Form Phản Hồi. | Medium | [ ] |
-| **TC-F05.22** | `US-08/AC2` | `DND`   | **[Drag Block]** Gọi Block Rút Thể Thả Từ Menu Rơi Sang Layout | 1. Chuột Dẫn Cục Icon Block "Product List".<br>2. Thả Cắm Giữa Trục 2 Section Trên Cầu Iframe Màn Giữa. | Báo Trục Ngang Xanh Indicator Drop. Iframe Vững Layout Mở Đoạn Code Mockup Block Giao Thật Gắn Kết Form Mobile Tốt Đậm Kích Thước Chuyển Chỉnh. | Blocker | [ ] |
-| **TC-F05.22b** | `US-08/Mob` | `Mobile`| **[Tap to Add]** Thay thế Drag & Drop bằng Chạm (Tap) trên Mobile | 1. Ở Viewport < 768px, mở Component Library.<br>2. Chạm 1 lần (Tap) vào "Product List". | Vô hiệu hóa hệ thống Kéo Thả (Drag). Thẻ Unit Component tự động chèn thẳng xuống Đáy Iframe và trình duyệt Cuộn tới mượt mà (FR-30). | High | [ ] |
-| **[US-09: Tùy chỉnh Trang 404 (404 Not Found Page)]** | | | | | | | |
-| **TC-F05.23** | `US-09/AC1` | `Func`  | **[Edit 404]** Edit Cấu Tạo Render Thẳng Trang 404 Cơ Bản Hệ Thống | 1. Page Cột Quản Lý Tìm Kiếm Gọi Màn Hệ Thống Trang Mặc Định "404 Not Found".<br>2. Đánh Sửa Đoạn Header Text Bằng Lệnh WYSIWYG Hoặc Gọi AI Đổi Nền. | URL Route Sai Truy Xuất Ra Bản Thể Này Ngoài Đời Mang Đúng Kèm Code Status Trả HTTP Res. Không Chạm Lệnh 500 Nằm Iframe. | High | [x] |
-| **[US-10: Publish & Unpublish Flow (Live & Maintenance)]** | | | | | | | |
-| **TC-F05.24** | `US-10/AC1` | `Flow`  | **[Publish]** Thực Thi Publish Đẩy Code Deploy Phân Mạch Subdomain | 1. Nhấn Nút "Publish" Ở Cửa Top Toolbar.<br>2. Modal Check Form Pre-Publish Liệt Rành List Route Nhấn Xác Nhận. | Trịnh System Trả Dòng Tín Subdomain Gán DNS Lực Mạng Đáo Rớt `<30 giây`. Cắm Nháy Xanh Biếc Hiện Badge `Live`. Iframe Đưa Link HTTP Test Chuẩn Domain. | Blocker | [x] |
-| **TC-F05.24b** | `US-10/AC2` | `Flow`  | **[Re-Publish]** Publish lại bản Web đang Live (Update Changes) | 1. Edit lại trang đang gắn mác Live.<br>2. Bấm Publish lần 2. | Render nội dung cấp cập nhật trên Web Live trong `<30 giây`. Server kích hoạt Cronjob tự động Re-generate Sitemap cấu trúc mới URL. | High | [ ] |
-| **TC-F05.25** | `US-10/AC3` | `Flow`  | **[Unpublish]** Ấn Bật Sập Khung Chế Độ Tĩnh Bảo Trì (Maintenance) | 1. Editor Tương Đốc Ấn Set `Unpublish`.<br>2. Bật Tab Gắn Ngoài Truy Lệnh URL Mạng Site User Khác. | Dịch Route API Load HTML Không Render Data Trang Khách Mà Đả Mã `503 Service Unavailable`, UI Hiển Thị Warning Code "Bảo Trì". Admin Tác Chủ Nhánh Vẫn Dựng Web Trong Iframe Đều Tính Thường Quy. | High | [x] |
-| **[US-11: Interactive Widgets (Cart & Social Media)]** | | | | | | | |
-| **TC-F05.26** | `US-11/AC1` | `Func`  | **[Social UX]** Gắn Widget Nút Social Media Đích Link MXH | 1. Thả Gắn Button Social Lên Header Cắm Layout.<br>2. Phục Box Gõ Form URL Target `Facebook` | Phân Mạch Public View Truy Cập Gắn Target Click Móc Dấu Bảy Rút Icon Dính Mở Tác Tab Mới Tính Năng (`_blank` HTML), Render Đúng Lõi Href Đi. | Priority | [x] |
-| **TC-F05.27** | `US-11/AC2` | `Logic` | **[Cart UI]** Giao Hành Component Phục Giỏ Hàng & Fallback Checkout | 1. Thả Nút Giỏ Hàng Lên Khung Cột Layout.<br>2. Bấm Nút Thanh toán (Checkout/Mua Hàng) Trên Iframe. | Các Cửa Popover Số Đếm Counter Xuất Huyện Đều. Chặn Cấm Nháy Nút Checkout Sinh 404 Báo Toast: "Tính năng Checkout đang được phát triển" (Ngăn Prevent Default) (BR-08). | High | [x] |
-| **[US-12: Global Business Info & Settings Panel]** | | | | | | | |
-| **TC-F05.27b** | `US-12/AC1` | `UX/UI` | **[Open Settings]** Bật Navigation/Global Panel tự động | 1. Click phím trái hụt ra Outline Trắng rào Iframe (Un-focus Text) Lập Tức Chờ. | Sidebar phải (Right Panel 320px) Chuyển Ngữ Cảnh Qua "GLOBAL SITE SETTINGS" có Brand, Contact, Social, SEO accordion. | High | [ ] |
-| **TC-F05.28** | `US-12/AC2` | `DB`    | **[Data Bind]** Data Bound Phân Tức Real-time Render Thông Tin Doanh Nghiệp | 1. Nhập Mã Phone Định Lệnh Dấu Hotline: `0909000` (Settings Panel Dọc). | Mạng Node Trục Dữ Liệu Footer Iframe (Nếu Đang Bám Rào Cú Binding Số ĐT) Đổi Form Kíp Lập Tức Dạng Nguồn. | High | [x] |
-| **TC-F05.28c** | `BR-08.1` | `Neg`   | **[Global Settings Validation]** Ràng buộc Regex Form Business Info | 1. Nhập Store Name dài 150 ký tự.<br>2. Nhập Email không có chũ "@".<br>3. Nhập Social URL "www.fb.com/brand". | Hệ thống Validator bắt lỗi Regex. Form từ chối Save, hiển thị cảnh báo đỏ tương ứng: "Invalid email format/URL must start with http/https". | High | [ ] |
-| **TC-F05.28b** | `US-12/AC3` | `DB`    | **[Global SEO]** Lưu Thiết Lập SEO Dùng Chung Toàn Hệ Page | 1. Gõ Meta Title Tổng (Bio) và Tải Thumbnail OG:Image Lên Box Global SEO Setting. | Code Source Iframe Cấy Metadata SEO Cứng Vào Mạch Root `<head>` Phủ Gốc Cho Web Bật Toàn Cục SEO Thể Chuẩn. | High | [ ] |
-| **[US-13: Page-Level SEO & AI Optimization]** | | | | | | | |
-| **TC-F05.29** | `US-13/AC1` | `Func`  | **[Manual SEO]** Tùy Biến Chỉ Số SEO Cho Từng Mảnh Page (Page-level) | 1. Chuyển Panel Nhánh Route `/about`. Mở Tab "PAGE SEO SETTINGS".<br>2. Nhập tay `URL Slug`, `Meta Title`, `Description`. | Google Preview Snippet Card giả lập Khởi Kết Quả Search Thay Cập Nhật Chữ Viền Khung URL. Slug URL Tự Ngậm Đổi DB Router. | Priority | [ ] |
-| **TC-F05.29b** | `US-13/AC2` | `AI Logic`| **[Auto SEO]** Dùng Prompt API Quét Chữ Auto-Gen Meta Dịch Data SEO | 1. Nút Form Trọng Trang Phục Target Nhấn Cấp "✨ Tự Động Tối Ưu SEO Cây SEO". | LLM Khảo Dữ Lưới Văn Bản Căn Kéo Box Text Render Tác Iframe. Viền Mã Dữ Form Meta Title / Desc Code Ngọt Ráp Khớp Bỏ Khung Schema Tự Sinh Form Code Không Quá Mạch Nghĩa. | High | [x] |
-| **TC-F05.30** | `BR-08.1` | `Logic` | **[SEO Soft Limit]** Cảnh báo vàng SEO Metadata quá dài | 1. Nhập Meta Title > 60 ký tự và Description > 160 ký tự vào Panel SEO.<br>2. Lưu thay đổi. | Dữ liệu vẫn được lưu (Soft limit). Nhưng Panel Inputs viền vàng Warning: "Title/Description may be truncated on Google Search." | Medium | [x] |
-| **[Non-Functional: Bảo Mật, SLA & Kiểm Soát Lệch Lệnh API]** | | | | | | | |
-| **TC-F05.31** | `Negative`| `Limit`   | **[Undo Stack]** Rào Tràn Bộ Nhớ Stack Rút Cáo Trạng > 50 Nút State Kéo RAM | 1. Bấm Click Thực Chạy Dịch Khối Edit Rộng 60 Lần Hạch Liên Tiếp.<br>2. Gõ Code Yêu Cầu Undo Trình Hoàn Liên Nháy Quá Đích 55 Cú Rollback. | List Dựng Kích Quản Giới Rút Threshold Phá Rào Tối Đa `50 Vòng Quay Undo`. Khóa Bấm Disable Xám Cứng Để Cáp RAM Chrome Browser Mạng Không Trọng Báo Khóa Bug Bể Rớt RAM Kích Kém Nhằm DOM Iframe Giữ Chắc. | Blocker | [x] |
-| **TC-F05.32** | `Edge`    | `Logic`   | **[Concurrency]** Bắt Nhịp Tắt Concurrency Ráp AI SSE Stream & Tác Lệnh Bấm Undo Trái Nhanh Chống Sập DOM | 1. Trào Mạng Phóng Stream Lõi HTML Đang Rớt. Kích Liền Tool Nhấn Hoàn Tác (Undo). | Nút Icon Hoàn Tác Cầm Disabled Block Ác Xám Mã Quá Quá Trình Stream Đoạn Lệnh SSE Khéo 3s Đáy Mốc Rút Để Cáp Trái Giới Trình Re-flow Render Render Dép Corrupted Markup Vỡ Web Page Hoàn Toàn Xó Cũ. | Blocker | [x] |
-| **TC-F05.33** | `Negative`| `Sec/XSS` | **[Prompt XSS]** Bóc Token Trạm Bắn Bypass JavaScript Malicious Code XSS Trong Bảng Bot AI Dẫn | 1. Nạp Script Thẳng Móc Lệnh Dịch `<script>alert('hack')</script>` Khung Chat. | Không Dính Mã Hack. React Bóc Dom Render Thành Dải Encode Bão Hạn Trơ Chuỗi Text Tĩnh HTML Chữ. Giữ Báo Vành Backend Middleware Vượt. | Blocker | [x] |
-| **TC-F05.33b** | `BR-08.1` | `Limit` | **[Chat Limit]** Bắt Rate Limit và Độ dài Prompt chat AI | 1. Pass block Text > 500 chars gửi Chat.<br>2. Gửi dồn dập 6 tin nhắn chat trong vòng chưa tới 1 phút. | Tin 1 bị Frontend chặn báo: "Prompt exceeds 500 characters." Tin 2 bị bắt "Too many requests" do limit 5 requests/min. | Priority | [ ] |
-| **TC-F05.34** | `Edge`    | `Network` | **[Stream Drop]** Ngắt kết nối mạng (Offline) đột ngột khi AI đang Stream dữ liệu dang dở | 1. Nhập lệnh AI Chat đổi nền.<br>2. Cắt mạng Wifi/LAN khi tiến trình SSE chạy được 50%. | Iframe không hiển thị mã HTML vỡ lở (Corrupted). Báo lỗi "Mất kết nối", khôi phục Iframe về mốc Undo gần nhất khi có mạng lại. | Blocker | [ ] |
-| **TC-F05.34b** | `BR-07`   | `Edge`    | **[Offline Queue]** Auto-save LocalStorage khi Mạng đứt kết nối ngầm | 1. Thao tác edit chữ/ ảnh (Debounce 3s auto-save chờ nhảy).<br>2. Ngắt kết nối Mạng đột ngột tắt API Save.<br>3. Ấn tắt Tab Chrome. | Trạng thái Saving màu đỏ gào "Mất mạng...". DOM Payload nằm lại LocalStorage. Browser nảy Cảnh báo tắt Tab (onbeforeunload) chặn User thoát trang. | Priority | [ ] |
-| **TC-F05.35** | `Neg`     | `WYSIWYG` | **[Paste Dirty]** Dán (Paste) Rich Text rác từ MS Word chứa Style, Script ngầm | 1. Copy đoạn text dài từ Word rác.<br>2. Paste (Ctrl+V) thẳng vào Text Block đang Edit WYSIWYG. | Frontend phải kích hoạt DOMPurify tự động lọc sạch các thẻ `<style>`, `<script>`, class rác, chỉ giữ plaintext hoặc cấu trúc HTML Allow-list. | High | [x] |
-| **TC-F05.36** | `Edge`    | `Logic`   | **[Multi-tab]** Mở Editor Iframe song song trên 2 Tab Browser cùng 1 Website | 1. Mở Editor ở Tab A và Tab B.<br>2. Sửa ở Tab A chờ Auto-save.<br>3. Sửa nghịch lại ở Tab B. | Tab B gọi API PATCH trả về HTTP 409 Conflict (Mismatched Version). Cấm lưu cờ bạc, bật bảng cảnh báo bắt người dùng Refresh lấy data mới. | Blocker | [x] |
-| **TC-F05.37** | `Neg`     | `UI`      | **[Drag Ghosting]** Rê (Drag) Component Library và vứt thả ra ngoài cửa sổ Browser OS | 1. Nắm Handgrip Block Product.<br>2. Kéo văng chuột ra khỏi mép Window Desktop rồi thả nhả tay. | Con trỏ Ghost Element tự hủy, không bị kẹt dính chết cứng trên con trỏ chuột. UI Iframe trả Layout về nguyên trạng ban đầu an toàn. | Medium | [ ] |
-| **TC-F05.38** | `Neg`     | `Sec/SVG` | **[SVG Inject]** Upload giả dạng ảnh SVG nhúng chứa mã lệnh độc hại XML | 1. Lấy file logo `.svg` chèn script XSS Header.<br>2. Thay Image qua form tải lên Upload. | Backend Reject file hoặc tự động Sanitize xóa mã lớp SVG XML nguy hiểm. Output Iframe View File ảnh không kích hoạt Script ăn cắp Cookie Browser. | Blocker | [x] |
-| **TC-F05.39** | `Neg`     | `Logic`   | **[Cart No F10]** Thả Widget Giỏ Hàng khi Tenant chưa mua gói cài Module Cửa Hàng | 1. Gắp khối Giỏ Hàng vào UI khi Site Doanh Nghiệp User này chưa thiết lập Commerce. | Render UI giỏ hàng nhưng khi test Click sẽ hiện Popup Toast "Vui lòng kích hoạt tính năng Cửa Hàng ở Dashboard", không gọi API lỗi HTTP 500 chập chờn. | High | [ ] |
-| **TC-F05.40** | `Edge`    | `Race`    | **[Race Condition]** Bấm vội nút Publish và đè tiếp nút Unpublish liên hoàn trong 1 giây | 1. Bấm nút Publish Trên Toolbar (Cờ đang Load).<br>2. Cú hích bấm lách Unpublish trước cả khi Domain trỏ xong. | Nút Publish Clicked => Đóng băng Block khóa giao diện nút Unpublish bằng Disabled Lock để ép không phát Race Condition trên máy chủ DNS/Cloudflare. | Blocker | [x] |
+| **[US-01: AI Editor — Split Screen Chat + Preview]** (10 Cases) | | | | | | | |
+| **TC-F05-01-01**| `US-01/AC1` | `UI`    | Kiểm tra khởi tạo Layout 3 vùng | Truy cập URL `/editor/:siteId` | Hệ thống hiển thị đầy đủ 3 phân vùng (Chat, Preview, Settings). | Blocker | [x] |
+| **TC-F05-01-02**| `US-01/AC2` | `Func`  | Phản hồi giao diện qua luồng SSE | Nhập lệnh (Prompt) và nhấn Submit| Giao diện Iframe cập nhật với luồng stream `< 3 giây`. | Blocker | [x] |
+| **TC-F05-01-03**| `US-01/AC3` | `Logic` | Xử lý lệnh Hoàn tác (Undo) | Sử dụng phím tắt Ctrl+Z hoặc UI | Phục hồi trạng thái State gần nhất trong khoảng `< 200ms`. | High    | [x] |
+| **TC-F05-01-04**| `US-01/AC5` | `Edge`  | Cơ chế Auto-save (Throttling) | Nhập từ khóa liên tục 5s, dừng 3s | Hệ thống chỉ kích hoạt API PATCH 1 lần duy nhất để lưu DB. | High    | [x] |
+| **TC-F05-01-05**| `US-01/UX`  | `UX`    | Tương tác phím tắt | Bấm phím Shift+Enter tại Chat | Con trỏ chuyển dòng văn bản, không gửi (Submit) đoạn lệnh. | High    | [ ] |
+| **TC-F05-01-06**| `US-01/Val` | `Val`   | Xử lý chuỗi lệnh rỗng (Empty) | Nhập toàn bộ ký tự trắng (Space) | Giao diện vô hiệu hóa (Disable) nút Gửi, không gọi API LLM. | Priority| [x] |
+| **TC-F05-01-07**| `US-01/Val` | `Bound` | Giới hạn tối đa chuỗi ký tự | Dán chuỗi lệnh trên 5,000 ký tự | Hiển thị chuỗi lỗi "Vượt quá độ dài tối đa", hệ thống hủy gọi API. | Blocker | [ ] |
+| **TC-F05-01-08**| `US-01/Net` | `Net`   | Lỗi ngắt kết nối trong lúc truyền | Cắt kết nối mạng khi stream chạy| Sinh Toast lỗi kết nối. Phục hồi Iframe về mốc dữ liệu cũ. | Blocker | [x] |
+| **TC-F05-01-09**| `US-01/Race`| `Race`  | Hủy lệnh AI đang thực thi | Nhấn phím Mũi Tên Hủy (Abort) | Kết thúc tiến trình stream ngay lập tức. Không lưu dữ liệu rác. | High    | [ ] |
+| **TC-F05-01-10**| `US-01/Con` | `Concu` | Xung đột phiên chỉnh sửa song song | Thao tác đồng thời trên 2 Tab | Tab thao tác sau trả về HTTP 409 Conflict. Yêu cầu làm mới trang. | Blocker | [ ] |
+| **[US-02: Page Manager]** (12 Cases) | | | | | | | |
+| **TC-F05-02-01**| `US-02/AC1` | `UI`    | Hiển thị lưới danh sách Page | Mở Tab Pages tại công cụ Sidebar | Trả về danh sách gồm: Cờ Live/Draft, số lượng khối, Ngày update. | High    | [x] |
+| **TC-F05-02-02**| `US-02/Stt` | `State` | Trạng thái lưới khi Dữ liệu rỗng | Xóa toàn bộ trang trong cơ sở dữ liệu | Giao diện Empty State hiển thị thông báo "Chưa có trang". | High    | [x] |
+| **TC-F05-02-03**| `US-02/Stt` | `State` | Trạng thái Loading Skeleton | Giảm tốc độ đường truyền kết nối | Cấu trúc Skeleton mờ sáng hiển thị đến khi Load xong dữ liệu. | Medium  | [ ] |
+| **TC-F05-02-04**| `US-02/AC2` | `Func`  | Thêm trang mới hợp lệ | Nhập tên trang mới hợp lệ | Tạo trang thành công. Slug định dạng `kebal-caseL`. Redirect đúng URL| Blocker | [x] |
+| **TC-F05-02-05**| `US-02/Val` | `Val`   | Form Title bị bỏ trống | Click Submit mà không nhập liệu| Cản luồng Form Submit. Trường Zod báo lỗi "Tên trang là bắt buộc". | High    | [x] |
+| **TC-F05-02-06**| `US-02/Sec` | `Sec`   | XSS Injection vào Form Tên | Nhập chuỗi HTML `<script>` nguy hiểm| Payload CMS Sanitize lọc bỏ XSS. Tên trang loại trừ rủi ro JS chạy ngầm. | Blocker | [x] |
+| **TC-F05-02-07**| `US-02/Val` | `Val`   | Phân tích giá trị biên Title Length| Nhập chuỗi 300 ký tự vào Name | Lỗi Input Maxlength (Tối đa 255 ký tự). Block tiến trình API Save. | Priority| [ ] |
+| **TC-F05-02-08**| `US-02/Limit`| `Bound` | Trùng lặp đường dẫn (Duplicated Slug)| Thêm một trang có tên đã tồn tại| Cơ chế tự động thêm đuôi số thứ tự vào slug mới để tránh DB Conflict. | Medium  | [x] |
+| **TC-F05-02-09**| `BR-08.1`   | `Limit` | Giới hạn số lượng trang (Max Pages) | Tạo vượt quá 100 trang trong Site| Trả về lỗi Validation "Đã đạt giới hạn 100 trang cho cơ sở dữ liệu". | Medium  | [ ] |
+| **TC-F05-02-10**| `US-02/AC3` | `Logic` | Xóa mềm một trang (Soft Delete)| Xác nhận lệnh xóa trang | Thiết lập `deletedAt`. Mảng danh sách loại bỏ ID này. | High    | [x] |
+| **TC-F05-02-11**| `US-02/Undo`| `Recov` | Hủy thao tác xóa (Undo Deletion)| Bấm "Hoàn tác" ngay tại Toast | Xóa giá trị `deletedAt`. Trang hiển thị trả về đúng vị trí danh sách cũ. | Blocker | [x] |
+| **TC-F05-02-12**| `US-02/AC4` | `Flow`  | Đổi trạng thái Ẩn trang (Hide/Unhide)| Dùng Toggle kích hoạt vô hiệu hóa| Giá trị isVisible thay đổi. Trạng thái Live của User ngoài báo 404. | Blocker | [x] |
+| **[US-03: Inline Click-to-Edit Element]** (6 Cases) | | | | | | | |
+| **TC-F05-03-01**| `US-03/AC1` | `UX`    | Tương tác hiển thị Nút gọi AI | Hover chuột lên một Text Block tĩnh | Gọi Popup "Edit with AI" tọa lề chính xác. | Medium  | [ ] |
+| **TC-F05-03-02**| `US-03/AC2` | `Func`  | Viết lệnh Inline Text AI | Cung cấp ngữ cảnh sửa nội dung | Khối Block nhận lệnh điều chỉnh ký tự cục bộ không làm lệch layout CSS.| Blocker | [x] |
+| **TC-F05-03-03**| `US-03/Flow`| `Flow`  | Hủy quá trình soạn thảo Inline | Click chuột viền ngoài Component | Thoát bảng Popup. Không tạo lịch sử nháp lưu trên State. | Medium  | [ ] |
+| **TC-F05-03-04**| `US-03/Mob` | `Mob`   | Tương thích Popup Inline Mobile | Mô phỏng tại Viewport 375px | Popup chuyển thể thành Bottom Sheet thay vì Floating Box tràn lề. | High    | [ ] |
+| **TC-F05-03-05**| `US-03/AI`  | `Val`   | Ngoại lệ kết nối API Backend | Ngắt ngầm kết nối trong Inline Edit | Text Component được bảo tồn giá trị ban đầu, cờ Error Toast báo kết nối. | High    | [x] |
+| **TC-F05-03-06**| `US-03/Limit`| `Bound` | Rào cản ký tự Text Input Prompt | Nhập quá số lượng từ quy ước | Dấu hiệu đỏ hiển thị Form Validation chống Bypass gửi Request dư. | Medium  | [ ] |
+| **[US-04: Add New Section via AI]** (3 Cases) | | | | | | | |
+| **TC-F05-04-01**| `US-04/AC1` | `Logic` | Khởi tạo Component tự động | Lệnh khởi tạo một Block Footer | Cập nhật cấu trúc JSON DOM bổ sung Element mượt mà. | High    | [x] |
+| **TC-F05-04-02**| `US-04/Hall`| `Edge`  | Lệnh Ảo/Out of Context Scope | LLM nhầm cấu trúc Block phi chuẩn | Fallback cơ chế từ chối rủi ro, thông báo Chat "Không nhận dạng khối". | Medium  | [ ] |
+| **TC-F05-04-03**| `US-04/Lim` | `Bound` | Tràn bộ nhớ Component DOM Limit | Gấp số lượng Block > Max Length | Chặn đứng cơ chế ghép DOM vượt hạn độ (Chống quá tải Render Engine). | High    | [ ] |
+| **[US-05: Drag-and-Drop Block Reorder in Editor]** (5 Cases) | | | | | | | |
+| **TC-F05-05-01**| `US-05/AC1` | `DND`   | Thao tác hoán đổi vị trí Block | Kéo Block lên một khoảng mục tiêu | Index Z-Order đổi chỗ hợp lệ. Render trực diện tại Iframe chuẩn thông số. | Blocker | [ ] |
+| **TC-F05-05-02**| `US-05/AC2` | `Logic` | Hủy thay đổi Hoán Vị DND | Gọi lại Component Undo State | Undo khôi phục chính xác ID định khối Block. API Redo State hoạt động. | High    | [x] |
+| **TC-F05-05-03**| `US-05/Spam`| `Race`  | Tương tác Drag and Drop dồn dập | Liên tục thay vị trí Block 5s | Throttling chống tạo Race Condition Array, API Update ghi nhận bản lưu cùng. | Blocker | [ ] |
+| **TC-F05-05-04**| `US-05/Sec` | `UI`    | Tha thả Component Ngoài Boundary | Keo element rời ra ngoài phạm vi Window | Xóa thành công Ghost Element khỏi DOM. Reset Layout an toàn gốc. | Medium  | [ ] |
+| **TC-F05-05-05**| `US-05/Mob` | `Mob`   | Thiết lập giới hạn Drag trên Mobile | Kiểm thử Môi trường điện thoại | Cơ chế trượt vuốt (Scroll) không Xung đột Lẫn Lộn với cơ chế Kéo thả. | High    | [ ] |
+| **[US-06: Manual Visual Editing (WYSIWYG Text & Image)]** (8 Cases)| | | | | | | |
+| **TC-F05-06-01**| `US-06/AC1` | `Func`  | Định dạng chuẩn Bold/Italic | Sử dụng thanh công cụ Text Toolbar| Tag `<b>`, `<i>` được wrap an toàn trong mã nguồn Rich Text DB. | High    | [x] |
+| **TC-F05-06-02**| `US-06/AC2` | `DB`    | Tình huống xóa Null toàn vẹn Block| Cố tình xóa rỗng phần Text | Khóa chặn đứt mạch Document bằng Placeholder Text, duy trì Padding CSS.| Medium  | [ ] |
+| **TC-F05-06-03**| `US-06/Img` | `Val`   | Nén hình ảnh tự động (Auto Compress) | Tải tệp hình Bitmap >10MB lên | Frontend Middleware thực thi Resize hình đạt chuẩn, giảm nhẹ File Size API.| Blocker | [x] |
+| **TC-F05-06-04**| `BR-08.1`   | `Limit` | Chối File Upload Ngoại Lệ định dạng | Nhúng file `.exe` thay vì ảnh | Xác thực Validator khóa API chặn gọi Cloud Storage S3 dư thừa. | High    | [ ] |
+| **TC-F05-06-05**| `US-06/Sec` | `Sec`   | Chống Injection Style Dơ từ Office | Copy/Paste nội dung dài từ Word | Hàm DOMPurify làm sạch mọi thẻ Inline Style rủi ro hỏng định dạng App. | High    | [x] |
+| **TC-F05-06-06**| `US-06/Sec` | `Sec`   | Security Check Injection SVG XML | Upload File Logo mang mã SVG Hack | Object Base Server xóa bỏ Payload XML không an toàn phòng chống XSS triệt.| Blocker | [x] |
+| **TC-F05-06-07**| `US-06/UI`  | `UI`    | Hiển thị Floating Toolbar Chuẩn | Text selection Highlight phạm vi | Bảng Tool xuất hiện canh lề chuẩn, không chắn View nội dung phía dưới. | High    | [ ] |
+| **TC-F05-06-08**| `US-06/Race`| `Race`  | History Undo Limit Test (Tràn Range)| Tổ hợp Ctrl+Z 60 vòng lặp nhanh | Chỉ giữ mảng tối đa 50 Undo Array (Nút mờ đi) chống nguy cơ Crash Memory. | Blocker | [ ] |
+| **[US-07: Global Header & Footer Management]** (5 Cases) | | | | | | | |
+| **TC-F05-07-01**| `US-07/AC1` | `Func`  | Sắp xếp phân cấp Sub-menu Navigation| Neo và đưa Item Menu lồng | Cấu hình Menu cha-con hiển thị Global Navigation Bar xuyên suốt các List Page. | High    | [ ] |
+| **TC-F05-07-02**| `BR-08.1`   | `Limit` | Hạn chế cấp lồng tối đa tầng Node | Gắn một tầng cấp 3 vào Tree | Cơ chế cản Nested level 3 (Toast Cấm: Chỉ hỗ trợ Navigation 1 cấp con). | High    | [x] |
+| **TC-F05-07-03**| `US-07/AC2` | `Logic` | Tính năng cắt gọt sinh Favicon Tự | Thay đổi Main Logo Root | Xử lý hình ảnh gốc xuống tỷ lệ 32x32px ghim tự động cho thẻ `[rel="icon"]`.| High    | [x] |
+| **TC-F05-07-04**| `US-07/Val` | `Val`   | Check Validation Menu Không Cố Dãn| Liên kết Link Empty không Url | Trường Dữ liệu báo Valid Error yêu cầu nhúng Đích Cụ Thể (URL Target Lived). | High    | [ ] |
+| **TC-F05-07-05**| `US-07/Race`| `Sec`   | Giới Hạn Array Item Header Menu | Load vượt mốc 15 Title Danh Cấp | Khóa cấm mốc List vượt ngạch Navigation tránh Trầm Cấp Mobile Render Nát.| Medium  | [ ] |
+| **[US-08: Drag-and-Drop Component Library]** (5 Cases) | | | | | | | |
+| **TC-F05-08-01**| `US-08/UI`  | `UI`    | Hiểu Thị Menu Dạng List Danh Block| Chọn mở Thanh Cụ Component Vãn | Render đầy đủ Library Element tách từng phân loại Ecommerce / Content Tĩnh.| Medium  | [ ] |
+| **TC-F05-08-02**| `US-08/Stt` | `State` | Cấp Độ Lỗi Fallback Database Fetch| Ngưng Server API Blocks List Model| Trả Lỗi Empty State Rỗng Network Đính "Nút Lỗi Tải Mạng, Nhấn Xin Thử Đi Lại".| Priority| [x] |
+| **TC-F05-08-03**| `US-08/DND` | `DND`   | Thao Tác Neo Ráp Chạm Đích DND Chuẩn| Gọi Chọn Cấu Đáy Trục Dọc Layout | Tính Toán Iframe Z-Order Mượt Sóng Không Khựng Hiệu Ứng Nối Nút (Indicator Nổi).| Blocker | [ ] |
+| **TC-F05-08-04**| `US-08/Mob` | `Mob`   | Click Thẳng Trên Màn Hình Handset | View Trộm Di Động Bấm Màn Chọn | Mobile Hỗ Trợ Ghi Đáy Iframe Qua Mode Nút Tap Chìm Chạm Chống Nhập Drag Drop. | High    | [ ] |
+| **TC-F05-08-05**| `US-08/Sec` | `Race`  | Bắt Rào Căn Cản Vứt Component Nhấn| Đẩy Nhanh Chuỗi Touch API Liên Tục| API Batch Call Cản Giảm Vãn Click Gây Race Dội Load Server Khi Spawn Data Block. | High    | [ ] |
+| **[US-09: Tùy chỉnh Trang 404 (404 Not Found Page)]** (3 Cases) | | | | | | | |
+| **TC-F05-09-01**| `US-09/AC1` | `Func`  | Update Hình Ảnh Nền Template Cũ 404| Cung cấp Content Mới Ở Form 404 | System Route Ánh Xạ Đường Lỗi Http 404 Bắt Format Page Template 404 Khách Tạo. | High    | [x] |
+| **TC-F05-09-02**| `US-09/Val` | `Bound` | Ràng buộc Bảo Vệ Field Root Path | Đè Trịch Chỉnh Sửa Path Routing | Nút Sửa Slug Tắt Input Đen Không Vãn Đổi Hệ Cắt Root Error Domain Phá 500 Vỡ. | Blocker | [x] |
+| **TC-F05-09-03**| `US-09/Flow`| `Flow`  | Đánh Unpublish Rút Chân 404 Form Mới| Xoay Giao Diện Dọc Đổi Khóa Bật Trang| Hệ System 404 Cấm Quyền Unpublish Block Nút Đè Trái Màn Web System Default. | High    | [x] |
+| **[US-10: Publish & Unpublish Flow (Live & Maintenance)]** (6 Cases)| | | | | | | |
+| **TC-F05-10-01**| `US-10/AC1` | `Flow`  | Thử Nghiệm Chuỗi Dựng Live Web Domain| Chọn Khóa Form Triền Publish Ra | Đẩy API Subdomain Nối Pipeline Cloud Flare Ping Khách Trong Range 30 Giây. | Blocker | [x] |
+| **TC-F05-10-02**| `US-10/AC2` | `Flow`  | Gọi Lặp Lệnh Re-Publish Dữ Liệu | Đổi Text Live Web Và Gửi Sync Deploy| Server Refresh Trả 100% Nội Render Cache Sạch Mọi Endpoint URL DNS Truy Xuất. | High    | [x] |
+| **TC-F05-10-03**| `US-10/AC3` | `Flow`  | Đẩy Form Ngưng Dùng Route Maintenance| Thiết Lập Quản Unpublish Chặn Khách| Router Code Quảy 503 Web Ngang Giật Thay Bảng Maintenace Thay Khách Ngã. | Blocker | [x] |
+| **TC-F05-10-04**| `US-10/Err` | `Net`   | Lỗi Trạm Cloud Server Mạng Sập Đột Ngột| Mất Network Giữa Cú Deploy Lõi | Loading Timeout 30s Chặn Đứt Gắn Alert "Lỗi Đồng Bộ Backend Hệ Thống Sống". | Blocker | [ ] |
+| **TC-F05-10-05**| `US-10/Race`| `Race`  | Nháp Nháy Kép Publish Component Ngay | Double Tán Nút Gọi Khí Giật Đô Cấp | Bảng Khóa Disable Tool Chặn Dữ Liệu Kênh Race API Route Cạn Nguồn Cloud Nhất. | Blocker | [x] |
+| **TC-F05-10-06**| `US-10/UI`  | `UI`    | Render Card Live Liên Tuyến Link Vành| Hiện Badge Xanh Chướng Nút Route Mở| Form Dâng "Mở Web" Trực Bật Trang Link Tĩnh Bảng New Tab Tách Mảng Edit Khách. | Medium  | [ ] |
+| **[US-11: Interactive Widgets (Cart & Social Media)]** (4 Cases)| | | | | | | |
+| **TC-F05-11-01**| `US-11/AC1` | `UX`    | Tích Giác Click Link Direct Social | Khúc Form Nền Gõ Kênh Mạng FaceBook | Nút Nhấn Nẩy Route Trang Mục Tiêu `_blank` Đảm Bảo Dữ Target Chuẩn Hành Vi Mới.| Priority| [x] |
+| **TC-F05-11-02**| `US-11/Val` | `Val`   | Form Input Validate Định Ngữ Error Lạc| Truy Cập Text Box Chừa Lố Link URL Rỗng| Regex Kiểm Gốc Kích Đỏ Khung Input Required Định Ngăn Form API Rỗng Gây Dump.| High    | [ ] |
+| **TC-F05-11-03**| `US-11/AC2` | `Logic` | Lệnh Gọi CheckOut Kênh Cart Chưa Pay| Ráp Giỏ Hàng Tenant Tòa Free Mức Dưới| Nền Iframe Có Cart Ngưng Hành Toast Báo "Hãy Kích Hoạt Tính Năng Ở Bảng Dashboard".| Blocker | [x] |
+| **TC-F05-11-04**| `US-11/Flow`| `Flow`  | Mạng Giỏ Hàng Lệch Index Ngãng Sync | Thao Tác Chặn Thêm Giỏi Lệnh Data Cart| API Cống Nạp Item Render Căng Sóng Iframe Mượt Cấm Nháy Quá Đếm Số Ảo Gây Vỡ Layout.| Medium  | [ ] |
+| **[US-12: Global Business Info & Settings Panel]** (6 Cases)| | | | | | | |
+| **TC-F05-12-01**| `US-12/AC1` | `UI`    | Quan Sát Giao Diện Right Global Settings| Trích Form Navigation Chọn Global Khung| Component Cấu Kiến Form Contact Social Media Mở Ngang UI Mượt Dọc Tĩnh Rất Bền.| Medium  | [ ] |
+| **TC-F05-12-02**| `US-12/AC2` | `DB`    | Tương Cặp Binding Root Data Dây Chuyền| Nhập Dữ Liệu Email Số HotLine Số Doanh | Hệ Layout Tương Chéo API Render Nối Layout Bật Kịp Mép Dữ Header Rẽ Không Trễ Cáp.| Blocker | [x] |
+| **TC-F05-12-03**| `US-12/Del` | `State` | Càn Quét Logo Icon Xóa Tức Rút Kho | Đánh Biến Nút Logo Image Bóc Null Quản| Component Logo Bật Xóa, Chặn Mảng Trống Fallback Sang Chữ Text Name Bảng Thay Image.| High    | [ ] |
+| **TC-F05-12-04**| `US-12/Val` | `Val`   | Check Validation Email Contact Wrong | Gõ Email Cốc Lạc Định Lỗi Thừa Mã `@@`| Zod Bắt Áp Regex Red Check Error Text Nhá Tọa Lệnh Ngăn Save API Nhập Rác Lưới Iframe.| High    | [x] |
+| **TC-F05-12-05**| `US-12/Alert`| `Safe` | Vùi Cửa Sổ Form Chưa Save Khi Sửa Thoát| Sửa Email Lại Bấm Phím Nút Đóng Popup| Chóp Modal Confirm Phanh Vành Khẳng Cáo "Bạn Chưa Lưu Form Nhé Tắt Không Kệ Bỏ Xong".| High    | [ ] |
+| **TC-F05-12-06**| `BR-08.1`   | `Limit` | Điền Tên Mạng Tràn Max Regex Độ Rộng| Cặp Tên Store Max Quá Giá 150 Dài Cuốc| Frontend Input Field Chặn Quản Ngang Nhập, Quýt Mã Boundary Không Cấu Rách Mảng Navbar.| Priority| [ ] |
+| **[US-13: Page-Level SEO & AI Optimization]** (5 Cases) | | | | | | | |
+| **TC-F05-13-01**| `US-13/AC1` | `Func`  | Nắn Trục Form Metadata Input SEO | Gõ Tay Đoạn Dòng Thẻ Meta Route Đỉnh| Mạng Form Hiển View Tựa Bảng Google Search Result Đúng Y Nét Ảo Code DOM Head Gài Iframe.| High    | [ ] |
+| **TC-F05-13-02**| `US-13/AI`  | `AI`    | Gọi Auto-Gen AI Text Gen Description| Nút Nhấp Chuỗi API Prompt Sinh Chuẩn Kép| Bộ Payload Tool Extract Ngọt Nghĩa Nhả Đoạn Meta Text Đưa Chữ Kéo Thẻ Route Chính Iframe. | Blocker | [x] |
+| **TC-F05-13-03**| `US-13/Lim` | `AI`    | Quản Spam Auto SEO Liên Hoành | Hit Call Generate Quá 15 Rate Limits Cáp| 429 Error Tắt Gen Mã Lệnh, Text Đỏ Thông Giới AI Bọc Chóp Rate Token Ráo Ngăn Vỗ Ngay Cấp.| Blocker | [x] |
+| **TC-F05-13-04**| `BR-08.1`   | `Limit` | Chừa Vành Vỏ Title Dài Quá Ngưỡng | Viết Quá Số Character Recommend Ngập Khung | Lỗi Soft Limit Warn Cảnh Vàng Viền Thể Hiện Rút Mức Text Cắt Title Trên Màn Hình Search.| Priority| [ ] |
+| **TC-F05-13-05**| `US-13/Stt` | `State` | Network Auto-Gen Drop Giữa Form Quá Tĩnh| AI Tải Mã Đứt Đuôi Error Kẹt Ngang Trục Rớt| Giao Diện Input Text Rỗng Form, Toast Bắn Báo Kẽ Hỏng Route Fallback Mạng An Toàn Dịch Lưu.| High    | [ ] |
 
 ---
 
@@ -107,10 +125,10 @@ _Bảng tổng hợp kịch bản kiểm thử, phân loại theo User Story nh�
 _Mô tả kịch bản kiểm thử dựa trên hành vi tổng thể của Cửa hàng Bán lẻ (SME Owner)._
 
 **Kịch bản E2E:** 
-1. **[Bơm dữ liệu mồi - US-01]** Truy cập trình Builder Editor với Site ID mới. Thực hiện chat thử lệnh thay đổi nền website sang màu đậm. API streaming trả về layout trong thời gian chưa đến 3 giây mà không làm sập giao diện preview (TC-F05.02).
-2. **[Hiệu đính thủ công - US-05, US-06, US-08]** Người dùng tiếp tục tương tác kéo thả component như Giỏ hàng hoặc Form Contact từ danh mục (Library) sang Iframe. Layout không bị xô lệch trên di động. Sửa nhanh 1 dòng chữ bằng cách Double-Click WYSIWYG và Upload Logo mới hệ thống tự sinh Favicon đẹp chuẩn (TC-F05.20).
-3. **[Quản lý rẽ nhánh - US-02]** Thêm 1 trang hoàn toàn mới "Khuyến Mãi" bằng Page Manager. Cấu trúc link tự động render và đẩy menu header cập nhật realtime lên toàn bộ 2 trang. Thao tác xóa mượt mà với tính năng Undo Toast (TC-F05.09).
-4. **[Phát hành xuất bản - US-10]** Xem trước toàn bộ thiết bị (Desktop, Mobile) trước khi check Pre-Publish Box. Hệ thống render live trên subdomain public trong chưa tới nửa phút mà không gặp trục trặc CDN hay lỗi SSL 503 (TC-F05.24). DNS đẩy Live thành công 100%. Đảm bảo User thao tác lưu mượt (Throttle 3 giây) xuyên suốt dòng đời hành trình trải nghiệm Hybrid Bot này (TC-F05.04).
+1. **[Bơm dữ liệu mồi - US-01]** Truy cập trình Builder Editor với Site ID mới. Thực hiện chat thử lệnh thay đổi nền website sang màu đậm. API streaming trả về layout trong thời gian chưa đến 3 giây mà không làm sập giao diện preview (TC-F05-01-02).
+2. **[Hiệu đính thủ công - US-05, US-06, US-08]** Người dùng tiếp tục tương tác kéo thả component như Giỏ hàng hoặc Form Contact từ danh mục (Library) sang Iframe. Layout không bị xô lệch trên di động. Sửa nhanh 1 dòng chữ bằng cách Double-Click WYSIWYG và Upload Logo mới hệ thống tự sinh Favicon đẹp chuẩn.
+3. **[Quản lý rẽ nhánh - US-02]** Thêm 1 trang hoàn toàn mới "Khuyến Mãi" bằng Page Manager. Cấu trúc link tự động render và đẩy menu header cập nhật realtime lên toàn bộ 2 trang. Thao tác xóa mượt mà với tính năng Undo Toast (TC-F05-02-09).
+4. **[Phát hành xuất bản - US-10]** Xem trước toàn bộ thiết bị (Desktop, Mobile) trước khi check Pre-Publish Box. Hệ thống render live trên subdomain public trong chưa tới nửa phút mà không gặp trục trặc CDN hay lỗi SSL 503 (TC-F05-10-01). DNS đẩy Live thành công 100%. Đảm bảo User thao tác lưu mượt (Throttle 3 giây) xuyên suốt dòng đời hành trình trải nghiệm Hybrid Bot này.
 
 ---
 
@@ -118,8 +136,7 @@ _Mô tả kịch bản kiểm thử dựa trên hành vi tổng thể của Cử
 
 | Nhóm Kiểm thử (Criteria) | Trạng Thái (Status) | Ghi chú (Notes) |
 |---|---|---|
-| **1. UI/UX Coverage** | [ ] Not Run | Thực thi kiểm định đa kích thước màn hình & tương thích Layout Component Drag And Drop trên DOM Iframe Sandboxed. |
-| **2. AI Logic & Functions** | [ ] Not Run | Xác minh các tác vụ Stream SSE và Render Hoàn tác State Management Zustand thông qua Automation Test Script Playwright. |
-| **3. Security & DB Validation** | [ ] Not Run | Kiểm duyệt cơ chế Auto-Save không gây Overload DB, Sandbox Protocol ngăn chặn Script Cross-frame Inject. |
-| **4. Performance SLA** | [ ] Not Run | Đánh giá Render DOM và phản hồi Network < 3s cho từng tương tác cập nhật Web tĩnh, 30s cho Submit Live DNS Web Route Publish Gateway Server Network Lực Mạng Kéo Chuẩn Nhanh Chống Sập Lag. |
-| **5. E2E UAT Approval** | [ ] Not Run | BA và PM Review kịch bản UAT User Story Journey, phê duyệt độ hoàn thiện mức 9/10 User-Satisfaction Metric cho Launch. |
+| **1. Trận Địa UI/UX Coverage & UI States** | [ ] Not Run | Xác Minh Skeleton, Ngắn Mạng Không Đứt, Bảng Liệt Kê Empty Cứng Cáp Đóng Cổng Gãy Trắng Đáy. |
+| **2. AI Logic & Recovery Limits** | [ ] Not Run | Đo 100% Rate Limit Bot, Tràn Token Text Dài, Mạng Tháo Socket SSE Vẫn Tinh Tế Revert Lại Mã Iframe Lõi Bền Bỉ. |
+| **3. Negative Form Validation** | [ ] Not Run | Áp Lệnh Zod Ngăn Ôn Blank Space Mọi Lỗ Hổng Add Page, Chặn Vọc Tự Tiêm Mã Script Độc `<>`. |
+| **4. E2E UAT Approval** | [ ] Not Run | PO Review Hành Trình Liên Tuyết Nối Thành Công, Đạt Tỷ Lệ Approved Coverage 100% Theo Kịch Bản Định Chuẩn Nhất. |
