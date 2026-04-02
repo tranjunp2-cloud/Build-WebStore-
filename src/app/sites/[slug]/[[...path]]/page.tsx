@@ -21,14 +21,29 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     const payload = await getPayload({ config })
     const user = await getCurrentUser()
 
-    // Find tenant by subdomain slug
-    const tenantsResult = await payload.find({
-        collection: 'tenants',
-        where: { slug: { equals: slug } },
-        limit: 1,
-    })
+    let tenant;
 
-    const tenant = tenantsResult.docs[0]
+    /* REQ-F19: Resolve custom domain route */
+    if (slug === 'custom') {
+        const hostname = reqHeaders.get('x-tenant-hostname')
+        if (!hostname) return null
+        
+        const tenantsResult = await payload.find({
+            collection: 'tenants',
+            where: { 'customDomains.domain': { equals: hostname } },
+            limit: 1,
+        })
+        tenant = tenantsResult.docs[0]
+    } else {
+        // Find tenant by subdomain slug
+        const tenantsResult = await payload.find({
+            collection: 'tenants',
+            where: { slug: { equals: slug } },
+            limit: 1,
+        })
+        tenant = tenantsResult.docs[0]
+    }
+
     if (!tenant) return null
 
     // Find the site for this tenant
