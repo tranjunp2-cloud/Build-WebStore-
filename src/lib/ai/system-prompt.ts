@@ -65,6 +65,7 @@ ${blockList}
 8. Include at least one CTA block or CTA in hero
 9. Navigation should have relevant links matching other sections
 10. Footer should reference the business name
+11. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
 
 ## CONTENT QUALITY RULES
 11. Hero headline must mention the ACTUAL business name
