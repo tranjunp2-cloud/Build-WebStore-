@@ -76,7 +76,12 @@ Each product item MUST have:
     - price: (number) same as base price unless specified per variant
     - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on product abbreviation + option (e.g. "DT-XH-M")
     - stock: (number) default to 10 per variant
-  If the product has NO specific color/size/variant options mentioned, return variants as an empty array [].
+  If the product has NO specific options mentioned, return variants as an empty array [].
+- variantConfigs: (array) If variants exist, provide up to 2 tier configurations representing the dimensions.
+  Each object MUST have:
+    - name: (string) The dimension name in ${targetLanguage.toUpperCase()} (e.g., "Color", "Size", "Material", "Warna")
+    - options: (array) An array of objects with a "value" string, e.g., [{"value": "S"}, {"value": "M"}]
+  If no variants exist, return an empty array [].
 
 Rules:
 - Extract prices correctly: k/K = x1000, eg. 45k = 45000
@@ -104,19 +109,19 @@ Rules:
 
         const parsed = JSON.parse(content)
         return NextResponse.json(parsed)
-    } catch (error: any) {
+    } catch (error) {
         console.error('[AI Bulk Parse Error]', error)
         
-        // Cải thiện UX (QA & FE friendly error message)
-        let message = 'Hệ thống AI tạm thời không tĩnh được, vui lòng thử lại sau.'
-        if (error?.message) {
-            if (error.message.includes('429') || error.message.includes('quota') || error.message.includes('insufficient_quota')) {
-                message = 'Hệ thống AI đang quá tải hoặc hết hạn ngạch (Quota Exceeded), vui lòng thử lại sau hoặc báo admin.'
-            } else if (error.message.includes('timeout')) {
-                message = 'Hệ thống AI phản hồi quá chậm (Timeout), vui lòng nhập ít văn bản hơn hoặc thử lại sau.'
+        let errorCode = 'parseError'
+        const err = error as Error;
+        if (err?.message) {
+            if (err.message.includes('429') || err.message.includes('quota') || err.message.includes('insufficient_quota')) {
+                errorCode = 'aiQuotaExceeded'
+            } else if (err.message.includes('timeout')) {
+                errorCode = 'aiTimeout'
             }
         }
         
-        return NextResponse.json({ error: message }, { status: 500 })
+        return NextResponse.json({ error: errorCode }, { status: 500 })
     }
 })

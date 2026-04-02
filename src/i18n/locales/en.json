@@ -514,6 +514,41 @@
             }
         },
         "products": {
+            "mobile": {
+                "productDetails": "PRODUCT DETAILS",
+                "noImage": "No Image",
+                "unnamedProduct": "Unnamed Product",
+                "multipleSkus": "Multiple SKUs",
+                "none": "None",
+                "taxesSst": "Taxes: SST (6%)<br />Incl.",
+                "stockLevel": "Stock Level",
+                "centralWarehouse": "Central Warehouse",
+                "unitsAvailable": "Units Available",
+                "productVariants": "Product Variants",
+                "productFeatures": "Product Features"
+            },
+            "quickView": {
+                "altMainProduct": "Main product",
+                "stockLevel": "Stock Level",
+                "healthy": "Healthy",
+                "lowStock": "Low Stock",
+                "outOfStock": "Out of Stock",
+                "currentStock": "Current Stock:",
+                "productDetails": "Product Details",
+                "skuIdentification": "SKU Identification",
+                "skuFallback": "N/A",
+                "taxConfiguration": "Tax Configuration",
+                "taxesSst": "Taxes: SST (6%) Incl.",
+                "categoryPath": "Category Path",
+                "uncategorized": "Uncategorized",
+                "pricing": "Pricing",
+                "off": "OFF",
+                "inventoryVariants": "Inventory Variants",
+                "description": "Description",
+                "deleteConfirm": "Are you certain?",
+                "deleteProduct": "DELETE PRODUCT",
+                "editProduct": "EDIT PRODUCT"
+            },
             "title": "Products",
             "addProduct": "Add Product",
             "empty": {
@@ -714,6 +749,7 @@
                     "optionPlaceholderRed": "e.g. Red",
                     "optionPlaceholderSmall": "e.g. Small",
                     "addOption": "Add option",
+                    "addTier": "Add Option / Tier",
                     "createSkuTable": "Create SKU Table",
                     "skuMatrix": "SKU Matrix Table",
                     "colVariant": "Variant",
@@ -742,8 +778,8 @@
                 }
             },
             "bulkCreate": {
-                "title": "Fast AI Bulk Create",
-                "subtitle": "Paste a list of items for AI to process automatically",
+                "title": "Confirm Create Products (AI Preview)",
+                "subtitle": "Review and edit before saving",
                 "promptLabel": "Prompt / Item List",
                 "promptPlaceholder": "Example: 2 brown capybara keychains $15, 1 red slippers size M $5...",
                 "parseEmptyError": "Please enter a product list description",
@@ -752,6 +788,8 @@
                 "parseSuccess": "Successfully extracted {count} products",
                 "parseInvalidData": "AI returned invalid data",
                 "parseError": "Processing error",
+                "aiQuotaExceeded": "AI system is overloaded or out of quota. Please try again later.",
+                "aiTimeout": "AI system responses are too slow (Timeout). Please try again with shorter text.",
                 "previewTitle": "Preview Grid (AI Processed)",
                 "previewSubtitle": "Empty images will use a default carton icon when saved",
                 "colImage": "Image",
@@ -764,13 +802,41 @@
                 "editorHint": "💡 Click directly on Name, Price, or Category cells to edit before saving.",
                 "footerCount": "{selected} / {total} products selected",
                 "cancel": "Cancel",
-                "saveButton": "Save {count} Products",
+                "saveButton": "Save",
+                "productsItem": "Products",
                 "saveEmptyError": "Please select at least 1 product to save",
                 "saveSuccess": "Created {count} draft products. Please add images before publishing.",
                 "saveFailed": "Failed to create products",
-                "saveError": "Error saving products"
+                "saveError": "Error saving products",
+                "aiWorking": "AI magic is working...",
+                "table": {
+                    "name": "NAME",
+                    "price": "PRICE",
+                    "variants": "VARIANTS",
+                    "empty": "Product list is empty.",
+                    "defaultVariant": "Default"
+                },
+                "note": {
+                    "label": "Note: ",
+                    "description": "Products will be saved as Draft"
+                },
+                "toast": {
+                    "invalidFormat": "Invalid products format received from AI",
+                    "parseFailed": "Failed to parse products summary",
+                    "noSelection": "Please select at least 1 product",
+                    "saveSuccess": "Saved {count} products as draft",
+                    "saveFailed": "Failed to save products"
+                }
             },
             "categories": {
+                "table": {
+                    "level": "LEVEL",
+                    "products": "PRODUCTS",
+                    "actions": "ACTIONS",
+                    "noResults": "No results found",
+                    "noCategories": "No Categories",
+                    "tryAdjusting": "Try adjusting your search terms."
+                },
                 "title": "Category Management",
                 "subtitle": "Manage product categories (up to 3 levels deep)",
                 "backToProducts": "Products",
