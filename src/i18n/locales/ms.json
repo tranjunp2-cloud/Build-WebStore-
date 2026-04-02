@@ -434,7 +434,7 @@
                 "loadFailed": "Gagal memuatkan pesanan",
                 "bulkSuccess": "Berjaya mengesahkan {count} pesanan",
                 "bulkFailed": "{count} pesanan gagal (aliran kerja tidak sah)",
-                "updateFailed": "Ralat: {message}"
+                "updateFailed": "Gagal mengemaskini pesanan"
             },
             "pageTitle": "Pesanan",
             "pageSubtitle": "Urus dan jejak pesanan anda",

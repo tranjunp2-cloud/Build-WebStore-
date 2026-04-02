@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { TEMPLATE_CATEGORY_OPTIONS } from '@/collections/Templates'
 
 /**
- * GET /api/templates/categories
+ * GET /api/data/industries
  * Returns template categories that actually exist in the database.
  * Public endpoint — used by builder form to show industry options.
  */
@@ -45,10 +45,10 @@ export async function GET() {
 
         return NextResponse.json({ docs: categories })
     } catch (error: any) {
-        console.error('Templates categories error:', error)
+        console.error('Industries API error:', error)
         return NextResponse.json({
             docs: [],
-            error: 'Failed to load categories',
+            error: 'Failed to load industries',
         }, { status: 500 })
     }
 }

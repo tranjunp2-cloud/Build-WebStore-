@@ -14,6 +14,44 @@ vi.mock('@/store/builderStore', () => ({
         selector({ setBusinessInfo: mockSetBusinessInfo }),
 }))
 
+// Mock i18n
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: {
+            onboarding: {
+                step1Title: 'Create Website with AI',
+                step1Subtitle: 'Business Information',
+                form: {
+                    businessName: 'Business Name',
+                    businessNamePlaceholder: 'e.g. Acme Studio',
+                    industry: 'Industry',
+                    loadingIndustries: 'Loading industries...',
+                    products: 'Products / Services',
+                    productsHint: 'What do you sell?',
+                    productsPlaceholder: 'e.g. Custom website design...',
+                    shortDescription: 'Short Description',
+                    shortDescriptionHint: 'What is your business about?',
+                    shortDescriptionPlaceholder: 'e.g. We are a creative agency...',
+                    generateButton: 'Continue',
+                    promoTitle: 'AI Builder',
+                    promoDescription: 'Let AI build your website.',
+                    promoStep1: 'Describe',
+                    promoStep2: 'Generate',
+                    promoStep3: 'Refine',
+                    errors: {
+                        businessName: 'Please enter your business name',
+                        industry: 'Please select an industry',
+                        products: 'Please describe your products / services',
+                        shortDescription: 'Please describe your business',
+                    },
+                    errorMessage: 'Generation failed, please try again.',
+                    retryWithCurrent: 'Retry with current information',
+                }
+            }
+        }
+    })
+}))
+
 // Stub builder sub-components so tests focus on BusinessInfoForm logic
 vi.mock('@/components/builder/fields/BuilderField', () => ({
     BuilderField: ({ children, label, error, required }: {
@@ -170,7 +208,7 @@ describe('BusinessInfoForm Component', () => {
             })
             expect(screen.getByTestId('field-industry')).toBeInTheDocument()
             expect(screen.getByTestId('field-products-/-services')).toBeInTheDocument()
-            expect(screen.getByTestId('field-description')).toBeInTheDocument()
+            expect(screen.getByTestId('field-short-description')).toBeInTheDocument()
         })
 
         it('renders industry options after fetch', async () => {

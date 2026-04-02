@@ -298,9 +298,8 @@ describe('TC-F10.i18n.06 — OrdersPagination i18n labels', () => {
     it('renders Previous and Next labels from i18n', () => {
         render(
             <OrdersPagination
-                page={2}
+                currentPage={2}
                 totalPages={5}
-                totalOrders={50}
                 onPageChange={vi.fn()}
             />
         )

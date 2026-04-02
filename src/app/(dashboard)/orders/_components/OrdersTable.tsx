@@ -425,7 +425,7 @@ export function OrdersTable({
     onOrdersLoaded,
     searchQuery = '',
     statusFilter = 'all',
-    dateFilter = 'All Dates'
+    dateFilter = 'all'
 }: {
     onSelectOrder?: (orderId: string) => void
     selectedOrderId?: string | null
@@ -449,7 +449,7 @@ export function OrdersTable({
                 let url = `/api/orders?page=${page}&limit=10`
                 if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
                 if (statusFilter && statusFilter !== 'all') url += `&status=${encodeURIComponent(statusFilter)}`
-                if (dateFilter && dateFilter !== 'All dates' && dateFilter !== 'All Dates') url += `&date=${encodeURIComponent(dateFilter)}`
+                if (dateFilter && dateFilter !== 'all') url += `&date=${encodeURIComponent(dateFilter)}`
 
                 const res = await fetch(url)
                 if (!res.ok) throw new Error('Failed to fetch')
