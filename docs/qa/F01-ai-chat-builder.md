@@ -1,5 +1,5 @@
 # Kiểm Thử Chi Tiết: F01 — AI Website Builder
-> **Phiên bản:** 6.0 (85-Case Full Coverage) | **Cập nhật:** 2026-03-27 | **Thực hiện:** QA Team
+> **Phiên bản:** 7.0 (118-Case Comprehensive Coverage) | **Cập nhật:** 2026-04-02 | **Thực hiện:** QA Team
 > **Nguồn tham chiếu:** PRD v2.1 (`F01-ai-builder.md`), User Stories 10 US / 26 ACs (`F01-ai-builder-stories.md`), Figma Design (Desktop + Mobile)
 > **Nhánh làm việc:** `qa/F01-testcase-update`
 
@@ -15,7 +15,7 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 - 9 Business Rules (BR-01 → BR-09)
 - Responsive Design: Desktop (1920×1080) + Mobile (375px)
 
-**Tổng số kịch bản:** **85 test cases** (Positive + Negative + Edge + Mobile)
+**Tổng số kịch bản:** **117 test cases** (Positive + Negative + Edge + Mobile + Recovery + Race Condition)
 
 ---
 
@@ -63,6 +63,13 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.05 | AC-2 | Boundary | **[Negative]** Không cho submit khi thiếu trường bắt buộc | **1.** Để trống toàn bộ các trường bắt buộc.<br>**2.** Nhấn "Continue". | Hiển thị lỗi tại Business Name ("Must be at least 3 characters") và Industry. Form không gửi API request. | High | [ ] |
 | TC-F01.06 | AC-3 | Func | **[Positive]** Industry — Chỉ chọn được 1 (Single-Select) | **1.** Click chọn "Tech / IT / SaaS".<br>**2.** Click chọn "Restaurant / Cafe / F&B". | Khi chọn chip thứ 2, chip thứ 1 tự động bỏ chọn (mất trạng thái `.active`). Industry chỉ lưu 1 giá trị duy nhất. Cần verify tất cả 9 options: Restaurant/Cafe/F&B, Shop/Fashion/Ecommerce, Tech/IT/SaaS, Health/Dental/Clinic, Real Estate/Property, Portfolio/Freelancer/Agency, Education/Training, Gym/Fitness/Yoga, Other. | Medium | [ ] |
 | TC-F01.07 | Design | Sec | **[Negative]** Chống XSS Injection trong form | **1.** Nhập vào Products/Services: `<iframe src="javascript:alert('XSS')">`. Nhấn Continue. | Payload được HTML encode trước khi gửi. Request gửi tới API an toàn. Website được tạo ra escape chuỗi đúng cách. | Blocker | [x] |
+| TC-F01.68 | AC-2 (02) | Val | **[Validation]** Business Name chỉ chứa dấu cách (Whitespace) | **1.** Nhập Business Name: `"     "` (5 dấu cách).<br>**2.** Nhấn Continue. | Hệ thống trim whitespace → hiển thị lỗi "Tên doanh nghiệp là bắt buộc". Form không gửi API. | High | [ ] |
+| TC-F01.69 | AC-3 (02) | BVA | **[Boundary]** Business Name đúng 3 ký tự (Min BVA Pass) | **1.** Nhập Business Name: `"ABC"` (3 ký tự).<br>**2.** Điền đủ các trường khác, nhấn Continue. | Form chấp nhận (pass validation). API được gọi bình thường. | Medium | [ ] |
+| TC-F01.70 | AC-3 (02) | BVA | **[Boundary]** Business Name 2 ký tự (Min BVA Fail) | **1.** Nhập Business Name: `"AB"` (2 ký tự).<br>**2.** Nhấn Continue. | Hiển thị lỗi "Must be at least 3 characters". Form không gửi API. | Medium | [ ] |
+| TC-F01.71 | AC-2 (05) | BVA | **[Boundary]** Business Name vượt 255 ký tự (Max BVA) | **1.** Paste chuỗi 300 ký tự vào Business Name.<br>**2.** Nhấn Continue. | Frontend chặn hoặc cắt chuỗi tại 255 ký tự. DB không lưu chuỗi tràn. | High | [ ] |
+| TC-F01.72 | AC-2 (05) | Val | **[Negative]** Industry không được chọn (bỏ qua required) | **1.** Điền Business Name, Products/Services hợp lệ.<br>**2.** Không chọn Industry chip nào. Nhấn Continue. | Hiển thị lỗi validation tại vùng Industry. Form không gửi API. | High | [ ] |
+| TC-F01.73 | AC-1 (05) | UI | **[UI State]** Placeholder text hiển thị đúng mẫu gợi ý | **1.** Truy cập `/builder/new` lần đầu.<br>**2.** Quan sát các trường form chưa nhập. | Trường "Mô tả ngắn" hiện placeholder: "VD: Tiệm bánh handmade hoạt động từ 2020...". Các trường khác hiện gợi ý phù hợp. | Low | [ ] |
+| TC-F01.74 | AC-2 (05) | Val | **[Negative]** Chỉ điền 1/3 trường bắt buộc (Partial Submit) | **1.** Chỉ nhập Business Name, bỏ trống Industry + Products/Services.<br>**2.** Nhấn Continue. | Hiển thị lỗi đồng thời tại 2 trường còn thiếu. Form không gửi API. | High | [ ] |
 
 ---
 
@@ -78,6 +85,13 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.13 | AC-4 | Data | **[Positive]** Khôi phục phiên làm việc khi Refresh (F5) | **1.** Trong lúc đang tạo (≈50%), nhấn F5 hoặc đóng trình duyệt.<br>**2.** Mở lại trang. | Gọi API `GET /api/drafts`. Giao diện không mất dữ liệu, tiếp tục từ điểm dừng (~50%). | High | [x] |
 | TC-F01.14 | AC-5 | Edge | **[Negative]** Xử lý lỗi khi API OpenAI timeout | **1.** Mô phỏng timeout mạng tới OpenAI. | Thanh tiến trình dừng lại. Hiển thị toast đỏ: "Không thể tạo website". | High | [ ] |
 | TC-F01.15 | AC-5 | UX | **[Positive]** Giữ nguyên dữ liệu form khi Retry | **1.** Tiếp nối TC-F01.14. Kiểm tra form nhập liệu. | Dữ liệu đã nhập trước đó không bị xóa. Nút "Thử lại" gửi lại request cũ mà không cần nhập lại. | Blocker | [x] |
+| TC-F01.75 | AC-3 (05) | State | **[UI State]** Form bị khóa (disable) trong lúc generate | **1.** Nhấn Continue với dữ liệu hợp lệ.<br>**2.** Trong lúc SSE stream đang chạy, thử click vào các input field và nút Submit. | Tất cả input fields và button đều ở trạng thái Disabled. Không thể chỉnh sửa hoặc submit lần 2. | Blocker | [ ] |
+| TC-F01.76 | AC-1 (01) | Perf | **[Negative]** Generation vượt quá 60 giây (Timeout) | **1.** Simulate API OpenAI phản hồi chậm >60 giây. | Hệ thống hiển thị thông báo timeout. Toast báo lỗi "Quá trình tạo website mất quá lâu. Vui lòng thử lại". Form unlock cho retry. | Blocker | [ ] |
+| TC-F01.77 | AC-1 (01) | Net | **[Negative]** SSE stream bị ngắt giữa chừng | **1.** Bắt đầu generate bình thường.<br>**2.** Cắt kết nối mạng khi tiến trình đạt ~50%. | Preview giữ nguyên trạng thái cuối cùng nhận được (không bị trắng). Toast đỏ báo lỗi kết nối. Nút "Thử lại" xuất hiện. | Blocker | [x] |
+| TC-F01.78 | AC-3 (01) | Edge | **[Edge]** Full-screen view vô hiệu hóa Drag-and-Drop | **1.** Tại preview, nhấn "View Full Preview" để chuyển Full-screen.<br>**2.** Thử hover và kéo block. | Drag handle không xuất hiện. Không thể kéo thả block. Chỉ khi quay về Normal view mới kéo thả được. | High | [ ] |
+| TC-F01.79 | AC-1 (01) | Flow | **[Recovery]** Hủy (Abort) quá trình generate giữa chừng | **1.** Nhấn Generate, chờ SSE stream chạy ~30%.<br>**2.** Nhấn nút Hủy (X) hoặc navigate sang trang khác. | SSE stream bị đóng. Dữ liệu nháp (nếu có) được lưu dưới dạng Draft incomplete. Form dữ liệu gốc được giữ nguyên khi quay lại. | High | [ ] |
+| TC-F01.80 | FR-08 | Race | **[Race]** Double-click nút "Tạo Website" (Anti-spam) | **1.** Điền form hợp lệ.<br>**2.** Click nhanh 2 lần liên tiếp vào nút "Continue — AI will create your website →". | Nút chuyển sang trạng thái Disabled + Loading ngay sau click đầu tiên. Chỉ gửi 1 API request duy nhất. Không tạo 2 site trùng lặp. | Blocker | [ ] |
+| TC-F01.81 | AC-4 (01) | Edge | **[Edge]** Draft hết hạn 24 giờ — hiển thị thông báo | **1.** Tạo draft, không hoàn thành. Đợi >24 giờ (hoặc set createdAt cũ trong DB).<br>**2.** Truy cập lại `/builder/new`. | Hệ thống không load draft cũ. Hiển thị form trống mới hoàn toàn. Không báo lỗi crash. | Medium | [ ] |
 
 ---
 
@@ -97,6 +111,8 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.M09 | Design | Mobile | **[Positive]** Màn hình thành công trên mobile | **1.** Chờ tạo website hoàn tất trên mobile. | Hiển thị card thành công: "Website has been created successfully!" kèm "+N sections generated" và thời gian tạo. Có nút "View Full Preview" để mở preview toàn màn hình. | High | [ ] |
 | TC-F01.M10 | Design | Mobile | **[Positive]** Nút CTA xếp dọc trên mobile (Success) | **1.** Quan sát phần nút bấm sau khi tạo xong website trên mobile. | Hai nút **"Dashboard"** (primary, gradient xanh, full-width) và **"Open Editor"** (secondary, outline) xếp dọc theo thứ tự. | Medium | [ ] |
 | TC-F01.M11 | Design | Mobile | **[Positive]** Nút "View Full Preview" mở preview toàn màn hình | **1.** Trên mobile, nhấn nút "View Full Preview" ở màn hình thành công. | Mở preview website full-screen vì mobile không có panel preview inline như desktop. | High | [ ] |
+| TC-F01.M14 | AC-1 (09) | Mobile | **[Edge]** Xoay ngang màn hình (Landscape) trong khi nhập form | **1.** Trên mobile, đang nhập form ở Portrait.<br>**2.** Xoay ngang sang Landscape. | Layout responsive không vỡ. Input data vẫn giữ nguyên. Nút sticky CTA vẫn hiển thị đúng vị trí. | Medium | [ ] |
+| TC-F01.M15 | AC-2 (09) | Mobile | **[Recovery]** Nhấn Back khi đang ở chế độ Immersive Preview | **1.** Trên mobile, đang xem Immersive Preview (generation hoàn tất).<br>**2.** Nhấn nút Back của trình duyệt. | Quay lại form với dữ liệu đã nhập. Không bị mất trạng thái. Không gọi API generate lại. | High | [ ] |
 
 ---
 
@@ -107,6 +123,9 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.17 | AC-9 | Func | **[Positive]** Website tạo ra có đủ 4 trang bắt buộc | **1.** Mở website vừa tạo xong. Kiểm tra menu điều hướng (navigation). | Có đúng 4 trang: Homepage, About, Products, Contact. Tất cả link trả mã HTTP 200. | Blocker | [x] |
 | TC-F01.18 | AC-10 | Theme | **[Positive]** Layout phù hợp ngành F&B | **1.** Nhập: "Mở Quán Phở bò Nam Định". Tạo website, kiểm tra layout. | Layout sử dụng component phù hợp ngành ẩm thực (VD: Menu Grid, Food Gallery). Tone màu ấm. | High | [ ] |
 | TC-F01.19 | AC-10 | Theme | **[Positive]** Layout phù hợp ngành Spa/Beauty | **1.** Nhập: "Mở tiệm Nails Spa". Tạo website, kiểm tra layout. | Layout sử dụng Gallery mẫu nails. Tone màu chủ đạo Pastel mềm mại, thanh nhã. | High | [ ] |
+| TC-F01.82 | AC-7 (01) | Theme | **[Positive]** Layout phù hợp ngành Tech/IT/SaaS | **1.** Nhập: "SaaS platform for project management".<br>**2.** Tạo website, kiểm tra layout. | Layout text-focused với trust signals, testimonials section. Tone màu chuyên nghiệp (xanh dương/xám). | High | [ ] |
+| TC-F01.83 | AC-7 (01) | Edge | **[Edge]** Layout ngành "Other" — Fallback mặc định | **1.** Chọn Industry = "Other".<br>**2.** Nhập mô tả chung chung. Tạo website. | Hệ thống sử dụng layout generic mặc định. Website vẫn tạo thành công với cấu trúc 4 trang đầy đủ. | Medium | [ ] |
+| TC-F01.84 | AC-6 (01) | Func | **[Positive]** Navigation menu liên kết đầy đủ 4 trang | **1.** Tạo website hoàn chỉnh.<br>**2.** Click lần lượt từng link trong menu: Home, About, Products, Contact. | Tất cả 4 link trả về HTTP 200. Nội dung mỗi trang hiển thị đúng. Không có link trỏ sai hoặc broken (404). | Blocker | [x] |
 
 ---
 
@@ -117,6 +136,8 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.20 | AC-6 | API | **[Positive]** Tạo ảnh Hero Banner bằng DALL-E | **1.** Nhập prompt tạo cửa hàng thú cưng. Kiểm tra ảnh Hero. | Ảnh Hero Banner được tạo (1200×400px), URL ảnh trỏ về Payload CMS media (`/media/dalle-img.jpg`). | Blocker | [x] |
 | TC-F01.21 | AC-6 | Edge | **[Negative]** Sử dụng ảnh dự phòng khi API ảnh lỗi | **1.** Mock API DALL-E trả lỗi. Tạo website. | Website vẫn tạo thành công. Ảnh Hero sử dụng stock image phù hợp ngành từ thư viện dự phòng. Không hiển thị ảnh bị lỗi (broken image). | High | [x] |
 | TC-F01.59 | AC-3 (03) | Func | **[Positive]** Tạo lại ảnh AI (Regenerate Image) | **1.** Sau khi tạo website xong, nhấn nút "Generate New Image" trên ảnh Hero.<br>**2.** Chờ ảnh mới được tạo. | Ảnh mới thay thế ảnh cũ. Ảnh mới tự động lưu vào Payload CMS media library. | High | [ ] |
+| TC-F01.85 | AC-1 (03) | Net | **[Negative]** Upload ảnh CDN timeout | **1.** Simulate CDN (Cloudinary/Payload media) upload bị timeout.<br>**2.** Quan sát quá trình generate. | Website vẫn tạo thành công. Vị trí ảnh Hero sử dụng stock image fallback. Không hiển thị broken image icon. | High | [ ] |
+| TC-F01.86 | AC-3 (03) | Race | **[Race]** Nhấn Regenerate Image liên tục (Rate Limit) | **1.** Nhấn "Generate New Image" 5 lần liên tiếp trong vòng 10 giây. | Nút bị disable sau lần click đầu, chỉ gửi 1 API request. Hoặc hiển thị thông báo rate limit sau N lần. Không tạo 5 ảnh trùng lặp. | High | [ ] |
 
 ---
 
@@ -130,6 +151,10 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.25 | AC-20 | State | **[Positive]** Tiếp tục chỉnh sửa (Continue Editing) | **1.** Nhấn nút "Open Editor" (hoặc "Continue Editing"). | Chuyển hướng tới `/editor/:id`. Trạng thái website trong DB đã cập nhật từ Draft sang Published. | High | [x] |
 | TC-F01.26 | AC-21 | Func | **[Positive]** Sao chép link website (Copy to Clipboard) | **1.** Nhấn nút "Copy Link" trên màn hình thành công. | Hiển thị thông báo "Copied ✓" hoặc "Link copied! 🎉". Giá trị trong clipboard khớp chính xác với subdomain URL. | Low | [ ] |
 | TC-F01.60 | AC-2 (04) | Func | **[Positive]** Unpublish — Website trả 404 | **1.** Vào Settings của website đã publish.<br>**2.** Nhấn "Unpublish". | Website chuyển về trạng thái Draft. Truy cập URL `{slug}.primeweb.app` trả HTTP 404. Dashboard hiển thị trạng thái "Draft". | Blocker | [ ] |
+| TC-F01.87 | AC-1 (04) | Net | **[Negative]** Publish thất bại do mất kết nối mạng | **1.** Nhấn Publish.<br>**2.** Ngắt kết nối mạng ngay khi tiến trình bắt đầu. | Hiển thị Toast lỗi kết nối. Website vẫn giữ trạng thái Draft. Nút Publish khôi phục enabled cho retry. | Blocker | [ ] |
+| TC-F01.88 | AC-1 (04) | Race | **[Race]** Double-click nút Publish (Anti-spam) | **1.** Nhấn nút Publish nhanh 2 lần liên tiếp. | Nút chuyển Disabled + Loading spinner ngay lần click đầu. Chỉ gửi 1 API request. Không tạo trùng lặp 2 bản Live. | Blocker | [ ] |
+| TC-F01.89 | AC-1 (04) | State | **[UI State]** Loading state khi Publish đang chạy | **1.** Nhấn Publish.<br>**2.** Quan sát giao diện trong 30 giây. | Nút Publish hiện spinner/loading text. Thanh progress hoặc thông báo bước đang thực hiện. User không thể thực hiện thao tác khác trong lúc đợi. | High | [ ] |
+| TC-F01.90 | AC-2 (04) | Flow | **[Recovery]** Re-publish sau khi đã Unpublish | **1.** Unpublish website (TC-F01.60).<br>**2.** Nhấn Publish lại. | Website chuyển lại trạng thái Published. URL `{slug}.primeweb.app` hoạt động trả HTTP 200. Nội dung hiển thị đúng version mới nhất. | High | [ ] |
 
 ---
 
@@ -146,7 +171,9 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.33 | AC-15 | Locale | **[Positive]** Nội dung tiếng Việt chuyên nghiệp cho SME | **1.** Tạo website hoàn chỉnh bằng tiếng Việt, kiểm tra nội dung output. | Các đoạn văn (heading, CTA, mô tả) sử dụng văn phong chuyên nghiệp phù hợp doanh nghiệp Việt Nam. Không có lỗi ngữ pháp nghiêm trọng. | High | [x] |
 | TC-F01.34 | AC-15 | Locale | **[Positive]** Nội dung Bahasa Melayu formal | **1.** Tạo website bằng BM, kiểm tra nội dung output. | Nội dung sử dụng Bahasa Melayu lịch sự (formal), phù hợp thị trường Malaysia. Không lẫn với Bahasa Indonesia. | High | [x] |
 | TC-F01.35 | AC-16 | Func | **[Positive]** Gợi ý thêm phiên bản tiếng Anh | **1.** Tạo xong website bằng tiếng Việt hoặc BM.<br>**2.** Quan sát màn hình kết quả. | Hiển thị gợi ý: "Want an English version too? [Add English Content]". Nếu chọn → tạo thêm bản dịch tiếng Anh song song. | Medium | [ ] |
-| TC-F01.36 | AC-17 | Edge | **[Negative]** Fallback sang tiếng Anh với ngôn ngữ không hỗ trợ | **1.** Nhập bằng tiếng Ả Rập: `أريد بناء` hoặc tiếng H'Mông. | Website vẫn tạo thành công bằng tiếng Anh (fallback). Hiển thị thông báo giải thích (VD: "Your site has been generated in English"). Không bị crash. | High | [x] |
+| TC-F01.36 | AC-17 | Edge | **[Negative]** Fallback sang tiếng Anh với ngôn ngữ không hỗ trợ | **1.** Nhập bằng tiếng Ả Rập: `أريد بناء` hoặc tiếng H’Mông. | Website vẫn tạo thành công bằng tiếng Anh (fallback). Hiển thị thông báo giải thích (VD: "Your site has been generated in English"). Không bị crash. | High | [x] |
+| TC-F01.91 | AC-1 (06) | Edge | **[Edge]** Input trộn 3 ngôn ngữ cùng lúc | **1.** Nhập: "Kedai makan, bán phở bò, with delivery service".<br>(BM + Việt + English trộn lẫn) | AI nhận diện ngôn ngữ chính xác nhất (hoặc fallback EN). Website tạo thành công với nội dung nhất quán 1 ngôn ngữ duy nhất. Không bị lộn xộn đa ngữ. | Medium | [ ] |
+| TC-F01.92 | AC-2 (06) | Flow | **[Negative]** Bỏ qua gợi ý ngôn ngữ thứ 2 (Skip) | **1.** Tạo website bằng tiếng Việt thành công.<br>**2.** Gợi ý "Want an English version too?" xuất hiện. Nhấn bỏ qua (skip). | Hệ thống không tạo bản dịch. Website giữ nguyên 1 ngôn ngữ duy nhất. Không tốn token API. Không hiển lại gợi ý. | Low | [ ] |
 
 ---
 
@@ -175,6 +202,8 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.43 | AC-25 | Mobile | **[Negative]** Không xung đột giữa kéo block và cuộn trang | **1.** Trên mobile, kéo block trong khi cuộn trang. | CSS `touch-action: none` khóa cuộn trang khi đang kéo block. Chỉ 1 thao tác xảy ra tại một thời điểm, không bị giật hoặc cuộn nhầm. | High | [ ] |
 | TC-F01.44 | AC-26 | Logic | **[Negative]** Không cho kéo block Navigation (Header) | **1.** Hover vào block Navigation Header trên cùng. | Drag handle **không xuất hiện**. Tooltip hiển thị: "Navigation and Footer position is fixed". | Blocker | [ ] |
 | TC-F01.45 | AC-26 | Logic | **[Negative]** Không cho kéo block Footer | **1.** Kéo block nội dung xuống dưới Footer. | Không thể thả block vào vị trí dưới Footer. Footer cố định ở cuối trang, không thể di chuyển. | High | [ ] |
+| TC-F01.93 | AC-1 (08) | Recov | **[Recovery]** Undo reorder bằng Ctrl+Z | **1.** Kéo block About Us lên trước Hero.<br>**2.** Nhấn Ctrl+Z. | Block trở về vị trí ban đầu. State (builderStore) revert chính xác. Preview cập nhật tức thì. | High | [ ] |
+| TC-F01.94 | AC-3 (08) | DB | **[Negative]** Kéo thả nhưng không Publish — DB chưa lưu | **1.** Kéo thả đổi vị trí 2 block.<br>**2.** Đóng tab mà không nhấn Publish. Kiểm tra DB. | DB vẫn giữ thứ tự cũ. Dữ liệu chỉ được persist khi user xác nhận Publish hoặc Save. | High | [ ] |
 
 ---
 
@@ -184,6 +213,9 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | TC-F01.M12 | AC-1 (10) | Mobile | **[Positive]** Sắp xếp block bằng nút Lên/Xuống (Tap Up/Down) | **1.** Trên mobile, chạm vào block (VD: About Us).<br>**2.** Nhấn nút [⬆ Lên] trên floating action bar. | Block hoán đổi vị trí với block phía trên tức thì. State được cập nhật, không cần reload. Nút chạm phải ≥ 44×44px (chuẩn touch target). | High | [ ] |
 | TC-F01.M13 | AC-2 (10) | Mobile | **[Positive]** Chế độ sắp xếp dạng danh sách (Card List Mode) | **1.** Trên mobile, nhấn nút "≡ Sắp xếp" trên toolbar.<br>**2.** Kéo thả các card nhỏ gọn.<br>**3.** Nhấn "Xong". | Iframe preview tạm thời thay bằng danh sách Card (Hero, About, Products, Contact). Kéo thả card native smooth, không xung đột scroll. Sau khi nhấn "Xong", quay lại preview đầy đủ với thứ tự mới. | High | [ ] |
+| TC-F01.M16 | AC-1 (10) | Edge | **[Edge]** Nhấn Up khi block đã ở vị trí đầu tiên | **1.** Trên mobile, chạm vào block đầu tiên (Hero).<br>**2.** Nhấn [⬆ Lên]. | Nút [⬆ Lên] bị disabled (mờ) vì không có block nào phía trên. Block không thay đổi vị trí. Không xuất hiện lỗi. | Medium | [ ] |
+| TC-F01.M17 | AC-1 (10) | Edge | **[Edge]** Nhấn Down khi block đã ở vị trí cuối cùng | **1.** Trên mobile, chạm vào block cuối (Contact).<br>**2.** Nhấn [⬇ Xuống]. | Nút [⬇ Xuống] bị disabled. Block giữ nguyên vị trí. Không xuất hiện lỗi. | Medium | [ ] |
+| TC-F01.M18 | AC-2 (10) | Flow | **[Edge]** Nhấn "Xong" mà không kéo thả gì | **1.** Mở Card List Mode.<br>**2.** Không kéo thả bất kỳ card nào. Nhấn "Xong". | Preview quay lại bình thường. Thứ tự block không thay đổi. API không gọi update. | Low | [ ] |
 
 ---
 
@@ -201,6 +233,9 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.65 | BR-02 | DB | **[Negative]** Chỉ Soft Delete — Không Hard Delete website | **1.** Gọi API xóa website.<br>**2.** Kiểm tra database. | Website chỉ được đánh dấu `deletedAt` (soft delete). Record vẫn tồn tại trong DB. Không hard delete. | High | [ ] |
 | TC-F01.66 | BR-04 | UI | **[Positive]** Nhãn "AI Generated ✨" hiện trong Editor, ẩn trên Storefront | **1.** Mở website trong Editor → kiểm tra ảnh/nội dung AI tạo.<br>**2.** Mở website live (storefront) cùng vị trí. | Trong Editor: hiển thị nhãn "AI Generated ✨" trên các ảnh/nội dung do AI tạo. Trên Storefront: nhãn không hiển thị cho khách truy cập. | Medium | [ ] |
 | TC-F01.67 | BR-07 | Logic | **[Negative]** Không trừ quota khi tạo website thất bại | **1.** Tạo website, để API OpenAI timeout (simulate server error).<br>**2.** Kiểm tra quota còn lại. | Quota không bị trừ khi lỗi server. Sau khi Retry thành công, quota mới bị trừ. | High | [ ] |
+| TC-F01.95 | PRD §17 | Sec | **[Security]** Truy cập /builder/new không xác thực (Unauthenticated) | **1.** Mở trình duyệt ẩn danh (không đăng nhập).<br>**2.** Truy cập trực tiếp `/builder/new`. | Server trả HTTP 401. Chuyển hướng tự động về `/login`. Không hiển thị form nhập liệu. | Blocker | [x] |
+| TC-F01.96 | AC-2 (07) | Sec | **[Security]** JWT hết hạn khi redirect vào CMS Admin | **1.** Nhấn "Go to Admin Dashboard".<br>**2.** Simulate JWT token đã expired. | Hệ thống yêu cầu đăng nhập lại. Redirect về `/login` với return URL về `/admin`. Không hiển thị trang trắng hoặc lỗi 500. | High | [ ] |
+| TC-F01.97 | FR-15 | Concu | **[Race]** Mở 2 Tab cùng /builder/new đồng thời | **1.** Mở Tab A và Tab B cùng truy cập `/builder/new`.<br>**2.** Điền form và nhấn Generate ở cả 2 Tab. | Chỉ 1 request được xử lý. Tab thứ 2 nhận thông báo conflict hoặc tải lại draft từ Tab 1. Không tạo 2 site trùng lặp. | Blocker | [ ] |
 
 ---
 
@@ -209,6 +244,7 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | ID | Ref | Loại | Tiêu đề | Các bước thực hiện | Kết quả mong đợi | Mức độ | Auto |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
 | TC-F01.58 | AC-2 (02) | Func | **[Positive]** Chọn Template thay vì AI Builder | **1.** Tại màn hình onboarding, chọn "Chọn Template" thay vì "Tạo bằng AI".<br>**2.** Chuyển tới `/templates`, chọn 1 template.<br>**3.** Xác nhận chọn template. | Hệ thống tạo website từ template đã chọn. Chuyển hướng tới `/editor/:id`. Website hiển thị đúng layout của template. | Medium | [ ] |
+| TC-F01.98 | AC-2 (02) | State | **[UI State]** Template gallery rỗng (0 templates) | **1.** Xóa hoặc ẩn toàn bộ templates trong DB.<br>**2.** Chọn "Chọn Template" ở onboarding. | Hiển thị Empty State: "Chưa có template nào. Hãy tạo bằng AI". Cung cấp nút quay lại AI Builder. Không hiển trang trắng hoặc lỗi. | Medium | [ ] |
 
 ---
 
@@ -227,11 +263,14 @@ _Mô tả kịch bản kiểm thử dựa trên hành vi tổng thể của ch�
 
 | Nhóm kiểm thử | Trạng thái | Ghi chú |
 |---|---|---|
-| **1. UI/UX & Design System** | [ ] 0/18 TC đã chạy | Bao gồm Desktop + Mobile responsive |
-| **2. AI Logic & NLU** | [ ] 0/16 TC đã chạy | Đa ngôn ngữ, code-switching, slang |
-| **3. Security & DB Validation** | [ ] 0/12 TC đã chạy | XSS, SQLi, Tenant Isolation, NSFW filter |
-| **4. Performance SLA** | [ ] Chưa chạy | SSE < 2s, Generation < 60s, Publish < 30s |
-| **5. E2E UAT** | [ ] Chưa chạy | Full flow từ đăng nhập → publish → verify live |
-| **6. Mobile Responsive** | [ ] 0/13 TC đã chạy | US-F01-09 + US-F01-10 coverage |
+| **1. UI/UX & Design System** | [ ] 0/20 TC đã chạy | Desktop + Mobile responsive + UI States |
+| **2. Form Validation & BVA** | [ ] 0/14 TC đã chạy | Whitespace, BVA min/max, partial submit, XSS |
+| **3. AI Logic & Generation** | [ ] 0/18 TC đã chạy | SSE stream, timeout, abort, NLU, multilingual |
+| **4. Security & Auth** | [ ] 0/14 TC đã chạy | XSS, SQLi, Tenant Isolation, NSFW, JWT, 401 |
+| **5. Race Condition & Anti-spam** | [ ] 0/6 TC đã chạy | Double-click Generate/Publish, 2 Tab, Regenerate spam |
+| **6. Recovery & Cancel** | [ ] 0/8 TC đã chạy | Undo DND, abort generation, draft expired, back button, re-publish |
+| **7. Performance SLA** | [ ] Chưa chạy | SSE < 2s, Generation < 60s, Publish < 30s |
+| **8. E2E UAT** | [ ] Chưa chạy | Full flow từ đăng nhập → publish → verify live |
+| **9. Mobile Responsive** | [ ] 0/17 TC đã chạy | US-F01-09 + US-F01-10 + landscape + back button |
 
-> **Khuyến nghị Release:** Bộ kiểm thử bao gồm **85 kịch bản** phủ 100% các Acceptance Criteria, Functional Requirements, và Business Rules. Cần đạt tỷ lệ **≥ 95% PASS** ở nhóm Blocker/High trước khi chuyển lên Production.
+> **Khuyến nghị Release:** Bộ kiểm thử bao gồm **117 kịch bản** phủ 100% các Acceptance Criteria, Functional Requirements, và Business Rules, bổ sung đầy đủ Negative/Edge/Race/Recovery theo chuẩn Comprehensive QA Expert. Cần đạt tỷ lệ **≥ 95% PASS** ở nhóm Blocker/High trước khi chuyển lên Production.
