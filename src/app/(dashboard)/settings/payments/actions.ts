@@ -8,7 +8,6 @@ export type PaymentUpdates = {
     payment_cod?: boolean;
     payment_qr?: boolean;
     qr_image?: string | number | null;
-    [key: string]: unknown; // Allow extending for other payment fields
 };
 
 export async function getPaymentSettings() {
@@ -41,11 +40,17 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
             return { success: false, error: 'Unauthorized: No tenant found for current session.' };
         }
 
+        // Whitelist safe fields before saving
+        const cleanUpdates: PaymentUpdates = {};
+        if (updates.payment_cod !== undefined) cleanUpdates.payment_cod = Boolean(updates.payment_cod);
+        if (updates.payment_qr !== undefined) cleanUpdates.payment_qr = Boolean(updates.payment_qr);
+        if (updates.qr_image !== undefined) cleanUpdates.qr_image = updates.qr_image;
+
         await payload.update({
             collection: 'tenants',
             id: tenantId,
             data: {
-                payments: updates,
+                payments: cleanUpdates,
             },
         });
 

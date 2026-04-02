@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia } from '@/app/(dashboard)/settings/payments/actions';
 import { getCurrentTenantId } from '@/lib/auth';
 import { getPayloadHMR } from '@payloadcms/next/utilities';
@@ -16,8 +16,10 @@ vi.mock('@payload-config', () => ({
     default: Promise.resolve({}),
 }));
 
+type MockPayload = { findByID: Mock; update: Mock; create: Mock };
+
 describe('Payment Actions', () => {
-    let mockPayloadContext: any;
+    let mockPayloadContext: MockPayload;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -28,13 +30,13 @@ describe('Payment Actions', () => {
             create: vi.fn(),
         };
 
-        (getPayloadHMR as any).mockResolvedValue(mockPayloadContext);
+        vi.mocked(getPayloadHMR).mockResolvedValue(mockPayloadContext as unknown as Awaited<ReturnType<typeof getPayloadHMR>>);
     });
 
     describe('getPaymentSettings', () => {
         it('should return unauthorized error if no session tenant', async () => {
             // Arrange
-            (getCurrentTenantId as any).mockResolvedValue(null);
+            vi.mocked(getCurrentTenantId).mockResolvedValue(null);
 
             // Act
             const result = await getPaymentSettings();
@@ -46,7 +48,7 @@ describe('Payment Actions', () => {
 
         it('should return payments config on success', async () => {
             // Arrange
-            (getCurrentTenantId as any).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
             mockPayloadContext.findByID.mockResolvedValue({
                 payments: { payment_cod: true },
             });
@@ -65,7 +67,7 @@ describe('Payment Actions', () => {
 
         it('should catch database errors and obscure them', async () => {
             // Arrange
-            (getCurrentTenantId as any).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
             mockPayloadContext.findByID.mockRejectedValue(new Error('DATABASE_CRASH'));
 
             // Act
@@ -80,7 +82,7 @@ describe('Payment Actions', () => {
     describe('updatePaymentSettings', () => {
         it('should return unauthorized error if no session tenant', async () => {
             // Arrange
-            (getCurrentTenantId as any).mockResolvedValue(null);
+            vi.mocked(getCurrentTenantId).mockResolvedValue(null);
 
             // Act
             const result = await updatePaymentSettings({ payment_cod: true });
@@ -93,7 +95,7 @@ describe('Payment Actions', () => {
 
         it('should update tenant on success', async () => {
             // Arrange
-            (getCurrentTenantId as any).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
             mockPayloadContext.update.mockResolvedValue({});
 
             // Act
@@ -112,7 +114,7 @@ describe('Payment Actions', () => {
     describe('uploadQrMedia', () => {
         it('should return unauthorized error if no session tenant', async () => {
             // Arrange
-            (getCurrentTenantId as any).mockResolvedValue(null);
+            vi.mocked(getCurrentTenantId).mockResolvedValue(null);
             const formData = new FormData();
 
             // Act
@@ -125,7 +127,7 @@ describe('Payment Actions', () => {
 
         it('should block file larger than 2MB', async () => {
             // Arrange
-            (getCurrentTenantId as any).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
             
             // Mock a 3MB file
             const formData = new FormData();
@@ -143,7 +145,7 @@ describe('Payment Actions', () => {
 
         it('should block non-image files', async () => {
             // Arrange
-            (getCurrentTenantId as any).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
             const formData = new FormData();
             const textFile = new File(['hello'], 'doc.txt', { type: 'text/plain' });
             formData.append('file', textFile);
@@ -159,7 +161,7 @@ describe('Payment Actions', () => {
 
         it('should create media on valid image payload', async () => {
             // Arrange
-            (getCurrentTenantId as any).mockResolvedValue('tenant-123');
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
             const formData = new FormData();
             const validImage = new File(['binary-content'], 'test.png', { type: 'image/png' });
             formData.append('file', validImage);
