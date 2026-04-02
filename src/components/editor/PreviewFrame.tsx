@@ -7,6 +7,7 @@ import { RichTextToolbar } from './RichTextToolbar'
 import { ImageToolbar } from './ImageToolbar'
 import { useEditorStore } from '@/store/editorStore'
 import { toast } from 'sonner'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface PreviewFrameProps {
     siteId: string
@@ -162,40 +163,59 @@ function PreviewFrameInner({
     const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null)
     const clearHoverTimerRef = useRef<number | null>(null)
     const dragPointerClientYRef = useRef<number | null>(null)
+    const dragPointerStartYRef = useRef<number | null>(null)
+    const dragPointerOffsetYRef = useRef<number | null>(null)
+    const isHoveringControlsRef = useRef<boolean>(false)
+    const latestBlockLayoutsRef = useRef<BlockLayoutRect[]>([])
+    useEffect(() => {
+        latestBlockLayoutsRef.current = blockLayouts
+    }, [blockLayouts])
 
-    const syncDragPosition = useCallback((clientY: number) => {
-        if (!frameElement || !dragState) return
+    const syncDragPosition = useCallback((clientY: number, sourceIndex?: number) => {
+        if (!frameElement) return
+        
+        const safeSourceIndex = sourceIndex
+        if (safeSourceIndex === undefined) return
+
+        const startY = dragPointerStartYRef.current ?? clientY
 
         const frameRect = frameElement.getBoundingClientRect()
         const nextY = clientY - frameRect.top
         dragPointerClientYRef.current = clientY
-
+        
         setDragState(prev => prev ? { ...prev, currentY: nextY } : prev)
 
-        const editableLayouts = getEditableBlockLayouts(blockLayouts)
+        const editableLayouts = getEditableBlockLayouts(latestBlockLayoutsRef.current)
+        const draggedLayout = editableLayouts.find(l => l.blockIndex === safeSourceIndex)
         const remainingLayouts = editableLayouts.filter(
-            layout => layout.blockIndex !== dragState.sourceIndex,
+            layout => layout.blockIndex !== safeSourceIndex,
         )
 
-        if (remainingLayouts.length === 0) {
+        if (remainingLayouts.length === 0 || !draggedLayout) {
             setDropIndex(null)
             return
         }
+
+        const pointerOffsetY = dragPointerOffsetYRef.current ?? 0
+        const currentTop = nextY - pointerOffsetY
+        const currentBottom = currentTop + draggedLayout.height
+
+        const isMovedUp = currentTop < draggedLayout.top
+        const activeHitPoint = isMovedUp ? currentTop : currentBottom
 
         let nextIndex = remainingLayouts.length
 
         for (let index = 0; index < remainingLayouts.length; index += 1) {
             const layout = remainingLayouts[index]
-            const midpoint = layout.top + layout.height / 2
-            if (nextY < midpoint) {
+            const targetMidpoint = layout.top + layout.height / 2
+            if (activeHitPoint < targetMidpoint) {
                 nextIndex = index
                 break
             }
-            nextIndex = index + 1
         }
 
         setDropIndex(nextIndex)
-    }, [blockLayouts, dragState, frameElement])
+    }, [frameElement, setDropIndex])
 
     const cancelPendingHoverClear = useCallback(() => {
         if (clearHoverTimerRef.current !== null) {
@@ -205,7 +225,7 @@ function PreviewFrameInner({
     }, [])
 
     const finishDrag = useCallback(({ sourceIndex, nextDropIndex }: DragFinishPayload) => {
-        const editableLayouts = getEditableBlockLayouts(blockLayouts)
+        const editableLayouts = getEditableBlockLayouts(latestBlockLayoutsRef.current)
         const sourcePosition = editableLayouts.findIndex(
             layout => layout.blockIndex === sourceIndex,
         )
@@ -238,7 +258,7 @@ function PreviewFrameInner({
         setDragState(null)
         setDropIndex(null)
         dragPointerClientYRef.current = null
-    }, [blockLayouts, onReorderBlocks])
+    }, [onReorderBlocks])
 
     useEffect(() => {
         const handleMessage = (e: MessageEvent) => {
@@ -260,7 +280,7 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'BLOCK_LAYOUT') {
                 setBlockLayouts((e.data.layouts || []) as BlockLayoutRect[])
             } else if (e.data?.type === 'BLOCK_MOUSEOUT') {
-                if (!isEditing && !dragState) {
+                if (!isEditing && !dragState && !isHoveringControlsRef.current) {
                     cancelPendingHoverClear()
                     clearHoverTimerRef.current = window.setTimeout(() => {
                         setHoverData(null)
@@ -430,34 +450,40 @@ function PreviewFrameInner({
         }
     }, [blocks, imageClickData, updateBlock])
 
+    const isDragging = dragState !== null
+    const dragSourceIndex = dragState?.sourceIndex
+
+    const latestDropIndexRef = useRef<number | null>(null)
     useEffect(() => {
-        if (!dragState || !containerElement || !frameElement) return
+        latestDropIndexRef.current = dropIndex
+    }, [dropIndex])
+
+    useEffect(() => {
+        if (!isDragging || dragSourceIndex === undefined || !containerElement || !frameElement) return
 
         const handlePointerMove = (event: PointerEvent) => {
-            syncDragPosition(event.clientY)
+            syncDragPosition(event.clientY, dragSourceIndex)
         }
 
         const handlePointerUp = () => {
             finishDrag({
-                sourceIndex: dragState.sourceIndex,
-                nextDropIndex: dropIndex,
+                sourceIndex: dragSourceIndex,
+                nextDropIndex: latestDropIndexRef.current,
             })
         }
 
         window.addEventListener('pointermove', handlePointerMove)
         window.addEventListener('pointerup', handlePointerUp, { once: true })
-        window.addEventListener('mouseup', handlePointerUp, { once: true })
         window.addEventListener('pointercancel', handlePointerUp, { once: true })
         window.addEventListener('blur', handlePointerUp, { once: true })
 
         return () => {
             window.removeEventListener('pointermove', handlePointerMove)
             window.removeEventListener('pointerup', handlePointerUp)
-            window.removeEventListener('mouseup', handlePointerUp)
             window.removeEventListener('pointercancel', handlePointerUp)
             window.removeEventListener('blur', handlePointerUp)
         }
-    }, [containerElement, dragState, dropIndex, finishDrag, frameElement, syncDragPosition])
+    }, [isDragging, dragSourceIndex, containerElement, frameElement, syncDragPosition, finishDrag])
 
     useEffect(() => {
         if (!frameElement) return
@@ -470,14 +496,14 @@ function PreviewFrameInner({
     }, [dragState, frameElement])
 
     useEffect(() => {
-        if (!dragState || !scrollContainerElement) return
+        if (!isDragging || dragSourceIndex === undefined || !frameElement) return
 
         const handleWheel = (event: WheelEvent) => {
             event.preventDefault()
-            scrollContainerElement.scrollTop += event.deltaY
+            frameElement.contentWindow?.scrollBy(0, event.deltaY)
 
             if (dragPointerClientYRef.current !== null) {
-                syncDragPosition(dragPointerClientYRef.current)
+                syncDragPosition(dragPointerClientYRef.current, dragSourceIndex)
             }
         }
 
@@ -486,48 +512,38 @@ function PreviewFrameInner({
         return () => {
             window.removeEventListener('wheel', handleWheel)
         }
-    }, [dragState, scrollContainerElement, syncDragPosition])
+    }, [isDragging, dragSourceIndex, frameElement, syncDragPosition])
 
     useEffect(() => {
-        if (!dragState || !scrollContainerElement) return
+        if (!isDragging || dragSourceIndex === undefined || !frameElement) return
 
         let animationFrameId = 0
         const edgeThreshold = 72
-        const maxStep = 18
+        const maxStep = 24
 
         const tick = () => {
             const pointerY = dragPointerClientYRef.current
             if (pointerY !== null) {
-                const scrollRect = scrollContainerElement.getBoundingClientRect()
-                const distanceToTop = pointerY - scrollRect.top
-                const distanceToBottom = scrollRect.bottom - pointerY
+                const frameRect = frameElement.getBoundingClientRect()
+                const distanceToTop = pointerY - frameRect.top
+                const distanceToBottom = frameRect.bottom - pointerY
                 let scrollDelta = 0
 
                 if (distanceToTop < edgeThreshold) {
                     scrollDelta = -Math.max(
                         4,
-                        ((edgeThreshold - distanceToTop) / edgeThreshold) * maxStep,
+                        Math.min(maxStep, ((edgeThreshold - distanceToTop) / edgeThreshold) * maxStep),
                     )
                 } else if (distanceToBottom < edgeThreshold) {
                     scrollDelta = Math.max(
                         4,
-                        ((edgeThreshold - distanceToBottom) / edgeThreshold) * maxStep,
+                        Math.min(maxStep, ((edgeThreshold - distanceToBottom) / edgeThreshold) * maxStep),
                     )
                 }
 
                 if (scrollDelta !== 0) {
-                    const nextScrollTop = Math.max(
-                        0,
-                        Math.min(
-                            scrollContainerElement.scrollHeight - scrollContainerElement.clientHeight,
-                            scrollContainerElement.scrollTop + scrollDelta,
-                        ),
-                    )
-
-                    if (nextScrollTop !== scrollContainerElement.scrollTop) {
-                        scrollContainerElement.scrollTop = nextScrollTop
-                        syncDragPosition(pointerY)
-                    }
+                    frameElement.contentWindow?.scrollBy(0, scrollDelta)
+                    syncDragPosition(pointerY, dragSourceIndex)
                 }
             }
 
@@ -539,7 +555,7 @@ function PreviewFrameInner({
         return () => {
             window.cancelAnimationFrame(animationFrameId)
         }
-    }, [dragState, scrollContainerElement, syncDragPosition])
+    }, [isDragging, dragSourceIndex, frameElement, syncDragPosition])
 
     const handleInlineRewrite = useCallback(async (instruction: string) => {
         if (!hoverData) return
@@ -673,7 +689,7 @@ function PreviewFrameInner({
 
                         return (
                             <div
-                                className="pointer-events-none absolute rounded-xl border border-cyan-400/40 bg-cyan-400/5 transition-all duration-150"
+                                className="pointer-events-none absolute rounded-xl border border-cyan-400/40 bg-cyan-400/5 transition-opacity duration-150"
                                 style={{
                                     top: overlayOffset.top + activeLayout.top - 6,
                                     left: overlayOffset.left + activeLayout.left - 6,
@@ -701,22 +717,26 @@ function PreviewFrameInner({
                                 left: overlayOffset.left + activeLayout.left - 20,
                                 zIndex: 45,
                             }}
-                            onMouseEnter={cancelPendingHoverClear}
-                            onMouseDown={(event) => {
+                            onMouseEnter={() => {
+                                isHoveringControlsRef.current = true
+                                cancelPendingHoverClear()
+                            }}
+                            onMouseLeave={() => {
+                                isHoveringControlsRef.current = false
+                            }}
+                            onPointerDown={(event) => {
                                 const frameRect = frameElement?.getBoundingClientRect()
                                 if (!frameRect) return
 
                                 event.preventDefault()
                                 event.stopPropagation()
+                                event.currentTarget.setPointerCapture(event.pointerId)
                                 cancelPendingHoverClear()
                                 dragPointerClientYRef.current = event.clientY
+                                dragPointerStartYRef.current = event.clientY
+                                dragPointerOffsetYRef.current = event.clientY - frameRect.top - activeLayout.top
                                 setHoverData(null)
                                 setIsEditing(false)
-                                setDropIndex(
-                                    editableLayouts.findIndex(
-                                        layout => layout.blockIndex === activeLayout.blockIndex,
-                                    ),
-                                )
                                 setDragState({
                                     sourceIndex: activeLayout.blockIndex,
                                     sourceRect: activeLayout,
@@ -724,6 +744,12 @@ function PreviewFrameInner({
                                         event.clientY - frameRect.top - activeLayout.top,
                                     currentY: activeLayout.top,
                                 })
+                                setDropIndex(
+                                    editableLayouts.findIndex(
+                                        layout => layout.blockIndex === activeLayout.blockIndex,
+                                    ),
+                                )
+                                syncDragPosition(event.clientY, activeLayout.blockIndex)
                             }}
                         >
                             <GripVertical className="h-4 w-4" />
@@ -733,8 +759,13 @@ function PreviewFrameInner({
                 </>
             ) : null}
 
+            <AnimatePresence>
             {dragState && overlayOffset ? (
-                <div
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.15 }}
                     className="pointer-events-none absolute rounded-xl border border-cyan-400/40 bg-cyan-400/10 shadow-[0_24px_64px_rgba(45,212,191,0.15)]"
                     style={{
                         top: overlayOffset.top + dragState.currentY - dragState.pointerOffsetY,
@@ -745,25 +776,40 @@ function PreviewFrameInner({
                     }}
                 >
                     <div className="absolute inset-0 rounded-xl border border-dashed border-cyan-300/60" />
-                </div>
+                </motion.div>
             ) : null}
+            </AnimatePresence>
 
+            <AnimatePresence>
             {dropIndicatorTop !== null && overlayOffset ? (
-                <div
+                <motion.div
+                    initial={{ opacity: 0, scaleX: 0.5 }}
+                    animate={{ 
+                        opacity: 1, 
+                        scaleX: 1,
+                        top: overlayOffset.top + dropIndicatorTop - 2,
+                    }}
+                    exit={{ opacity: 0, scaleX: 0.5 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                     className="pointer-events-none absolute z-50 h-1 rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] shadow-[0_0_0_4px_rgba(45,212,191,0.12)]"
                     style={{
-                        top: overlayOffset.top + dropIndicatorTop - 2,
                         left: overlayOffset.left + 20,
                         width: Math.max(160, overlayOffset.width - 40),
+                        transformOrigin: 'left center'
                     }}
                 />
             ) : null}
+            </AnimatePresence>
 
             {hoverData && hoverData.rect && overlayOffset && !dragState ? (
                 <div 
-                    className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10 rounded transition-all duration-200"
-                    onMouseEnter={cancelPendingHoverClear}
+                    className="absolute pointer-events-none border-2 border-blue-500 bg-blue-500/10 rounded transition-opacity duration-200"
+                    onMouseEnter={() => {
+                        isHoveringControlsRef.current = true
+                        cancelPendingHoverClear()
+                    }}
                     onMouseLeave={() => {
+                        isHoveringControlsRef.current = false
                         if (!isEditing) {
                             setHoverData(null)
                         }
@@ -780,7 +826,13 @@ function PreviewFrameInner({
                         <div
                             data-inline-edit-trigger
                             className="absolute -top-8 right-0 flex cursor-pointer items-center gap-1 rounded-full bg-blue-600 px-3 py-1.5 text-[10px] font-bold uppercase text-white shadow-lg transition-colors hover:bg-blue-500 pointer-events-auto"
-                            onMouseEnter={cancelPendingHoverClear}
+                            onMouseEnter={() => {
+                                isHoveringControlsRef.current = true
+                                cancelPendingHoverClear()
+                            }}
+                            onMouseLeave={() => {
+                                isHoveringControlsRef.current = false
+                            }}
                             onClick={() => setIsEditing(true)}
                         >
                             ✨ Edit with AI
@@ -790,7 +842,13 @@ function PreviewFrameInner({
                         <div
                             data-inline-edit-popover
                             className="absolute left-0 top-0 z-50 pointer-events-auto -translate-y-[calc(100%+12px)]"
-                            onMouseEnter={cancelPendingHoverClear}
+                            onMouseEnter={() => {
+                                isHoveringControlsRef.current = true
+                                cancelPendingHoverClear()
+                            }}
+                            onMouseLeave={() => {
+                                isHoveringControlsRef.current = false
+                            }}
                         >
                             <InlineEditPopover
                                 blockType={hoverData.blockType}

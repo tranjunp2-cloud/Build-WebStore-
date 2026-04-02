@@ -474,9 +474,10 @@ const MIGRATIONS = [
     sql: `CREATE INDEX IF NOT EXISTS orders_items_parent_idx ON orders_items (_parent_id);`,
   },
   // ── ALTER TABLE fallbacks ──────────────────────────────────────────────
-  // pushDevSchema may create array tables with only metadata columns (id, _order, _parent_id, _uuid).
-  // CREATE TABLE IF NOT EXISTS skips if table already exists → field columns missing.
+  // Use these for adding columns to existing tables where recreating is not an option.
   // ALTER TABLE ADD COLUMN IF NOT EXISTS ensures columns exist regardless of creation order.
+  { name: 'categories.description', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS description varchar;` },
+  { name: 'categories.deleted_at', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS deleted_at timestamptz;` },
   // orders_items
   { name: 'orders_items.product_id', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS product_id integer;` },
   { name: 'orders_items.product_name', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS product_name varchar;` },
@@ -1018,6 +1019,37 @@ const MIGRATIONS = [
       platform varchar, url varchar, enabled boolean DEFAULT true
     );`,
   },
+  // ── snake_case aliases required by Payload Drizzle ORM ──
+  // Drizzle converts camelCase blockType → snake_case for table names.
+  // "socialWidget" → "social_widget", "cartWidget" → "cart_widget".
+  // The camelCase tables above are unreachable by Payload queries — these are the real tables.
+  {
+    name: '_pages_v_blocks_social_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_social_widget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_social_widget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_social_widget_links" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar,
+      platform varchar, url varchar, enabled boolean DEFAULT true
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_cart_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_cart_widget" (
+      id serial PRIMARY KEY,
+      _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, label varchar, show_label boolean
+    );`,
+  },
   {
     name: '_pages_v_blocks_hero_cta_buttons.create_table',
     sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_hero_cta_buttons" (
@@ -1177,7 +1209,7 @@ const MIGRATIONS = [
   },
   {
     name: 'users.has_seen_ai_wizard.backfill_legacy',
-    sql: `UPDATE users SET has_seen_ai_wizard = true WHERE id IN (SELECT _parent_id::varchar FROM users_tenants WHERE _parent_id IS NOT NULL);`,
+    sql: `UPDATE users SET has_seen_ai_wizard = true WHERE id IN (SELECT _parent_id FROM users_tenants WHERE _parent_id IS NOT NULL);`,
   },
   // ── Payload locked documents rels: FK columns for new collections ──
   {
@@ -1238,6 +1270,65 @@ const MIGRATIONS = [
   {
     name: 'users.phone',
     sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS phone varchar;`,
+  },
+  // ── _pages_v: mirror columns added to pages (versioning) ──
+  // Whenever a column is added to `pages`, the corresponding version_* column
+  // must be added to `_pages_v` or Payload's draft queries will 500.
+  {
+    name: '_pages_v.version_is_visible',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_is_visible boolean DEFAULT true;`,
+  },
+  {
+    name: '_pages_v.version_deleted_at',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_deleted_at timestamptz;`,
+  },
+  // ── pages_blocks: snake_case tables for socialWidget / cartWidget ──
+  // Payload Drizzle ORM converts camelCase block slugs to snake_case at runtime
+  // (socialWidget → social_widget, cartWidget → cart_widget). These blocks are
+  // new in this PR so there is no existing camelCase data to backfill.
+  // No INSERT...SELECT needed: staging DB had no rows in any camelCase variant.
+  {
+    name: 'pages_blocks_social_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_social_widget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _path varchar NOT NULL DEFAULT 'layout',
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      block_name varchar,
+      variant varchar,
+      headline varchar
+    );`,
+  },
+  {
+    // _parent_id is varchar (not integer): sub-tables reference the parent block UUID.
+    // Top-level block tables → _parent_id integer (ref pages.id).
+    // Block sub-tables → _parent_id varchar (ref parent block's uuid PK).
+    // This matches the CLAUDE.md migration convention for array sub-tables inside blocks.
+    name: 'pages_blocks_social_widget_links.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_social_widget_links" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      platform varchar,
+      url varchar,
+      enabled boolean DEFAULT true
+    );`,
+  },
+  {
+    name: 'pages_blocks_cart_widget.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_cart_widget" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _path varchar NOT NULL DEFAULT 'layout',
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      block_name varchar,
+      variant varchar,
+      label varchar,
+      show_label boolean
+    );`,
   },
 ];
 

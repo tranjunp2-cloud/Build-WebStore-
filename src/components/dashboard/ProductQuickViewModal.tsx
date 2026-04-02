@@ -55,13 +55,17 @@ interface ProductQuickViewModalProps {
 
 function getImageUrl(image: ProductImage | string | null): string | null {
     if (!image || typeof image === 'string') return null
-    const url = image.url || image.thumbnailURL || null
+    let url = image.url || image.thumbnailURL || null
     if (!url) return null
-    try {
-        return new URL(url, 'http://localhost').pathname
-    } catch {
-        return url
+    
+    // Fix existing broken local URLs directly to S3 because MinIO stores them
+    if (url.includes('/api/media/file/')) {
+        const filename = url.split('/').pop()
+        const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
+        url = `${s3Endpoint}/primeweb-media/${filename}`
     }
+    
+    return url
 }
 
 function formatPrice(price: number, currency: string) {
@@ -95,7 +99,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
 
     // Process Images
     const images = product.images?.map(img => getImageUrl(img.image)).filter(Boolean) as string[] || []
-    const displayImages = images.length > 0 ? images : ['/images/placeholder.webp'] // Fallback if no images
+    const displayImages = images.length > 0 ? images : ['/images/crate-carton.png'] // Fallback if no images
 
     // Process Categories (Assuming populated)
     const categoryNames = product.category?.map(c => typeof c === 'object' ? c.name : 'Unknown').join(' / ') || 'Uncategorized'

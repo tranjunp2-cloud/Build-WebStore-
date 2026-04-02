@@ -8,7 +8,7 @@ import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
-import { checkRateLimit } from '@/lib/rateLimit'
+import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -86,18 +86,27 @@ export async function POST(req: NextRequest) {
 
         const payload = await getPayload({ config })
 
-        // Rate Limit: 20 AI tasks per hour
-        const rateLimit = checkRateLimit(String(user.id), 20)
+        // Rate Limit: 5 requests/min (burst) + 20 requests/hour (sustained)
+        const rateLimit = checkTwoTierRateLimit(String(user.id), 5, 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
-                { error: 'Rate limit exceeded. Try again later.' },
-                { status: 429 }
+                {
+                    error: 'Rate limit exceeded. Please wait before trying again.',
+                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                },
+                {
+                    status: 429,
+                    headers: {
+                        'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+                        'X-RateLimit-Remaining': '0',
+                    },
+                }
             )
         }
 
         // Get tenant ID — auto-create if missing (legacy accounts)
         let tenantId = (user as { tenants?: Array<{ tenant: unknown }> }).tenants?.[0]?.tenant
-        let resolvedTenantId = typeof tenantId === 'object' && tenantId ? (tenantId as { id: string }).id : (tenantId as string)
+        let resolvedTenantId: number | string | undefined = typeof tenantId === 'object' && tenantId ? (tenantId as { id: number | string }).id : (tenantId as number | string | undefined)
 
         if (!resolvedTenantId) {
             const fallbackSlug = `store-${user.id}`
@@ -120,7 +129,7 @@ export async function POST(req: NextRequest) {
                     } as Record<string, unknown>,
                 })
 
-                resolvedTenantId = String(recoveredTenant.id)
+                resolvedTenantId = recoveredTenant.id as number | string
             } else {
                 // Auto-create tenant for legacy users without one
                 const firstName = (user as { firstName?: string }).firstName || (user as { name?: string }).name || 'My'
@@ -140,7 +149,7 @@ export async function POST(req: NextRequest) {
                         tenants: [{ tenant: newTenant.id, role: 'owner' }],
                     } as Record<string, unknown>,
                 })
-                resolvedTenantId = String(newTenant.id)
+                resolvedTenantId = newTenant.id as number | string
             }
         }
 
@@ -178,7 +187,7 @@ export async function POST(req: NextRequest) {
         // ────────────────────────────────────────────────────────────────────
         // Start DALL-E Hero Image generation in parallel with GPT-4 Site Gen
         // ────────────────────────────────────────────────────────────────────
-        const heroImagePromise = generateAndUploadHeroImage(businessInfo, resolvedTenantId, payload)
+        const heroImagePromise = generateAndUploadHeroImage(businessInfo, String(resolvedTenantId), payload)
 
         // Generate with AI (or fallback)
         const { result, events } = await generateSiteWithAI(businessInfo, extraInstructions, language)
@@ -708,16 +717,30 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
         }
 
         // ── Footer: columns[].links[] requires { label, url } ──
-        if (sanitized.blockType === 'footer' && Array.isArray(sanitized.columns)) {
-            sanitized.columns = sanitized.columns.map((col: AIBlock | string) => {
-                if (typeof col === 'string') {
-                    return { title: col, links: [] }
-                }
-                return {
-                    title: String(col.title || col.heading || 'Column'),
-                    links: Array.isArray(col.links) ? col.links.map(normalizeLink) : [],
-                }
-            })
+        if (sanitized.blockType === 'footer') {
+            if (Array.isArray(sanitized.columns)) {
+                sanitized.columns = sanitized.columns.map((col: AIBlock | string) => {
+                    if (typeof col === 'string') {
+                        return { title: col, links: [] }
+                    }
+                    return {
+                        title: String(col.title || col.heading || 'Column'),
+                        links: Array.isArray(col.links) ? col.links.map(normalizeLink) : [],
+                    }
+                })
+            }
+            if (Array.isArray(sanitized.socials)) {
+                sanitized.socials = sanitized.socials.map((socialRaw: unknown) => {
+                    if (typeof socialRaw === 'string') {
+                        return { platform: socialRaw.toLowerCase(), url: '#' }
+                    }
+                    const social = (typeof socialRaw === 'object' && socialRaw !== null) ? socialRaw as Record<string, unknown> : {};
+                    return {
+                        platform: String(social.platform || social.name || 'twitter').toLowerCase(),
+                        url: String(social.url || social.link || '#'),
+                    }
+                })
+            }
         }
 
         // ── Features: features[] requires { title (required), description (required) } ──
@@ -764,6 +787,27 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             delete sanitized.items
         }
 
+        // ── Team: members[].socials[] requires { platform, url } ──
+        if (sanitized.blockType === 'team' && Array.isArray(sanitized.members)) {
+            sanitized.members = sanitized.members.map((memberRaw: unknown) => {
+                const member = (typeof memberRaw === 'object' && memberRaw !== null) ? memberRaw as Record<string, unknown> : {};
+                const safeMember = { ...member }
+                if (Array.isArray(safeMember.socials)) {
+                    safeMember.socials = safeMember.socials.map((socialRaw: unknown) => {
+                        if (typeof socialRaw === 'string') {
+                            return { platform: socialRaw.toLowerCase(), url: '#' }
+                        }
+                        const social = (typeof socialRaw === 'object' && socialRaw !== null) ? socialRaw as Record<string, unknown> : {};
+                        return {
+                            platform: String(social.platform || social.name || 'twitter').toLowerCase(),
+                            url: String(social.url || social.link || '#'),
+                        }
+                    })
+                }
+                return safeMember
+            })
+        }
+
         // ── About: ensure headline ──
         if (sanitized.blockType === 'about') {
             if (!sanitized.headline) {
@@ -773,17 +817,47 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
 
         // ── Pricing: plans[] normalization ──
         if (sanitized.blockType === 'pricing' && Array.isArray(sanitized.plans)) {
-            sanitized.plans = sanitized.plans.map((plan: AIBlock | string) => {
-                if (typeof plan === 'string') {
-                    return { name: plan, price: 'RM 0', features: [] }
+            sanitized.plans = sanitized.plans.map((planRaw: unknown) => {
+                if (typeof planRaw === 'string') {
+                    return { name: planRaw, price: 'RM 0', features: [], ctaLabel: 'Buy', ctaUrl: '#' }
                 }
+                const plan = (typeof planRaw === 'object' && planRaw !== null) ? planRaw as Record<string, unknown> : {};
+                const safePlan = { ...plan } as Record<string, unknown>
+                safePlan.name = String(plan.name || plan.title || 'Plan')
+                safePlan.price = String(plan.price || plan.cost || '$0')
+                safePlan.ctaLabel = String(plan.ctaLabel || plan.buttonText || 'Buy Now')
+                safePlan.ctaUrl = String(plan.ctaUrl || plan.url || '#')
+                
                 if (Array.isArray(plan.features)) {
-                    plan.features = plan.features.map((f: AIBlock | string) =>
-                        typeof f === 'string' ? { text: f, included: true } : (f as { text?: string; included?: boolean })
-                    ) as Array<{ text?: string; included?: boolean }>
+                    safePlan.features = plan.features.map((fRaw: unknown) => {
+                        if (typeof fRaw === 'string') return fRaw;
+                        const f = (typeof fRaw === 'object' && fRaw !== null) ? fRaw as Record<string, unknown> : {};
+                        return String(f.text || f.name || f.feature || '')
+                    })
+                } else {
+                    safePlan.features = []
                 }
-                return plan
+                return safePlan
             })
+        }
+
+        // ── FAQ: items[] normalization ──
+        if (sanitized.blockType === 'faq' && Array.isArray(sanitized.items)) {
+            sanitized.items = sanitized.items.map((itemRaw: unknown) => {
+                if (typeof itemRaw === 'string') {
+                    return { question: itemRaw, answer: '...' }
+                }
+                const item = (typeof itemRaw === 'object' && itemRaw !== null) ? itemRaw as Record<string, unknown> : {};
+                return {
+                    question: String(item.question || item.title || item.q || 'Question?'),
+                    answer: String(item.answer || item.description || item.a || 'Answer.'),
+                }
+            })
+        }
+
+        // ── Logo Cloud: strip logos (needs real media) ──
+        if (sanitized.blockType === 'logo-cloud') {
+            sanitized.logos = []
         }
 
         // ── Remove non-schema fields that AI might add ──

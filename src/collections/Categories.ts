@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Where } from 'payload'
 import slugify from 'slugify'
 
 export const Categories: CollectionConfig = {
@@ -8,11 +8,16 @@ export const Categories: CollectionConfig = {
         description: 'Quản lý Danh mục (Tối đa 3 cấp độ)',
     },
     access: {
-        create: ({ req }) => Boolean(req.user),
+        create: ({ req }) => {
+            return Boolean(req.user);
+        },
         read: ({ req }) => {
-            if (!req.user) return true // Public read for storefront
+            if (!req.user) {
+                const query: Where = { deletedAt: { exists: false } };
+                return query; // Public read for storefront
+            }
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
@@ -20,7 +25,7 @@ export const Categories: CollectionConfig = {
         update: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
@@ -28,7 +33,7 @@ export const Categories: CollectionConfig = {
         delete: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            const tenantIds = req.user.tenants?.map((t: any) =>
+            const tenantIds = req.user.tenants?.map((t: { tenant: string | { id: string } }) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
             return { tenant: { in: tenantIds } }
@@ -144,6 +149,11 @@ export const Categories: CollectionConfig = {
             admin: { description: 'Danh mục cha (Tối đa 3 level)' },
         },
         {
+            name: 'description',
+            type: 'textarea',
+            admin: { description: 'Mô tả ngắn gọn cho SEO' },
+        },
+        {
             name: 'breadcrumbs',
             type: 'text',
             admin: { readOnly: true, description: 'Đường dẫn danh mục (auto-generated)' },
@@ -153,6 +163,11 @@ export const Categories: CollectionConfig = {
             type: 'upload',
             relationTo: 'media',
             admin: { description: 'Ảnh danh mục (Tùy chọn)' }
+        },
+        {
+            name: 'deletedAt',
+            type: 'date',
+            admin: { readOnly: true, description: 'Soft delete timestamp' },
         }
     ],
     timestamps: true,
