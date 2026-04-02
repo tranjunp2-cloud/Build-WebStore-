@@ -473,6 +473,82 @@
         "bulkSuccess": "Berjaya mengesahkan {count} pesanan",
         "bulkFailed": "{count} pesanan gagal (aliran kerja tidak sah)",
         "updateFailed": "Ralat: {message}"
+      },
+      "pageTitle": "Pesanan",
+      "pageSubtitle": "Urus dan jejak pesanan anda",
+      "metrics": {
+        "pending": "Menunggu",
+        "readyToShip": "Sedia Dihantar",
+        "shipped": "Dihantar",
+        "completed": "Selesai"
+      },
+      "tableHeaders": {
+        "orderNumber": "Pesanan #",
+        "customer": "Pelanggan",
+        "total": "Jumlah",
+        "status": "Status",
+        "loading": "Memuatkan pesanan...",
+        "noOrders": "Tiada pesanan dijumpai",
+        "selectAll": "Pilih semua baris"
+      },
+      "pagination": {
+        "previous": "Sebelum",
+        "next": "Seterusnya"
+      },
+      "detail": {
+        "title": "Butiran Pesanan",
+        "orderProgress": "KEMAJUAN PESANAN",
+        "customerInfo": "MAKLUMAT PELANGGAN",
+        "paymentInfo": "MAKLUMAT PEMBAYARAN",
+        "orderItems": "BARANGAN PESANAN",
+        "orderSummary": "RINGKASAN PESANAN",
+        "name": "Nama",
+        "phone": "Telefon",
+        "email": "E-mel",
+        "address": "Alamat",
+        "method": "Kaedah",
+        "paymentStatus": "Status",
+        "product": "Produk",
+        "qty": "Kuantiti",
+        "price": "Harga",
+        "subtotal": "Jumlah Kecil",
+        "shippingFee": "Kos Penghantaran",
+        "tax": "Cukai (SST 6%)",
+        "total": "Jumlah Besar",
+        "free": "Percuma",
+        "noItems": "Tiada barangan"
+      },
+      "actions": {
+        "confirmOrder": "Sahkan Pesanan",
+        "readyToShip": "Sedia Dihantar",
+        "shipOrder": "Hantar Pesanan",
+        "cancelOrder": "Batal Pesanan",
+        "refund": "Bayaran Balik"
+      },
+      "progress": {
+        "pending": "Menunggu",
+        "confirmed": "Disahkan",
+        "ready": "Sedia",
+        "shipped": "Dihantar",
+        "completed": "Selesai"
+      },
+      "cancel": {
+        "title": "Batal Pesanan",
+        "orderLabel": "Pesanan",
+        "reasonLabel": "Sebab pembatalan",
+        "reasonPlaceholder": "Masukkan sebab pembatalan...",
+        "back": "Kembali",
+        "confirm": "Sahkan Pembatalan",
+        "confirming": "Membatalkan..."
+      },
+      "filterDates": {
+        "allDates": "Semua Tarikh",
+        "today": "Hari Ini",
+        "thisWeek": "Minggu Ini",
+        "thisMonth": "Bulan Ini"
+      },
+      "filterStatus": {
+        "allStatus": "Semua Status"
       }
     },
     "products": {

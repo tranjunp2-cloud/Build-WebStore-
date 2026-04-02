@@ -17,7 +17,9 @@ export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number 
                 if (json.success && json.data) {
                     setCounts(json.data)
                 }
-            } catch (err) { }
+            } catch (err) {
+                console.error('Failed to load metrics:', err)
+            }
         }
         fetchMetrics()
     }, [refreshCounter])
