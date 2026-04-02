@@ -132,7 +132,7 @@ function AIChatPanelInner({
             const payload = JSON.parse(dataLines.join('\n'))
 
             if (eventName === 'status') {
-                updateAssistantMessage(messageId, { content: payload.message || 'AI dang xu ly...' })
+                updateAssistantMessage(messageId, { content: payload.message || 'AI is drafting...' })
                 return
             }
 
@@ -143,7 +143,7 @@ function AIChatPanelInner({
 
             if (eventName === 'done') {
                 updateAssistantMessage(messageId, {
-                    content: payload.message || 'Da ap dung thay doi cho website.',
+                    content: payload.message || 'Applied changes to website.',
                     isStreaming: false,
                     undoable: true,
                 })
@@ -227,7 +227,7 @@ function AIChatPanelInner({
             const data = await res.json()
             await onAIAction(data as AIAction)
             updateAssistantMessage(assistantMessageId, {
-                content: data.message || 'Da ap dung thay doi cho website.',
+                content: data.message || 'Applied changes to website.',
                 isStreaming: false,
                 undoable: true,
             })
@@ -370,9 +370,11 @@ function AIChatPanelInner({
                             onClick={() => void handleSendChat()}
                             disabled={!input.trim() || isProcessing}
                             className={cn(
-                                'absolute right-3.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[12px] bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white opacity-50 transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50',
-                                input.trim() && !isProcessing && 'opacity-100',
-                                compact && 'h-9 w-9 rounded-[14px]',
+                                'absolute right-3.5 top-1/2 inline-flex -translate-y-1/2 items-center justify-center transition-all',
+                                (!input.trim() || isProcessing)
+                                    ? 'cursor-not-allowed bg-slate-700/50 text-slate-500'
+                                    : 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white hover:opacity-90',
+                                compact ? 'h-9 w-9 rounded-[14px]' : 'h-8 w-8 rounded-[12px]',
                             )}
                         >
                             <Send className="h-4 w-4" />

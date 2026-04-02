@@ -819,7 +819,7 @@ function PreviewFrameInner({
                         left: overlayOffset.left + hoverData.rect.left - 4,
                         width: hoverData.rect.width + 8,
                         height: hoverData.rect.height + 8,
-                        zIndex: 40,
+                        zIndex: 100,
                     }}
                 >
                     {!isEditing && canInlineEdit && (

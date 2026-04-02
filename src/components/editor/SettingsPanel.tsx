@@ -243,9 +243,16 @@ function SettingsPanelInner({
                     <div>
                         <label className="text-[12px] font-medium text-[#A5B4CF]">Email</label>
                         <Input
+                            type="email"
                             defaultValue={siteContactInfo.email || ''}
                             key={`contact-email-${siteContactInfo.email || ''}`}
-                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, email: e.target.value } })}
+                            onBlur={(e: FieldBlurEvent) => {
+                                if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
+                                    void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, email: e.target.value } })
+                                } else {
+                                    toast.error('Please enter a valid email address')
+                                }
+                            }}
                             variant="editor"
                             className={editorInputClassName}
                             placeholder="hello@company.com"
@@ -737,8 +744,14 @@ function SettingsPanelInner({
                         <div className="mt-3 space-y-3">
                             <div>
                                 <label className={labelCls}>Email</label>
-                                <Input defaultValue={(block.email as string) || ''} key={`email-${currentBlockIndex}`}
-                                    onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'email', e.target.value)}
+                                <Input type="email" defaultValue={(block.email as string) || ''} key={`email-${currentBlockIndex}`}
+                                    onBlur={(e: FieldBlurEvent) => {
+                                        if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
+                                            onBlockFieldChange(currentBlockIndex, 'email', e.target.value)
+                                        } else {
+                                            toast.error('Please enter a valid email address')
+                                        }
+                                    }}
                                     variant="editor"
                                     className={editorInputClassName} placeholder="contact@example.com" />
                             </div>

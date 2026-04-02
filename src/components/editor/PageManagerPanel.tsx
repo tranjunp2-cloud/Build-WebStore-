@@ -235,6 +235,7 @@ export function PageManagerPanel({
                     <form onSubmit={handleCreatePage} className="rounded-2xl border border-white/10 bg-white/5 p-3">
                         <Input
                             autoFocus
+                            required
                             value={newPageTitle}
                             onChange={e => setNewPageTitle(e.target.value)}
                             placeholder="Tên trang (VD: Khuyến mãi)"
@@ -326,8 +327,12 @@ export function PageManagerPanel({
                                                         {statusBadge.label}
                                                     </span>
                                                 </div>
-                                                <div className="mt-1 truncate text-xs leading-4 text-[#94A3B8]">
-                                                    {getPagePath(page)}
+                                                <div className="mt-1 flex items-center gap-2 truncate text-xs leading-4 text-[#94A3B8]">
+                                                    <span>{getPagePath(page)}</span>
+                                                    <span className="text-[#475569]">•</span>
+                                                    <span>{page.blockCount || 0} blocks</span>
+                                                    <span className="text-[#475569]">•</span>
+                                                    <span>{new Date(page.updatedAt).toLocaleDateString()}</span>
                                                 </div>
                                             </div>
 
