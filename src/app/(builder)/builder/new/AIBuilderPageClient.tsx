@@ -660,8 +660,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     totalBlocks={blocks.length || 7}
                 />
                 <CongratsModal
-                    dashboardHref="/dashboard"
-                    dashboardLabel="Go to Dashboard"
+                    dashboardHref="/admin"
+                    dashboardLabel="Go to Admin Dashboard"
                     isOpen={!!publishedSiteUrl}
                     onOpenChange={(open) => {
                         if (!open) setPublishedSiteUrl(null)
