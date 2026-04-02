@@ -17,6 +17,10 @@ let mockTenant: Record<string, unknown> | null = null
 let mockUser: Record<string, unknown> | null = null
 let mockPage: Record<string, unknown> | null = null
 
+vi.mock('@/lib/auth', () => ({
+    getCurrentUser: vi.fn().mockImplementation(async () => mockUser)
+}))
+
 vi.mock('payload', () => {
     return {
         getPayload: vi.fn().mockResolvedValue({
@@ -91,7 +95,7 @@ describe('TenantSitePage', () => {
 
         // notFound should not be called, meaning the page renders
         expect(notFound).not.toHaveBeenCalled()
-        
+
         // Assert the component returned is not null
         expect(result).toBeTruthy()
     })
