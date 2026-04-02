@@ -5,13 +5,14 @@ import configPromise from '@payload-config';
 import { revalidatePath } from 'next/cache';
 import { getCurrentTenantId } from '@/lib/auth';
 
-// DigitalOcean API Constants (from ENV)
-const DO_API_TOKEN = process.env.DO_API_TOKEN;
-const DO_APP_ID = process.env.DO_APP_ID;
+// DigitalOcean API Constants
 const DO_API_URL = 'https://api.digitalocean.com/v2/apps';
 
 type DomainEntry = { domain: string; status: 'pending' | 'active'; isPrimary?: boolean };
 
+// DigitalOcean specific types to replace any
+type DoAppSpecDomain = { domain?: string; type?: string; [k: string]: unknown };
+type DoAppLiveDomain = { id?: string; phase?: string; spec?: DoAppSpecDomain; [k: string]: unknown };
 // Helper to get current domains array from tenant
 async function getTenantDomains(payload: Awaited<ReturnType<typeof getPayloadHMR>>, tenantId: string): Promise<DomainEntry[]> {
     const tenant = await payload.findByID({ collection: 'tenants', id: tenantId });
@@ -68,6 +69,8 @@ export async function addCustomDomain(rawDomain: string) {
         });
 
         // ── VIP: DigitalOcean API Integration ──
+        const DO_API_TOKEN = process.env.DO_API_TOKEN;
+        const DO_APP_ID = process.env.DO_APP_ID;
         // Only call if we have credentials
         if (DO_API_TOKEN && DO_APP_ID) {
             try {
@@ -85,7 +88,7 @@ export async function addCustomDomain(rawDomain: string) {
                     
                     // Add the new domain to existing domains in DO spec
                     const existingDomains = appSpec.domains || [];
-                    if (!existingDomains.some((d: any) => d.domain === domain)) {
+                    if (!existingDomains.some((d: DoAppSpecDomain) => d.domain === domain)) {
                         const newDomains = [...existingDomains, { domain, type: 'ALIAS' }];
                         
                         // Update the app with the new domain
@@ -134,6 +137,8 @@ export async function removeCustomDomain(domain: string) {
         });
 
         // ── VIP: DigitalOcean API Integration (Remove) ──
+        const DO_API_TOKEN = process.env.DO_API_TOKEN;
+        const DO_APP_ID = process.env.DO_APP_ID;
         if (DO_API_TOKEN && DO_APP_ID) {
             try {
                 const doResponse = await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
@@ -149,7 +154,7 @@ export async function removeCustomDomain(domain: string) {
                     const appSpec = appData.app.spec;
                     
                     // Filter out the domain from DO spec
-                    const newDomains = (appSpec.domains || []).filter((d: any) => d.domain !== domain);
+                    const newDomains = (appSpec.domains || []).filter((d: DoAppSpecDomain) => d.domain !== domain);
                     
                     await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
                         method: 'PUT',
@@ -211,6 +216,8 @@ export async function verifyCustomDomain(domain: string) {
                 errorMessage = `DNS mismatch. Domain points to ${addresses.join(', ')}. Expected one of: ${validIps.join(', ')}. Propagation may take up to 48 hours.`;
             } else {
                 // DNS is OK, now check if DO has finished SSL provisioning
+                const DO_API_TOKEN = process.env.DO_API_TOKEN;
+                const DO_APP_ID = process.env.DO_APP_ID;
                 if (DO_API_TOKEN && DO_APP_ID) {
                     const doResponse = await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
                         headers: { 'Authorization': `Bearer ${DO_API_TOKEN}` }
@@ -220,14 +227,14 @@ export async function verifyCustomDomain(domain: string) {
                         const appData = await doResponse.json();
                         // Find this domain in live_state or spec
                         const domainsStatuses = appData.app.domains || [];
-                        const domainStatus = domainsStatuses.find((d: any) => d.spec?.domain === domain);
+                        const domainStatus = domainsStatuses.find((d: DoAppLiveDomain) => d.spec?.domain === domain);
                         
-                        // If domain is found and progress is solid
-                        // Phase 'ACTIVE' means ready.
-                        isSuccess = !domainStatus || domainStatus.phase === 'ACTIVE'; 
+                        // Only succeed if domain exists in DO AND phase is ACTIVE.
+                        // If it's undefined, it means DO doesn't track it (maybe Add failed).
+                        isSuccess = !!domainStatus && domainStatus.phase === 'ACTIVE'; 
                         
                         if (!isSuccess) {
-                            errorMessage = 'SSL Provisioning is still in progress. Please wait up to 48 hours.';
+                            errorMessage = 'SSL Provisioning is still in progress or domain registration is syncing. Please wait up to 48 hours.';
                         }
                     } else {
                         // If DO API fails, fall back to just DNS success
