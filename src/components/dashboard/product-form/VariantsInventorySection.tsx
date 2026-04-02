@@ -251,6 +251,17 @@ export function VariantsInventorySection() {
                             ))}
                         </div>
 
+                        {hasVariants && tiers.length < 2 && (
+                            <button
+                                type="button"
+                                onClick={() => appendTier({ id: crypto.randomUUID(), name: '', options: [] })}
+                                className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-transparent py-3 text-[14px] font-medium text-[#F8FAFC]/60 hover:bg-white/5 transition-colors"
+                            >
+                                <Plus className="h-4 w-4" />
+                                {t.dashboard.products.form.sections?.addTier || 'Add Option / Tier'}
+                            </button>
+                        )}
+
 
 
                         {hasVariants && (

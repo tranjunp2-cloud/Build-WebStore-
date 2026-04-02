@@ -401,13 +401,13 @@ export default function CategoryManager() {
                         </span>
                         <div className="flex items-center">
                             <span className="w-[80px] text-center text-[13px] font-semibold text-[#94A3B8] uppercase tracking-[0.038em]">
-                                LEVEL
+                                {t.dashboard?.products?.categories?.table?.level || 'LEVEL'}
                             </span>
                             <span className="w-[100px] text-left text-[13px] font-semibold text-[#94A3B8] uppercase tracking-[0.038em]">
-                                PRODUCTS
+                                {t.dashboard?.products?.categories?.table?.products || 'PRODUCTS'}
                             </span>
                             <span className="w-[120px] text-right text-[13px] font-semibold text-[#94A3B8] uppercase tracking-[0.038em]">
-                                ACTIONS
+                                {t.dashboard?.products?.categories?.table?.actions || 'ACTIONS'}
                             </span>
                         </div>
                     </div>
@@ -426,11 +426,11 @@ export default function CategoryManager() {
                                 <Search className="w-6 h-6 text-[#64748B]" />
                             </div>
                             <h3 className="text-[16px] font-semibold text-[#F1F5F9] mb-1">
-                                {searchQuery ? 'No results found' : 'No Categories'}
+                                {searchQuery ? (t.dashboard?.products?.categories?.table?.noResults || 'No results found') : (t.dashboard?.products?.categories?.table?.noCategories || 'No Categories')}
                             </h3>
                             <p className="text-[14px] text-[#64748B]">
                                 {searchQuery 
-                                    ? 'Try adjusting your search terms.' 
+                                    ? (t.dashboard?.products?.categories?.table?.tryAdjusting || 'Try adjusting your search terms.') 
                                     : (t.dashboard.products.categories.emptyState || 'Start by creating a new category.')}
                             </p>
                         </div>
