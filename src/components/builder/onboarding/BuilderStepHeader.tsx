@@ -15,12 +15,12 @@ export function BuilderStepHeader({
         <div className="flex flex-col gap-5">
             <div className="flex items-center gap-3">
                 <img
-                    alt=""
-                    className="h-auto w-1/5 shrink-0 object-contain translate-x-[-30%]"
+                    alt="Builder Logo"
+                    className="h-auto w-40 shrink-0 object-contain translate-x-[-30%]"
                     src={BUILDER_LOGO_URL}
                 />
-                <div className="flex flex-col translate-x-[-40%]">
-                    <h1 className="text-[20px] font-semibold leading-7 text-white">
+                <div className="flex flex-col -ml-20">
+                    <h1 className="font-['Inter'] text-[20px] font-semibold leading-7 text-white">
                         {title}
                     </h1>
                     <p className="text-xs leading-4 text-[#94a3b8]">
