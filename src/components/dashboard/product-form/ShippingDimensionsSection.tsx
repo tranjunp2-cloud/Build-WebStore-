@@ -4,18 +4,21 @@ import { useFormContext } from 'react-hook-form'
 import { ProductFormValues } from './schema'
 import { cn } from '@/lib/utils'
 
+import { useI18n } from '@/i18n'
+
 export function ShippingDimensionsSection() {
     const { register, formState: { errors } } = useFormContext<ProductFormValues>()
+    const { t } = useI18n()
 
     return (
         <div className="rounded-2xl border border-white/[0.08] bg-[#1E293B]/60 p-[25px] flex flex-col gap-5">
-            <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.56] font-outfit m-0">Shipping information</h2>
+            <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.shipping || 'Shipping Configuration'}</h2>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
                 {/* Weight */}
                 <div className="flex flex-col gap-2">
                     <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                        Weight
+                        {t.dashboard.products.form.sections?.weight || 'Weight (kg)'}
                     </label>
                     <div className="relative flex items-center">
                         <input
@@ -37,7 +40,7 @@ export function ShippingDimensionsSection() {
                 {/* Length */}
                 <div className="flex flex-col gap-2">
                     <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                        Length
+                        {t.dashboard.products.form.sections?.length || 'Length (cm)'}
                     </label>
                     <div className="relative flex items-center">
                         <input
@@ -59,7 +62,7 @@ export function ShippingDimensionsSection() {
                 {/* Height */}
                 <div className="flex flex-col gap-2">
                     <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                        Height
+                        {t.dashboard.products.form.sections?.height || 'Height (cm)'}
                     </label>
                     <div className="relative flex items-center">
                         <input
@@ -81,7 +84,7 @@ export function ShippingDimensionsSection() {
                 {/* Width */}
                 <div className="flex flex-col gap-2">
                     <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                        Width
+                        {t.dashboard.products.form.sections?.width || 'Width (cm)'}
                     </label>
                     <div className="relative flex items-center">
                         <input

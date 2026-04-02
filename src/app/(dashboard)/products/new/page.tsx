@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { ProductForm } from '@/components/dashboard/product-form/ProductForm'
 import { ProductFormValues } from '@/components/dashboard/product-form/schema'
 import { useI18n } from '@/i18n'
+import { saveProductAction } from '../actions'
 
 function slugify(text: string) {
     return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -41,7 +42,7 @@ export default function NewProductPage() {
             price: data.hasVariants ? 0 : data.basePrice || 0,
             compareAtPrice: data.hasVariants ? undefined : data.compareAtPrice || undefined,
             category: data.categoryIds,
-            inventory: data.hasVariants ? 0 : data.baseInventory || 0,
+            inventory: data.hasVariants ? (data.variants?.reduce((acc, v) => acc + (v.stock || 0), 0) || 0) : (data.baseInventory || 0),
             sku: data.hasVariants ? '' : data.baseSku || '',
             weight: data.shippingWeight || 0,
             dimensions: {
@@ -59,7 +60,7 @@ export default function NewProductPage() {
                 name: v.variantName,          // Payload schema field: 'name'
                 sku: v.skuCode,               // Payload schema field: 'sku'
                 price: v.price,
-                compareAtPrice: v.discount,
+                compareAtPrice: v.compareAtPrice,
                 stock: v.stock,
             })) || [] : [],
             seo: {
@@ -70,21 +71,14 @@ export default function NewProductPage() {
             currency: 'MYR'
         }
 
-        const res = await fetch('/api/products', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(body),
-        })
-
-        if (res.ok) {
+        try {
+            await saveProductAction(body)
             toast.success(t.dashboard.products.form.draftSaved)
             setTimeout(() => {
                 router.push('/products')
             }, 1500)
-        } else {
-            const errData = await res.json()
-            throw new Error(errData.error?.message || t.dashboard.products.form.somethingWentWrong)
+        } catch (err: any) {
+            throw new Error(err?.message || t.dashboard.products.form.somethingWentWrong)
         }
     }
 

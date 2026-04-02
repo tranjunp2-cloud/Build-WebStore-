@@ -5,9 +5,11 @@ import { ProductFormValues } from './schema'
 import { Plus, X, Wand2, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
+import { useI18n } from '@/i18n'
 
 export function VariantsInventorySection() {
     const { register, watch, setValue, getValues, control, formState } = useFormContext<ProductFormValues>()
+    const { t } = useI18n()
     
     const hasVariants = watch('hasVariants')
     const errors = formState.errors
@@ -64,7 +66,7 @@ export function VariantsInventorySection() {
                 skuCode,
                 price: 0,
                 stock: 0,
-                discount: 0,
+                compareAtPrice: 0,
             }
         })
 
@@ -73,7 +75,7 @@ export function VariantsInventorySection() {
 
     return (
         <div className="rounded-2xl border border-white/[0.08] bg-[#1E293B]/60 p-[25px] flex flex-col gap-6">
-            <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.56] font-outfit m-0">Variants &amp; Inventory</h2>
+            <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.56] font-outfit m-0">{t.dashboard.products.form.sections?.variants || 'Variants & Inventory'}</h2>
             
             {/* Body */}
             <div className="flex flex-col gap-6">
@@ -81,8 +83,8 @@ export function VariantsInventorySection() {
                 {/* Variant Toggle Banner */}
                 <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-[#0B1120]/50 p-[17px]">
                     <div className="flex flex-col gap-1">
-                        <h3 className="text-[16px] font-medium text-[#F8FAFC] leading-[1.42] m-0">Product has multiple Options/Variants</h3>
-                        <p className="text-[12px] text-[#F8FAFC]/50 leading-[1.33] m-0">Example: color, size, style</p>
+                        <h3 className="text-[16px] font-medium text-[#F8FAFC] leading-[1.42] m-0">{t.dashboard.products.form.sections?.hasVariants || 'Product has multiple Options/Variants'}</h3>
+                        <p className="text-[12px] text-[#F8FAFC]/50 leading-[1.33] m-0">{t.dashboard.products.form.sections?.hasVariantsExample || 'Example: color, size, style'}</p>
                     </div>
                     <button 
                         type="button"
@@ -112,15 +114,17 @@ export function VariantsInventorySection() {
 
                 {!hasVariants ? (
                     /* Base Information (No Variants) */
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">Price (RM)</label>
+                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                    {t.dashboard.products.form.sections?.price || 'Price (RM)'} <span className="text-[#F8FAFC]">*</span>
+                                </label>
                                 <input
                                     type="number"
                                     step="0.01"
                                     {...register('basePrice')}
-                                    placeholder="0.00"
+                                    placeholder="0"
                                     className={cn(
                                         "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
                                         errors.basePrice ? "border-red-500" : "border-white/[0.08] focus:border-white"
@@ -129,24 +133,42 @@ export function VariantsInventorySection() {
                                 {errors.basePrice && <p className="text-xs text-red-500">{errors.basePrice.message}</p>}
                             </div>
                             <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">Compare at Price (RM)</label>
+                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                    {t.dashboard.products.form.sections?.comparePrice || 'Compare price (RM)'}
+                                </label>
                                 <input
                                     type="number"
                                     step="0.01"
                                     {...register('compareAtPrice')}
-                                    placeholder="0.00"
+                                    placeholder="0"
                                     className={cn(
                                         "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
                                         errors.compareAtPrice ? "border-red-500" : "border-white/[0.08] focus:border-white"
                                     )}
                                 />
                                 {errors.compareAtPrice && <p className="text-xs text-red-500">{errors.compareAtPrice.message}</p>}
-                                <p className="text-[11px] text-[#F8FAFC]/40 m-0">Original price before discount (optional)</p>
                             </div>
                         </div>
+                        
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">Inventory</label>
+                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                    {t.dashboard.products.form.sections?.sku || 'SKU code'} <span className="text-[#F8FAFC]">*</span>
+                                </label>
+                                <input
+                                    {...register('baseSku')}
+                                    placeholder="SKU-001"
+                                    className={cn(
+                                        "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
+                                        errors.baseSku ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                                    )}
+                                />
+                                {errors.baseSku && <p className="text-xs text-red-500">{errors.baseSku.message}</p>}
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                    {t.dashboard.products.form.sections?.inventory || 'Inventory'} <span className="text-[#F8FAFC]">*</span>
+                                </label>
                                 <input
                                     type="number"
                                     {...register('baseInventory')}
@@ -157,18 +179,6 @@ export function VariantsInventorySection() {
                                     )}
                                 />
                                 {errors.baseInventory && <p className="text-xs text-red-500">{errors.baseInventory.message}</p>}
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">SKU Code</label>
-                                <input
-                                    {...register('baseSku')}
-                                    placeholder="SKU-001"
-                                    className={cn(
-                                        "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                        errors.baseSku ? "border-red-500" : "border-white/[0.08] focus:border-white"
-                                    )}
-                                />
-                                {errors.baseSku && <p className="text-xs text-red-500">{errors.baseSku.message}</p>}
                             </div>
                         </div>
                     </div>
@@ -182,13 +192,13 @@ export function VariantsInventorySection() {
                                 <div key={tier.id} className="flex flex-col gap-4 relative group">
                                     <div className="flex items-center justify-between">
                                         <label className="text-[14px] font-medium text-[#F8FAFC] m-0">
-                                            Tier {index + 1} (Example: {index === 0 ? 'Color' : 'Size'})
+                                            {t.dashboard.products.form.sections?.tierFormat?.replace('{level}', String(index + 1)).replace('{example}', index === 0 ? (t.dashboard.products.form.sections?.color || 'Color') : (t.dashboard.products.form.sections?.size || 'Size')) || `Tier ${index + 1} (Example: ${index === 0 ? 'Color' : 'Size'})`}
                                         </label>
                                     </div>
                                     <div className="flex flex-col gap-1 w-full">
                                         <input
                                             {...register(`tiers.${index}.name`)}
-                                            placeholder={index === 0 ? "e.g. Color" : "e.g. Size"}
+                                            placeholder={index === 0 ? (t.dashboard.products.form.sections?.tierPlaceholderColor || "e.g. Color") : (t.dashboard.products.form.sections?.tierPlaceholderSize || "e.g. Size")}
                                             className={cn("w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 outline-none focus:ring-1 focus:ring-white transition-colors",
                                                 errors.tiers?.[index]?.name ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
                                             )}
@@ -202,7 +212,7 @@ export function VariantsInventorySection() {
                                                 <div className="flex items-center gap-3">
                                                     <input
                                                         {...register(`tiers.${index}.options.${oIdx}` as const)}
-                                                        placeholder={index === 0 ? "e.g. Red" : "e.g. Small"}
+                                                        placeholder={index === 0 ? (t.dashboard.products.form.sections?.optionPlaceholderRed || "e.g. Red") : (t.dashboard.products.form.sections?.optionPlaceholderSmall || "e.g. Small")}
                                                         className={cn("w-full rounded-xl border bg-[#0B1120] px-4 py-3 text-[14px] text-[#F8FAFC] outline-none focus:ring-1 focus:ring-white transition-colors",
                                                             errors.tiers?.[index]?.options?.[oIdx] ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
                                                         )}
@@ -234,7 +244,7 @@ export function VariantsInventorySection() {
                                             className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-transparent py-3 text-[14px] font-medium text-[#F8FAFC]/60 hover:bg-white/5 transition-colors"
                                         >
                                             <Plus className="h-4 w-4" />
-                                            Add option
+                                            {t.dashboard.products.form.sections?.addOption || 'Add option'}
                                         </button>
                                     </div>
                                 </div>
@@ -251,7 +261,7 @@ export function VariantsInventorySection() {
                                     className="flex w-full items-center justify-center gap-2 rounded-2xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-[14px] font-medium text-blue-500 hover:bg-blue-500/20 transition-colors"
                                 >
                                     <Wand2 className="h-4 w-4" />
-                                    Create SKU Table
+                                    {t.dashboard.products.form.sections?.createSkuTable || 'Create SKU Table'}
                                 </button>
                             </div>
                         )}
@@ -260,17 +270,17 @@ export function VariantsInventorySection() {
                         {variants.length > 0 && (
                             <div className="mt-6 rounded-2xl border border-white/[0.08] bg-[#1E293B]/30 overflow-hidden" id="variants">
                                 <div className="px-4 py-3 border-b border-white/[0.08] bg-[#1E293B]/50">
-                                    <h3 className="text-[14px] font-medium text-[#F8FAFC]">SKU Matrix Table</h3>
+                                    <h3 className="text-[14px] font-medium text-[#F8FAFC]">{t.dashboard.products.form.sections?.skuMatrix || 'SKU Matrix Table'}</h3>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-sm border-spacing-y-2 border-separate -mt-2">
                                         <thead className="text-[12px] uppercase text-[#F8FAFC]/60 font-medium whitespace-nowrap">
                                             <tr>
-                                                <th className="px-4 py-3 font-medium">Variant</th>
-                                                <th className="px-4 py-3 font-medium">SKU Code</th>
-                                                <th className="px-4 py-3 font-medium">Price</th>
-                                                <th className="px-4 py-3 font-medium">Discount</th>
-                                                <th className="px-4 py-3 font-medium">Stock</th>
+                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colVariant || 'Variant'}</th>
+                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colSku || 'SKU Code'}</th>
+                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colPrice || 'PRICE'}</th>
+                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colComparePrice || 'COMPARE PRICE'}</th>
+                                                <th className="px-4 py-3 font-medium">{t.dashboard.products.form.sections?.colStock || 'STOCK'}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -301,11 +311,16 @@ export function VariantsInventorySection() {
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2">
-                                                        <input 
-                                                            type="number" 
-                                                            {...register(`variants.${i}.discount`)} 
-                                                            className="w-full rounded-xl border border-white/[0.08] bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:border-white focus:ring-1 focus:ring-white transition-colors" 
-                                                        />
+                                                        <div className="flex flex-col gap-1">
+                                                            <input 
+                                                                type="number" 
+                                                                {...register(`variants.${i}.compareAtPrice`)} 
+                                                                className={cn("w-full rounded-xl border bg-[#0B1120] px-3 py-2 text-[14px] text-[#F8FAFC] min-w-[120px] outline-none focus:ring-1 focus:ring-white transition-colors",
+                                                                    errors.variants?.[i]?.compareAtPrice ? "border-red-500 focus:border-red-500" : "border-white/[0.08] focus:border-white"
+                                                                )} 
+                                                            />
+                                                            {errors.variants?.[i]?.compareAtPrice && <span className="text-[10px] text-red-500">{errors.variants[i]?.compareAtPrice?.message}</span>}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
