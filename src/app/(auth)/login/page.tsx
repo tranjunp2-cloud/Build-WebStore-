@@ -141,7 +141,8 @@ function LoginFormContent() {
                 // Return here without resetting state to keep loading active while browser redirects
                 return
             }
-        } catch {
+        } catch (error) {
+            console.error('check-reset-flow failed', error)
             // On error, fall through to internal page
         }
 
