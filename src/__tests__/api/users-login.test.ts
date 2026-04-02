@@ -1,8 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
-import { Users } from '@/collections/Users'
+import { Users } from '../../collections/Users'
+import type { PayloadRequest } from 'payload'
+
+type MockReq = Pick<PayloadRequest, 'json' | 'payload'>
 
 describe('Payload Custom Endpoint: /api/users/login', () => {
-    const loginEndpoint = Users.endpoints?.find(e => e.path === '/login')
+    const endpoints = Array.isArray(Users.endpoints) ? Users.endpoints : []
+    const loginEndpoint = endpoints.find((e: any) => e.path === '/login')
     const handler = loginEndpoint?.handler
 
     if (!handler) {
@@ -13,9 +17,9 @@ describe('Payload Custom Endpoint: /api/users/login', () => {
         const req = {
             json: vi.fn().mockResolvedValue({ email: '', password: 'password123' }),
             payload: { login: vi.fn() }
-        } as any
+        } as unknown as PayloadRequest
 
-        const res = await handler(req)
+        const res = await handler(req as unknown as PayloadRequest)
         const body = await res.json()
         expect(res.status).toBe(400)
         expect(body.errors[0].message).toBe('Email and password are required')
@@ -24,8 +28,8 @@ describe('Payload Custom Endpoint: /api/users/login', () => {
         const req2 = {
             json: vi.fn().mockResolvedValue({ email: '', password: '' }),
             payload: { login: vi.fn() }
-        } as any
-        const res2 = await handler(req2)
+        } as unknown as PayloadRequest
+        const res2 = await handler(req2 as unknown as PayloadRequest)
         const body2 = await res2.json()
         expect(res2.status).toBe(400)
         expect(body2.errors[0].message).toBe('Email and password are required')
@@ -35,9 +39,9 @@ describe('Payload Custom Endpoint: /api/users/login', () => {
         const req = {
             json: vi.fn().mockResolvedValue({ email: 'invalid-email', password: 'password123' }),
             payload: { login: vi.fn() }
-        } as any
+        } as unknown as PayloadRequest
 
-        const res = await handler(req)
+        const res = await handler(req as unknown as PayloadRequest)
         const body = await res.json()
         expect(res.status).toBe(400)
         expect(body.errors[0].message).toBe('Invalid email format')
@@ -46,8 +50,8 @@ describe('Payload Custom Endpoint: /api/users/login', () => {
         const reqSql = {
             json: vi.fn().mockResolvedValue({ email: "admin' --", password: 'password123' }),
             payload: { login: vi.fn() }
-        } as any
-        const resSql = await handler(reqSql)
+        } as unknown as PayloadRequest
+        const resSql = await handler(reqSql as unknown as PayloadRequest)
         const bodySql = await resSql.json()
         expect(resSql.status).toBe(400)
         expect(bodySql.errors[0].message).toBe('Invalid email format')
@@ -61,7 +65,7 @@ describe('Payload Custom Endpoint: /api/users/login', () => {
         const req = {
             json: vi.fn().mockResolvedValue({ email: 'test@example.com', password: 'password123' }),
             payload: { login: mockPayloadLogin }
-        } as any
+        } as unknown as PayloadRequest
 
         const res = await handler(req)
         
@@ -82,16 +86,17 @@ describe('Payload Custom Endpoint: /api/users/login', () => {
         expect(res.headers.get('Set-Cookie')).toContain('payload-token=valid-token')
     })
     
-    it('returns 401 when payload.login throws an error (e.g. wrong password)', async () => {
-        const mockPayloadLogin = vi.fn().mockRejectedValue(new Error('Login failed'))
+    it('returns 401 and masks internal errors from payload.login', async () => {
+        const mockPayloadLogin = vi.fn().mockRejectedValue(new Error('Internal raw database connection error'))
         const req = {
             json: vi.fn().mockResolvedValue({ email: 'test@example.com', password: 'wrongpassword' }),
             payload: { login: mockPayloadLogin }
-        } as any
+        } as unknown as PayloadRequest
 
         const res = await handler(req)
         const body = await res.json()
+        
         expect(res.status).toBe(401)
-        expect(body.errors[0].message).toBe('Login failed')
+        expect(body.errors[0].message).toBe('Login failed') // Should not be 'Internal raw database connection error'
     })
 })
