@@ -544,7 +544,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         const targetIndex = movableIndices[targetMovablePosition]
         const reorderedBlocks = [...blocks]
         const [movedBlock] = reorderedBlocks.splice(currentIndex, 1)
-        const insertionIndex = currentIndex < targetIndex ? targetIndex - 1 : targetIndex
+        const insertionIndex = targetIndex
         reorderedBlocks.splice(insertionIndex, 0, movedBlock)
         setBlocks(reorderedBlocks)
     }, [blocks, setBlocks])
@@ -660,8 +660,8 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     totalBlocks={blocks.length || 7}
                 />
                 <CongratsModal
-                    dashboardHref="/dashboard"
-                    dashboardLabel="Go to Dashboard"
+                    dashboardHref="/admin"
+                    dashboardLabel="Go to Admin Dashboard"
                     isOpen={!!publishedSiteUrl}
                     onOpenChange={(open) => {
                         if (!open) setPublishedSiteUrl(null)

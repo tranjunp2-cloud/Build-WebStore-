@@ -48,7 +48,7 @@ describe('buildSavePayload [TC-F08.15]', () => {
             category: 'Food',
             variants: [],
         }
-        const payload = buildSavePayload(product)
+        const payload = buildSavePayload(product, null, null)
 
         expect(payload.name).toBe('Nasi Lemak')
         expect(payload.price).toBe(12.5)
@@ -69,7 +69,7 @@ describe('buildSavePayload [TC-F08.15]', () => {
                 { name: 'Medium', price: 39.9, sku: 'TS-M', stock: 20 },
             ],
         }
-        const payload = buildSavePayload(product)
+        const payload = buildSavePayload(product, null, null)
 
         expect(payload.hasVariants).toBe(true)
         expect(payload.variants).toHaveLength(2)
@@ -77,7 +77,7 @@ describe('buildSavePayload [TC-F08.15]', () => {
         expect(payload.variants![1].stock).toBe(20)
     })
 
-    it('defaults variant name to "Mặc định" when empty', () => {
+    it('defaults variant name to "Default" when empty', () => {
         const product = {
             selected: true,
             name: 'Product',
@@ -85,9 +85,50 @@ describe('buildSavePayload [TC-F08.15]', () => {
             category: '',
             variants: [{ name: '', price: 0, sku: '', stock: 0 }],
         }
-        const payload = buildSavePayload(product)
+        const payload = buildSavePayload(product, null, null)
 
-        expect(payload.variants![0].name).toBe('Mặc định')
+        expect(payload.variants![0].name).toBe('Default')
+    })
+
+    it('generates variantConfigs successfully from 2-tier variants', () => {
+        const product = {
+            selected: true,
+            name: 'Fashion Dress',
+            price: 50,
+            category: '',
+            variants: [
+                { name: 'Red - S', price: 50, sku: 'DR-RD-S', stock: 10 },
+                { name: 'Red - M', price: 50, sku: 'DR-RD-M', stock: 10 }
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variantConfigs).toBeDefined()
+        expect(payload.variantConfigs!).toHaveLength(2)
+        expect(payload.variantConfigs![0].name).toBe('Color')
+        expect(payload.variantConfigs![0].options).toEqual([{ value: 'Red' }])
+        expect(payload.variantConfigs![1].name).toBe('Size')
+        expect(payload.variantConfigs![1].options).toEqual([{ value: 'S' }, { value: 'M' }])
+    })
+
+    it('uses AI provided variantConfigs if available', () => {
+        const product = {
+            selected: true,
+            name: 'Perfume',
+            price: 100,
+            category: '',
+            variants: [
+                { name: 'Rose - 50ml', price: 100, sku: 'P-R-50', stock: 5 }
+            ],
+            variantConfigs: [
+                { name: 'Scent', options: [{ value: 'Rose' }] },
+                { name: 'Volume', options: [{ value: '50ml' }] }
+            ]
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variantConfigs).toBeDefined()
+        expect(payload.variantConfigs![0].name).toBe('Scent')
     })
 
     it('defaults variant price to product price when 0', () => {
@@ -98,7 +139,7 @@ describe('buildSavePayload [TC-F08.15]', () => {
             category: '',
             variants: [{ name: 'Default', price: 0, sku: '', stock: 0 }],
         }
-        const payload = buildSavePayload(product)
+        const payload = buildSavePayload(product, null, null)
 
         expect(payload.variants![0].price).toBe(50)
     })
@@ -111,8 +152,8 @@ describe('buildSavePayload [TC-F08.15]', () => {
             category: '',
             variants: [],
         }
-        const slug1 = buildSavePayload(product).slug
-        const slug2 = buildSavePayload(product).slug
+        const slug1 = buildSavePayload(product, null, null).slug
+        const slug2 = buildSavePayload(product, null, null).slug
 
         expect(slug1).toContain('same-name-')
         expect(slug2).toContain('same-name-')

@@ -569,37 +569,49 @@ export const Users: CollectionConfig = {
                     )
                 }
 
-                // Check expiry
-                if (!user.otpHash || !user.otpExpiresAt) {
+                // E2E test bypass — only when E2E_TEST_OTP_CODE is explicitly configured
+                // Security: production MUST NOT set E2E_TEST_OTP_CODE in GitHub Secrets
+                // CI_ONLY_SECRETS in sync-do-envs.py can exclude it if needed
+                const testOtpCode = process.env.E2E_TEST_OTP_CODE
+                const testEmail = process.env.TEST_EMAIL
+                const isTestBypass = !!(testOtpCode && testEmail
+                    && email === testEmail && otp === testOtpCode)
+
+                // Check expiry (skip for test bypass)
+                if (!isTestBypass && (!user.otpHash || !user.otpExpiresAt)) {
                     return Response.json(
                         { errors: [{ message: 'No verification code found. Please request a new one.' }] },
                         { status: 401 },
                     )
                 }
 
-                const isExpired = Date.now() > new Date(user.otpExpiresAt as string).getTime()
-                if (isExpired) {
-                    return Response.json(
-                        { errors: [{ message: 'Code has expired. Please request a new one.' }] },
-                        { status: 401 },
-                    )
+                if (!isTestBypass) {
+                    const isExpired = Date.now() > new Date(user.otpExpiresAt as string).getTime()
+                    if (isExpired) {
+                        return Response.json(
+                            { errors: [{ message: 'Code has expired. Please request a new one.' }] },
+                            { status: 401 },
+                        )
+                    }
                 }
 
-                // Verify OTP hash
-                const { verifyOTP } = await import('@/lib/otp/generate')
-                const isValid = verifyOTP(otp, user.otpHash as string)
+                // Verify OTP hash (skip for test bypass)
+                if (!isTestBypass) {
+                    const { verifyOTP } = await import('@/lib/otp/generate')
+                    const isValid = verifyOTP(otp, user.otpHash as string)
 
-                if (!isValid) {
-                    // Increment attempts
-                    await req.payload.update({
-                        collection: 'users',
-                        id: user.id,
-                        data: { otpAttempts: attempts + 1 },
-                    })
-                    return Response.json(
-                        { errors: [{ message: 'Invalid verification code.' }] },
-                        { status: 401 },
-                    )
+                    if (!isValid) {
+                        // Increment attempts
+                        await req.payload.update({
+                            collection: 'users',
+                            id: user.id,
+                            data: { otpAttempts: attempts + 1 },
+                        })
+                        return Response.json(
+                            { errors: [{ message: 'Invalid verification code.' }] },
+                            { status: 401 },
+                        )
+                    }
                 }
 
                 // OTP valid — clear OTP fields

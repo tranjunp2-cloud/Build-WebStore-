@@ -6,8 +6,9 @@
 
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
-import { buildSystemPrompt, buildUserPrompt, type BusinessInfoInput } from './system-prompt'
-import { generateBlocks, type GenerationResult } from './generate-blocks'
+import { buildSystemPrompt, type BusinessInfoInput } from './system-prompt'
+import { generateBlocks, type GenerationResult, type GeneratedBlock } from './generate-blocks'
+import { buildUserPrompt } from './system-prompt'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -69,43 +70,46 @@ export async function generateSiteWithAI(
 
         events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
 
-        const parsed = JSON.parse(content)
+        const parsed = JSON.parse(content) as Record<string, unknown>
 
         // Set theme (validate fonts against Payload CMS allowed values)
         const ALLOWED_HEADING_FONTS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
         const ALLOWED_BODY_FONTS = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
 
-        const rawHeadingFont = parsed.theme?.fontHeading || 'Outfit'
-        const rawBodyFont = parsed.theme?.fontBody || 'Inter'
+        const parsedTheme = (parsed.theme && typeof parsed.theme === 'object' ? parsed.theme : {}) as Record<string, unknown>
+        const rawHeadingFont = String(parsedTheme.fontHeading || 'Outfit')
+        const rawBodyFont = String(parsedTheme.fontBody || 'Inter')
 
         const theme = {
-            primaryColor: parsed.theme?.primaryColor || '#0ea5e9',
-            secondaryColor: parsed.theme?.secondaryColor || '#d946ef',
+            primaryColor: String(parsedTheme.primaryColor || '#0ea5e9'),
+            secondaryColor: String(parsedTheme.secondaryColor || '#d946ef'),
             fontHeading: ALLOWED_HEADING_FONTS.includes(rawHeadingFont) ? rawHeadingFont : 'Outfit',
             fontBody: ALLOWED_BODY_FONTS.includes(rawBodyFont) ? rawBodyFont : 'Inter',
-            colorMode: (['light', 'dark'] as const).includes(parsed.theme?.colorMode) ? parsed.theme.colorMode : 'dark',
+            colorMode: (['light', 'dark'] as const).includes(parsedTheme.colorMode as 'light' | 'dark') ? (parsedTheme.colorMode as 'light' | 'dark') : 'dark',
         }
 
         events.push({ event: 'theme_set', data: { theme } })
 
         // Validate and emit each block
-        const validBlocks: any[] = []
-        const rawBlocks = parsed.blocks || []
+        const validBlocks: Record<string, unknown>[] = []
+        const rawBlocks = Array.isArray(parsed.blocks) ? parsed.blocks : []
 
         for (let i = 0; i < rawBlocks.length; i++) {
             const block = rawBlocks[i]
             const progress = 60 + Math.round((i / rawBlocks.length) * 30)
 
-            events.push({ event: 'step', data: { step: `block_${i}`, label: `Creating ${block.blockType || 'section'}...`, progress } })
+            const blockTypeStr = (typeof block === 'object' && block !== null && 'blockType' in block) ? String((block as Record<string, unknown>).blockType) : 'section'
+
+            events.push({ event: 'step', data: { step: `block_${i}`, label: `Creating ${blockTypeStr}...`, progress } })
 
             // Sanitize block data FIRST (before validation)
-            const sanitized = sanitizeBlockData(block)
+            const sanitized = sanitizeBlockData(block as Record<string, unknown>)
 
             // Validate with block registry
-            if (sanitized.blockType && blockRegistry.has(sanitized.blockType)) {
+            if (typeof sanitized.blockType === 'string' && blockRegistry.has(sanitized.blockType)) {
                 const validation = blockRegistry.validate(sanitized.blockType, sanitized)
                 if (validation.success) {
-                    validBlocks.push(validation.data)
+                    validBlocks.push(validation.data as Record<string, unknown>)
                 } else {
                     // Use sanitized block if validation fails (graceful degradation)
                     console.warn(`[AI] Block "${sanitized.blockType}" validation warning:`, validation.error)
@@ -121,28 +125,30 @@ export async function generateSiteWithAI(
         }
 
         // SEO
+        const parsedSeo = (parsed.seo && typeof parsed.seo === 'object' ? parsed.seo : {}) as Record<string, unknown>
         const seo = {
-            title: (parsed.seo?.title || parsed.siteName || 'Website').substring(0, 60),
-            description: (parsed.seo?.description || '').substring(0, 160),
+            title: String(parsedSeo.title || parsed.siteName || 'Website').substring(0, 60),
+            description: String(parsedSeo.description || '').substring(0, 160),
         }
 
         events.push({ event: 'seo_generated', data: seo })
         events.push({ event: 'step', data: { step: 'saving', label: 'Saving to database...', progress: 95 } })
 
         const result: GenerationResult = {
-            siteName: parsed.siteName || 'My Website',
-            siteType: parsed.category || 'business',
-            blocks: validBlocks,
+            siteName: String(parsed.siteName || 'My Website'),
+            siteType: (['business', 'ecommerce', 'restaurant', 'portfolio', 'blog'] as const).includes(parsed.category as 'business' | 'ecommerce' | 'restaurant' | 'portfolio' | 'blog') ? (parsed.category as 'business' | 'ecommerce' | 'restaurant' | 'portfolio' | 'blog') : 'business',
+            blocks: validBlocks as GeneratedBlock[],
             seo,
-            language: ['en', 'ms', 'vi'].includes(parsed.language) ? parsed.language : 'en',
+            language: (['en', 'ms', 'vi'] as const).includes(parsed.language as 'en' | 'ms' | 'vi') ? (parsed.language as 'en' | 'ms' | 'vi') : 'en',
             theme,
         }
 
         events.push({ event: 'done', data: { totalBlocks: validBlocks.length, timeMs: 0 } })
 
         return { result, events }
-    } catch (error: any) {
-        console.error('[AI] OpenAI generation failed, falling back:', error.message)
+    } catch (error: unknown) {
+        const errMessage = error instanceof Error ? error.message : String(error)
+        console.error('[AI] OpenAI generation failed, falling back:', errMessage)
         events.push({ event: 'error', data: { code: 'ai_fallback', message: 'Using smart templates', retryable: false } })
         return generateWithFallback(promptText, events)
     }
@@ -151,18 +157,19 @@ export async function generateSiteWithAI(
 function generateWithFallback(prompt: string, events: SSEEvent[]): { result: GenerationResult; events: SSEEvent[] } {
     events.push({ event: 'step', data: { step: 'fallback', label: 'Creating from smart templates...', progress: 50 } })
 
-    const result = {
-        ...generateBlocks(prompt),
+    const generated = generateBlocks(prompt)
+    const result: GenerationResult = {
+        ...generated,
         language: 'en' as const
     }
 
     events.push({ event: 'theme_set', data: { theme: result.theme } })
 
     result.blocks.forEach((block, i) => {
-        events.push({ event: 'block_complete', data: { block, index: i } })
+        events.push({ event: 'block_complete', data: { block: block as Record<string, unknown>, index: i } })
     })
 
-    events.push({ event: 'seo_generated', data: result.seo })
+    events.push({ event: 'seo_generated', data: result.seo as Record<string, unknown> })
     events.push({ event: 'done', data: { totalBlocks: result.blocks.length, timeMs: 0 } })
 
     return { result, events }
@@ -170,13 +177,15 @@ function generateWithFallback(prompt: string, events: SSEEvent[]): { result: Gen
 
 /**
  * Sanitize a single AI-generated block for Payload CMS compatibility.
+ * Removes hallucinated fields, enforces exact variant enums, and recursively normalizes
+ * objects into the strictly required keys to prevent validation failures.
  */
-function sanitizeBlockData(block: any): any {
+export function sanitizeBlockData(block: Record<string, unknown>): Record<string, unknown> {
     const s = { ...block }
 
     // Helper: normalize array where strings should be objects
-    const norm = (arr: any[], toObj: (v: string) => any): any[] =>
-        arr.map((item: any) => typeof item === 'string' ? toObj(item) : item)
+    const norm = (arr: unknown[], toObj: (v: string) => Record<string, unknown>): unknown[] =>
+        arr.map((item: unknown) => typeof item === 'string' ? toObj(item) : item)
 
     // ═══════════════════════════════════════════════════════════════════════
     // CRITICAL: Strip ALL upload/image fields that are strings
@@ -194,31 +203,40 @@ function sanitizeBlockData(block: any): any {
     // VARIANT VALIDATION: Ensure variant is a valid enum value
     // ═══════════════════════════════════════════════════════════════════════
     const VARIANT_ENUMS: Record<string, string[]> = {
-        hero: ['centered', 'split-left', 'split-right', 'fullscreen', 'video'],
-        navigation: ['fixed', 'sticky', 'static', 'transparent'],
         about: ['image-right', 'image-left', 'centered', 'cards'],
-        features: ['grid-3', 'grid-2', 'alternating', 'centered-list'],
-        testimonials: ['carousel', 'grid', 'masonry', 'single'],
-        gallery: ['masonry', 'grid', 'carousel', 'lightbox'],
+        contact: ['form', 'info-only', 'split'],
+        cta: ['banner', 'inline', 'floating'],
+        faq: ['accordion', 'grid', 'simple'],
+        features: ['grid-2', 'grid-3', 'grid-4', 'list'],
+        footer: ['simple', 'expanded', 'minimal'],
+        gallery: ['grid', 'masonry', 'carousel'],
+        hero: ['centered', 'split', 'video', 'minimal'],
+        'logo-cloud': ['row', 'grid'],
+        navigation: ['simple', 'centered', 'mega-menu'],
+        pricing: ['cards', 'table'],
+        stats: ['row', 'grid', 'highlight'],
+        team: ['grid', 'list'],
+        testimonials: ['cards', 'carousel', 'simple'],
+        video: ['embed', 'background']
     }
 
-    if (s.variant && VARIANT_ENUMS[s.blockType]) {
+    if (typeof s.blockType === 'string' && typeof s.variant === 'string' && VARIANT_ENUMS[s.blockType]) {
         if (!VARIANT_ENUMS[s.blockType].includes(s.variant)) {
             s.variant = VARIANT_ENUMS[s.blockType][0] // Default to first option
         }
     }
 
-    // Also handle 'style' field for navigation
-    if (s.style && s.blockType === 'navigation') {
-        if (!VARIANT_ENUMS.navigation.includes(s.style)) {
-            s.style = 'fixed'
-        }
+    // Clean up hallucinated fields that cause validation issues
+    if (s.blockType === 'navigation') {
+        delete s.style
+        delete s.layout
     }
 
-    // Also handle 'layout' field for features/about/gallery
-    if (s.layout && typeof s.layout === 'string' && VARIANT_ENUMS[s.blockType]) {
-        if (!VARIANT_ENUMS[s.blockType].includes(s.layout)) {
-            s.layout = VARIANT_ENUMS[s.blockType][0]
+    // Handle 'layout' specifically for 'about' block (sometimes AI hallucinates layout)
+    if (s.blockType === 'about' && typeof s.layout === 'string') {
+        const ABOUT_LAYOUTS = ['image-right', 'image-left', 'centered']
+        if (!ABOUT_LAYOUTS.includes(s.layout)) {
+            s.layout = 'image-right'
         }
     }
 
@@ -233,16 +251,25 @@ function sanitizeBlockData(block: any): any {
         }
         // Normalize links
         if (Array.isArray(s.links)) {
-            s.links = norm(s.links, (v) => ({ label: v, url: '#', openInNewTab: false }))
+            s.links = s.links.map((link: unknown) => {
+                if (typeof link === 'string') return { label: link, url: '#', openInNewTab: false }
+                const l = (typeof link === 'object' && link !== null ? link : {}) as Record<string, unknown>
+                return {
+                    label: String(l.label || l.text || l.title || l.name || 'Link'),
+                    url: String(l.url || l.href || l.link || '#'),
+                    openInNewTab: typeof l.openInNewTab === 'boolean' ? l.openInNewTab : false
+                }
+            })
         }
         // Ensure ctaButton has required shape
         if (!s.ctaButton || typeof s.ctaButton !== 'object') {
             s.ctaButton = { show: true, label: 'Get Started', url: '#' }
         } else {
+            const btn = s.ctaButton as Record<string, unknown>
             s.ctaButton = {
-                show: s.ctaButton.show ?? true,
-                label: s.ctaButton.label || s.ctaButton.text || 'Get Started',
-                url: s.ctaButton.url || '#',
+                show: typeof btn.show === 'boolean' ? btn.show : true,
+                label: String(btn.label || btn.text || 'Get Started'),
+                url: String(btn.url || btn.href || '#'),
             }
         }
     }
@@ -252,29 +279,32 @@ function sanitizeBlockData(block: any): any {
     // ═══════════════════════════════════════════════════════════════════════
     if (s.blockType === 'hero') {
         if (Array.isArray(s.ctaButtons)) {
-            s.ctaButtons = norm(s.ctaButtons, (v) => ({ label: v, url: '#', style: 'primary' }))
-            // Ensure each button has valid style
-            s.ctaButtons = s.ctaButtons.map((btn: any) => ({
-                label: btn.label || btn.text || 'Button',
-                url: btn.url || btn.href || '#',
-                style: ['primary', 'secondary', 'outline', 'ghost'].includes(btn.style) ? btn.style : 'primary',
-            }))
+            const primaryBtns = norm(s.ctaButtons, (v) => ({ label: v, url: '#', style: 'primary' }))
+            s.ctaButtons = primaryBtns.map((btn: unknown) => {
+                const bObj = (typeof btn === 'object' && btn !== null ? btn : {}) as Record<string, unknown>
+                const style = String(bObj.style)
+                return {
+                    label: String(bObj.label || bObj.text || 'Button'),
+                    url: String(bObj.url || bObj.href || '#'),
+                    style: ['primary', 'secondary', 'outline', 'ghost'].includes(style) ? style : 'primary',
+                }
+            })
         }
         // Normalize badge
         if (s.badge && typeof s.badge === 'string') {
             s.badge = { show: true, text: s.badge }
         } else if (s.badge && typeof s.badge === 'object') {
-            s.badge = { show: s.badge.show ?? false, text: s.badge.text || '' }
+            const badgeObj = s.badge as Record<string, unknown>
+            s.badge = { show: typeof badgeObj.show === 'boolean' ? badgeObj.show : false, text: String(badgeObj.text || '') }
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // CONTACT BLOCK: formFields
-    // Payload allows fieldType: text | email | phone | textarea | select
     // ═══════════════════════════════════════════════════════════════════════
     const VALID_FIELD_TYPES = ['text', 'email', 'phone', 'textarea', 'select']
     if (Array.isArray(s.formFields)) {
-        s.formFields = s.formFields.map((field: any) => {
+        s.formFields = s.formFields.map((field: unknown) => {
             if (typeof field === 'string') {
                 const name = field.toLowerCase()
                 let fieldType = 'text'
@@ -283,97 +313,189 @@ function sanitizeBlockData(block: any): any {
                 else if (name.includes('message') || name.includes('content') || name.includes('notes') || name.includes('mesej')) fieldType = 'textarea'
                 return { fieldName: field, label: field, fieldType, required: true }
             }
-            // Normalize fieldType — map common aliases
-            let ft = field.fieldType || field.type || 'text'
+            const fObj = (typeof field === 'object' && field !== null ? field : {}) as Record<string, unknown>
+            let ft = String(fObj.fieldType || fObj.type || 'text')
             if (ft === 'tel' || ft === 'telephone') ft = 'phone'
             if (ft === 'number') ft = 'text'
             if (!VALID_FIELD_TYPES.includes(ft)) ft = 'text'
 
             return {
-                fieldName: field.fieldName || field.name || 'field',
-                label: field.label || field.fieldName || field.name || 'Field',
+                fieldName: String(fObj.fieldName || fObj.name || 'field'),
+                label: String(fObj.label || fObj.fieldName || fObj.name || 'Field'),
                 fieldType: ft,
-                required: field.required ?? true,
+                required: typeof fObj.required === 'boolean' ? fObj.required : true,
             }
         })
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // FOOTER: columns + links
+    // FOOTER: columns + links + socials
     // ═══════════════════════════════════════════════════════════════════════
-    if (Array.isArray(s.columns)) {
-        s.columns = s.columns.map((col: any) => {
-            if (typeof col === 'string') return { title: col, links: [] }
-            return {
-                title: col.title || col.heading || 'Column',
-                links: Array.isArray(col.links)
-                    ? norm(col.links, (v) => ({ label: v, url: '#' }))
-                    : [],
-            }
-        })
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // TESTIMONIALS: normalize testimonials array
-    // Payload schema: testimonials[].quote (required), .name (required), .title, .company
-    // ═══════════════════════════════════════════════════════════════════════
-    if (Array.isArray(s.testimonials)) {
-        s.testimonials = s.testimonials.map((t: any) => {
-            if (typeof t === 'string') {
-                return { quote: t, name: 'Customer' }
-            }
-            const result: any = {
-                quote: t.quote || t.text || t.content || t.message || 'Great experience!',
-                name: t.name || t.author || t.customerName || 'Customer',
-            }
-            if (t.title || t.role || t.position) result.title = t.title || t.role || t.position
-            if (t.company) result.company = t.company
-            if (t.rating) result.rating = Math.min(5, Math.max(1, Number(t.rating) || 5))
-            // Strip avatar if string (upload field)
-            return result
-        })
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // FEATURES: features array (not items)
-    // Payload schema: features[].icon, .title (required), .description (required)
-    // ═══════════════════════════════════════════════════════════════════════
-    if (s.blockType === 'features') {
-        // AI might use 'items' instead of 'features'
-        if (Array.isArray(s.items) && !Array.isArray(s.features)) {
-            s.features = s.items
-            delete s.items
-        }
-        if (Array.isArray(s.features)) {
-            s.features = s.features.map((f: any) => {
-                if (typeof f === 'string') return { title: f, description: '', icon: '⭐' }
+    if (s.blockType === 'footer') {
+        if (Array.isArray(s.columns)) {
+            s.columns = s.columns.map((col: unknown) => {
+                if (typeof col === 'string') return { title: col, links: [] }
+                const cObj = (typeof col === 'object' && col !== null ? col : {}) as Record<string, unknown>
+                
+                let cleanLinks: Record<string, unknown>[] = []
+                if (Array.isArray(cObj.links)) {
+                    cleanLinks = cObj.links.map((link: unknown) => {
+                        if (typeof link === 'string') return { label: link, url: '#' }
+                        const l = (typeof link === 'object' && link !== null ? link : {}) as Record<string, unknown>
+                        return {
+                            label: String(l.label || l.text || l.title || l.name || 'Link'),
+                            url: String(l.url || l.href || l.link || '#')
+                        }
+                    })
+                }
                 return {
-                    icon: f.icon || f.emoji || '⭐',
-                    title: f.title || f.name || f.heading || 'Feature',
-                    description: f.description || f.text || f.body || '',
+                    title: String(cObj.title || cObj.heading || 'Column'),
+                    links: cleanLinks,
+                }
+            })
+        }
+        if (Array.isArray(s.socials)) {
+            s.socials = s.socials.map((social: unknown) => {
+                if (typeof social === 'string') return { platform: social.toLowerCase(), url: '#' }
+                const soc = (typeof social === 'object' && social !== null ? social : {}) as Record<string, unknown>
+                return {
+                    platform: String(soc.platform || soc.name || 'twitter').toLowerCase(),
+                    url: String(soc.url || soc.link || '#')
                 }
             })
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // GALLERY: images array
-    // Payload schema: images[].image (upload, required), .caption
-    // Since AI can't provide upload IDs, skip gallery images (leave empty)
+    // TESTIMONIALS: normalize testimonials array
+    // ═══════════════════════════════════════════════════════════════════════
+    if (Array.isArray(s.testimonials)) {
+        s.testimonials = s.testimonials.map((t: unknown) => {
+            if (typeof t === 'string') return { quote: t, name: 'Customer' }
+            const tObj = (typeof t === 'object' && t !== null ? t : {}) as Record<string, unknown>
+            const result: Record<string, unknown> = {
+                quote: String(tObj.quote || tObj.text || tObj.content || tObj.message || 'Great experience!'),
+                name: String(tObj.name || tObj.author || tObj.customerName || 'Customer'),
+            }
+            if (tObj.title || tObj.role || tObj.position) result.title = String(tObj.title || tObj.role || tObj.position)
+            if (tObj.company) result.company = String(tObj.company)
+            if (tObj.rating) result.rating = Math.min(5, Math.max(1, Number(tObj.rating) || 5))
+            return result
+        })
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FEATURES
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'features') {
+        if (Array.isArray(s.items) && !Array.isArray(s.features)) {
+            s.features = s.items
+            delete s.items
+        }
+        if (Array.isArray(s.features)) {
+            s.features = s.features.map((f: unknown) => {
+                if (typeof f === 'string') return { title: f, description: '', icon: '⭐' }
+                const fObj = (typeof f === 'object' && f !== null ? f : {}) as Record<string, unknown>
+                return {
+                    icon: String(fObj.icon || fObj.emoji || '⭐'),
+                    title: String(fObj.title || fObj.name || fObj.heading || 'Feature'),
+                    description: String(fObj.description || fObj.text || fObj.body || ''),
+                }
+            })
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // TEAM
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'team' && Array.isArray(s.members)) {
+        s.members = s.members.map((member: unknown) => {
+            if (typeof member === 'string') return { name: member, role: 'Member' }
+            const mObj = (typeof member === 'object' && member !== null ? member : {}) as Record<string, unknown>
+            const safeMember = { ...mObj }
+            safeMember.name = String(mObj.name || mObj.fullName || 'Member')
+            safeMember.role = String(mObj.role || mObj.position || 'Role')
+
+            if (Array.isArray(safeMember.socials)) {
+                safeMember.socials = safeMember.socials.map((social: unknown) => {
+                    if (typeof social === 'string') return { platform: social.toLowerCase(), url: '#' }
+                    const soc = (typeof social === 'object' && social !== null ? social : {}) as Record<string, unknown>
+                    return {
+                        platform: String(soc.platform || soc.name || 'twitter').toLowerCase(),
+                        url: String(soc.url || soc.link || '#')
+                    }
+                })
+            }
+            return safeMember
+        })
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FAQ
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'faq' && Array.isArray(s.items)) {
+        s.items = s.items.map((item: unknown) => {
+            if (typeof item === 'string') {
+                return { question: item, answer: '...' }
+            }
+            const iObj = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>
+            return {
+                question: String(iObj.question || iObj.title || iObj.q || 'Question?'),
+                answer: String(iObj.answer || iObj.description || iObj.a || 'Answer.'),
+            }
+        })
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PRICING
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'pricing' && Array.isArray(s.plans)) {
+        s.plans = s.plans.map((plan: unknown) => {
+            if (typeof plan === 'string') {
+                return { name: plan, price: 'RM 0', features: [], ctaLabel: 'Buy', ctaUrl: '#' }
+            }
+            const pObj = (typeof plan === 'object' && plan !== null ? plan : {}) as Record<string, unknown>
+            const safePlan = { ...pObj }
+            safePlan.name = String(pObj.name || pObj.title || 'Plan')
+            safePlan.price = String(pObj.price || pObj.cost || '$0')
+            safePlan.ctaLabel = String(pObj.ctaLabel || pObj.buttonText || 'Buy Now')
+            safePlan.ctaUrl = String(pObj.ctaUrl || pObj.url || '#')
+            
+            if (Array.isArray(pObj.features)) {
+                safePlan.features = pObj.features.map((f: unknown) => {
+                    if (typeof f === 'string') return f
+                    const fObj = (typeof f === 'object' && f !== null ? f : {}) as Record<string, unknown>
+                    return String(fObj.text || fObj.name || fObj.feature || '')
+                })
+            } else {
+                safePlan.features = []
+            }
+            return safePlan
+        })
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GALLERY
     // ═══════════════════════════════════════════════════════════════════════
     if (s.blockType === 'gallery' && Array.isArray(s.images)) {
-        // Can't save images without actual Media uploads — clear the array
-        // but keep captions for later population
         s.images = []
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // LOGO CLOUD
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'logo-cloud') {
+        s.logos = []
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // ABOUT: stats array
     // ═══════════════════════════════════════════════════════════════════════
     if (Array.isArray(s.stats)) {
-        s.stats = s.stats.map((stat: any) => {
+        s.stats = s.stats.map((stat: unknown) => {
             if (typeof stat === 'string') return { value: stat, label: stat }
-            return { value: stat.value || stat.number || '0', label: stat.label || stat.text || 'Stat' }
+            const sObj = (typeof stat === 'object' && stat !== null ? stat : {}) as Record<string, unknown>
+            return { value: String(sObj.value || sObj.number || '0'), label: String(sObj.label || sObj.text || 'Stat') }
         })
     }
 
@@ -381,9 +503,16 @@ function sanitizeBlockData(block: any): any {
     // Generic links array cleanup
     // ═══════════════════════════════════════════════════════════════════════
     if (Array.isArray(s.links) && s.blockType !== 'navigation') {
-        s.links = norm(s.links, (v) => ({ label: v, url: '#' }))
+        const rawLinks = norm(s.links, (v) => ({ label: v, url: '#' }))
+        s.links = rawLinks.map((link: unknown) => {
+            if (typeof link === 'string') return { label: link, url: '#' }
+            const l = (typeof link === 'object' && link !== null ? link : {}) as Record<string, unknown>
+            return {
+                label: String(l.label || l.text || l.title || l.name || 'Link'),
+                url: String(l.url || l.href || l.link || '#')
+            }
+        })
     }
 
     return s
 }
-

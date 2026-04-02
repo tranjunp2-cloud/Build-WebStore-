@@ -30,7 +30,7 @@ const protectedPaths = [
     '/help',
 ]
 
-const authPaths = ['/login', '/register']
+const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password']
 
 /**
  * Multi-tenant middleware
@@ -135,7 +135,7 @@ export async function middleware(req: NextRequest) {
     const isProtectedRoute = protectedPaths.some((p) => pathname.startsWith(p))
     const isAuthRoute = authPaths.some((p) => pathname.startsWith(p))
     const tokenCookie = req.cookies.get('payload-token')?.value
-    const hasToken = !!tokenCookie
+    const hasToken = !!tokenCookie && tokenCookie.trim() !== ''
 
     let mfaVerified = false
     let tokenEmail = ''

@@ -150,6 +150,44 @@
                 "continue": "Continue",
                 "explore": "Explore CMS"
             }
+        },
+        "step1Description": "Provide basic information so AI can create the perfect website for you.",
+        "generating": {
+            "title": "Create Website with AI",
+            "subtitle": "Website Generation",
+            "startingMessage": "Starting website creation...",
+            "creatingTitle": "Creating Your Website...",
+            "creatingSubtitle": "AI is analyzing your business and generating the perfect design.",
+            "stepAnalyzing": "Analyzing business information",
+            "stepGenerating": "Generating content & design",
+            "stepPreparing": "Preparing preview",
+            "progressLabel": "Building your website",
+            "processing": "Processing..."
+        },
+        "form": {
+            "businessName": "Business Name",
+            "businessNamePlaceholder": "e.g., The Cookie House, Beauty Spa Hana...",
+            "industry": "Industry / Sector",
+            "products": "Products / Services",
+            "productsPlaceholder": "e.g., Specialty coffee, milk tea, pastries...",
+            "productsHint": "AI will use this to suggest product images and layout",
+            "shortDescription": "Short Description",
+            "shortDescriptionPlaceholder": "e.g., Handmade bakery operating since 2020...",
+            "shortDescriptionHint": "AI will use this to suggest content and tone",
+            "loadingIndustries": "Loading industries...",
+            "generateButton": "Generate Website",
+            "retryWithCurrent": "Retry with current information",
+            "promoTitle": "AI Website Builder",
+            "promoDescription": "Just 3 simple steps, AI will create a professional website in minutes.",
+            "promoStep1": "Enter business information",
+            "promoStep2": "AI creates content & design",
+            "promoStep3": "Preview & Publish",
+            "errors": {
+                "businessName": "Please enter your business name",
+                "industry": "Please select an industry",
+                "shortDescription": "Please describe your business",
+                "products": "Please describe your products / services"
+            }
         }
     },
     "email": {
@@ -434,10 +472,121 @@
                 "loadFailed": "Failed to load orders",
                 "bulkSuccess": "Successfully confirmed {count} orders",
                 "bulkFailed": "{count} orders failed (invalid workflow)",
-                "updateFailed": "Error: {message}"
+                "updateFailed": "Failed to update order"
+            },
+            "pageTitle": "Orders",
+            "pageSubtitle": "Manage and track your orders",
+            "metrics": {
+                "pending": "Pending",
+                "readyToShip": "Ready to Ship",
+                "shipped": "Shipped",
+                "completed": "Completed"
+            },
+            "tableHeaders": {
+                "orderNumber": "Order #",
+                "customer": "Customer",
+                "total": "Total",
+                "status": "Status",
+                "loading": "Loading orders...",
+                "noOrders": "No orders found",
+                "selectAll": "Select all rows"
+            },
+            "pagination": {
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "detail": {
+                "title": "Order Details",
+                "orderProgress": "ORDER PROGRESS",
+                "customerInfo": "CUSTOMER INFORMATION",
+                "paymentInfo": "PAYMENT INFORMATION",
+                "orderItems": "ORDER ITEMS",
+                "orderSummary": "ORDER SUMMARY",
+                "name": "Name",
+                "phone": "Phone",
+                "email": "Email",
+                "address": "Address",
+                "method": "Method",
+                "paymentStatus": "Status",
+                "product": "Product",
+                "qty": "Qty",
+                "price": "Price",
+                "subtotal": "Subtotal",
+                "shippingFee": "Shipping Fee",
+                "tax": "Tax (SST 6%)",
+                "total": "Total",
+                "free": "Free",
+                "noItems": "No items"
+            },
+            "actions": {
+                "confirmOrder": "Confirm Order",
+                "readyToShip": "Ready to Ship",
+                "shipOrder": "Ship Order",
+                "cancelOrder": "Cancel Order",
+                "refund": "Refund"
+            },
+            "progress": {
+                "pending": "Pending",
+                "confirmed": "Confirmed",
+                "ready": "Ready",
+                "shipped": "Shipped",
+                "completed": "Completed"
+            },
+            "cancel": {
+                "title": "Cancel Order",
+                "orderLabel": "Order",
+                "reasonLabel": "Reason for cancellation",
+                "reasonPlaceholder": "Enter reason for cancellation...",
+                "back": "Back",
+                "confirm": "Confirm Cancel",
+                "confirming": "Cancelling..."
+            },
+            "filterDates": {
+                "allDates": "All Dates",
+                "today": "Today",
+                "thisWeek": "This Week",
+                "thisMonth": "This Month"
+            },
+            "filterStatus": {
+                "allStatus": "All Status"
             }
         },
         "products": {
+            "mobile": {
+                "productDetails": "PRODUCT DETAILS",
+                "noImage": "No Image",
+                "unnamedProduct": "Unnamed Product",
+                "multipleSkus": "Multiple SKUs",
+                "none": "None",
+                "taxesSst": "Taxes: SST (6%)\nIncl.",
+                "stockLevel": "Stock Level",
+                "centralWarehouse": "Central Warehouse",
+                "unitsAvailable": "Units Available",
+                "productVariants": "Product Variants",
+                "productFeatures": "Product Features"
+            },
+            "quickView": {
+                "altMainProduct": "Main product",
+                "stockLevel": "Stock Level",
+                "healthy": "Healthy",
+                "lowStock": "Low Stock",
+                "outOfStock": "Out of Stock",
+                "currentStock": "Current Stock:",
+                "productDetails": "Product Details",
+                "skuIdentification": "SKU Identification",
+                "skuFallback": "N/A",
+                "taxConfiguration": "Tax Configuration",
+                "taxesSst": "Taxes: SST (6%) Incl.",
+                "categoryPath": "Category Path",
+                "uncategorized": "Uncategorized",
+                "pricing": "Pricing",
+                "off": "OFF",
+                "inventoryVariants": "Inventory Variants",
+                "description": "Description",
+                "deleteConfirm": "Are you certain?",
+                "deleteProduct": "DELETE PRODUCT",
+                "editProduct": "EDIT PRODUCT"
+            },
             "title": "Products",
             "addProduct": "Add Product",
             "empty": {
@@ -494,6 +643,15 @@
                 "aiChatTitle": "AI Chat: Quickly create multiple products",
                 "aiChatPlaceholder": "Enter leather jacket 500k, hat 50k",
                 "aiChatBtn": "Create"
+            },
+            "messages": {
+                "nameRequired": "Please enter a product name first!",
+                "aiWritingDesc": "AI is writing description...",
+                "descSuccess": "Description generated successfully!",
+                "aiOptimizingSeo": "AI is optimizing SEO...",
+                "seoSuccess": "SEO optimized successfully!",
+                "generateFailed": "Failed to generate",
+                "networkError": "Network error"
             },
             "form": {
                 "editTitle": "Edit Product",
@@ -598,11 +756,68 @@
                 "editProduct": "Edit Product",
                 "fillInfo": "Fill in complete product information",
                 "saving": "Saving...",
-                "saveChanges": "Save Changes"
+                "saveChanges": "Save Changes",
+                "fields": {
+                    "name": "Product Name",
+                    "categoryIds": "Category",
+                    "images": "Images",
+                    "variants": "Variants Matrix",
+                    "tiers": "Variant Options",
+                    "basePrice": "Price",
+                    "baseSku": "SKU Code",
+                    "baseInventory": "Inventory"
+                },
+                "sections": {
+                    "general": "General Information",
+                    "productName": "Product Name *",
+                    "productNamePlaceholder": "Enter product name",
+                    "category": "Category",
+                    "images": "Images (Up to 5 images, each < 5MB)",
+                    "variants": "Variants & Inventory",
+                    "hasVariants": "Product has multiple Options/Variants",
+                    "hasVariantsExample": "Example: color, size, style",
+                    "price": "Price (RM)",
+                    "comparePrice": "Compare at Price (RM)",
+                    "comparePriceHelp": "Original price before discount (optional)",
+                    "inventory": "Inventory",
+                    "sku": "SKU Code",
+                    "tierFormat": "Tier {level} (Example: {example})",
+                    "tierPlaceholderColor": "e.g. Color",
+                    "tierPlaceholderSize": "e.g. Size",
+                    "optionPlaceholderRed": "e.g. Red",
+                    "optionPlaceholderSmall": "e.g. Small",
+                    "addOption": "Add option",
+                    "addTier": "Add Option / Tier",
+                    "createSkuTable": "Create SKU Table",
+                    "skuMatrix": "SKU Matrix Table",
+                    "colVariant": "Variant",
+                    "colSku": "SKU Code",
+                    "colPrice": "Price",
+                    "colComparePrice": "Compare Price",
+                    "colStock": "Stock",
+                    "shipping": "Shipping Configuration",
+                    "weight": "Weight (kg)",
+                    "length": "Length (cm)",
+                    "width": "Width (cm)",
+                    "height": "Height (cm)",
+                    "seo": "Description & SEO",
+                    "writeWithAi": "Write with AI",
+                    "seoOpt": "Search Optimization (SEO)",
+                    "seoOptDesc": "Auto-generate Meta Title and Slug",
+                    "aiOpt": "AI Optimization",
+                    "metaTitle": "Meta Title",
+                    "metaTitleMax": "(max 70 chars)",
+                    "metaDesc": "Meta Description",
+                    "metaDescMax": "(max 160 chars)",
+                    "urlSlug": "URL Slug",
+                    "urlSlugHint": "Leave blank to auto-generate from Title",
+                    "color": "Color",
+                    "size": "Size"
+                }
             },
             "bulkCreate": {
-                "title": "Fast AI Bulk Create",
-                "subtitle": "Paste a list of items for AI to process automatically",
+                "title": "Confirm Create Products (AI Preview)",
+                "subtitle": "Review and edit before saving",
                 "promptLabel": "Prompt / Item List",
                 "promptPlaceholder": "Example: 2 brown capybara keychains $15, 1 red slippers size M $5...",
                 "parseEmptyError": "Please enter a product list description",
@@ -611,6 +826,8 @@
                 "parseSuccess": "Successfully extracted {count} products",
                 "parseInvalidData": "AI returned invalid data",
                 "parseError": "Processing error",
+                "aiQuotaExceeded": "AI system is overloaded or out of quota. Please try again later.",
+                "aiTimeout": "AI system responses are too slow (Timeout). Please try again with shorter text.",
                 "previewTitle": "Preview Grid (AI Processed)",
                 "previewSubtitle": "Empty images will use a default carton icon when saved",
                 "colImage": "Image",
@@ -623,11 +840,89 @@
                 "editorHint": "💡 Click directly on Name, Price, or Category cells to edit before saving.",
                 "footerCount": "{selected} / {total} products selected",
                 "cancel": "Cancel",
-                "saveButton": "Save {count} Products",
+                "saveButton": "Save",
+                "productsItem": "Products",
                 "saveEmptyError": "Please select at least 1 product to save",
                 "saveSuccess": "Created {count} draft products. Please add images before publishing.",
                 "saveFailed": "Failed to create products",
-                "saveError": "Error saving products"
+                "saveError": "Error saving products",
+                "aiWorking": "AI magic is working...",
+                "table": {
+                    "name": "NAME",
+                    "price": "PRICE",
+                    "variants": "VARIANTS",
+                    "empty": "Product list is empty.",
+                    "defaultVariant": "Default"
+                },
+                "note": {
+                    "label": "Note: ",
+                    "description": "Products will be saved as Draft"
+                },
+                "toast": {
+                    "invalidFormat": "Invalid products format received from AI",
+                    "parseFailed": "Failed to parse products summary",
+                    "noSelection": "Please select at least 1 product",
+                    "saveSuccess": "Saved {count} products as draft",
+                    "saveFailed": "Failed to save products"
+                }
+            },
+            "categories": {
+                "table": {
+                    "level": "LEVEL",
+                    "products": "PRODUCTS",
+                    "actions": "ACTIONS",
+                    "noResults": "No results found",
+                    "noCategories": "No Categories",
+                    "tryAdjusting": "Try adjusting your search terms."
+                },
+                "title": "Category Management",
+                "subtitle": "Manage product categories (up to 3 levels deep)",
+                "backToProducts": "Products",
+                "addCategory": "Add Category",
+                "addSubcategory": "Add Subcategory",
+                "edit": "Edit",
+                "delete": "Delete",
+                "search": "Search categories...",
+                "emptyState": "No categories found. Start by creating a new category.",
+                "maxLevelReached": "Maximum depth (Level 3) reached. Cannot add lower subcategories.",
+                "productsCount": "products",
+                "form": {
+                    "newTitle": "Add Category",
+                    "editTitle": "Edit Category",
+                    "name": "Category Name",
+                    "namePlaceholder": "e.g. Electronics, Fashion",
+                    "slug": "URL Slug",
+                    "slugPlaceholder": "category-url",
+                    "slugHelp": "Auto-suggested from category name.",
+                    "parent": "Parent Category",
+                    "parentNone": "None (Top Level)",
+                    "description": "Description",
+                    "descriptionPlaceholder": "Short description for SEO (optional)",
+                    "image": "Category Image",
+                    "cancel": "Cancel",
+                    "save": "Save Category",
+                    "saving": "Saving...",
+                    "optional": "(Optional)"
+                },
+                "deleteModal": {
+                    "title": "Delete Category",
+                    "warning1": "Are you sure you want to delete",
+                    "warning2": "",
+                    "subCategoryWarning": "This category has child categories. They will be unlinked from the tree (not permanently deleted).",
+                    "productsWarning": "Products in this category will not be deleted, but will lose this category tag.",
+                    "cancel": "Cancel",
+                    "confirm": "Delete",
+                    "deleting": "Deleting..."
+                },
+                "toast": {
+                    "created": "Category \"{name}\" created! 🎉",
+                    "updated": "Category \"{name}\" updated! ✨",
+                    "deleted": "Category \"{name}\" deleted! 🗑️",
+                    "loadError": "Failed to load categories",
+                    "saveError": "Failed to save category",
+                    "deleteError": "Failed to delete category",
+                    "maxDepthError": "Cannot nest deeper than 3 levels"
+                }
             },
             "subtitle": "Manage store products"
         }

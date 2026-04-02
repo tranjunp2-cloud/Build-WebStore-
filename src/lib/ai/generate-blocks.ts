@@ -303,4 +303,4 @@ export function generateBlocks(prompt: string): GenerationResult {
     }
 }
 
-export type { GenerationResult, BusinessIntent }
+export type { GenerationResult, BusinessIntent, GeneratedBlock }

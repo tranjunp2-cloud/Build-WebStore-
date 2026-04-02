@@ -474,9 +474,10 @@ const MIGRATIONS = [
     sql: `CREATE INDEX IF NOT EXISTS orders_items_parent_idx ON orders_items (_parent_id);`,
   },
   // ── ALTER TABLE fallbacks ──────────────────────────────────────────────
-  // pushDevSchema may create array tables with only metadata columns (id, _order, _parent_id, _uuid).
-  // CREATE TABLE IF NOT EXISTS skips if table already exists → field columns missing.
+  // Use these for adding columns to existing tables where recreating is not an option.
   // ALTER TABLE ADD COLUMN IF NOT EXISTS ensures columns exist regardless of creation order.
+  { name: 'categories.description', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS description varchar;` },
+  { name: 'categories.deleted_at', sql: `ALTER TABLE categories ADD COLUMN IF NOT EXISTS deleted_at timestamptz;` },
   // orders_items
   { name: 'orders_items.product_id', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS product_id integer;` },
   { name: 'orders_items.product_name', sql: `ALTER TABLE orders_items ADD COLUMN IF NOT EXISTS product_name varchar;` },

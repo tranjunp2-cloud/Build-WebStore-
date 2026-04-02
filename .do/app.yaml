@@ -35,6 +35,14 @@ services:
       - key: NEXT_PUBLIC_APP_ENV
         value: staging
 
+      # ── E2E Testing (staging only — NOT in production app.yaml) ─────────
+      - key: E2E_TEST_OTP_CODE
+        type: SECRET
+      - key: TEST_EMAIL
+        type: SECRET
+      - key: TEST_PASSWORD
+        type: SECRET
+
       # ── Database ─────────────────────────────────────────────────────────
       - key: DATABASE_URI
         value: ${db.DATABASE_URL}
