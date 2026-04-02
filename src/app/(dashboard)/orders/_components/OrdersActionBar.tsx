@@ -33,7 +33,7 @@ export function OrdersActionBar({
         { value: 'all', label: o.filterStatus.allStatus },
         { value: 'pending', label: o.status.pending },
         { value: 'confirmed', label: o.status.confirmed },
-        { value: 'ready_to_ship', label: o.filters.readyToShip },
+        { value: 'ready_to_ship', label: o.status.readyToShip },
         { value: 'shipped', label: o.status.shipped },
         { value: 'completed', label: o.status.completed },
         { value: 'cancelled', label: o.status.cancelled },

@@ -21,8 +21,8 @@ export function BuilderOptionCard({
                 'relative flex w-full items-center gap-2 rounded-2xl border text-left transition-all duration-200',
                 compact ? 'min-h-11 justify-center px-4 py-3 text-center' : 'min-h-11 px-[9px] py-[9px]',
                 selected
-                    ? 'border-[#3b82f6] bg-[linear-gradient(90deg,rgba(59,130,246,0.2)_0%,rgba(45,212,191,0.2)_100%)] text-[#f8fafc] shadow-[0px_10px_15px_0px_rgba(59,130,246,0.25),0px_4px_6px_0px_rgba(59,130,246,0.25)]'
-                    : 'border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] text-[#94a3b8] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)] hover:border-blue-500/30',
+                    ? 'border-blue-500 bg-blue-500/15 text-white ring-1 ring-blue-500'
+                    : 'border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] text-[#94a3b8] shadow-sm hover:border-blue-500/30',
             )}
             onClick={onClick}
             type="button"
