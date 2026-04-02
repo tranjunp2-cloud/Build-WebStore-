@@ -472,7 +472,7 @@
         "loadFailed": "Failed to load orders",
         "bulkSuccess": "Successfully confirmed {count} orders",
         "bulkFailed": "{count} orders failed (invalid workflow)",
-        "updateFailed": "Error: {message}"
+        "updateFailed": "Failed to update order"
       },
       "pageTitle": "Orders",
       "pageSubtitle": "Manage and track your orders",
