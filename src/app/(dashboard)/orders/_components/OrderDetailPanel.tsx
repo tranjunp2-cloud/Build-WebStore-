@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 import Image from 'next/image'
@@ -424,21 +424,25 @@ function PaymentInformation({ order }: { order: OrderDetail }) {
     if (order.status === 'ready_to_ship' || order.status === 'shipped' || order.status === 'completed' || order.paymentStatus?.toLowerCase() === 'paid') {
         statusColor = '#10B981'
         statusBg = 'rgba(16, 185, 129, 0.1)'
-        StatusIcon = () => (
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="8" cy="8" r="6.666" stroke="#10B981" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M5.333 8L7.333 10L11.333 5.333" stroke="#10B981" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        )
+        StatusIcon = function SuccessIcon() {
+            return (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="8" cy="8" r="6.666" stroke="#10B981" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M5.333 8L7.333 10L11.333 5.333" stroke="#10B981" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            )
+        }
     } else if (order.status === 'cancelled' || order.status === 'refunded') {
         statusColor = '#FB2C36' // Red
         statusBg = 'rgba(251, 44, 54, 0.1)'
-        StatusIcon = () => (
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="8" cy="8" r="6.666" stroke="#FB2C36" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M6 6L10 10M10 6L6 10" stroke="#FB2C36" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-        )
+        StatusIcon = function CancelledIcon() {
+            return (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="8" cy="8" r="6.666" stroke="#FB2C36" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M6 6L10 10M10 6L6 10" stroke="#FB2C36" strokeWidth="1.33" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            )
+        }
     }
 
     return (
@@ -851,7 +855,7 @@ export function OrderDetailPanel({
     const { t } = useI18n()
     const d = t.dashboard.orders.detail
 
-    const fetchOrder = async () => {
+    const fetchOrder = useCallback(async () => {
         if (!orderId) return
         setIsLoading(true)
         try {
@@ -866,7 +870,7 @@ export function OrderDetailPanel({
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [orderId, t.dashboard.orders.toast.loadFailed])
 
     useEffect(() => {
         if (orderId) {
@@ -874,7 +878,7 @@ export function OrderDetailPanel({
         } else {
             setOrder(null)
         }
-    }, [orderId])
+    }, [orderId, fetchOrder])
 
     if (!orderId) return null
 
