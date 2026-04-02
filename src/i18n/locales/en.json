@@ -435,6 +435,82 @@
                 "bulkSuccess": "Successfully confirmed {count} orders",
                 "bulkFailed": "{count} orders failed (invalid workflow)",
                 "updateFailed": "Error: {message}"
+            },
+            "pageTitle": "Orders",
+            "pageSubtitle": "Manage and track your orders",
+            "metrics": {
+                "pending": "Pending",
+                "readyToShip": "Ready to Ship",
+                "shipped": "Shipped",
+                "completed": "Completed"
+            },
+            "tableHeaders": {
+                "orderNumber": "Order #",
+                "customer": "Customer",
+                "total": "Total",
+                "status": "Status",
+                "loading": "Loading orders...",
+                "noOrders": "No orders found",
+                "selectAll": "Select all rows"
+            },
+            "pagination": {
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "detail": {
+                "title": "Order Details",
+                "orderProgress": "ORDER PROGRESS",
+                "customerInfo": "CUSTOMER INFORMATION",
+                "paymentInfo": "PAYMENT INFORMATION",
+                "orderItems": "ORDER ITEMS",
+                "orderSummary": "ORDER SUMMARY",
+                "name": "Name",
+                "phone": "Phone",
+                "email": "Email",
+                "address": "Address",
+                "method": "Method",
+                "paymentStatus": "Status",
+                "product": "Product",
+                "qty": "Qty",
+                "price": "Price",
+                "subtotal": "Subtotal",
+                "shippingFee": "Shipping Fee",
+                "tax": "Tax (SST 6%)",
+                "total": "Total",
+                "free": "Free",
+                "noItems": "No items"
+            },
+            "actions": {
+                "confirmOrder": "Confirm Order",
+                "readyToShip": "Ready to Ship",
+                "shipOrder": "Ship Order",
+                "cancelOrder": "Cancel Order",
+                "refund": "Refund"
+            },
+            "progress": {
+                "pending": "Pending",
+                "confirmed": "Confirmed",
+                "ready": "Ready",
+                "shipped": "Shipped",
+                "completed": "Completed"
+            },
+            "cancel": {
+                "title": "Cancel Order",
+                "orderLabel": "Order",
+                "reasonLabel": "Reason for cancellation",
+                "reasonPlaceholder": "Enter reason for cancellation...",
+                "back": "Back",
+                "confirm": "Confirm Cancel",
+                "confirming": "Cancelling..."
+            },
+            "filterDates": {
+                "allDates": "All Dates",
+                "today": "Today",
+                "thisWeek": "This Week",
+                "thisMonth": "This Month"
+            },
+            "filterStatus": {
+                "allStatus": "All Status"
             }
         },
         "products": {
