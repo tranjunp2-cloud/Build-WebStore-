@@ -54,10 +54,10 @@ export default function BusinessInfoForm({
     const [isLoadingIndustries, setIsLoadingIndustries] = useState(true)
 
     const isFormReady =
-        form.businessName.trim().length > 0 &&
+        form.businessName.trim().length >= 3 &&
         form.industry.trim().length > 0 &&
-        form.shortDescription.trim().length > 0 &&
-        form.products.trim().length > 0
+        form.shortDescription.trim().length >= 3 &&
+        form.products.trim().length >= 3
 
     useEffect(() => {
         let isMounted = true
@@ -112,10 +112,10 @@ export default function BusinessInfoForm({
     const validate = (): boolean => {
         const nextErrors: Record<string, string> = {}
 
-        if (!form.businessName.trim()) nextErrors.businessName = t.onboarding.form.errors.businessName
+        if (form.businessName.trim().length < 3) nextErrors.businessName = t.onboarding.form.errors.businessName
         if (!form.industry) nextErrors.industry = t.onboarding.form.errors.industry
-        if (!form.shortDescription.trim()) nextErrors.shortDescription = t.onboarding.form.errors.shortDescription
-        if (!form.products.trim()) nextErrors.products = t.onboarding.form.errors.products
+        if (form.shortDescription.trim().length < 3) nextErrors.shortDescription = t.onboarding.form.errors.shortDescription
+        if (form.products.trim().length < 3) nextErrors.products = t.onboarding.form.errors.products
 
         setErrors(nextErrors)
         return Object.keys(nextErrors).length === 0
