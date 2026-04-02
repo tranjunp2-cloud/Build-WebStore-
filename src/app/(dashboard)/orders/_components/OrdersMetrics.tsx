@@ -1,36 +1,56 @@
-import React from 'react'
+"use client"
+
+import React, { useState, useEffect } from 'react'
 import { Clock, CheckCircle2, Package, Truck } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
-const metrics = [
-    {
-        label: 'Pending',
-        value: 3,
-        icon: <Clock className="w-5 h-5 text-[#FF8904]" />,
-        iconBg: 'bg-[rgba(255,105,0,0.1)]',
-    },
-    {
-        label: 'Ready to Ship',
-        value: 3,
-        icon: <Package className="w-5 h-5 text-blue-500" />,
-        iconBg: 'bg-blue-500/10',
-    },
-    {
-        label: 'Confirmed',
-        value: 3,
-        icon: <CheckCircle2 className="w-5 h-5 text-blue-500" />,
-        iconBg: 'bg-blue-500/10',
-    },
-    {
-        label: 'Shipped',
-        value: 3,
-        icon: <Truck className="w-5 h-5 text-[#05DF72]" />,
-        iconBg: 'bg-[rgba(0,201,80,0.1)]',
-    },
-]
+export function OrdersMetrics({ refreshCounter = 0 }: { refreshCounter?: number }) {
+    const { t } = useI18n()
+    const o = t.dashboard.orders
+    const [counts, setCounts] = useState({ pending: 0, readyToShip: 0, confirmed: 0, shipped: 0 })
 
-export function OrdersMetrics() {
+    useEffect(() => {
+        async function fetchMetrics() {
+            try {
+                const res = await fetch('/api/orders/metrics')
+                const json = await res.json()
+                if (json.success && json.data) {
+                    setCounts(json.data)
+                }
+            } catch (err) { }
+        }
+        fetchMetrics()
+    }, [refreshCounter])
+
+    const metrics = [
+        {
+            label: o.metrics.pending,
+            value: counts.pending,
+            icon: <Clock className="w-5 h-5 text-[#FF8904]" />,
+            iconBg: 'bg-[rgba(255,105,0,0.1)]',
+        },
+        {
+            label: o.metrics.readyToShip,
+            value: counts.readyToShip,
+            icon: <Package className="w-5 h-5 text-blue-500" />,
+            iconBg: 'bg-blue-500/10',
+        },
+        {
+            label: o.status.confirmed,
+            value: counts.confirmed,
+            icon: <CheckCircle2 className="w-5 h-5 text-blue-500" />,
+            iconBg: 'bg-blue-500/10',
+        },
+        {
+            label: o.metrics.shipped,
+            value: counts.shipped,
+            icon: <Truck className="w-5 h-5 text-[#05DF72]" />,
+            iconBg: 'bg-[rgba(0,201,80,0.1)]',
+        },
+    ]
+
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[22px] w-full">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-[22px] w-full">
             {metrics.map((item, index) => (
                 <div
                     key={index}

@@ -1,0 +1,278 @@
+[
+  {
+    "url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454976",
+    "pull_request_review_id": 4035751185,
+    "id": 3014454976,
+    "node_id": "PRRC_kwDORgtWTM6zrO7A",
+    "diff_hunk": "@@ -36,6 +36,32 @@ export async function POST(req: NextRequest) {\n             })\n             callerUser = authResult?.user || null\n \n+            // Fallback for custom jose-signed JWT (SSO service token)",
+    "path": "src/app/api/v1/sso/provision/route.ts",
+    "commit_id": "11c2d8e77d845bd6185c0f89145a8c4e18591f73",
+    "original_commit_id": "744968c10c6428b465ee1af4e7d574f42fb857e2",
+    "user": {
+      "login": "github-actions[bot]",
+      "id": 41898282,
+      "node_id": "MDM6Qm90NDE4OTgyODI=",
+      "avatar_url": "https://avatars.githubusercontent.com/in/15368?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/github-actions%5Bbot%5D",
+      "html_url": "https://github.com/apps/github-actions",
+      "followers_url": "https://api.github.com/users/github-actions%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/github-actions%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/github-actions%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/github-actions%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/github-actions%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/github-actions%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/github-actions%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/github-actions%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/github-actions%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "**![P0](https://img.shields.io/badge/P0-red?style=flat) Auth JWT xử lý rời rạc trong route, dễ tái phát lỗi decode token**\n\nRoute tự fallback `jose` thay vì dùng chuẩn chung `getCurrentUser()` từ `@/lib/auth`. Điều này dễ gây regression cross-feature khi format JWT đổi. Nên thay toàn bộ logic auth tại route bằng helper chung, ví dụ: `const callerUser = await getCurrentUser(req, payload)` và bỏ nhánh verify thủ công.\n\nUseful? React with 👍 / 👎.",
+    "created_at": "2026-03-31T08:51:53Z",
+    "updated_at": "2026-03-31T08:51:53Z",
+    "html_url": "https://github.com/primeproduction/ech-prime-web-v2/pull/412#discussion_r3014454976",
+    "pull_request_url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/412",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454976"
+      },
+      "html": {
+        "href": "https://github.com/primeproduction/ech-prime-web-v2/pull/412#discussion_r3014454976"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/412"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454976/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 39,
+    "original_line": 39,
+    "side": "RIGHT",
+    "author_association": "NONE",
+    "original_position": 4,
+    "position": 4,
+    "subject_type": "line"
+  },
+  {
+    "url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454985",
+    "pull_request_review_id": 4035751185,
+    "id": 3014454985,
+    "node_id": "PRRC_kwDORgtWTM6zrO7J",
+    "diff_hunk": "@@ -36,6 +36,32 @@ export async function POST(req: NextRequest) {\n             })\n             callerUser = authResult?.user || null\n \n+            // Fallback for custom jose-signed JWT (SSO service token)\n+            if (!callerUser) {\n+                const payloadSecret = process.env.PAYLOAD_SECRET\n+                if (payloadSecret) {\n+                    const { jwtVerify } = await (import('jose'))\n+                    const secret = new TextEncoder().encode(payloadSecret)\n+                    try {\n+                        const { payload: decoded } = await jwtVerify(token, secret)\n+\n+                        const isIdValid =\n+                            typeof decoded.id === 'number' ||\n+                            (typeof decoded.id === 'string' && /^[a-zA-Z0-9-]+$/.test(decoded.id))\n+\n+                        if (isIdValid && decoded.collection === 'users') {\n+                            const user = await payload.findByID({\n+                                collection: 'users',\n+                                id: decoded.id as string | number,\n+                            })\n+                            callerUser = user || null\n+                        }\n+                    } catch (e) {",
+    "path": "src/app/api/v1/sso/provision/route.ts",
+    "commit_id": "11c2d8e77d845bd6185c0f89145a8c4e18591f73",
+    "original_commit_id": "744968c10c6428b465ee1af4e7d574f42fb857e2",
+    "user": {
+      "login": "github-actions[bot]",
+      "id": 41898282,
+      "node_id": "MDM6Qm90NDE4OTgyODI=",
+      "avatar_url": "https://avatars.githubusercontent.com/in/15368?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/github-actions%5Bbot%5D",
+      "html_url": "https://github.com/apps/github-actions",
+      "followers_url": "https://api.github.com/users/github-actions%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/github-actions%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/github-actions%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/github-actions%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/github-actions%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/github-actions%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/github-actions%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/github-actions%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/github-actions%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "**![P0](https://img.shields.io/badge/P0-red?style=flat) Catch block rỗng làm nuốt lỗi xác thực JWT**\n\n`catch (e)` chỉ có comment, vi phạm rule không để catch rỗng và làm mất tín hiệu lỗi. Nên xử lý rõ ràng: log an toàn + return 401/403, hoặc rethrow lỗi có kiểm soát. Ví dụ: `catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }) }`.\n\nUseful? React with 👍 / 👎.",
+    "created_at": "2026-03-31T08:51:53Z",
+    "updated_at": "2026-03-31T08:51:53Z",
+    "html_url": "https://github.com/primeproduction/ech-prime-web-v2/pull/412#discussion_r3014454985",
+    "pull_request_url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/412",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454985"
+      },
+      "html": {
+        "href": "https://github.com/primeproduction/ech-prime-web-v2/pull/412#discussion_r3014454985"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/412"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454985/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 59,
+    "original_line": 59,
+    "side": "RIGHT",
+    "author_association": "NONE",
+    "original_position": 24,
+    "position": 24,
+    "subject_type": "line"
+  },
+  {
+    "url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454990",
+    "pull_request_review_id": 4035751185,
+    "id": 3014454990,
+    "node_id": "PRRC_kwDORgtWTM6zrO7O",
+    "diff_hunk": "@@ -41,6 +41,32 @@ export async function PUT(req: NextRequest) {\n             })\n             callerUser = authResult?.user || null\n \n+            // Fallback for custom jose-signed JWT (SSO service token)",
+    "path": "src/app/api/v1/sso/reset-password/route.ts",
+    "commit_id": "11c2d8e77d845bd6185c0f89145a8c4e18591f73",
+    "original_commit_id": "744968c10c6428b465ee1af4e7d574f42fb857e2",
+    "user": {
+      "login": "github-actions[bot]",
+      "id": 41898282,
+      "node_id": "MDM6Qm90NDE4OTgyODI=",
+      "avatar_url": "https://avatars.githubusercontent.com/in/15368?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/github-actions%5Bbot%5D",
+      "html_url": "https://github.com/apps/github-actions",
+      "followers_url": "https://api.github.com/users/github-actions%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/github-actions%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/github-actions%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/github-actions%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/github-actions%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/github-actions%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/github-actions%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/github-actions%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/github-actions%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "**![P0](https://img.shields.io/badge/P0-red?style=flat) Auth JWT xử lý rời rạc trong route, không theo chuẩn getCurrentUser**\n\nRoute thêm fallback verify JWT thủ công thay vì dùng `getCurrentUser()` từ `@/lib/auth`. Đây là pattern đã gây lỗi 401 ở các API khác khi JWT format thay đổi. Nên gom về helper chung để decode/validate nhất quán và tránh lệch hành vi giữa các route.\n\nUseful? React with 👍 / 👎.",
+    "created_at": "2026-03-31T08:51:53Z",
+    "updated_at": "2026-03-31T08:51:53Z",
+    "html_url": "https://github.com/primeproduction/ech-prime-web-v2/pull/412#discussion_r3014454990",
+    "pull_request_url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/412",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454990"
+      },
+      "html": {
+        "href": "https://github.com/primeproduction/ech-prime-web-v2/pull/412#discussion_r3014454990"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/412"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454990/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 44,
+    "original_line": 44,
+    "side": "RIGHT",
+    "author_association": "NONE",
+    "original_position": 4,
+    "position": 4,
+    "subject_type": "line"
+  },
+  {
+    "url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454994",
+    "pull_request_review_id": 4035751185,
+    "id": 3014454994,
+    "node_id": "PRRC_kwDORgtWTM6zrO7S",
+    "diff_hunk": "@@ -41,6 +41,32 @@ export async function PUT(req: NextRequest) {\n             })\n             callerUser = authResult?.user || null\n \n+            // Fallback for custom jose-signed JWT (SSO service token)\n+            if (!callerUser) {\n+                const payloadSecret = process.env.PAYLOAD_SECRET\n+                if (payloadSecret) {\n+                    const { jwtVerify } = await (import('jose'))\n+                    const secret = new TextEncoder().encode(payloadSecret)\n+                    try {\n+                        const { payload: decoded } = await jwtVerify(token, secret)\n+\n+                        const isIdValid =\n+                            typeof decoded.id === 'number' ||\n+                            (typeof decoded.id === 'string' && /^[a-zA-Z0-9-]+$/.test(decoded.id))\n+\n+                        if (isIdValid && decoded.collection === 'users') {\n+                            const user = await payload.findByID({\n+                                collection: 'users',\n+                                id: decoded.id as string | number,\n+                            })\n+                            callerUser = user || null\n+                        }\n+                    } catch (e) {",
+    "path": "src/app/api/v1/sso/reset-password/route.ts",
+    "commit_id": "11c2d8e77d845bd6185c0f89145a8c4e18591f73",
+    "original_commit_id": "744968c10c6428b465ee1af4e7d574f42fb857e2",
+    "user": {
+      "login": "github-actions[bot]",
+      "id": 41898282,
+      "node_id": "MDM6Qm90NDE4OTgyODI=",
+      "avatar_url": "https://avatars.githubusercontent.com/in/15368?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/github-actions%5Bbot%5D",
+      "html_url": "https://github.com/apps/github-actions",
+      "followers_url": "https://api.github.com/users/github-actions%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/github-actions%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/github-actions%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/github-actions%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/github-actions%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/github-actions%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/github-actions%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/github-actions%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/github-actions%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "**![P0](https://img.shields.io/badge/P0-red?style=flat) Catch block rỗng trong nhánh verify token**\n\n`catch (e)` không xử lý gì ngoài comment, khiến lỗi bị nuốt và khó audit bảo mật. Nên trả lỗi xác thực rõ ràng hoặc xử lý/log an toàn. Gợi ý: `catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }) }`.\n\nUseful? React with 👍 / 👎.",
+    "created_at": "2026-03-31T08:51:53Z",
+    "updated_at": "2026-03-31T08:51:53Z",
+    "html_url": "https://github.com/primeproduction/ech-prime-web-v2/pull/412#discussion_r3014454994",
+    "pull_request_url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/412",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454994"
+      },
+      "html": {
+        "href": "https://github.com/primeproduction/ech-prime-web-v2/pull/412#discussion_r3014454994"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/412"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/primeproduction/ech-prime-web-v2/pulls/comments/3014454994/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 64,
+    "original_line": 64,
+    "side": "RIGHT",
+    "author_association": "NONE",
+    "original_position": 24,
+    "position": 24,
+    "subject_type": "line"
+  }
+]
