@@ -133,10 +133,10 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                         ) : null}
                         <div className="ml-auto bg-[#1D2026] rounded-[2px] py-1 pl-2 pr-4 text-[10px] text-[#C1C6D7] uppercase tracking-[0.1em] leading-[1.5]">
                             <span>
-                                {(t.dashboard?.products?.mobile?.taxesSst || 'Taxes: SST (6%)\nIncl.').split('\n').map((line, i) => (
+                                {(t.dashboard?.products?.mobile?.taxesSst || 'Taxes: SST (6%)\nIncl.').split('\n').map((line, i, arr) => (
                                     <React.Fragment key={i}>
                                         {line}
-                                        {i === 0 && <br />}
+                                        {i < arr.length - 1 && <br />}
                                     </React.Fragment>
                                 ))}
                             </span>
