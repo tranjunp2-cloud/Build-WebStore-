@@ -30,7 +30,7 @@ User sử dụng thông tin Static Ingress (A Record hoặc CNAME) hiển thị 
 ### Bước 3: Xác minh Kết nối (Connection Verification & SSL Check)
 User bấm nút **Verify Connection** trên UI.
 1. **Network DNS Resolution:** Backend chạy `dns.resolve4('store.com')` để kiểm tra bản ghi A có thực sự resolve về 1 trong 2 địa chỉ IP khai báo trong `NEXT_PUBLIC_SERVER_IP` hay không.
-2. **SSL State Check (DO API):** Do việc sinh chứng chỉ Let's Encrypt của DO tốn thời gian thực thi (khoảng 1 - 5 phút), Backend dùng lệnh `GET /v2/apps/{DO_APP_ID}` để trích xuất mảng `live_state.domain_progress`. 
+2. **SSL State Check (DO API):** Do việc sinh chứng chỉ Let's Encrypt của DO tốn thời gian thực thi (khoảng 1 - 5 phút), Backend dùng lệnh `GET /v2/apps/{DO_APP_ID}` để trích xuất mảng `app.domains` của DigitalOcean. 
    * Trạng thái Verification chỉ trả về `Thành công (Active)` khi biến `phase` của domain đạt trạng thái `ACTIVE` (Hoàn tất SSL Provisioning). Nếu không, hệ thống báo User đợi thêm.
 
 ### Bước 4: Định tuyến Request tại Lớp Application (L7 URL Rewrite)
@@ -78,7 +78,7 @@ Bảng dưới đây giải trình cách Lõi Code (Core Logic) đáp ứng chí
 | :--- | :--- |
 | **1.** *"Phải cần đăng ký thêm domain về DigitalOcean qua API này. Thì domain mới work được"* | **Zero-Touch Automation:** Tại `actions.ts -> addCustomDomain()`, ngay khi insert DB, code lén lấy `DO_API_TOKEN` gọi lệnh `PUT spec.domains` lên DO. Devops không cần vào Dashboard cấu hình tay. Tương tự khi Xóa, tự động gọi API dọn dẹp hạ tầng. Lệnh call API được bọc trong Try-Catch để chống sập Web nếu mạng mẽo của hệ thống DigitalOcean có vấn đề. |
 | **2.** *"Record A thì có 1 trong 2 IP này: 162.159.140.98, 172.66.0.96"* | **Robust DNS Matcher:** Biến `SERVER_IP` được code chẻ ra thành Mảng. Hàm Verify `dns.resolve4()` nhận diện trúng 1 trong 2 IP qua ngầm `.some()` là Pass. Triệt tiêu hoàn toàn khả năng báo lỗi rác do vị trí địa lý của Cloudflare/DO trả về IP ngẫu nhiên. |
-| **3.** *"SSL https thì mặc định digital ocean đã work gắn sẵn"* | **Double Verification Layer:** Code chạy kiểm tra 2 lớp chuyên sâu. Lớp 1 check DNS Pass xong -> Lớp 2 bốc Token gọi API `GET` lên DO để soi biến `live_state.domain_progress[domain].phase`. CHỈ KHI API DO báo `phase === 'ACTIVE'` (Nghĩa là DO đã lo xong vụ chứng chỉ SSL), UI Frontend mới sáng nút Xanh báo `Connected` cho khách. Tránh triệt để lỗi User click vào link bị Trình duyệt chặn màn hình Đỏ vì lỗi bảo mật Https. |
+| **3.** *"SSL https thì mặc định digital ocean đã work gắn sẵn"* | **Double Verification Layer:** Code chạy kiểm tra 2 lớp chuyên sâu. Lớp 1 check DNS Pass xong -> Lớp 2 bốc Token gọi API `GET` lên DO để soi biến `app.domains`. CHỈ KHI API DO báo `phase === 'ACTIVE'` (Nghĩa là DO đã lo xong vụ chứng chỉ SSL), UI Frontend mới sáng nút Xanh báo `Connected` cho khách. Tránh triệt để lỗi User click vào link bị Trình duyệt chặn màn hình Đỏ vì lỗi bảo mật Https. |
 
 ---
 
@@ -93,7 +93,7 @@ Khi Lead review task này, bạn hãy bám sát 4 Luận điểm (Talking points
 > **Nói với Lead:** "Hạ tầng DO App Platform là một rổ Load Balancer dùng chung (Shared Ingress). Mọi cửa hàng (Tenant) đều phải trỏ chung về 2 IP (`162.159.140.98`, `172.66.0.96`) hoặc CNAME đích (`ech-prime-web-v2...`). Vì bản chất cổng vào này là tĩnh (Static), nên em đọc trực tiếp từ `.env` để nhả ra UI cho khách xài luôn, không cần viết hàm API sinh số ảo."
 
 ### Luận điểm 3: "Luồng Verify thông minh & Phòng thủ 2 lớp như thế nào?"
-> **Nói với Lead:** "Hàm Verify của em không fix cứng 1 IP. Em code chẻ biến `SERVER_IP` ra thành mảng rồi check `some()` -> Khách trỏ rớt hộp 1 IP ngẫu nhiên nào của Cloudflare DO em cũng bắt dính.\nĐặc biệt, em code **Check SSL 2 vòng**. Dù DNS trỏ đúng, em vẫn gọi qua API `GET` của DO kiểm tra trường `domain_progress.phase`. Chừng nào DO báo `ACTIVE` (đã xong HTTPS) em mới cho bật màu Xanh Thành công. Tránh tuyệt đối lỗi dâng cho khách 1 cái link Đỏ lòm báo lỗi bảo mật trình duyệt."
+> **Nói với Lead:** "Hàm Verify của em không fix cứng 1 IP. Em code chẻ biến `SERVER_IP` ra thành mảng rồi check `some()` -> Khách trỏ rớt hộp 1 IP ngẫu nhiên nào của Cloudflare DO em cũng bắt dính.\nĐặc biệt, em code **Check SSL 2 vòng**. Dù DNS trỏ đúng, em vẫn gọi qua API `GET` của DO kiểm tra trường `app.domains[...].phase`. Chừng nào DO báo `ACTIVE` (đã xong HTTPS) em mới cho bật màu Xanh Thành công. Tránh tuyệt đối lỗi dâng cho khách 1 cái link Đỏ lòm báo lỗi bảo mật trình duyệt."
 
 ### Luận điểm 4: "Luồng Middleware Next.js bắt Hostname ra sao?"
 > **Nói với Lead:** "Sau khi traffic chui lọt qua Firewall của DO và rơi xuống Next.js. Em sửa `middleware.ts` để đọc HTTP `Host` header. Nếu nó không phải Platform, không phải Admin CMS thì em dán một cái cờ `x-tenant-hostname` rồi lái qua thư mục `/sites/custom`. \nTrong file `page.tsx`, hệ thống sẽ bóc cờ `x-tenant-hostname` (VD: tuixach.com) đi Query ngược lại DB Payload CMS ở field `customDomains.domain` để lôi đúng Data của cửa hàng đó ra Render."
