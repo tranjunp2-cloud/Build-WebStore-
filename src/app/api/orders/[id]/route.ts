@@ -60,13 +60,7 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
         if (trackingNumber) updateData.trackingNumber = trackingNumber
         if (notes) updateData.notes = notes
 
-        // If shipping, require tracking number
-        if (newStatus === 'shipped' && !trackingNumber && !order.trackingNumber) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Tracking number is required when shipping' } },
-                { status: 422 }
-            )
-        }
+
 
         const updated = await payload.update({
             collection: 'orders',
