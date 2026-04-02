@@ -1,12 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Users } from '../../collections/Users'
-import type { PayloadRequest } from 'payload'
-
-type MockReq = Pick<PayloadRequest, 'json' | 'payload'>
+import type { PayloadRequest, Endpoint } from 'payload'
 
 describe('Payload Custom Endpoint: /api/users/login', () => {
     const endpoints = Array.isArray(Users.endpoints) ? Users.endpoints : []
-    const loginEndpoint = endpoints.find((e: any) => e.path === '/login')
+    const loginEndpoint = endpoints.find((e: Endpoint) => e.path === '/login')
     const handler = loginEndpoint?.handler
 
     if (!handler) {
