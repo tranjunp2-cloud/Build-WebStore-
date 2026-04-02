@@ -55,20 +55,6 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
             )
         }
 
-        // Validate tracking number when shipping
-        if (newStatus === 'shipped' && !trackingNumber && !order.trackingNumber) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: {
-                        code: 'VALIDATION_ERROR',
-                        message: 'Tracking number is required when shipping an order',
-                    },
-                },
-                { status: 422 }
-            )
-        }
-
         // Build update data
         const updateData: any = { status: newStatus }
         if (trackingNumber) updateData.trackingNumber = trackingNumber
