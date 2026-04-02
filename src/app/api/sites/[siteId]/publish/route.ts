@@ -171,3 +171,6 @@ export async function DELETE(
         )
     }
 }
+
+// Alias PUT to PATCH for automated testing bot (Playwright) which uses PUT
+export const PUT = PATCH
