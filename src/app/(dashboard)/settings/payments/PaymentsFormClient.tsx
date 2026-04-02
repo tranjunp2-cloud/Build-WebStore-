@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CreditCard, Banknote, Upload, UploadCloud, X, Save, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { getPaymentSettings, updatePaymentSettings, uploadQrMedia } from './actions';
+import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, type PaymentUpdates } from './actions';
 import { useI18n } from '@/i18n';
 
 export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined }) {
@@ -65,7 +65,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
         fetchSettings();
     }, [tenantId]);
 
-    const saveTenantSettings = async (updates: Record<string, any>) => {
+    const saveTenantSettings = async (updates: PaymentUpdates) => {
             if (!tenantId) return false;
             try {
                 const res = await updatePaymentSettings({
@@ -76,9 +76,10 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                 });
                 if (!res.success) throw new Error(res.error || "Failed to save settings");
                 return true;
-            } catch (error: any) {
+            } catch (error: unknown) {
                 console.error("Save error:", error);
-                toast.error(error.message || "Failed to save changes. Please try again.");
+                const errorMessage = error instanceof Error ? error.message : "Failed to save changes. Please try again.";
+                toast.error(errorMessage);
                 return false;
             }
         };
@@ -157,10 +158,11 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                 setQrImageId(null);
             }
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Upload error:", error);
             toast.dismiss('upload-qr');
-            toast.error(pt.uploadError + (error.message || "Failed to upload image"));
+            const errorMessage = error instanceof Error ? error.message : "Failed to upload image";
+            toast.error(pt.uploadError + errorMessage);
             setQrPreviewUrl(null);
             setPaymentQr(false); // Revert state
         }
