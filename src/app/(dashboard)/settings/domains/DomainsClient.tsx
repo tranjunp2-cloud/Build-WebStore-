@@ -5,9 +5,9 @@ import { Globe, Plus, AlertCircle, Copy, Check, ChevronRight, Loader2 } from 'lu
 import { toast } from 'sonner';
 import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
 
-// Đọc từ env vars — deploy production chỉ cần set 2 biến này, không sửa code
-const DNS_A_RECORD = process.env.NEXT_PUBLIC_SERVER_IP ?? '192.168.1.1';
-const DNS_CNAME = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'primeweb.app';
+// Đọc từ env vars — deploy production chỉ cần set các biến này, không sửa code
+const DNS_A_RECORD = process.env.NEXT_PUBLIC_SERVER_IP ?? '162.159.140.98';
+const DNS_CNAME = process.env.NEXT_PUBLIC_CNAME_TARGET ?? process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'ech-prime-web-v2-staging-pzdwc.ondigitalocean.app';
 
 type DomainEntry = { domain: string; status: string; isPrimary?: boolean | null };
 
@@ -304,18 +304,23 @@ export function DomainsClient({
                                     <div className="flex flex-col gap-4">
                                         {/* A Record */}
                                         <div className="flex flex-col gap-1.5">
-                                            <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">A Record</span>
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex-1 h-[44px] flex items-center px-4 rounded-[12px] border border-white/[0.08] bg-[#1E293B]/40">
-                                                    <span className="text-[14px] text-[#F8FAFC] font-mono">{DNS_A_RECORD}</span>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { navigator.clipboard.writeText(DNS_A_RECORD); toast.success('Copied! ✅'); }}
-                                                    className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0"
-                                                >
-                                                    <Copy className="h-5 w-5" />
-                                                </button>
+                                            <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">A Record (Static IPs)</span>
+                                            <div className="flex flex-col gap-2">
+                                                {DNS_A_RECORD.split(',').map((ip, idx) => (
+                                                    <div key={idx} className="flex items-center gap-2">
+                                                        <div className="flex-1 h-[44px] flex items-center px-4 rounded-[12px] border border-white/[0.08] bg-[#1E293B]/40">
+                                                            <span className="text-[14px] text-[#F8FAFC] font-mono">{ip.trim()}</span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { navigator.clipboard.writeText(ip.trim()); toast.success(`Copied IP ${idx + 1}! ✅`); }}
+                                                            className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0"
+                                                        >
+                                                            <Copy className="h-5 w-5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <p className="text-[12px] text-slate-400">Point your domain to any of these IPs.</p>
                                             </div>
                                         </div>
                                         {/* CNAME Record */}

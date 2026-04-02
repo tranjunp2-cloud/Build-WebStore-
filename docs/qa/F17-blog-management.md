@@ -1,141 +1,122 @@
-# Kịch bản Kiểm thử Đầu cuối (E2E Test Matrix) - F17: Blog Management
+# Tài Liệu Kiểm Thử Toàn Diện (Comprehensive QA Matrix): F17 - Quản Lý Bài Viết (Blog Management)
 
-> **Module:** F17 — Blog Management (Quản lý Bài viết & SEO)
-> **Author:** QA Automation Team
-> **Mục tiêu:** Mật độ bao phủ (Coverage) 100% PRD & NFRs. Đảm bảo chất lượng Frontend, Backend, AI Assistant và Storefront.
-> **Phạm vi (Env):** Staging (`staging.primeweb.app`)
-> **Chú thích Locators:** Selector (ID/CSS/Xpath) được gắn trực tiếp vào Test Steps phục vụ cho Script Playwright Java.
+> **Framework Áp Dụng:** Comprehensive QA Expert (`.agent/skills/comprehensive-qa-expert`)
+> **Tham chiếu US:** Lưới PRD F17 (Bao gồm 8 User Story độc lập + 1 Global AC). Tổng số **22 AC** (Acceptance Criteria).
 
 ---
 
-## 1. Môi trường Giao diện Thực tế & 9-Point Checklist (Cross-cutting UI/UX)
-
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_001` | UI | [Pos] Skeleton Loading (Visual Animation) | Yes | High | 1. Navigate `/dashboard/blog`. Mô phỏng Slow 3G.<br> *`[Loc: div.blog-list-skeleton]`* | Thay vì thẻ Spinner, hệ thống render Skeleton Layout mượt mà. Header, Sidebar Không bị re-render. | | `Not Run` |
-| `TC_F17_002` | Logic| [Neg] Disable Element lúc gọi AI | Yes | High | 1. Click "✨ Generate with AI", đợi xử lý.<br> *`[Loc: button.btn-ai-generate]`, `[Loc: button.btn-save-post]`* | Nút Save và Data Form bị disable (`disabled=true`) để ngăn rủi ro lưu khi chưa có text mới trả về. | | `Not Run` |
-| `TC_F17_003` | UI | [Pos] Toast Message Feedback | Yes | High | 1. Thực hiện tạo bài mới thành công.<br> *`[Loc: div.toast-success]`* | Trả về Toast màu xanh báo thành công ở mép màn hình, Animation Fade out sau 3 giây. Trùng khớp UI Kit Figma. | | `Not Run` |
-| `TC_F17_004` | Error| [Neg] Báo lỗi Time-out Global | Yes | High | 1. Tắt Wifi, bấm Lưu Bài.<br> *`[Loc: div.toast-error]`* | Bắn Toast báo lỗi kết nối đỏ. Không Crash trắng màn hình React ứng dụng. Mọi Component giữ nguyên state. | | `Not Run` |
-| `TC_F17_005` | UI | [Pos] Hệ thống Margin & Padding chuẩn Figma | No | Med | 1. Mở màn Editor, resize trình duyệt sang Desktop (1440px).<br> *`[Loc: main.blog-editor-container]`* | Khung làm việc nằm cách Sidebar/Header khoảng trắng 24px (`p-6`). Độ rộng layout chuẩn thiết kế F18-03. | | `Not Run` |
+## 1. Mục Tiêu Kiểm Thử (Objective)
+Bộ Test Case V9.0 quy hoạch lại sự giao thoa (Traceability) giữa 100% Acceptance Criteria của BA/Product Owner ban hành tại PRD và hệ tiêu chuẩn `Comprehensive QA Expert`. 
+- Mỗi dòng `AC` cơ sở trong PRD đều có Test Case đối ứng (`Happy Path`).
+- Các Điểm mù (Blind Spots) được cấy nối tiếp và nâng cấp: `Form Validation`, `UI/UX States`, `Concurrency`, `Security Guards`.
 
 ---
 
-## 2. [US-F17-01] Quản lý Duyệt và Thao tác Danh sách Blog
+## 2. Ma Trận Kịch Bản Comprehensive BDD (Traceability Matrix)
 
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_006` | Func | [Pos] Empty State 0 Kết Quả | Yes | High | 1. Wipe clear dữ liệu bảng Blog.<br> *`[Loc: section.empty-state]`, `[Loc: button.create-first-post]`* | Màn hình hiển thị Illustration "Người cầm bút viết" + Text "Chưa có bài viết nào..." chuẩn Design F17. Không dùng chung Icon Hộp của F08. | | `Not Run` |
-| `TC_F17_007` | Func | [Pos] Lưới Table Data hiển thị đúng | Yes | High | 1. Load Data có 5 bản ghi. Xem lưới Blog.<br> *`[Loc: tr.blog-row]`* | Table hiển thị 4 cột: Tiêu đề (kèm Thumbnail nhỏ), Trạng thái (Draft/Pub), Tác giả, Thời gian. Format Date `DD/MM/YYYY`. | | `Not Run` |
-| `TC_F17_008` | Func | [Pos] Search, Sort, Filter | Yes | High | 1. Nhập từ khóa "Mới" vào Search Bar.<br> *`[Loc: input.search-blog]`*, *`[Loc: select.filter-status]`* | Table React lập tức update (Debounce 500ms) Lưới dữ liệu (Không reload trình duyệt page gốc). | | `Not Run` |
-| `TC_F17_009` | Func | [Pos] Bulk Publish / Unpublish / Delete | Yes | High | 1. Tick chọn 3 bài viết. Bấm nút Tác vụ hàng loạt (Publish/Unpublish/Delete).<br> *`[Loc: input.checkbox-blog-row]`, `[Loc: button.bulk-publish]`* | Hệ thống áp dụng tác vụ cho 3 bài. Status badge chuyển qua màu xanh "Published" hoặc nhạt "Draft". Payload Database cập nhật chính xác. | | `Not Run` |
-| `TC_F17_010` | Func | [Neg] Partial Error Bulk Action | Yes | Med | 1. Bulk Publish 2 bài. 1 Bài cố tình xóa Title ở DB để bắt lỗi Validation.<br> *`[Loc: div.toast-warning]`* | Hiện Toast Warning: Báo cáo Publish thành công 1 bài, 1 bài từ chối do thiếu Tiêu đề. Không Rollback bài hợp lệ. | | `Not Run` |
-
----
-
-## 3. [US-F17-02] Trình soạn thảo (Create & Edit Blog)
-
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_011` | Func | [Pos] Thao tác tạo mới Happy Path | Yes | High | 1. Điền Info: Title, Content, Upload Thumbnail.<br> *`[Loc: input[name="title"]]`, `[Loc: div.tiptap-editor]`* | Request `/api/blogs` được gọi, Data lưu chính xác, Image Thumbnail Upload lên S3/CDN. Routing quay về màn List. | | `Not Run` |
-| `TC_F17_012` | Bound| [Neg] Bỏ trống trường Bắt buộc (Title) | Yes | High | 1. Bỏ trống Input Title. Điền Content. Bấm Lưu.<br> *`[Loc: input[name="title"].error]`, `[Loc: p.error-msg]`* | Validation Field đỏ rực với Text "Title is required". Không gửi HTTP Request. Data không rác DB. | | `Not Run` |
-| `TC_F17_013` | Func | [Pos] Tối ưu hóa SEO Metadata bằng AI | Yes | Med | 1. Gõ Title và Content. Bấm nút ✨ Tối ưu SEO.<br> *`[Loc: button.btn-seo-ai]`, `[Loc: input[name="metaTitle"]]`* | API AI phân tích nội dung. Meta Title và Meta Description tự động chép Text hợp logic. Text có thể sửa tay sau đó. | | `Not Run` |
-| `TC_F17_014` | Logic| [Pos] Thuật toán Uniqueness Slug URL | Yes | High | 1. Tạo Bài 1: Title "Khuyến Mãi". Slug -> `/khuyen-mai`. Tạo bài 2 Title "Khuyến Mãi".<br> *`[Loc: input[name="slug"]]`* | Bài số 2 tự động thêm Hậu tố Unique (VD: `/khuyen-mai-1`) vào Slug để chống Crash Error MongoDB Index. | | `Not Run` |
-
----
-
-## 4. [US-F17-03] Trợ lý Viết Blog AI (Text Only Constraint)
-
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_015` | Func | [Pos] Sinh nội dung văn bản (Generate) | Yes | High | 1. Prompt bài viết chủ đề "Cà phê sạch".<br> *`[Loc: textarea.ai-prompt]`, `[Loc: button.ai-submit]`* | Chèn Text đã gen vào vị trí con trỏ cuối cùng (Caret Focus) bên trong lõi Rich Text Editor. Giữ nguyên format. | | `Not Run` |
-| `TC_F17_016` | Logic| [Pos] Tùy biến AI qua Tooltip Context Menu | Yes | Med | 1. Highlight bôi đen đoạn Text có sẵn. Popup (Tooltip) nổi lên phía trên.<br>2. Chọn Action AI "📝 Rewrite / Make Shorter".<br> *`[Loc: button.ai-action-pro]`* | Đoạn văn bôi đen bị replace bởi đoạn Text AI xử lý. Thanh Tooltip Context Menu bắt buộc phải NỔI trôi (Floating) ngay sát phía trên vùng bôi đen (Chuẩn UI Design F17). | | `Not Run` |
-| `TC_F17_017` | Sec | [Neg] Chống gọi DALL-E (Block Image API) | Yes | Blocker| 1. Bẫy Prompt "Vẽ 1 hình con chó 3D bằng tính năng Image gen".<br> *`[Loc: textarea.ai-prompt]`* | Cấu hình System Prompt chặt, AI tuyệt đối từ chối kết xuất Hình Ảnh. Phải cảnh báo "Tôi chỉ có thể khởi tạo văn bản". An toàn cho API Quota. | | `Not Run` |
-
----
-
-## 5. [US-F17-04] Status Workflow (Publish, Draft, Delete)
-
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_018` | Func | [Pos] Switch Trạng Thái Draft <-> Publish | Yes | High | 1. Đổi Bài từ Pub sang Draft, check Storefront.<br> *`[Loc: button.toggle-status]`* | Bài Publish hiện Public Storefront. Chuyển thành Draft lập tức Gỡ Khỏi hệ thống Live (Cache invalidate). | | `Not Run` |
-| `TC_F17_019` | Func | [Pos] Delete Post Warning Dialog | Yes | High | 1. Xóa bài viết đang Published.<br> *`[Loc: button.delete-post]`, `[Loc: div.confirm-modal]`* | Dialog Confirm màu đỏ cản lại. Cảnh báo URL Storefront có thể lỗi 404 cho User. Xác nhận Delete DB. | | `Not Run` |
-
----
-
-## 6. [US-F17-05] Simple Category Management
-
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_020` | Func | [Pos] Luồng Category Fallback khi Xóa Gốc | Yes | High | 1. Bài "Sale" gắn Category "C1". Xóa Category "C1". Kiểm tra bài "Sale".<br> *`[Loc: button.delete-category]`* | Xóa Category thì Bài Viết `KHÔNG` bị xóa (Soft Fallback). Trạng thái phân loại của Bài "Sale" trả về Mặc định "Uncategorized"/Null. | | `Not Run` |
-| `TC_F17_020b`| Func | [Neg] Chống Trùng Lặp Tên Category | Yes | High | 1. Tạo Category Name `Promotions`.<br>2. Cố tình tạo thêm Name `Promotions` nữa. | Lỗi Validation! Từ chối tạo do vi phạm Uniqueness Rule. Cảnh báo "Danh mục đã tồn tại" để chống rác URL và nhầm lẫn UX khi Assign. | | `Not Run` |
----
-
-## 7. [US-F17-06] Giao diện Mobile (On-the-go Editor)
-
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_021` | UI | [Pos] Thanh Sticky Toolbar vướng Keyboard | No | High | 1. Thiết bị iOS 375px. Bơm Text tràn dòng. Bắn Virtual Keyboard.<br> *`[Loc: div.toolbar-sticky]`* | Thanh Toolbar bám dính trên đỉnh Bàn Phím. Viewport chừa góc >30% để nhìn thấy chữ Focus gõ. Auto-Scroll con trỏ tránh đè khuất do Toolbar. | | `Not Run` |
-| `TC_F17_022` | UX | [Pos] Kéo AI Bottom Sheet đè Z-Index | No | Med | 1. Click Nút AI Assistant trên Mobile Browser.<br> *`[Loc: div.bottom-sheet-ai]`* | Component AI mọc lên kiểu Bottom Sheet Drawer đè chuẩn phía trên (z-index cao hơn Sticky Toolbar). Các nút bấm rộng >44px dễ Tap bằng ngón tay. | | `Not Run` |
+| ID | [THAM CHIẾU AC] | LOẠI (TAG) | KỊCH BẢN KIỂM THỬ (SCENARIO) | CÁC BƯỚC THỰC HIỆN | KẾT QUẢ MONG ĐỢI | PRIORITY |
+|:---|:---|:---|:---|:---|:---|:---:|
+| **[Global AC: CMS Layout Compliance]** (1 Giao dịch) | | | | | | |
+| **TC-F17-GB-01**| `Global AC` | `[Happy Path]` | Layout phân nhánh Main Area | Truy cập trang Quản lý Blog. | Widget, Grid Data phải Render lọt lòng Main Content Area. Các Module Sidebar và Top Header giữ nguyên hoạt động, không bị đè CSS. | Blocker |
+| **[US-F17-01: Quản Trị Danh Sách Bài Viết]** (5 Giao dịch) | | | | | | |
+| **TC-F17-01-01**| `US-01/AC-1` | `[Happy Path]` | Trạng thái rỗng (Empty State) | Tải CMS khi hệ thống có 0 Blog. | Hiển thị màn hình "Chưa có bài viết nào" dùng chung Component (Shared empty state) kèm Button Create. | High |
+| **TC-F17-01-02**| `US-01/AC-2` | `[Happy Path]` | Tìm kiếm & Lọc kết hợp | Gán nội dung Khung Search + Trạng thái Lọc "Draft". | Lưới bảng Data Table Filter 2 lớp (Toán tử AND) mượt mà giữ nguyên cấu trúc hiển thị 4 cột. | High |
+| **TC-F17-01-03**| `US-01/AC-2` | `[Validation]` | Sắp xếp mảng (Sort Table) | Nhấn đúp Trục `Last Modified Date`. | Render Sort Date ASC/DESC trọn vẹn, không Crash Object JS Data. | Medium |
+| **TC-F17-01-04**| `US-01/AC-2` | `[Concurrency]`| Ngưỡng Tải Bulk Actions | Tick Bulk Delete chọn siêu lớn 5,000 bài viết. | Cấm OOM Crash RAM Node Server, từ chối Request trả 413 Payload Error hoặc chuyển sang Worker Job ngầm. | High |
+| **TC-F17-01-05**| `Skill Expert` | `[UI State]` | Chặn Tải chậm (Fetch Latency) | Bóp mạng Throttling Slow 3G. | Render Khung Load Skeleton Framework tránh Flash White/Lỗi Null biến số. | Medium |
+| **[US-F17-02: Bộ Soạn Thảo và Cập Nhật Bài Viết]** (8 Giao dịch) | | | | | | |
+| **TC-F17-02-01**| `US-02/AC-1` | `[Happy Path]` | Khởi tạo thành công End-To-End | Điền dữ liệu Title, Body, Thumbnail hợp lệ nhấn Save. | Toast xanh "Thành công", bài viết hiển thị trên CMS List. | Blocker |
+| **TC-F17-02-02**| `US-02/AC-2` | `[Negative]` | Ràng buộc Title bỏ trống (Trim) | Điền khoảng trắng "     " hoặc để Null Title. | Báo Validation Form đỏ rực "Title is required", gãy Submit Cấm đẩy Rác vào DB. | High |
+| **TC-F17-02-03**| `US-02/AC-3` | `[Happy Path]` | Mở Tính năng AI Gen SEO Meta | Nhấn nút Button "✨ Optimize with AI". | Form Auto-Gen điền ngay chuỗi Metadata SEO chính xác lấy ngầm từ Body Text. | High |
+| **TC-F17-02-04**| `Skill Expert` | `[Validation]` | Trói Chuẩn AI Meta SEO Length | Viết >50,000 từ Body siêu dài ép AI Gen. | Hệ AI bắt buộc Cắt Ngọn Trích Đoạn Meta Title `< 60 ký tự` và Meta Description `< 160 ký tự` chuẩn luật SERP Google Snippets (Dựa trên thiết kế UI Design). | Blocker |
+| **TC-F17-02-05**| `Skill Expert` | `[UI State]` | Khớp Đồng bộ Đếm Số Ký Tự | Gõ nhanh văn bản ngẫu nhiên vào ô Meta Title và Rich Text. | Bộ đếm Ký Tự góc dưới ô (Ví dụ: `15/60 characters`) nảy số mượt mà theo từng chu trình OnKeyPress, Không văng Lỗi độ trễ React Render. | High |
+| **TC-F17-02-06**| `Skill Expert` | `[Negative]`| Database Unique Slugifier Lỗi | Trùng 2 bài viết có cùng tên "Sự kiện". | Auto-Slug Function phải tự hậu đính ID chuỗi (`/su-kien-1`) chặn 100% Lỗi sập MongoDB vì Trùng Unique Index Key Mạng. | Blocker |
+| **TC-F17-02-07**| `Skill Expert` | `[Validation]`| Chặn Định dạng Chỉnh sửa Slug Bẩn | Nhập ký tự đặc biệt `!@# $^` vào trường Editable Slug. | Regex Form Front-end tự động cắt (Sanitize) bỏ hoặc hiện Validation Lỗi Đỏ cấm nhập (Ví dụ URL hợp lệ chỉ nhận chữ thường và dấu gạch nối `a-z, 0-9, -`). | High |
+| **TC-F17-02-08**| `Skill Expert` | `[Negative]` | Chống Phá Dung Lượng Tệp Ảnh Bìa (10MB Constraint) | Upload tệp `.PDF` hoặc Tệp Ảnh PNG/JPG có dung lượng `10.5 MB`. | Cổng chặn File Uploader ném ra cảnh báo "File vượt quá giới hạn 10MB / Định dạng không hỗ trợ". Hệ thống API không xử lý ghi chặn 413 Payload. | Blocker |
+| **[US-F17-03: Trợ Lý Soạn Thảo Văn Bản Bằng AI]** (5 Giao dịch) | | | | | | |
+| **TC-F17-03-01**| `US-03/AC-1` | `[Happy Path]` | Tích hợp Generated Copy AI | Focus Input Editor, gọi AI tạo Paragraph từ Prompt. | Khối Text được tạo ra mượt, trả thẳng vào Caret Point (Con trỏ) nội trong Editor Component. | High |
+| **TC-F17-03-02**| `US-03/AC-2` | `[Negative]` | Chặn Tính Năng Lừa Mạng DALL-E | Nhập Prompt "Gen hình con chó 3D để vào web" | Cấm Sinh Hình tiêu Token API lố. Hệ trả lời bằng Text: "Chỉ xử lý văn bản (No Image)". | Blocker |
+| **TC-F17-03-03**| `US-03/AC-3` | `[Happy Path]` | Tính năng "Improve Text" | Bôi đen Đoạn Lỗi, click "Make Professional". | Replace Đoạn mới trực tiếp mà không lôi Error Rách DOM Rich-Text Tag Editor. | High |
+| **TC-F17-03-04**| `Skill Expert` | `[Concurrency]`| Khống Lệnh Nhanh Rate Throttled | Spam liên tục Click AI Generator 15 Lần. | Trả API 429 Ngắt HTTP Gate Request Too Fast, Nút Nảy Lên Disable Phòng Đứt OOM Tải Gateway Trả Tiền Rate Limit OpenAI. | Blocker |
+| **TC-F17-03-05**| `Skill Expert` | `[Security]` | Tẩy Rác Dirty SQL/XSS Code | Bơm Command Prompt `<script>alert(1)</script>`. | Hệ DOM Sanitize (Html Escape Decode) Ngắt Rớt Lệnh Lọc Thành Dạng String Tĩnh Cấm Thực Thi Gây Độc Hại XSS Code Cho Khách Frontend. | Blocker |
+| **[US-F17-04: Quản Trị Trạng Thái Phiên Bản - Publish/Draft/Delete]** (5 Giao dịch) | | | | | | |
+| **TC-F17-04-01**| `US-04/AC-1` | `[Happy Path]` | Đặt Live Public | Đổi Status Draft -> Published. | Hệ Next JS Vượt Khung Invalid Cache `< 30s` Public Storefront Hiển Thị. | High |
+| **TC-F17-04-02**| `US-04/AC-2` | `[State Trans]`| Ẩn Hình Về Giao Diện (Unpublish) | Giấu Status Bài Đang Live thành Draft. | Chặn 404 Route Cứng Leak File Khách Khi Bấm Refresh Rớt Văng. Data Edit Nằm Chỉ Bên Trong CMS Giữa Thể Draft Ẩn Trọn Vẹn. | Blocker |
+| **TC-F17-04-03**| `US-04/AC-3` | `[State Trans]`| Khóa Hộp Thoại (Delete Guard Modal) | Bóp Remove Xóa 1 Bài Viết Bất Kỳ (Draft / Live). | Dialog Warning Bật Popup "Xóa Cứng Vĩnh Viễn Không Bọc Rác", Tránh Tay Nhầm. | High |
+| **TC-F17-04-04**| `Skill Expert` | `[Concurrency]`| Xung Đột Race-Condition Lưu Delete | Một User Save Lệnh, User Khác Lệnh Delete Form. | API Reject Báo Mã Xung Lệnh Document Version Locked, Tránh Treo Node Memory MongoDB F5 White Screen Lật UI. | Blocker |
+| **TC-F17-04-05**| `Skill Expert` | `[UI State]` | Lưu Hồi Mạch Rớt Kết Nối Cache | Rút Cáp Mạng / Nhấn Tải Lại F5 Trình Ở Editor. | Unload Warning Browser Bậc "Dữ Liệu Mất Alert". Re-load Hệ Đổ Text Từ LocalStorage Rót Trôi Xuống Lại Form Bảo Hộ Text. | High |
+| **[US-F17-05: Quản Lý Phân Tuần Tự Danh Mục (Category Management)]** (4 Giao dịch) | | | | | | |
+| **TC-F17-05-01**| `US-05/AC-1` | `[Happy Path]` | Tổ Chức Cây Category 1 Bậc Cứng | Edit Tạo Chỉnh Xóa Menu CMS Table Category. | Table Thêm Rút Data Cập Nhật Gọi Lệnh Sang Dropdown Editor Gọn Ghẽ. | High |
+| **TC-F17-05-02**| `US-05/AC-2` | `[Happy Path]` | Chọn Dạng Categorize Editor | Móc Assign Chọn Tên Thẻ Category Nhấn Save Bài | List Route Đã Thắt Chứa Data Bài Gắn Component Danh Mục Thẻ Hiện Storefront Thẳng Cánh. | Medium |
+| **TC-F17-05-03**| `US-05/AC-3` | `[State Trans]`| Đệm Ngắt Cứng Lọc Thẻ Gắn (Orphan Fallback) | Tróc Xóa Category Trùng Node Dính Giữ Bài Data Mạch | System Không Rót Lệnh Rớt Cắn Constraint Database. Bài Blog Đưa Sang Bẫy Đợi Trạng Thái Mặc Định "Uncategorized". Cấm Bể Web. | Blocker |
+| **TC-F17-05-04**| `Skill Expert` | `[Negative]` | Cấm Sinh Trùng Thẻ Label Category | Render Tạo Lại Category Đã Nằm "Giảm Giá". | DB Mongo Nổi Lệnh Unique 400 Bad Tùy Lề Nhện Component UI Toast Red Label Ép Buộc Sửa Tên Category Mới. | High |
+| **[US-F17-06: Tương Tác Thiết Bị Di Động Giao Diện Admin]** (3 Giao dịch) | | | | | | |
+| **TC-F17-06-01**| `US-06/AC-1` | `[UI State]` | Giữ Toolbar Đứng Trượt Di (Sticky Top Keypad)| Layout View Điện Thoại Touch Focus Ngõ Bàn Phím Keyboard Ảo. | Bảng Toolbar (Bold, Lin) Chạy Fixed Lên Trân Layout Bàn Đục Gác Phá Che Khuất Của Editor React Form, Focus Caret Vuốt Text Thoáng Trục. | Blocker |
+| **TC-F17-06-02**| `US-06/AC-2` | `[UI State]` | Lệnh Rạch Tap Dễ Giao Nút AI | Mở Tab AI Drawer Lược Rút Chạm Dưới Mobile Bụng App. | Rát Drawer Trượt Kèo Không Giữ Lõi Modal Hiện Giữa Center Pop, Nút Cấu To Button Full-width Bức Khung Tap `> 44px` Định Layout Responsive Ngón Tương Giúp Nhấn. | Blocker |
+| **TC-F17-06-03**| `Skill Expert` | `[UI State]` | Cấm Rạch Responsive Grid Liệt Yếu Màn Mobile| Ngắm Dòng Card Dữ CMS Nét Màn Chạm Cỡ Phân Width 320. | Flex Card React Đổi Đóng Table Trống Layout Dọc, Cuộn Ngang Scroll-X Khóa Trật Chặt Gây Bó Layout View Front. | High |
+| **[US-F17-07: Public Blog List Storefront]** (3 Giao dịch) | | | | | | |
+| **TC-F17-07-01**| `US-07/AC-1` | `[Happy Path]` | Tải hiển thị Component Grid Bài Viết | Điều hướng duyệt Store URL `/blogs`. | Component hiển thị chuẩn xác Thông tin Cột: Ảnh Thumbnail, Category, Title, Excerpt, Date. Dữ liệu bắt buộc cấu hình tham số `Status="Published"` (Tuyệt đối không lọt bài Nháp/Draft ra màn hình Khách Hàng). | Blocker |
+| **TC-F17-07-02**| `US-07/AC-2` | `[Concurrency]`| Xử lý Bố cục Phân trang Số Lượng Lớn (Pagination)| Dữ liệu Backend vượt quá >50 Bài đăng để Hệ thống tải trang. | Hệ API đặt Giới hạn Render hiển thị mặc định `limit = 12` bài/trang. Tích hợp nút Load More hoặc Phân Trang Số. Hệ thống tránh treo RAM Component (React DOM OOM Crash) ở màn hình khách. | High |
+| **TC-F17-07-03**| `US-07/AC-3` | `[Validation]`| Chuyển hướng Lọc Danh Mục (Router Filter) | Click chọn Thẻ Nhóm Category "Tin tức". | Tuyến Code React Route tự động lọc lọc nội dung Component theo dạng SPA Filter. Không tải lại F5 (White flash) toàn trang. | Blocker |
+| **[US-F17-08: Giao Diện Blog Chi Tiết Kèm Lưới Mạch SEO Tĩnh]** (4 Giao dịch) | | | | | | |
+| **TC-F17-08-01**| `US-08/AC-1` | `[Happy Path]` | Điều phối Component HTML Rich Text | Truy cập nội dung Chi tiết Blog `blogs/[slug]`. File CMS chứa định dạng In Đậm, Tiêu đề Lớn, Bảng (Table). | Hệ Layout Dàn trang Storefront đảm bảo biên dịch (Compile HTML) kết xuất định dạng 100% chuẩn quy tắc Khối CMS. Các khung chữ HTML không được vỡ tràn sang cột CSS Mobile. | Blocker |
+| **TC-F17-08-02**| `US-08/AC-2` | `[SEO Logic]` | Khai báo Bot Graph Object Tĩnh Thẻ SEO | Sử dụng F12 hoặc Tool Audit đọc Header Object SEO Schema của Web Store Hướng Ngoại. | Đảm bảo Code Sinh Ra chèn `<meta name="description">` chuẩn. Tích hợp hệ thẻ Graph Header Object: Cấu trúc Open Graph (`og:title`, `og:image`) và JSON-LD Article Schema tiêu chuẩn Google Bot Index Data. | Blocker |
+| **TC-F17-08-03**| `US-08/AC-3` | `[UI State]` | Lược Tuyến Định Hướng Mạch Quay Lại | Scroll Cuộn xuống Bài Blog Khách Hàng, Click nút Back / Quay danh sách. | Component Cache History kích hoạt trả Component UI chuyển động mềm trở lại danh sách `/blogs`. Không văng F5, React DOM Update State hoàn thiện. | High |
+| **TC-F17-08-04**| `Skill Expert` | `[Negative]` | Thường Form Render Chống Leak Payload XSS | Admin CMS tiêm Text Mã Phá Ngầm: `<script>alert(XSS)</script>` Ra Public Route Store. | Hệ Html Code Encode Render lột trần mã Text HTML Tĩnh. Triệt hạ không thể thực thi Code Lệnh Block Alert tại Front-end khách. Đóng rủi ro Security Token Sessions. | Blocker |
 
 ---
 
-## 8. [US-F17-07] Public Blog List (Storefront)
+## 3. Checklist Điểm Mù (Blind Spots Sign-off) - "Comprehensive QA"
+> Áp dụng phân lớp theo chuẩn `.agent/skills/comprehensive-qa-expert`. Trọng tâm quản lý 5 nhóm Rủi ro Điểm Mù (Blind Spots).
 
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_023` | Logic| [Neg] Bảo vệ Màn Trắng Pagination | Yes | High | 1. Khách xem List Trang 3. Admin Xóa cụm bài Trang 1. Khách Reload lại Trang 3.<br> *`[Loc: div.blog-grid-storefront]`* | Bẫy lỗi Out of Bound Page. Frontend đẩy khách về Trang 1 hoặc Text "Đã hết bài", Không Throw Runtime Crash Error làm trắng xóa App Web. | | `Not Run` |
-
----
-
-## 9. [US-F17-08] Public Blog Detail (Storefront)
-
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_024` | Sec | [Pos] Bảo mật Meta robots noindex Draft Bài | Yes | High | 1. Bật F12 soi thẻ `<head>` của link Preview 1 bài Đang Nháp (Draft).<br> *`[Loc: meta[name="robots"]]`* | Bắt buộc tiêm thẻ `<meta name="robots" content="noindex">`. Không cho Google Bot dò rỉ bò vào quét Content CMS nội bộ trước ngày ra mắt. | | `Not Run` |
-| `TC_F17_025` | Edge | [Pos] Cứu Lỗi SEO Thiếu Thẻ Ảnh JSON-LD | Yes | High | 1. Render bài Live KHÔNG có Ảnh Cover và Tóm tắt.<br> *`[Loc: script[type="application/ld+json"]]`* | Thẻ Schema JSON-LD vẫn xuất xưởng hợp lệ. Auto Render File Ảnh Placeholder ngầm và Tóm tắt tự cắt từ chữ Body. Tool Audit Google Không Báo Đỏ. | | `Not Run` |
-| `TC_F17_026` | Func | [Pos] Tích hợp Thẻ OpenGraph & Twitter Card | Yes | High | 1. Đọc bài Publish, view Page Source.<br> *`[Loc: meta[property="og:image"]]`* | Có đủ thẻ `og:title`, `og:description`, `og:image`. Bấm Share Link qua Facebook/Zalo phải Render ra đầy đủ Card chứa Khung Ảnh bự và Tiêu đề. | | `Not Run` |
-| `TC_F17_027` | Sec | [Neg] Chặn IDOR Route API Get Blog Detail | Yes | Blocker| 1. Bắn cURL GET `api/storefront/blogs/[SLUG]` lấy mã bài DRAFT.<br> *`[Client: Postman/cURL]`* | Access Control chặn quyền truy nhập bài nháp qua Storefront. Bắn trả mã 404/403. Không để lộ Response Lõi Database ra ngoài. | | `Not Run` |
-| `TC_F17_028` | UI | [Neg] Responsive Text Overflow trên Mobile | Manual | High | 1. Mở bài Publish có Text liên tục siêu dài (Không khoảng trắng, VD: Link).<br>2. Xem trên màn hình iPhone 375px.<br> *`[Loc: div.blog-detail-content]`* | Đoạn Text siêu dài bị CSS `word-break: break-all` hoặc cản lại. Bề ngang Storefront KHÔNG bị chình phình (Overflow-X) sinh thanh cuộn ngang gây bể layout. | | `Not Run` |
+1. **[X] Kiểm Xét Giá Trị Biên và Rỗng (Form Validation/BVA):** Đẩy Giới hạn Regex Khai lược Meta SEO đúng chuẩn hệ Form UI Design (Meta Title `<60 kí tự`, Meta Description `<160 kí tự`). Rào Chặn Hành vi lưu Tiêu đề bài trống gán bằng khoảng trắng. Ràng buộc Tệp Ảnh Ảnh Bìa (Thumbnail) khắt khe ở mức Boundary 10MB và Format (Chỉ chấp nhận PNG, JPG).
+2. **[X] Kiểm định Tín hiệu Biến Chuyển Kép (State Transition Logic):** Quay bài viết về trạng thái Nháp (Draft) -> tự động Routing 404. Phá Category Mẹ -> kích hoạt Fallback Null (Uncategorized). Giám sát Bộ Đếm Ký Tự Động (Dynamic Character Counter UI State) khi KeyPress.
+3. **[X] Khống Lỗi Cảnh Giác Rủi Ro Âm Mưu (Error Guessing / Negative Bounds):** Xử lý React Sanitize DOM chống Script Payload XSS. Ngăn chặn Prompt AI tạo DALL-E (Giữ giới hạn Text). Lọc sạch các ký tự đặc biệt lọt qua khi Biên tập viên cố ý chỉnh sửa trường URL Slug.
+4. **[X] Hoạch Tính Cường Độ Đồng Thời (Concurrency & Limits):** Ngăn chặn Rate API HTTP 429 nếu thao tác Request API AI liên tục (Spam). Quản lý phiên giao tiếp 2 Tab Admin Editor chống Đè Form. Hệ đếm Character không Re-render chớp nhảy làm chết DOM Memory khi gõ nhanh (Debounce / Trạng thái React ảo).
+5. **[X] Trải Nghiệm Giao Diện Tĩnh (UI/UX Backup):** Xử lý Loading Skeleton. Giữ Sticky Keypad Editor cho thiết bị Mobile Điện Thoại. Backup LocalStorage khi lỡ tay nhấn F5 Refresh hoặc sập trình duyệt Unload.
 
 ---
 
-## 10. Payload Abuse & Edge Cases (Database, CMS Limit, Race Condition)
+## 4. Kịch Bản Thực Thi Chi Tiết (UAT Execution Test Scripts)
+> Bản mô tả chi tiết từng bước (Step-by-step) dành cho Tester Manual chạy UAT hoặc Automation Engineer thiết lập Playwright Script.
 
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_029` | Sec | [Neg] Rich Text XSS Payload Injection | Yes | Blocker| 1. Điền mã JavaScript rết `<script>alert(1)</script>` vào Lõi Content Blog. Publish ra Storefront.<br> *`[Loc: div.blog-detail-content]`* | Quá trình Render dùng Sanitizer bóc sạch Tag Script hoặc Escape tag thành dạng chữ nổi thô sơ `. Trình duyệt không chạy lệnh tấn công ăn cắp Cookie. | | `Not Run` |
-| `TC_F17_030` | Error| [Neg] Nhồi Image Base64 Quá Payload Băng thông | No | High | 1. Copy Image Raw dán thẳng vào Text, Tăng dung lượng JSON lên 8MB. SAVE.<br> *`[Loc: div.tiptap-editor]`* | Nếu quá 413 Payload Too Large, API trả Lỗi Toast Đỏ. CMS sống sót (React ko chết), Editor chặn Save DB bắt nhả Text ra. Quản lý Rủi Ro Băng Thông tốt. | | `Not Run` |
-| `TC_F17_031` | Logic| [Neg] Chạm Trán Sửa Đổi Giữa 2 Tabs (Race Condition)| No | Low | 1. M mở Cùng 1 bài Blog trên 2 Tabs Chrome. Tab 1 Sửa Text lưu. Tab 2 sửa Title Lưu tiếp.<br> *`[Loc: button.btn-save-post]`* | Last-write-wins (Lưu đè). Hoặc Hệ thống thông báo Version Conflict Update. Tránh gây đứng kẹt giao dịch CSDL MongoDB. | | `Not Run` |
-| `TC_F17_032` | FailSafe| [Pos] Chống mất bài (Auto-Save / Leave Warning) | Yes | Blocker| 1. Gõ 1000 chữ. Tắt Tab đột ngột HOẶC Bấm nút Back.<br> *`[Loc: window.onbeforeunload]`* | Trình duyệt bắn Popup chặn đứng: "Unsaved changes...". Nếu rớt F5, LocalStorage khôi phục lại phần lớn nội dung vừa gõ. Bảo vệ công sức Editor. | | `Not Run` |
-| `TC_F17_033` | Logic| [Neg] Đổi Slug Gây Gãy Link 404 Đầu Cuối | Yes | High | 1. Bài A đang dùng Slug `/link-cu`. Sửa thành `/link-moi` & Pub.<br>2. Khách click link URL `/link-cu`. | Hệ thống Back-end tự cấu hình (Auto-generate) Rule 301 Redirect đẩy Khách từ `/link-cu` sang `/link-moi`. KHÔNG văng màn trắng 404. | | `Not Run` |
-| `TC_F17_034` | Func | [Pos] Dọn rác khi Paste Content từ MS Word | No | High | 1. Mở file Word (chứa Table, Styles). Copy và Paste tất cả vào Text Editor.<br> *`[Loc: div.tiptap-editor]`* | Tiptap Editor Clean/Strip Inline Styles rác. Storefront Mobile view không bị tràn viền (overflow-x) gây thanh cuộn ngang khó chịu. | | `Not Run` |
-| `TC_F17_035` | Logic| [Neg] Xóa Bài Đang Được Sửa (Multi-Admin Conflict) | Yes | Blocker| 1. Admin A mở trang Edit bài X. Admin B ở ngoài trang List bấm Xóa bài X. 2. Admin A bấm Save bài X. | Backend trả về Lỗi Đỏ (Trạng thái 404 Update Fail) "Bài viết đã bị xóa!". CMS giữ nguyên Content ở Tab đang mở cho Admin A lấy lại văn tự chứ Không tự F5 Crash mất trắng. | | `Not Run` |
-| `TC_F17_036` | Sec | [Neg] Phân Quyền IDOR POST API (Role-Based) | Yes | Blocker| 1. Khởi tạo Token tài khoản Staff (Role `order:manage`, KHÔNG có `blog:manage`).<br>2. Bắn API `POST /api/blogs` kèm JSON Body Tạo bài.<br> *`[Client: Postman/cURL]`* | Backend Middleware chặn Request báo `HTTP 403 Forbidden`. Không phụ thuộc vào giấu Nút UI Frontend. Hacker không thể tuồn bài viết lên CMS bằng Code. | | `Not Run` |
-| `TC_F17_037` | Logic| [Pos] Thu hồi và Tái sử dụng Slug (Hard Delete) | Yes | High | 1. Tạo bài A có Slug `/tet-2026`.<br>2. Xóa Vĩnh Viễn bài A.<br>3. Tạo bài B mới, gỡ Slug thành `/tet-2026`.<br> *`[Loc: button.delete-post]`* | Do PRD yêu cầu Hard Delete, Slug `/tet-2026` phải được nhả ra free. Bài B lưu thành công không bị báo lỗi "Slug already exists" (Do đụng độ rác Soft-delete). | | `Not Run` |
-| `TC_F17_038` | UX/SEO| [Neg] Lỗi Cache Stale Data (Cache Invalidation) | Manual | Blocker| 1. Bài "Sale" đang Live ở Storefront.<br>2. Admin vào CMS sửa sai chính tả chữ "Sale" -> "Sales" và Lưu.<br>3. Ra Storefront F5 ẩn danh ngay lập tức.<br> *`[Loc: div.blog-detail-content]`* | Lỗi chính tả phải được update MỚI trên Storefront trong vòng < 30 giây (Theo AC PRD). Hệ thống bắt buộc phải Purge/Invalidate CDN Cache (Next.js Revalidate) khi có lệnh PUT API. | | `Not Run` |
-| `TC_F17_039` | Sec | [Neg] Tấn công giả mạo CSRF Xóa Blog | Yes | High | 1. Admin đang Login CMS.<br>2. Click vào 1 link Phishing dụ bấm nút. Link ngầm gửi `DELETE /api/blogs/123`.<br> *`[Client: HTML Form Auto Submit]`* | Trình duyệt chặn request vì thiếu Anti-CSRF Token trong Header hoặc Cookie SameSite=Lax chặn gửi Origin chéo. Bài viết của Admin không bị Hacker xóa lén. | | `Not Run` |
-| `TC_F17_040` | Logic| [Neg] Lỗi Concurrency Xóa Category Khi Đang Edit | Yes | High | 1. Admin A mở bài X, chọn Dropdown Category "Tips". Chưa bấm Save.<br>2. Admin B xóa vĩnh viễn Category "Tips".<br>3. Admin A bấm Save bài X. | Bài X lưu thành công nhưng Fallback về "Uncategorized", hoặc API trả lỗi "Category không còn tồn tại". Hệ thống KHÔNG được ném Internal Server Error 500 do kẹt khóa Ngoại (Foreign Key constraint). | | `Not Run` |
+### [UAT-FLOW-01]: Tạo Bài Viết và Sinh Tự Động AI SEO
+**Tiền điều kiện:** Đăng nhập tk Admin. Chuẩn bị ảnh `cover-seo.jpg` (2MB).
+* **Bước 1:** Trỏ chuột Menu trái, chọn "Blog Management", nhấn nút `Create New Post`.
+* **Bước 2:** Nhập Test Data:
+  - Title: `Review Dịch Vụ SEO 2026`
+  - URL Slug: (Bỏ trống để tự nhảy)
+  - Category: Chọn `Thủ thuật SEO`
+  - Thumbnail: Tải File `cover-seo.jpg` lên (Kiểm tra xem thanh hiển thị tiến trình Load ảnh tải 100%).
+  - Nội dung Editor (Body): Viết 3 dòng nội dung dài tầm 200 chữ mô tả thủ thuật SEO cơ bản.
+* **Bước 3:** Ở Sidebar Cột Phải (SEO Settings), bấm nút `✨ Optimize with AI`.
+* **Bước 4:** Quan sát (Verify) trường Meta Title và Meta Description. *Hệ thống AI tự sinh chữ và đếm ngược bộ Count (VD: 55/60 và 140/160 chars).*
+* **Bước 5:** Bấm nút `Publish` góc trên bên phải.
+**Kết quả mong đợi:** 
+  1. Giao diện báo Toast "Lưu bài viết Live thành công".
+  2. Router tự đẩy user ra lại danh sách CMS, mục Status bài này hiển thị "Published".
+  3. URL Slug tự sinh thành `review-dich-vu-seo-2026`.
+
+### [UAT-FLOW-02]: Cắt Phá Lỗi Giao Diện và Boundary
+**Tiền điều kiện:** Mở tính năng Create New Post.
+* **Bước 1:** Cố tình bôi đen Paste Data bẩn dài 5,000 ký tự rác vào trường Title.
+* **Bước 2:** Bấm nút `Save Draft`. -> **Verify**: Validation đỏ chặn lại "Title quá dài".
+* **Bước 3:** Tải File Ảnh `hacked.pdf` hoặc Ảnh PNG nặng `15MB` vào Box Thumbnail.
+* **Bước 4:** -> **Verify**: Khối Ảnh đẩy Validation Lỗi "File quá giới hạn 10MB hoặc Sai định dạng". Hệ thống không làm rớt Page báo 500 Network.
+* **Bước 5:** Tại khung Content Rich Text, nhấn Gõ chữ liên tục tốc độ cao (Spasm). Nhìn qua bộ đếm Ký Tự góc dưới bên phải. -> **Verify**: Số `Characters` nhảy nhanh nhưng Cửa sổ thao tác App không bị sượng/đơ (Xác minh cơ chế Đếm React DOM đã được tối ưu Debounce).
+
+### [UAT-FLOW-03]: Xác Thực Mạch Public StoreFront & Navigation (Khách Hàng)
+**Tiền điều kiện:** URL của bài viết đã Live từ *UAT-FLOW-01* là `/blogs/review-dich-vu-seo-2026`. Mở 1 Tab Trình duyệt ẩn danh Mới (Chế độ Người dùng vãng lai).
+* **Bước 1:** Khách truy cập vào tên miền ngoài Public URL `/blogs`.
+* **Bước 2:** Quét tìm xem Card Banner hiển thị File Ảnh `cover-seo.jpg` có Loading bị vỡ Layout không. -> **Verify**: Grid Component thẳng thớn.
+* **Bước 3:** Click thẳng vào Tên Bài Viết. Hệ thống Render sang `/blogs/review-dich-vu-seo-2026`.
+* **Bước 4:** -> **Verify SEO**: Bấm Phím `F12` kiểm tra Thẻ Mạng (Elements Header DOM). Tìm thuộc tính Meta Property `og:title` & `description`. Check Object JSON Schema `<script type="application/ld+json">`. Chắc chắn mọi thứ trùng khớp với SEO Meta mà AI Generate ở Bước 3 UAT-FLOW-01.
+* **Bước 5:** Bấm Link Nút "Back / Về trang trước" hoặc Breadcrumb bên góc màn hình. -> **Verify**: Khách hàng trượt SPA Mượt mà về lại Trang Danh sách Blogs (Trải nghiệm liền mạch, không load trắng web 404).
 
 ---
 
-## 11. Kịch bản Hành trình Người dùng Thực tế (E2E Real User Journey)
+## 5. Hành Trình Trải Nghiệm Tóm Tắt (End-To-End Journey)
 
-> **Mục tiêu:** Kiểm thử luồng tích hợp nguyên khối (Integration & Workflow) từ góc độ Người dùng thực tế (Store Owner) và Khách hàng (Customer) trải nghiệm xuyên suốt. Tuyệt đối không test rời rạc từng nút bấm.
-
-| TC ID | Type | Title/Scenario | Auto | Pri | Test Steps & Locators | Expected Results | Actual Results | Status |
-|-------|------|----------------|------|-----|-----------------------|------------------|----------------|--------|
-| `TC_F17_E2E_01` | E2E | [Pos] Luồng xuất bản và hiển thị hoàn hảo | Yes | Blocker| **Chủ Shop:**<br>1. Login CMS -> Blog Menu.<br>2. Empty State, tạo Category "Sự kiện".<br>3. Tạo Bài, gõ Title "Khai Trương", dùng AI sinh text, up Thumbnail.<br>4. Save as Published.<br>**Khách hàng:**<br>5. Mở Tab ẩn danh, truy cập `/blogs`.<br>6. Đọc chi tiết Bài "Khai Trương". | 1-4. CMS lưu trơn tru, Toast xanh. Bảng dữ liệu update.<br>5. Khách thấy bài ở Grid.<br>6. Màn xem mượt, check JSON-LD SEO đầy đủ ảnh và Meta description. | | `Not Run` |
-| `TC_F17_E2E_02` | E2E | [Neg] Viết bài trên Mobile & Gián đoạn Offline | Man | High | **Chủ Shop:**<br>1. Safari iOS (375px), mở bài "Khai Trương" Published để sửa (gõ text qua Toolbar Sticky).<br>2. Chưa kịp lưu, cúp Wifi (Offline).<br>3. Có mạng lại, đổi Status -> Draft, Lưu.<br>**Khách hàng:**<br>4. Khách đang xem bài Khai trương, bấm F5. | 1-3. Mobile UI không vỡ. Báo lỗi mạng Toast đỏ. Data gõ dở không bay màu (Auto-save/Local). Lưu Draft thành công.<br>4. Khách bị 404 hoặc trả về trang `/blogs` do bài đã rút khỏi Public. | | `Not Run` |
-| `TC_F17_E2E_03` | E2E | [Neg] Xóa Danh mục & Link SEO 301 Sharing | Yes | High | **Chủ Shop CMS:**<br>1. Xóa vĩnh viễn Category "Sự kiện".<br>2. Đổi Slug bài "Khai Trương" sang "khai-truong-2026".<br>**Khách Mạng Xã Hội:**<br>3. Khách click URL cũ chia sẻ trên Zalo. | 1-2. Xóa Category không mất bài (Trả về Uncategorized). Đổi Slug ép sinh rule 301 ngầm.<br>3. URL cũ lập tức Redirect 301 (Permanent) sang URL `khai-truong-2026`. Trải nghiệm xuyên suốt. | | `Not Run` |
-
----
-
-## 12. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates - F17)
-
-| Criteria | Status | Target Agent .SKILL |
-|---|---|---|
-| **1. UI/UX Coverage** | [ ] Not Run | `Locator_Healer_Agent`: Focus Playwright Skeleton Loading, Toolbar Sticky Mobile OS, Modal Bottom Sheet. |
-| **2. API & Logic** | [ ] Not Run | `BDD_Cucumber_Agent`: Validate Category Deletion Fallback, Uniqueness Slug Routing URL. |
-| **3. Security & Filter** | [ ] Not Run | `QC_Fixer_Test`: Audit NoSQLi/XSS tiêm thẻ Script, IDOR phân quyền bài Draft qua GET API, Block call ảnh AI DALLE. |
-| **4. SEO Crawler SLA** | [ ] Not Run | `Performance_Tester`: JSON-LD Validation Script, `<meta noindex>`, Limit File Base64 413. |
-| **5. E2E UAT Approval** | [ ] Not Run | Pass P0/P1 Suite (Blocker & High Priority Results = 100% Passed). |
+1. **[Tạo Nội Dung]**: Admin vào quản trị. Gọi Menu tạo Bài viết Category "Công Nghệ". Quét 1 câu nhấn Nút LLM (AI Assistant) nhờ viết dài Phân Tích Kép. AI tự động làm xong. Admin tải ảnh chuẩn 5MB lên. Bấm Lưu Save Draft do Wifi đứt mạng ngang -> LocalStorage phục hồi lại 100% Nội dung ngay lập tức.
+2. **[Xuất Bản]**: Admin Bấm AI sinh Meta SEO Tự Động. Bấm Publish Online.
+3. **[Khách Storefront]**: Client dạo mua sắm, mò mẫm vào Trang Web "/blogs". Bấm thẻ Category "Công Nghệ". Data Render ra đúng Bài viết Mới. Nội dung Blog đẹp vì Rich - Html Formatting, Google Bot nhận dải Code Schema đúng chuẩn SEO Indexing Tươi Gọn 100%. Mạch Vận Hành Khép Kín Hoàn Hảo.

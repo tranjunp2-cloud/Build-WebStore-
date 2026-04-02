@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
+import { getCurrentUser } from '@/lib/auth'
 import config from '@payload-config'
 import type { Metadata } from 'next'
 import { SiteRenderer, type NavPage } from '@/components/site-renderer/SiteRenderer'
@@ -18,16 +19,31 @@ type Props = {
 async function getTenantAndPage(slug: string, pagePath: string) {
     const reqHeaders = await headers()
     const payload = await getPayload({ config })
-    const { user } = await payload.auth({ headers: reqHeaders })
+    const user = await getCurrentUser()
 
-    // Find tenant by subdomain slug
-    const tenantsResult = await payload.find({
-        collection: 'tenants',
-        where: { slug: { equals: slug } },
-        limit: 1,
-    })
+    let tenant;
 
-    const tenant = tenantsResult.docs[0]
+    /* REQ-F19: Resolve custom domain route */
+    if (slug === 'custom') {
+        const hostname = reqHeaders.get('x-tenant-hostname')
+        if (!hostname) return null
+        
+        const tenantsResult = await payload.find({
+            collection: 'tenants',
+            where: { 'customDomains.domain': { equals: hostname } },
+            limit: 1,
+        })
+        tenant = tenantsResult.docs[0]
+    } else {
+        // Find tenant by subdomain slug
+        const tenantsResult = await payload.find({
+            collection: 'tenants',
+            where: { slug: { equals: slug } },
+            limit: 1,
+        })
+        tenant = tenantsResult.docs[0]
+    }
+
     if (!tenant) return null
 
     // Find the site for this tenant
@@ -52,7 +68,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
         const tenantIds = user.tenants?.map((t: TenantRef) =>
             typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
         ) ?? []
-        
+
         if (!tenantIds.includes(String(tenant.id))) {
             return null // Visitor hits 404 for draft site (AC-2)
         }

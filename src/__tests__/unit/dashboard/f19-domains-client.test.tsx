@@ -41,7 +41,7 @@ describe('F19 Domain Management (DomainsClient)', () => {
     it('[TC-F19.01] Renders active and pending domains in the directory', () => {
         render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={mockDomains} />);
         
-        expect(screen.getByText('mywebstore.primeweb.app')).toBeInTheDocument();
+        expect(screen.getByText('mywebstore.ech-prime-web-v2-staging-pzdwc.ondigitalocean.app')).toBeInTheDocument();
         expect(screen.getAllByText('store.custom.com').length).toBeGreaterThan(0);
         expect(screen.getByText('pending.custom.com')).toBeInTheDocument();
         expect(screen.getByText('Pending Verification')).toBeInTheDocument();
@@ -111,9 +111,9 @@ describe('F19 Domain Management (DomainsClient)', () => {
         
         expect(screen.getByText(/A Record/i)).toBeInTheDocument();
         expect(screen.getByText(/CNAME/i)).toBeInTheDocument();
-        // The DNS IPs fallback to these defaults when env vars are not set during test
-        expect(screen.getByText(process.env.NEXT_PUBLIC_SERVER_IP ?? '192.168.1.1')).toBeInTheDocument();
-        expect(screen.getByText(process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'primeweb.app')).toBeInTheDocument();
+        const firstIp = (process.env.NEXT_PUBLIC_SERVER_IP ?? '162.159.140.98').split(',')[0].trim();
+        expect(screen.getByText(firstIp)).toBeInTheDocument();
+        expect(screen.getByText(process.env.NEXT_PUBLIC_CNAME_TARGET ?? process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'ech-prime-web-v2-staging-pzdwc.ondigitalocean.app')).toBeInTheDocument();
     });
 
     it('[TC-F19.11] Prevents Setting Primary for Pending domains', () => {
@@ -175,8 +175,8 @@ describe('F19 Domain Management (DomainsClient)', () => {
     it('[TC-F19.10] Protects default platform subdomain from removal', () => {
         render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={[]} />);
         
-        // The default platform domain mywebstore.primeweb.app should render
-        expect(screen.getByText('mywebstore.primeweb.app')).toBeInTheDocument();
+        //  The default platform domain mywebstore.ech-prime-web-v2-staging-pzdwc.ondigitalocean.app should render
+        expect(screen.getByText('mywebstore.ech-prime-web-v2-staging-pzdwc.ondigitalocean.app')).toBeInTheDocument();
 
         // There shouldn't be a generic Remove Domain button for it.
         const removeBtns = screen.queryAllByRole('button', { name: /Remove/i });
@@ -194,8 +194,9 @@ describe('F19 Domain Management (DomainsClient)', () => {
         fireEvent.click(clipboardBtns[0]); // A Record
 
         await waitFor(() => {
-            expect(navigator.clipboard.writeText).toHaveBeenCalledWith(process.env.NEXT_PUBLIC_SERVER_IP ?? '192.168.1.1');
-            expect(toast.success).toHaveBeenCalledWith('Copied! ✅');
+            const firstIp = (process.env.NEXT_PUBLIC_SERVER_IP ?? '162.159.140.98').split(',')[0].trim();
+            expect(navigator.clipboard.writeText).toHaveBeenCalledWith(firstIp);
+            expect(toast.success).toHaveBeenCalledWith('Copied IP 1! ✅');
         });
     });
 
