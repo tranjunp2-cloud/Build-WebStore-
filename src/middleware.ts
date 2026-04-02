@@ -30,7 +30,7 @@ const protectedPaths = [
     '/help',
 ]
 
-const authPaths = ['/login', '/register']
+const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password']
 
 /**
  * Multi-tenant middleware

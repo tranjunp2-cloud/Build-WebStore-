@@ -161,7 +161,7 @@ function VerifyOTPContent() {
             if (!returnUrl.startsWith('/') || returnUrl.startsWith('//')) {
                 returnUrl = '/dashboard'
             }
-            window.location.href = returnUrl
+            window.location.replace(returnUrl)
         } catch {
             setError(t.auth.otp?.connectionError || 'Connection error. Please try again.')
             toast.error(t.auth.otp?.connectionError || 'Connection error. Please try again.')

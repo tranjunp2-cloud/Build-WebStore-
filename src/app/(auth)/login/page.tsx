@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -69,6 +70,17 @@ function LoginFormContent() {
     const { t } = useI18n()
 
     useEffect(() => {
+        // Reset checking state if user navigates back via bfcache
+        const handlePageShow = (event: PageTransitionEvent) => {
+            if (event.persisted) {
+                setCheckingReset(false)
+            }
+        }
+        window.addEventListener('pageshow', handlePageShow)
+        return () => window.removeEventListener('pageshow', handlePageShow)
+    }, [])
+
+    useEffect(() => {
         const errorMsg = searchParams.get('error')
         if (!errorMsg) return
 
@@ -106,17 +118,21 @@ function LoginFormContent() {
 
         // No email typed → go to forgot-password form as usual
         if (!email) {
-            router.push('/forgot-password')
+            window.location.href = '/forgot-password'
             return
         }
 
         setCheckingReset(true)
         try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 5000)
             const res = await fetch('/api/auth/check-reset-flow', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email }),
+                signal: controller.signal,
             })
+            clearTimeout(timeoutId)
             const data = await res.json()
 
             if (data.flow === 'sso' && data.redirectUrl) {
@@ -125,13 +141,14 @@ function LoginFormContent() {
                 // Return here without resetting state to keep loading active while browser redirects
                 return
             }
-        } catch {
+        } catch (error) {
+            console.error('check-reset-flow failed', error)
             // On error, fall through to internal page
         }
 
         // Staff or unknown → internal forgot-password page
         setCheckingReset(false)
-        router.push('/forgot-password')
+        window.location.href = '/forgot-password'
     }
 
     const onSubmit = async (data: LoginForm) => {
@@ -176,7 +193,7 @@ function LoginFormContent() {
 
                 // Map known Payload CMS backend English errors to i18n
                 const authErrors = t.auth.errors as Record<string, string | undefined>
-                
+
                 if (message === 'Email and password are required' || message === 'Missing credentials') {
                     message = authErrors.missingCredentials || message
                 } else if (message.includes('locked due to having too many failed login attempts')) {
@@ -217,7 +234,7 @@ function LoginFormContent() {
 
             // Redirect to OTP verification page
             const returnParam = returnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(returnUrl)}` : ''
-            router.push(`/verify-otp?email=${encodeURIComponent(userEmail)}${returnParam}`)
+            router.replace(`/verify-otp?email=${encodeURIComponent(userEmail)}${returnParam}`)
         } catch {
             setFormError('root', { message: t.auth.errors.connection })
             toast.error(t.auth.errors.connection)

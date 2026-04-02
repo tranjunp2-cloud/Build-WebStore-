@@ -34,16 +34,15 @@ export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarM
                 method: 'POST',
                 credentials: 'include',
             })
-            if (res.ok) {
-                document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
-                window.location.href = '/login'
-            } else {
+            if (!res.ok) {
                 toast.error('Logout failed.')
             }
         } catch {
             toast.error('Network error. You may need to refresh.')
+        } finally {
+            document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
+            window.location.href = '/login'
         }
-
     }
 
     return (

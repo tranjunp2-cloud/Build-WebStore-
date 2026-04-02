@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
+import { getCurrentUser } from '@/lib/auth'
 import config from '@payload-config'
 import type { Metadata } from 'next'
 import { SiteRenderer, type NavPage } from '@/components/site-renderer/SiteRenderer'
@@ -18,7 +19,7 @@ type Props = {
 async function getTenantAndPage(slug: string, pagePath: string) {
     const reqHeaders = await headers()
     const payload = await getPayload({ config })
-    const { user } = await payload.auth({ headers: reqHeaders })
+    const user = await getCurrentUser()
 
     // Find tenant by subdomain slug
     const tenantsResult = await payload.find({
@@ -52,7 +53,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
         const tenantIds = user.tenants?.map((t: TenantRef) =>
             typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
         ) ?? []
-        
+
         if (!tenantIds.includes(String(tenant.id))) {
             return null // Visitor hits 404 for draft site (AC-2)
         }
