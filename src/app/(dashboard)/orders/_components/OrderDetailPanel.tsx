@@ -18,7 +18,7 @@ export interface OrderDetail {
     status: OrderStatus
     paymentStatus: string
     paymentMethod: string
-    paymentProofImage?: any
+    paymentProofImage?: string | { url?: string } | null
     subtotal: number
     shippingFee: number
     tax: number
@@ -214,7 +214,7 @@ const IconRefund = () => (
 //   Active (Pending):  style_N6FR8S Inter 600 10px CENTER, fill_KU03NT #F8FAFC
 //   Inactive:          style_VL7F6N Inter 400 10px CENTER, fill_3G5XDF rgba(248,250,252,0.6)
 
-function getProgressSteps(labels: any) {
+function getProgressSteps(labels: Record<string, string>) {
     return [
         { label: labels.pending, x: 0, width: 39.64, StepIcon: StepPendingIcon },
         { label: labels.confirmed, x: 84.86, width: 49.53, StepIcon: StepConfirmedIcon },
@@ -697,12 +697,14 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
             })
             if (!res.ok) {
                 const data = await res.json()
-                throw new Error(data.error?.message || 'Failed to update order status')
+                console.error('Failed to update order status:', data.error)
+                throw new Error('API_ERROR')
             }
             toast.success(t.dashboard.orders.toast.updated)
             onUpdate()
-        } catch (error: any) {
-            toast.error(error.message || t.dashboard.orders.toast.updateFailed)
+        } catch (error: unknown) {
+            console.error('Order action error:', error)
+            toast.error(t.dashboard.orders.toast.updateFailed)
         } finally {
             setIsLoading(false)
         }
@@ -718,13 +720,15 @@ function ActionButtons({ order, onUpdate }: { order: OrderDetail, onUpdate: () =
             })
             if (!res.ok) {
                 const data = await res.json()
-                throw new Error(data.error || 'Failed to cancel order')
+                console.error('Failed to cancel order:', data.error)
+                throw new Error('API_ERROR')
             }
             toast.success(t.dashboard.orders.toast.updated)
             setIsCancelModalOpen(false)
             onUpdate()
-        } catch (error: any) {
-            toast.error(error.message || t.dashboard.orders.toast.updateFailed)
+        } catch (error: unknown) {
+            console.error('Cancel order error:', error)
+            toast.error(t.dashboard.orders.toast.updateFailed)
         } finally {
             setIsLoading(false)
         }
