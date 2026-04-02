@@ -150,6 +150,44 @@
                 "continue": "Continue",
                 "explore": "Explore CMS"
             }
+        },
+        "step1Description": "Provide basic information so AI can create the perfect website for you.",
+        "generating": {
+            "title": "Create Website with AI",
+            "subtitle": "Website Generation",
+            "startingMessage": "Starting website creation...",
+            "creatingTitle": "Creating Your Website...",
+            "creatingSubtitle": "AI is analyzing your business and generating the perfect design.",
+            "stepAnalyzing": "Analyzing business information",
+            "stepGenerating": "Generating content & design",
+            "stepPreparing": "Preparing preview",
+            "progressLabel": "Building your website",
+            "processing": "Processing..."
+        },
+        "form": {
+            "businessName": "Business Name",
+            "businessNamePlaceholder": "e.g., The Cookie House, Beauty Spa Hana...",
+            "industry": "Industry / Sector",
+            "products": "Products / Services",
+            "productsPlaceholder": "e.g., Specialty coffee, milk tea, pastries...",
+            "productsHint": "AI will use this to suggest product images and layout",
+            "shortDescription": "Short Description",
+            "shortDescriptionPlaceholder": "e.g., Handmade bakery operating since 2020...",
+            "shortDescriptionHint": "AI will use this to suggest content and tone",
+            "loadingIndustries": "Loading industries...",
+            "generateButton": "Generate Website",
+            "retryWithCurrent": "Retry with current information",
+            "promoTitle": "AI Website Builder",
+            "promoDescription": "Just 3 simple steps, AI will create a professional website in minutes.",
+            "promoStep1": "Enter business information",
+            "promoStep2": "AI creates content & design",
+            "promoStep3": "Preview & Publish",
+            "errors": {
+                "businessName": "Please enter your business name",
+                "industry": "Please select an industry",
+                "shortDescription": "Please describe your business",
+                "products": "Please describe your products / services"
+            }
         }
     },
     "email": {

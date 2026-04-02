@@ -150,6 +150,44 @@
                 "continue": "Seterusnya",
                 "explore": "Teroka CMS"
             }
+        },
+        "step1Description": "Berikan maklumat asas supaya AI boleh mencipta laman web yang sempurna untuk anda.",
+        "generating": {
+            "title": "Cipta Laman Web dengan AI",
+            "subtitle": "Penjanaan Laman Web",
+            "startingMessage": "Memulakan penciptaan laman web...",
+            "creatingTitle": "Mencipta Laman Web Anda...",
+            "creatingSubtitle": "AI sedang menganalisis perniagaan anda dan menjana reka bentuk yang sempurna.",
+            "stepAnalyzing": "Menganalisis maklumat perniagaan",
+            "stepGenerating": "Menjana kandungan & reka bentuk",
+            "stepPreparing": "Menyediakan pratonton",
+            "progressLabel": "Membina laman web anda",
+            "processing": "Memproses..."
+        },
+        "form": {
+            "businessName": "Nama Perniagaan",
+            "businessNamePlaceholder": "cth., The Cookie House, Beauty Spa Hana...",
+            "industry": "Industri / Sektor",
+            "products": "Produk / Perkhidmatan",
+            "productsPlaceholder": "cth., Kopi istimewa, teh susu, pastri...",
+            "productsHint": "AI akan gunakan ini untuk mencadangkan imej produk dan susun atur",
+            "shortDescription": "Penerangan Ringkas",
+            "shortDescriptionPlaceholder": "cth., Kedai roti buatan tangan beroperasi sejak 2020...",
+            "shortDescriptionHint": "AI akan gunakan ini untuk mencadangkan kandungan dan nada",
+            "loadingIndustries": "Memuatkan industri...",
+            "generateButton": "Jana Laman Web",
+            "retryWithCurrent": "Cuba lagi dengan maklumat semasa",
+            "promoTitle": "Pembina Laman Web AI",
+            "promoDescription": "Hanya 3 langkah mudah, AI akan mencipta laman web profesional dalam beberapa minit.",
+            "promoStep1": "Masukkan maklumat perniagaan",
+            "promoStep2": "AI mencipta kandungan & reka bentuk",
+            "promoStep3": "Pratonton & Terbit",
+            "errors": {
+                "businessName": "Sila masukkan nama perniagaan anda",
+                "industry": "Sila pilih industri",
+                "shortDescription": "Sila terangkan perniagaan anda",
+                "products": "Sila terangkan produk / perkhidmatan anda"
+            }
         }
     },
     "email": {
