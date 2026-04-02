@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -64,7 +65,6 @@ function LoginFormContent() {
         returnUrl = '/dashboard'
     }
     const [showPassword, setShowPassword] = useState(false)
-    const [checkingReset, setCheckingReset] = useState(false)
     const [rememberMe, setRememberMe] = useState(false)
     const { t } = useI18n()
 
@@ -93,46 +93,10 @@ function LoginFormContent() {
         formState: { errors, isSubmitting },
         setError: setFormError,
         resetField,
-        getValues,
     } = useForm<LoginForm>({
         resolver: zodResolver(loginSchema),
         defaultValues: { email: '', password: '' },
     })
-
-    // FR-07/FR-08: Smart forgot-password — Owner → SSO direct, Staff → internal
-    const handleForgotPassword = async (e: React.MouseEvent) => {
-        e.preventDefault()
-        const email = getValues('email')?.trim()
-
-        // No email typed → go to forgot-password form as usual
-        if (!email) {
-            router.push('/forgot-password')
-            return
-        }
-
-        setCheckingReset(true)
-        try {
-            const res = await fetch('/api/auth/check-reset-flow', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email }),
-            })
-            const data = await res.json()
-
-            if (data.flow === 'sso' && data.redirectUrl) {
-                // Owner → redirect straight to SSO portal
-                window.location.href = data.redirectUrl
-                // Return here without resetting state to keep loading active while browser redirects
-                return
-            }
-        } catch {
-            // On error, fall through to internal page
-        }
-
-        // Staff or unknown → internal forgot-password page
-        setCheckingReset(false)
-        router.push('/forgot-password')
-    }
 
     const onSubmit = async (data: LoginForm) => {
         if (data.email.trim().toLowerCase() === 'sso-service@primeweb.app') {
@@ -176,7 +140,7 @@ function LoginFormContent() {
 
                 // Map known Payload CMS backend English errors to i18n
                 const authErrors = t.auth.errors as Record<string, string | undefined>
-                
+
                 if (message === 'Email and password are required' || message === 'Missing credentials') {
                     message = authErrors.missingCredentials || message
                 } else if (message.includes('locked due to having too many failed login attempts')) {
@@ -217,7 +181,7 @@ function LoginFormContent() {
 
             // Redirect to OTP verification page
             const returnParam = returnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(returnUrl)}` : ''
-            router.push(`/verify-otp?email=${encodeURIComponent(userEmail)}${returnParam}`)
+            router.replace(`/verify-otp?email=${encodeURIComponent(userEmail)}${returnParam}`)
         } catch {
             setFormError('root', { message: t.auth.errors.connection })
             toast.error(t.auth.errors.connection)
@@ -355,15 +319,13 @@ function LoginFormContent() {
                             Remember me
                         </span>
                     </label>
-                    <button
-                        type="button"
-                        onClick={handleForgotPassword}
-                        disabled={checkingReset}
-                        className="text-sm font-medium text-[#3B82F6] hover:text-blue-400 transition-colors disabled:opacity-50 bg-transparent border-none p-0 cursor-pointer"
-                        style={{ lineHeight: '1.43' }}
+                    <Link
+                        href="/forgot-password"
+                        className="text-sm font-medium text-[#3B82F6] hover:text-blue-400 transition-colors bg-transparent border-none p-0 cursor-pointer"
+                        style={{ lineHeight: '1.43', textDecoration: 'none' }}
                     >
-                        {checkingReset ? 'Checking...' : t.auth.forgotPassword}
-                    </button>
+                        {t.auth.forgotPassword}
+                    </Link>
                 </div>
 
                 {/* ─── Bottom Actions (Button & Lang) ─── */}
