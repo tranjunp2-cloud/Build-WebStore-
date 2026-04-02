@@ -64,6 +64,13 @@ export const Users: CollectionConfig = {
                     return Response.json({ errors: [{ message: 'Email and password are required' }] }, { status: 400 })
                 }
 
+                // Input Validation (Mitigate SQL/NoSQL Injection)
+                const { z } = await import('zod')
+                const emailSchema = z.string().email()
+                if (!emailSchema.safeParse(email).success) {
+                    return Response.json({ errors: [{ message: 'Invalid email format' }] }, { status: 400 })
+                }
+
                 try {
                     // Internal Payload login (verifies password)
                     const result = await req.payload.login({
