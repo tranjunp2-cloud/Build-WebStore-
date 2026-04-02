@@ -5,6 +5,11 @@ import configPromise from '@payload-config';
 import { revalidatePath } from 'next/cache';
 import { getCurrentTenantId } from '@/lib/auth';
 
+// DigitalOcean API Constants (from ENV)
+const DO_API_TOKEN = process.env.DO_API_TOKEN;
+const DO_APP_ID = process.env.DO_APP_ID;
+const DO_API_URL = 'https://api.digitalocean.com/v2/apps';
+
 type DomainEntry = { domain: string; status: 'pending' | 'active'; isPrimary?: boolean };
 
 // Helper to get current domains array from tenant
@@ -61,6 +66,50 @@ export async function addCustomDomain(rawDomain: string) {
             id: tenantId,
             data: { customDomains: updated },
         });
+
+        // ── VIP: DigitalOcean API Integration ──
+        // Only call if we have credentials
+        if (DO_API_TOKEN && DO_APP_ID) {
+            try {
+                const doResponse = await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${DO_API_TOKEN}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (doResponse.ok) {
+                    const appData = await doResponse.json();
+                    const appSpec = appData.app.spec;
+                    
+                    // Add the new domain to existing domains in DO spec
+                    const existingDomains = appSpec.domains || [];
+                    if (!existingDomains.some((d: any) => d.domain === domain)) {
+                        const newDomains = [...existingDomains, { domain, type: 'ALIAS' }];
+                        
+                        // Update the app with the new domain
+                        await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `Bearer ${DO_API_TOKEN}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                spec: {
+                                    ...appSpec,
+                                    domains: newDomains
+                                }
+                            })
+                        });
+                    }
+                }
+            } catch (doError) {
+                console.error('DO API Error (Add Domain):', doError);
+                // We still returned success because it's in our DB, but background DO task failed.
+            }
+        }
+
         revalidatePath('/settings/domains');
         return { success: true };
     } catch (error) {
@@ -83,6 +132,44 @@ export async function removeCustomDomain(domain: string) {
             id: tenantId,
             data: { customDomains: updated },
         });
+
+        // ── VIP: DigitalOcean API Integration (Remove) ──
+        if (DO_API_TOKEN && DO_APP_ID) {
+            try {
+                const doResponse = await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${DO_API_TOKEN}`,
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (doResponse.ok) {
+                    const appData = await doResponse.json();
+                    const appSpec = appData.app.spec;
+                    
+                    // Filter out the domain from DO spec
+                    const newDomains = (appSpec.domains || []).filter((d: any) => d.domain !== domain);
+                    
+                    await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${DO_API_TOKEN}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            spec: {
+                                ...appSpec,
+                                domains: newDomains
+                            }
+                        })
+                    });
+                }
+            } catch (doError) {
+                console.error('DO API Error (Remove Domain):', doError);
+            }
+        }
+
         revalidatePath('/settings/domains');
         return { success: true };
     } catch (error) {
@@ -108,13 +195,48 @@ export async function verifyCustomDomain(domain: string) {
         await new Promise(resolve => setTimeout(resolve, 1500));
         isSuccess = Math.random() > 0.2;
     } else {
-        // ── PRODUCTION: Real DNS lookup ──
+        // ── PRODUCTION: Real DNS lookup & DO SSL Check ──
         try {
             const { promises: dns } = await import('dns');
             const addresses = await dns.resolve4(domain);
-            isSuccess = addresses.includes(serverIp);
-            if (!isSuccess) {
-                errorMessage = `DNS mismatch. Expected A record to point to ${serverIp}. Propagation may take up to 48 hours.`;
+            
+            // Handle multiple IPs (comma separated in env)
+            const validIps = (process.env.SERVER_IP || process.env.NEXT_PUBLIC_SERVER_IP || '').split(',').map(ip => ip.trim());
+            
+            // Check if any resolved IP matches our valid ingress IPs
+            const isDnsMatched = addresses.some(ip => validIps.includes(ip));
+            
+            if (!isDnsMatched) {
+                isSuccess = false;
+                errorMessage = `DNS mismatch. Domain points to ${addresses.join(', ')}. Expected one of: ${validIps.join(', ')}. Propagation may take up to 48 hours.`;
+            } else {
+                // DNS is OK, now check if DO has finished SSL provisioning
+                if (DO_API_TOKEN && DO_APP_ID) {
+                    const doResponse = await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
+                        headers: { 'Authorization': `Bearer ${DO_API_TOKEN}` }
+                    });
+                    
+                    if (doResponse.ok) {
+                        const appData = await doResponse.json();
+                        // Find this domain in live_state or spec
+                        const domainsStatuses = appData.app.domains || [];
+                        const domainStatus = domainsStatuses.find((d: any) => d.spec?.domain === domain);
+                        
+                        // If domain is found and progress is solid
+                        // Phase 'ACTIVE' means ready.
+                        isSuccess = !domainStatus || domainStatus.phase === 'ACTIVE'; 
+                        
+                        if (!isSuccess) {
+                            errorMessage = 'SSL Provisioning is still in progress. Please wait up to 48 hours.';
+                        }
+                    } else {
+                        // If DO API fails, fall back to just DNS success
+                        isSuccess = true;
+                    }
+                } else {
+                    // No API Token? Just trust the DNS check.
+                    isSuccess = true;
+                }
             }
         } catch {
             isSuccess = false;
