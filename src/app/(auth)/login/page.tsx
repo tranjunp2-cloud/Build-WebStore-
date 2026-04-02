@@ -65,8 +65,20 @@ function LoginFormContent() {
         returnUrl = '/dashboard'
     }
     const [showPassword, setShowPassword] = useState(false)
+    const [checkingReset, setCheckingReset] = useState(false)
     const [rememberMe, setRememberMe] = useState(false)
     const { t } = useI18n()
+
+    useEffect(() => {
+        // Reset checking state if user navigates back via bfcache
+        const handlePageShow = (event: PageTransitionEvent) => {
+            if (event.persisted) {
+                setCheckingReset(false)
+            }
+        }
+        window.addEventListener('pageshow', handlePageShow)
+        return () => window.removeEventListener('pageshow', handlePageShow)
+    }, [])
 
     useEffect(() => {
         const errorMsg = searchParams.get('error')
@@ -93,10 +105,50 @@ function LoginFormContent() {
         formState: { errors, isSubmitting },
         setError: setFormError,
         resetField,
+        getValues,
     } = useForm<LoginForm>({
         resolver: zodResolver(loginSchema),
         defaultValues: { email: '', password: '' },
     })
+
+    // FR-07/FR-08: Smart forgot-password — Owner → SSO direct, Staff → internal
+    const handleForgotPassword = async (e: React.MouseEvent) => {
+        e.preventDefault()
+        const email = getValues('email')?.trim()
+
+        // No email typed → go to forgot-password form as usual
+        if (!email) {
+            window.location.href = '/forgot-password'
+            return
+        }
+
+        setCheckingReset(true)
+        try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 5000)
+            const res = await fetch('/api/auth/check-reset-flow', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+                signal: controller.signal,
+            })
+            clearTimeout(timeoutId)
+            const data = await res.json()
+
+            if (data.flow === 'sso' && data.redirectUrl) {
+                // Owner → redirect straight to SSO portal
+                window.location.href = data.redirectUrl
+                // Return here without resetting state to keep loading active while browser redirects
+                return
+            }
+        } catch {
+            // On error, fall through to internal page
+        }
+
+        // Staff or unknown → internal forgot-password page
+        setCheckingReset(false)
+        window.location.href = '/forgot-password'
+    }
 
     const onSubmit = async (data: LoginForm) => {
         if (data.email.trim().toLowerCase() === 'sso-service@primeweb.app') {
@@ -319,13 +371,15 @@ function LoginFormContent() {
                             Remember me
                         </span>
                     </label>
-                    <Link
-                        href="/forgot-password"
-                        className="text-sm font-medium text-[#3B82F6] hover:text-blue-400 transition-colors bg-transparent border-none p-0 cursor-pointer"
-                        style={{ lineHeight: '1.43', textDecoration: 'none' }}
+                    <button
+                        type="button"
+                        onClick={handleForgotPassword}
+                        disabled={checkingReset}
+                        className="text-sm font-medium text-[#3B82F6] hover:text-blue-400 transition-colors disabled:opacity-50 bg-transparent border-none p-0 cursor-pointer"
+                        style={{ lineHeight: '1.43' }}
                     >
-                        {t.auth.forgotPassword}
-                    </Link>
+                        {checkingReset ? 'Checking...' : t.auth.forgotPassword}
+                    </button>
                 </div>
 
                 {/* ─── Bottom Actions (Button & Lang) ─── */}

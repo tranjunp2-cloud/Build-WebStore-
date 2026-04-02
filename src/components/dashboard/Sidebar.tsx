@@ -317,15 +317,15 @@ export function DashboardSidebar({ userName, userInitial, mobileOpen, setMobileO
                         try {
                             await fetch('/api/auth/logout', {
                                 method: 'POST',
+                                credentials: 'include',
                             })
-                            router.push('/login')
-                            router.refresh()
                         } catch (error) {
                             console.error('Logout failed:', error)
+                        } finally {
+                            document.cookie =
+                                'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
+                            window.location.href = '/login'
                         }
-                        document.cookie =
-                            'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
-                        window.location.href = '/login'
                     }}
                     className="flex items-center gap-3 rounded-[16px] border border-white/[0.08] bg-transparent outline-none pl-4 h-[44px] text-[14px] font-medium text-[#F8FAFC] hover:bg-white/5 cursor-pointer transition-colors"
                 >

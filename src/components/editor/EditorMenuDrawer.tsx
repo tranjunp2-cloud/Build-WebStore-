@@ -76,10 +76,12 @@ export function EditorMenuDrawer({ siteId, open, onClose }: EditorMenuDrawerProp
         try {
             await fetch('/api/users/logout', {
                 method: 'POST',
+                credentials: 'include',
             })
-            window.location.href = '/login'
         } catch (error) {
             console.error('Logout request failed:', error)
+        } finally {
+            document.cookie = 'payload-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
             window.location.href = '/login'
         }
     }
