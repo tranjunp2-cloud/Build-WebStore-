@@ -170,17 +170,17 @@ describe('US-F08-04 — buildSavePayload (AC-2: category included)', () => {
     }
 
     it('sets status to draft by default — AC-2', () => {
-        const payload = buildSavePayload(baseProduct)
+        const payload = buildSavePayload(baseProduct, null, null)
         expect(payload.status).toBe('draft')
     })
 
     it('generates a random slug from product name', () => {
-        const payload = buildSavePayload(baseProduct)
+        const payload = buildSavePayload(baseProduct, null, null)
         expect(payload.slug).toMatch(/^dep-to-ong-[a-z0-9]{5}$/)
     })
 
     it('sets default inventory=10 when no variants', () => {
-        const payload = buildSavePayload({ ...baseProduct, variants: [] })
+        const payload = buildSavePayload({ ...baseProduct, variants: [] }, null, null)
         expect(payload.inventory).toBe(10)
         expect(payload.variants).toBeUndefined()
     })
@@ -193,7 +193,7 @@ describe('US-F08-04 — buildSavePayload (AC-2: category included)', () => {
                 { name: 'Đỏ - M', price: 20000, sku: 'DT-DO-M', stock: 10 },
             ],
         }
-        const payload = buildSavePayload(prodWithVariants)
+        const payload = buildSavePayload(prodWithVariants, null, null)
         expect(payload.inventory).toBe(0)
         expect(Array.isArray(payload.variants)).toBe(true)
         if (payload.variants) {
@@ -202,12 +202,12 @@ describe('US-F08-04 — buildSavePayload (AC-2: category included)', () => {
     })
 
     it('omits category from payload entirely as API requires relationship ID', () => {
-        const payload = buildSavePayload({ ...baseProduct, category: 'Food' })
+        const payload = buildSavePayload({ ...baseProduct, category: 'Food' }, null, null)
         expect((payload as any).category).toBeUndefined()
     })
 
     it('includes weight as fallback for F14 integration', () => {
-        const payload = buildSavePayload(baseProduct)
+        const payload = buildSavePayload(baseProduct, null, null)
         expect(payload.weight).toBe(1)
     })
 })
