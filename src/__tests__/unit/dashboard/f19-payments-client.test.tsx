@@ -10,34 +10,29 @@ vi.mock('sonner', () => ({
     toast: {
         success: vi.fn(),
         error: vi.fn(),
+        loading: vi.fn(),
+        dismiss: vi.fn()
     }
 }));
 
+vi.mock('@/app/(dashboard)/settings/payments/actions', () => ({
+    getPaymentSettings: vi.fn().mockResolvedValue({ success: true, payments: { payment_cod: false, payment_qr: false, qr_image: null } }),
+    updatePaymentSettings: vi.fn().mockResolvedValue({ success: true }),
+    uploadQrMedia: vi.fn().mockResolvedValue({ success: true, doc: { id: 'img-123', url: 'https://example.com/qr.png' } })
+}));
+
 import { PaymentsFormClient } from '@/app/(dashboard)/settings/payments/PaymentsFormClient';
+import { I18nProvider } from '@/i18n';
 import { toast } from 'sonner';
 
 describe('F19 Payment Settings (PaymentsFormClient)', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        const mockFetch = vi.fn().mockImplementation(async (url: any, options: any) => {
-            console.log('FETCH CALLED', url, options);
-            if (options?.method === 'PATCH') {
-                return {
-                    ok: true,
-                    json: async () => ({ success: true })
-                };
-            }
-            return {
-                ok: true,
-                json: async () => ({ payment_cod: false, payment_qr: false, qr_image: null })
-            };
-        });
-        vi.stubGlobal('fetch', mockFetch);
     });
 
     it('[TC-F19.12] Renders both COD and QR payment toggles', async () => {
-        const { container } = render(<PaymentsFormClient tenantId="tenant-1" />);
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
         console.log('DOM BEFORE WAIT', container.innerHTML);
 
         await waitFor(() => {
@@ -47,7 +42,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
     });
 
     it('[TC-F19.12] Allows toggling COD and saves changes (Auto-Save)', async () => {
-        const { container } = render(<PaymentsFormClient tenantId="tenant-1" />);
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
             expect(screen.getByText('Cash on Delivery (COD)')).toBeInTheDocument();
@@ -63,7 +58,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
     });
 
     it('[TC-F19.13] Expands QR Widget if toggling QR Banking without an image (Gatekeeping Rule)', async () => {
-        const { container } = render(<PaymentsFormClient tenantId="tenant-1" />);
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
             expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
@@ -81,7 +76,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
     });
 
     it('[TC-F19.14] Validates QR Code upload size (> 2MB rejected)', async () => {
-        const { container } = render(<PaymentsFormClient tenantId="tenant-1" />);
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
             expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
@@ -106,7 +101,7 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
     });
 
     it('[TC-F19.15] Validates QR Code valid format (rejects PDF/DOC via HTML accept)', async () => {
-        const { container } = render(<PaymentsFormClient tenantId="tenant-1" />);
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
 
         await waitFor(() => {
             expect(screen.getByText('Bank Transfer / DuitNow QR')).toBeInTheDocument();
@@ -124,19 +119,17 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
 
     it('[TC-F19.16] Automatically disables QR Banking toggle when QR image is removed', async () => {
         // Assume initial load returns an existing image so QR Banking is ON
-        const mockFetchWithImage = vi.fn().mockImplementation(async (url: any, options: any) => {
-            return {
-                ok: true,
-                json: async () => ({ 
-                    payment_cod: false, 
-                    payment_qr: true, 
-                    qr_image: { id: 'img-123', url: 'https://example.com/qr.png' } 
-                })
-            };
+        const actionsMock = await import('@/app/(dashboard)/settings/payments/actions');
+        (actionsMock.getPaymentSettings as any).mockResolvedValueOnce({
+            success: true,
+            payments: { 
+                payment_cod: false, 
+                payment_qr: true, 
+                qr_image: { id: 'img-123', url: 'https://example.com/qr.png' } 
+            }
         });
-        vi.stubGlobal('fetch', mockFetchWithImage);
 
-        const { container } = render(<PaymentsFormClient tenantId="tenant-1" />);
+        const { container } = render(<I18nProvider><PaymentsFormClient tenantId="tenant-1" /></I18nProvider>);
         
         await waitFor(() => {
             expect((container.querySelectorAll('input[type="checkbox"]')[1] as HTMLInputElement).checked).toBe(true);
