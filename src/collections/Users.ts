@@ -598,7 +598,9 @@ export const Users: CollectionConfig = {
                 })
 
                 // Never log OTP codes — mask email to avoid leaking PII
-                const maskedEmail = email.replace(/(^.{2})[^@]+/, '$1***')
+                const [local, domain] = email.split('@')
+                const safeLocal = local.length <= 2 ? '*'.repeat(local.length) : local.slice(0,2) + '***'
+                const maskedEmail = `${safeLocal}@${domain}`
                 if (process.env.NODE_ENV !== 'production') {
                     console.log(`[DEV OTP] Code dispatched for ${maskedEmail} (check your email)`)
                 } else {
