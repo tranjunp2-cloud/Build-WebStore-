@@ -952,6 +952,33 @@
                 }
             },
             "subtitle": "Manage store products"
+        },
+        "settings": {
+            "payments": {
+                "title": "Payment Methods",
+                "subtitle": "Configure how customers can pay for their orders",
+                "gatewayTitle": "Credit/Debit Gateway",
+                "gatewaySubtitle": "Accept credit and debit card payments via Stripe",
+                "codTitle": "Cash on Delivery (COD)",
+                "codSubtitle": "Allow manual cash collection upon delivery",
+                "bankTransferTitle": "Bank Transfer / DuitNow QR",
+                "bankTransferSubtitle": "Accept payments via bank transfer with QR code",
+                "active": "Active",
+                "inactive": "Inactive",
+                "uploadQrTitle": "Upload QR Code Image",
+                "uploadQrSub": "Click to upload QR Code",
+                "uploadHint": "JPG or PNG. Max size: 2MB",
+                "loading": "Loading configuration...",
+                "uploadingQr": "Uploading QR Code...",
+                "removeSuccess": "Removed! ✅",
+                "uploadError": "Upload Error: ",
+                "successSave": "Changes saved! ✅",
+                "failSaveConfig": "Failed to save QR configuration.",
+                "failSaveSettings": "Failed to save settings",
+                "failClearQR": "Failed to clear QR image setting.",
+                "infoTitle": "Payment Method Setup",
+                "infoDesc": "Customers will only see enabled payment methods during checkout. For Stripe integration, you'll need to connect your account in the advanced settings."
+            }
         }
     },
     "auth": {
