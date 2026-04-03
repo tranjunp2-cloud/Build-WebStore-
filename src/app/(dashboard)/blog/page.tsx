@@ -288,7 +288,6 @@ export default function BlogListPage() {
                     <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/5">
                         <FileText className="h-8 w-8 text-gray-500" />
                     </div>
-                    <h3 className="text-lg font-semibold text-white">No blog posts yet</h3>
                     <h3 className="text-lg font-semibold text-white">{t.dashboard.blog.noPostsTitle}</h3>
                     <p className="text-sm text-gray-400">{t.dashboard.blog.noPostsSubtitle}</p>
                     <button

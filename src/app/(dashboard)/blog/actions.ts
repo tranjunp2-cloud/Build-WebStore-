@@ -192,7 +192,7 @@ export async function listBlogsAction(params: {
     if (!user) return { data: [], meta: null }
 
     const payload = await getPayload({ config: configPromise })
-    const tenantId = (user as any).tenant?.id || (user as any).tenant
+    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
 
     const where: Record<string, any> = {}
     if (tenantId) where.tenant = { equals: tenantId }
@@ -232,6 +232,15 @@ export async function deleteBlogAction(id: string) {
     if (!user) throw new Error('Unauthorized')
 
     const payload = await getPayload({ config: configPromise })
+
+    const existing = await payload.findByID({ collection: 'blogs', id })
+    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
+
+    if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {
+        throw new Error('Unauthorized delete access')
+    }
+
     await payload.delete({
         collection: 'blogs',
         id,
@@ -247,6 +256,15 @@ export async function updateBlogStatusAction(id: string, status: string) {
     if (!user) throw new Error('Unauthorized')
 
     const payload = await getPayload({ config: configPromise })
+
+    const existing = await payload.findByID({ collection: 'blogs', id })
+    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
+
+    if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {
+        throw new Error('Unauthorized update access')
+    }
+
     const result = await payload.update({
         collection: 'blogs',
         id,
@@ -267,6 +285,13 @@ export async function getBlogByIdAction(id: string) {
         collection: 'blogs',
         id,
     })
+
+    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const blogTenantId = typeof result.tenant === 'object' ? result.tenant?.id : result.tenant
+
+    if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {
+        throw new Error('Unauthorized access')
+    }
 
     return JSON.parse(JSON.stringify(result))
 }
