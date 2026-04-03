@@ -84,15 +84,19 @@ export async function addCustomDomain(rawDomain: string) {
                 
                 if (doResponse.ok) {
                     const appData = await doResponse.json();
-                    const appSpec = appData.app.spec;
                     
-                    // Add the new domain to existing domains in DO spec
-                    const existingDomains = appSpec.domains || [];
-                    if (!existingDomains.some((d: DoAppSpecDomain) => d.domain === domain)) {
-                        const newDomains = [...existingDomains, { domain, type: 'ALIAS' }];
+                    // Lời Lead: "Domain là cha ngoài spec". 
+                    // Tức là phải check mảng appData.app.domains (nằm ngoài spec) để biết chính xác DO đang quản lý những domain nào.
+                    const liveDomains = appData.app.domains || [];
+                    
+                    // Nếu domain chưa thực sự tồn tại trên DO Live Domains
+                    if (!liveDomains.some((d: DoAppLiveDomain) => d.spec?.domain === domain)) {
+                        const appSpec = appData.app.spec; // Bản config
+                        const specDomains = appSpec.domains || [];
+                        const newDomains = [...specDomains, { domain, type: 'ALIAS' }];
                         
-                        // Update the app with the new domain
-                        await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
+                        // Update the app spec
+                        const putResponse = await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
                             method: 'PUT',
                             headers: {
                                 'Authorization': `Bearer ${DO_API_TOKEN}`,
@@ -105,6 +109,10 @@ export async function addCustomDomain(rawDomain: string) {
                                 }
                             })
                         });
+                        
+                        if (!putResponse.ok) {
+                            console.error('DO API Error (PUT Add Domain):', await putResponse.text());
+                        }
                     }
                 }
             } catch (doError) {
@@ -156,7 +164,7 @@ export async function removeCustomDomain(domain: string) {
                     // Filter out the domain from DO spec
                     const newDomains = (appSpec.domains || []).filter((d: DoAppSpecDomain) => d.domain !== domain);
                     
-                    await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
+                    const putResponse = await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
                         method: 'PUT',
                         headers: {
                             'Authorization': `Bearer ${DO_API_TOKEN}`,
@@ -169,6 +177,10 @@ export async function removeCustomDomain(domain: string) {
                             }
                         })
                     });
+                    
+                    if (!putResponse.ok) {
+                        console.error('DO API Error (PUT Remove Domain):', await putResponse.text());
+                    }
                 }
             } catch (doError) {
                 console.error('DO API Error (Remove Domain):', doError);
@@ -225,19 +237,30 @@ export async function verifyCustomDomain(domain: string) {
                     
                     if (doResponse.ok) {
                         const appData = await doResponse.json();
-                        // Find this domain in live_state or spec
+                        
+                        // Domain status live tracking
                         const domainsStatuses = appData.app.domains || [];
                         const domainStatus = domainsStatuses.find((d: DoAppLiveDomain) => d.spec?.domain === domain);
                         
-                        // Only succeed if domain exists in DO AND phase is ACTIVE.
-                        // If it's undefined, it means DO doesn't track it (maybe Add failed).
-                        isSuccess = !!domainStatus && domainStatus.phase === 'ACTIVE'; 
-                        
-                        if (!isSuccess) {
-                            errorMessage = 'SSL Provisioning is still in progress or domain registration is syncing. Please wait up to 48 hours.';
+                        if (!domainStatus) {
+                            // If undefined, it means DO hasn't started tracking it in live state (Deployment is pending)
+                            isSuccess = false;
+                            errorMessage = 'Domain registration is syncing with DigitalOcean. Please wait a few minutes and try again.';
+                        } else {
+                            const phase = domainStatus.phase?.toUpperCase();
+                            if (phase === 'ACTIVE') {
+                                isSuccess = true;
+                            } else if (phase === 'ERROR') {
+                                isSuccess = false;
+                                errorMessage = 'Domain SSL configuration failed on DigitalOcean. Please check your DNS records, or try removing and re-adding the domain.';
+                            } else {
+                                // PENDING, CONFIGURING, etc.
+                                isSuccess = false;
+                                errorMessage = `SSL Provisioning is currently ${phase || 'in progress'}. Please wait up to 48 hours.`;
+                            }
                         }
                     } else {
-                        // If DO API fails, fall back to just DNS success
+                        // If DO API fails, fall back to just DNS success to avoid blocking
                         isSuccess = true;
                     }
                 } else {
