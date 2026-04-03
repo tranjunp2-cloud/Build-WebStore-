@@ -259,8 +259,11 @@ export const Users: CollectionConfig = {
                 const requesterTenant = req.user.tenants?.find((t: any) =>
                     (t.tenant?.id === tenantId || t.tenant === tenantId)
                 )
-                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
-                    return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
+                if (!requesterTenant || requesterTenant.role !== 'owner') {
+                    return Response.json({ errors: [{ message: 'Forbidden: Only owners can remove staff' }] }, { status: 403 })
+                }
+                if (String(userId) === String(req.user.id)) {
+                    return Response.json({ errors: [{ message: 'Cannot remove yourself via this action' }] }, { status: 400 })
                 }
 
                 // Check target user
@@ -277,24 +280,27 @@ export const Users: CollectionConfig = {
 
                 // Security: Prevent removing if they are the last active owner
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
+                const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
                 if (targetTenantRole === 'owner') {
                     if (requesterTenant.role !== 'owner') {
                         return Response.json({ errors: [{ message: 'Only an owner can remove another owner' }] }, { status: 403 })
                     }
-                    // Check if there are other owners
-                    const allStaff = await req.payload.find({
-                        collection: 'users',
-                        where: {
-                            'tenants.tenant': { equals: tenantId }
-                        },
-                        limit: 1000
-                    })
-                    const activeOwners = allStaff.docs.filter((u: any) =>
-                        u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
-                    )
+                    if (targetTenantStatus === 'active') {
+                        // Check if there are other owners
+                        const allStaff = await req.payload.find({
+                            collection: 'users',
+                            where: {
+                                'tenants.tenant': { equals: tenantId }
+                            },
+                            limit: 1000
+                        })
+                        const activeOwners = allStaff.docs.filter((u: any) =>
+                            u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                        )
 
-                    if (activeOwners.length <= 1) {
-                        return Response.json({ errors: [{ message: 'Cannot remove the last workspace owner' }] }, { status: 400 })
+                        if (activeOwners.length <= 1) {
+                            return Response.json({ errors: [{ message: 'Cannot remove the last workspace owner' }] }, { status: 400 })
+                        }
                     }
                 }
 
@@ -325,8 +331,8 @@ export const Users: CollectionConfig = {
                 const requesterTenant = req.user.tenants?.find((t: any) =>
                     (t.tenant?.id === tenantId || t.tenant === tenantId)
                 )
-                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
-                    return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
+                if (!requesterTenant || requesterTenant.role !== 'owner') {
+                    return Response.json({ errors: [{ message: 'Forbidden: Only owners can update staff' }] }, { status: 403 })
                 }
 
                 const targetUser = await req.payload.findByID({ collection: 'users', id: userId })
@@ -341,17 +347,22 @@ export const Users: CollectionConfig = {
                 }
 
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
+                const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
                 
                 // Security: Prevent Admin from promoting anyone to Owner
                 if (role === 'owner' && requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Only an owner can promote another user to owner' }] }, { status: 403 })
+                }
+                
+                if (String(userId) === String(req.user.id) && role !== targetTenantRole) {
+                    return Response.json({ errors: [{ message: 'Cannot change your own role' }] }, { status: 400 })
                 }
 
                 if (targetTenantRole === 'owner') {
                     if (requesterTenant.role !== 'owner') {
                         return Response.json({ errors: [{ message: 'Only an owner can modify another owner' }] }, { status: 403 })
                     }
-                    if (role !== 'owner') {
+                    if (role !== 'owner' && targetTenantStatus === 'active') {
                         const allStaff = await req.payload.find({
                             collection: 'users',
                             where: { 'tenants.tenant': { equals: tenantId } },
@@ -412,20 +423,23 @@ export const Users: CollectionConfig = {
                 }
 
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
+                const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
                 if (targetTenantRole === 'owner') {
                     if (requesterTenant.role !== 'owner') {
                         return Response.json({ errors: [{ message: 'Only an owner can update the status of another owner' }] }, { status: 403 })
                     }
-                    const allStaff = await req.payload.find({
-                        collection: 'users',
-                        where: { 'tenants.tenant': { equals: tenantId } },
-                        limit: 1000
-                    })
-                    const activeOwners = allStaff.docs.filter((u: any) =>
-                        u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
-                    )
-                    if (activeOwners.length <= 1 && status !== 'active') {
-                        return Response.json({ errors: [{ message: 'Cannot deactivate the last workspace owner' }] }, { status: 400 })
+                    if (status !== 'active' && targetTenantStatus === 'active') {
+                        const allStaff = await req.payload.find({
+                            collection: 'users',
+                            where: { 'tenants.tenant': { equals: tenantId } },
+                            limit: 1000
+                        })
+                        const activeOwners = allStaff.docs.filter((u: any) =>
+                            u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                        )
+                        if (activeOwners.length <= 1) {
+                            return Response.json({ errors: [{ message: 'Cannot deactivate the last workspace owner' }] }, { status: 400 })
+                        }
                     }
                 }
 

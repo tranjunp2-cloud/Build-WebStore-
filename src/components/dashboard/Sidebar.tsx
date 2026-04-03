@@ -21,7 +21,7 @@
  * - Logout: row, gap 12px, pl-16, border rgba(255,255,255,0.08), radius 16, icon 16px, text #F8FAFC
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -105,13 +105,14 @@ const NAV_ITEMS: NavItemConfig[] = [
 type SidebarProps = {
     userName: string
     userInitial: string
+    currentUserRole?: string
     mobileOpen: boolean
     setMobileOpen: (open: boolean) => void
 }
 
 // ─── Component ───────────────────────────────────────────────────────────
 
-export function DashboardSidebar({ userName, userInitial, mobileOpen, setMobileOpen }: SidebarProps) {
+export function DashboardSidebar({ userName, userInitial, currentUserRole = 'viewer', mobileOpen, setMobileOpen }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { locale, toggleLocale } = useI18n()
@@ -124,6 +125,26 @@ export function DashboardSidebar({ userName, userInitial, mobileOpen, setMobileO
         }
         return expanded
     })
+
+    // Filter NAV_ITEMS based on access rights
+    const accessibleNavItems = useMemo(() => {
+        return NAV_ITEMS.map(item => {
+            if (item.href === '/settings' && item.children) {
+                // Return copied item with filtered children
+                return {
+                    ...item,
+                    children: item.children.filter(child => {
+                        // Only owner can see the Staff menu
+                        if (child.href === '/settings/staff') {
+                            return currentUserRole === 'owner';
+                        }
+                        return true;
+                    })
+                }
+            }
+            return item;
+        })
+    }, [currentUserRole]);
 
     // Close sidebar on route change
     useEffect(() => {
@@ -267,7 +288,7 @@ export function DashboardSidebar({ userName, userInitial, mobileOpen, setMobileO
                 className="flex-1 flex flex-col gap-1 px-3 pt-6"
                 aria-label="CMS Navigation"
             >
-                {NAV_ITEMS.map(renderNavItem)}
+                {accessibleNavItems.map(renderNavItem)}
 
 
             </nav>
