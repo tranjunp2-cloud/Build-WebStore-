@@ -145,7 +145,6 @@ export function StaffDirectoryClient({
         switch (role) {
             case 'owner': return t?.Staff?.table?.owner || 'Workspace Owner';
             case 'admin': return t?.Staff?.drawer?.roles?.admin || 'Manager';
-            case 'editor': return t?.Staff?.drawer?.roles?.editor || 'Editor';
             case 'viewer': return t?.Staff?.table?.viewer || 'Viewer';
             case 'custom': return t?.Staff?.table?.custom || 'Crew (Custom)';
             default: return role;
@@ -224,8 +223,8 @@ export function StaffDirectoryClient({
                                 const amIOwner = currentUserRole === 'owner';
 
                                 // Owner can edit/delete anyone except themselves (to prevent accidental self-demotion or error)
-                                const canEdit = !isSelf && (amIOwner || !isTargetOwner);
-                                const canDelete = !isSelf && (amIOwner || !isTargetOwner);
+                                const canEdit = !isSelf && amIOwner;
+                                const canDelete = !isSelf && amIOwner;
 
                                 return (
                                     <tr key={user.id} className="h-[73px] border-b border-white/[0.05] hover:bg-white/[0.02] transition-colors group">
