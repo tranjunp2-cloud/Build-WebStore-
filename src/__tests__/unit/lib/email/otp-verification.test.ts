@@ -154,10 +154,12 @@ describe('otpVerificationEmail — OTP code formatting (TC-F02.23)', () => {
         expect(result.html).toContain('Courier New')
     })
 
-    it('OTP appears as raw unspaced string but has nowrap style to prevent breaking', () => {
+    it('OTP appears inside the OTP span element with nowrap and letter-spacing styles', () => {
         const result = otpVerificationEmail({ userName: 'Ali', otpCode: '123456' })
-        expect(result.html).toContain('123456')
-        expect(result.html).toContain('white-space: nowrap')
+        // Assert OTP code, letter-spacing and white-space are all in the same <span> element
+        expect(result.html).toMatch(
+            /<span[^>]*letter-spacing:\s*12px[^>]*white-space:\s*nowrap[^>]*>123456<\/span>|<span[^>]*white-space:\s*nowrap[^>]*letter-spacing:\s*12px[^>]*>123456<\/span>/
+        )
     })
 })
 
