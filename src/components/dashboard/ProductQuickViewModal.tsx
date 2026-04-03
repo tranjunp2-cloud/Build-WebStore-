@@ -61,9 +61,10 @@ function getImageUrl(image: ProductImage | string | null): string | null {
     
     // Fix existing broken local URLs directly to S3 because MinIO stores them
     if (url.includes('/api/media/file/')) {
-        const filename = url.split('/').pop()
-        const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
-        url = `${s3Endpoint}/primeweb-media/${filename}`
+        if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
+            const filename = url.split('/').pop()
+            url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`
+        }
     }
     
     return url
@@ -286,10 +287,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                     <div className="mt-auto pt-[24px] border-t border-[#414754]/10 flex justify-between items-center shrink-0">
                         <button 
                             onClick={() => {
-                                if (confirm(t.dashboard?.products?.quickView?.deleteConfirm || 'Are you certain?')) {
-                                    onDelete(product)
-                                    onClose()
-                                }
+                                onDelete(product)
                             }}
                             className="flex items-center justify-center gap-[8px] px-[16px] py-[8px] rounded-[4px] uppercase tracking-[0.1em] hover:opacity-80 transition-opacity"
                             style={{ 

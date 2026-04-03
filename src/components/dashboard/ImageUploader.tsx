@@ -132,9 +132,10 @@ export function ImageUploader({
                         let url = img.url || ''
                         if (!url) return ''
                         if (url.includes('/api/media/file/')) {
-                            const filename = url.split('/').pop()
-                            const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
-                            url = `${s3Endpoint}/primeweb-media/${filename}`
+                            if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
+                                const filename = url.split('/').pop()
+                                url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`
+                            }
                         }
                         return url
                     })()

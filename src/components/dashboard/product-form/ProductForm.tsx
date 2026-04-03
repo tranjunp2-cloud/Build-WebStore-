@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ProductFormValues, productFormSchema } from './schema'
+import { ProductFormValues, getProductFormSchema } from './schema'
 import Link from 'next/link'
 import { ChevronLeft, Save, Trash2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,6 +13,7 @@ import { GeneralInfoSection } from './GeneralInfoSection'
 import { VariantsInventorySection } from './VariantsInventorySection'
 import { ShippingDimensionsSection } from './ShippingDimensionsSection'
 import { DescriptionSeoSection } from './DescriptionSeoSection'
+import { useMemo } from 'react'
 
 interface ProductFormProps {
     initialData?: Partial<ProductFormValues>;
@@ -26,17 +27,24 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
     const [isSaving, setIsSaving] = useState(false)
     const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
 
+    const schema = useMemo(() => getProductFormSchema(t), [t])
+
     const methods = useForm<ProductFormValues>({
-        resolver: zodResolver(productFormSchema),
+        resolver: async (values, context, options) => {
+            const payload = values.hasVariants === false 
+                ? { ...values, variants: [], tiers: [] } 
+                : values;
+            return zodResolver(schema)(payload, context, options);
+        },
         defaultValues: initialData || {
             name: '',
             categoryIds: [],
             images: [],
             description: '',
             hasVariants: false,
-            basePrice: undefined,
-            compareAtPrice: undefined,
-            baseInventory: undefined,
+            basePrice: 0,
+            compareAtPrice: 0,
+            baseInventory: 0,
             baseSku: '',
             autoGenerateSeo: false,
             tiers: [],
@@ -53,6 +61,15 @@ export function ProductForm({ initialData, isEdit, onSubmitForm }: ProductFormPr
 
     // Mount logic for hydration, default registrations, and fetch categories
     const [mounted, setMounted] = useState(false)
+    
+    // Auto re-validate fields that have errors when language changes
+    useEffect(() => {
+        const errorKeys = Object.keys(methods.formState.errors) as (keyof ProductFormValues)[]
+        if (errorKeys.length > 0) {
+            methods.trigger(errorKeys)
+        }
+    }, [t, methods])
+
     useEffect(() => {
         setMounted(true)
         

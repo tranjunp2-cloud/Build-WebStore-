@@ -15,6 +15,7 @@ import { BulkCreateModal } from '@/components/dashboard/BulkCreateModal'
 import { ProductQuickViewModal, DetailedProduct } from '@/components/dashboard/ProductQuickViewModal'
 import { ProductDetailsMobile } from '@/components/dashboard/product-form/ProductDetailsMobile'
 import { DeleteProductModal } from '@/components/dashboard/DeleteProductModal'
+import { Pagination } from '@/components/ui/Pagination'
 import { useI18n } from '@/i18n'
 import { getProductsAction, updateProductFieldAction } from './actions'
 import { getCategoriesAction } from './categories/actions'
@@ -71,9 +72,10 @@ function getImageUrl(image: ProductImage | string | null): string | null {
     
     // Fix existing broken local URLs directly to S3 because MinIO stores them
     if (url.includes('/api/media/file/')) {
-        const filename = url.split('/').pop()
-        const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
-        url = `${s3Endpoint}/primeweb-media/${filename}`
+        if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
+            const filename = url.split('/').pop()
+            url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`
+        }
     }
     
     return url
@@ -98,6 +100,7 @@ export default function ProductsPage() {
     const [showLowStock, setShowLowStock] = useState<boolean>(false)
     const [mounted, setMounted] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
+    const [currentPage, setCurrentPage] = useState(1)
 
     const SORT_OPTIONS = [
         'Latest',
@@ -114,6 +117,10 @@ export default function ProductsPage() {
         'Price: High > Low': t.dashboard.products.list.sortPriceDesc,
         'Inventory: Low > High': t.dashboard.products.list.sortStockAsc
     }
+
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [filterStatus, searchQuery, showLowStock, saleStatus, selectedCategories, sortBy])
 
     useEffect(() => {
         setMounted(true)
@@ -201,6 +208,10 @@ export default function ProductsPage() {
             }
         })
 
+    const ITEMS_PER_PAGE = 10
+    const totalPages = Math.ceil(filteredAndSortedProducts.length / ITEMS_PER_PAGE)
+    const paginatedProducts = filteredAndSortedProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+
     const statusCounts = {
         all: products.length,
         active: products.filter(p => p.status === 'active').length,
@@ -257,6 +268,11 @@ export default function ProductsPage() {
             
             // Wait for transition before unmounting modal completely if we want, but closing immediately is also fine
             setProductToDelete(null)
+            
+            // If the deleted product is currently being previewed, close the preview
+            if (quickViewProduct?.id === prod.id) {
+                setQuickViewProduct(null)
+            }
             
             toast.success(t.dashboard.products.form.productDeleted, {
                 action: {
@@ -698,7 +714,7 @@ export default function ProductsPage() {
 
                             {/* Table Body */}
                             <div className="flex flex-col divide-y divide-white/5">
-                                {filteredAndSortedProducts.map(product => {
+                                {paginatedProducts.map(product => {
                                     const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                     const isOutOfStock = product.inventory <= 0
                                     const priceDisplay = formatPrice(product.price, product.currency)
@@ -800,11 +816,22 @@ export default function ProductsPage() {
                                     )
                                 })}
                             </div>
+
+                            {/* Desktop Pagination */}
+                            {totalPages > 1 && (
+                                <div className="flex justify-end items-center p-[16px] border-t border-white/[0.08]">
+                                    <Pagination 
+                                        currentPage={currentPage} 
+                                        totalPages={totalPages} 
+                                        onPageChange={setCurrentPage}
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* --- Mobile View (Figma Node 30945:1017 - High Fidelity Refinement) --- */}
                         <div className="md:hidden flex flex-col gap-3">
-                            {filteredAndSortedProducts.map(product => {
+                            {paginatedProducts.map(product => {
                                 const imgUrl = product.images?.[0]?.image ? getImageUrl(product.images[0].image) : null
                                 const inv = product.inventory || 0
                                 const priceDisplay = formatPrice(product.price, product.currency)
@@ -925,6 +952,17 @@ export default function ProductsPage() {
                         {filteredAndSortedProducts.length === 0 && (
                             <div className="py-16 text-center text-[15px] text-[#F8FAFC]/40">
                                 {t.dashboard.products.list.noResults}
+                            </div>
+                        )}
+
+                        {/* Mobile Pagination */}
+                        {totalPages > 1 && (
+                            <div className="md:hidden flex justify-center py-6 border-t border-white/[0.08] mt-2">
+                                <Pagination 
+                                    currentPage={currentPage} 
+                                    totalPages={totalPages} 
+                                    onPageChange={setCurrentPage}
+                                />
                             </div>
                         )}
                     </div>

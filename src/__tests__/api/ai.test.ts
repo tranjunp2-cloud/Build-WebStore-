@@ -312,7 +312,7 @@ describe('AI Streaming APIs', () => {
         })
     })
 
-    describe('POST /api/ai/seo-generate (TC-F08.13)', () => {
+    describe('POST /api/ai/seo-generate (TC-F08-03-01)', () => {
         it('returns 429 when rate limit exceeded', async () => {
             mockRateLimitAllowed = false
             const req = new NextRequest('http://localhost:3000/api/ai/seo-generate', {
@@ -362,7 +362,7 @@ describe('AI Streaming APIs', () => {
         })
     })
 
-    describe('POST /api/ai/products-bulk-parse (TC-F08.15 & TC-F08.18)', () => {
+    describe('POST /api/ai/products-bulk-parse (TC-F08-04-01 & TC-F08.18)', () => {
         it('returns 429 when rate limit is hit (Stress Protection)', async () => {
             mockRateLimitAllowed = false
             const req = new NextRequest('http://localhost:3000/api/ai/products-bulk-parse', {
