@@ -24,6 +24,29 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
     return doc
 }
 
+async function injectUser(req: any) {
+    if (req.user) return;
+    const authHeader = (typeof req.headers.get === 'function') 
+        ? req.headers.get('authorization') 
+        : req.headers.authorization;
+        
+    if (authHeader && (authHeader.startsWith('JWT ') || authHeader.startsWith('Bearer '))) {
+        const token = authHeader.split(' ')[1];
+        try {
+            const payloadSecret = process.env.PAYLOAD_SECRET || '';
+            const { jwtVerify } = await import('jose');
+            const secret = new TextEncoder().encode(payloadSecret);
+            const { payload: decoded } = await jwtVerify(token, secret);
+            if (decoded?.id && decoded?.collection === 'users') {
+                const user = await req.payload.findByID({ collection: 'users', id: decoded.id as string });
+                if (user) req.user = user;
+            }
+        } catch (e) {
+            // ignore decoding errors
+        }
+    }
+}
+
 export const Users: CollectionConfig = {
     slug: 'users',
     auth: {
@@ -125,6 +148,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { email, name, tenantId, role, permissions } = body as { email?: string; name?: string; tenantId?: string; role?: string; permissions?: string[] }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!email || !name || !tenantId || !role) return Response.json({ errors: [{ message: 'Missing required fields' }] }, { status: 400 })
 
@@ -135,11 +159,18 @@ export const Users: CollectionConfig = {
                 if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
+                
+                // Security: Only an owner can invite another owner
+                if (role === 'owner' && requesterTenant.role !== 'owner') {
+                    return Response.json({ errors: [{ message: 'Only an owner can invite another owner' }] }, { status: 403 })
+                }
 
                 try {
                     // Check if user exists
                     const users = await req.payload.find({ collection: 'users', where: { email: { equals: email } } })
                     let targetUser = users.docs[0]
+                    let isNewUser = false
+                    let tempPassword = ''
 
                     if (targetUser) {
                         // Check if already in tenant
@@ -162,15 +193,16 @@ export const Users: CollectionConfig = {
                             }
                         })
                     } else {
-                        // Generate a strong random password since they will login via OTP anyway
-                        const randomPassword = require('crypto').randomBytes(16).toString('hex')
+                        // Generate a readable 8-character temporary password
+                        tempPassword = Math.random().toString(36).slice(-8)
+                        isNewUser = true
 
                         targetUser = await req.payload.create({
                             collection: 'users',
                             data: {
                                 email,
                                 firstName: name,
-                                password: randomPassword,
+                                password: tempPassword,
                                 roles: ['tenant-owner'], // Default platform role
                                 tenants: [
                                     { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? permissions : undefined }
@@ -187,7 +219,8 @@ export const Users: CollectionConfig = {
                     const { subject, html } = staffInvitationEmail({
                         userName: name || targetUser.firstName || email.split('@')[0],
                         workspaceName: tenant.name as string,
-                        loginUrl
+                        loginUrl,
+                        temporaryPassword: isNewUser ? tempPassword : undefined
                     })
 
                     req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
@@ -208,6 +241,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { userId, tenantId } = body as { userId?: string; tenantId?: string }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!userId || !tenantId) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
@@ -234,6 +268,9 @@ export const Users: CollectionConfig = {
                 // Security: Prevent removing if they are the last active owner
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                 if (targetTenantRole === 'owner') {
+                    if (requesterTenant.role !== 'owner') {
+                        return Response.json({ errors: [{ message: 'Only an owner can remove another owner' }] }, { status: 403 })
+                    }
                     // Check if there are other owners
                     const allStaff = await req.payload.find({
                         collection: 'users',
@@ -271,6 +308,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { userId, tenantId, name, role, permissions } = body as { userId?: string; tenantId?: string; name?: string; role?: string; permissions?: string[] }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!userId || !tenantId || !role || !name) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
@@ -293,17 +331,28 @@ export const Users: CollectionConfig = {
                 }
 
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
-                if (targetTenantRole === 'owner' && role !== 'owner') {
-                    const allStaff = await req.payload.find({
-                        collection: 'users',
-                        where: { 'tenants.tenant': { equals: tenantId } },
-                        limit: 1000
-                    })
-                    const activeOwners = allStaff.docs.filter((u: any) =>
-                        u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
-                    )
-                    if (activeOwners.length <= 1) {
-                        return Response.json({ errors: [{ message: 'Cannot demote the last workspace owner' }] }, { status: 400 })
+                
+                // Security: Prevent Admin from promoting anyone to Owner
+                if (role === 'owner' && requesterTenant.role !== 'owner') {
+                    return Response.json({ errors: [{ message: 'Only an owner can promote another user to owner' }] }, { status: 403 })
+                }
+
+                if (targetTenantRole === 'owner') {
+                    if (requesterTenant.role !== 'owner') {
+                        return Response.json({ errors: [{ message: 'Only an owner can modify another owner' }] }, { status: 403 })
+                    }
+                    if (role !== 'owner') {
+                        const allStaff = await req.payload.find({
+                            collection: 'users',
+                            where: { 'tenants.tenant': { equals: tenantId } },
+                            limit: 1000
+                        })
+                        const activeOwners = allStaff.docs.filter((u: any) =>
+                            u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                        )
+                        if (activeOwners.length <= 1) {
+                            return Response.json({ errors: [{ message: 'Cannot demote the last workspace owner' }] }, { status: 400 })
+                        }
                     }
                 }
 
@@ -330,6 +379,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { userId, tenantId, status } = body as { userId?: string; tenantId?: string; status?: string }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!userId || !tenantId || !status) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
@@ -353,6 +403,9 @@ export const Users: CollectionConfig = {
 
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                 if (targetTenantRole === 'owner') {
+                    if (requesterTenant.role !== 'owner') {
+                        return Response.json({ errors: [{ message: 'Only an owner can update the status of another owner' }] }, { status: 403 })
+                    }
                     const allStaff = await req.payload.find({
                         collection: 'users',
                         where: { 'tenants.tenant': { equals: tenantId } },
@@ -385,6 +438,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { userId, tenantId } = body as { userId?: string; tenantId?: string }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!userId || !tenantId) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
@@ -422,6 +476,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { userIds, tenantId } = body as { userIds?: string[]; tenantId?: string }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!userIds || !tenantId || !Array.isArray(userIds)) return Response.json({ errors: [{ message: 'Missing or invalid fields' }] }, { status: 400 })
 
@@ -532,7 +587,11 @@ export const Users: CollectionConfig = {
                     console.error(`[Users] Failed to send OTP email to ${email}:`, err)
                 })
 
-                console.log(`[OTP] Sent to ${email}`)
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log(`[DEV OTP] Sent to ${email}. Code: ${otp}`)
+                } else {
+                    console.log(`[OTP] Sent to ${email}`)
+                }
                 return Response.json({ message: 'If the email exists, an OTP has been sent.' })
             },
         },
@@ -621,7 +680,14 @@ export const Users: CollectionConfig = {
                     }
                 }
 
-                // OTP valid — clear OTP fields
+                // OTP valid — clear OTP fields and activate any pending tenant invites
+                const updatedTenants = (user.tenants || []).map((t: any) => {
+                    if (t.status === 'pending') {
+                        return { ...t, status: 'active' }
+                    }
+                    return t
+                })
+
                 await req.payload.update({
                     collection: 'users',
                     id: user.id,
@@ -630,6 +696,7 @@ export const Users: CollectionConfig = {
                         otpExpiresAt: null,
                         otpAttempts: 0,
                         lastLoginAt: new Date().toISOString(),
+                        tenants: updatedTenants,
                     },
                 })
 
