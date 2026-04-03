@@ -46,7 +46,7 @@ export function DeleteProductModal({
     if (!isRendered) return null
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-0">
             {/* Backdrop */}
             <div 
                 className={`absolute inset-0 bg-black/60 backdrop-blur-[4px] transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
