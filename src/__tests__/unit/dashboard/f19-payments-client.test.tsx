@@ -120,7 +120,8 @@ describe('F19 Payment Settings (PaymentsFormClient)', () => {
     it('[TC-F19.16] Automatically disables QR Banking toggle when QR image is removed', async () => {
         // Assume initial load returns an existing image so QR Banking is ON
         const actionsMock = await import('@/app/(dashboard)/settings/payments/actions');
-        (actionsMock.getPaymentSettings as any).mockResolvedValueOnce({
+        const getPaymentSettingsMock = vi.mocked(actionsMock.getPaymentSettings);
+        getPaymentSettingsMock.mockResolvedValueOnce({
             success: true,
             payments: { 
                 payment_cod: false, 
