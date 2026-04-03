@@ -11,7 +11,7 @@ export async function GET() {
         }
 
         // Check if the user still belongs to the active tenant
-        const isStillInTenant = user.tenants?.some((t: any) => {
+        const isStillInTenant = user.tenants?.some((t: { tenant: string | { id: string } }) => {
             const tId = typeof t.tenant === 'object' ? t.tenant?.id : t.tenant;
             return tId === tenantId;
         });

@@ -12,7 +12,7 @@ export default async function StaffPage() {
     const user = await getCurrentUser();
     if (!user) return null;
 
-    const currentTenantInfo = user.tenants?.find((t: any) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId);
+    const currentTenantInfo = user.tenants?.find((t: { tenant: string | { id: string }, role?: string }) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId);
     const currentUserRole = currentTenantInfo?.role || 'viewer';
     const currentUserId = String(user.id);
 
@@ -32,7 +32,7 @@ export default async function StaffPage() {
     });
 
     const staffMembers = usersRes.docs.map(u => {
-        const tenantInfo = u.tenants?.find((t: any) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId);
+        const tenantInfo = u.tenants?.find((t: { tenant: string | { id: string }, role?: string }) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId);
         return {
             id: String(u.id),
             email: u.email,

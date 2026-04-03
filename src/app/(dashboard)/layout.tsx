@@ -19,7 +19,7 @@ export default async function DashboardLayout({
     const userEmail = typedUser?.email || ''
     const userInitial = userName.charAt(0).toUpperCase()
     
-    const currentTenantInfo = typedUser?.tenants?.find((t: any) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId)
+    const currentTenantInfo = typedUser?.tenants?.find((t: { tenant: string | { id: string }, role?: string }) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId)
     const currentUserRole = currentTenantInfo?.role || 'viewer'
 
     return (

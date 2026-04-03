@@ -223,7 +223,8 @@ export function StaffDirectoryClient({
                                 const isTargetOwner = user.role === 'owner';
                                 const amIOwner = currentUserRole === 'owner';
 
-                                const canEdit = isSelf || amIOwner || !isTargetOwner;
+                                // Owner can edit/delete anyone except themselves (to prevent accidental self-demotion or error)
+                                const canEdit = !isSelf && (amIOwner || !isTargetOwner);
                                 const canDelete = !isSelf && (amIOwner || !isTargetOwner);
 
                                 return (
