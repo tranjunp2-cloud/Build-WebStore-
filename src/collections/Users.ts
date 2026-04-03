@@ -1,10 +1,19 @@
 import type { CollectionConfig, CollectionAfterChangeHook } from 'payload'
+import { randomBytes } from 'crypto'
 import { sendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
 import { staffInvitationEmail } from '@/lib/email/templates/staff-invitation'
 import { forgotPasswordEmail } from '@/lib/email/templates/forgot-password'
 import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
+
+/** Minimal shape of a user's tenant membership returned by Payload queries */
+interface TenantMembership {
+    tenant: string | { id: string }
+    role: string
+    status?: string
+    permissions?: string[]
+}
 
 /**
  * afterChange hook: send Welcome email to new users.
@@ -41,8 +50,9 @@ async function injectUser(req: any) {
                 const user = await req.payload.findByID({ collection: 'users', id: decoded.id as string });
                 if (user) req.user = user;
             }
-        } catch (e) {
-            // ignore decoding errors
+        } catch (err) {
+            // JWT decode failures are expected (expired/invalid tokens) — log at warn level only
+            req.payload?.logger?.warn?.({ err }, 'injectUser: JWT decode failed — treating as unauthenticated')
         }
     }
 }
@@ -193,8 +203,8 @@ export const Users: CollectionConfig = {
                             }
                         })
                     } else {
-                        // Generate a readable 8-character temporary password
-                        tempPassword = Math.random().toString(36).slice(-8)
+                        // Generate a cryptographically secure temporary password (crypto.randomBytes)
+                        tempPassword = randomBytes(8).toString('base64url').slice(0, 12)
                         isNewUser = true
 
                         targetUser = await req.payload.create({
@@ -587,10 +597,12 @@ export const Users: CollectionConfig = {
                     console.error(`[Users] Failed to send OTP email to ${email}:`, err)
                 })
 
+                // Never log OTP codes — mask email to avoid leaking PII
+                const maskedEmail = email.replace(/(^.{2})[^@]+/, '$1***')
                 if (process.env.NODE_ENV !== 'production') {
-                    console.log(`[DEV OTP] Sent to ${email}. Code: ${otp}`)
+                    console.log(`[DEV OTP] Code dispatched for ${maskedEmail} (check your email)`)
                 } else {
-                    console.log(`[OTP] Sent to ${email}`)
+                    console.log(`[OTP] Code dispatched for ${maskedEmail}`)
                 }
                 return Response.json({ message: 'If the email exists, an OTP has been sent.' })
             },
