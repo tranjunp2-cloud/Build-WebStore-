@@ -109,6 +109,32 @@ describe('Payment Actions', () => {
                 data: { payments: { payment_cod: true } },
             });
         });
+
+        it('should return error if payment_cod is not a boolean', async () => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+
+            // Act
+            const result = await updatePaymentSettings({ payment_cod: 'true' as any });
+
+            // Assert
+            expect(result.success).toBe(false);
+            expect(result.error).toMatch(/Invalid type for payment_cod/);
+            expect(mockPayloadContext.update).not.toHaveBeenCalled();
+        });
+
+        it('should return error if no valid payment fields provided', async () => {
+            // Arrange
+            vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
+
+            // Act
+            const result = await updatePaymentSettings({});
+
+            // Assert
+            expect(result.success).toBe(false);
+            expect(result.error).toMatch(/No valid payment fields provided/);
+            expect(mockPayloadContext.update).not.toHaveBeenCalled();
+        });
     });
 
     describe('uploadQrMedia', () => {
@@ -164,6 +190,7 @@ describe('Payment Actions', () => {
             vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-123');
             const formData = new FormData();
             const validImage = new File(['binary-content'], 'test.png', { type: 'image/png' });
+            validImage.arrayBuffer = vi.fn().mockResolvedValue(new ArrayBuffer(10));
             formData.append('file', validImage);
 
             const mockCreatedDoc = { id: 123, url: '/media/test.png' };
@@ -173,6 +200,7 @@ describe('Payment Actions', () => {
             const result = await uploadQrMedia(formData);
 
             // Assert
+            if (!result.success) console.error(result.error, (result as any).detail);
             expect(result.success).toBe(true);
             expect(result.doc).toEqual(mockCreatedDoc);
             expect(mockPayloadContext.create).toHaveBeenCalledWith(expect.objectContaining({

@@ -42,9 +42,30 @@ export async function updatePaymentSettings(updates: PaymentUpdates) {
 
         // Whitelist safe fields before saving
         const cleanUpdates: PaymentUpdates = {};
-        if (updates.payment_cod !== undefined) cleanUpdates.payment_cod = Boolean(updates.payment_cod);
-        if (updates.payment_qr !== undefined) cleanUpdates.payment_qr = Boolean(updates.payment_qr);
-        if (updates.qr_image !== undefined) cleanUpdates.qr_image = updates.qr_image;
+        
+        if (updates.payment_cod !== undefined) {
+            if (typeof updates.payment_cod === 'boolean') {
+                cleanUpdates.payment_cod = updates.payment_cod;
+            } else {
+                return { success: false, error: 'Invalid type for payment_cod. Expected boolean.' };
+            }
+        }
+        
+        if (updates.payment_qr !== undefined) {
+            if (typeof updates.payment_qr === 'boolean') {
+                cleanUpdates.payment_qr = updates.payment_qr;
+            } else {
+                return { success: false, error: 'Invalid type for payment_qr. Expected boolean.' };
+            }
+        }
+        
+        if (updates.qr_image !== undefined) {
+            cleanUpdates.qr_image = updates.qr_image;
+        }
+
+        if (Object.keys(cleanUpdates).length === 0) {
+            return { success: false, error: 'No valid payment fields provided' };
+        }
 
         await payload.update({
             collection: 'tenants',
@@ -101,6 +122,6 @@ export async function uploadQrMedia(formData: FormData) {
         return { success: true, doc: media };
     } catch (error: unknown) {
         console.error("Media upload action error:", error);
-        return { success: false, error: 'Internal server error' };
+        return { success: false, error: 'Internal server error', detail: error instanceof Error ? error.message : String(error) };
     }
 }
