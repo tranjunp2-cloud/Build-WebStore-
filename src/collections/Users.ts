@@ -22,6 +22,10 @@ interface TenantMembership {
 const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation }) => {
     if (operation !== 'create') return doc
 
+    // Skip welcome email for SSO-provisioned or staff-invited users
+    // These users already have tenants assigned at creation time
+    if (doc.tenants && doc.tenants.length > 0) return doc
+
     const userName = doc.firstName || doc.email?.split('@')[0] || 'there'
     const { subject, html } = welcomeEmail({ userName })
 
@@ -35,10 +39,10 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
 
 async function injectUser(req: any) {
     if (req.user) return;
-    const authHeader = (typeof req.headers.get === 'function') 
-        ? req.headers.get('authorization') 
+    const authHeader = (typeof req.headers.get === 'function')
+        ? req.headers.get('authorization')
         : req.headers.authorization;
-        
+
     if (authHeader && (authHeader.startsWith('JWT ') || authHeader.startsWith('Bearer '))) {
         const token = authHeader.split(' ')[1];
         try {
@@ -66,7 +70,23 @@ export const Users: CollectionConfig = {
             generateEmailHTML: (args) => {
                 const token = args?.token || ''
                 const user = args?.user || {}
-                const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
+                const req = args?.req
+
+                // Use req.headers' host/origin if available to point to correct portal
+                let serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
+                if (req && req.headers) {
+                    const origin = typeof req.headers.get === 'function' ? req.headers.get('origin') : (req.headers as any).origin
+                    const host = typeof req.headers.get === 'function' ? req.headers.get('host') : (req.headers as any).host
+
+                    if (origin && !origin.includes('null')) {
+                        serverUrl = origin
+                    } else if (host && !host.includes('localhost')) {
+                        // Assuming https for deployed environments, fallback for local is handled by NEXT_PUBLIC_SERVER_URL defaulting to localhost:3000
+                        const proto = typeof req.headers.get === 'function' ? (req.headers.get('x-forwarded-proto') || 'https') : 'https'
+                        serverUrl = `${proto}://${host}`
+                    }
+                }
+
                 const resetUrl = `${serverUrl}/reset-password?token=${token}`
                 const userName = user.firstName || user.email?.split('@')[0] || 'there'
                 const { html } = forgotPasswordEmail({ userName, resetUrl })
@@ -169,7 +189,7 @@ export const Users: CollectionConfig = {
                 if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
-                
+
                 // Security: Only an owner can invite another owner
                 if (role === 'owner' && requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Only an owner can invite another owner' }] }, { status: 403 })
@@ -348,12 +368,12 @@ export const Users: CollectionConfig = {
 
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                 const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
-                
+
                 // Security: Prevent Admin from promoting anyone to Owner
                 if (role === 'owner' && requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Only an owner can promote another user to owner' }] }, { status: 403 })
                 }
-                
+
                 if (String(userId) === String(req.user.id) && role !== targetTenantRole) {
                     return Response.json({ errors: [{ message: 'Cannot change your own role' }] }, { status: 400 })
                 }
@@ -613,7 +633,7 @@ export const Users: CollectionConfig = {
 
                 // Never log OTP codes — mask email to avoid leaking PII
                 const [local, domain] = email.split('@')
-                const safeLocal = local.length <= 2 ? '*'.repeat(local.length) : local.slice(0,2) + '***'
+                const safeLocal = local.length <= 2 ? '*'.repeat(local.length) : local.slice(0, 2) + '***'
                 const maskedEmail = `${safeLocal}@${domain}`
                 if (process.env.NODE_ENV !== 'production') {
                     console.log(`[DEV OTP] Code dispatched for ${maskedEmail} (check your email)`)
