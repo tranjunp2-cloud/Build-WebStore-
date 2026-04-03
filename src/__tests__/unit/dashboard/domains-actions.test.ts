@@ -154,7 +154,24 @@ describe('Domains Server Actions', () => {
 
             const res = await verifyCustomDomain('check-me.com');
             expect(res.success).toBe(false);
-            expect(res.error).toMatch(/SSL Provisioning is still in progress/i);
+            expect(res.error).toMatch(/SSL Provisioning is currently PENDING/i);
+        });
+
+        it('TC-F19.03e: returns ERROR message if DO API phase is ERROR', async () => {
+            const mockedDnsResolve4 = vi.mocked(dns.promises.resolve4);
+            mockedDnsResolve4.mockResolvedValueOnce(['162.159.140.98']); // Valid IP
+
+            // Mock DO App API returning ERROR
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                json: () => Promise.resolve({
+                    app: { domains: [{ spec: { domain: 'check-me.com' }, phase: 'ERROR' }] }
+                })
+            });
+
+            const res = await verifyCustomDomain('check-me.com');
+            expect(res.success).toBe(false);
+            expect(res.error).toMatch(/Domain SSL configuration failed on DigitalOcean/i);
         });
 
         it('TC-F19.03c: falls back to success if DO API fetch fails (500 internal)', async () => {

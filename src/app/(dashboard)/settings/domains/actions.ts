@@ -88,11 +88,14 @@ export async function addCustomDomain(rawDomain: string) {
                     // Lời Lead: "Domain là cha ngoài spec". 
                     // Tức là phải check mảng appData.app.domains (nằm ngoài spec) để biết chính xác DO đang quản lý những domain nào.
                     const liveDomains = appData.app.domains || [];
+                    const appSpec = appData.app.spec || {}; // Bản config
+                    const specDomains = appSpec.domains || [];
                     
-                    // Nếu domain chưa thực sự tồn tại trên DO Live Domains
-                    if (!liveDomains.some((d: DoAppLiveDomain) => d.spec?.domain === domain)) {
-                        const appSpec = appData.app.spec; // Bản config
-                        const specDomains = appSpec.domains || [];
+                    // Nếu domain chưa thực sự tồn tại trên DO Live Domains và cũng chưa có trong Spec pending
+                    const isLive = liveDomains.some((d: DoAppLiveDomain) => d.spec?.domain === domain);
+                    const isInSpec = specDomains.some((d: DoAppSpecDomain) => d.domain === domain);
+                    
+                    if (!isLive && !isInSpec) {
                         const newDomains = [...specDomains, { domain, type: 'ALIAS' }];
                         
                         // Update the app spec
