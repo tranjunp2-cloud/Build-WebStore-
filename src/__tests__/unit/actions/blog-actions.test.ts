@@ -191,8 +191,8 @@ describe('listBlogsAction [TC-F17.05]', () => {
         vi.mocked(getCurrentUser).mockResolvedValue(null)
         const result = await listBlogsAction({})
         expect(result).toEqual({
-            docs: [],
-            pagination: { totalDocs: 0, totalPages: 0, page: 1, hasNextPage: false, hasPrevPage: false },
+            data: [],
+            meta: null,
         })
     })
 

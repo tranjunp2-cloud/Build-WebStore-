@@ -81,18 +81,18 @@ export async function updateBlogCategoryAction(id: string, data: { name: string 
 
     const payload = await getPayload({ config: configPromise })
 
-    // Check Tenant Isolation
-    const existing = await payload.findByID({ collection: 'blog_categories', id })
-    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
-    const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
-
-    if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
-        return { error: 'Unauthorized access' }
-    }
-
-    const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
-
     try {
+        // Check Tenant Isolation
+        const existing = await payload.findByID({ collection: 'blog_categories', id })
+        const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+        const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
+
+        if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
+            return { error: 'Unauthorized access' }
+        }
+
+        const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+
         const result = await payload.update({
             collection: 'blog_categories',
             id,
@@ -112,16 +112,16 @@ export async function deleteBlogCategoryAction(id: string) {
 
     const payload = await getPayload({ config: configPromise })
 
-    // Check Tenant Isolation
-    const existing = await payload.findByID({ collection: 'blog_categories', id })
-    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
-    const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
-
-    if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
-        return { error: 'Unauthorized delete access' }
-    }
-
     try {
+        // Check Tenant Isolation
+        const existing = await payload.findByID({ collection: 'blog_categories', id })
+        const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+        const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
+
+        if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
+            return { error: 'Unauthorized delete access' }
+        }
+
         await payload.delete({
             collection: 'blog_categories',
             id,

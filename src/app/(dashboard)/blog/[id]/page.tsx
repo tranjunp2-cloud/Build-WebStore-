@@ -88,7 +88,8 @@ export default function BlogEditorPage() {
     const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
     const [thumbnailId, setThumbnailId] = useState<string | null>(null)
 
-    type CurrentUser = { id: string; email: string; firstName?: string; lastName?: string; tenants?: any[] }
+    type TenantRef = { tenant: { id: string } | string; role?: string; status?: string }
+    type CurrentUser = { id: string; email: string; firstName?: string; lastName?: string; tenants?: TenantRef[] }
     // Current User, Category Dropdown, and Date State
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
     // Current User, Category Dropdown, and Date State
