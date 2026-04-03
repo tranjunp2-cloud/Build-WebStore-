@@ -154,6 +154,10 @@ export const Products: CollectionConfig = {
             name: 'name',
             type: 'text',
             required: true,
+            minLength: 3,
+            hooks: {
+                beforeValidate: [({ value }) => (typeof value === 'string' ? value.trim() : value)],
+            },
             admin: { description: 'Product name' },
         },
         {
@@ -188,12 +192,20 @@ export const Products: CollectionConfig = {
             type: 'number',
             required: true,
             min: 0,
+            max: 100000000,
             admin: { description: 'Product price (in smallest currency unit or decimal)' },
         },
         {
             name: 'compareAtPrice',
             type: 'number',
             min: 0,
+            validate: (value: number | null | undefined, { data }: { data: Record<string, unknown> }) => {
+                if (value === undefined || value === null || value === 0) return true;
+                if (typeof data?.price === 'number' && parseFloat(String(value)) <= data.price) {
+                    return 'Compare at price must be greater than the regular price.';
+                }
+                return true;
+            },
             admin: { description: 'Original price before discount (for sale displays)' },
         },
         {
@@ -230,6 +242,8 @@ export const Products: CollectionConfig = {
             type: 'relationship',
             relationTo: 'categories',
             hasMany: true,
+            required: true,
+            minRows: 1,
             admin: { description: 'Danh mục sản phẩm (Hỗ trợ Multi-select)' },
         },
         {
@@ -254,6 +268,7 @@ export const Products: CollectionConfig = {
             name: 'inventory',
             type: 'number',
             min: 0,
+            max: 1000000,
             defaultValue: 0,
             admin: { description: 'Stock quantity' },
         },
@@ -276,14 +291,29 @@ export const Products: CollectionConfig = {
                 condition: (data) => Boolean(data?.hasVariants),
                 description: 'Cấu hình các phân loại (VD: Màu sắc, Kích cỡ)',
             },
+            validate: (value: unknown[] | null | undefined) => {
+                if (Array.isArray(value)) {
+                    const names = value.map((v: any) => v.name?.trim().toLowerCase()).filter(Boolean);
+                    if (new Set(names).size !== names.length) return 'Tier names must be unique (cannot duplicate names)';
+                }
+                return true;
+            },
             fields: [
-                { name: 'name', type: 'text', required: true, admin: { description: 'Tên phân loại (VD: Màu sắc)' } },
+                { name: 'name', type: 'text', required: true, maxLength: 50, admin: { description: 'Tên phân loại (VD: Màu sắc)' } },
                 {
                     name: 'options',
                     type: 'array',
                     minRows: 1,
+                    maxRows: 30,
+                    validate: (value: unknown[] | null | undefined) => {
+                        if (Array.isArray(value)) {
+                            const opts = value.map(v => (v as any).value?.trim().toLowerCase()).filter(Boolean);
+                            if (new Set(opts).size !== opts.length) return 'Options must be unique (no duplicates allowed)';
+                        }
+                        return true;
+                    },
                     fields: [
-                        { name: 'value', type: 'text', required: true, admin: { description: 'Giá trị tùy chọn (VD: Đỏ, Xanh)' } }
+                        { name: 'value', type: 'text', required: true, maxLength: 50, admin: { description: 'Giá trị tùy chọn (VD: Đỏ, Xanh)' } }
                     ]
                 }
             ],
@@ -291,16 +321,36 @@ export const Products: CollectionConfig = {
         {
             name: 'variants',
             type: 'array',
+            maxRows: 900,
             admin: {
                 condition: (data) => Boolean(data?.hasVariants),
                 description: 'Ma trận SKU (Tự động sinh ra từ cấu hình ở trên)',
             },
+            validate: (value: unknown[] | null | undefined) => {
+                if (Array.isArray(value)) {
+                    const skus = value.map((v: any) => v.sku?.trim().toLowerCase()).filter(Boolean);
+                    if (new Set(skus).size !== skus.length) return 'SKU Codes must be unique across variants';
+                }
+                return true;
+            },
             fields: [
                 { name: 'name', type: 'text', required: true },
-                { name: 'sku', type: 'text' },
-                { name: 'price', type: 'number', required: true, min: 0 },
-                { name: 'compareAtPrice', type: 'number', min: 0 },
-                { name: 'stock', type: 'number', required: true, min: 0, defaultValue: 0 },
+                { name: 'sku', type: 'text', maxLength: 100 },
+                { name: 'price', type: 'number', required: true, min: 0, max: 100000000 },
+                { 
+                    name: 'compareAtPrice', 
+                    type: 'number', 
+                    min: 0, 
+                    max: 100000000,
+                    validate: (val: number | null | undefined, { siblingData }: { siblingData: Record<string, unknown> }) => {
+                        if (val === undefined || val === null || val === 0) return true;
+                        if (typeof siblingData?.price === 'number' && parseFloat(String(val)) <= siblingData.price) {
+                            return 'Compare at price must be greater than variant price.';
+                        }
+                        return true;
+                    }
+                },
+                { name: 'stock', type: 'number', required: true, min: 0, max: 1000000, defaultValue: 0 },
             ],
         },
         {

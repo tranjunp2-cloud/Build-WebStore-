@@ -58,7 +58,7 @@ You MUST TRANSLATE the user's input into ${targetLanguage.toUpperCase()} if they
 
 Parse the text and return a JSON object with a single "products" array.
 Each product item MUST have:
-- name: (string) The product name in Vietnamese or Malay as provided
+- name: (string) The product name. MUST BE AT LEAST 3 CHARACTERS LONG (e.g. use "Áo Thun" instead of "Áo").
 - price: (number) The price in full VND or MYR (e.g. "45k" = 45000, "RM 89" = 89). Default to 0 if not specified.
 - compareAtPrice: (number) A sensible simulated original price (e.g. 20-30% higher than price) if realistic, or omit if not applicable.
 - category: (string) Best-fit single category. Use one of: Fashion, F&B, Beauty, Home, Electronics, Footwear, Accessories, Sports, Books, Health, Toys, Automotive, Others
@@ -70,13 +70,13 @@ Each product item MUST have:
 - seoTitle: (string) A catchy SEO-friendly title under 70 characters.
 - seoDescription: (string) A compelling SEO meta description under 160 characters.
 - slug: (string) URL-friendly lowercase slug (e.g. "ao-khoac-da").
-- variants: (array) Generate flat 1D array of variant objects if color/size/options are mentioned (2-tier Cartesian flattened).
+- variants: (array) Generate flat 1D array of variant objects if any color/size/attribute is mentioned (2-tier Cartesian flattened). EVEN IF ONLY A SINGLE specific color or size is mentioned (e.g., "quần màu đỏ"), you MUST STILL generate exactly 1 variant for it (e.g., name: "Đỏ" or "Red").
   Each variant object MUST have:
     - name: (string) The full combination, e.g. "Đỏ - M", "Nâu - Size L", or just "Xanh" if 1-tier only
     - price: (number) same as base price unless specified per variant
     - sku: (string) auto-generate a 6-8 char unique uppercase SKU based on product abbreviation + option (e.g. "DT-XH-M")
     - stock: (number) default to 10 per variant
-  If the product has NO specific options mentioned, return variants as an empty array [].
+  If the product has NO specific options or attributes mentioned AT ALL, return variants as an empty array [].
 - variantConfigs: (array) If variants exist, provide up to 2 tier configurations representing the dimensions.
   Each object MUST have:
     - name: (string) The dimension name in ${targetLanguage.toUpperCase()} (e.g., "Color", "Size", "Material", "Warna")
@@ -85,8 +85,12 @@ Each product item MUST have:
 
 Rules:
 - Extract prices correctly: k/K = x1000, eg. 45k = 45000
-- Detect 2-tier variants: if BOTH color AND size are mentioned, create the full Cartesian product (e.g. Đỏ+Xanh × M+L = 4 variants)
-- If only 1 dimension of options (e.g. only colors), create 1 variant per option
+- STRICT RULE for VARIANTS (MAXIMUM 2 TIERS): Our database ONLY supports a maximum of 2 variant tiers (e.g. Color and Size). 
+  If the user mentions 3 or MORE attributes (e.g. Color, Size, Material, Type), YOU MUST ONLY USE THE FIRST 2 ATTRIBUTES and COMPLETELY DISCARD/IGNORE the rest. Do not merge them.
+  Example: Tier 1 = Color (Xanh, Đỏ), Tier 2 = Size (S, M, L). Completely ignore attributes like "Vải len", "Loại thường".
+  NEVER generate 3 tiers in variantConfigs. variantConfigs array length must be <= 2.
+  Variant names MUST have at most ONE hyphen separating Tier 1 and Tier 2, e.g., "Xanh - S".
+- If only 1 dimension of options (e.g. only colors), create 1 variant per option. NOTE: If the user says "quần màu đỏ" (ONLY 1 color option exists), you MUST output exactly 1 variant named "Đỏ" instead of empty array.
 - The category name MUST be in English.
 - Output ONLY valid JSON matching this exact schema, no other text
 `
