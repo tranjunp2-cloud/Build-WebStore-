@@ -80,18 +80,46 @@ function getFrameOverlayOffset(
 
 function findStringFieldPath(
     value: unknown,
-    targetText: string,
+    searchKey: string,
+    oldHtml: string,
     currentPath: Array<string | number> = [],
+    exactOnly: boolean = true
 ): Array<string | number> | null {
     if (typeof value === 'string') {
-        if (value === targetText) return currentPath
-        if (value.includes(targetText)) return currentPath
+        const temp = document.createElement('textarea');
+        temp.innerHTML = oldHtml;
+        const decodedOldHtml = temp.value;
+
+        // Exact matches
+        if (value === oldHtml) return currentPath
+        if (value === decodedOldHtml) return currentPath
+        if (value === searchKey) return currentPath
+        
+        // Partial matches
+        if (!exactOnly) {
+            if (value.includes(oldHtml)) return currentPath
+            if (value.includes(decodedOldHtml)) return currentPath
+            if (value.includes(searchKey)) return currentPath
+
+            // Case-insensitive fallbacks
+            const valLower = value.toLowerCase()
+            if (valLower.includes(oldHtml.toLowerCase())) return currentPath
+            if (valLower.includes(decodedOldHtml.toLowerCase())) return currentPath
+            if (valLower.includes(searchKey.toLowerCase())) return currentPath
+
+            // Flexible whitespace handling
+            const flexWs = (str: string) => str.replace(/\s+/g, ' ').trim().toLowerCase()
+            const valFlex = flexWs(value)
+            if (valFlex.includes(flexWs(oldHtml))) return currentPath
+            if (valFlex.includes(flexWs(decodedOldHtml))) return currentPath
+            if (valFlex.includes(flexWs(searchKey))) return currentPath
+        }
         return null
     }
 
     if (Array.isArray(value)) {
         for (let index = 0; index < value.length; index += 1) {
-            const result = findStringFieldPath(value[index], targetText, [...currentPath, index])
+            const result = findStringFieldPath(value[index], searchKey, oldHtml, [...currentPath, index], exactOnly)
             if (result) return result
         }
         return null
@@ -99,12 +127,22 @@ function findStringFieldPath(
 
     if (value && typeof value === 'object') {
         for (const [key, child] of Object.entries(value)) {
-            const result = findStringFieldPath(child, targetText, [...currentPath, key])
+            const result = findStringFieldPath(child, searchKey, oldHtml, [...currentPath, key], exactOnly)
             if (result) return result
         }
     }
 
     return null
+}
+
+function findStringFieldPathTwoPass(
+    value: unknown,
+    searchKey: string,
+    oldHtml: string
+): Array<string | number> | null {
+    const exactMatch = findStringFieldPath(value, searchKey, oldHtml, [], true)
+    if (exactMatch) return exactMatch
+    return findStringFieldPath(value, searchKey, oldHtml, [], false)
 }
 
 function updateValueAtPath(
@@ -147,7 +185,7 @@ function PreviewFrameInner({
     onReorderBlocks,
     onBlockDrop,
 }: PreviewFrameProps) {
-    const { blocks, updateBlock } = useEditorStore()
+    const { blocks, updateBlock, performSave } = useEditorStore()
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [blockHover, setBlockHover] = useState<BlockLayoutRect | null>(null)
     const [blockLayouts, setBlockLayouts] = useState<BlockLayoutRect[]>([])
@@ -158,6 +196,7 @@ function PreviewFrameInner({
     const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number } | null>(null)
     const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string } | null>(null)
     const [isImageProcessing, setIsImageProcessing] = useState(false)
+    const [wysiwygState, setWysiwygState] = useState<Record<string, unknown>>({})
     const [frameElement, setFrameElement] = useState<HTMLIFrameElement | null>(null)
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
     const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null)
@@ -268,7 +307,7 @@ function PreviewFrameInner({
 
                 const nextData = e.data as Omit<HoveredElementData, 'fieldPath'> & { rect: HoverRect | null }
                 const block = blocks[nextData.blockIndex]
-                const fieldPath = block ? findStringFieldPath(block, nextData.text) : null
+                const fieldPath = block ? findStringFieldPath(block, nextData.text, nextData.text) : null
 
                 setHoverData({
                     ...nextData,
@@ -306,26 +345,101 @@ function PreviewFrameInner({
                 setTextEditingData({ rect: e.data.rect, blockIndex: e.data.blockIndex })
                 setImageClickData(null)
             } else if (e.data?.type === 'TEXT_EDITING_STOPPED') {
-                setTextEditingData(null)
+                setTimeout(() => {
+                    // If the parent window focus moved to our WYSIWYG toolbar, DON'T drop active state
+                    if (document.activeElement?.closest('[data-wysiwyg-toolbar]')) {
+                        return
+                    }
+                    setTextEditingData(null)
+                    performSave(true) // Trigger immediate auto save when focusing out
+                }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
-                const { oldText, newText, blockIndex } = e.data
-                if (oldText !== newText && newText !== undefined) {
+                const { searchKey, oldHtml, newHtml, blockIndex } = e.data
+                console.log('[PreviewFrame] TEXT_EDITED Event:', { searchKey, oldHtml, newHtml, blockIndex })
+                if (oldHtml !== newHtml && newHtml !== undefined) {
                     const block = blocks[blockIndex]
-                    const fieldPath = block ? findStringFieldPath(block, oldText) : null
+                    const fieldPath = block ? findStringFieldPathTwoPass(block, searchKey, oldHtml) : null
+                    console.log('[PreviewFrame] Found fieldPath:', fieldPath)
                     if (fieldPath && block) {
                         const currentValue = getValueAtPath(block as Record<string, unknown>, fieldPath)
-                        const nextValue = typeof currentValue === 'string' && currentValue.includes(oldText)
-                            ? currentValue.replace(oldText, newText)
-                            : newText
+                        let nextValue = newHtml
+                        console.log('[PreviewFrame] currentValue:', currentValue, 'type:', typeof currentValue)
+                        if (typeof currentValue === 'string') {
+                            const temp = document.createElement('textarea')
+                            temp.innerHTML = oldHtml
+                            const decodedOldHtml = temp.value
+
+                            const createFlexibleRegex = (str: string) => {
+                                const escaped = str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                                const flexibleSpace = escaped.replace(/(?:\\s| )+/g, '\\s+')
+                                return new RegExp(flexibleSpace, 'i')
+                            }
+
+                            if (currentValue.includes(oldHtml)) {
+                                nextValue = currentValue.replace(oldHtml, newHtml)
+                                console.log('[PreviewFrame] Replaced using exact oldHtml')
+                            } else if (currentValue.includes(decodedOldHtml)) {
+                                nextValue = currentValue.replace(decodedOldHtml, newHtml)
+                                console.log('[PreviewFrame] Replaced using decodedOldHtml')
+                            } else if (currentValue.includes(searchKey)) {
+                                nextValue = currentValue.replace(searchKey, newHtml)
+                                console.log('[PreviewFrame] Replaced using exact searchKey')
+                            } else {
+                                const flexOld = createFlexibleRegex(oldHtml)
+                                if (flexOld.test(currentValue)) {
+                                    nextValue = currentValue.replace(flexOld, newHtml)
+                                    console.log('[PreviewFrame] Replaced using flexible oldHtml')
+                                } else {
+                                    const flexDecoded = createFlexibleRegex(decodedOldHtml)
+                                    if (flexDecoded.test(currentValue)) {
+                                        nextValue = currentValue.replace(flexDecoded, newHtml)
+                                        console.log('[PreviewFrame] Replaced using flexible decodedOldHtml')
+                                    } else {
+                                        const flexKey = createFlexibleRegex(searchKey)
+                                        if (flexKey.test(currentValue)) {
+                                            nextValue = currentValue.replace(flexKey, newHtml)
+                                            console.log('[PreviewFrame] Replaced using flexible searchKey')
+                                        } else if (searchKey && Math.abs(currentValue.replace(/<[^>]*>/g, '').length - searchKey.length) < 15) {
+                                            nextValue = newHtml
+                                            console.log('[PreviewFrame] Replaced entirely as fallback')
+                                        } else {
+                                            console.log('[PreviewFrame] COULD NOT FIND pattern in currentValue!')
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Sanitize any infinitely nested block wrappers left from prior edits
+                            // Example: <h6><h4><i>Coffee...</i></h4></h6> becomes <h4><i>Coffee...</i></h4>
+                            let prevValue
+                            do {
+                                prevValue = nextValue
+                                nextValue = nextValue.replace(/<([hH][1-6]|[pP])[^>]*>(\s*<([hH][1-6]|[pP])[^>]*>.*?<\/\3>\s*)<\/\1>/gi, '$2')
+                            } while (nextValue !== prevValue)
+                        }
                         
                         const clone = JSON.parse(JSON.stringify(blocks))
                         const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, nextValue)
                         updateBlock(blockIndex, nextBlock)
                     }
                 }
+            } else if (e.data?.type === 'REQUEST_STOP_EDITING') {
+                setTimeout(() => {
+                    const activeEl = document.activeElement
+                    const isToolbarClicked = activeEl?.hasAttribute('data-wysiwyg-toolbar') || 
+                                           activeEl?.closest('[data-wysiwyg-toolbar]')
+                    if (!isToolbarClicked) {
+                        const iframe = document.querySelector('iframe') as HTMLIFrameElement
+                        iframe?.contentWindow?.postMessage({ type: 'STOP_TEXT_EDITING' }, '*')
+                        setTextEditingData(null)
+                        setWysiwygState({})
+                    }
+                }, 100)
             } else if (e.data?.type === 'IMAGE_CLICKED') {
                 setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType })
                 setTextEditingData(null)
+            } else if (e.data?.type === 'SELECTION_STATE') {
+                setWysiwygState(e.data.state)
             } else if (e.data?.type === 'IMAGE_HOVERED') {
             } else if (e.data?.type === 'EDITOR_BLOCK_DROP') {
                 const { index, blockData } = e.data.payload
@@ -351,7 +465,10 @@ function PreviewFrameInner({
             if (!target) return
             if (target.closest('[data-inline-edit-popover]')) return
             if (target.closest('[data-inline-edit-trigger]')) return
+            if (target.closest('[data-wysiwyg-toolbar]')) return // Don't close if clicking toolbar!
+            
             setIsEditing(false)
+            setTextEditingData(null) // Clean up WYSIWYG if clicking outside
         }
 
         document.addEventListener('keydown', handleKeyDown)
@@ -375,8 +492,13 @@ function PreviewFrameInner({
         setImageClickData(null)
     }, [cancelPendingHoverClear, iframeKey, pageId, viewport])
 
-    const handleExecCommand = useCallback((command: string, value?: string) => {
+    const handleExecCommand = useCallback(async (command: string, value?: string) => {
         if (!frameElement) return
+
+        if (command === 'createLink' && !value) {
+            return
+        }
+
         frameElement.contentWindow?.postMessage({
             type: 'EXEC_COMMAND',
             command,
@@ -405,7 +527,7 @@ function PreviewFrameInner({
 
             const { blockIndex, src } = imageClickData
             const block = blocks[blockIndex]
-            const fieldPath = block ? findStringFieldPath(block, src) : null
+            const fieldPath = block ? findStringFieldPath(block, src, src) : null
 
             if (block && fieldPath) {
                 const clone = JSON.parse(JSON.stringify(blocks))
@@ -661,7 +783,7 @@ function PreviewFrameInner({
                 className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4"
             >
                 <div
-                    className="relative h-full overflow-hidden rounded-[24px] border border-white/10 bg-white shadow-2xl transition-all"
+                    className="relative h-full overflow-hidden rounded-[24px] border border-white/10 bg-transparent shadow-2xl transition-all"
                     style={{
                         width: viewport === 'mobile' ? 390 : '100%',
                         maxWidth: viewport === 'mobile' ? 390 : 1280,
@@ -863,34 +985,57 @@ function PreviewFrameInner({
             ) : null}
 
             {/* US-F05-06 AC-1: Rich Text Toolbar */}
-            {textEditingData && overlayOffset && (
-                <div
-                    className="absolute z-[100]"
-                    style={{
-                        top: overlayOffset.top + textEditingData.rect.top - 48,
-                        left: overlayOffset.left + textEditingData.rect.left + (textEditingData.rect.width / 2) - 150,
-                    }}
-                >
-                    <RichTextToolbar onCommand={handleExecCommand} />
-                </div>
-            )}
+            {textEditingData && overlayOffset && (() => {
+                const TOOLBAR_WIDTH = 340;
+                let topPos = overlayOffset.top + textEditingData.rect.top - 48;
+                let leftPos = overlayOffset.left + textEditingData.rect.left + (textEditingData.rect.width / 2) - (TOOLBAR_WIDTH / 2);
+                
+                const maxLeft = (containerElement?.clientWidth || typeof window !== 'undefined' ? window.innerWidth : 1000) - TOOLBAR_WIDTH - 16;
+                leftPos = Math.max(16, Math.min(leftPos, maxLeft));
+
+                if (topPos < 16) {
+                    topPos = overlayOffset.top + textEditingData.rect.top + textEditingData.rect.height + 8;
+                }
+
+                return (
+                    <div
+                        className="absolute z-[100]"
+                        data-wysiwyg-toolbar
+                        style={{
+                            top: topPos,
+                            left: leftPos,
+                        }}
+                    >
+                        <RichTextToolbar onCommand={handleExecCommand} activeState={wysiwygState} />
+                    </div>
+                )
+            })()}
 
             {/* US-F05-06 AC-2: Image Toolbar */}
-            {imageClickData && overlayOffset && (
-                <div
-                    className="absolute z-[100]"
-                    style={{
-                        top: overlayOffset.top + imageClickData.rect.top + 8,
-                        left: overlayOffset.left + imageClickData.rect.left + 8,
-                    }}
-                >
-                    <ImageToolbar 
-                        onImageSelect={handleImageReplace} 
-                        isProcessing={isImageProcessing}
-                        onAiGenerate={() => { toast.info('AI Generation context locked to: ' + imageClickData.blockType) }} 
-                    />
-                </div>
-            )}
+            {imageClickData && overlayOffset && (() => {
+                const TOOLBAR_WIDTH = 250;
+                let topPos = overlayOffset.top + imageClickData.rect.top + 8;
+                let leftPos = overlayOffset.left + imageClickData.rect.left + 8;
+
+                const maxLeft = (containerElement?.clientWidth || typeof window !== 'undefined' ? window.innerWidth : 1000) - TOOLBAR_WIDTH - 16;
+                leftPos = Math.max(16, Math.min(leftPos, maxLeft));
+
+                return (
+                    <div
+                        className="absolute z-[100]"
+                        style={{
+                            top: topPos,
+                            left: leftPos,
+                        }}
+                    >
+                        <ImageToolbar 
+                            onImageSelect={handleImageReplace} 
+                            isProcessing={isImageProcessing}
+                            onAiGenerate={() => { toast.info('AI Generation context locked to: ' + imageClickData.blockType) }} 
+                        />
+                    </div>
+                )
+            })()}
         </div>
     )
 }

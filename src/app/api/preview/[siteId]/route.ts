@@ -111,6 +111,24 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
       parentOrigin = window.location.origin; // fallback
     }
     (function() {
+      // Standalone tab logic: disable editor tools, but route internal links properly
+      if (window === window.parent) {
+        document.addEventListener('click', (e) => {
+          const anchor = e.target.closest('a');
+          if (anchor && anchor.hasAttribute('href') && anchor.getAttribute('href') !== '#') {
+            try {
+              const url = new URL(anchor.href, window.location.origin);
+              // Only intercept internal links that match the current origin e.g. /about-us
+              if (url.origin === window.location.origin && !url.pathname.startsWith('/api/')) {
+                e.preventDefault();
+                window.location.href = window.location.pathname + '?path=' + encodeURIComponent(url.pathname);
+              }
+            } catch(err) {}
+          }
+        }, true);
+        return;
+      }
+
       const validTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'SPAN', 'A', 'BUTTON', 'LI', 'LABEL', 'DIV']
       const excludedBlockTypes = ['navigation', 'footer']
       let hoveredEl = null;
@@ -192,8 +210,32 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
           return
         }
 
-        if (!validTags.includes(target.tagName) || target.children.length > 1) {
-          return
+        // Identify the closest meaningful text block for editing out of the valid tags
+        const textBlockTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'LI', 'LABEL'];
+        let possibleTextContainer = target.closest(textBlockTags.join(','));
+        
+        // Fix: To prevent infinite nesting of formatBlock tags, we must attach contenteditable
+        // to the OUTERMOST text block container, not the inner nested ones.
+        if (possibleTextContainer && blockContainer.contains(possibleTextContainer)) {
+            let outermost = possibleTextContainer;
+            let parent = outermost.parentElement;
+            while (parent && blockContainer.contains(parent)) {
+                if (textBlockTags.includes(parent.tagName)) {
+                    outermost = parent;
+                }
+                parent = parent.parentElement;
+            }
+            target = outermost;
+        }
+
+        const isTextBlock = textBlockTags.includes(target.tagName);
+        if (!isTextBlock) {
+            if (!validTags.includes(target.tagName)) return;
+            // For generic tags like DIV, SPAN, A, reject if they contain block elements or >1 children (likely structural)
+            const hasBlockChildren = Array.from(target.children).some(c => textBlockTags.includes(c.tagName) || c.tagName === 'DIV');
+            if (hasBlockChildren || target.children.length > 1) {
+                return;
+            }
         }
         
         const text = target.innerText?.trim()
@@ -233,43 +275,132 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
         }
       })
 
+      document.addEventListener('click', (e) => {
+        // Do not block links if the preview is opened in a separate tab (standalone)
+        if (window === window.parent) return;
+
+        const anchor = e.target.closest('a')
+        if (anchor && anchor.hasAttribute('href') && anchor.getAttribute('href') !== '#') {
+          e.preventDefault()
+          // Optionally notify parent that we prevented a redirect if we want
+        }
+      }, true)
+
       document.addEventListener('pointerdown', () => {
         window.parent.postMessage({ type: 'PREVIEW_POINTER_DOWN' }, parentOrigin)
       })
 
       // US-F05-06: WYSIWYG Text Editing
       let currentEditingEl = null
-      let originalText = ''
+      let searchKey = ''
+      let currentHtml = ''
+      let isTrackingOuterHTML = false
+      let isExecutingCommand = false
+
 
       const cleanUpEditing = () => {
         if (!currentEditingEl) return
         currentEditingEl.removeAttribute('contenteditable')
-        const newText = currentEditingEl.innerText?.trim()
+        let newHtml = isTrackingOuterHTML ? currentEditingEl.outerHTML : currentEditingEl.innerHTML?.trim()
+        if (isTrackingOuterHTML && newHtml) newHtml = newHtml.replace(/\s*contenteditable="true"\s*/i, '');
+        let oldHtmlFixed = currentHtml;
+        if (isTrackingOuterHTML && oldHtmlFixed) oldHtmlFixed = oldHtmlFixed.replace(/\s*contenteditable="true"\s*/i, '');
+        
         window.parent.postMessage({
           type: 'TEXT_EDITED',
           blockIndex: parseInt(currentEditingEl.closest('[data-block-index]')?.getAttribute('data-block-index')),
-          oldText: originalText,
-          newText: newText
+          searchKey: searchKey,
+          oldHtml: oldHtmlFixed,
+          newHtml: newHtml
         }, parentOrigin)
         currentEditingEl = null
         window.parent.postMessage({ type: 'TEXT_EDITING_STOPPED' }, parentOrigin)
       }
+
+      // Send text back on keyup
+      const reportTextChange = () => {
+        if (!currentEditingEl) return
+        
+        let newHtml = isTrackingOuterHTML ? currentEditingEl.outerHTML : currentEditingEl.innerHTML?.trim()
+        if (isTrackingOuterHTML && newHtml) newHtml = newHtml.replace(/\s*contenteditable="true"\s*/i, '');
+        let oldHtmlFixed = currentHtml;
+        if (isTrackingOuterHTML && oldHtmlFixed) oldHtmlFixed = oldHtmlFixed.replace(/\s*contenteditable="true"\s*/i, '');
+
+        const blockIndex = parseInt(currentEditingEl.closest('[data-block-index]')?.getAttribute('data-block-index') || '0')
+        
+        console.log('[WYSIWYG] reportTextChange => oldHtml:', oldHtmlFixed, 'newHtml:', newHtml, 'blockIndex:', blockIndex)
+
+        window.parent.postMessage({
+          type: 'TEXT_EDITED',
+          searchKey: searchKey,
+          oldHtml: oldHtmlFixed,
+          newHtml: newHtml,
+          blockIndex: blockIndex
+        }, parentOrigin)
+        // If outer tracking, newHtml will become the new currentHtml
+        currentHtml = isTrackingOuterHTML ? currentEditingEl.outerHTML : newHtml
+      }
+
+      document.addEventListener('keyup', (e) => {
+        if (currentEditingEl) {
+            // Give browser time to update DOM
+            setTimeout(reportTextChange, 100)
+        }
+      })
+
+      let blurTimeout = null;
 
       document.addEventListener('dblclick', (e) => {
         let target = e.target
         let blockContainer = target.closest('[data-block-index]')
         if (!blockContainer || excludedBlockTypes.includes(blockContainer.getAttribute('data-block-type'))) return
 
-        if (validTags.includes(target.tagName) && target.children.length <= 1) {
+        // Identify the closest meaningful text block for editing out of the valid tags
+        const textBlockTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'LI', 'LABEL'];
+        let possibleTextContainer = target.closest(textBlockTags.join(','));
+        
+        // Stop if the parent is a template tag (has classes or styles)
+        if (possibleTextContainer && blockContainer.contains(possibleTextContainer)) {
+            let outermost = possibleTextContainer;
+            let parent = outermost.parentElement;
+            while (parent && blockContainer.contains(parent)) {
+                if (textBlockTags.includes(parent.tagName)) {
+                    if (parent.hasAttribute('class') || parent.hasAttribute('style')) break;
+                    outermost = parent;
+                } else {
+                    break;
+                }
+                parent = parent.parentElement;
+            }
+            target = outermost;
+        }
+
+        const isTextBlock = textBlockTags.includes(target.tagName);
+        if (!isTextBlock) {
+            if (!validTags.includes(target.tagName)) return;
+            const hasBlockChildren = Array.from(target.children).some(c => textBlockTags.includes(c.tagName) || c.tagName === 'DIV');
+            if (hasBlockChildren || target.children.length > 1) {
+                return;
+            }
+        }
+        
+        const isPurePayloadTag = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P'].includes(target.tagName) 
+            && !target.hasAttribute('class') 
+            && !target.hasAttribute('style');
+
+        if (target) {
           e.preventDefault()
           e.stopPropagation()
+          if (blurTimeout) clearTimeout(blurTimeout)
           if (currentEditingEl && currentEditingEl !== target) {
             cleanUpEditing()
           }
           currentEditingEl = target
           currentEditingEl.setAttribute('contenteditable', 'true')
           currentEditingEl.focus()
-          originalText = currentEditingEl.innerText?.trim()
+          searchKey = currentEditingEl.innerText?.trim()
+          isTrackingOuterHTML = isPurePayloadTag
+          currentHtml = isTrackingOuterHTML ? currentEditingEl.outerHTML : currentEditingEl.innerHTML?.trim()
           
           const rect = target.getBoundingClientRect()
           window.parent.postMessage({
@@ -281,8 +412,9 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
       })
 
       document.addEventListener('blur', (e) => {
+        if (isExecutingCommand) return // Ignore blur from execCommand DOM replacements
         if (currentEditingEl === e.target) {
-          cleanUpEditing()
+            window.parent.postMessage({ type: 'REQUEST_STOP_EDITING' }, parentOrigin)
         }
       }, true)
 
@@ -294,10 +426,50 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
         }
       })
 
+      let savedRange = null;
+
+      const reportSelectionState = () => {
+         if (!currentEditingEl) return;
+         
+         // If the user clicked into the top-level window (e.g. into the link input), 
+         // the iframe loses focus and the selection might collapse. 
+         // We do not want to record that collapsed selection.
+         if (!document.hasFocus()) return;
+         
+         const sel = window.getSelection();
+         if (sel && sel.rangeCount > 0) {
+             savedRange = sel.getRangeAt(0).cloneRange();
+         }
+
+         window.parent.postMessage({
+             type: 'SELECTION_STATE',
+             state: {
+                 bold: document.queryCommandState('bold'),
+                 italic: document.queryCommandState('italic'),
+                 underline: document.queryCommandState('underline'),
+                 justifyCenter: document.queryCommandState('justifyCenter'),
+                 justifyLeft: document.queryCommandState('justifyLeft'),
+                 justifyRight: document.queryCommandState('justifyRight'),
+                 justifyFull: document.queryCommandState('justifyFull'),
+                 formatBlock: document.queryCommandValue('formatBlock')
+             }
+         }, parentOrigin)
+      }
+
+      document.addEventListener('selectionchange', () => {
+          if (currentEditingEl) {
+              reportSelectionState()
+          }
+      })
+
       // Image click handling
       document.addEventListener('click', (e) => {
         let target = e.target
         let blockContainer = target.closest('[data-block-index]')
+        if (currentEditingEl) {
+            reportSelectionState()
+        }
+        
         if (target.tagName === 'IMG') {
           if (!blockContainer || excludedBlockTypes.includes(blockContainer.getAttribute('data-block-type'))) return
           
@@ -405,13 +577,162 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
 
       // Parent command execution (for bold, italic etc from RichTextToolbar)
       window.addEventListener('message', (e) => {
-        const allowedOrigin = window.location.origin
-        if (e.origin !== allowedOrigin) return
+        if (e.origin !== parentOrigin && e.origin !== window.location.origin) return
         
-        if (e.data?.type === 'EXEC_COMMAND') {
-          document.execCommand(e.data.command, false, e.data.value)
-          currentEditingEl?.focus() // keep focus on the element
+        if (e.data?.type === 'STOP_TEXT_EDITING') {
+            cleanUpEditing()
         }
+
+        if (e.data?.type === 'EXEC_COMMAND') {
+          isExecutingCommand = true
+          try {
+            console.log('[WYSIWYG] Executing command:', e.data.command, e.data.value)
+            
+            const preSavedRange = savedRange ? savedRange.cloneRange() : null;
+            if (currentEditingEl) {
+                currentEditingEl.focus() // keep focus on the element
+            }
+            if (preSavedRange) {
+                const sel = window.getSelection();
+                if (sel) {
+                    sel.removeAllRanges();
+                    sel.addRange(preSavedRange);
+                    savedRange = preSavedRange;
+                }
+            }
+
+            let cmdVal = e.data.value;
+
+            if (e.data.command === 'formatBlock' && currentEditingEl) {
+                const newTag = cmdVal.replace(/[<>]/g, '').toUpperCase();
+                const blockTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'DIV'];
+                
+                // Keep inline tags, unwrap nested block tags
+                const elements = currentEditingEl.querySelectorAll(blockTags.join(','));
+                Array.from(elements).reverse().forEach(el => {
+                    const parent = el.parentNode;
+                    while (el.firstChild) {
+                        parent.insertBefore(el.firstChild, el);
+                    }
+                    parent.removeChild(el);
+                });
+                
+                const isPurePayloadTag = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P'].includes(currentEditingEl.tagName) 
+                    && !currentEditingEl.hasAttribute('class') 
+                    && !currentEditingEl.hasAttribute('style');
+
+                if (isPurePayloadTag) {
+                    const wrapper = document.createElement(newTag);
+                    while (currentEditingEl.firstChild) {
+                        wrapper.appendChild(currentEditingEl.firstChild);
+                    }
+                    currentEditingEl.parentNode.replaceChild(wrapper, currentEditingEl);
+                    currentEditingEl = wrapper;
+                    currentEditingEl.setAttribute('contenteditable', 'true');
+                    currentEditingEl.focus();
+                } else {
+                    const wrapper = document.createElement(newTag);
+                    
+                    // Because structural blocks in Hero schemas hardcode parent styling (e.g., <h1 style="font-size: clamp(...)">)
+                    // We must forcibly assign explicit Tailwind classes to the nested injected heading tag
+                    // so that the text size and weight visually updates for the user, instead of inheriting standard layout styles.
+                    const sizeMap = {
+                        'H1': 'text-4xl md:text-5xl font-extrabold',
+                        'H2': 'text-3xl md:text-4xl font-bold',
+                        'H3': 'text-2xl md:text-3xl font-bold',
+                        'H4': 'text-xl md:text-2xl font-bold',
+                        'H5': 'text-lg font-bold',
+                        'H6': 'text-base font-bold',
+                        'P': 'text-base font-normal'
+                    };
+                    if (sizeMap[newTag]) {
+                        wrapper.className = sizeMap[newTag];
+                    }
+
+                    while (currentEditingEl.firstChild) {
+                        wrapper.appendChild(currentEditingEl.firstChild);
+                    }
+                    currentEditingEl.appendChild(wrapper);
+                }
+                
+                if (savedRange) {
+                    try {
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(savedRange);
+                    } catch(err) {}
+                }
+                
+                setTimeout(() => {
+                    reportSelectionState()
+                    reportTextChange()
+                }, 10)
+
+                return; // Skip native execCommand which could cause messy nesting boundaries
+            }
+            
+            const result = document.execCommand(e.data.command, false, cmdVal)
+            console.log('[WYSIWYG] Result:', result)
+            
+            if (e.data.command === 'createLink' && result && currentEditingEl) {
+                // native execCommand doesn't add target="_blank"
+                const links = currentEditingEl.querySelectorAll('a');
+                links.forEach(a => {
+                    const hrefStr = a.getAttribute('href');
+                    if (hrefStr && hrefStr.includes(cmdVal)) {
+                        a.setAttribute('target', '_blank');
+                        a.setAttribute('rel', 'noopener noreferrer');
+                    }
+                });
+            }
+            
+            // If the browser replaced the element (e.g. changing <p> to <h1>), 
+            // the old currentEditingEl is detached. We must find the new one.
+            const selAfter = window.getSelection();
+            if (selAfter && selAfter.anchorNode) {
+                let node = selAfter.anchorNode;
+                if (node.nodeType === 3) node = node.parentElement;
+                
+                let newEditable = node.closest('[contenteditable="true"]');
+                // If contenteditable attribute was lost during tag swap, restore it
+                if (!newEditable) {
+                    const blockContainer = node.closest('[data-block-index]');
+                    if (blockContainer) {
+                        let topChild = node;
+                        while (topChild && topChild.parentElement !== blockContainer && topChild !== blockContainer) {
+                            topChild = topChild.parentElement;
+                        }
+                        if (topChild && topChild !== blockContainer) {
+                            newEditable = topChild;
+                            newEditable.setAttribute('contenteditable', 'true');
+                        }
+                    }
+                }
+
+                if (newEditable && newEditable !== currentEditingEl) {
+                    currentEditingEl = newEditable;
+                    currentEditingEl.focus();
+                }
+            }
+
+            if (currentEditingEl) {
+                setTimeout(() => {
+                    reportSelectionState()
+                    reportTextChange() // Immediately report to parent to trigger auto-save
+                }, 10)
+            }
+          } catch(err) {
+            console.error('[WYSIWYG] Error executing command:', err)
+          } finally {
+            setTimeout(() => { isExecutingCommand = false }, 50)
+          }
+        }
+      })
+
+      document.addEventListener('keyup', (e) => {
+          if (currentEditingEl) {
+              reportSelectionState()
+          }
       })
 
       window.addEventListener('load', postLayouts)
@@ -432,6 +753,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
     const payload = await getPayload({ config })
     const numericSiteId = Number(siteId)
     const pageId = new URL(req.url).searchParams.get('pageId')
+    const pagePath = new URL(req.url).searchParams.get('path')
 
     interface NavPage { id: string | number; title?: string; slug?: string; isVisible?: boolean; [key: string]: unknown }
 
@@ -467,6 +789,29 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
 
       if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
         page = requestedPage
+      }
+    } else if (pagePath !== null) {
+      const parsedSlugWithSlash = pagePath === '' ? '/' : (pagePath.startsWith('/') ? pagePath : `/${pagePath}`)
+      const parsedSlugWithoutSlash = pagePath === '/' ? '/' : pagePath.replace(/^\/+/, '')
+      
+      const pagesResult = await payload.find({
+        collection: 'pages',
+        where: {
+          and: [
+            { site: { equals: numericSiteId } },
+            {
+              or: [
+                { slug: { equals: parsedSlugWithSlash } },
+                { slug: { equals: parsedSlugWithoutSlash } }
+              ]
+            }
+          ],
+        },
+        limit: 1,
+        draft: true, // From staging: include drafts
+      })
+      if (pagesResult.docs.length > 0) {
+        page = pagesResult.docs[0]
       }
     }
 
