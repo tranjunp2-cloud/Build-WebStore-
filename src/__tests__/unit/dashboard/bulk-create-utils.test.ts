@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { slugify, buildSavePayload } from '@/components/dashboard/BulkCreateModal'
+import { slugify, buildSavePayload } from '../../../components/dashboard/BulkCreateModal'
 
-// ─── TC-F08.15: Bulk product creation utilities ──────────────────────
+// ─── TC-F08-04-01: Bulk product creation utilities ──────────────────────
 
-describe('slugify [TC-F08.15]', () => {
+describe('slugify [TC-F08-04-01]', () => {
     it('converts basic text to kebab-case', () => {
         expect(slugify('Hello World')).toBe('hello-world')
     })
@@ -39,7 +39,7 @@ describe('slugify [TC-F08.15]', () => {
     })
 })
 
-describe('buildSavePayload [TC-F08.15]', () => {
+describe('buildSavePayload [TC-F08-04-01]', () => {
     it('builds payload for simple product (no variants)', () => {
         const product = {
             selected: true,
@@ -111,7 +111,28 @@ describe('buildSavePayload [TC-F08.15]', () => {
         expect(payload.variantConfigs![1].options).toEqual([{ value: 'S' }, { value: 'M' }])
     })
 
-    it('uses AI provided variantConfigs if available', () => {
+    it('TC-F08-02-04: limits generated variantConfigs to maximum 2 tiers by dropping extra tiers', () => {
+        const product = {
+            selected: true,
+            name: 'Excessive Tiers',
+            price: 50,
+            category: '',
+            variants: [
+                { name: 'Red - S - Cotton', price: 50, sku: 'R-S-C', stock: 10 },
+                { name: 'Red - M - Cotton', price: 50, sku: 'R-M-C', stock: 10 }
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.variantConfigs).toBeDefined()
+        expect(payload.variantConfigs!).toHaveLength(2) 
+        expect(payload.variantConfigs![0].name).toBe('Color')
+        expect(payload.variantConfigs![0].options).toEqual([{ value: 'Red' }])
+        expect(payload.variantConfigs![1].name).toBe('Size')
+        expect(payload.variantConfigs![1].options).toEqual([{ value: 'S' }, { value: 'M' }])
+    })
+
+    it('ignores AI provided variantConfigs and regenerates from variant names', () => {
         const product = {
             selected: true,
             name: 'Perfume',
@@ -128,7 +149,8 @@ describe('buildSavePayload [TC-F08.15]', () => {
         const payload = buildSavePayload(product, null, null)
 
         expect(payload.variantConfigs).toBeDefined()
-        expect(payload.variantConfigs![0].name).toBe('Scent')
+        expect(payload.variantConfigs![0].name).toBe('Color')
+        expect(payload.variantConfigs![1].name).toBe('Size')
     })
 
     it('defaults variant price to product price when 0', () => {
@@ -142,6 +164,28 @@ describe('buildSavePayload [TC-F08.15]', () => {
         const payload = buildSavePayload(product, null, null)
 
         expect(payload.variants![0].price).toBe(50)
+    })
+
+    it('TC-F08-04-06: sanitizes HTML/XSS script tags from text inputs', () => {
+        const product = {
+            selected: true,
+            name: '<script>alert(1)</script>Hacked Name',
+            price: 50,
+            seoTitle: '<iframe src="malicious"/>SEO',
+            seoDescription: 'Normal <b>Desc</b>',
+            category: 'Hacks',
+            variants: [
+                { name: 'Red <img src=x onerror=alert(1)>', price: 50, sku: 'R-<script>S</script>', stock: 10 },
+            ],
+        }
+        const payload = buildSavePayload(product, null, null)
+
+        expect(payload.name).toBe('Hacked Name')
+        expect(payload.seo.title).toBe('SEO')
+        // It completely strips out tags, including <b>
+        expect(payload.seo.description).toBe('Normal Desc')
+        expect(payload.variants![0].name).toBe('Red')
+        expect(payload.variants![0].sku).toBe('R-')
     })
 
     it('generates unique slug with random suffix', () => {

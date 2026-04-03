@@ -18,9 +18,10 @@ function getImageUrl(image: any): string | null {
     
     // Fix existing broken local URLs directly to S3 because MinIO stores them
     if (url.includes('/api/media/file/')) {
-        const filename = url.split('/').pop()
-        const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
-        url = `${s3Endpoint}/primeweb-media/${filename}`
+        if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
+            const filename = url.split('/').pop()
+            url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`
+        }
     }
     
     return url
@@ -222,7 +223,9 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                         {t.dashboard?.products?.form?.editProduct || 'EDIT PRODUCT'}
                     </button>
                     <button 
-                        onClick={onDelete}
+                        onClick={() => {
+                            onDelete();
+                        }}
                         className="w-full flex items-center justify-center gap-2 bg-transparent text-[#FFB4AB] py-2 font-medium text-[12px] leading-[16px] tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded-lg border-none appearance-none outline-none"
                     >
                         <Trash2 className="w-[14px] h-[14px]" />

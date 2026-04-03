@@ -8,9 +8,9 @@ vi.mock('@/lib/ai/seo-queue', () => ({
 import { vi } from 'vitest'
 import { Products } from '@/collections/Products'
 
-// ─── TC-F08.03: Product collection config validation ──────────────────
+// ─── TC-F08-01-01: Product collection config validation ──────────────────
 
-describe('Products collection config [TC-F08.03]', () => {
+describe('Products collection config [TC-F08-01-01]', () => {
     it('has slug "products"', () => {
         expect(Products.slug).toBe('products')
     })
