@@ -85,8 +85,9 @@ export async function addCustomDomain(rawDomain: string) {
                 if (doResponse.ok) {
                     const appData = await doResponse.json();
                     
-                    // Lời Lead: "Domain là cha ngoài spec". 
-                    // Tức là phải check mảng appData.app.domains (nằm ngoài spec) để biết chính xác DO đang quản lý những domain nào.
+                    // Technical Note: DO's 'app.spec.domains' holds the static configuration target.
+                    // We must inspect the top-level 'app.domains' array (live state outside the spec) 
+                    // to accurately track real-time SSL provisioning and deployment phases.
                     const liveDomains = appData.app.domains || [];
                     const appSpec = appData.app.spec || {}; // Bản config
                     const specDomains = appSpec.domains || [];
