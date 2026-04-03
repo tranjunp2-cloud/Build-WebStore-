@@ -88,8 +88,9 @@ export default function BlogEditorPage() {
     const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
     const [thumbnailId, setThumbnailId] = useState<string | null>(null)
 
+    type CurrentUser = { id: string; email: string; firstName?: string; lastName?: string; tenants?: any[] }
     // Current User, Category Dropdown, and Date State
-    const [currentUser, setCurrentUser] = useState<any>(null)
+    const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
     // Current User, Category Dropdown, and Date State
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false)
@@ -101,13 +102,14 @@ export default function BlogEditorPage() {
     const [aiTone, setAiTone] = useState('Professional')
     const [isGenerating, setIsGenerating] = useState(false)
     const [generatedAiContent, setGeneratedAiContent] = useState('')
-    const [generatedAiData, setGeneratedAiData] = useState<any>(null)
+    type GeneratedAIData = { title?: string; content?: string; seoTitle?: string; seoDescription?: string }
+    const [generatedAiData, setGeneratedAiData] = useState<GeneratedAIData | null>(null)
 
     // Load categories
     useEffect(() => {
         getBlogCategoriesAction()
             .then(docs => setCategories(docs || []))
-            .catch(() => { })
+            .catch((err) => { console.error('Failed to load categories', err) })
     }, [])
 
     // Load current user & click outside listener
@@ -115,10 +117,10 @@ export default function BlogEditorPage() {
         getCurrentUserAction()
             .then(user => {
                 if (user) {
-                    setCurrentUser(user)
+                    setCurrentUser(user as CurrentUser)
                 }
             })
-            .catch(() => { })
+            .catch((err) => { console.error('Failed to load user', err) })
     }, [])
 
     const getAuthorName = () => {
@@ -233,8 +235,8 @@ export default function BlogEditorPage() {
                     router.push('/blog')
                 }, 1000)
             }
-        } catch (err: any) {
-            const msg = err?.message || 'Failed to save'
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Failed to save post'
             setError(msg)
             toast.error(msg)
         } finally {
@@ -932,7 +934,7 @@ export default function BlogEditorPage() {
                                                 ...prev,
                                                 title: generatedAiData.title || prev.title,
                                                 slug: generatedAiData.title ? slugify(generatedAiData.title) : prev.slug,
-                                                content: generatedAiData.content,
+                                                content: generatedAiData.content || prev.content,
                                                 seoTitle: generatedAiData.seoTitle || generatedAiData.title || prev.seoTitle,
                                                 seoDescription: generatedAiData.seoDescription || prev.seoDescription
                                             }))

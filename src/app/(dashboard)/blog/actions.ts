@@ -32,6 +32,10 @@ export async function createBlogCategoryAction(data: { name: string }) {
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
+    if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0 || data.name.length > 80) {
+        return { error: 'Validation Error: Name must be between 1 and 80 characters' }
+    }
+
     const payload = await getPayload({ config: configPromise })
     const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
 
@@ -47,13 +51,13 @@ export async function createBlogCategoryAction(data: { name: string }) {
         }
     }
 
-    const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+    const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
 
     try {
         const result = await payload.create({
             collection: 'blog_categories',
             data: {
-                name: data.name,
+                name: data.name.trim(),
                 slug: slug,
                 tenant: tenantId,
                 site: siteId,
@@ -61,8 +65,9 @@ export async function createBlogCategoryAction(data: { name: string }) {
             user: user as any,
         })
         return JSON.parse(JSON.stringify(result))
-    } catch (e: any) {
-        return { error: e?.message || 'Failed to create category' }
+    } catch (e: unknown) {
+        console.error('Failed to create category:', e)
+        return { error: 'Failed to create category' }
     }
 }
 
@@ -70,19 +75,34 @@ export async function updateBlogCategoryAction(id: string, data: { name: string 
     const user = await getCurrentUser()
     if (!user) throw new Error('Unauthorized')
 
+    if (!data.name || typeof data.name !== 'string' || data.name.trim().length === 0 || data.name.length > 80) {
+        return { error: 'Validation Error: Name must be between 1 and 80 characters' }
+    }
+
     const payload = await getPayload({ config: configPromise })
-    const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
+
+    // Check Tenant Isolation
+    const existing = await payload.findByID({ collection: 'blog_categories', id })
+    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
+
+    if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
+        return { error: 'Unauthorized access' }
+    }
+
+    const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
 
     try {
         const result = await payload.update({
             collection: 'blog_categories',
             id,
-            data: { name: data.name, slug: slug } as any,
+            data: { name: data.name.trim(), slug: slug } as any,
             user: user as any,
         })
         return JSON.parse(JSON.stringify(result))
-    } catch (e: any) {
-        return { error: e?.message || 'Failed to update category' }
+    } catch (e: unknown) {
+        console.error('Failed to update category:', e)
+        return { error: 'Failed to update category' }
     }
 }
 
@@ -92,6 +112,15 @@ export async function deleteBlogCategoryAction(id: string) {
 
     const payload = await getPayload({ config: configPromise })
 
+    // Check Tenant Isolation
+    const existing = await payload.findByID({ collection: 'blog_categories', id })
+    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
+
+    if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
+        return { error: 'Unauthorized delete access' }
+    }
+
     try {
         await payload.delete({
             collection: 'blog_categories',
@@ -99,8 +128,9 @@ export async function deleteBlogCategoryAction(id: string) {
             user: user as any,
         })
         return { success: true }
-    } catch (e: any) {
-        return { error: e?.message || 'Failed to delete category. It might be in use.' }
+    } catch (e: unknown) {
+        console.error('Failed to delete category:', e)
+        return { error: 'Failed to delete category. It might be in use.' }
     }
 }
 
