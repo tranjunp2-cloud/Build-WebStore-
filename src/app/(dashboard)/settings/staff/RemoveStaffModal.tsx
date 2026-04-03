@@ -1,4 +1,5 @@
 import React, { useTransition } from 'react';
+import { useI18n } from '@/i18n';
 import { ShieldAlert, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { removeStaff } from './actions';
@@ -11,8 +12,11 @@ interface RemoveStaffModalProps {
     onSuccess: (userId: string) => void;
 }
 
-export function RemoveStaffModal({ isOpen, onClose, user, onSuccess }: RemoveStaffModalProps) {
+export function RemoveStaffModal({
+ isOpen, onClose, user, onSuccess }: RemoveStaffModalProps) {
     const [isPending, startTransition] = useTransition();
+
+    const { t } = useI18n();
 
     if (!isOpen || !user) return null;
 

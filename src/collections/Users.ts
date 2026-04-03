@@ -1,10 +1,19 @@
 import type { CollectionConfig, CollectionAfterChangeHook } from 'payload'
+import { randomBytes } from 'crypto'
 import { sendEmail } from '@/lib/email/send'
 import { welcomeEmail } from '@/lib/email/templates/welcome'
 import { staffInvitationEmail } from '@/lib/email/templates/staff-invitation'
 import { forgotPasswordEmail } from '@/lib/email/templates/forgot-password'
 import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
+
+/** Minimal shape of a user's tenant membership returned by Payload queries */
+interface TenantMembership {
+    tenant: string | { id: string }
+    role: string
+    status?: string
+    permissions?: string[]
+}
 
 /**
  * afterChange hook: send Welcome email to new users.
@@ -22,6 +31,30 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
     })
 
     return doc
+}
+
+async function injectUser(req: any) {
+    if (req.user) return;
+    const authHeader = (typeof req.headers.get === 'function') 
+        ? req.headers.get('authorization') 
+        : req.headers.authorization;
+        
+    if (authHeader && (authHeader.startsWith('JWT ') || authHeader.startsWith('Bearer '))) {
+        const token = authHeader.split(' ')[1];
+        try {
+            const payloadSecret = process.env.PAYLOAD_SECRET || '';
+            const { jwtVerify } = await import('jose');
+            const secret = new TextEncoder().encode(payloadSecret);
+            const { payload: decoded } = await jwtVerify(token, secret);
+            if (decoded?.id && decoded?.collection === 'users') {
+                const user = await req.payload.findByID({ collection: 'users', id: decoded.id as string });
+                if (user) req.user = user;
+            }
+        } catch (err) {
+            // JWT decode failures are expected (expired/invalid tokens) — log at warn level only
+            req.payload?.logger?.warn?.({ err }, 'injectUser: JWT decode failed — treating as unauthenticated')
+        }
+    }
 }
 
 export const Users: CollectionConfig = {
@@ -125,6 +158,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { email, name, tenantId, role, permissions } = body as { email?: string; name?: string; tenantId?: string; role?: string; permissions?: string[] }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!email || !name || !tenantId || !role) return Response.json({ errors: [{ message: 'Missing required fields' }] }, { status: 400 })
 
@@ -135,11 +169,18 @@ export const Users: CollectionConfig = {
                 if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
+                
+                // Security: Only an owner can invite another owner
+                if (role === 'owner' && requesterTenant.role !== 'owner') {
+                    return Response.json({ errors: [{ message: 'Only an owner can invite another owner' }] }, { status: 403 })
+                }
 
                 try {
                     // Check if user exists
                     const users = await req.payload.find({ collection: 'users', where: { email: { equals: email } } })
                     let targetUser = users.docs[0]
+                    let isNewUser = false
+                    let tempPassword = ''
 
                     if (targetUser) {
                         // Check if already in tenant
@@ -162,15 +203,16 @@ export const Users: CollectionConfig = {
                             }
                         })
                     } else {
-                        // Generate a strong random password since they will login via OTP anyway
-                        const randomPassword = require('crypto').randomBytes(16).toString('hex')
+                        // Generate a cryptographically secure temporary password (crypto.randomBytes)
+                        tempPassword = randomBytes(8).toString('base64url').slice(0, 12)
+                        isNewUser = true
 
                         targetUser = await req.payload.create({
                             collection: 'users',
                             data: {
                                 email,
                                 firstName: name,
-                                password: randomPassword,
+                                password: tempPassword,
                                 roles: ['tenant-owner'], // Default platform role
                                 tenants: [
                                     { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? permissions : undefined }
@@ -187,7 +229,8 @@ export const Users: CollectionConfig = {
                     const { subject, html } = staffInvitationEmail({
                         userName: name || targetUser.firstName || email.split('@')[0],
                         workspaceName: tenant.name as string,
-                        loginUrl
+                        loginUrl,
+                        temporaryPassword: isNewUser ? tempPassword : undefined
                     })
 
                     req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
@@ -208,6 +251,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { userId, tenantId } = body as { userId?: string; tenantId?: string }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!userId || !tenantId) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
@@ -215,8 +259,11 @@ export const Users: CollectionConfig = {
                 const requesterTenant = req.user.tenants?.find((t: any) =>
                     (t.tenant?.id === tenantId || t.tenant === tenantId)
                 )
-                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
-                    return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
+                if (!requesterTenant || requesterTenant.role !== 'owner') {
+                    return Response.json({ errors: [{ message: 'Forbidden: Only owners can remove staff' }] }, { status: 403 })
+                }
+                if (String(userId) === String(req.user.id)) {
+                    return Response.json({ errors: [{ message: 'Cannot remove yourself via this action' }] }, { status: 400 })
                 }
 
                 // Check target user
@@ -233,21 +280,27 @@ export const Users: CollectionConfig = {
 
                 // Security: Prevent removing if they are the last active owner
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
+                const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
                 if (targetTenantRole === 'owner') {
-                    // Check if there are other owners
-                    const allStaff = await req.payload.find({
-                        collection: 'users',
-                        where: {
-                            'tenants.tenant': { equals: tenantId }
-                        },
-                        limit: 1000
-                    })
-                    const activeOwners = allStaff.docs.filter((u: any) =>
-                        u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
-                    )
+                    if (requesterTenant.role !== 'owner') {
+                        return Response.json({ errors: [{ message: 'Only an owner can remove another owner' }] }, { status: 403 })
+                    }
+                    if (targetTenantStatus === 'active') {
+                        // Check if there are other owners
+                        const allStaff = await req.payload.find({
+                            collection: 'users',
+                            where: {
+                                'tenants.tenant': { equals: tenantId }
+                            },
+                            limit: 1000
+                        })
+                        const activeOwners = allStaff.docs.filter((u: any) =>
+                            u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                        )
 
-                    if (activeOwners.length <= 1) {
-                        return Response.json({ errors: [{ message: 'Cannot remove the last workspace owner' }] }, { status: 400 })
+                        if (activeOwners.length <= 1) {
+                            return Response.json({ errors: [{ message: 'Cannot remove the last workspace owner' }] }, { status: 400 })
+                        }
                     }
                 }
 
@@ -271,14 +324,15 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { userId, tenantId, name, role, permissions } = body as { userId?: string; tenantId?: string; name?: string; role?: string; permissions?: string[] }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!userId || !tenantId || !role || !name) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
                 const requesterTenant = req.user.tenants?.find((t: any) =>
                     (t.tenant?.id === tenantId || t.tenant === tenantId)
                 )
-                if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
-                    return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
+                if (!requesterTenant || requesterTenant.role !== 'owner') {
+                    return Response.json({ errors: [{ message: 'Forbidden: Only owners can update staff' }] }, { status: 403 })
                 }
 
                 const targetUser = await req.payload.findByID({ collection: 'users', id: userId })
@@ -293,17 +347,33 @@ export const Users: CollectionConfig = {
                 }
 
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
-                if (targetTenantRole === 'owner' && role !== 'owner') {
-                    const allStaff = await req.payload.find({
-                        collection: 'users',
-                        where: { 'tenants.tenant': { equals: tenantId } },
-                        limit: 1000
-                    })
-                    const activeOwners = allStaff.docs.filter((u: any) =>
-                        u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
-                    )
-                    if (activeOwners.length <= 1) {
-                        return Response.json({ errors: [{ message: 'Cannot demote the last workspace owner' }] }, { status: 400 })
+                const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
+                
+                // Security: Prevent Admin from promoting anyone to Owner
+                if (role === 'owner' && requesterTenant.role !== 'owner') {
+                    return Response.json({ errors: [{ message: 'Only an owner can promote another user to owner' }] }, { status: 403 })
+                }
+                
+                if (String(userId) === String(req.user.id) && role !== targetTenantRole) {
+                    return Response.json({ errors: [{ message: 'Cannot change your own role' }] }, { status: 400 })
+                }
+
+                if (targetTenantRole === 'owner') {
+                    if (requesterTenant.role !== 'owner') {
+                        return Response.json({ errors: [{ message: 'Only an owner can modify another owner' }] }, { status: 403 })
+                    }
+                    if (role !== 'owner' && targetTenantStatus === 'active') {
+                        const allStaff = await req.payload.find({
+                            collection: 'users',
+                            where: { 'tenants.tenant': { equals: tenantId } },
+                            limit: 1000
+                        })
+                        const activeOwners = allStaff.docs.filter((u: any) =>
+                            u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                        )
+                        if (activeOwners.length <= 1) {
+                            return Response.json({ errors: [{ message: 'Cannot demote the last workspace owner' }] }, { status: 400 })
+                        }
                     }
                 }
 
@@ -330,6 +400,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { userId, tenantId, status } = body as { userId?: string; tenantId?: string; status?: string }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!userId || !tenantId || !status) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
@@ -352,17 +423,23 @@ export const Users: CollectionConfig = {
                 }
 
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
+                const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
                 if (targetTenantRole === 'owner') {
-                    const allStaff = await req.payload.find({
-                        collection: 'users',
-                        where: { 'tenants.tenant': { equals: tenantId } },
-                        limit: 1000
-                    })
-                    const activeOwners = allStaff.docs.filter((u: any) =>
-                        u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
-                    )
-                    if (activeOwners.length <= 1 && status !== 'active') {
-                        return Response.json({ errors: [{ message: 'Cannot deactivate the last workspace owner' }] }, { status: 400 })
+                    if (requesterTenant.role !== 'owner') {
+                        return Response.json({ errors: [{ message: 'Only an owner can update the status of another owner' }] }, { status: 403 })
+                    }
+                    if (status !== 'active' && targetTenantStatus === 'active') {
+                        const allStaff = await req.payload.find({
+                            collection: 'users',
+                            where: { 'tenants.tenant': { equals: tenantId } },
+                            limit: 1000
+                        })
+                        const activeOwners = allStaff.docs.filter((u: any) =>
+                            u.tenants?.find((t: any) => (t.tenant?.id === tenantId || t.tenant === tenantId) && t.role === 'owner' && t.status === 'active')
+                        )
+                        if (activeOwners.length <= 1) {
+                            return Response.json({ errors: [{ message: 'Cannot deactivate the last workspace owner' }] }, { status: 400 })
+                        }
                     }
                 }
 
@@ -385,6 +462,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { userId, tenantId } = body as { userId?: string; tenantId?: string }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!userId || !tenantId) return Response.json({ errors: [{ message: 'Missing fields' }] }, { status: 400 })
 
@@ -422,6 +500,7 @@ export const Users: CollectionConfig = {
                 const body = await req.json?.() ?? {}
                 const { userIds, tenantId } = body as { userIds?: string[]; tenantId?: string }
 
+                await injectUser(req);
                 if (!req.user) return Response.json({ errors: [{ message: 'Unauthorized' }] }, { status: 401 })
                 if (!userIds || !tenantId || !Array.isArray(userIds)) return Response.json({ errors: [{ message: 'Missing or invalid fields' }] }, { status: 400 })
 
@@ -532,7 +611,15 @@ export const Users: CollectionConfig = {
                     console.error(`[Users] Failed to send OTP email to ${email}:`, err)
                 })
 
-                console.log(`[OTP] Sent to ${email}`)
+                // Never log OTP codes — mask email to avoid leaking PII
+                const [local, domain] = email.split('@')
+                const safeLocal = local.length <= 2 ? '*'.repeat(local.length) : local.slice(0,2) + '***'
+                const maskedEmail = `${safeLocal}@${domain}`
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log(`[DEV OTP] Code dispatched for ${maskedEmail} (check your email)`)
+                } else {
+                    console.log(`[OTP] Code dispatched for ${maskedEmail}`)
+                }
                 return Response.json({ message: 'If the email exists, an OTP has been sent.' })
             },
         },
@@ -621,7 +708,14 @@ export const Users: CollectionConfig = {
                     }
                 }
 
-                // OTP valid — clear OTP fields
+                // OTP valid — clear OTP fields and activate any pending tenant invites
+                const updatedTenants = (user.tenants || []).map((t: any) => {
+                    if (t.status === 'pending') {
+                        return { ...t, status: 'active' }
+                    }
+                    return t
+                })
+
                 await req.payload.update({
                     collection: 'users',
                     id: user.id,
@@ -630,6 +724,7 @@ export const Users: CollectionConfig = {
                         otpExpiresAt: null,
                         otpAttempts: 0,
                         lastLoginAt: new Date().toISOString(),
+                        tenants: updatedTenants,
                     },
                 })
 

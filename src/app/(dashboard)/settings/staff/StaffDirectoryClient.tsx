@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useTransition } from 'react';
+import { useI18n } from '@/i18n';
 import { Users, Plus, UserPlus, Trash2, Shield, ShieldAlert, Loader2, Search, MoreHorizontal, Mail, Power, PowerOff, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { removeStaff, bulkRemoveStaff, updateStaffStatus, resendInvite } from './actions';
@@ -17,15 +18,21 @@ export type StaffMember = {
     status: string;
     permissions: string[];
     lastLoginAt?: string | null;
+    createdAt?: string | null;
 };
 
 export function StaffDirectoryClient({
     tenantId,
     initialStaff,
+    currentUserId,
+    currentUserRole,
 }: {
     tenantId: string;
     initialStaff: StaffMember[];
+    currentUserId: string;
+    currentUserRole: string;
 }) {
+    const { t, ti } = useI18n();
     const [staff, setStaff] = useState<StaffMember[]>(initialStaff);
 
     // Sync state when Server Action `revalidatePath` passes down a newly fetched `initialStaff` array
@@ -63,11 +70,11 @@ export function StaffDirectoryClient({
             );
         }
 
-        // Sort by lastLoginAt DESC
+        // Sort by createdAt DESC (newest first)
         filtered.sort((a, b) => {
-            if (!a.lastLoginAt) return 1;
-            if (!b.lastLoginAt) return -1;
-            return new Date(b.lastLoginAt).getTime() - new Date(a.lastLoginAt).getTime();
+            if (!a.createdAt) return 1;
+            if (!b.createdAt) return -1;
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
 
         return filtered;
@@ -96,7 +103,7 @@ export function StaffDirectoryClient({
             if (res.success) {
                 setStaff(prev => prev.filter(s => !selectedIds.includes(s.id)));
                 setSelectedIds([]);
-                toast.success('Selected staff removed successfully');
+                toast.success(t?.Staff?.toast?.removedBulk || 'Selected staff removed successfully');
             } else {
                 toast.error(res.error || 'Failed to remove staff');
             }
@@ -114,7 +121,7 @@ export function StaffDirectoryClient({
             const res = await updateStaffStatus(userId, newStatus);
             if (res.success) {
                 setStaff(prev => prev.map(s => s.id === userId ? { ...s, status: newStatus } : s));
-                toast.success(`User marked as ${newStatus}`);
+                toast.success(ti(t?.Staff?.toast?.updated || 'User marked as {status}', { status: newStatus }));
                 setOpenDropdownId(null);
             } else {
                 toast.error(res.error || 'Failed to update status');
@@ -126,7 +133,7 @@ export function StaffDirectoryClient({
         startTransition(async () => {
             const res = await resendInvite(userId);
             if (res.success) {
-                toast.success('Invitation email resent successfully');
+                toast.success(t?.Staff?.toast?.resent || 'Invitation email resent successfully');
                 setOpenDropdownId(null);
             } else {
                 toast.error(res.error || 'Failed to resend invite');
@@ -136,11 +143,10 @@ export function StaffDirectoryClient({
 
     const getRoleLabel = (role: string) => {
         switch (role) {
-            case 'owner': return 'Workspace Owner';
-            case 'admin': return 'Manager';
-            case 'editor': return 'Editor';
-            case 'viewer': return 'Viewer';
-            case 'custom': return 'Crew (Custom)';
+            case 'owner': return t?.Staff?.table?.owner || 'Workspace Owner';
+            case 'admin': return t?.Staff?.drawer?.roles?.admin || 'Manager';
+            case 'viewer': return t?.Staff?.table?.viewer || 'Viewer';
+            case 'custom': return t?.Staff?.table?.custom || 'Crew (Custom)';
             default: return role;
         }
     };
@@ -150,8 +156,8 @@ export function StaffDirectoryClient({
             {/* Page Header — Figma 31058:693 */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex flex-col">
-                    <div className="m-0 p-0 text-[30px] font-bold text-[#F8FAFC] leading-[1.2em] font-['Inter']">Staff Management</div>
-                    <div className="m-0 p-0 mt-[2px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter']">Manage your team members and their access permissions</div>
+                    <div className="m-0 p-0 text-[30px] font-bold text-[#F8FAFC] leading-[1.2em] font-['Inter']">{t?.Staff?.title || 'Staff Management'}</div>
+                    <div className="m-0 p-0 mt-[2px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter']">{t?.Staff?.description || 'Manage your team members and their access permissions'}</div>
                 </div>
 
                 <div className="flex items-center gap-[12px]">
@@ -163,7 +169,7 @@ export function StaffDirectoryClient({
                             className="flex items-center justify-center gap-2 h-[48px] px-[16px] rounded-[16px] bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors font-medium text-[14px]"
                         >
                             <Trash2 className="h-4 w-4" />
-                            Delete ({selectedIds.length})
+                            {ti(t?.Staff?.deleteSelected || 'Delete ({count})', { count: selectedIds.length })}
                         </button>
                     )}
                     {/* Invite Staff Button — Figma 31058:699 */}
@@ -174,7 +180,7 @@ export function StaffDirectoryClient({
                         className="flex items-center justify-center gap-[8px] h-[48px] px-[24px] rounded-[16px] text-white text-[16px] font-semibold leading-[1.5em] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
                     >
                         <UserPlus className="h-5 w-5" />
-                        <span>Invite Staff</span>
+                        <span>{t?.Staff?.inviteBtn || 'Invite Staff'}</span>
                     </button>
                 </div>
             </div>
@@ -185,7 +191,7 @@ export function StaffDirectoryClient({
             <div className="overflow-hidden rounded-[16px] border border-white/[0.08] bg-[#1E293B]">
                 {/* Heading 2 — Figma 31058:708 */}
                 <div className="py-[16px] px-[24px] pb-[1px] border-b border-white/[0.08]">
-                    <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.556em] font-['Inter']">Staff Directory</h2>
+                    <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.556em] font-['Inter']">{t?.Staff?.directoryTitle || 'Staff Directory'}</h2>
                 </div>
 
                 {/* Loader overlay */}
@@ -200,10 +206,10 @@ export function StaffDirectoryClient({
                     <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead>
                             <tr className="border-b border-white/[0.08]">
-                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">NAME / EMAIL</th>
-                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">ROLE</th>
-                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">STATUS</th>
-                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">ACTIONS</th>
+                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.nameEmail || 'NAME / EMAIL'}</th>
+                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.role || 'ROLE'}</th>
+                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.status || 'STATUS'}</th>
+                                <th className="px-[24px] py-[16px] text-[12px] font-semibold text-[rgba(248,250,252,0.6)] uppercase tracking-[0.05em] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.actions || 'ACTIONS'}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/[0.08]">
@@ -211,6 +217,14 @@ export function StaffDirectoryClient({
                                 const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
                                     user.email.split('@')[0];
                                 const isOwner = user.role === 'owner';
+                                
+                                const isSelf = user.id === currentUserId;
+                                const isTargetOwner = user.role === 'owner';
+                                const amIOwner = currentUserRole === 'owner';
+
+                                // Owner can edit/delete anyone except themselves (to prevent accidental self-demotion or error)
+                                const canEdit = !isSelf && amIOwner;
+                                const canDelete = !isSelf && amIOwner;
 
                                 return (
                                     <tr key={user.id} className="h-[73px] border-b border-white/[0.05] hover:bg-white/[0.02] transition-colors group">
@@ -238,15 +252,15 @@ export function StaffDirectoryClient({
                                         <td className="px-[24px] whitespace-nowrap">
                                             {isOwner ? (
                                                 <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.2)]">
-                                                    <span className="text-[12px] font-semibold text-[#3B82F6] leading-[1.333em] font-['Inter']">Owner</span>
+                                                    <span className="text-[12px] font-semibold text-[#3B82F6] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.owner || 'Owner'}</span>
                                                 </div>
                                             ) : user.role === 'custom' ? (
                                                 <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(240,177,0,0.1)] border border-[rgba(240,177,0,0.2)]">
-                                                    <span className="text-[12px] font-semibold text-[#FDC700] leading-[1.333em] font-['Inter']">Custom Features</span>
+                                                    <span className="text-[12px] font-semibold text-[#FDC700] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.custom || 'Custom Features'}</span>
                                                 </div>
                                             ) : (
                                                 <div className="inline-flex items-center justify-center h-[30px] px-[12px] py-[6px] rounded-[12px] bg-[rgba(0,201,80,0.1)] border border-[rgba(0,201,80,0.2)]">
-                                                    <span className="text-[12px] font-semibold text-[#05DF72] leading-[1.333em] font-['Inter']">Full Access</span>
+                                                    <span className="text-[12px] font-semibold text-[#05DF72] leading-[1.333em] font-['Inter']">{t?.Staff?.table?.fullAccess || 'Full Access'}</span>
                                                 </div>
                                             )}
                                         </td>
@@ -256,12 +270,12 @@ export function StaffDirectoryClient({
                                             {user.status === 'active' ? (
                                                 <div className="flex items-center gap-[8px]">
                                                     <div className="w-[8px] h-[8px] rounded-full bg-[#00C950]"></div>
-                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">Active</span>
+                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.active || 'Active'}</span>
                                                 </div>
                                             ) : user.status === 'suspended' ? (
                                                 <div className="flex items-center gap-[8px]">
                                                     <div className="w-[8px] h-[8px] rounded-full bg-[#EF4444]"></div>
-                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">Suspended</span>
+                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.suspended || 'Suspended'}</span>
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center gap-[8px]">
@@ -273,27 +287,31 @@ export function StaffDirectoryClient({
 
                                         {/* ACTIONS */}
                                         <td className="px-[24px] whitespace-nowrap relative">
-                                            {isOwner ? (
+                                            {(!canEdit && !canDelete) ? (
                                                 <span className="text-[14px] font-normal text-[rgba(248,250,252,0.4)] leading-[1.428em] font-['Inter']">—</span>
                                             ) : (
                                                 <div className="flex items-center gap-[16px]">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => { setEditingStaff(user); setIsDrawerOpen(true); }}
-                                                        className="bg-transparent border-none shadow-none p-0 m-0 outline-none hover:opacity-80 transition-opacity flex items-center justify-center"
-                                                        title="Edit Details"
-                                                    >
-                                                        <Edit2 className="w-[18px] h-[18px] text-[#3B82F6]" strokeWidth={2.5} />
-                                                    </button>
+                                                    {canEdit && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { setEditingStaff(user); setIsDrawerOpen(true); }}
+                                                            className="bg-transparent border-none shadow-none p-0 m-0 outline-none hover:opacity-80 transition-opacity flex items-center justify-center"
+                                                            title="Edit Details"
+                                                        >
+                                                            <Edit2 className="w-[18px] h-[18px] text-[#3B82F6]" strokeWidth={2.5} />
+                                                        </button>
+                                                    )}
                                                     
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemove(user.id)}
-                                                        className="bg-transparent border-none shadow-none p-0 m-0 outline-none hover:opacity-80 transition-opacity flex items-center justify-center"
-                                                        title="Remove User"
-                                                    >
-                                                        <Trash2 className="w-[18px] h-[18px] text-[#FF6467]" strokeWidth={2.5} />
-                                                    </button>
+                                                    {canDelete && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemove(user.id)}
+                                                            className="bg-transparent border-none shadow-none p-0 m-0 outline-none hover:opacity-80 transition-opacity flex items-center justify-center"
+                                                            title="Remove User"
+                                                        >
+                                                            <Trash2 className="w-[18px] h-[18px] text-[#FF6467]" strokeWidth={2.5} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                         </td>
@@ -345,6 +363,8 @@ export function StaffDirectoryClient({
                 isOpen={isDrawerOpen}
                 onClose={() => { setIsDrawerOpen(false); setEditingStaff(null); }}
                 editData={editingStaff}
+                currentUserId={currentUserId}
+                tenantId={tenantId}
             />
 
             <RemoveStaffModal
