@@ -4,6 +4,16 @@ import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 
+// ─── Types & Helpers ──────────────────────────────────────────────────────
+type TenantEntry = { tenant: { id: string } | string; role?: string; status?: string }
+type UserWithTenants = { id: string; email: string; tenants?: TenantEntry[] }
+
+function getTenantId(user: UserWithTenants): string | undefined {
+    const entry = user.tenants?.[0]
+    if (!entry) return undefined
+    return typeof entry.tenant === 'object' ? entry.tenant.id : entry.tenant
+}
+
 // ─── Blog Categories ───────────────────────────────────────────────────────
 export async function getBlogCategoriesAction() {
     const user = await getCurrentUser()
@@ -12,7 +22,7 @@ export async function getBlogCategoriesAction() {
     const payload = await getPayload({ config: configPromise })
 
     // Get the first tenant from user's tenants array
-    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const tenantId = getTenantId(user as UserWithTenants)
 
     // Apply tenant filtering
     const where: any = {}
@@ -37,7 +47,7 @@ export async function createBlogCategoryAction(data: { name: string }) {
     }
 
     const payload = await getPayload({ config: configPromise })
-    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const tenantId = getTenantId(user as UserWithTenants)
 
     let siteId = null
     if (tenantId) {
@@ -84,7 +94,7 @@ export async function updateBlogCategoryAction(id: string, data: { name: string 
     try {
         // Check Tenant Isolation
         const existing = await payload.findByID({ collection: 'blog_categories', id })
-        const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+        const tenantId = getTenantId(user as UserWithTenants)
         const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
         if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
@@ -115,7 +125,7 @@ export async function deleteBlogCategoryAction(id: string) {
     try {
         // Check Tenant Isolation
         const existing = await payload.findByID({ collection: 'blog_categories', id })
-        const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+        const tenantId = getTenantId(user as UserWithTenants)
         const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
         if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
@@ -162,7 +172,7 @@ export async function saveBlogAction(data: {
     const isNew = !data.id || data.id === 'new'
 
     // Get the first tenant from user's tenants array (similar to how Products does)
-    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const tenantId = getTenantId(user as UserWithTenants)
 
     // Fetch the site associated with this tenant
     let siteId = null
@@ -185,7 +195,7 @@ export async function saveBlogAction(data: {
         category: data.category ? (isNaN(Number(data.category)) ? data.category : Number(data.category)) : null,
         thumbnail: data.thumbnail ? (isNaN(Number(data.thumbnail)) ? data.thumbnail : Number(data.thumbnail)) : null,
         seo: data.seo || {},
-        author: (user as any).id,
+        author: (user as UserWithTenants).id,
     }
 
     if (isNew) {
@@ -222,7 +232,7 @@ export async function listBlogsAction(params: {
     if (!user) return { data: [], meta: null }
 
     const payload = await getPayload({ config: configPromise })
-    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const tenantId = getTenantId(user as UserWithTenants)
 
     const where: Record<string, any> = {}
     if (tenantId) where.tenant = { equals: tenantId }
@@ -264,7 +274,7 @@ export async function deleteBlogAction(id: string) {
     const payload = await getPayload({ config: configPromise })
 
     const existing = await payload.findByID({ collection: 'blogs', id })
-    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const tenantId = getTenantId(user as UserWithTenants)
     const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
     if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {
@@ -288,7 +298,7 @@ export async function updateBlogStatusAction(id: string, status: string) {
     const payload = await getPayload({ config: configPromise })
 
     const existing = await payload.findByID({ collection: 'blogs', id })
-    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const tenantId = getTenantId(user as UserWithTenants)
     const blogTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
     if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {
@@ -316,7 +326,7 @@ export async function getBlogByIdAction(id: string) {
         id,
     })
 
-    const tenantId = (user as any).tenants?.[0]?.tenant?.id || (user as any).tenants?.[0]?.tenant
+    const tenantId = getTenantId(user as UserWithTenants)
     const blogTenantId = typeof result.tenant === 'object' ? result.tenant?.id : result.tenant
 
     if (tenantId && blogTenantId && String(tenantId) !== String(blogTenantId)) {
