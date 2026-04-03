@@ -122,6 +122,6 @@ export async function uploadQrMedia(formData: FormData) {
         return { success: true, doc: media };
     } catch (error: unknown) {
         console.error("Media upload action error:", error);
-        return { success: false, error: 'Internal server error', detail: error instanceof Error ? error.message : String(error) };
+        return { success: false, error: 'Internal server error' };
     }
 }
