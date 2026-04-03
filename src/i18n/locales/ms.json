@@ -713,6 +713,7 @@
                     "stockMax": "Stok terlalu besar",
                     "urlSlugMin": "URL Slug terlalu pendek",
                     "urlSlugMax": "URL Slug terlalu panjang",
+                    "urlSlugInvalid": "Slug mesti huruf kecil alfanumerik mengandungi sempang",
                     "seoTitleMax": "Tajuk Meta terlalu panjang",
                     "seoDescMax": "Penerangan Meta terlalu panjang",
                     "imagesMax": "Maksimum 5 gambar dibenarkan",

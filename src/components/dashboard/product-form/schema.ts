@@ -1,6 +1,8 @@
   import { z } from 'zod'
 
-export const getProductFormSchema = (t: any) => {
+type ProductFormI18n = { dashboard?: { products?: { form?: { errors?: Record<string, string> } } } };
+
+export const getProductFormSchema = (t: ProductFormI18n) => {
     const errorT = t?.dashboard?.products?.form?.errors || {};
 
     const optionTierSchema = z.object({

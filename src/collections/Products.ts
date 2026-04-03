@@ -293,7 +293,7 @@ export const Products: CollectionConfig = {
             },
             validate: (value: unknown[] | null | undefined) => {
                 if (Array.isArray(value)) {
-                    const names = value.map((v: any) => v.name?.trim().toLowerCase()).filter(Boolean);
+                    const names = value.map((v) => (v as { name?: string })?.name?.trim().toLowerCase()).filter(Boolean);
                     if (new Set(names).size !== names.length) return 'Tier names must be unique (cannot duplicate names)';
                 }
                 return true;
@@ -307,7 +307,7 @@ export const Products: CollectionConfig = {
                     maxRows: 30,
                     validate: (value: unknown[] | null | undefined) => {
                         if (Array.isArray(value)) {
-                            const opts = value.map(v => (v as any).value?.trim().toLowerCase()).filter(Boolean);
+                            const opts = value.map(v => (v as { value?: string })?.value?.trim().toLowerCase()).filter(Boolean);
                             if (new Set(opts).size !== opts.length) return 'Options must be unique (no duplicates allowed)';
                         }
                         return true;
@@ -328,7 +328,7 @@ export const Products: CollectionConfig = {
             },
             validate: (value: unknown[] | null | undefined) => {
                 if (Array.isArray(value)) {
-                    const skus = value.map((v: any) => v.sku?.trim().toLowerCase()).filter(Boolean);
+                    const skus = value.map((v) => (v as { sku?: string })?.sku?.trim().toLowerCase()).filter(Boolean);
                     if (new Set(skus).size !== skus.length) return 'SKU Codes must be unique across variants';
                 }
                 return true;
