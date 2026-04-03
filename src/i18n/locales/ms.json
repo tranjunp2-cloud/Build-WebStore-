@@ -1400,5 +1400,81 @@
                 "aSst": "Ya, apabila anda mengaktifkan <strong>SST</strong> dalam <strong>Tetapan Kedai → Konfigurasi Cukai</strong>, sistem mengira 6% SST secara automatik dan memaparkannya dengan jelas kepada pembeli."
             }
         }
+    },
+    "Staff": {
+        "title": "Pengurusan Kakitangan",
+        "description": "Urus ahli pasukan anda dan kebenaran akses mereka",
+        "deleteSelected": "Padam ({count})",
+        "inviteBtn": "Jemput Staf",
+        "directoryTitle": "Senarai Staf",
+        "table": {
+            "nameEmail": "NAMA / E-MEL",
+            "role": "PERANAN",
+            "status": "STATUS",
+            "actions": "TINDAKAN",
+            "owner": "Pemilik",
+            "custom": "Akses Khas",
+            "fullAccess": "Akses Penuh",
+            "viewer": "Pemerhati",
+            "active": "Aktif",
+            "suspended": "Digantung",
+            "pending": "Menunggu"
+        },
+        "actions": {
+            "edit": "Ubah Kebenaran",
+            "resend": "Hantar Semula",
+            "suspend": "Gantung",
+            "unsuspend": "Batal Gantung",
+            "remove": "Buang",
+            "you": " (Anda)"
+        },
+        "drawer": {
+            "inviteTitle": "Jemput Staf",
+            "editTitle": "Ubah Kebenaran",
+            "saveBtn": "Simpan",
+            "sendInviteBtn": "Hantar Jemputan",
+            "cancelBtn": "Batal",
+            "firstName": "Nama Depan",
+            "lastName": "Nama Belakang",
+            "email": "Alamat E-mel",
+            "emailNeeded": "Kami memerlukan e-mel untuk menghantar jemputan.",
+            "roles": {
+                "label": "Tahap Akses",
+                "admin": "Pengurus",
+                "adminDesc": "Akses penuh kepada semua ruang kerja dan tetapan",
+                "custom": "Tersuai",
+                "customDesc": "Pilih akses spesifik secara individu"
+            },
+            "permissions": {
+                "categories": {
+                    "Dashboard": "Papan Pemuka",
+                    "Marketing": "Pemasaran",
+                    "Business": "Perniagaan",
+                    "Site": "Tapak"
+                },
+                "items": {
+                    "Dashboard, Overview": "Papan Pemuka, Umum",
+                    "Orders": "Pesanan",
+                    "Products": "Produk",
+                    "Vouchers": "Baucar",
+                    "Store Configuration": "Konfigurasi Kedai",
+                    "Store Design": "Reka Bentuk Kedai",
+                    "Pages": "Halaman"
+                }
+            }
+        },
+        "removeModal": {
+            "title": "Buang Akses",
+            "desc1": "Adakah anda pasti mahu membuang akses untuk pengguna ini?",
+            "desc2": "Individu ini akan kehilangan akses serta-merta ke sistem. Tindakan ini tidak boleh dibatalkan.",
+            "cancel": "Batal",
+            "confirm": "Ya, Buang"
+        },
+        "toast": {
+            "removed": "Pengguna dikeluarkan",
+            "removedBulk": "Staf yang dipilih telah dibuang",
+            "updated": "Pengguna ditandakan sebagai {status}",
+            "resent": "E-mel jemputan berjaya dihantar semula"
+        }
     }
 }

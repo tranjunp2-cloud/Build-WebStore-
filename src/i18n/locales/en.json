@@ -1400,5 +1400,81 @@
                 "aSst": "Yes, when you enable <strong>SST</strong> in <strong>Store Settings → Tax Configuration</strong>, the system calculates 6% SST automatically and displays it clearly to the buyer."
             }
         }
+    },
+    "Staff": {
+        "title": "Staff Management",
+        "description": "Manage your team members and their access permissions",
+        "deleteSelected": "Delete ({count})",
+        "inviteBtn": "Invite Staff",
+        "directoryTitle": "Staff Directory",
+        "table": {
+            "nameEmail": "NAME / EMAIL",
+            "role": "ROLE",
+            "status": "STATUS",
+            "actions": "ACTIONS",
+            "owner": "Owner",
+            "custom": "Custom Features",
+            "fullAccess": "Full Access",
+            "viewer": "Viewer",
+            "active": "Active",
+            "suspended": "Suspended",
+            "pending": "Pending Inv."
+        },
+        "actions": {
+            "edit": "Edit Permission",
+            "resend": "Resend Invite",
+            "suspend": "Suspend Access",
+            "unsuspend": "Unsuspend Access",
+            "remove": "Remove",
+            "you": " (You)"
+        },
+        "drawer": {
+            "inviteTitle": "Invite Staff",
+            "editTitle": "Edit Permissions",
+            "saveBtn": "Save Changes",
+            "sendInviteBtn": "Send Invite",
+            "cancelBtn": "Cancel",
+            "firstName": "First name",
+            "lastName": "Last name",
+            "email": "Email Address",
+            "emailNeeded": "We need an email so we can send an invitation.",
+            "roles": {
+                "label": "Access Level",
+                "admin": "Manager",
+                "adminDesc": "Have full access to all workspaces and settings",
+                "custom": "Custom",
+                "customDesc": "Select specific access individually"
+            },
+            "permissions": {
+                "categories": {
+                    "Dashboard": "Dashboard",
+                    "Marketing": "Marketing",
+                    "Business": "Business",
+                    "Site": "Site"
+                },
+                "items": {
+                    "Dashboard, Overview": "Dashboard, Overview",
+                    "Orders": "Orders",
+                    "Products": "Products",
+                    "Vouchers": "Vouchers",
+                    "Store Configuration": "Store Configuration",
+                    "Store Design": "Store Design",
+                    "Pages": "Pages"
+                }
+            }
+        },
+        "removeModal": {
+            "title": "Remove Staff Access",
+            "desc1": "Are you sure you want to remove access for this user?",
+            "desc2": "This person will immediately lose access to the system and all store data. This action cannot be undone.",
+            "cancel": "Cancel",
+            "confirm": "Yes, Remove"
+        },
+        "toast": {
+            "removed": "User removed from workspace",
+            "removedBulk": "Selected staff removed successfully",
+            "updated": "User marked as {status}",
+            "resent": "Invitation email resent successfully"
+        }
     }
 }
