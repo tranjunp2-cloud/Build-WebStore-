@@ -72,18 +72,41 @@ export const Users: CollectionConfig = {
                 const user = args?.user || {}
                 const req = args?.req
 
-                // Use req.headers' host/origin if available to point to correct portal
+                // Use req.headers' host/origin if available but strictly validate against allowlist
+                // to prevent Host Header Injection.
                 let serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
                 if (req && req.headers) {
-                    const origin = typeof req.headers.get === 'function' ? req.headers.get('origin') : (req.headers as any).origin
-                    const host = typeof req.headers.get === 'function' ? req.headers.get('host') : (req.headers as any).host
+                    const headers = req.headers as Headers | Record<string, string | string[] | undefined>
+                    const isHeadersObj = typeof (headers as Headers).get === 'function'
 
-                    if (origin && !origin.includes('null')) {
-                        serverUrl = origin
-                    } else if (host && !host.includes('localhost')) {
-                        // Assuming https for deployed environments, fallback for local is handled by NEXT_PUBLIC_SERVER_URL defaulting to localhost:3000
-                        const proto = typeof req.headers.get === 'function' ? (req.headers.get('x-forwarded-proto') || 'https') : 'https'
-                        serverUrl = `${proto}://${host}`
+                    const origin = isHeadersObj ? (headers as Headers).get('origin') : (headers as Record<string, string | string[] | undefined>)['origin']
+                    const host = isHeadersObj ? (headers as Headers).get('host') : (headers as Record<string, string | string[] | undefined>)['host']
+
+                    const originStr = Array.isArray(origin) ? origin[0] : origin
+                    const hostStr = Array.isArray(host) ? host[0] : host
+
+                    const allowedOrigins = [
+                        process.env.NEXT_PUBLIC_SERVER_URL,
+                        process.env.NEXT_PUBLIC_APP_URL,
+                        'http://localhost:3000',
+                    ].filter(Boolean) as string[]
+
+                    if (process.env.ALLOWED_ORIGINS) {
+                        allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()))
+                    }
+
+                    if (originStr && !originStr.includes('null') && allowedOrigins.includes(originStr)) {
+                        serverUrl = originStr
+                    } else if (hostStr && !hostStr.includes('localhost')) {
+                        const protoVal = isHeadersObj ? (headers as Headers).get('x-forwarded-proto') : (headers as Record<string, string | string[] | undefined>)['x-forwarded-proto']
+                        const protoStr = Array.isArray(protoVal) ? protoVal[0] : protoVal
+
+                        const proto = protoStr || 'https'
+                        const potentialUrl = `${proto}://${hostStr}`
+
+                        if (allowedOrigins.includes(potentialUrl)) {
+                            serverUrl = potentialUrl
+                        }
                     }
                 }
 
