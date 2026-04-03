@@ -10,8 +10,8 @@ type UserWithTenants = { id: string; email: string; tenants?: TenantEntry[] }
 
 function getTenantId(user: UserWithTenants): string | undefined {
     const entry = user.tenants?.[0]
-    if (!entry) return undefined
-    return typeof entry.tenant === 'object' ? entry.tenant.id : entry.tenant
+    if (!entry?.tenant) return undefined
+    return typeof entry.tenant === 'object' ? entry.tenant?.id : entry.tenant
 }
 
 // ─── Blog Categories ───────────────────────────────────────────────────────
