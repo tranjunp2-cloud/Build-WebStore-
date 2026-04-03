@@ -127,25 +127,26 @@ describe('otpVerificationEmail — MS locale (TC-F02.21, TC-F02.23)', () => {
 })
 
 describe('otpVerificationEmail — OTP code formatting (TC-F02.23)', () => {
-    it('formats 6-digit OTP with double spaces between each digit', () => {
+    it('formats 6-digit OTP with letter-spacing CSS', () => {
         const result = otpVerificationEmail({ userName: 'Ali', otpCode: '377528' })
-        // "377528" → "3  7  7  5  2  8" (double space separator)
-        expect(result.html).toContain('3  7  7  5  2  8')
+        // "377528" is unspaced but styled with letter-spacing: 12px
+        expect(result.html).toContain('377528')
+        expect(result.html).toContain('letter-spacing: 12px')
     })
 
     it('formats all-zeros OTP correctly', () => {
         const result = otpVerificationEmail({ userName: 'Ali', otpCode: '000000' })
-        expect(result.html).toContain('0  0  0  0  0  0')
+        expect(result.html).toContain('000000')
     })
 
     it('formats all-nines OTP correctly', () => {
         const result = otpVerificationEmail({ userName: 'Ali', otpCode: '999999' })
-        expect(result.html).toContain('9  9  9  9  9  9')
+        expect(result.html).toContain('999999')
     })
 
     it('formats mixed-digit OTP correctly', () => {
         const result = otpVerificationEmail({ userName: 'Ali', otpCode: '102938' })
-        expect(result.html).toContain('1  0  2  9  3  8')
+        expect(result.html).toContain('102938')
     })
 
     it('OTP rendered in monospace font element', () => {
@@ -153,12 +154,10 @@ describe('otpVerificationEmail — OTP code formatting (TC-F02.23)', () => {
         expect(result.html).toContain('Courier New')
     })
 
-    it('OTP does NOT appear as raw unspaced string in the OTP box', () => {
-        // Ensure the raw OTP code "123456" is NOT present as-is (it should be spaced)
+    it('OTP appears as raw unspaced string but has nowrap style to prevent breaking', () => {
         const result = otpVerificationEmail({ userName: 'Ali', otpCode: '123456' })
-        // The formatted version "1  2  3  4  5  6" should be present but not "123456"
-        // (the raw code may appear in other places, so we just verify the formatted one IS present)
-        expect(result.html).toContain('1  2  3  4  5  6')
+        expect(result.html).toContain('123456')
+        expect(result.html).toContain('white-space: nowrap')
     })
 })
 
