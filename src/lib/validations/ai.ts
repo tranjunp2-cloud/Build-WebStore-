@@ -6,9 +6,31 @@ export const generateSiteSchema = z.object({
         industry: z.string().min(1),
         products: z.string().min(1),
         shortDescription: z.string().min(1),
+        businessUrl: z.string().url().optional(),
+        source: z.enum(['form', 'url']).optional(),
     }),
     extraInstructions: z.string().optional(),
     language: z.enum(['en', 'ms', 'vi', 'auto']).optional(),
+})
+
+export const extractFromUrlSchema = z.object({
+    url: z.string().url().max(2048),
+})
+
+export const extractionResultSchema = z.object({
+    businessName: z.string().default(''),
+    industry: z.string().default(''),
+    shortDescription: z.string().default(''),
+    products: z.string().default(''),
+    suggestedTheme: z
+        .object({
+            primaryColor: z.string().optional(),
+            secondaryColor: z.string().optional(),
+            siteType: z.string().optional(),
+        })
+        .optional(),
+    detectedLanguage: z.enum(['en', 'ms', 'vi']).default('en'),
+    confidence: z.enum(['high', 'medium', 'low']).default('medium'),
 })
 
 export const editBlockSchema = z.object({

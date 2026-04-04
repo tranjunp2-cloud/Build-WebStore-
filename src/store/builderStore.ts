@@ -31,6 +31,8 @@ export type BusinessInfo = {
     industry: string
     products: string
     language?: 'en' | 'ms' | 'vi' | 'auto'
+    businessUrl?: string
+    source?: 'form' | 'url'
 }
 
 type BuilderState = {

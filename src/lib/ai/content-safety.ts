@@ -33,6 +33,33 @@ function normalizeForSafety(value: string) {
         .trim()
 }
 
+const BLOCKED_DOMAINS = ['localhost', '127.0.0.1', '0.0.0.0']
+
+export function checkUrlSafety(url: string): { safe: boolean; message: string } {
+    try {
+        const parsed = new URL(url)
+        const hostname = parsed.hostname.toLowerCase()
+        if (BLOCKED_DOMAINS.some((d) => hostname === d || hostname.endsWith(`.${d}`))) {
+            return { safe: false, message: 'This URL is not allowed.' }
+        }
+        return { safe: true, message: '' }
+    } catch {
+        return { safe: false, message: 'Invalid URL format.' }
+    }
+}
+
+export function checkScrapedContentSafety(text: string): { safe: boolean; message: string } {
+    const normalized = normalizeForSafety(text)
+    const matchedTerm = BLOCKED_TERMS.find((term) => normalized.includes(normalizeForSafety(term)))
+    if (!matchedTerm) {
+        return { safe: true, message: '' }
+    }
+    return {
+        safe: false,
+        message: 'The website content contains restricted material and cannot be processed.',
+    }
+}
+
 export function checkBusinessInfoSafety(input: BusinessInfoSafetyInput) {
     const combined = normalizeForSafety(
         [

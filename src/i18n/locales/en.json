@@ -187,7 +187,28 @@
                 "industry": "Please select an industry",
                 "shortDescription": "Please describe your business",
                 "products": "Please describe your products / services"
-            }
+            },
+            "tabManual": "Describe Business",
+            "tabUrl": "Import from URL",
+            "urlLabel": "Website URL",
+            "urlPlaceholder": "https://your-website.com",
+            "urlHint": "Paste your existing website URL",
+            "extractButton": "Extract",
+            "extracting": "Extracting...",
+            "analyzingWebsite": "Analyzing website...",
+            "extractingInfo": "Extracting business info...",
+            "confidenceHigh": "Extracted from URL",
+            "confidenceMedium": "Partially extracted",
+            "confidenceLow": "Limited info extracted",
+            "warningLow": "We couldn't extract much. Please review and fill in the missing information.",
+            "warningMedium": "Some fields may need manual editing.",
+            "errorTimeout": "We couldn't access this website. It may be too slow or blocking our request.",
+            "errorBlocked": "This website blocked our request. Please enter your business info manually.",
+            "errorInvalid": "This doesn't appear to be a valid website URL.",
+            "errorUnsafe": "This URL contains content that is not allowed.",
+            "errorRateLimit": "Too many requests. Please wait a moment and try again.",
+            "errorGeneric": "Something went wrong. Please try again or enter info manually.",
+            "tryManual": "Try manual entry"
         }
     },
     "email": {
