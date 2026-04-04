@@ -2,6 +2,7 @@ import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import { filterNavigationLinksByVisibility } from '@/lib/navigation'
+import { GoogleFontsLoader } from './GoogleFontsLoader'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
@@ -43,6 +44,7 @@ export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
 
     return (
         <>
+            <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
             <style>{`
           :root {
             --brand-primary: ${theme.primaryColor};

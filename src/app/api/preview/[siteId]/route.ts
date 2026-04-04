@@ -527,7 +527,16 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
     if (normalizedFooter) combinedBlocks.push(normalizedFooter)
 
     const cat = detectCategory(combinedBlocks, site.name || '')
-    const t = THEMES[cat] || THEMES.business
+    const baseTheme = THEMES[cat] || THEMES.business
+    // Merge site's actual theme (user-chosen fonts/colors) over industry defaults
+    const siteTheme = (site as Record<string, unknown>).theme as Record<string, string> | undefined
+    const t: TemplateTheme = {
+      ...baseTheme,
+      ...(siteTheme?.fontHeading ? { fontHeading: siteTheme.fontHeading } : {}),
+      ...(siteTheme?.fontBody ? { fontBody: siteTheme.fontBody } : {}),
+      ...(siteTheme?.primaryColor ? { primary: siteTheme.primaryColor } : {}),
+      ...(siteTheme?.secondaryColor ? { secondary: siteTheme.secondaryColor } : {}),
+    }
     const html = buildFullHTML(combinedBlocks, t, cat, {
       name: page?.seo?.title || site.seo?.metaTitle || site.name,
       description: page?.seo?.description || site.seo?.metaDescription || site.description,

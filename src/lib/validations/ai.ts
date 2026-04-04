@@ -28,6 +28,6 @@ export const rewriteTextSchema = z.object({
 })
 
 export const applyTemplateSchema = z.object({
-    templateId: z.string().min(1),
-    siteId: z.string().optional(),
+    templateId: z.union([z.string().min(1), z.number()]).transform(String),
+    siteId: z.union([z.string(), z.number()]).optional().transform((v) => v != null ? String(v) : undefined),
 })

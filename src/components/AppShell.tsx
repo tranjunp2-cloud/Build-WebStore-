@@ -11,13 +11,13 @@ import '../app/globals.css'
 import { Inter, Outfit } from 'next/font/google'
 
 const inter = Inter({
-    subsets: ['latin'],
+    subsets: ['latin', 'vietnamese'],
     variable: '--font-inter',
     display: 'swap',
 })
 
 const outfit = Outfit({
-    subsets: ['latin'],
+    subsets: ['latin', 'latin-ext'],
     variable: '--font-outfit',
     display: 'swap',
 })

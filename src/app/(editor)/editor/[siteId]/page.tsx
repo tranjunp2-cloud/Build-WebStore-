@@ -16,6 +16,7 @@ import { useEditorStore } from '@/store/editorStore'
 import type { AIAction } from '@/types/editor'
 import { PrePublishModal } from '@/components/editor/PrePublishModal'
 import { UnpublishModal } from '@/components/editor/UnpublishModal'
+import { EditorTemplateModal } from '@/components/editor/EditorTemplateModal'
 
 type SiteData = {
     id: string
@@ -86,6 +87,7 @@ export default function EditorPage() {
     const [isCompactLayout, setIsCompactLayout] = useState(false)
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
+    const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
 
     const blocks = useEditorStore(state => state.blocks)
     const theme = useEditorStore(state => state.theme)
@@ -664,7 +666,7 @@ export default function EditorPage() {
                 viewport={viewport}
                 compact={isCompactLayout}
                 onOpenMenu={() => setIsMenuOpen(true)}
-                onOpenTemplates={() => toast.info('Template gallery will be connected in the next step.')}
+                onOpenTemplates={() => setIsTemplateModalOpen(true)}
                 onPageSelected={handlePageSelected}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
@@ -754,6 +756,17 @@ export default function EditorPage() {
                 onOpenChange={setIsUnpublishModalOpen}
                 onUnpublish={handlePublish}
                 isPublishing={isPublishing}
+            />
+
+            <EditorTemplateModal
+                isOpen={isTemplateModalOpen}
+                onClose={() => setIsTemplateModalOpen(false)}
+                siteId={siteId}
+                onApplied={() => {
+                    setIsTemplateModalOpen(false)
+                    // Reload editor with new template data
+                    window.location.reload()
+                }}
             />
         </div>
     )

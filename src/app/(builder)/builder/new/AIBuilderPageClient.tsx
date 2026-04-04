@@ -14,6 +14,7 @@ import type { BuilderPreviewMode } from '@/components/builder/BuilderPreviewPrim
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
+import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
 
 export interface AIBuilderPageClientProps {
@@ -95,6 +96,8 @@ function LivePreview({
     if (!theme || blocks.length === 0) return null
 
     return (
+        <>
+        <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
         <Reorder.Group
             axis="y"
             className="min-h-full w-full"
@@ -146,6 +149,7 @@ function LivePreview({
                 )
             })}
         </Reorder.Group>
+        </>
     )
 }
 
