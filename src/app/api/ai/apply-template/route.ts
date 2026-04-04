@@ -45,14 +45,13 @@ export const POST = withAuth(async (user, req) => {
             return NextResponse.json({ error: 'Template not found' }, { status: 404 })
         }
 
-        // Get tenant
-        const tenantResult = await payload.find({
-            collection: 'tenants',
-            where: { 'users.user': { equals: user.id } },
-            limit: 1,
-        })
-        const tenant = tenantResult.docs[0]
-        if (!tenant) {
+        // Get tenant from user object (same pattern as generate-site)
+        const userWithTenants = user as { id: number | string; tenants?: Array<{ tenant: unknown }> }
+        let tenantId = userWithTenants.tenants?.[0]?.tenant
+        if (typeof tenantId === 'object' && tenantId !== null) {
+            tenantId = (tenantId as Record<string, unknown>).id
+        }
+        if (!tenantId) {
             return NextResponse.json({ error: 'Tenant not found' }, { status: 400 })
         }
 
@@ -83,7 +82,7 @@ export const POST = withAuth(async (user, req) => {
             const siteTenantId = typeof existingSite.tenant === 'object'
                 ? (existingSite.tenant as Record<string, unknown>).id
                 : existingSite.tenant
-            if (String(siteTenantId) !== String(tenant.id)) {
+            if (String(siteTenantId) !== String(tenantId)) {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
             }
 
@@ -133,7 +132,7 @@ export const POST = withAuth(async (user, req) => {
             collection: 'sites',
             data: {
                 name: String(template.name || 'Untitled'),
-                tenant: tenant.id,
+                tenant: tenantId,
                 status: 'draft',
                 siteType: Array.isArray(template.category) ? String(template.category[0]) : String(template.category || 'business'),
                 theme: templateTheme,
@@ -147,7 +146,7 @@ export const POST = withAuth(async (user, req) => {
                 title: 'Home',
                 slug: 'home',
                 site: site.id,
-                tenant: tenant.id,
+                tenant: tenantId,
                 isHomepage: true,
                 status: 'draft',
                 layout: blocks,
@@ -161,7 +160,7 @@ export const POST = withAuth(async (user, req) => {
                 title: '404 Not Found',
                 slug: '404',
                 site: site.id,
-                tenant: tenant.id,
+                tenant: tenantId,
                 isHomepage: false,
                 status: 'draft',
                 layout: blocks,

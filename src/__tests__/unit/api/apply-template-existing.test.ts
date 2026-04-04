@@ -14,7 +14,11 @@ import { NextRequest } from 'next/server'
 // ── Mocks — MUST be declared before any imports that trigger module resolution ──
 
 // Bypass withAuth HOC — inject authenticated user directly
-let mockUser = { id: 'user-42', email: 'owner@example.com' }
+let mockUser: Record<string, unknown> = {
+    id: 'user-42',
+    email: 'owner@example.com',
+    tenants: [{ tenant: { id: 'tenant-99' }, role: 'owner', status: 'active' }],
+}
 
 vi.mock('@/lib/auth', () => ({
     withAuth: vi.fn().mockImplementation((handler: any) => {
@@ -119,7 +123,11 @@ describe('POST /api/ai/apply-template', () => {
 
         // Reset all control flags and mock state to known defaults
         mockRateLimitAllowed = true
-        mockUser = { id: 'user-42', email: 'owner@example.com' }
+        mockUser = {
+            id: 'user-42',
+            email: 'owner@example.com',
+            tenants: [{ tenant: { id: 'tenant-99' }, role: 'owner', status: 'active' }],
+        }
         mockTemplate = { ...DEFAULT_TEMPLATE }
         mockTenant = { ...DEFAULT_TENANT }
         mockSite = { ...DEFAULT_SITE }
@@ -275,8 +283,8 @@ describe('POST /api/ai/apply-template', () => {
         })
 
         it('returns 400 when user has no associated tenant', async () => {
-            // Arrange
-            mockTenant = null
+            // Arrange — user.tenants is empty (no tenant assigned)
+            mockUser = { id: 'user-42', email: 'owner@example.com', tenants: [] }
             const req = makeRequest({ templateId: 'tpl-modern' })
 
             // Act
