@@ -218,7 +218,35 @@ export default function BusinessInfoForm({
 
             setExtractionResult(result)
 
-            // Auto-fill form fields
+            // Build payload from extraction result
+            const extractedInfo: BusinessInfo = {
+                businessName: result.businessName || '',
+                industry: result.industry || '',
+                shortDescription: result.shortDescription || '',
+                products: result.products || '',
+                language: result.detectedLanguage === 'ms' ? 'ms' : result.detectedLanguage === 'vi' ? 'vi' : 'auto',
+                businessUrl: urlValue,
+                source: 'url',
+            }
+
+            // If all required fields extracted → generate immediately (skip review)
+            const canAutoGenerate =
+                extractedInfo.businessName.trim().length >= 3 &&
+                extractedInfo.industry.trim().length > 0 &&
+                extractedInfo.shortDescription.trim().length >= 3 &&
+                extractedInfo.products.trim().length >= 3
+
+            if (canAutoGenerate) {
+                // Direct generation — no review step needed
+                if (onSubmit) {
+                    onSubmit(extractedInfo)
+                } else {
+                    setBusinessInfo(extractedInfo)
+                }
+                return
+            }
+
+            // Fallback: not enough data → show form for user to fill gaps
             setForm((current) => ({
                 ...current,
                 businessName: result.businessName || current.businessName,
@@ -226,8 +254,6 @@ export default function BusinessInfoForm({
                 shortDescription: result.shortDescription || current.shortDescription,
                 products: result.products || current.products,
             }))
-
-            // Switch to manual view so user can review
             setInputMode('manual')
             setErrors({})
 
