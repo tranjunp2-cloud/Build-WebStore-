@@ -27,6 +27,11 @@ export const BLOCK_TYPES = [
     'products-grid', 'products-featured',
     'video', 'logo-cloud', 'blog-list', 'custom-html',
     'socialWidget', 'cartWidget',
+    // v1.1 — Block Library Expansion
+    'pricing-table', 'gallery-masonry', 'whatsapp-button', 'google-maps', 'social-proof',
+    'countdown-timer', 'before-after', 'feature-comparison', 'download-cta', 'video-background',
+    'breadcrumb', 'divider', 'announcement-bar', 'client-logos', 'accordion',
+    'step-process', 'portfolio-grid', 'menu-food', 'service-cards', 'carousel',
 ] as const
 
 export type BlockType = (typeof BLOCK_TYPES)[number]

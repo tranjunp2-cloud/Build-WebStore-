@@ -20,6 +20,7 @@ interface PreviewFrameProps {
     onInlineEditApplied?: (content: string, blockIndex: number) => void
     onReorderBlocks?: (fromIndex: number, toIndex: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
+    disableDragDrop?: boolean
 }
 
 type HoverRect = {
@@ -146,6 +147,7 @@ function PreviewFrameInner({
     onInlineEditApplied,
     onReorderBlocks,
     onBlockDrop,
+    disableDragDrop = false,
 }: PreviewFrameProps) {
     const { blocks, updateBlock } = useEditorStore()
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
@@ -384,7 +386,7 @@ function PreviewFrameInner({
             type: 'EXEC_COMMAND',
             command,
             value
-        }, '*')
+        }, window.location.origin)
     }, [frameElement])
 
     const handleImageReplace = useCallback(async (file: File) => {
@@ -707,7 +709,7 @@ function PreviewFrameInner({
                         const activeLayout = blockHover || (selectedBlock !== null
                             ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
                             : null)
-                        if (!activeLayout || !overlayOffset || dragState || ['navigation', 'footer'].includes(activeLayout.blockType)) {
+                        if (!activeLayout || !overlayOffset || dragState || disableDragDrop || ['navigation', 'footer'].includes(activeLayout.blockType)) {
                             return null
                         }
 

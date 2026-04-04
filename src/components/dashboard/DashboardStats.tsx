@@ -46,7 +46,7 @@ export function DashboardStats(props: DashboardStatsProps) {
     }
 
     return (
-        <div className="grid grid-cols-1 gap-3 md:gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 md:gap-4 sm:grid-cols-3">
             {order.map(key => STAT_CARDS[key as keyof typeof STAT_CARDS] || null)}
         </div>
     )

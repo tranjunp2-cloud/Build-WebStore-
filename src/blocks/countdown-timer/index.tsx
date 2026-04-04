@@ -1,0 +1,135 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import type { BlockProps } from '../types'
+import type { CountdownTimerConfig } from './config'
+import { AnimatedSection } from '../shared/animations'
+
+function calcTimeLeft(target: string) {
+    const diff = new Date(target).getTime() - Date.now()
+    if (diff <= 0) return null
+    return {
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / (1000 * 60)) % 60),
+        seconds: Math.floor((diff / 1000) % 60),
+    }
+}
+
+function TimeBox({ value, label, pc }: { value: number; label: string; pc: string }) {
+    return (
+        <div
+            className="flex flex-col items-center gap-2 rounded-xl px-4 py-3 md:px-6 md:py-4 min-w-[70px]"
+            style={{ background: `${pc}12`, border: `1px solid ${pc}20` }}
+        >
+            <span className="text-3xl md:text-5xl font-bold font-heading" style={{ color: pc }}>
+                {String(value).padStart(2, '0')}
+            </span>
+            <span className="text-xs uppercase tracking-wider opacity-50">{label}</span>
+        </div>
+    )
+}
+
+export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerConfig>) {
+    const {
+        variant = 'banner',
+        headline,
+        targetDate,
+        expiredMessage = 'This offer has expired',
+        showDays = true,
+        showHours = true,
+        showMinutes = true,
+        showSeconds = true,
+    } = block
+    const pc = theme.primaryColor
+    const [timeLeft, setTimeLeft] = useState(calcTimeLeft(targetDate))
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const tl = calcTimeLeft(targetDate)
+            setTimeLeft(tl)
+            if (!tl) clearInterval(timer)
+        }, 1000)
+        return () => clearInterval(timer)
+    }, [targetDate])
+
+    const units = [
+        showDays && timeLeft && { value: timeLeft.days, label: 'Days' },
+        showHours && timeLeft && { value: timeLeft.hours, label: 'Hours' },
+        showMinutes && timeLeft && { value: timeLeft.minutes, label: 'Minutes' },
+        showSeconds && timeLeft && { value: timeLeft.seconds, label: 'Seconds' },
+    ].filter(Boolean) as { value: number; label: string }[]
+
+    if (variant === 'minimal') {
+        return (
+            <AnimatedSection className="py-24">
+                <div className="container mx-auto px-6 text-center">
+                    <h2 className="text-2xl md:text-3xl font-bold font-heading mb-4">{headline}</h2>
+                    {!timeLeft ? (
+                        <p className="text-lg opacity-60">{expiredMessage}</p>
+                    ) : (
+                        <p className="text-xl md:text-2xl font-heading" style={{ color: pc }}>
+                            {units.map((u, i) => (
+                                <span key={u.label}>
+                                    {i > 0 && <span className="opacity-30 mx-1">:</span>}
+                                    <span className="font-bold">{String(u.value).padStart(2, '0')}</span>
+                                    <span className="text-sm opacity-50 ml-1">{u.label}</span>
+                                </span>
+                            ))}
+                        </p>
+                    )}
+                </div>
+            </AnimatedSection>
+        )
+    }
+
+    if (variant === 'card') {
+        return (
+            <AnimatedSection className="py-24">
+                <div className="container mx-auto px-6 flex justify-center">
+                    <div
+                        className="rounded-2xl p-8 md:p-12 text-center max-w-lg w-full"
+                        style={{ background: `${pc}08`, border: `1px solid ${pc}20` }}
+                    >
+                        <h2 className="text-2xl md:text-4xl font-bold font-heading mb-8">{headline}</h2>
+                        {!timeLeft ? (
+                            <p className="text-lg opacity-60">{expiredMessage}</p>
+                        ) : (
+                            <div className="flex justify-center gap-3 md:gap-4">
+                                {units.map((u) => (
+                                    <TimeBox key={u.label} value={u.value} label={u.label} pc={pc} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </AnimatedSection>
+        )
+    }
+
+    // banner (default)
+    return (
+        <AnimatedSection className="py-24">
+            <div className="container mx-auto px-6">
+                <div
+                    className="rounded-3xl p-10 md:p-16 text-center relative overflow-hidden"
+                    style={{
+                        background: `linear-gradient(135deg, ${pc}18 0%, ${pc}06 100%)`,
+                        border: `1px solid ${pc}20`,
+                    }}
+                >
+                    <h2 className="text-3xl md:text-5xl font-bold font-heading mb-10">{headline}</h2>
+                    {!timeLeft ? (
+                        <p className="text-xl opacity-60">{expiredMessage}</p>
+                    ) : (
+                        <div className="flex justify-center gap-4 md:gap-6">
+                            {units.map((u) => (
+                                <TimeBox key={u.label} value={u.value} label={u.label} pc={pc} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </AnimatedSection>
+    )
+}

@@ -24,6 +24,27 @@ import { ProductsFeaturedBlock } from './products-featured'
 import { CustomHtmlBlock } from './custom-html'
 import { SocialWidgetBlock } from './social-widget'
 import { CartWidgetBlock } from './cart-widget'
+// v1.1 — New Block Components
+import { PricingTableBlock } from './pricing-table'
+import { GalleryMasonryBlock } from './gallery-masonry'
+import { WhatsappButtonBlock } from './whatsapp-button'
+import { GoogleMapsBlock } from './google-maps'
+import { SocialProofBlock } from './social-proof'
+import { CountdownTimerBlock } from './countdown-timer'
+import { BeforeAfterBlock } from './before-after'
+import { FeatureComparisonBlock } from './feature-comparison'
+import { DownloadCTABlock } from './download-cta'
+import { VideoBackgroundBlock } from './video-background'
+import { BreadcrumbBlock } from './breadcrumb'
+import { DividerBlock } from './divider'
+import { AnnouncementBarBlock } from './announcement-bar'
+import { ClientLogosBlock } from './client-logos'
+import { AccordionBlock } from './accordion'
+import { StepProcessBlock } from './step-process'
+import { PortfolioGridBlock } from './portfolio-grid'
+import { MenuFoodBlock } from './menu-food'
+import { ServiceCardsBlock } from './service-cards'
+import { CarouselBlock } from './carousel'
 
 // ── Block Configs (Schemas + Meta) ───────────────────────────────────────────
 import { NavigationConfigSchema, navigationMeta } from './navigation/config'
@@ -48,6 +69,27 @@ import { ProductsFeaturedConfigSchema, productsFeaturedMeta } from './products-f
 import { CustomHtmlConfigSchema, customHtmlMeta } from './custom-html/config'
 import { SocialWidgetConfigSchema, socialWidgetMeta } from './social-widget/config'
 import { CartWidgetConfigSchema, cartWidgetMeta } from './cart-widget/config'
+// v1.1 — New Block Configs
+import { PricingTableConfigSchema, pricingTableMeta } from './pricing-table/config'
+import { GalleryMasonryConfigSchema, galleryMasonryMeta } from './gallery-masonry/config'
+import { WhatsappButtonConfigSchema, whatsappButtonMeta } from './whatsapp-button/config'
+import { GoogleMapsConfigSchema, googleMapsMeta } from './google-maps/config'
+import { SocialProofConfigSchema, socialProofMeta } from './social-proof/config'
+import { CountdownTimerConfigSchema, countdownTimerMeta } from './countdown-timer/config'
+import { BeforeAfterConfigSchema, beforeAfterMeta } from './before-after/config'
+import { FeatureComparisonConfigSchema, featureComparisonMeta } from './feature-comparison/config'
+import { DownloadCTAConfigSchema, downloadCTAMeta } from './download-cta/config'
+import { VideoBackgroundConfigSchema, videoBackgroundMeta } from './video-background/config'
+import { BreadcrumbConfigSchema, breadcrumbMeta } from './breadcrumb/config'
+import { DividerConfigSchema, dividerMeta } from './divider/config'
+import { AnnouncementBarConfigSchema, announcementBarMeta } from './announcement-bar/config'
+import { ClientLogosConfigSchema, clientLogosMeta } from './client-logos/config'
+import { AccordionConfigSchema, accordionMeta } from './accordion/config'
+import { StepProcessConfigSchema, stepProcessMeta } from './step-process/config'
+import { PortfolioGridConfigSchema, portfolioGridMeta } from './portfolio-grid/config'
+import { MenuFoodConfigSchema, menuFoodMeta } from './menu-food/config'
+import { ServiceCardsConfigSchema, serviceCardsMeta } from './service-cards/config'
+import { CarouselConfigSchema, carouselMeta } from './carousel/config'
 
 // ── Registry ─────────────────────────────────────────────────────────────────
 
@@ -81,6 +123,27 @@ const REGISTRY: Record<string, BlockRegistryEntry> = {
     'custom-html': { component: CustomHtmlBlock, schema: CustomHtmlConfigSchema, meta: customHtmlMeta },
     socialWidget: { component: SocialWidgetBlock, schema: SocialWidgetConfigSchema, meta: socialWidgetMeta },
     cartWidget: { component: CartWidgetBlock, schema: CartWidgetConfigSchema, meta: cartWidgetMeta },
+    // v1.1 — New Blocks
+    'pricing-table': { component: PricingTableBlock, schema: PricingTableConfigSchema, meta: pricingTableMeta },
+    'gallery-masonry': { component: GalleryMasonryBlock, schema: GalleryMasonryConfigSchema, meta: galleryMasonryMeta },
+    'whatsapp-button': { component: WhatsappButtonBlock, schema: WhatsappButtonConfigSchema, meta: whatsappButtonMeta },
+    'google-maps': { component: GoogleMapsBlock, schema: GoogleMapsConfigSchema, meta: googleMapsMeta },
+    'social-proof': { component: SocialProofBlock, schema: SocialProofConfigSchema, meta: socialProofMeta },
+    'countdown-timer': { component: CountdownTimerBlock, schema: CountdownTimerConfigSchema, meta: countdownTimerMeta },
+    'before-after': { component: BeforeAfterBlock, schema: BeforeAfterConfigSchema, meta: beforeAfterMeta },
+    'feature-comparison': { component: FeatureComparisonBlock, schema: FeatureComparisonConfigSchema, meta: featureComparisonMeta },
+    'download-cta': { component: DownloadCTABlock, schema: DownloadCTAConfigSchema, meta: downloadCTAMeta },
+    'video-background': { component: VideoBackgroundBlock, schema: VideoBackgroundConfigSchema, meta: videoBackgroundMeta },
+    breadcrumb: { component: BreadcrumbBlock, schema: BreadcrumbConfigSchema, meta: breadcrumbMeta },
+    divider: { component: DividerBlock, schema: DividerConfigSchema, meta: dividerMeta },
+    'announcement-bar': { component: AnnouncementBarBlock, schema: AnnouncementBarConfigSchema, meta: announcementBarMeta },
+    'client-logos': { component: ClientLogosBlock, schema: ClientLogosConfigSchema, meta: clientLogosMeta },
+    accordion: { component: AccordionBlock, schema: AccordionConfigSchema, meta: accordionMeta },
+    'step-process': { component: StepProcessBlock, schema: StepProcessConfigSchema, meta: stepProcessMeta },
+    'portfolio-grid': { component: PortfolioGridBlock, schema: PortfolioGridConfigSchema, meta: portfolioGridMeta },
+    'menu-food': { component: MenuFoodBlock, schema: MenuFoodConfigSchema, meta: menuFoodMeta },
+    'service-cards': { component: ServiceCardsBlock, schema: ServiceCardsConfigSchema, meta: serviceCardsMeta },
+    carousel: { component: CarouselBlock, schema: CarouselConfigSchema, meta: carouselMeta },
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
