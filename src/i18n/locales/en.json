@@ -1125,6 +1125,7 @@
         "email": "Email",
         "password": "Password",
         "forgotPassword": "Forgot password?",
+        "rememberMe": "Remember me",
         "signIn": "Sign in",
         "signingIn": "Signing in...",
         "or": "or",

@@ -22,6 +22,10 @@ interface TenantMembership {
 const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation }) => {
     if (operation !== 'create') return doc
 
+    // Skip welcome email for SSO-provisioned or staff-invited users
+    // These users already have tenants assigned at creation time
+    if (doc.tenants && doc.tenants.length > 0) return doc
+
     const userName = doc.firstName || doc.email?.split('@')[0] || 'there'
     const { subject, html } = welcomeEmail({ userName })
 
@@ -35,10 +39,10 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
 
 async function injectUser(req: any) {
     if (req.user) return;
-    const authHeader = (typeof req.headers.get === 'function') 
-        ? req.headers.get('authorization') 
+    const authHeader = (typeof req.headers.get === 'function')
+        ? req.headers.get('authorization')
         : req.headers.authorization;
-        
+
     if (authHeader && (authHeader.startsWith('JWT ') || authHeader.startsWith('Bearer '))) {
         const token = authHeader.split(' ')[1];
         try {
@@ -66,7 +70,46 @@ export const Users: CollectionConfig = {
             generateEmailHTML: (args) => {
                 const token = args?.token || ''
                 const user = args?.user || {}
-                const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
+                const req = args?.req
+
+                // Use req.headers' host/origin if available but strictly validate against allowlist
+                // to prevent Host Header Injection.
+                let serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
+                if (req && req.headers) {
+                    const headers = req.headers as Headers | Record<string, string | string[] | undefined>
+                    const isHeadersObj = typeof (headers as Headers).get === 'function'
+
+                    const origin = isHeadersObj ? (headers as Headers).get('origin') : (headers as Record<string, string | string[] | undefined>)['origin']
+                    const host = isHeadersObj ? (headers as Headers).get('host') : (headers as Record<string, string | string[] | undefined>)['host']
+
+                    const originStr = Array.isArray(origin) ? origin[0] : origin
+                    const hostStr = Array.isArray(host) ? host[0] : host
+
+                    const allowedOrigins = [
+                        process.env.NEXT_PUBLIC_SERVER_URL,
+                        process.env.NEXT_PUBLIC_APP_URL,
+                        'http://localhost:3000',
+                    ].filter(Boolean) as string[]
+
+                    if (process.env.ALLOWED_ORIGINS) {
+                        allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()))
+                    }
+
+                    if (originStr && !originStr.includes('null') && allowedOrigins.includes(originStr)) {
+                        serverUrl = originStr
+                    } else if (hostStr && !hostStr.includes('localhost')) {
+                        const protoVal = isHeadersObj ? (headers as Headers).get('x-forwarded-proto') : (headers as Record<string, string | string[] | undefined>)['x-forwarded-proto']
+                        const protoStr = Array.isArray(protoVal) ? protoVal[0] : protoVal
+
+                        const proto = protoStr || 'https'
+                        const potentialUrl = `${proto}://${hostStr}`
+
+                        if (allowedOrigins.includes(potentialUrl)) {
+                            serverUrl = potentialUrl
+                        }
+                    }
+                }
+
                 const resetUrl = `${serverUrl}/reset-password?token=${token}`
                 const userName = user.firstName || user.email?.split('@')[0] || 'there'
                 const { html } = forgotPasswordEmail({ userName, resetUrl })
@@ -169,7 +212,7 @@ export const Users: CollectionConfig = {
                 if (!requesterTenant || !['owner', 'admin'].includes(requesterTenant.role)) {
                     return Response.json({ errors: [{ message: 'Forbidden' }] }, { status: 403 })
                 }
-                
+
                 // Security: Only an owner can invite another owner
                 if (role === 'owner' && requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Only an owner can invite another owner' }] }, { status: 403 })
@@ -348,12 +391,12 @@ export const Users: CollectionConfig = {
 
                 const targetTenantRole = targetUser.tenants![targetTenantIndex].role
                 const targetTenantStatus = targetUser.tenants![targetTenantIndex].status
-                
+
                 // Security: Prevent Admin from promoting anyone to Owner
                 if (role === 'owner' && requesterTenant.role !== 'owner') {
                     return Response.json({ errors: [{ message: 'Only an owner can promote another user to owner' }] }, { status: 403 })
                 }
-                
+
                 if (String(userId) === String(req.user.id) && role !== targetTenantRole) {
                     return Response.json({ errors: [{ message: 'Cannot change your own role' }] }, { status: 400 })
                 }
@@ -613,7 +656,7 @@ export const Users: CollectionConfig = {
 
                 // Never log OTP codes — mask email to avoid leaking PII
                 const [local, domain] = email.split('@')
-                const safeLocal = local.length <= 2 ? '*'.repeat(local.length) : local.slice(0,2) + '***'
+                const safeLocal = local.length <= 2 ? '*'.repeat(local.length) : local.slice(0, 2) + '***'
                 const maskedEmail = `${safeLocal}@${domain}`
                 if (process.env.NODE_ENV !== 'production') {
                     console.log(`[DEV OTP] Code dispatched for ${maskedEmail} (check your email)`)
