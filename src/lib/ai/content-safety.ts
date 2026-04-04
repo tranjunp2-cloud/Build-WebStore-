@@ -33,6 +33,17 @@ function normalizeForSafety(value: string) {
         .trim()
 }
 
+/**
+ * Check if text contains a blocked term as a whole word (not as a substring).
+ * E.g. "meth" should match "buy meth online" but NOT "payment methods".
+ */
+function findBlockedTerm(normalized: string): string | undefined {
+    return BLOCKED_TERMS.find((term) => {
+        const pattern = new RegExp(`\\b${normalizeForSafety(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
+        return pattern.test(normalized)
+    })
+}
+
 const BLOCKED_DOMAINS = ['localhost', '127.0.0.1', '0.0.0.0']
 
 export function checkUrlSafety(url: string): { safe: boolean; message: string } {
@@ -50,7 +61,7 @@ export function checkUrlSafety(url: string): { safe: boolean; message: string } 
 
 export function checkScrapedContentSafety(text: string): { safe: boolean; message: string } {
     const normalized = normalizeForSafety(text)
-    const matchedTerm = BLOCKED_TERMS.find((term) => normalized.includes(normalizeForSafety(term)))
+    const matchedTerm = findBlockedTerm(normalized)
     if (!matchedTerm) {
         return { safe: true, message: '' }
     }
@@ -70,7 +81,7 @@ export function checkBusinessInfoSafety(input: BusinessInfoSafetyInput) {
         ].join(' '),
     )
 
-    const matchedTerm = BLOCKED_TERMS.find((term) => combined.includes(normalizeForSafety(term)))
+    const matchedTerm = findBlockedTerm(combined)
     if (!matchedTerm) {
         return { safe: true as const, matchedTerm: null }
     }
