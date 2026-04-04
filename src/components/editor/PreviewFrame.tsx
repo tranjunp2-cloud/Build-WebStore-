@@ -262,6 +262,9 @@ function PreviewFrameInner({
 
     useEffect(() => {
         const handleMessage = (e: MessageEvent) => {
+            // Security: only accept messages from own origin or sandboxed iframe ('null')
+            if (e.origin !== window.location.origin && e.origin !== 'null') return
+
             if (e.data?.type === 'BLOCK_HOVERED') {
                 if (isEditing || dragState) return
                 cancelPendingHoverClear()

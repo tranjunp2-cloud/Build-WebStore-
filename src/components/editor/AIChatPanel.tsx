@@ -2,11 +2,17 @@
 
 
 import React, { memo, useEffect, useRef, useState } from 'react'
+import DOMPurify from 'isomorphic-dompurify'
 import { RotateCcw, Send, WandSparkles } from 'lucide-react'
 import { AddSectionPromptChips } from './AddSectionPromptChips'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData, ThemeData } from '@/types/editor'
+
+/** Strip all HTML tags from content — defense-in-depth against XSS in AI responses */
+function sanitizeContent(content: string): string {
+    return DOMPurify.sanitize(content, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+}
 
 type ChatMessage = {
     id: string
@@ -88,13 +94,15 @@ function AIChatPanelInner({
 
     const updateAssistantMessage = (messageId: string, next: Partial<ChatMessage>) => {
         setMessages(prev =>
-            prev.map(message => (message.id === messageId ? { ...message, ...next } : message)),
+            prev.map(message => (message.id === messageId
+                ? { ...message, ...next, content: next.content ? sanitizeContent(next.content) : message.content }
+                : message)),
         )
     }
 
     const handleAIError = (messageId: string, message: string) => {
         updateAssistantMessage(messageId, {
-            content: `❌ ${message}`,
+            content: `❌ ${sanitizeContent(message)}`,
             isStreaming: false,
             undoable: false,
         })

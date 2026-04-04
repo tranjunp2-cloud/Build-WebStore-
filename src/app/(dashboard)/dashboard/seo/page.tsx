@@ -10,6 +10,33 @@ import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 import { KeywordTracker } from '@/components/seo/KeywordTracker'
 
+// ── SEO Undo Backup Persistence (sessionStorage) ─────────────────────────
+const UNDO_STORAGE_KEY = 'seo-fix-undo-backup'
+const UNDO_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
+
+function saveUndoToStorage(data: BatchFix[]) {
+    try {
+        sessionStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify({ data, timestamp: Date.now() }))
+    } catch { /* private browsing or quota exceeded — silently fail */ }
+}
+
+function loadUndoFromStorage(): BatchFix[] | null {
+    try {
+        const raw = sessionStorage.getItem(UNDO_STORAGE_KEY)
+        if (!raw) return null
+        const { data, timestamp } = JSON.parse(raw)
+        if (Date.now() - timestamp > UNDO_EXPIRY_MS) {
+            sessionStorage.removeItem(UNDO_STORAGE_KEY)
+            return null
+        }
+        return data
+    } catch { return null }
+}
+
+function clearUndoStorage() {
+    try { sessionStorage.removeItem(UNDO_STORAGE_KEY) } catch { /* ignore */ }
+}
+
 type SEOIssue = {
     type: 'error' | 'warning' | 'info'
     field: string
@@ -142,6 +169,12 @@ function SEODashboardInner() {
     const [approvedFixIds, setApprovedFixIds] = useState<Set<string>>(new Set())
     const [appliedBackup, setAppliedBackup] = useState<BatchFix[]>([])
     const [isApplyingFixes, setIsApplyingFixes] = useState(false)
+
+    // Restore undo backup from sessionStorage on mount
+    useEffect(() => {
+        const saved = loadUndoFromStorage()
+        if (saved && saved.length > 0) setAppliedBackup(saved)
+    }, [])
 
     const trackEvent = useCallback(async (eventName: string, metadata?: any) => {
         if (!selectedSiteId) return
@@ -293,6 +326,7 @@ function SEODashboardInner() {
                 const data = await res.json()
                 const undoData = data.undoData || []
                 setAppliedBackup(undoData)
+                saveUndoToStorage(undoData)
                 setIsFixAllModalOpen(false)
                 toast.success(st.aifix.applySuccess.replace('{count}', String(fixes.length)), {
                     action: {
@@ -325,7 +359,8 @@ function SEODashboardInner() {
 
             if (res.ok) {
                 toast.success(st.aifix.undoSuccess)
-                setAppliedBackup([]) // Clear state to avoid multiple undos
+                setAppliedBackup([])
+                clearUndoStorage()
                 if (selectedSiteId) analyseSite(selectedSiteId)
             }
         } catch {
