@@ -95,7 +95,7 @@ export default async function DashboardPage({ searchParams }: Props) {
             }),
             payload.count({
                 collection: 'analytics',
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { in: ['form_submit', 'cta_click'] } }
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { not_equals: 'pageview' } }
             }),
         ])
 
