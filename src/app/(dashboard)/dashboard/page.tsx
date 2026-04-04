@@ -10,7 +10,6 @@ import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
-import { DashboardActionList } from '@/components/dashboard/DashboardActionList'
 import { SEOHealthWidget } from '@/components/dashboard/SEOHealthWidget'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
@@ -75,56 +74,35 @@ export default async function DashboardPage({ searchParams }: Props) {
     let prevViews = 0
     let leads = 0
     let engagement = 0
-    let revenue = 0
-    let pendingOrdersCount = 0
-    let pendingOrders: any[] = []
     let dashboardPreferences: string[] | undefined = undefined
 
     if (tenantId) {
         const tenantResult: any = await payload.findByID({ collection: 'tenants', id: tenantId })
         dashboardPreferences = tenantResult?.settings?.dashboardPreferences
 
-        const [viewsRes, prevViewsRes, leadsRes, engagementRes, ordersRes, pendingOrdersRes] = await Promise.all([
-            payload.count({ 
-                collection: 'analytics', 
+        const [viewsRes, prevViewsRes, leadsRes, engagementRes] = await Promise.all([
+            payload.count({
+                collection: 'analytics',
                 where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'pageview' } }
             }),
-            payload.count({ 
-                collection: 'analytics', 
+            payload.count({
+                collection: 'analytics',
                 where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevStartDate.toISOString(), less_than: startDate.toISOString() }, event: { equals: 'pageview' } }
             }),
-            payload.count({ 
-                collection: 'analytics', 
+            payload.count({
+                collection: 'analytics',
                 where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'click' } }
             }),
-            payload.count({ 
-                collection: 'analytics', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { in: ['add_to_cart', 'checkout'] } }
+            payload.count({
+                collection: 'analytics',
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { in: ['form_submit', 'cta_click'] } }
             }),
-            payload.find({ 
-                collection: 'orders', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, status: { in: ['paid', 'completed'] } }, 
-                limit: 2000 
-            }),
-            payload.find({ 
-                collection: 'orders', 
-                where: { tenant: { equals: tenantId }, status: { equals: 'pending' } }, 
-                sort: '-createdAt', 
-                limit: 5 
-            })
         ])
 
         views = viewsRes.totalDocs
         prevViews = prevViewsRes.totalDocs
         leads = leadsRes.totalDocs
         engagement = engagementRes.totalDocs
-
-        ordersRes.docs.forEach((doc: any) => {
-            if (doc.total) revenue += doc.total
-        })
-
-        pendingOrdersCount = pendingOrdersRes.totalDocs
-        pendingOrders = pendingOrdersRes.docs
     }
 
     return (
@@ -143,19 +121,15 @@ export default async function DashboardPage({ searchParams }: Props) {
                 <AISmartInsights views={views} prevViews={prevViews} />
 
                 {/* Stats Cards */}
-                <DashboardStats 
+                <DashboardStats
                     views={views}
                     leads={leads}
                     engagement={engagement}
-                    revenue={revenue}
-                    pendingOrdersCount={pendingOrdersCount}
-                    currency="MYR"
                     preferences={dashboardPreferences}
                 />
 
                 {/* Main Content Grid */}
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <DashboardActionList pendingOrders={pendingOrders} />
                     <SEOHealthWidget score={68} />
                 </div>
 

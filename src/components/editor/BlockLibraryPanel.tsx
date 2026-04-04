@@ -15,12 +15,15 @@ type CategoryConfig = {
     blockTypes: string[]
 }
 
+// Ecom block types hidden in v1.0 (landing page focus). Re-enable for v1.1.
+const ECOM_BLOCK_TYPES = ['products-grid', 'products-featured', 'cartWidget']
+
 const categoryConfig: CategoryConfig[] = [
     { id: 'basics', label: 'Basics', icon: '📦', blockTypes: ['custom-html', 'hero', 'gallery', 'cta'] },
-    { id: 'store', label: 'Store', icon: '🛍️', blockTypes: ['products-grid', 'products-featured', 'pricing'] },
+    { id: 'store', label: 'Business', icon: '💼', blockTypes: ['pricing'] },
     { id: 'content', label: 'Content', icon: '📄', blockTypes: ['about', 'blog-list', 'faq'] },
     { id: 'form', label: 'Form', icon: '📝', blockTypes: ['contact', 'newsletter'] },
-    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'socialWidget', 'cartWidget'] },
+    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'socialWidget'] },
 ]
 
 const itemIconOverrides: Record<string, string> = {
@@ -29,7 +32,7 @@ const itemIconOverrides: Record<string, string> = {
     gallery: '🖼️',
     cta: '🔘',
     socialWidget: '💬',
-    cartWidget: '🛒',
+    pricing: '💰',
 }
 
 function getBlockMeta(blockType: string) {
