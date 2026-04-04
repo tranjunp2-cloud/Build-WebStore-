@@ -20,6 +20,7 @@ export const GET = withAuth(async (user, request) => {
         const page = parseInt(url.searchParams.get('page') || '1')
         const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100)
         const paymentMethod = url.searchParams.get('paymentMethod')
+        const dateFilter = url.searchParams.get('date')
 
         // Build where clause (tenant scoping is handled by collection access)
         const where: any = {}
@@ -38,6 +39,24 @@ export const GET = withAuth(async (user, request) => {
                 { customerName: { contains: search } },
                 { customerEmail: { contains: search } },
             ]
+        }
+
+        if (dateFilter && dateFilter !== 'All Dates' && dateFilter !== 'All dates') {
+            const now = new Date()
+            let fromDate: Date | null = null
+            if (dateFilter === 'Today') {
+                fromDate = new Date(now.setHours(0, 0, 0, 0))
+            } else if (dateFilter === 'This Week') {
+                const startOfWeek = new Date(now)
+                startOfWeek.setDate(now.getDate() - now.getDay())
+                startOfWeek.setHours(0, 0, 0, 0)
+                fromDate = startOfWeek
+            } else if (dateFilter === 'This Month') {
+                fromDate = new Date(now.getFullYear(), now.getMonth(), 1)
+            }
+            if (fromDate) {
+                where.createdAt = { greater_than_equal: fromDate.toISOString() }
+            }
         }
 
         const result = await payload.find({

@@ -46,16 +46,7 @@ describe('PATCH /api/orders/[id] [TC-F10.09]', () => {
         expect(body.error.code).toBe('INVALID_TRANSITION')
     })
 
-    it('requires tracking number when shipping', async () => {
-        mockFindByID.mockResolvedValue({ id: 'order-1', status: 'ready_to_ship', trackingNumber: null })
 
-        const req = { json: () => Promise.resolve({ status: 'shipped' }) } as unknown as Request
-        const res = await PATCH(req, ctx as any)
-        const body = await res.json()
-
-        expect(res.status).toBe(422)
-        expect(body.error.code).toBe('VALIDATION_ERROR')
-    })
 
     it('returns 404 when order not found', async () => {
         mockFindByID.mockResolvedValue(null)

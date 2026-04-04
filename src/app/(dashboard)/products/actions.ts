@@ -36,7 +36,7 @@ export async function getProductAction(id: string | number) {
 import { z } from 'zod'
 
 const ProductServerSchema = z.object({
-    name: z.string().min(1, "Name is required"),
+    name: z.string().min(3, "Name must be at least 3 characters"),
     images: z.array(z.object({
         image: z.union([z.string(), z.number(), z.record(z.unknown())]).optional(),
         alt: z.string().optional()

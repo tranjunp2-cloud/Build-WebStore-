@@ -20,10 +20,10 @@ vi.mock('lucide-react', () => ({
 import { ImageUploader } from '@/components/dashboard/ImageUploader'
 import { toast } from 'sonner'
 
-// ─── TC-F08.03f: Image upload validation ─────────────────────────────
-// ─── TC-F08.03g: Max 5 images ────────────────────────────────────────
+// ─── TC-F08-01-15: Image upload validation ─────────────────────────────
+// ─── TC-F08-01-14: Max 5 images ────────────────────────────────────────
 
-describe('ImageUploader [TC-F08.03f, TC-F08.03g]', () => {
+describe('ImageUploader [TC-F08-01-15, TC-F08-01-14]', () => {
     const defaultProps = {
         value: [] as any[],
         onChange: vi.fn(),
@@ -46,7 +46,7 @@ describe('ImageUploader [TC-F08.03f, TC-F08.03g]', () => {
         expect(screen.getByText('1 / 5')).toBeDefined()
     })
 
-    it('hides upload zone when max images reached [TC-F08.03g]', () => {
+    it('hides upload zone when max images reached [TC-F08-01-14]', () => {
         const images = Array.from({ length: 5 }, (_, i) => ({ url: `/img${i}.jpg` }))
         render(<ImageUploader {...defaultProps} value={images} />)
         // Upload zone should not be visible

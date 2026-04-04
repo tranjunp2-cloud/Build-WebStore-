@@ -14,6 +14,44 @@ vi.mock('@/store/builderStore', () => ({
         selector({ setBusinessInfo: mockSetBusinessInfo }),
 }))
 
+// Mock i18n
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: {
+            onboarding: {
+                step1Title: 'Create Website with AI',
+                step1Subtitle: 'Business Information',
+                form: {
+                    businessName: 'Business Name',
+                    businessNamePlaceholder: 'e.g. Acme Studio',
+                    industry: 'Industry',
+                    loadingIndustries: 'Loading industries...',
+                    products: 'Products / Services',
+                    productsHint: 'What do you sell?',
+                    productsPlaceholder: 'e.g. Custom website design...',
+                    shortDescription: 'Short Description',
+                    shortDescriptionHint: 'What is your business about?',
+                    shortDescriptionPlaceholder: 'e.g. We are a creative agency...',
+                    generateButton: 'Continue',
+                    promoTitle: 'AI Builder',
+                    promoDescription: 'Let AI build your website.',
+                    promoStep1: 'Describe',
+                    promoStep2: 'Generate',
+                    promoStep3: 'Refine',
+                    errors: {
+                        businessName: 'Please enter your business name',
+                        industry: 'Please select an industry',
+                        products: 'Please describe your products / services',
+                        shortDescription: 'Please describe your business',
+                    },
+                    errorMessage: 'Generation failed, please try again.',
+                    retryWithCurrent: 'Retry with current information',
+                }
+            }
+        }
+    })
+}))
+
 // Stub builder sub-components so tests focus on BusinessInfoForm logic
 vi.mock('@/components/builder/fields/BuilderField', () => ({
     BuilderField: ({ children, label, error, required }: {
@@ -170,7 +208,7 @@ describe('BusinessInfoForm Component', () => {
             })
             expect(screen.getByTestId('field-industry')).toBeInTheDocument()
             expect(screen.getByTestId('field-products-/-services')).toBeInTheDocument()
-            expect(screen.getByTestId('field-description')).toBeInTheDocument()
+            expect(screen.getByTestId('field-short-description')).toBeInTheDocument()
         })
 
         it('renders industry options after fetch', async () => {
@@ -217,6 +255,43 @@ describe('BusinessInfoForm Component', () => {
             expect(screen.getByText('Please select an industry')).toBeInTheDocument()
             expect(screen.getByText('Please describe your business')).toBeInTheDocument()
             expect(screen.getByText('Please describe your products / services')).toBeInTheDocument()
+        })
+
+        it('TC-F01.07: enforces minimum 3 characters (excluding spaces) for text fields', async () => {
+            render(<BusinessInfoForm onSubmit={vi.fn()} />)
+            await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
+            
+            await waitFor(() => expect(screen.getByTestId('option-Food & Beverage')).toBeInTheDocument())
+            fireEvent.click(screen.getByTestId('option-Food & Beverage'))
+
+            const inputs = screen.getAllByTestId('builder-text-input')
+            const textareas = screen.getAllByTestId('builder-textarea')
+
+            // Case 1: 0 characters (empty)
+            expect(screen.getByTestId('submit-button')).toBeDisabled()
+
+            // Case 2: 2 characters
+            fireEvent.change(inputs[0], { target: { value: 'ab' } })
+            fireEvent.change(textareas[0], { target: { value: 'cd' } })
+            fireEvent.change(textareas[1], { target: { value: 'ef' } })
+            expect(screen.getByTestId('submit-button')).toBeDisabled()
+
+            // Trigger submit manually to see validation errors
+            const form = screen.getByTestId('left-body').querySelector('form')!
+            fireEvent.submit(form)
+            await waitFor(() => {
+                expect(screen.getByText('Please enter your business name')).toBeInTheDocument()
+            })
+
+            // Case 3: 3 valid characters
+            fireEvent.change(inputs[0], { target: { value: 'abc' } })
+            fireEvent.change(textareas[0], { target: { value: 'cde' } })
+            fireEvent.change(textareas[1], { target: { value: 'fgh' } })
+            expect(screen.getByTestId('submit-button')).not.toBeDisabled()
+
+            // Case 4: padding spaces (< 3 actual characters)
+            fireEvent.change(inputs[0], { target: { value: ' a ' } }) // 1 char
+            expect(screen.getByTestId('submit-button')).toBeDisabled()
         })
 
         it('does not call onSubmit when validation fails', async () => {

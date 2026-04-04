@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DetailedProduct } from '../ProductQuickViewModal';
 import { ArrowLeft, Package, Trash2, Edit2 } from 'lucide-react';
 import Image from 'next/image';
+import { useI18n } from '@/i18n';
 
 interface ProductDetailsMobileProps {
     product: DetailedProduct;
@@ -17,15 +18,17 @@ function getImageUrl(image: any): string | null {
     
     // Fix existing broken local URLs directly to S3 because MinIO stores them
     if (url.includes('/api/media/file/')) {
-        const filename = url.split('/').pop()
-        const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
-        url = `${s3Endpoint}/primeweb-media/${filename}`
+        if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
+            const filename = url.split('/').pop()
+            url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`
+        }
     }
     
     return url
 }
 
 export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: ProductDetailsMobileProps) {
+    const { t } = useI18n();
     const [activeIdx, setActiveIdx] = useState(0)
     // Process Images
     const displayImages = product.images?.map(img => getImageUrl(img.image)).filter(Boolean) as string[] || [];
@@ -64,7 +67,7 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                 <button onClick={onClose} className="p-2 -ml-2 rounded-xl shrink-0 transition-opacity hover:opacity-70 bg-transparent border-none appearance-none outline-none">
                     <ArrowLeft className="w-6 h-6 text-white" />
                 </button>
-                <h1 className="text-[24px] font-bold text-white uppercase tracking-wider">PRODUCT DETAILS</h1>
+                <h1 className="text-[24px] font-bold text-white uppercase tracking-wider">{t.dashboard?.products?.mobile?.productDetails || 'PRODUCT DETAILS'}</h1>
             </div>
 
             <div className="flex flex-col gap-6">
@@ -82,7 +85,7 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                         ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center gap-2 opacity-50 border-y border-white/10">
                                 <Package className="w-12 h-12 text-white" />
-                                <span className="text-sm">No Image</span>
+                                <span className="text-sm">{t.dashboard?.products?.mobile?.noImage || 'No Image'}</span>
                             </div>
                         )}
                     </div>
@@ -110,10 +113,10 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                 <div className="flex flex-col gap-4 px-5">
                     <div className="flex flex-col gap-1">
                         <h2 className="m-0 p-0 text-[24px] font-normal text-[#E1E2EB] leading-[1.25] tracking-[-0.025em]">
-                            {product.name || 'Unnamed Product'}
+                            {product.name || t.dashboard?.products?.mobile?.unnamedProduct || 'Unnamed Product'}
                         </h2>
                         <p className="m-0 p-0 text-[12px] font-normal text-[#C1C6D7] tracking-[0.05em]">
-                            SKU: {product.hasVariants ? 'Multiple SKUs' : (product.sku || 'N/A')} | Category: {product.category?.length ? product.category.map(c => typeof c === 'string' ? c : c.name).join(', ') : 'None'}
+                            SKU: {product.hasVariants ? (t.dashboard?.products?.mobile?.multipleSkus || 'Multiple SKUs') : (product.sku || 'N/A')} | {t.dashboard?.products?.list?.category || 'Category'}: {product.category?.length ? product.category.map(c => typeof c === 'string' ? c : c.name).join(', ') : (t.dashboard?.products?.mobile?.none || 'None')}
                         </p>
                     </div>
 
@@ -130,7 +133,14 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                             </div>
                         ) : null}
                         <div className="ml-auto bg-[#1D2026] rounded-[2px] py-1 pl-2 pr-4 text-[10px] text-[#C1C6D7] uppercase tracking-[0.1em] leading-[1.5]">
-                            Taxes: SST (6%)<br />Incl.
+                            <span>
+                                {(t.dashboard?.products?.mobile?.taxesSst || 'Taxes: SST (6%)\nIncl.').split('\n').map((line, i, arr) => (
+                                    <React.Fragment key={i}>
+                                        {line}
+                                        {i < arr.length - 1 && <br />}
+                                    </React.Fragment>
+                                ))}
+                            </span>
                         </div>
                     </div>
 
@@ -139,20 +149,20 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                         <div className="flex items-center gap-3">
                             <Package className="w-4 h-4 text-[#C1C6D7]" strokeWidth={1.5} />
                             <div className="flex flex-col">
-                                <span className="text-[14px] text-[#E1E2EB] font-medium leading-[1.42]">Stock Level</span>
-                                <span className="text-[12px] text-[#C1C6D7] font-normal leading-[1.33]">Central Warehouse</span>
+                                <span className="text-[14px] text-[#E1E2EB] font-medium leading-[1.42]">{t.dashboard?.products?.mobile?.stockLevel || 'Stock Level'}</span>
+                                <span className="text-[12px] text-[#C1C6D7] font-normal leading-[1.33]">{t.dashboard?.products?.mobile?.centralWarehouse || 'Central Warehouse'}</span>
                             </div>
                         </div>
                         <div className="flex flex-col items-end">
                             <span className="text-[20px] font-bold text-[#E1E2EB] leading-[1.4]">{totalStock}</span>
-                            <span className="text-[10px] font-bold text-[#44DDC1] uppercase tracking-[-0.05em] leading-[1.5]">Units Available</span>
+                            <span className="text-[10px] font-bold text-[#44DDC1] uppercase tracking-[-0.05em] leading-[1.5]">{t.dashboard?.products?.mobile?.unitsAvailable || 'Units Available'}</span>
                         </div>
                     </div>
 
                     {/* Variants List Section */}
                     {product.hasVariants && product.variants && product.variants.length > 0 && (
                         <div className="flex flex-col gap-3 mt-2">
-                            <h3 className="m-0 p-0 text-[12px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em] leading-[1.33]">Product Variants</h3>
+                            <h3 className="m-0 p-0 text-[12px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em] leading-[1.33]">{t.dashboard?.products?.mobile?.productVariants || 'Product Variants'}</h3>
                             <div className="flex flex-col gap-2">
                                 {product.variants.map((variant, idx) => (
                                     <div key={variant.id || idx} className="bg-[#272A31]/50 rounded p-3 flex items-center justify-between">
@@ -183,7 +193,7 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                                                 })()}
                                             </span>
                                         </div>
-                                        <span className="text-[14px] font-normal text-[#C1C6D7] leading-[1.42] font-mono">Stock {variant.stock}</span>
+                                        <span className="text-[14px] font-normal text-[#C1C6D7] leading-[1.42] font-mono">{t.dashboard?.products?.list?.stock || 'Stock'} {variant.stock}</span>
                                     </div>
                                 ))}
                             </div>
@@ -193,7 +203,7 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                     {/* Description Section */}
                     {descText ? (
                         <div className="flex flex-col gap-[7px] mt-2">
-                            <h3 className="m-0 p-0 text-[12px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em] leading-[1.33]">Product Features</h3>
+                            <h3 className="m-0 p-0 text-[12px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em] leading-[1.33]">{t.dashboard?.products?.mobile?.productFeatures || 'Product Features'}</h3>
                             <div className="m-0 p-0 text-[14px] font-normal text-[#C1C6D7] leading-[1.625] whitespace-pre-wrap">
                                 {descText}
                             </div>
@@ -210,14 +220,16 @@ export function ProductDetailsMobile({ product, onClose, onEdit, onDelete }: Pro
                         className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white py-4 rounded-lg font-bold text-[16px] leading-[24px] hover:opacity-90 transition-opacity shadow-[0px_4px_6px_-4px_rgba(68,221,193,0.1),0px_10px_15px_-3px_rgba(68,221,193,0.1)] border-none appearance-none outline-none"
                     >
                         <Edit2 className="w-5 h-5" />
-                        EDIT PRODUCT
+                        {t.dashboard?.products?.form?.editProduct || 'EDIT PRODUCT'}
                     </button>
                     <button 
-                        onClick={onDelete}
+                        onClick={() => {
+                            onDelete();
+                        }}
                         className="w-full flex items-center justify-center gap-2 bg-transparent text-[#FFB4AB] py-2 font-medium text-[12px] leading-[16px] tracking-[0.1em] uppercase hover:bg-white/5 transition-colors rounded-lg border-none appearance-none outline-none"
                     >
                         <Trash2 className="w-[14px] h-[14px]" />
-                        DELETE PRODUCT
+                        {t.dashboard?.products?.form?.delete || 'DELETE PRODUCT'}
                     </button>
                 </div>
             </div>

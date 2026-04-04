@@ -18,6 +18,7 @@ export const Blogs: CollectionConfig = {
             const tenantIds = req.user.tenants?.map((t: any) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
         update: ({ req }) => {
@@ -26,6 +27,7 @@ export const Blogs: CollectionConfig = {
             const tenantIds = req.user.tenants?.map((t: any) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
         delete: ({ req }) => {
@@ -34,6 +36,7 @@ export const Blogs: CollectionConfig = {
             const tenantIds = req.user.tenants?.map((t: any) =>
                 typeof t.tenant === 'object' ? t.tenant.id : t.tenant
             ) ?? []
+            if (tenantIds.length === 0) return false
             return { tenant: { in: tenantIds } }
         },
     },

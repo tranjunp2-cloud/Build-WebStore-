@@ -5,15 +5,17 @@ import { usePathname } from 'next/navigation'
 import { DashboardSidebar } from '@/components/dashboard/Sidebar'
 import { TopHeader } from '@/components/dashboard/TopHeader'
 import { Toaster } from '@/components/ui/sonner'
+import { TenantAccessWatcher } from '@/components/dashboard/TenantAccessWatcher'
 
 type CMSLayoutClientProps = {
     userName: string
     userInitial: string
     userEmail: string
+    currentUserRole?: string
     children: React.ReactNode
 }
 
-export function CMSLayoutClient({ userName, userInitial, userEmail, children }: CMSLayoutClientProps) {
+export function CMSLayoutClient({ userName, userInitial, userEmail, currentUserRole = 'viewer', children }: CMSLayoutClientProps) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const pathname = usePathname()
 
@@ -26,6 +28,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, children }: 
 
     return (
         <div className="min-h-screen bg-[#0B1120] flex flex-col">
+            <TenantAccessWatcher />
             <TopHeader
                 userName={userName}
                 userInitial={userInitial}
@@ -37,6 +40,7 @@ export function CMSLayoutClient({ userName, userInitial, userEmail, children }: 
                 <DashboardSidebar
                     userName={userName}
                     userInitial={userInitial}
+                    currentUserRole={currentUserRole}
                     mobileOpen={sidebarOpen}
                     setMobileOpen={setSidebarOpen}
                 />

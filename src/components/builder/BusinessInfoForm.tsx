@@ -11,6 +11,7 @@ import { BuilderTextarea } from '@/components/builder/fields/BuilderTextarea'
 import { BuilderPromoCard } from '@/components/builder/onboarding/BuilderPromoCard'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
+import { useI18n } from '@/i18n'
 
 type IndustryOption = {
     value: string
@@ -45,6 +46,7 @@ export default function BusinessInfoForm({
     initialValues,
 }: BusinessInfoFormProps) {
     const setBusinessInfo = useBuilderStore((s) => s.setBusinessInfo)
+    const { t } = useI18n()
 
     const [form, setForm] = useState<BusinessInfo>({ ...DEFAULT_FORM, ...initialValues })
     const [errors, setErrors] = useState<Record<string, string>>({})
@@ -52,17 +54,17 @@ export default function BusinessInfoForm({
     const [isLoadingIndustries, setIsLoadingIndustries] = useState(true)
 
     const isFormReady =
-        form.businessName.trim().length > 0 &&
+        form.businessName.trim().length >= 3 &&
         form.industry.trim().length > 0 &&
-        form.shortDescription.trim().length > 0 &&
-        form.products.trim().length > 0
+        form.shortDescription.trim().length >= 3 &&
+        form.products.trim().length >= 3
 
     useEffect(() => {
         let isMounted = true
 
         async function fetchIndustryOptions() {
             try {
-                const response = await fetch('/api/templates/categories', {
+                const response = await fetch('/api/data/industries', {
                     credentials: 'include',
                 })
 
@@ -110,10 +112,10 @@ export default function BusinessInfoForm({
     const validate = (): boolean => {
         const nextErrors: Record<string, string> = {}
 
-        if (!form.businessName.trim()) nextErrors.businessName = 'Please enter your business name'
-        if (!form.industry) nextErrors.industry = 'Please select an industry'
-        if (!form.shortDescription.trim()) nextErrors.shortDescription = 'Please describe your business'
-        if (!form.products.trim()) nextErrors.products = 'Please describe your products / services'
+        if (form.businessName.trim().length < 3) nextErrors.businessName = t.onboarding.form.errors.businessName
+        if (!form.industry) nextErrors.industry = t.onboarding.form.errors.industry
+        if (form.shortDescription.trim().length < 3) nextErrors.shortDescription = t.onboarding.form.errors.shortDescription
+        if (form.products.trim().length < 3) nextErrors.products = t.onboarding.form.errors.products
 
         setErrors(nextErrors)
         return Object.keys(nextErrors).length === 0
@@ -147,7 +149,7 @@ export default function BusinessInfoForm({
                                 onClick={() => onRetry(form)}
                                 type="button"
                             >
-                                Retry with current information
+                                {t.onboarding.form.retryWithCurrent}
                             </button>
                         ) : null}
                     </div>
@@ -156,13 +158,13 @@ export default function BusinessInfoForm({
                 <BuilderField
                     error={errors.businessName}
                     icon="📝"
-                    label="Business Name"
+                    label={t.onboarding.form.businessName}
                     required
                 >
                     <BuilderTextInput
                         invalid={!!errors.businessName}
                         onChange={(e) => setForm((current) => ({ ...current, businessName: e.target.value }))}
-                        placeholder="e.g., The Cookie House, Beauty Spa Hana..."
+                        placeholder={t.onboarding.form.businessNamePlaceholder}
                         type="text"
                         value={form.businessName}
                     />
@@ -171,7 +173,7 @@ export default function BusinessInfoForm({
                 <BuilderField
                     error={errors.industry}
                     icon="🏢"
-                    label="Industry"
+                    label={t.onboarding.form.industry}
                     required
                 >
                     <BuilderOptionGrid>
@@ -186,7 +188,7 @@ export default function BusinessInfoForm({
                         ))}
                     </BuilderOptionGrid>
                     {isLoadingIndustries ? (
-                        <p className="text-xs text-[#94a3b8]">Loading industries...</p>
+                        <p className="text-xs text-[#94a3b8]">{t.onboarding.form.loadingIndustries}</p>
                     ) : null}
                 </BuilderField>
 
@@ -194,12 +196,12 @@ export default function BusinessInfoForm({
                     hint={(
                         <div className="flex items-center gap-2">
                             <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
-                            <span>AI will use this to suggest product images and layout</span>
+                            <span>{t.onboarding.form.productsHint}</span>
                         </div>
                     )}
                     error={errors.products}
                     icon="📦"
-                    label="Products / Services"
+                    label={t.onboarding.form.products}
                     required
                 >
                     <BuilderTextarea
@@ -210,7 +212,7 @@ export default function BusinessInfoForm({
                         )}
                         invalid={!!errors.products}
                         onChange={(e) => setForm((current) => ({ ...current, products: e.target.value }))}
-                        placeholder="e.g., Specialty coffee, bubble tea, handmade pastries, croissants etc..."
+                        placeholder={t.onboarding.form.productsPlaceholder}
                         rows={3}
                         value={form.products}
                     />
@@ -220,12 +222,12 @@ export default function BusinessInfoForm({
                     hint={(
                         <div className="flex items-center gap-2">
                             <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
-                            <span>AI will use this to suggest content and tone</span>
+                            <span>{t.onboarding.form.shortDescriptionHint}</span>
                         </div>
                     )}
                     error={errors.shortDescription}
                     icon="📝"
-                    label="Description"
+                    label={t.onboarding.form.shortDescription}
                     required
                 >
                     <BuilderTextarea
@@ -236,7 +238,7 @@ export default function BusinessInfoForm({
                         )}
                         invalid={!!errors.shortDescription}
                         onChange={(e) => setForm((current) => ({ ...current, shortDescription: e.target.value }))}
-                        placeholder="e.g., We are a family-owned bakery that specializes in artisan breads and pastries..."
+                        placeholder={t.onboarding.form.shortDescriptionPlaceholder}
                         rows={3}
                         value={form.shortDescription}
                     />
@@ -252,30 +254,30 @@ export default function BusinessInfoForm({
             onClick={submitForm}
             type="button"
         >
-            Continue — AI will create your website
+            {t.onboarding.form.generateButton}
         </BuilderSubmitButton>
     )
 
     const rightPane = (
         <BuilderPromoCard
-            description="Just 3 simple steps, AI will create a professional website in minutes."
+            description={t.onboarding.form.promoDescription}
             steps={[
-                { id: 1, label: 'Enter business information', active: true },
-                { id: 2, label: 'AI creates content & design' },
-                { id: 3, label: 'Preview & Publish' },
+                { id: 1, label: t.onboarding.form.promoStep1, active: true },
+                { id: 2, label: t.onboarding.form.promoStep2 },
+                { id: 3, label: t.onboarding.form.promoStep3 },
             ]}
-            title="AI Website Builder"
+            title={t.onboarding.form.promoTitle}
         />
     )
 
     return (
         <BuilderStepScreen
-            description="Provide basic information so AI can create the perfect website for you."
+            description={t.onboarding.step1Description}
             leftBody={leftBody}
             leftFooter={leftFooter}
             right={rightPane}
-            subtitle="Business Information"
-            title="Create Website with AI"
+            subtitle={t.onboarding.step1Subtitle}
+            title={t.onboarding.step1Title}
         />
     )
 }

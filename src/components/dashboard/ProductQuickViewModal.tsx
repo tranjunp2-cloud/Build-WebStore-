@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import { ChevronRight, Trash2, Pencil } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useI18n } from '@/i18n'
 
 // We extend the Product type locally as page.tsx might not have all fields typed
 type Category = {
@@ -60,9 +61,10 @@ function getImageUrl(image: ProductImage | string | null): string | null {
     
     // Fix existing broken local URLs directly to S3 because MinIO stores them
     if (url.includes('/api/media/file/')) {
-        const filename = url.split('/').pop()
-        const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
-        url = `${s3Endpoint}/primeweb-media/${filename}`
+        if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
+            const filename = url.split('/').pop()
+            url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`
+        }
     }
     
     return url
@@ -75,6 +77,7 @@ function formatPrice(price: number, currency: string) {
 }
 
 export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: ProductQuickViewModalProps) {
+    const { t } = useI18n()
     const router = useRouter()
     const [mounted, setMounted] = useState(false)
     const [selectedImageIdx, setSelectedImageIdx] = useState(0)
@@ -102,7 +105,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
     const displayImages = images.length > 0 ? images : ['/images/crate-carton.png'] // Fallback if no images
 
     // Process Categories (Assuming populated)
-    const categoryNames = product.category?.map(c => typeof c === 'object' ? c.name : 'Unknown').join(' / ') || 'Uncategorized'
+    const categoryNames = product.category?.map(c => typeof c === 'object' ? c.name : 'Unknown').join(' / ') || ''
 
     // Pricing
     const hasDiscount = product.compareAtPrice && product.compareAtPrice > product.price
@@ -110,7 +113,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
 
     // Stock Level
     const totalStock = product.hasVariants && product.variants ? product.variants.reduce((acc, v) => acc + (v.stock || 0), 0) : (product.inventory || 0)
-    const stockStatus = totalStock > 10 ? 'Healthy' : totalStock > 0 ? 'Low Stock' : 'Out of Stock'
+    const stockStatus = totalStock > 10 ? (t.dashboard?.products?.quickView?.healthy || 'Healthy') : totalStock > 0 ? (t.dashboard?.products?.quickView?.lowStock || 'Low Stock') : (t.dashboard?.products?.quickView?.outOfStock || 'Out of Stock')
     const stockColor = totalStock > 10 ? 'text-[#05DF72]' : totalStock > 0 ? 'text-amber-400' : 'text-red-400'
     const stockBg = totalStock > 10 ? 'bg-[#05DF72]/10' : totalStock > 0 ? 'bg-amber-400/10' : 'bg-red-400/10'
 
@@ -146,7 +149,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                     <div className="flex flex-col bg-[#1D2026] rounded-[8px] w-full aspect-square shrink-0 overflow-hidden relative border border-white/5">
                         <Image 
                             src={displayImages[selectedImageIdx] || '/images/figma/quick-view-main.png'}
-                            alt={product.name || "Main product"} 
+                            alt={product.name || t.dashboard?.products?.quickView?.altMainProduct || "Main product"} 
                             fill
                             className="object-cover"
                         />
@@ -167,14 +170,14 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                     <div className="mt-auto pt-[40px] flex flex-col justify-end h-full min-h-[147px]">
                         <div className="flex flex-col gap-[8px] p-[20px] bg-[#1D2026] border border-white/[0.05] rounded-[8px]">
                             <div className="flex justify-between items-center w-full">
-                                <span className="text-[12px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">Stock Level</span>
+                                <span className="text-[12px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.stockLevel || 'Stock Level'}</span>
                                 <div className="flex items-center gap-[8px]">
                                     <div className="w-[8px] h-[8px] rounded-[12px] bg-[#44DDC1]" />
                                     <span className={`text-[10px] font-bold uppercase tracking-[0.05em] ${stockColor}`}>{stockStatus}</span>
                                 </div>
                             </div>
                             <div className="pb-[8px]">
-                                <p className="font-sans text-[24px] font-black text-[#E1E2EB] tracking-[-0.05em]">Current Stock: {totalStock}</p>
+                                <p className="font-sans text-[24px] font-black text-[#E1E2EB] tracking-[-0.05em]">{t.dashboard?.products?.quickView?.currentStock || 'Current Stock:'} {totalStock}</p>
                             </div>
                             <div className="h-[6px] w-full bg-[#10131A] rounded-[12px] overflow-hidden">
                                 <div className={`h-full rounded-[12px] transition-all duration-500 ${stockColor.replace('text-', 'bg-')}`} style={{ width: `${Math.min(100, Math.max(5, (totalStock / 50) * 100))}%` }} />
@@ -189,7 +192,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                         {/* Header Details (Node 30928:3994) */}
                         <div className="flex flex-col pb-[32px]">
                             <div className="flex flex-col gap-[4px]">
-                                <span className="text-[10px] font-black text-[#44DDC1] uppercase tracking-[0.2em]">Product Details</span>
+                                <span className="text-[10px] font-black text-[#44DDC1] uppercase tracking-[0.2em]">{t.dashboard?.products?.quickView?.productDetails || 'Product Details'}</span>
                                 <h2 className="font-sans text-[30px] font-black text-[#E1E2EB] leading-[1.2] tracking-[-0.05em] uppercase">
                                     {product.name}
                                 </h2>
@@ -201,17 +204,17 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                             <div className="flex flex-col pb-[32px] border-b border-[#414754]/10">
                                 <div className="grid grid-cols-2 gap-y-[24px] gap-x-[16px]">
                                     <div className="flex flex-col gap-[4px]">
-                                        <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">SKU Identification</span>
+                                        <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.skuIdentification || 'SKU Identification'}</span>
                                         <span className="text-[14px] text-[#ADC7FF]">{product.sku || 'N/A'}</span>
                                     </div>
                                     <div className="flex flex-col gap-[4px]">
-                                        <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">Tax Configuration</span>
-                                        <span className="text-[14px] font-medium text-[#E1E2EB]">Taxes: SST (6%) Incl.</span>
+                                        <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.taxConfiguration || 'Tax Configuration'}</span>
+                                        <span className="text-[14px] font-medium text-[#E1E2EB]">{t.dashboard?.products?.quickView?.taxesSst || 'Taxes: SST (6%) Incl.'}</span>
                                     </div>
                                     <div className="flex flex-col gap-[4px] col-span-2">
-                                        <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">Category Path</span>
+                                        <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.categoryPath || 'Category Path'}</span>
                                         <div className="flex items-center gap-[8px] text-[14px] font-medium">
-                                            <span className="text-[#E1E2EB]">{categoryNames || 'Uncategorized'}</span>
+                                            <span className="text-[#E1E2EB]">{categoryNames || t.dashboard?.products?.quickView?.uncategorized || 'Uncategorized'}</span>
                                             {/* Note: In a real multi-level category, you would map this. Hardcoded / separated as per Figma */}
                                         </div>
                                     </div>
@@ -222,7 +225,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                         {/* Pricing Configuration (Node 30928:4023) */}
                         <div className="flex flex-col pb-[40px]">
                             <div className="flex flex-col pb-[32px] gap-[8px] border-b border-[#414754]/10">
-                                <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">Pricing</span>
+                                <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.pricing || 'Pricing'}</span>
                                 <div className="flex items-end gap-[16px]">
                                     <span className="text-[36px] font-[900] text-[#E1E2EB] leading-[1.11]">
                                         {formatPrice(product.price, product.currency)}
@@ -234,7 +237,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                                             </span>
                                             <div className="flex items-center justify-center px-[8px] py-[2px] bg-[#FFB695]/10 rounded-[2px] mb-[6px]">
                                                 <span className="text-[10px] font-bold text-[#FFB695] uppercase">
-                                                    {discountPercent}% OFF
+                                                    {discountPercent}% {t.dashboard?.products?.quickView?.off || 'OFF'}
                                                 </span>
                                             </div>
                                         </>
@@ -247,7 +250,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                         {product.hasVariants && product.variants && product.variants.length > 0 && (
                             <div className="flex flex-col pb-[40px]">
                                 <div className="flex flex-col pb-[32px] gap-[16px] border-b border-[#414754]/10">
-                                    <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">Inventory Variants</span>
+                                    <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.inventoryVariants || 'Inventory Variants'}</span>
                                     <div className="flex flex-col gap-[12px]">
                                         {product.variants.map((v, idx) => (
                                             <div key={idx} className="flex items-center justify-between px-[16px] py-[12px] rounded-[8px] bg-[#1D2026] border border-white/5">
@@ -257,7 +260,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                                                 </div>
                                                 <div className="flex items-center justify-center px-[8px] py-[4px] bg-white/5 rounded-[4px]">
                                                     <span className="text-[12px] font-medium text-[#C1C6D7]">
-                                                        Stock: {v.stock}
+                                                        {t.dashboard?.products?.list?.stock || 'Stock'}: {v.stock}
                                                     </span>
                                                 </div>
                                             </div>
@@ -271,7 +274,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                         {descText && (
                             <div className="flex flex-col pb-[48px]">
                                 <div className="flex flex-col gap-[11px]">
-                                    <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">Description</span>
+                                    <span className="text-[10px] font-bold text-[#C1C6D7] uppercase tracking-[0.1em]">{t.dashboard?.products?.quickView?.description || 'Description'}</span>
                                     <p className="font-sans text-[14px] leading-[1.625] text-[#C1C6D7] whitespace-pre-wrap">
                                         {descText}
                                     </p>
@@ -284,10 +287,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                     <div className="mt-auto pt-[24px] border-t border-[#414754]/10 flex justify-between items-center shrink-0">
                         <button 
                             onClick={() => {
-                                if (confirm('Are you certain?')) {
-                                    onDelete(product)
-                                    onClose()
-                                }
+                                onDelete(product)
                             }}
                             className="flex items-center justify-center gap-[8px] px-[16px] py-[8px] rounded-[4px] uppercase tracking-[0.1em] hover:opacity-80 transition-opacity"
                             style={{ 
@@ -299,7 +299,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                             }}
                         >
                             <Trash2 className="w-[14px] h-[14px]" />
-                            DELETE PRODUCT
+                            {t.dashboard?.products?.quickView?.deleteProduct || 'DELETE PRODUCT'}
                         </button>
                         <button 
                             onClick={() => {
@@ -317,7 +317,7 @@ export function ProductQuickViewModal({ isOpen, onClose, product, onDelete }: Pr
                             }}
                         >
                             <Pencil className="w-[14px] h-[14px]" />
-                            EDIT PRODUCT
+                            {t.dashboard?.products?.quickView?.editProduct || 'EDIT PRODUCT'}
                         </button>
                     </div>
                 </div>

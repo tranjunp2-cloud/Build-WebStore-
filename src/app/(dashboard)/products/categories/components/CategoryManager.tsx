@@ -23,6 +23,7 @@ import {
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { ImageUploader, UploadedImage } from '@/components/dashboard/ImageUploader'
+import { Pagination } from '@/components/ui/Pagination'
 import { getCategoriesAction, saveCategoryAction, deleteCategoryAction } from '../actions'
 
 // Types
@@ -78,6 +79,12 @@ export default function CategoryManager() {
     const [isLoading, setIsLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
     const [expandedIds, setExpandedIds] = useState<Set<string | number>>(new Set())
+    const [currentPage, setCurrentPage] = useState(1)
+
+    // Reset pagination
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [searchQuery])
     
     // Modal States
     const [isFormOpen, setIsFormOpen] = useState(false)
@@ -401,13 +408,13 @@ export default function CategoryManager() {
                         </span>
                         <div className="flex items-center">
                             <span className="w-[80px] text-center text-[13px] font-semibold text-[#94A3B8] uppercase tracking-[0.038em]">
-                                LEVEL
+                                {t.dashboard?.products?.categories?.table?.level || 'LEVEL'}
                             </span>
                             <span className="w-[100px] text-left text-[13px] font-semibold text-[#94A3B8] uppercase tracking-[0.038em]">
-                                PRODUCTS
+                                {t.dashboard?.products?.categories?.table?.products || 'PRODUCTS'}
                             </span>
                             <span className="w-[120px] text-right text-[13px] font-semibold text-[#94A3B8] uppercase tracking-[0.038em]">
-                                ACTIONS
+                                {t.dashboard?.products?.categories?.table?.actions || 'ACTIONS'}
                             </span>
                         </div>
                     </div>
@@ -418,7 +425,7 @@ export default function CategoryManager() {
                         </div>
                     ) : tree.length > 0 ? (
                         <div className="flex flex-col w-full">
-                            {tree.map(node => renderNode(node))}
+                            {tree.slice((currentPage - 1) * 10, currentPage * 10).map(node => renderNode(node))}
                         </div>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
@@ -426,13 +433,23 @@ export default function CategoryManager() {
                                 <Search className="w-6 h-6 text-[#64748B]" />
                             </div>
                             <h3 className="text-[16px] font-semibold text-[#F1F5F9] mb-1">
-                                {searchQuery ? 'No results found' : 'No Categories'}
+                                {searchQuery ? (t.dashboard?.products?.categories?.table?.noResults || 'No results found') : (t.dashboard?.products?.categories?.table?.noCategories || 'No Categories')}
                             </h3>
                             <p className="text-[14px] text-[#64748B]">
                                 {searchQuery 
-                                    ? 'Try adjusting your search terms.' 
+                                    ? (t.dashboard?.products?.categories?.table?.tryAdjusting || 'Try adjusting your search terms.') 
                                     : (t.dashboard.products.categories.emptyState || 'Start by creating a new category.')}
                             </p>
+                        </div>
+
+                    )}
+                    {!isLoading && tree.length > 0 && Math.ceil(tree.length / 10) > 1 && (
+                        <div className="flex justify-end items-center p-[16px] border-t border-[#1E293B]">
+                            <Pagination 
+                                currentPage={currentPage} 
+                                totalPages={Math.ceil(tree.length / 10)} 
+                                onPageChange={setCurrentPage} 
+                            />
                         </div>
                     )}
                 </div>
