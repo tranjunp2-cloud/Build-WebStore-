@@ -41,9 +41,18 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
         if (!isOpen) return
         setIsLoading(true)
         fetch('/api/templates/list?limit=50&sort=sortOrder', { credentials: 'include' })
-            .then((res) => res.json())
-            .then((data) => setTemplates(data.docs || []))
-            .catch(() => toast.error('Failed to load templates'))
+            .then((res) => {
+                if (!res.ok) throw new Error(`Server returned ${res.status}`)
+                return res.json()
+            })
+            .then((data) => {
+                const docs = data.docs || data.results || []
+                setTemplates(Array.isArray(docs) ? docs : [])
+            })
+            .catch((err) => {
+                console.error('[EditorTemplateModal] Load error:', err)
+                toast.error('Failed to load templates')
+            })
             .finally(() => setIsLoading(false))
     }, [isOpen])
 
@@ -166,12 +175,18 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                     {/* Grid */}
                     <div className="flex-1 overflow-y-auto p-6">
                         {isLoading ? (
-                            <div className="flex h-40 items-center justify-center">
+                            <div className="flex h-40 flex-col items-center justify-center gap-2">
                                 <Loader2 className="h-6 w-6 animate-spin text-white/30" />
+                                <span className="text-xs text-gray-600">Loading templates...</span>
+                            </div>
+                        ) : templates.length === 0 ? (
+                            <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-gray-500">
+                                <p>No templates available yet.</p>
+                                <p className="text-xs text-gray-600">Run POST /api/templates/seed to create templates.</p>
                             </div>
                         ) : filtered.length === 0 ? (
                             <div className="flex h-40 items-center justify-center text-sm text-gray-500">
-                                No templates found
+                                No templates match this filter
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
