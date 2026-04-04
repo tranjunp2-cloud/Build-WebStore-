@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
     ArrowLeft, Plus, Pencil, Trash2, X, Check, Loader2,
     Tag, AlertTriangle,
@@ -16,6 +17,7 @@ type Category = {
 }
 
 export default function BlogCategoriesPage() {
+    const router = useRouter()
     const [categories, setCategories] = useState<Category[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -120,188 +122,174 @@ export default function BlogCategoriesPage() {
     }
 
     return (
-        <div className="mx-auto max-w-2xl space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                    <Link
-                        href="/blog"
-                        className="flex-shrink-0 rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-white transition-colors"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                    </Link>
-                    <h1 className="text-xl font-bold text-white">Blog Categories</h1>
-                </div>
-
-                <button
-                    onClick={() => setShowCreateInput(true)}
-                    className="flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-cyan-500/25 hover:bg-cyan-500 transition-colors"
-                >
-                    <Plus className="h-4 w-4" />
-                    Add Category
-                </button>
-            </div>
-
-            {/* Create Input */}
-            {showCreateInput && (
-                <div className="rounded-xl border border-cyan-500/20 bg-[#1E293B]/30 p-4">
-                    <p className="text-xs font-medium text-gray-400 mb-2">New Category</p>
-                    <div className="flex gap-2">
-                        <input
-                            value={newName}
-                            onChange={e => setNewName(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                            placeholder="e.g. Marketing Tips"
-                            autoFocus
-                            className="flex-1 rounded-lg border border-white/10 bg-[#0B1120] px-4 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
-                        />
-                        <button
-                            onClick={handleCreate}
-                            disabled={!newName.trim() || isCreating}
-                            className="flex items-center gap-1.5 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-50 transition-colors"
-                        >
-                            {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                            Save
-                        </button>
-                        <button
-                            onClick={() => { setShowCreateInput(false); setNewName('') }}
-                            className="rounded-lg p-2.5 text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-                        >
-                            <X className="h-4 w-4" />
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Loading skeleton */}
-            {loading && (
-                <div className="space-y-3">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="flex items-center justify-between rounded-lg border border-white/10 bg-[#1E293B]/30 px-5 py-4 animate-pulse">
-                            <div className="h-4 w-32 rounded bg-white/5" />
-                            <div className="h-4 w-20 rounded bg-white/5" />
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Empty state */}
-            {!loading && categories.length === 0 && !showCreateInput && (
-                <div className="py-16 text-center">
-                    <Tag className="mx-auto h-10 w-10 text-gray-600 mb-4" />
-                    <p className="text-sm text-gray-400 mb-1">No categories yet</p>
-                    <p className="text-xs text-gray-600 mb-6">Create categories to organise your blog posts</p>
+        <div className="w-full h-full flex flex-col items-center pt-[64px]">
+            <div className="flex flex-col p-[1px] w-full max-w-[768px] bg-[#1E293B] border-[1px] border-[rgba(255,255,255,0.08)] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]">
+                {/* Header (31611:5304) */}
+                <div className="flex flex-row justify-between items-center w-full px-[24px] py-[12px] border-b-[1px] border-b-[rgba(255,255,255,0.08)]">
+                    <span className="font-['Inter'] font-[700] text-[20px] leading-[1.4em] text-[#F8FAFC]">Manage Category</span>
                     <button
-                        onClick={() => setShowCreateInput(true)}
-                        className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-cyan-500/25 hover:bg-cyan-500 transition-colors"
+                        onClick={() => router.push('/blog')}
+                        className="flex flex-col items-center justify-center pt-[8px] px-[8px] w-[36px] h-[36px] rounded-[12px] hover:bg-white/5 transition-colors"
                     >
-                        <Plus className="h-4 w-4" />
-                        Create your first category
+                        <X className="w-[20px] h-[20px] text-[#F8FAFC]" />
                     </button>
                 </div>
-            )}
 
-            {/* Categories list */}
-            {!loading && categories.length > 0 && (
-                <div className="space-y-2">
-                    {categories.map(cat => (
-                        <div
-                            key={cat.id}
-                            className="group flex items-center justify-between rounded-lg border border-white/10 bg-[#1E293B]/30 px-5 py-3.5 hover:border-white/15 transition-colors"
-                        >
-                            {editingId === cat.id ? (
-                                // Inline edit mode
-                                <div className="flex flex-1 gap-2">
-                                    <input
-                                        value={editName}
-                                        onChange={e => setEditName(e.target.value)}
-                                        onKeyDown={e => {
-                                            if (e.key === 'Enter') handleUpdate()
-                                            if (e.key === 'Escape') setEditingId(null)
-                                        }}
-                                        autoFocus
-                                        className="flex-1 rounded-lg border border-cyan-500/30 bg-[#0B1120] px-3 py-1.5 text-sm text-white outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20"
-                                    />
-                                    <button
-                                        onClick={handleUpdate}
-                                        disabled={!editName.trim() || isUpdating}
-                                        className="rounded-lg p-1.5 text-cyan-400 hover:bg-cyan-500/10 disabled:opacity-50 transition-colors"
-                                    >
-                                        {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                                    </button>
-                                    <button
-                                        onClick={() => setEditingId(null)}
-                                        className="rounded-lg p-1.5 text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </button>
+                {/* Body (31611:5322) */}
+                <div className="flex flex-col w-full px-[24px] py-[24px] gap-[24px]">
+                    <div className="flex flex-col w-full gap-[12px]">
+                        {/* Title Row */}
+                        <div className="flex flex-row justify-between items-center h-[20px] w-full">
+                            <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">Existing Category</span>
+                            <span className="font-['Inter'] font-[400] text-[12px] leading-[1.6666666666666667em] text-[#F8FAFC]">{categories.length} items</span>
+                        </div>
+
+                        {/* List Frame (31611:5417) */}
+                        <div className="flex flex-col w-full space-y-[-1px]">
+                            {loading ? (
+                                <div className="flex flex-col p-[12px] gap-[12px] border-[1px] border-[#374151] rounded-[12px] animate-pulse h-[52px]">
+                                    <div className="w-[100px] h-[16px] bg-white/10 rounded-[4px] mt-[4px]"></div>
+                                </div>
+                            ) : categories.length === 0 ? (
+                                <div className="flex flex-col p-[12px] gap-[12px] border-[1px] border-[#374151] rounded-[12px] items-center justify-center py-[24px]">
+                                    <span className="text-[#9F9FA9] text-[14px]">No categories yet</span>
                                 </div>
                             ) : (
-                                // Display mode
-                                <>
-                                    <div className="flex items-center gap-3 min-w-0">
-                                        <Tag className="h-4 w-4 text-gray-600 flex-shrink-0" />
-                                        <span className="text-sm font-medium text-white truncate">{cat.name}</span>
-                                        <span className="text-xs text-gray-600 hidden sm:inline">/{cat.slug}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={() => startEditing(cat)}
-                                            className="rounded-lg p-1.5 text-gray-500 hover:bg-white/5 hover:text-white transition-colors"
-                                            title="Edit"
+                                categories.map((cat, index) => {
+                                    const isFirst = index === 0
+                                    const isLast = index === categories.length - 1
+                                    const roundedClass = categories.length === 1 ? 'rounded-[12px]' : isFirst ? 'rounded-t-[12px]' : isLast ? 'rounded-b-[12px]' : ''
+
+                                    return (
+                                        <div
+                                            key={cat.id}
+                                            className={`flex flex-col p-[12px] gap-[12px] border-[1px] border-[#374151] hover:bg-white/5 transition-colors group ${roundedClass}`}
                                         >
-                                            <Pencil className="h-3.5 w-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={() => setDeleteTarget(cat)}
-                                            className="rounded-lg p-1.5 text-gray-500 hover:bg-red-500/10 hover:text-red-400 transition-colors"
-                                            title="Delete"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </button>
-                                    </div>
-                                </>
+                                            {editingId === cat.id ? (
+                                                <div className="flex flex-row items-center gap-[12px]">
+                                                    <input
+                                                        value={editName}
+                                                        onChange={e => setEditName(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter') handleUpdate()
+                                                            if (e.key === 'Escape') setEditingId(null)
+                                                        }}
+                                                        autoFocus
+                                                        className="flex-1 px-[12px] py-[4px] h-[26px] bg-[rgba(255,255,255,0.1)] border-[1px] border-[rgba(255,255,255,0.3)] rounded-[12px] font-['Inter'] font-[500] text-[12px] text-[#FFFFFF] outline-none"
+                                                    />
+                                                    <button onClick={handleUpdate} disabled={!editName.trim() || isUpdating} className="text-cyan-400 p-[4px] hover:bg-white/10 rounded">
+                                                        {isUpdating ? <Loader2 className="w-[14px] h-[14px] animate-spin" /> : <Check className="w-[14px] h-[14px]" />}
+                                                    </button>
+                                                    <button onClick={() => setEditingId(null)} className="text-[#9F9FA9] p-[4px] hover:bg-white/10 rounded">
+                                                        <X className="w-[14px] h-[14px]" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-row items-center justify-between">
+                                                    <div className="flex flex-row items-center px-[12px] py-[4px] min-w-0 bg-[rgba(255,255,255,0.1)] border-[1px] border-[rgba(255,255,255,0.3)] rounded-[12px] w-fit">
+                                                        <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[#FFFFFF] truncate">{cat.name}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-[8px] opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={() => startEditing(cat)}
+                                                            className="text-[#9F9FA9] hover:text-white p-[4px]"
+                                                        >
+                                                            <Pencil className="w-[14px] h-[14px]" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setDeleteTarget(cat)}
+                                                            className="text-[#9F9FA9] hover:text-red-400 p-[4px]"
+                                                        >
+                                                            <Trash2 className="w-[14px] h-[14px]" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })
                             )}
                         </div>
-                    ))}
+                    </div>
+
+                    {/* Add new Category */}
+                    {showCreateInput ? (
+                        <div className="flex flex-row items-center gap-[12px] w-full mt-[8px]">
+                            <Plus className="w-[24px] h-[24px] text-white opacity-50" strokeWidth={1.5} />
+                            <input
+                                value={newName}
+                                onChange={e => setNewName(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                                autoFocus
+                                placeholder="Category name"
+                                className="flex-1 bg-transparent font-['Inter'] font-[600] text-[14px] text-[#FFFFFF] outline-none placeholder-[#9F9FA9] border-b-[1px] border-b-[rgba(255,255,255,0.2)] pb-[4px]"
+                            />
+                            <div className="flex gap-[4px]">
+                                <button onClick={handleCreate} disabled={!newName.trim() || isCreating} className="p-[4px] text-cyan-400 hover:bg-white/10 rounded">
+                                    {isCreating ? <Loader2 className="w-[16px] h-[16px] animate-spin" /> : <Check className="w-[16px] h-[16px]" />}
+                                </button>
+                                <button onClick={() => { setShowCreateInput(false); setNewName('') }} className="p-[4px] text-[#9F9FA9] hover:bg-white/10 rounded hover:text-white">
+                                    <X className="w-[16px] h-[16px]" />
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setShowCreateInput(true)}
+                            className="flex flex-row items-center w-full gap-[6px] hover:opacity-80 transition-opacity"
+                        >
+                            <Plus className="w-[24px] h-[24px] text-white" strokeWidth={1.5} />
+                            <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#FFFFFF]">Add new Category</span>
+                        </button>
+                    )}
                 </div>
-            )}
+
+                {/* Footer (31611:5388) */}
+                <div className="flex flex-row justify-end items-center w-full pr-[24px] border-t-[1px] border-t-[rgba(255,255,255,0.08)]">
+                    <button
+                        onClick={() => router.push('/blog')}
+                        className="flex flex-row justify-center items-center px-[16px] py-[8px] h-[48px] bg-[#0B1120] border-[1px] border-[rgba(255,255,255,0.08)] rounded-[10px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] transition-colors hover:bg-white/5"
+                    >
+                        <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA]">Close</span>
+                    </button>
+                </div>
+            </div>
 
             {/* Delete Confirmation Modal */}
             {deleteTarget && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1120] p-6 shadow-2xl">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                <AlertTriangle className="w-5 h-5 text-red-400" />
+                    <div className="w-full max-w-md rounded-[16px] border border-white/10 bg-[#0B1120] p-[24px] shadow-2xl">
+                        <div className="flex items-center justify-between mb-[16px]">
+                            <h3 className="text-[18px] font-bold text-white flex items-center gap-[8px]">
+                                <AlertTriangle className="w-[20px] h-[20px] text-red-500" />
                                 Delete Category
                             </h3>
-                            <button onClick={() => setDeleteTarget(null)} className="text-gray-400 hover:text-white transition-colors">
-                                <X className="w-5 h-5" />
+                            <button onClick={() => setDeleteTarget(null)} className="text-[#9F9FA9] hover:text-white transition-colors">
+                                <X className="w-[20px] h-[20px]" />
                             </button>
                         </div>
-                        <p className="text-sm text-gray-400 mb-2">
-                            Are you sure you want to delete <span className="text-white font-medium">&quot;{deleteTarget.name}&quot;</span>?
+                        <p className="text-[14px] text-gray-400 mb-[8px]">
+                            Are you sure you want to delete <span className="text-white font-bold">&quot;{deleteTarget.name}&quot;</span>?
                         </p>
-                        <p className="text-xs text-gray-600 mb-5">
-                            Posts assigned to this category will become uncategorized.
+                        <p className="text-[13px] text-gray-500 mb-[24px]">
+                            Posts assigned to this category will become uncategorized. Space cannot be undone.
                         </p>
-                        <div className="flex justify-end gap-3">
+                        <div className="flex justify-end gap-[12px]">
                             <button
                                 onClick={() => setDeleteTarget(null)}
-                                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                                className="px-[16px] py-[10px] rounded-[8px] text-[14px] font-medium text-[#9F9FA9] hover:text-white hover:bg-white/5 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleDelete}
                                 disabled={isDeleting}
-                                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                                className="flex items-center gap-[8px] rounded-[8px] bg-red-600 px-[16px] py-[10px] text-[14px] font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
                             >
                                 {isDeleting ? (
-                                    <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
+                                    <><Loader2 className="w-[16px] h-[16px] animate-spin" /> Deleting...</>
                                 ) : (
-                                    <><Trash2 className="w-4 h-4" /> Delete</>
+                                    <><Trash2 className="w-[16px] h-[16px]" /> Delete</>
                                 )}
                             </button>
                         </div>
