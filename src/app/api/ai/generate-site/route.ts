@@ -154,10 +154,12 @@ export async function POST(req: NextRequest) {
         }
 
         // FR-15: Rate Limit - Free tier is limited to 1 AI generation
+        // Bypass in development mode for testing
+        const isDev = process.env.NODE_ENV === 'development'
         const tenant = typeof payload.findByID === 'function'
             ? await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
             : { plan: 'pro', aiGenerationsCount: 0 }
-        if (tenant.plan === 'free') {
+        if (!isDev && tenant.plan === 'free') {
             const currentCount = tenant.aiGenerationsCount || 0
             if (currentCount >= 1) {
                 return NextResponse.json(
