@@ -85,7 +85,18 @@ ${blockList}
 ## IMPORTANT
 - Respond ONLY with the JSON object, no markdown, no explanation
 - Content must feel real and professional, not generic placeholder
-- Theme should feel premium and modern`
+- Theme should feel premium and modern
+
+## REFERENCE MODE (when reference content is provided)
+When the user prompt includes a "REFERENCE CONTENT" section:
+- Use the EXACT headlines, descriptions, and feature text from the reference — do NOT rewrite or paraphrase
+- Match the section ORDER from suggestedBlocks (hero first, then features, etc.)
+- Adapt testimonials and pricing to our block schema but KEEP the original text
+- Use the visual style hints (primaryColor, secondaryColor, mood) for theme
+- Only generate NEW content for sections NOT in the reference
+- Hero headline MUST be the exact text from reference heroHeadline
+- Features MUST use the exact titles and descriptions from reference featuresList
+- This is a RECREATION of an existing website, not a new creative design`
 }
 
 export type BusinessInfoInput = {
@@ -99,6 +110,7 @@ export function buildUserPrompt(
   info: BusinessInfoInput,
   extraInstructions?: string,
   language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
+  referencePrompt?: string,
 ): string {
   const parts = [
     `Create a complete website for: "${info.businessName}"`,
@@ -110,7 +122,13 @@ export function buildUserPrompt(
     parts.push(`Additional instructions: ${extraInstructions}`)
   }
 
-  const langInstruction = language === 'auto' 
+  // Append reference content from ContentBrief (URL/Image extraction)
+  if (referencePrompt) {
+    parts.push(referencePrompt)
+    parts.push('\nIMPORTANT: Use the EXACT text from the REFERENCE CONTENT above. Do NOT invent new content or paraphrase. This is a recreation of an existing website.')
+  }
+
+  const langInstruction = language === 'auto'
     ? "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
     : `Generate in ${language === 'ms' ? 'Malay (Bahasa Melayu)' : language === 'vi' ? 'Vietnamese' : 'English'}.`
 

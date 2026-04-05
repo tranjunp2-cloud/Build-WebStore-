@@ -87,11 +87,13 @@ function LivePreview({
     theme,
     onReorder,
     interactive = true,
+    siteType,
 }: {
     blocks: any[]
     theme: ThemeConfig | null
     onReorder?: (newOrder: any[]) => void
     interactive?: boolean
+    siteType?: string
 }) {
     if (!theme || blocks.length === 0) return null
 
@@ -143,7 +145,7 @@ function LivePreview({
                         ) : null}
 
                         <BlockErrorBoundary blockType={block.blockType}>
-                            <BlockComponent block={block} theme={theme} />
+                            <BlockComponent block={block} theme={theme} site={siteType ? { siteType } : undefined} />
                         </BlockErrorBoundary>
                     </Reorder.Item>
                 )
@@ -188,6 +190,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         setBlocks,
         setStep,
         setUserId,
+        contentBrief,
         reset,
     } = useBuilderStore()
 
@@ -409,6 +412,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     businessInfo: info,
                     extraInstructions,
                     language: info.language || 'auto',
+                    ...(contentBrief ? { contentBrief } : {}),
                 }),
                 credentials: 'include',
             })
@@ -470,7 +474,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             setStep('info')
             toast.error(message)
         }
-    }, [handleSSEEvent, setError, setStep])
+    }, [handleSSEEvent, setError, setStep, contentBrief])
 
     const handleGenerateStart = useCallback((info: BusinessInfo) => {
         prepareGenerationSession(info)
@@ -559,7 +563,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const previewContent = blocks.length > 0 && theme ? (
         <div className="h-full overflow-y-auto bg-[#06090F]">
-            <LivePreview blocks={blocks} onReorder={setBlocks} theme={theme} />
+            <LivePreview blocks={blocks} onReorder={setBlocks} theme={theme} siteType={businessInfo?.industry} />
         </div>
     ) : (
         <div className="flex h-full items-center justify-center bg-[#06090F]">
@@ -572,7 +576,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
     const readonlyPreviewContent = blocks.length > 0 && theme ? (
         <div className="h-full overflow-y-auto bg-[#06090F]">
-            <LivePreview blocks={blocks} interactive={false} theme={theme} />
+            <LivePreview blocks={blocks} interactive={false} theme={theme} siteType={businessInfo?.industry} />
         </div>
     ) : (
         <div className="flex h-full items-center justify-center bg-[#06090F]">

@@ -7,10 +7,11 @@ export const generateSiteSchema = z.object({
         products: z.string().min(1),
         shortDescription: z.string().min(1),
         businessUrl: z.string().url().optional(),
-        source: z.enum(['form', 'url']).optional(),
+        source: z.enum(['form', 'url', 'image']).optional(),
     }),
     extraInstructions: z.string().optional(),
     language: z.enum(['en', 'ms', 'vi', 'auto']).optional(),
+    contentBrief: z.record(z.unknown()).optional(),
 })
 
 export const extractFromUrlSchema = z.object({
@@ -22,13 +23,43 @@ export const extractionResultSchema = z.object({
     industry: z.string().default(''),
     shortDescription: z.string().default(''),
     products: z.string().default(''),
-    suggestedTheme: z
-        .object({
-            primaryColor: z.string().optional(),
-            secondaryColor: z.string().optional(),
-            siteType: z.string().optional(),
-        })
-        .optional(),
+    referenceContent: z.object({
+        heroHeadline: z.string().optional(),
+        heroSubheadline: z.string().optional(),
+        heroCtaText: z.string().optional(),
+        aboutText: z.string().optional(),
+        featuresList: z.array(z.object({
+            title: z.string(),
+            description: z.string(),
+        })).optional(),
+        testimonials: z.array(z.object({
+            quote: z.string(),
+            name: z.string(),
+            role: z.string().optional(),
+        })).optional(),
+        pricingPlans: z.array(z.object({
+            name: z.string(),
+            price: z.string(),
+            features: z.array(z.string()),
+        })).optional(),
+        faqItems: z.array(z.object({
+            question: z.string(),
+            answer: z.string(),
+        })).optional(),
+        contactInfo: z.object({
+            phone: z.string().optional(),
+            email: z.string().optional(),
+            address: z.string().optional(),
+        }).optional(),
+        footerText: z.string().optional(),
+    }).default({}),
+    suggestedTheme: z.object({
+        primaryColor: z.string().optional(),
+        secondaryColor: z.string().optional(),
+        siteType: z.string().optional(),
+        mood: z.string().optional(),
+    }).optional(),
+    suggestedBlocks: z.array(z.string()).optional(),
     detectedLanguage: z.enum(['en', 'ms', 'vi']).default('en'),
     confidence: z.enum(['high', 'medium', 'low']).default('medium'),
 })

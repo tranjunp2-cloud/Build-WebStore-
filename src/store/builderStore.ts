@@ -54,6 +54,9 @@ type BuilderState = {
     siteName: string | null
     progress: ProgressStep
 
+    // ContentBrief (from URL/Image extraction — passed to generator for high-fidelity output)
+    contentBrief: Record<string, unknown> | null
+
     // Error
     error: { code: string; message: string; retryable: boolean } | null
 }
@@ -61,6 +64,7 @@ type BuilderState = {
 type BuilderActions = {
     // Business Info
     setBusinessInfo: (info: BusinessInfo) => void
+    setContentBrief: (brief: Record<string, unknown> | null) => void
     setStep: (step: BuilderState['step']) => void
 
     // Chat
@@ -96,6 +100,7 @@ const INITIAL_STATE: BuilderState = {
     siteId: null,
     siteName: null,
     progress: { step: '', label: '', progress: 0 },
+    contentBrief: null,
     error: null,
 }
 
@@ -134,6 +139,8 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                     step: 'chat',
                     messages: [],
                 }),
+
+            setContentBrief: (brief) => set({ contentBrief: brief }),
 
             setStep: (step) => set({ step }),
 

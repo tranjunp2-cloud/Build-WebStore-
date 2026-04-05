@@ -29,6 +29,7 @@ export async function generateSiteWithAI(
     businessInfo: BusinessInfoInput,
     extraInstructions?: string,
     language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
+    referencePrompt?: string,
 ): Promise<{ result: GenerationResult; events: SSEEvent[] }> {
     const events: SSEEvent[] = []
     const promptText = [
@@ -48,7 +49,7 @@ export async function generateSiteWithAI(
         events.push({ event: 'step', data: { step: 'analyzing', label: 'Analysing requirements...', progress: 10 } })
 
         const systemPrompt = buildSystemPrompt(language)
-        const userPromptText = buildUserPrompt(businessInfo, extraInstructions, language)
+        const userPromptText = buildUserPrompt(businessInfo, extraInstructions, language, referencePrompt)
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
 

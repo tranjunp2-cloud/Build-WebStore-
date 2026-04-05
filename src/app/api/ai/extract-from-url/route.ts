@@ -75,7 +75,7 @@ export const POST = withAuth(async (user, req) => {
             const completion = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 temperature: 0.3,
-                max_tokens: 1000,
+                max_tokens: 2000,
                 response_format: { type: 'json_object' },
                 messages: [
                     { role: 'system', content: system },

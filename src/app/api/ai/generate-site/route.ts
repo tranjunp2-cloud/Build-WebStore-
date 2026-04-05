@@ -10,6 +10,7 @@ import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 import { blockRegistry } from '@/blocks/registry'
+import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
         const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
         if (errorResponse) return errorResponse
 
-        const { businessInfo, extraInstructions, language = 'en' } = data!
+        const { businessInfo, extraInstructions, language = 'en', contentBrief: rawContentBrief } = data!
 
         // Authenticate — handles both Payload JWT and custom Jose JWT (from verify-otp)
         const user = await getCurrentUser()
@@ -192,8 +193,18 @@ export async function POST(req: NextRequest) {
         // ────────────────────────────────────────────────────────────────────
         const heroImagePromise = generateAndUploadHeroImage(businessInfo, String(resolvedTenantId), payload)
 
+        // Build reference prompt from ContentBrief (if provided from URL/Image extraction)
+        let referencePrompt: string | undefined
+        if (rawContentBrief && typeof rawContentBrief === 'object') {
+            try {
+                referencePrompt = contentBriefToReferencePrompt(rawContentBrief as ContentBrief)
+            } catch {
+                // Invalid ContentBrief — ignore, generate without reference
+            }
+        }
+
         // Generate with AI (or fallback)
-        const { result, events } = await generateSiteWithAI(businessInfo, extraInstructions, language)
+        const { result, events } = await generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt)
 
         // Wait for hero image if it hasn't finished yet
         let heroMedia: { id: string } | null = null

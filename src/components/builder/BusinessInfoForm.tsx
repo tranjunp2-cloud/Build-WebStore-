@@ -25,11 +25,14 @@ type ExtractionResult = {
     industry: string
     shortDescription: string
     products: string
+    referenceContent?: Record<string, unknown>
     suggestedTheme?: {
         primaryColor?: string
         secondaryColor?: string
         siteType?: string
+        mood?: string
     }
+    suggestedBlocks?: string[]
     detectedLanguage: string
     confidence: 'high' | 'medium' | 'low'
 }
@@ -61,6 +64,7 @@ export default function BusinessInfoForm({
     initialValues,
 }: BusinessInfoFormProps) {
     const setBusinessInfo = useBuilderStore((s) => s.setBusinessInfo)
+    const setContentBrief = useBuilderStore((s) => s.setContentBrief)
     const { t } = useI18n()
 
     const [form, setForm] = useState<BusinessInfo>({ ...DEFAULT_FORM, ...initialValues })
@@ -217,6 +221,27 @@ export default function BusinessInfoForm({
             const result = data.data as ExtractionResult
 
             setExtractionResult(result)
+
+            // Store ContentBrief in Zustand for generator to use
+            setContentBrief({
+                businessInfo: {
+                    businessName: result.businessName || '',
+                    industry: result.industry || '',
+                    shortDescription: result.shortDescription || '',
+                    products: result.products || '',
+                },
+                referenceContent: result.referenceContent || {},
+                visualStyle: {
+                    primaryColor: result.suggestedTheme?.primaryColor,
+                    secondaryColor: result.suggestedTheme?.secondaryColor,
+                    mood: result.suggestedTheme?.mood,
+                },
+                suggestedBlocks: result.suggestedBlocks,
+                source: 'url',
+                sourceUrl: urlValue,
+                language: result.detectedLanguage || 'en',
+                confidence: result.confidence,
+            })
 
             // Build payload from extraction result
             const extractedInfo: BusinessInfo = {
