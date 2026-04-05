@@ -486,11 +486,15 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     }, [handleGenerateStart])
 
     const handleDashboard = useCallback(async () => {
-        const saved = await saveDraftNow()
-        if (!saved) return
-        reset()
-        clearBuilderSessionStorage()
+        // Save draft in background — don't block navigation
+        void saveDraftNow()
+        // Navigate FIRST, then clear state (prevents flash of empty form)
         router.push('/dashboard')
+        // Delay reset so navigation starts before component re-renders
+        setTimeout(() => {
+            reset()
+            clearBuilderSessionStorage()
+        }, 100)
     }, [reset, router, saveDraftNow])
 
     const handleOpenEditor = useCallback(async () => {
