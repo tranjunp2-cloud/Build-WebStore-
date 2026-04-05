@@ -75,8 +75,91 @@ export function renderSections(block: RenderBlock, t: TemplateTheme, category?: 
     case 'cta': return renderCta(block, t)
     case 'socialWidget': return renderSocialWidget(block, t, site)
     case 'cartWidget': return renderCartWidget(block, t)
-    default: return ''
+    default: return renderGenericBlock(block, t)
   }
+}
+
+/** Generic renderer for new block types — shows basic content from block data */
+function renderGenericBlock(block: RenderBlock, t: TemplateTheme): string {
+  const headline = (block.headline as string) || ''
+  const subheadline = (block.subheadline as string) || (block.description as string) || ''
+  const rawItems = (block.items as Array<Record<string, unknown>>) || (block.steps as Array<Record<string, unknown>>) || (block.services as Array<Record<string, unknown>>) || (block.reviews as Array<Record<string, unknown>>) || (block.projects as Array<Record<string, unknown>>) || (block.plans as Array<Record<string, unknown>>) || (block.categories as Array<Record<string, unknown>>) || (block.logos as Array<Record<string, unknown>>) || (block.images as Array<Record<string, unknown>>) || []
+  const bt = block.blockType || 'section'
+  const variant = (block.variant as string) || ''
+
+  // Special renderers for specific new block types
+  if (bt === 'google-maps') {
+    const embedUrl = (block.embedUrl as string) || ''
+    const address = (block.address as string) || ''
+    const h = (block.height as number) || 400
+    const headPart = headline ? '<h2 style="font-family:\'' + t.fontHeading + '\',sans-serif;font-size:32px;font-weight:700;margin-bottom:24px;color:' + t.text + '">' + headline + '</h2>' : ''
+    const mapPart = embedUrl
+      ? '<div style="border-radius:16px;overflow:hidden;border:1px solid ' + t.text + '10"><iframe src="' + embedUrl + '" width="100%" height="' + h + '" style="border:0" loading="lazy"></iframe></div>'
+      : '<div style="background:#f0f0f0;border-radius:16px;height:300px;display:flex;align-items:center;justify-content:center;color:#999">Add a Google Maps embed URL in settings</div>'
+    const addrPart = address ? '<p style="margin-top:12px;color:' + t.muted + ';font-size:14px">' + address + '</p>' : ''
+    return '<section style="padding:60px 0"><div class="container">' + headPart + mapPart + addrPart + '</div></section>'
+  }
+
+  if (bt === 'divider') {
+    const h = (block.height as number) || 40
+    if (variant === 'spacer') return '<div style="height:' + h + 'px"></div>'
+    if (variant === 'dots') return '<div style="text-align:center;padding:20px 0;color:' + t.muted + ';letter-spacing:12px;font-size:20px">...</div>'
+    return '<div style="margin:0 auto;max-width:120px;height:1px;background:' + t.primary + '40"></div>'
+  }
+
+  if (bt === 'announcement-bar') {
+    const message = (block.message as string) || ''
+    return '<div style="background:' + t.primary + ';color:#fff;text-align:center;padding:10px 20px;font-size:13px;font-weight:600">' + message + '</div>'
+  }
+
+  if (bt === 'whatsapp-button') {
+    const phone = (block.phoneNumber as string) || ''
+    const msg = (block.message as string) || ''
+    const waUrl = 'https://wa.me/' + phone.replace(/[^0-9]/g, '') + (msg ? '?text=' + encodeURIComponent(msg) : '')
+    const label = (block.label as string) || 'Chat on WhatsApp'
+    if (variant === 'inline') {
+      return '<section style="padding:40px 0;text-align:center"><div class="container"><a href="' + waUrl + '" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:#25D366;color:#fff;border-radius:12px;font-weight:600;font-size:16px;text-decoration:none">' + label + '</a></div></section>'
+    }
+    return '<a href="' + waUrl + '" target="_blank" style="position:fixed;bottom:24px;right:24px;z-index:1000;width:56px;height:56px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;box-shadow:0 4px 12px rgba(0,0,0,.15);text-decoration:none" title="Chat on WhatsApp">💬</a>'
+  }
+
+  // Generic fallback — renders headline + items grid
+  let html = '<section style="padding:80px 0"><div class="container">'
+
+  if (headline) {
+    html += '<div style="text-align:center;margin-bottom:48px">'
+    html += '<h2 style="font-family:\'' + t.fontHeading + '\',sans-serif;font-size:36px;font-weight:700;color:' + t.text + ';margin-bottom:12px">' + headline + '</h2>'
+    if (subheadline) html += '<p style="font-size:16px;color:' + t.muted + ';max-width:600px;margin:0 auto">' + subheadline + '</p>'
+    html += '</div>'
+  }
+
+  if (rawItems.length > 0) {
+    const cols = rawItems.length <= 2 ? 2 : rawItems.length <= 4 ? rawItems.length : 3
+    html += '<div style="display:grid;grid-template-columns:repeat(' + cols + ',1fr);gap:24px">'
+    for (const item of rawItems) {
+      const title = (item.title as string) || (item.name as string) || (item.label as string) || ''
+      const desc = (item.description as string) || (item.content as string) || (item.answer as string) || ''
+      const icon = (item.icon as string) || ''
+      const imgUrl = (item.imageUrl as string) || ''
+      html += '<div style="padding:24px;border-radius:12px;border:1px solid ' + t.text + '10;background:' + t.bg + '">'
+      if (imgUrl) html += '<img src="' + imgUrl + '" alt="' + title + '" style="width:100%;height:180px;object-fit:cover;border-radius:8px;margin-bottom:16px">'
+      if (icon) html += '<div style="font-size:28px;margin-bottom:12px">' + icon + '</div>'
+      if (title) html += '<h3 style="font-weight:600;font-size:16px;margin-bottom:8px;color:' + t.text + '">' + title + '</h3>'
+      if (desc) html += '<p style="font-size:14px;color:' + t.muted + ';line-height:1.6">' + desc + '</p>'
+      html += '</div>'
+    }
+    html += '</div>'
+  } else if (!headline) {
+    const blockLabel = bt.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+    html += '<div style="text-align:center;padding:40px;border:2px dashed ' + t.text + '20;border-radius:16px;color:' + t.muted + '">'
+    html += '<div style="font-size:32px;margin-bottom:8px">🧩</div>'
+    html += '<p style="font-size:14px">' + blockLabel + ' block</p>'
+    html += '<p style="font-size:12px;opacity:.6">Click to select, then edit in settings panel</p>'
+    html += '</div>'
+  }
+
+  html += '</div></section>'
+  return html
 }
 
 function escapeAttr(str: string) {
