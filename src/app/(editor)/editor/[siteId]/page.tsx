@@ -471,6 +471,10 @@ export default function EditorPage() {
                 if (nextBlock) {
                     addBlock(afterIndex, nextBlock)
                     setSelectedBlock(Math.max(0, afterIndex + 1))
+                    // Auto-save + refresh preview to show new block
+                    setTimeout(() => {
+                        void handleSave({ showToast: false, refreshPreview: true })
+                    }, 300)
                 } else {
                     toast.error('Unable to add this section yet')
                 }
@@ -486,6 +490,10 @@ export default function EditorPage() {
                     if (prev > blockIndex) return prev - 1
                     return prev
                 })
+                // Auto-save + refresh preview
+                setTimeout(() => {
+                    void handleSave({ showToast: false, refreshPreview: true })
+                }, 300)
                 break
             }
 
