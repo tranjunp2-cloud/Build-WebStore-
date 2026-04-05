@@ -64,6 +64,8 @@ type BuilderState = {
 type BuilderActions = {
     // Business Info
     setBusinessInfo: (info: BusinessInfo) => void
+    /** Update businessInfo WITHOUT changing step — for extraction pre-fill */
+    setBusinessInfoDraft: (info: Partial<BusinessInfo>) => void
     setContentBrief: (brief: Record<string, unknown> | null) => void
     setStep: (step: BuilderState['step']) => void
 
@@ -139,6 +141,11 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                     step: 'chat',
                     messages: [],
                 }),
+
+            setBusinessInfoDraft: (draft) =>
+                set((state) => ({
+                    businessInfo: { ...state.businessInfo, ...draft } as BusinessInfo,
+                })),
 
             setContentBrief: (brief) => set({ contentBrief: brief }),
 

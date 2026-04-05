@@ -64,6 +64,7 @@ export default function BusinessInfoForm({
     initialValues,
 }: BusinessInfoFormProps) {
     const setBusinessInfo = useBuilderStore((s) => s.setBusinessInfo)
+    const setBusinessInfoDraft = useBuilderStore((s) => s.setBusinessInfoDraft)
     const setContentBrief = useBuilderStore((s) => s.setContentBrief)
     const { t } = useI18n()
 
@@ -272,13 +273,18 @@ export default function BusinessInfoForm({
             }
 
             // Fallback: not enough data → show form for user to fill gaps
+            const partialData = {
+                businessName: result.businessName || '',
+                industry: result.industry || '',
+                shortDescription: result.shortDescription || '',
+                products: result.products || '',
+            }
             setForm((current) => ({
                 ...current,
-                businessName: result.businessName || current.businessName,
-                industry: result.industry || current.industry,
-                shortDescription: result.shortDescription || current.shortDescription,
-                products: result.products || current.products,
+                ...partialData,
             }))
+            // Persist to Zustand store so data survives HMR/re-renders
+            setBusinessInfoDraft(partialData)
             setInputMode('manual')
             setErrors({})
 
