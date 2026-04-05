@@ -200,29 +200,15 @@ export function sanitizeBlockData(block: Record<string, unknown>): Record<string
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // VARIANT VALIDATION: Ensure variant is a valid enum value
+    // VARIANT VALIDATION: Ensure variant matches block registry schema
+    // Uses blockRegistry as single source of truth (not a hardcoded list)
     // ═══════════════════════════════════════════════════════════════════════
-    const VARIANT_ENUMS: Record<string, string[]> = {
-        about: ['image-right', 'image-left', 'centered', 'cards'],
-        contact: ['form', 'info-only', 'split'],
-        cta: ['banner', 'inline', 'floating'],
-        faq: ['accordion', 'grid', 'simple'],
-        features: ['grid-2', 'grid-3', 'grid-4', 'list'],
-        footer: ['simple', 'expanded', 'minimal'],
-        gallery: ['grid', 'masonry', 'carousel'],
-        hero: ['centered', 'split', 'video', 'minimal'],
-        'logo-cloud': ['row', 'grid'],
-        navigation: ['simple', 'centered', 'mega-menu'],
-        pricing: ['cards', 'table'],
-        stats: ['row', 'grid', 'highlight'],
-        team: ['grid', 'list'],
-        testimonials: ['cards', 'carousel', 'simple'],
-        video: ['embed', 'background']
-    }
-
-    if (typeof s.blockType === 'string' && typeof s.variant === 'string' && VARIANT_ENUMS[s.blockType]) {
-        if (!VARIANT_ENUMS[s.blockType].includes(s.variant)) {
-            s.variant = VARIANT_ENUMS[s.blockType][0] // Default to first option
+    if (typeof s.blockType === 'string' && blockRegistry.has(s.blockType)) {
+        const meta = blockRegistry.getBlockMeta(s.blockType)
+        if (meta && meta.variants.length > 0 && typeof s.variant === 'string') {
+            if (!meta.variants.includes(s.variant)) {
+                s.variant = meta.defaultVariant || meta.variants[0]
+            }
         }
     }
 
@@ -332,6 +318,10 @@ export function sanitizeBlockData(block: Record<string, unknown>): Record<string
     // FOOTER: columns + links + socials
     // ═══════════════════════════════════════════════════════════════════════
     if (s.blockType === 'footer') {
+        // AI sometimes returns columns as object instead of array — wrap it
+        if (s.columns && !Array.isArray(s.columns) && typeof s.columns === 'object') {
+            s.columns = Object.values(s.columns as Record<string, unknown>)
+        }
         if (Array.isArray(s.columns)) {
             s.columns = s.columns.map((col: unknown) => {
                 if (typeof col === 'string') return { title: col, links: [] }

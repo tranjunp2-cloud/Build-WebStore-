@@ -396,9 +396,11 @@ export async function POST(req: NextRequest) {
         })
 
     } catch (error: unknown) {
-        console.error('[AI Generate Site Error]', error)
+        const errMsg = error instanceof Error ? error.message : String(error)
+        const errStack = error instanceof Error ? error.stack : ''
+        console.error('[AI Generate Site Error]', errMsg, errStack)
         return NextResponse.json(
-            { error: 'Failed to generate website. Please try again.' },
+            { error: `Failed to generate website. Please try again. (${errMsg})` },
             { status: 500 },
         )
     }
