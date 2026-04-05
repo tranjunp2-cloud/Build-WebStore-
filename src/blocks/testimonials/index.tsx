@@ -4,10 +4,12 @@ import type { BlockProps } from '../types'
 import type { TestimonialsConfig } from './config'
 import { StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import { AvatarRing, GradientBlob } from '../shared/decorative'
+import { getTeamAvatar } from '@/lib/images/industry-images'
 
-export function TestimonialsBlock({ block, theme }: BlockProps<TestimonialsConfig>) {
+export function TestimonialsBlock({ block, theme, site }: BlockProps<TestimonialsConfig>) {
     const { headline, testimonials = [] } = block
     const pc = theme.primaryColor
+    const category = (site?.siteType as string) || 'business'
 
     return (
         <section className="py-24 relative overflow-hidden">
@@ -25,7 +27,7 @@ export function TestimonialsBlock({ block, theme }: BlockProps<TestimonialsConfi
                     {testimonials.map((t, i) => (
                         <StaggerItem key={i}>
                             <HoverCard
-                                className="p-8 rounded-2xl h-full relative group"
+                                className="p-8 rounded-2xl h-full relative group transition-shadow duration-300 hover:shadow-xl"
                                 style={{
                                     background: `linear-gradient(160deg, ${pc}08, transparent 60%)`,
                                     border: `1px solid ${pc}10`,
@@ -53,7 +55,7 @@ export function TestimonialsBlock({ block, theme }: BlockProps<TestimonialsConfi
 
                                 {/* Author */}
                                 <div className="flex items-center gap-3 mt-auto">
-                                    <AvatarRing color={pc} src={t.avatar?.url} name={t.name} size={44} />
+                                    <AvatarRing color={pc} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={44} />
                                     <div>
                                         <p className="font-semibold text-sm">{t.name}</p>
                                         {(t.title || t.company) && (

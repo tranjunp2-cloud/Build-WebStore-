@@ -5,10 +5,13 @@ import type { AboutConfig } from './config'
 import { AnimatedSection } from '../shared/animations'
 import { motion } from 'framer-motion'
 import { GradientBlob, SectionLabel } from '../shared/decorative'
+import { getAboutImage } from '@/lib/images/industry-images'
 
-export function AboutBlock({ block, theme }: BlockProps<AboutConfig>) {
+export function AboutBlock({ block, theme, site }: BlockProps<AboutConfig>) {
     const { headline, sectionLabel, layout = 'image-right' } = block
     const pc = theme.primaryColor
+    const category = (site?.siteType as string) || 'business'
+    const fallbackAboutUrl = getAboutImage(category)
 
     return (
         <AnimatedSection className="py-24 relative overflow-hidden">
@@ -30,26 +33,11 @@ export function AboutBlock({ block, theme }: BlockProps<AboutConfig>) {
                             viewport={{ once: true }}
                             transition={{ duration: 0.6 }}
                         >
-                            {block.image?.url ? (
-                                <img src={block.image.url} alt={block.image.alt || headline}
-                                    className="w-full h-auto rounded-3xl shadow-xl" />
-                            ) : (
-                                <div
-                                    className="aspect-[4/3] rounded-3xl flex items-center justify-center"
-                                    style={{
-                                        background: `linear-gradient(135deg, ${pc}10, ${pc}05)`,
-                                        border: `1px solid ${pc}12`,
-                                    }}
-                                >
-                                    <div className="text-center p-8">
-                                        <div className="w-16 h-16 mx-auto mb-3 rounded-2xl flex items-center justify-center"
-                                            style={{ background: `${pc}15` }}>
-                                            <span className="text-2xl">🏢</span>
-                                        </div>
-                                        <p className="text-xs opacity-30">Business image</p>
-                                    </div>
-                                </div>
-                            )}
+                            <img
+                                src={block.image?.url || fallbackAboutUrl}
+                                alt={block.image?.alt || headline}
+                                className="w-full h-auto rounded-3xl shadow-xl object-cover aspect-[4/3]"
+                            />
                         </motion.div>
                     )}
 
@@ -77,26 +65,11 @@ export function AboutBlock({ block, theme }: BlockProps<AboutConfig>) {
                             viewport={{ once: true }}
                             transition={{ duration: 0.6, delay: 0.15 }}
                         >
-                            {block.image?.url ? (
-                                <img src={block.image.url} alt={block.image.alt || headline}
-                                    className="w-full h-auto rounded-3xl shadow-xl" />
-                            ) : (
-                                <div
-                                    className="aspect-[4/3] rounded-3xl flex items-center justify-center"
-                                    style={{
-                                        background: `linear-gradient(135deg, ${pc}10, ${pc}05)`,
-                                        border: `1px solid ${pc}12`,
-                                    }}
-                                >
-                                    <div className="text-center p-8">
-                                        <div className="w-16 h-16 mx-auto mb-3 rounded-2xl flex items-center justify-center"
-                                            style={{ background: `${pc}15` }}>
-                                            <span className="text-2xl">📸</span>
-                                        </div>
-                                        <p className="text-xs opacity-30">Business image</p>
-                                    </div>
-                                </div>
-                            )}
+                            <img
+                                src={block.image?.url || fallbackAboutUrl}
+                                alt={block.image?.alt || headline}
+                                className="w-full h-auto rounded-3xl shadow-xl object-cover aspect-[4/3]"
+                            />
                         </motion.div>
                     )}
                 </div>

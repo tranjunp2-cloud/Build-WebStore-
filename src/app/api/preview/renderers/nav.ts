@@ -3,8 +3,47 @@
  */
 import { TemplateTheme } from './styles'
 
-export function renderNav(block: Record<string, unknown>, t: TemplateTheme): string {
-    const links = ((block.links as Record<string, unknown>[]) || []).map((l: Record<string, unknown>) => `<a href="${(l.url as string) || '#'}">${l.label as string}</a>`).join('')
+type NavPage = { id: string | number; slug?: string; title?: string }
+
+export function renderNav(block: Record<string, unknown>, t: TemplateTheme, pages?: NavPage[]): string {
+    // Build lookup maps for matching nav links to pages
+    const pageIndex = new Map<string, NavPage>()
+    if (pages) {
+        for (const p of pages) {
+            if (p.slug) {
+                pageIndex.set(p.slug.toLowerCase(), p)
+                // Also index without leading slash
+                pageIndex.set(p.slug.toLowerCase().replace(/^\//, ''), p)
+            }
+            if (p.title) {
+                pageIndex.set(p.title.toLowerCase().trim(), p)
+            }
+        }
+    }
+
+    function findPage(url: string, label: string): NavPage | undefined {
+        // 1. Try exact slug match (strip # and /)
+        const cleaned = url.replace(/^[/#]+/, '').toLowerCase().trim()
+        if (cleaned && pageIndex.has(cleaned)) return pageIndex.get(cleaned)
+        // 2. Try label match (e.g., "Sản Phẩm" → page titled "Sản Phẩm")
+        const labelKey = label?.toLowerCase().trim()
+        if (labelKey && pageIndex.has(labelKey)) return pageIndex.get(labelKey)
+        // 3. Try partial slug match (e.g., "about" in "ve-chung-toi" won't match, but "products" in "products")
+        if (cleaned) {
+            for (const [key, page] of pageIndex) {
+                if (key.includes(cleaned) || cleaned.includes(key)) return page
+            }
+        }
+        return undefined
+    }
+
+    const links = ((block.links as Record<string, unknown>[]) || []).map((l: Record<string, unknown>) => {
+        const url = (l.url as string) || '#'
+        const label = l.label as string
+        const matchedPage = findPage(url, label)
+        const pageAttr = matchedPage ? ` data-page-id="${matchedPage.id}"` : ''
+        return `<a href="${url}"${pageAttr}>${label}</a>`
+    }).join('')
     const ctaButton = block.ctaButton as Record<string, unknown>
     const cta = ctaButton?.show !== false ? `<a href="${(ctaButton?.url as string) || '#'}" class="nav-cta">${(ctaButton?.label as string) || 'Contact'}</a>` : ''
 

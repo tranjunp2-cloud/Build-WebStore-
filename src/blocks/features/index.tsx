@@ -35,7 +35,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                     {features.map((feature, i) => (
                         <StaggerItem key={i}>
                             <HoverCard
-                                className="p-8 rounded-2xl h-full transition-all duration-300 group"
+                                className="p-8 rounded-2xl h-full transition-all duration-300 group hover:shadow-xl"
                                 style={{
                                     background: `linear-gradient(135deg, ${pc}06, transparent)`,
                                     border: `1px solid ${pc}12`,

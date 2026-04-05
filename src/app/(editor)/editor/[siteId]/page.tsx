@@ -152,6 +152,16 @@ export default function EditorPage() {
         return () => mediaQuery.removeEventListener('change', handleChange)
     }, [])
 
+    // Phase 1: Reset store when siteId changes to prevent stale data flash
+    const storeSiteId = useEditorStore(state => state.siteId)
+    const resetStore = useEditorStore(state => state.reset)
+
+    useEffect(() => {
+        if (storeSiteId && storeSiteId !== siteId) {
+            resetStore()
+        }
+    }, [siteId, storeSiteId, resetStore])
+
     useEffect(() => {
         if (!siteId) return
 
@@ -214,6 +224,9 @@ export default function EditorPage() {
         const snapshot = useEditorStore.getState()
         const currentBlocks = snapshot.blocks
         const currentTheme = snapshot.theme
+        // Use pageId from store snapshot (not from closure) to prevent race condition
+        // when page switch happens during auto-save
+        const savePageId = snapshot.currentPageId
 
         if (currentBlocks.length === 0 && !page) return false
 
@@ -221,8 +234,8 @@ export default function EditorPage() {
 
         try {
             const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
-            if (currentPageId) {
-                saveUrl.searchParams.set('pageId', currentPageId)
+            if (savePageId) {
+                saveUrl.searchParams.set('pageId', savePageId)
             }
 
             const res = await fetch(saveUrl.toString(), {
@@ -261,7 +274,7 @@ export default function EditorPage() {
         } finally {
             setIsSaving(false)
         }
-    }, [currentPageId, markSaved, page, setIsSaving, siteId])
+    }, [markSaved, page, setIsSaving, siteId])
 
     useEffect(() => {
         if (!siteId || !hasUnsavedChanges || !autoSaveEnabled) return
@@ -558,9 +571,18 @@ export default function EditorPage() {
     }, [handleSave, hasUnsavedChanges, isPublishing, site?.status, siteId, siteName])
 
     const handlePageSelected = useCallback((pageId: string) => {
+        // Cancel any pending auto-save to prevent saving wrong page's blocks
+        const store = useEditorStore.getState()
+        if (store.hasUnsavedChanges) {
+            store.markSaved() // Discard unsaved changes from previous page
+        }
+
         const nextParams = new URLSearchParams(searchParams.toString())
         nextParams.set('pageId', pageId)
         router.replace(`/editor/${siteId}?${nextParams.toString()}`)
+        // Force iframe refresh to show new page content
+        setIframeKey(k => k + 1)
+        setSelectedBlock(null)
     }, [router, searchParams, siteId])
 
     const handlePageUpdate = useCallback(async (pageId: string, changes: Partial<PageData>) => {
@@ -644,6 +666,7 @@ export default function EditorPage() {
                     currentPageId={currentPageId}
                     onPageSelected={handlePageSelected}
                     onPagesChanged={() => setIframeKey(key => key + 1)}
+                    onEditPage={() => setActiveSidebarTab('chat')}
                 />
             ) : null}
         </>
@@ -782,6 +805,7 @@ export default function EditorPage() {
                             }}
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}
+                            onPageNavigate={handlePageSelected}
                         />
                     </div>
 

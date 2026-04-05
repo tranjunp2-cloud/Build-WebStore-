@@ -17,7 +17,7 @@ const HeroBlock = {
                 { label: 'Video Background', value: 'video' },
             ],
         },
-        { name: 'headline', type: 'text', required: true },
+        { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
         {
             name: 'ctaButtons',
@@ -105,7 +105,7 @@ const AboutBlock = {
             ],
         },
         { name: 'sectionLabel', type: 'text', defaultValue: 'About Us' },
-        { name: 'headline', type: 'text', required: true },
+        { name: 'headline', type: 'text' },
         { name: 'body', type: 'richText' },
         { name: 'image', type: 'upload', relationTo: 'media' },
         {
@@ -248,7 +248,7 @@ const FeaturesBlock = {
     labels: { singular: 'Features Section', plural: 'Features Sections' },
     fields: [
         { name: 'sectionLabel', type: 'text' },
-        { name: 'headline', type: 'text', required: true },
+        { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
         {
             name: 'layout',
@@ -372,7 +372,7 @@ const PricingBlock = {
     slug: 'pricing',
     labels: { singular: 'Pricing Section', plural: 'Pricing Sections' },
     fields: [
-        { name: 'headline', type: 'text', required: true },
+        { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
         {
             name: 'plans',

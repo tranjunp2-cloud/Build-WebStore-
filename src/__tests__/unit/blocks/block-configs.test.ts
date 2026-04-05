@@ -165,7 +165,7 @@ describe('heroMeta [TC-F01.08]', () => {
 
     it('lists expected variants', () => {
         expect(heroMeta.variants).toContain('centered')
-        expect(heroMeta.variants).toContain('split')
+        expect(heroMeta.variants).toContain('split-left')
     })
 
     it('has editableFields', () => {

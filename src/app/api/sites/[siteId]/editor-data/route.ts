@@ -62,11 +62,16 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             if (!/^\d+$/.test(pageId)) {
                 return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
             }
-            const requestedPage = await payload.findByID({
-                collection: 'pages',
-                id: pageId,
-                draft: true, // From staging: include drafts
-            })
+            let requestedPage: NonNullable<Awaited<ReturnType<typeof payload.findByID>>> | null = null
+            try {
+                requestedPage = await payload.findByID({
+                    collection: 'pages',
+                    id: pageId,
+                    draft: true,
+                })
+            } catch {
+                // Page not found — fall through to homepage
+            }
 
             const requestedPageSiteId =
                 typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site

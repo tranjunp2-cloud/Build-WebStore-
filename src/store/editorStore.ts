@@ -186,6 +186,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const effectiveHeader = headerBlock || (fallbackHeader ? JSON.parse(JSON.stringify(fallbackHeader)) : { blockType: 'navigation', links: [] })
         const effectiveFooter = footerBlock || (fallbackFooter ? JSON.parse(JSON.stringify(fallbackFooter)) : { blockType: 'footer' })
 
+        // Keep blocks as-is (including nav/footer) for preview iframe index consistency
         const snapshot = createSnapshot(blocks, theme, effectiveHeader, effectiveFooter, 'Initial state', 'manual')
         set({
             siteId,

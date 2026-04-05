@@ -4,6 +4,17 @@ import type { BlockProps } from '../types'
 import type { FooterConfig } from './config'
 import { GradientLine } from '../shared/decorative'
 import { mergeFooterSocialsWithSite } from '@/lib/site-settings'
+import { Facebook, Instagram, Twitter, Linkedin, Youtube, Globe } from 'lucide-react'
+
+const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
+    facebook: Facebook,
+    instagram: Instagram,
+    twitter: Twitter,
+    x: Twitter,
+    linkedin: Linkedin,
+    youtube: Youtube,
+    tiktok: Globe,
+}
 
 export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
     const mergedBlock = mergeFooterSocialsWithSite(block, site)
@@ -16,7 +27,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
             <GradientLine from={pc} to={`${pc}00`} className="absolute top-0 left-0" height={1} />
 
             <div className="container mx-auto px-6">
-                <div className={`grid grid-cols-1 md:grid-cols-${Math.min(columns.length + 1, 4)} gap-10 mb-16`}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-16">
                     {/* Brand Column */}
                     <div className="md:col-span-1">
                         <div className="font-bold text-2xl font-heading mb-4">
@@ -49,7 +60,11 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                                             color: pc,
                                         }}
                                     >
-                                        {(social.platform || social.label || '•').charAt(0).toUpperCase()}
+                                        {(() => {
+                                            const platform = (social.platform || '').toLowerCase()
+                                            const Icon = SOCIAL_ICONS[platform]
+                                            return Icon ? <Icon size={16} /> : (social.platform || '•').charAt(0).toUpperCase()
+                                        })()}
                                     </a>
                                 ))}
                             </div>
@@ -77,11 +92,13 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                 </div>
 
                 {/* Bottom bar */}
-                {copyrightText && (
-                    <div className="pt-8 text-center" style={{ borderTop: `1px solid ${pc}10` }}>
-                        <p className="text-xs opacity-30">{copyrightText}</p>
-                    </div>
-                )}
+                <div className="pt-8 text-center" style={{ borderTop: `1px solid ${pc}10` }}>
+                    <p className="text-xs opacity-30">
+                        {copyrightText
+                            ? copyrightText.replace(/\d{4}/, String(new Date().getFullYear()))
+                            : `© ${new Date().getFullYear()} ${logoText || 'All rights reserved'}`}
+                    </p>
+                </div>
             </div>
         </footer>
     )

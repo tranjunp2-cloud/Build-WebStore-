@@ -5,10 +5,13 @@ import type { HeroConfig } from './config'
 import { AnimatedSection } from '../shared/animations'
 import { motion } from 'framer-motion'
 import { GradientBlob, DotGrid, SectionLabel } from '../shared/decorative'
+import { getHeroImage } from '@/lib/images/industry-images'
 
-export function HeroBlock({ block, theme }: BlockProps<HeroConfig>) {
+export function HeroBlock({ block, theme, site }: BlockProps<HeroConfig>) {
     const { variant = 'centered', headline, subheadline, ctaButtons = [], image, badge } = block
     const pc = theme.primaryColor
+    const category = (site?.siteType as string) || 'business'
+    const fallbackHeroUrl = getHeroImage(category)
 
     // ── Split Variant ──────────────────────────────────────────────────────
     if (variant === 'split-left' || variant === 'split-right') {
@@ -71,33 +74,12 @@ export function HeroBlock({ block, theme }: BlockProps<HeroConfig>) {
                             transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
                             className="relative"
                         >
-                            {image?.url ? (
-                                <img src={image.url} alt={image.alt || headline}
-                                    className="w-full h-auto rounded-3xl shadow-2xl" />
-                            ) : (
-                                /* Decorative placeholder — abstract shapes */
-                                <div
-                                    className="aspect-[4/3] rounded-3xl flex items-center justify-center overflow-hidden relative"
-                                    style={{
-                                        background: `linear-gradient(135deg, ${pc}12, ${pc}05)`,
-                                        border: `1px solid ${pc}15`,
-                                    }}
-                                >
-                                    <div className="absolute inset-0" style={{
-                                        background: `
-                                            radial-gradient(circle at 30% 40%, ${pc}20 0%, transparent 50%),
-                                            radial-gradient(circle at 70% 60%, ${pc}15 0%, transparent 40%)
-                                        `,
-                                    }} />
-                                    <div className="relative text-center p-8">
-                                        <div className="w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center"
-                                            style={{ background: `${pc}15`, border: `1px solid ${pc}25` }}>
-                                            <span className="text-3xl">✨</span>
-                                        </div>
-                                        <p className="text-sm opacity-40">Business image</p>
-                                    </div>
-                                </div>
-                            )}
+                            <img
+                                src={image?.url || fallbackHeroUrl}
+                                alt={image?.alt || headline}
+                                className="w-full h-auto rounded-3xl object-cover aspect-auto max-h-[500px]"
+                                style={{ boxShadow: `0 25px 50px ${pc}15, 0 10px 20px rgba(0,0,0,0.2)` }}
+                            />
                         </motion.div>
                     </div>
                 </div>
@@ -226,17 +208,29 @@ export function HeroBlock({ block, theme }: BlockProps<HeroConfig>) {
                         </motion.div>
                     )}
 
-                    {/* Decorative image placeholder or real image */}
+                    {/* Hero image — only show if user uploaded an image */}
                     {image?.url && (
                         <motion.div
                             initial={{ opacity: 0, y: 40 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ duration: 0.8, delay: 0.3 }}
-                            className="mt-16"
+                            className="mt-16 relative max-w-4xl mx-auto group"
                         >
-                            <img src={image.url} alt={image.alt || headline}
-                                className="w-full max-w-4xl mx-auto rounded-2xl shadow-2xl" />
+                            <img
+                                src={image.url}
+                                alt={image.alt || headline}
+                                className="w-full rounded-2xl object-cover"
+                            />
+                            {/* Gradient overlay for polish */}
+                            <div
+                                className="absolute inset-0 rounded-2xl pointer-events-none"
+                                style={{
+                                    background: `linear-gradient(180deg, transparent 60%, ${pc}15 100%)`,
+                                    boxShadow: `0 25px 60px ${pc}20, 0 8px 24px rgba(0,0,0,0.3)`,
+                                    borderRadius: 'inherit',
+                                }}
+                            />
                         </motion.div>
                     )}
                 </div>
