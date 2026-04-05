@@ -11,7 +11,7 @@ export function HeroBlock({ block, theme }: BlockProps<HeroConfig>) {
     const pc = theme.primaryColor
 
     // ── Split Variant ──────────────────────────────────────────────────────
-    if (variant === 'split') {
+    if (variant === 'split-left' || variant === 'split-right') {
         return (
             <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
                 {/* Background decorations */}
@@ -106,7 +106,7 @@ export function HeroBlock({ block, theme }: BlockProps<HeroConfig>) {
     }
 
     // ── Minimal Variant ─────────────────────────────────────────────────────
-    if (variant === 'minimal') {
+    if (variant === 'fullscreen') {
         return (
             <AnimatedSection className="relative py-32 flex items-center overflow-hidden">
                 <GradientBlob color={pc} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.06} />

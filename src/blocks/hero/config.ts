@@ -5,7 +5,7 @@ import type { CTAButton, ImageRef } from '../types'
 // ── Hero Config ──────────────────────────────────────────────────────────────
 export type HeroConfig = {
     blockType: 'hero'
-    variant?: 'centered' | 'split' | 'video' | 'minimal'
+    variant?: 'centered' | 'split-left' | 'split-right' | 'fullscreen' | 'video'
     headline: string
     subheadline?: string
     ctaButtons?: CTAButton[]
@@ -18,7 +18,7 @@ export type HeroConfig = {
 
 export const HeroConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('hero'),
-    variant: z.enum(['centered', 'split', 'video', 'minimal']).default('centered'),
+    variant: z.enum(['centered', 'split-left', 'split-right', 'fullscreen', 'video']).default('centered'),
     headline: z.string(),
     subheadline: z.string().optional(),
     ctaButtons: z.array(CTAButtonSchema).default([]),
@@ -34,7 +34,7 @@ export const heroMeta = {
     name: 'Hero',
     description: 'Main hero/banner section with headline, CTA, and optional image',
     icon: '🏔️',
-    variants: ['centered', 'split', 'video', 'minimal'],
+    variants: ['centered', 'split-left', 'split-right', 'fullscreen', 'video'],
     defaultVariant: 'centered',
     editableFields: ['headline', 'subheadline', 'ctaButtons', 'image', 'badge'],
     quickActions: ['Rewrite headline', 'Change CTA', 'Change style'],

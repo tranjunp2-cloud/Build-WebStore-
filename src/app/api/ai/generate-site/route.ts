@@ -303,6 +303,19 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Map common AI variant names to Payload-valid variants
+        const VARIANT_ALIASES: Record<string, Record<string, string>> = {
+            hero: { 'split': 'split-left', 'minimal': 'centered', 'gradient': 'centered', 'hero-centered': 'centered', 'image-left': 'split-right', 'image-right': 'split-left' },
+        }
+        for (const block of sanitizedBlocks) {
+            if (typeof block.blockType === 'string' && typeof block.variant === 'string') {
+                const aliases = VARIANT_ALIASES[block.blockType]
+                if (aliases && aliases[block.variant]) {
+                    block.variant = aliases[block.variant]
+                }
+            }
+        }
+
         // Final variant sanitization — ensure all block variants match registry schemas
         // This catches any variants that slipped through openai-generator sanitization
         for (const block of sanitizedBlocks) {
@@ -528,7 +541,12 @@ function createPageHero(baseHero: AIBlock | null, options: {
     })
 
     hero.blockType = 'hero'
-    hero.variant = hero.variant || 'centered'
+    // Validate variant against registry — AI may produce invalid variants
+    const heroMeta = blockRegistry.getBlockMeta('hero')
+    const validVariants = heroMeta?.variants || ['centered', 'split', 'video', 'minimal']
+    hero.variant = (typeof hero.variant === 'string' && validVariants.includes(hero.variant))
+        ? hero.variant
+        : 'centered'
     hero.headline = options.headline
     hero.subheadline = options.subheadline
     hero.badge = options.badgeText
