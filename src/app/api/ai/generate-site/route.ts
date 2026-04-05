@@ -9,6 +9,7 @@ import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
+import { blockRegistry } from '@/blocks/registry'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -302,6 +303,19 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Final variant sanitization — ensure all block variants match registry schemas
+        // This catches any variants that slipped through openai-generator sanitization
+        for (const block of sanitizedBlocks) {
+            if (typeof block.blockType === 'string' && blockRegistry.has(block.blockType)) {
+                const meta = blockRegistry.getBlockMeta(block.blockType)
+                if (meta && meta.variants.length > 0) {
+                    if (typeof block.variant !== 'string' || !meta.variants.includes(block.variant)) {
+                        block.variant = meta.defaultVariant || meta.variants[0]
+                    }
+                }
+            }
+        }
+
         const pageDefinitions = buildGeneratedPages({
             blocks: sanitizedBlocks,
             businessInfo,
@@ -311,6 +325,22 @@ export async function POST(req: NextRequest) {
         const createdPages: Record<string, unknown>[] = []
 
         for (const pageDefinition of pageDefinitions) {
+            // Sanitize variants in each page's layout blocks (safety net for cloned heroes)
+            const sanitizedLayout = Array.isArray(pageDefinition.layout)
+                ? pageDefinition.layout.map((block: AIBlock | null) => {
+                    if (!block) return block
+                    if (typeof block.blockType === 'string' && blockRegistry.has(block.blockType)) {
+                        const meta = blockRegistry.getBlockMeta(block.blockType)
+                        if (meta && meta.variants.length > 0) {
+                            if (typeof block.variant !== 'string' || !meta.variants.includes(block.variant)) {
+                                return { ...block, variant: meta.defaultVariant || meta.variants[0] }
+                            }
+                        }
+                    }
+                    return block
+                })
+                : pageDefinition.layout
+
             const createdPage = await payload.create({
                 collection: 'pages',
                 data: {
@@ -318,7 +348,7 @@ export async function POST(req: NextRequest) {
                     slug: pageDefinition.slug,
                     site: site.id,
                     isHomepage: pageDefinition.isHomepage,
-                    layout: pageDefinition.layout,
+                    layout: sanitizedLayout,
                     seo: pageDefinition.seo,
                 },
             })
