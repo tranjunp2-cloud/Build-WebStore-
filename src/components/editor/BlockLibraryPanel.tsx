@@ -6,7 +6,7 @@ import { blockRegistry } from '@/blocks/registry'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData } from '@/types/editor'
 
-type LibraryCategoryId = 'basics' | 'store' | 'content' | 'form' | 'widgets'
+type LibraryCategoryId = 'basics' | 'store' | 'content' | 'form' | 'widgets' | 'media' | 'layout' | 'commerce'
 
 type CategoryConfig = {
     id: LibraryCategoryId
@@ -15,24 +15,44 @@ type CategoryConfig = {
     blockTypes: string[]
 }
 
-// Ecom block types hidden in v1.0 (landing page focus). Re-enable for v1.1.
-const ECOM_BLOCK_TYPES = ['products-grid', 'products-featured', 'cartWidget']
-
 const categoryConfig: CategoryConfig[] = [
-    { id: 'basics', label: 'Basics', icon: '📦', blockTypes: ['custom-html', 'hero', 'gallery', 'cta'] },
-    { id: 'store', label: 'Business', icon: '💼', blockTypes: ['pricing'] },
-    { id: 'content', label: 'Content', icon: '📄', blockTypes: ['about', 'blog-list', 'faq'] },
-    { id: 'form', label: 'Form', icon: '📝', blockTypes: ['contact', 'newsletter'] },
-    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'socialWidget'] },
+    { id: 'basics', label: 'Basics', icon: '📦', blockTypes: ['hero', 'cta', 'about', 'features', 'step-process', 'service-cards'] },
+    { id: 'content', label: 'Content', icon: '📄', blockTypes: ['faq', 'accordion', 'blog-list', 'testimonials', 'social-proof', 'portfolio-grid'] },
+    { id: 'media', label: 'Media', icon: '🖼️', blockTypes: ['gallery', 'gallery-masonry', 'video', 'video-background', 'carousel', 'before-after'] },
+    { id: 'store', label: 'Business', icon: '💼', blockTypes: ['pricing', 'pricing-table', 'feature-comparison', 'menu-food', 'countdown-timer'] },
+    { id: 'commerce', label: 'Commerce', icon: '🛒', blockTypes: ['products-grid', 'products-featured', 'cartWidget'] },
+    { id: 'form', label: 'Form & Contact', icon: '📝', blockTypes: ['contact', 'newsletter', 'download-cta', 'google-maps', 'whatsapp-button'] },
+    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'client-logos', 'socialWidget', 'team'] },
+    { id: 'layout', label: 'Layout', icon: '📐', blockTypes: ['custom-html', 'divider', 'breadcrumb', 'announcement-bar'] },
 ]
 
 const itemIconOverrides: Record<string, string> = {
-    'custom-html': '📝',
+    'custom-html': '🧱',
     hero: '🎯',
     gallery: '🖼️',
     cta: '🔘',
     socialWidget: '💬',
     pricing: '💰',
+    'pricing-table': '📊',
+    'gallery-masonry': '🧱',
+    'whatsapp-button': '💬',
+    'google-maps': '📍',
+    'social-proof': '⭐',
+    'countdown-timer': '⏰',
+    'before-after': '🔄',
+    'feature-comparison': '📋',
+    'download-cta': '📥',
+    'video-background': '🎬',
+    breadcrumb: '🔗',
+    divider: '➖',
+    'announcement-bar': '📢',
+    'client-logos': '🏢',
+    accordion: '📂',
+    'step-process': '🔢',
+    'portfolio-grid': '💼',
+    'menu-food': '🍽️',
+    'service-cards': '🛠️',
+    carousel: '🎠',
 }
 
 function getBlockMeta(blockType: string) {
