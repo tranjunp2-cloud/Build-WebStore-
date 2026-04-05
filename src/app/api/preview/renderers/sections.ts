@@ -168,14 +168,16 @@ function escapeAttr(str: string) {
 
 function sanitizeUrl(raw: string): string {
     let val = String(raw || '').trim()
-    if (!val || val === '#') return '#'
+    if (!val || val === '#' || val === 'https:///' || val === 'http:///') return '#'
     if (!/^https?:\/\//i.test(val)) val = `https://${val}`
+    // Reject URLs with empty hostname (e.g., "https:///")
+    if (/^https?:\/\/\//.test(val)) return '#'
     try {
         const parsed = new URL(val)
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '#'
+        if (!parsed.hostname || parsed.hostname.length < 2) return '#'
         return escapeAttr(parsed.href)
-    } catch (error: unknown) {
-        console.error('URL parse error:', error)
+    } catch {
         return '#'
     }
 }
