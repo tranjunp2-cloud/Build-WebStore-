@@ -89,17 +89,20 @@ export async function PATCH(
                 if (!/^\d+$/.test(pageId)) {
                     return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
                 }
-                const requestedPage = await payload.findByID({
-                    collection: 'pages',
-                    id: pageId,
-                })
+                let requestedPage: PageDoc | null = null
+                try {
+                    requestedPage = await payload.findByID({
+                        collection: 'pages',
+                        id: pageId,
+                    })
+                } catch {
+                    // Page not found — fall through to homepage
+                }
                 const requestedPageSiteId =
                     typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
 
                 if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
                     page = requestedPage
-                } else {
-                    return NextResponse.json({ error: 'Page not found or does not belong to site' }, { status: 404 })
                 }
             }
 
@@ -140,9 +143,14 @@ export async function PATCH(
         })
 
     } catch (error: unknown) {
-        console.error('[Save Error]', error)
+        const errMsg = error instanceof Error ? error.message : String(error)
+        const errName = error instanceof Error ? error.name : 'Unknown'
+        console.error('[Save Error]', errName + ':', errMsg)
+        if (error && typeof error === 'object' && 'data' in error) {
+            console.error('[Save Error] Validation data:', JSON.stringify((error as Record<string, unknown>).data, null, 2))
+        }
         return NextResponse.json(
-            { error: 'Save failed' },
+            { error: 'Save failed: ' + errMsg },
             { status: 500 },
         )
     }
