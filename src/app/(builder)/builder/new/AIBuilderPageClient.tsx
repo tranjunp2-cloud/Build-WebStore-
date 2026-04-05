@@ -403,8 +403,14 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         }
     }, [addBlock, addMessage, setError, setProgress, setSiteId, setSiteName, setStatus, setTheme])
 
-    const startSSEGeneration = useCallback(async (info: BusinessInfo, extraInstructions?: string) => {
+    const startSSEGeneration = useCallback(async (
+        info: BusinessInfo,
+        extraInstructions?: string,
+        briefSnapshot?: Record<string, unknown> | null,
+    ) => {
         try {
+            // Use briefSnapshot (captured before reset) if provided, fallback to store
+            const brief = briefSnapshot ?? contentBrief
             const response = await fetch('/api/ai/generate-site?stream=true', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -412,7 +418,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     businessInfo: info,
                     extraInstructions,
                     language: info.language || 'auto',
-                    ...(contentBrief ? { contentBrief } : {}),
+                    ...(brief ? { contentBrief: brief } : {}),
                 }),
                 credentials: 'include',
             })
@@ -477,8 +483,10 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     }, [handleSSEEvent, setError, setStep, contentBrief])
 
     const handleGenerateStart = useCallback((info: BusinessInfo) => {
+        // Capture contentBrief BEFORE reset() clears it from the store
+        const briefSnapshot = useBuilderStore.getState().contentBrief
         prepareGenerationSession(info)
-        void startSSEGeneration(info)
+        void startSSEGeneration(info, undefined, briefSnapshot)
     }, [prepareGenerationSession, startSSEGeneration])
 
     const handleRetryGeneration = useCallback((info: BusinessInfo) => {
