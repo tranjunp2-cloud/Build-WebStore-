@@ -208,7 +208,35 @@ export function createAddSectionBlock({
     }
 }
 
+import { blockRegistry } from '@/blocks/registry'
+
+/** Generate minimal default content for any block type using its Zod schema defaults */
+function createDefaultBlockFromRegistry(blockType: string, brandName: string): BlockData | null {
+    try {
+        if (!blockRegistry.has(blockType)) return null
+
+        const schema = blockRegistry.getSchema(blockType)
+        if (!schema) return { blockType } as BlockData
+
+        // Parse empty object to get Zod defaults
+        const result = schema.safeParse({ blockType })
+        if (result.success) {
+            const data = result.data as Record<string, unknown>
+            // Add placeholder headline if the schema has one
+            if ('headline' in data && !data.headline) {
+                data.headline = `${brandName} — ${blockType.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`
+            }
+            return data as BlockData
+        }
+
+        return { blockType } as BlockData
+    } catch {
+        return null
+    }
+}
+
 export function normalizeAddSectionBlock(context: AddSectionContext, block?: Record<string, unknown> | null) {
+    const brandName = context.siteName?.trim() || 'Your Brand'
     const fallbackBlock =
         createAddSectionBlock({
             instruction: context.instruction,
@@ -218,6 +246,14 @@ export function normalizeAddSectionBlock(context: AddSectionContext, block?: Rec
         }) || undefined
 
     if (!fallbackBlock) {
+        // For new block types not in createAddSectionBlock, generate from registry schema
+        const registryBlock = createDefaultBlockFromRegistry(
+            String(block?.blockType || context.requestedType || ''),
+            brandName,
+        )
+        if (registryBlock) {
+            return { ...registryBlock, ...(block || {}) } as BlockData
+        }
         return block as BlockData | undefined
     }
 
