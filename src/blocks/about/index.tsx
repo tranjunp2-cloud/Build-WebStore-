@@ -36,7 +36,7 @@ export function AboutBlock({ block, theme, site }: BlockProps<AboutConfig>) {
                             <img
                                 src={block.image?.url || fallbackAboutUrl}
                                 alt={block.image?.alt || headline}
-                                className="w-full h-auto rounded-3xl shadow-xl object-cover aspect-[4/3]"
+                                className="w-full h-auto rounded-3xl shadow-xl object-cover aspect-auto max-h-[450px]"
                             />
                         </motion.div>
                     )}
@@ -68,7 +68,7 @@ export function AboutBlock({ block, theme, site }: BlockProps<AboutConfig>) {
                             <img
                                 src={block.image?.url || fallbackAboutUrl}
                                 alt={block.image?.alt || headline}
-                                className="w-full h-auto rounded-3xl shadow-xl object-cover aspect-[4/3]"
+                                className="w-full h-auto rounded-3xl shadow-xl object-cover aspect-auto max-h-[450px]"
                             />
                         </motion.div>
                     )}
