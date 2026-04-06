@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { Bell } from 'lucide-react'
 import { useNotificationStore } from '@/store/notificationStore'
 import { UnreadBadge } from '@/components/notifications/UnreadBadge'
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown'
 import type { NotificationsResponse } from '@/types/notification'
 
 /**
@@ -37,15 +38,18 @@ export function NotificationBell() {
     }, [setUnreadCount])
 
     return (
-        <button
-            id="notification-bell-btn"
-            aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
-            aria-expanded={isDropdownOpen}
-            onClick={() => setDropdownOpen(!isDropdownOpen)}
-            className="relative flex h-10 w-10 items-center justify-center rounded-[16px] bg-transparent border-none outline-none hover:bg-white/5 cursor-pointer transition-colors"
-        >
-            <Bell className="h-5 w-5 text-[#F8FAFC]" />
-            <UnreadBadge count={unreadCount} />
-        </button>
+        <div className="relative">
+            <button
+                id="notification-bell-btn"
+                aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
+                aria-expanded={isDropdownOpen}
+                onClick={() => setDropdownOpen(!isDropdownOpen)}
+                className="relative flex h-10 w-10 items-center justify-center rounded-[16px] bg-transparent border-none outline-none hover:bg-white/5 cursor-pointer transition-colors"
+            >
+                <Bell className="h-5 w-5 text-[#F8FAFC]" />
+                <UnreadBadge count={unreadCount} />
+            </button>
+            <NotificationDropdown />
+        </div>
     )
 }
