@@ -31,7 +31,7 @@ Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State M
 | ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
 |:---|:---|:---|:---|:---|:---:|:---:|
 | **TC-F10-01-01** | `[Positive]` | Thong bao don hang moi trong vong 60 giay | 1. Khach hoan tat dat hang (COD hoac QR).<br>2. Admin dang mo trang `/orders`. | - Don moi xuat hien **trong < 60 giay** (SSE hoac WebSocket).<br>- Toast thong bao don moi hien thi goc tren phai. | Critical | [ ] |
-| **TC-F10-01-02** | `[Positive]` | Gui Email xac nhan tu dong toi khach | 1. Khach hoan tat thanh toan 1 don hang. | - He thong day task gui email (qua Resend) toi dia chi cua khach.<br>- Email chua tom tat don va link tra cuu. | Blocker | [x] |
+| **TC-F10-01-02** | `[Positive]` | Gui Email xac nhan tu dong toi khach | 1. Khach hoan tat thanh toan 1 don hang. | - He thong day task gui email (qua Payload SMTP) toi dia chi cua khach.<br>- Email chua tom tat don va link tra cuu. | Blocker | [x] |
 | **TC-F10-01-03** | `[Positive]` | Gui Email thong bao Merchant khi co don moi | 1. Khach dat hang thanh cong. | - Email gui toi Email dang ky cua Merchant.<br>- Noi dung: Ma don, ten khach, tong tien, phuong thuc thanh toan. | High | [ ] |
 | **TC-F10-01-04** | `[UI State]` | Empty State — Chua co don hang nao | 1. Admin vao `/orders` khi chua co don nao. | - Hien thi minh hoa dung theo UI Design ("Chua co don hang nao").<br>- Layout khong bi lech. Co nut huong dan chia se link store. | Low | [x] |
 | **TC-F10-01-05** | `[UI State]` | Loading Skeleton khi trang Orders dang fetch | 1. Lam cham mang (Devtools Throttle).<br>2. Mo trang `/orders`. | - Hien thi skeleton loader (Table skeleton lines).<br>- Khong trang trang, khong flash layout. | Medium | [ ] |
