@@ -90,47 +90,62 @@ export function EditorToolbar({
 
     if (compact) {
         return (
-            <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-[rgba(30,41,59,0.3)] px-2.5">
-                <div className="flex min-w-0 items-center gap-1">
+            <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0F172A]/90 backdrop-blur-sm px-3">
+                <div className="flex min-w-0 items-center gap-0.5">
                     <button
                         type="button"
                         onClick={onOpenMenu}
-                        className="inline-flex h-9 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-slate-100 transition-colors hover:bg-white/5"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                        title="Menu"
                     >
-                        <Menu className="h-4 w-4 text-slate-300" />
-                        <span>Menu</span>
+                        <Menu className="h-4 w-4" />
                     </button>
 
                     <button
                         type="button"
                         onClick={onOpenTemplates}
-                        className="inline-flex h-9 items-center gap-2 rounded-xl px-2.5 text-sm font-medium text-slate-100 transition-colors hover:bg-white/5"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-amber-300/80 transition-colors hover:bg-white/[0.06]"
+                        title="Templates"
                     >
-                        <Palette className="h-4 w-4 text-amber-300" />
-                        <span>Templates</span>
+                        <Palette className="h-4 w-4" />
                     </button>
+
+                    <div className="mx-1 h-4 w-px bg-white/[0.06]" />
+
+                    <div className="flex items-center gap-1">
+                        <span className={cn('h-1.5 w-1.5 rounded-full', isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
+                        <span className="text-[11px] text-slate-400">{isSaving ? 'Saving...' : hasUnsavedChanges ? 'Unsaved' : 'Saved'}</span>
+                    </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
+                    <Button variant="ghost" size="icon" asChild className="h-8 w-8 rounded-lg text-slate-300 hover:bg-white/[0.06] hover:text-white">
+                        <a
+                            href={currentPageId ? `/api/preview/${siteId}?pageId=${currentPageId}` : `/api/preview/${siteId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Preview"
+                        >
+                            <SquareArrowOutUpRight className="h-3.5 w-3.5" />
+                        </a>
+                    </Button>
+
                     <Button
                         type="button"
                         size="sm"
                         onClick={onPublish}
                         disabled={isPublishing || publishSuccess}
                         className={cn(
-                            'h-9 rounded-full border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-4 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(45,212,191,0.18)] hover:opacity-95',
+                            'h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white hover:opacity-95',
                             publishSuccess && 'from-emerald-500 to-emerald-400',
                         )}
                     >
                         {isPublishing ? (
-                            <>
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                Publishing
-                            </>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         ) : publishSuccess ? (
                             <>
                                 <Check className="h-3.5 w-3.5" />
-                                Published
+                                Live
                             </>
                         ) : (
                             <>
@@ -139,24 +154,13 @@ export function EditorToolbar({
                             </>
                         )}
                     </Button>
-
-                    <Button variant="ghost" size="icon" asChild className="h-9 w-9 rounded-xl text-slate-300 hover:bg-white/5 hover:text-white">
-                        <a
-                            href={currentPageId ? `/api/preview/${siteId}?pageId=${currentPageId}` : `/api/preview/${siteId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Open preview"
-                        >
-                            <PanelLeft className="h-4 w-4" />
-                        </a>
-                    </Button>
                 </div>
             </header>
         )
     }
 
     return (
-        <header className="relative flex h-14 shrink-0 items-center justify-between border-b border-[rgba(59,130,246,0.07)] bg-[rgba(30,41,59,0.3)] px-6">
+        <header className="relative flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0F172A]/90 backdrop-blur-sm px-5">
             <div className="flex min-w-0 items-center gap-3">
                 <button
                     type="button"
@@ -168,44 +172,10 @@ export function EditorToolbar({
                     Menu
                 </button>
 
-                <DropdownMenu.Root>
-                    <DropdownMenu.Trigger asChild>
-                        <button
-                            type="button"
-                            className="inline-flex h-8 items-center gap-2 rounded-xl px-3 text-sm font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
-                        >
-                            <CurrentPageIcon className="h-4 w-4" />
-                            <span className="truncate">{currentPageTitle}</span>
-                            <ChevronDown className="h-3.5 w-3.5 text-[#94A3B8]" />
-                        </button>
-                    </DropdownMenu.Trigger>
-
-                    <DropdownMenu.Portal>
-                        <DropdownMenu.Content
-                            sideOffset={8}
-                            align="start"
-                            className="z-50 min-w-[192px] rounded-xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.95)] p-1 shadow-[0_18px_40px_rgba(2,6,23,0.45)] backdrop-blur-[5px]"
-                        >
-                            {selectablePages.map(page => {
-                                const isActive = page.id === currentPageId
-                                const PageIcon = getPageIcon(page)
-                                return (
-                                    <DropdownMenu.Item
-                                        key={page.id}
-                                        onSelect={() => onPageSelected(page.id)}
-                                        className={cn(
-                                            'flex h-9 cursor-pointer items-center gap-2.5 rounded-[10px] px-4 text-sm font-medium text-[#F8FAFC] outline-none transition-colors',
-                                            isActive ? 'bg-white/5' : 'hover:bg-white/5',
-                                        )}
-                                    >
-                                        <PageIcon className="h-4 w-4 shrink-0 text-slate-300" />
-                                        <span className="truncate">{page.title}</span>
-                                    </DropdownMenu.Item>
-                                )
-                            })}
-                        </DropdownMenu.Content>
-                    </DropdownMenu.Portal>
-                </DropdownMenu.Root>
+                <div className="inline-flex h-8 items-center gap-2 rounded-lg bg-white/[0.04] px-3">
+                    <CurrentPageIcon className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="max-w-[120px] truncate text-[12px] font-medium text-slate-300">{currentPageTitle}</span>
+                </div>
 
                 <button
                     type="button"
@@ -216,7 +186,7 @@ export function EditorToolbar({
                     Templates
                 </button>
 
-                <div className="mx-1 h-6 w-px bg-[rgba(59,130,246,0.07)]" />
+                <div className="mx-1.5 h-4 w-px bg-white/[0.08]" />
 
                 <button
                     type="button"
@@ -272,26 +242,28 @@ export function EditorToolbar({
                 </div>
             </div>
 
-            <div className="flex items-center gap-4">
-                <div className="inline-flex items-center gap-2 text-xs">
-                    <span className={cn('h-2 w-2 rounded-full', isSaving ? 'bg-amber-400' : 'bg-[#00C950]')} />
-                    <span className="font-normal text-[#B9F8CF]">{isSaving ? 'Saving' : saveSuccess || !hasUnsavedChanges ? 'Saved' : 'Saved'}</span>
+            <div className="flex items-center gap-2.5">
+                <div className="inline-flex items-center gap-1.5 text-[11px]">
+                    <span className={cn('h-1.5 w-1.5 rounded-full', isSaving ? 'animate-pulse bg-amber-400' : hasUnsavedChanges ? 'bg-amber-400' : 'bg-emerald-400')} />
+                    <span className="text-slate-400">{isSaving ? 'Saving...' : hasUnsavedChanges ? 'Unsaved' : 'Saved'}</span>
                 </div>
 
-                <div className="h-6 w-px bg-[rgba(59,130,246,0.07)]" />
+                <div className="h-4 w-px bg-white/[0.08]" />
 
-                <div className="inline-flex h-[30px] items-center rounded-full border border-[rgba(106,114,130,0.3)] bg-[rgba(106,114,130,0.2)] px-3">
-                    <span className="mr-2 h-2 w-2 rounded-full bg-[#99A1AF]" />
-                    <span className="text-xs font-semibold text-[#D1D5DC]">{isPublished ? 'Live' : 'Draft'}</span>
+                <div className={cn(
+                    'inline-flex h-6 items-center rounded-md px-2 text-[10px] font-semibold uppercase tracking-wider',
+                    isPublished ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/[0.06] text-slate-400',
+                )}>
+                    {isPublished ? 'Live' : 'Draft'}
                 </div>
 
-                <Button variant="ghost" size="sm" asChild className="h-9 rounded-[10px] border border-[rgba(59,130,246,0.07)] px-3 text-xs font-medium text-[#F8FAFC] hover:bg-white/5">
+                <Button variant="ghost" size="sm" asChild className="h-8 rounded-lg border border-white/[0.08] px-3 text-[11px] font-medium text-slate-300 hover:bg-white/[0.06] hover:text-white">
                     <a
                         href={currentPageId ? `/api/preview/${siteId}?pageId=${currentPageId}` : `/api/preview/${siteId}`}
                         target="_blank"
                         rel="noopener noreferrer"
                     >
-                        <SquareArrowOutUpRight className="h-4 w-4" />
+                        <SquareArrowOutUpRight className="h-3.5 w-3.5" />
                         Preview
                     </a>
                 </Button>
@@ -302,7 +274,7 @@ export function EditorToolbar({
                     onClick={onPublish}
                     disabled={isPublishing || publishSuccess}
                     className={cn(
-                        'h-9 rounded-full border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-xs font-semibold text-white shadow-[0_10px_15px_rgba(0,0,0,0.1),0_4px_6px_rgba(0,0,0,0.1)] hover:opacity-95',
+                        'h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-4 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95',
                         publishSuccess && 'from-emerald-500 to-emerald-400',
                     )}
                 >

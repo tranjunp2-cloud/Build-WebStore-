@@ -6,7 +6,7 @@ import { blockRegistry } from '@/blocks/registry'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData } from '@/types/editor'
 
-type LibraryCategoryId = 'basics' | 'store' | 'content' | 'form' | 'widgets'
+type LibraryCategoryId = 'basics' | 'store' | 'content' | 'form' | 'widgets' | 'media' | 'layout' | 'commerce'
 
 type CategoryConfig = {
     id: LibraryCategoryId
@@ -16,20 +16,43 @@ type CategoryConfig = {
 }
 
 const categoryConfig: CategoryConfig[] = [
-    { id: 'basics', label: 'Basics', icon: '📦', blockTypes: ['custom-html', 'hero', 'gallery', 'cta'] },
-    { id: 'store', label: 'Store', icon: '🛍️', blockTypes: ['products-grid', 'products-featured', 'pricing'] },
-    { id: 'content', label: 'Content', icon: '📄', blockTypes: ['about', 'blog-list', 'faq'] },
-    { id: 'form', label: 'Form', icon: '📝', blockTypes: ['contact', 'newsletter'] },
-    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'socialWidget', 'cartWidget'] },
+    { id: 'basics', label: 'Basics', icon: '📦', blockTypes: ['hero', 'cta', 'about', 'features', 'step-process', 'service-cards'] },
+    { id: 'content', label: 'Content', icon: '📄', blockTypes: ['faq', 'accordion', 'blog-list', 'testimonials', 'social-proof', 'portfolio-grid'] },
+    { id: 'media', label: 'Media', icon: '🖼️', blockTypes: ['gallery', 'gallery-masonry', 'video', 'video-background', 'carousel', 'before-after'] },
+    { id: 'store', label: 'Business', icon: '💼', blockTypes: ['pricing', 'pricing-table', 'feature-comparison', 'menu-food', 'countdown-timer'] },
+    { id: 'commerce', label: 'Commerce', icon: '🛒', blockTypes: ['products-grid', 'products-featured', 'cartWidget'] },
+    { id: 'form', label: 'Form & Contact', icon: '📝', blockTypes: ['contact', 'newsletter', 'download-cta', 'google-maps', 'whatsapp-button'] },
+    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'client-logos', 'socialWidget', 'team'] },
+    { id: 'layout', label: 'Layout', icon: '📐', blockTypes: ['custom-html', 'divider', 'breadcrumb', 'announcement-bar'] },
 ]
 
 const itemIconOverrides: Record<string, string> = {
-    'custom-html': '📝',
+    'custom-html': '🧱',
     hero: '🎯',
     gallery: '🖼️',
     cta: '🔘',
     socialWidget: '💬',
-    cartWidget: '🛒',
+    pricing: '💰',
+    'pricing-table': '📊',
+    'gallery-masonry': '🧱',
+    'whatsapp-button': '💬',
+    'google-maps': '📍',
+    'social-proof': '⭐',
+    'countdown-timer': '⏰',
+    'before-after': '🔄',
+    'feature-comparison': '📋',
+    'download-cta': '📥',
+    'video-background': '🎬',
+    breadcrumb: '🔗',
+    divider: '➖',
+    'announcement-bar': '📢',
+    'client-logos': '🏢',
+    accordion: '📂',
+    'step-process': '🔢',
+    'portfolio-grid': '💼',
+    'menu-food': '🍽️',
+    'service-cards': '🛠️',
+    carousel: '🎠',
 }
 
 function getBlockMeta(blockType: string) {
@@ -95,45 +118,45 @@ export function BlockLibraryPanel({
 
     return (
         <div className="flex h-full flex-col bg-[#0F172A]">
-            <div className="border-b border-[rgba(59,130,246,0.07)] px-4 py-4">
+            <div className="border-b border-white/[0.06] px-4 py-3">
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
                     <input
                         type="text"
                         value={query}
                         onChange={event => setQuery(event.target.value)}
-                        placeholder="Search..."
-                        className="h-9 w-full rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#1E293B] pl-10 pr-4 text-sm text-white placeholder:text-slate-400 outline-none transition-colors focus:border-cyan-500/30"
+                        placeholder="Search blocks..."
+                        className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] pl-9 pr-4 text-[13px] text-white placeholder:text-slate-500 outline-none transition-all focus:border-cyan-400/40 focus:bg-[#1E293B] focus:shadow-[0_0_0_1px_rgba(34,211,238,0.1)]"
                     />
                 </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-                <div className="space-y-3">
+            <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+                <div className="space-y-1">
                     {categories.map(category => {
                         const isExpanded = category.id === expandedCategory
 
                         return (
-                            <section key={category.id} className="space-y-2">
+                            <section key={category.id}>
                                 <button
                                     type="button"
                                     onClick={() => setExpandedCategory(prev => (prev === category.id ? prev : category.id))}
-                                    className="flex h-10 w-full items-center justify-between rounded-xl px-2 text-left transition-colors hover:bg-white/5"
+                                    className="flex h-9 w-full items-center justify-between rounded-lg px-2 text-left transition-colors hover:bg-white/[0.04]"
                                 >
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <span className="text-base leading-none">{category.icon}</span>
-                                        <span className="font-medium text-white">{category.label}</span>
-                                        <span className="text-xs text-slate-400">({category.totalCount})</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm leading-none">{category.icon}</span>
+                                        <span className="text-[13px] font-medium text-slate-200">{category.label}</span>
+                                        <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-medium text-slate-500">{category.totalCount}</span>
                                     </div>
                                     {isExpanded ? (
-                                        <ChevronDown className="h-4 w-4 text-slate-400" />
+                                        <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
                                     ) : (
-                                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                                        <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
                                     )}
                                 </button>
 
                                 {isExpanded ? (
-                                    <div className="space-y-3 pl-2">
+                                    <div className="mt-1 space-y-1 pb-2">
                                         {category.items.map(item => (
                                             <button
                                                 key={item.type}
@@ -145,20 +168,18 @@ export function BlockLibraryPanel({
                                                     e.dataTransfer.effectAllowed = 'copy'
                                                 }}
                                                 onClick={() => handleAddBlock(item.type, item.defaultVariant)}
-                                                className="group flex w-full flex-col gap-2 rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#1E293B] px-[13px] py-[13px] text-left transition-colors hover:border-cyan-500/25 hover:bg-[#223049] cursor-grab active:cursor-grabbing"
+                                                className="group flex w-full items-center gap-3 rounded-lg border border-transparent bg-white/[0.02] px-3 py-2.5 text-left transition-all hover:border-white/[0.08] hover:bg-white/[0.06] cursor-grab active:cursor-grabbing active:scale-[0.98]"
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[linear-gradient(135deg,rgba(59,130,246,0.2),rgba(45,212,191,0.2))] text-[20px]">
-                                                        {item.icon}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="truncate text-sm font-medium text-white">{item.name}</p>
-                                                        <p className="truncate text-xs text-slate-400">{item.description}</p>
-                                                    </div>
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/15 to-cyan-500/15 text-lg">
+                                                    {item.icon}
                                                 </div>
-                                                <p className="max-h-0 overflow-hidden text-xs font-medium text-slate-400 opacity-0 transition-all duration-150 group-hover:max-h-4 group-hover:opacity-100 group-focus-visible:max-h-4 group-focus-visible:opacity-100">
-                                                    💡 Hold to drag
-                                                </p>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="truncate text-[13px] font-medium text-slate-200">{item.name}</p>
+                                                    <p className="truncate text-[11px] text-slate-500">{item.description}</p>
+                                                </div>
+                                                <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
+                                                    click to add
+                                                </span>
                                             </button>
                                         ))}
                                     </div>
@@ -169,10 +190,9 @@ export function BlockLibraryPanel({
                 </div>
             </div>
 
-            <div className="border-t border-[rgba(59,130,246,0.07)] bg-[rgba(11,17,32,0.5)] px-4 py-4">
-                <p className="flex items-center gap-2 text-xs text-slate-400">
-                    <span aria-hidden="true" className="text-sm">🧊</span>
-                    Drag and drop blocks into Preview to add to the page
+            <div className="border-t border-white/[0.06] bg-[#0B1120]/60 px-4 py-3">
+                <p className="text-center text-[11px] text-slate-500">
+                    Click to add or drag blocks into preview
                 </p>
             </div>
         </div>

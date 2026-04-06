@@ -100,12 +100,12 @@ describe('inferAddSectionType [TC-F05.13]', () => {
         expect(inferAddSectionType('insert a call to action')).toBe('cta')
     })
 
-    it('returns "socialWidget" for "social" keyword', () => {
+    it('returns "socialWidget" for "social media" keyword', () => {
         expect(inferAddSectionType('add social media widget')).toBe('socialWidget')
     })
 
-    it('returns "socialWidget" for "whatsapp" keyword', () => {
-        expect(inferAddSectionType('add whatsapp button')).toBe('socialWidget')
+    it('returns "whatsapp-button" for "whatsapp" keyword', () => {
+        expect(inferAddSectionType('add whatsapp button')).toBe('whatsapp-button')
     })
 
     it('returns "socialWidget" for "facebook" keyword', () => {
@@ -433,7 +433,7 @@ describe('createAddSectionBlock — socialWidget [TC-F05.26]', () => {
     })
 
     it('sets variant to "floating"', () => {
-        const block = createAddSectionBlock({ instruction: 'add social' }) as Record<string, unknown>
+        const block = createAddSectionBlock({ instruction: 'add social media' }) as Record<string, unknown>
         expect(block?.variant).toBe('floating')
     })
 })

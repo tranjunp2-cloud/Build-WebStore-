@@ -63,7 +63,7 @@ export const THEMES: Record<string, TemplateTheme> = {
 export function getGoogleFontsLink(theme: TemplateTheme): string {
     const fonts = [theme.fontHeading, theme.fontBody].filter((v, i, a) => a.indexOf(v) === i)
     const params = fonts.map(f => `family=${f.replace(/ /g, '+')}:wght@300;400;500;600;700;800;900`).join('&')
-    return `https://fonts.googleapis.com/css2?${params}&display=swap`
+    return `https://fonts.googleapis.com/css2?${params}&subset=latin,vietnamese&display=swap`
 }
 
 export function baseCSS(t: TemplateTheme): string {

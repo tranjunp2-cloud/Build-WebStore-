@@ -28,49 +28,117 @@ export const POST = withAuth(async (user, req) => {
         const { data, errorResponse } = await parseRequest(req, applyTemplateSchema)
         if (errorResponse) return errorResponse
         
-        const { templateId } = data!
+        const { templateId, siteId } = data!
 
         // Find template
-        const template = await payload.findByID({
-            collection: 'templates',
-            id: templateId,
-        }) as Record<string, unknown>
+        let template: Record<string, unknown>
+        try {
+            template = await payload.findByID({
+                collection: 'templates',
+                id: templateId,
+            }) as Record<string, unknown>
+        } catch {
+            return NextResponse.json({ error: 'Template not found' }, { status: 404 })
+        }
 
         if (!template) {
             return NextResponse.json({ error: 'Template not found' }, { status: 404 })
         }
 
-        // Get tenant
-        const tenantResult = await payload.find({
-            collection: 'tenants',
-            where: { 'users.user': { equals: user.id } },
-            limit: 1,
-        })
-        const tenant = tenantResult.docs[0]
-        if (!tenant) {
+        // Get tenant from user object (same pattern as generate-site)
+        const userWithTenants = user as { id: number | string; tenants?: Array<{ tenant: unknown }> }
+        let tenantId = userWithTenants.tenants?.[0]?.tenant
+        if (typeof tenantId === 'object' && tenantId !== null) {
+            tenantId = (tenantId as Record<string, unknown>).id
+        }
+        if (!tenantId) {
             return NextResponse.json({ error: 'Tenant not found' }, { status: 400 })
         }
 
-        // Create site from template
+        const blocks = (template.defaultBlocks as Record<string, unknown>[]) || []
+        const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
+        // Pick only valid theme fields — Payload groups may have extra metadata
+        const templateTheme = {
+            primaryColor: String(rawTheme.primaryColor || '#0ea5e9'),
+            secondaryColor: String(rawTheme.secondaryColor || '#d946ef'),
+            fontHeading: String(rawTheme.fontHeading || 'Outfit'),
+            fontBody: String(rawTheme.fontBody || 'Inter'),
+            colorMode: String(rawTheme.colorMode || 'dark'),
+        }
+
+        // === APPLY TO EXISTING SITE ===
+        if (siteId) {
+            let existingSite: Record<string, unknown>
+            try {
+                existingSite = await payload.findByID({ collection: 'sites', id: Number(siteId) }) as Record<string, unknown>
+            } catch {
+                return NextResponse.json({ error: 'Site not found' }, { status: 404 })
+            }
+            if (!existingSite) {
+                return NextResponse.json({ error: 'Site not found' }, { status: 404 })
+            }
+
+            // Verify ownership: site must belong to user's tenant
+            const siteTenantId = typeof existingSite.tenant === 'object'
+                ? (existingSite.tenant as Record<string, unknown>).id
+                : existingSite.tenant
+            if (String(siteTenantId) !== String(tenantId)) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+            }
+
+            // Update site theme
+            await payload.update({
+                collection: 'sites',
+                id: Number(siteId),
+                data: { theme: templateTheme },
+            })
+
+            // Find and update homepage blocks
+            const homepageResult = await payload.find({
+                collection: 'pages',
+                where: {
+                    site: { equals: Number(siteId) },
+                    isHomepage: { equals: true },
+                },
+                limit: 1,
+            })
+
+            if (homepageResult.docs[0]) {
+                await payload.update({
+                    collection: 'pages',
+                    id: homepageResult.docs[0].id,
+                    data: { layout: blocks },
+                })
+            }
+
+            // Increment template usage count
+            await payload.update({
+                collection: 'templates',
+                id: templateId,
+                data: { usageCount: (Number(template.usageCount) || 0) + 1 },
+            })
+
+            return NextResponse.json({
+                success: true,
+                siteId: Number(siteId),
+                siteName: existingSite.name,
+                templateName: template.name,
+                applied: true,
+            })
+        }
+
+        // === CREATE NEW SITE FROM TEMPLATE ===
         const site = await payload.create({
             collection: 'sites',
             data: {
                 name: String(template.name || 'Untitled'),
-                tenant: tenant.id,
+                tenant: tenantId,
                 status: 'draft',
                 siteType: Array.isArray(template.category) ? String(template.category[0]) : String(template.category || 'business'),
-                theme: (template.defaultTheme as Record<string, unknown>) || {
-                    primaryColor: '#0ea5e9',
-                    fontHeading: 'Outfit',
-                    fontBody: 'Inter',
-                    colorMode: 'dark',
-                },
+                theme: templateTheme,
             },
         })
 
-        // Create homepage and 404 page with template blocks
-        const blocks = (template.defaultBlocks as Record<string, unknown>[]) || []
-        
         // Homepage
         await payload.create({
             collection: 'pages',
@@ -78,7 +146,7 @@ export const POST = withAuth(async (user, req) => {
                 title: 'Home',
                 slug: 'home',
                 site: site.id,
-                tenant: tenant.id,
+                tenant: tenantId,
                 isHomepage: true,
                 status: 'draft',
                 layout: blocks,
@@ -92,7 +160,7 @@ export const POST = withAuth(async (user, req) => {
                 title: '404 Not Found',
                 slug: '404',
                 site: site.id,
-                tenant: tenant.id,
+                tenant: tenantId,
                 isHomepage: false,
                 status: 'draft',
                 layout: blocks,
@@ -119,9 +187,10 @@ export const POST = withAuth(async (user, req) => {
         })
 
     } catch (error: unknown) {
-        console.error('[Apply Template Error]', error)
+        const errMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.error('[Apply Template Error]', errMessage, error)
         return NextResponse.json(
-            { error: 'Failed to apply template' },
+            { error: `Failed to apply template: ${errMessage}` },
             { status: 500 },
         )
     }

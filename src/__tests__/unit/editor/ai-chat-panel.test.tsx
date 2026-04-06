@@ -42,7 +42,7 @@ describe('AIChatPanel', () => {
 
     it('typing message updates the input value', () => {
         render(<AIChatPanel {...defaultProps} />)
-        const input = screen.getByPlaceholderText(/Enter command/i) as HTMLTextAreaElement
+        const input = screen.getByPlaceholderText(/Tell AI what to change/i) as HTMLTextAreaElement
         fireEvent.change(input, { target: { value: 'Change color to green' } })
         expect(input.value).toBe('Change color to green')
     })
@@ -52,7 +52,7 @@ describe('AIChatPanel', () => {
         global.fetch = mockFetch
         render(<AIChatPanel {...defaultProps} />)
 
-        const input = screen.getByPlaceholderText(/Enter command/i) as HTMLTextAreaElement
+        const input = screen.getByPlaceholderText(/Tell AI what to change/i) as HTMLTextAreaElement
         fireEvent.change(input, { target: { value: '   ' } })
         
         // Enter should be blocked natively or by onClick check
@@ -76,7 +76,7 @@ describe('AIChatPanel', () => {
         global.fetch = mockFetch
 
         render(<AIChatPanel {...defaultProps} />)
-        const input = screen.getByPlaceholderText(/Enter command/i)
+        const input = screen.getByPlaceholderText(/Tell AI what to change/i)
         
         fireEvent.change(input, { target: { value: 'Change color to green' } })
         
@@ -105,7 +105,7 @@ describe('AIChatPanel', () => {
         })
 
         render(<AIChatPanel {...defaultProps} />)
-        const input = screen.getByPlaceholderText(/Enter command/i)
+        const input = screen.getByPlaceholderText(/Tell AI what to change/i)
         
         fireEvent.change(input, { target: { value: 'Make it pop' } })
         await act(async () => {
@@ -125,7 +125,7 @@ describe('AIChatPanel', () => {
         })
 
         render(<AIChatPanel {...defaultProps} />)
-        const input = screen.getByPlaceholderText(/Enter command/i)
+        const input = screen.getByPlaceholderText(/Tell AI what to change/i)
         
         fireEvent.change(input, { target: { value: 'Do something' } })
         await act(async () => {
@@ -158,7 +158,7 @@ describe('AIChatPanel', () => {
 
         // In AddSectionPromptChips when prompt is selected it sets the input. Wait, the chip mock only calls onPromptSelect.
         // It should set the input, let's just make sure input receives it
-        const input = screen.getByPlaceholderText(/Enter command/i) as HTMLTextAreaElement
+        const input = screen.getByPlaceholderText(/Tell AI what to change/i) as HTMLTextAreaElement
         expect(input.value).toBe('Test Prompt')
     })
 })
