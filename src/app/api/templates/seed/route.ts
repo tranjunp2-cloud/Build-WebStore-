@@ -58,9 +58,9 @@ export const POST = withAuth(async (_user, request) => {
             const payload = await getPayload({ config })
 
             if (force) {
-                const existing = await payload.find({ collection: 'templates', limit: 200 })
+                const existing = await payload.find({ collection: 'templates', limit: 200, overrideAccess: true })
                 for (const doc of existing.docs) {
-                    await payload.delete({ collection: 'templates', id: doc.id })
+                    await payload.delete({ collection: 'templates', id: doc.id, overrideAccess: true })
                 }
                 console.log(`[Seed v3] Deleted ${existing.totalDocs} existing templates`)
             }
@@ -74,6 +74,7 @@ export const POST = withAuth(async (_user, request) => {
                         const preset = TEMPLATE_PRESETS[i + idx]!
                         await payload.create({
                             collection: 'templates',
+                            overrideAccess: true,
                             data: {
                                 name: seed.name,
                                 description: seed.description,
@@ -86,7 +87,7 @@ export const POST = withAuth(async (_user, request) => {
                                     isHomepage: pidx === 0,
                                     layout: page.layout,
                                 })),
-                                tags: [seed.category, preset.personality, ...preset.tags],
+                                tags: [seed.category, preset.personality, ...preset.tags].map(t => ({ tag: t })),
                                 sortOrder: 0,
                                 isPremium: true,
                                 isFeatured: false,

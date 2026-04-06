@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useCallback, useRef, useState } from 'react'
+import { FormEvent, useCallback, useId, useRef, useState } from 'react'
 import { AnimatedSection } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { NewsletterConfig } from './config'
@@ -62,6 +62,9 @@ function EmailForm({
     layout?: 'row' | 'stack'
 }) {
     const { state, error, inputRef, handleSubmit } = useNewsletterForm(siteId)
+    const formId = useId()
+    const inputId = `newsletter-email-${formId}`
+    const errorId = `newsletter-error-${formId}`
 
     if (state === 'success') {
         return (
@@ -77,10 +80,10 @@ function EmailForm({
     return (
         <form onSubmit={handleSubmit} className={`flex ${layout === 'stack' ? 'flex-col' : 'flex-col sm:flex-row'} gap-3`}>
             <div className="flex-1">
-                <label htmlFor="newsletter-email" className="sr-only">Email address</label>
+                <label htmlFor={inputId} className="sr-only">Email address</label>
                 <input
                     ref={inputRef}
-                    id="newsletter-email"
+                    id={inputId}
                     type="email"
                     autoComplete="email"
                     placeholder={placeholder}
@@ -93,10 +96,10 @@ function EmailForm({
                         color: 'var(--text)',
                         outlineColor: 'var(--brand-primary)',
                     }}
-                    aria-describedby={error ? 'newsletter-error' : undefined}
+                    aria-describedby={error ? errorId : undefined}
                 />
                 {error && (
-                    <p id="newsletter-error" className="text-sm mt-1" style={{ color: '#ef4444' }} role="alert">
+                    <p id={errorId} className="text-sm mt-1" style={{ color: '#ef4444' }} role="alert">
                         {error}
                     </p>
                 )}
@@ -187,28 +190,7 @@ function BannerVariant({ block, siteId }: { block: NewsletterConfig; siteId?: st
                         {subheadline && <p className="opacity-85">{subheadline}</p>}
                     </div>
                     <div className="flex-1 w-full max-w-md">
-                        <form className="flex flex-col sm:flex-row gap-3">
-                            <label htmlFor="newsletter-banner-email" className="sr-only">Email address</label>
-                            <input
-                                id="newsletter-banner-email"
-                                type="email"
-                                autoComplete="email"
-                                placeholder={placeholder}
-                                className="flex-1 px-4 py-3 bg-white/15 border border-white/30 text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 transition-colors"
-                                style={{ borderRadius: 'var(--radius-md)' }}
-                            />
-                            <button
-                                type="submit"
-                                className="px-6 py-3 font-semibold transition-all hover:opacity-90 flex-shrink-0"
-                                style={{
-                                    background: '#ffffff',
-                                    color: 'var(--brand-primary)',
-                                    borderRadius: 'var(--radius-md)',
-                                }}
-                            >
-                                {buttonLabel}
-                            </button>
-                        </form>
+                        <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="row" />
                     </div>
                 </div>
             </div>

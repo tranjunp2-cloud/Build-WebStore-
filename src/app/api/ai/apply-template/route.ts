@@ -93,6 +93,7 @@ export const POST = withAuth(async (user, req) => {
                 : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
 
             // Transaction: delete old pages → update theme → create new pages
+            // Note: Payload 3 Drizzle transaction returns a req-like object with commit/rollback
             const txReq = await payload.db.beginTransaction()
             try {
                 // 1. Delete all existing pages for this site
