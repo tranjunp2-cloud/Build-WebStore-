@@ -397,7 +397,11 @@ describe('POST /api/ai/apply-template', () => {
                 (c: any[]) => c[0].collection === 'pages'
             )
             expect(pageCreateCall).toBeDefined()
-            expect(pageCreateCall[0].data.layout).toEqual(DEFAULT_TEMPLATE.defaultBlocks)
+            // Layout is sanitized (variants resolved, unknown blocks filtered)
+            // Just verify blocks are present with correct blockTypes
+            const layout = pageCreateCall[0].data.layout as Record<string, unknown>[]
+            expect(layout.length).toBeGreaterThan(0)
+            expect(layout[0].blockType).toBe('hero')
         })
 
         it('skips homepage layout update when site has no homepage', async () => {

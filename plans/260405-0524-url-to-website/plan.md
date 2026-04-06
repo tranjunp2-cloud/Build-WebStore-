@@ -1,7 +1,7 @@
 ---
 title: "URL-to-Website AI Redesign"
 description: "Paste URL → AI scrapes & extracts business info → generates full website with CMS"
-status: pending
+status: done
 priority: P1
 effort: 3d
 branch: feat/rebuild-user-flow
@@ -50,11 +50,11 @@ Cho phép user paste URL website hiện có → AI scrape + phân tích nội du
 
 | Phase | File | Status | Description |
 |-------|------|--------|-------------|
-| [Phase 1](phase-01-url-scraper-lib.md) | `src/lib/ai/url-scraper.ts` | pending | URL scraper + SSRF prevention + content extraction |
-| [Phase 2](phase-02-ai-extraction-endpoint.md) | `src/app/api/ai/extract-from-url/route.ts` | pending | API endpoint: URL → BusinessInfo extraction via GPT-4o-mini |
-| [Phase 3](phase-03-builder-ui.md) | `BusinessInfoForm.tsx` + `builderStore.ts` | pending | UI: URL input toggle + auto-fill form from extraction |
-| [Phase 4](phase-04-validation-safety.md) | `ai.ts` + `content-safety.ts` | pending | Zod schema update + URL domain safety + SSRF middleware |
-| [Phase 5](phase-05-testing.md) | `__tests__/` | pending | Unit tests + integration tests |
+| [Phase 1](phase-01-url-scraper-lib.md) | `src/lib/ai/url-scraper.ts` | ✅ done | URL scraper + SSRF prevention + content extraction |
+| [Phase 2](phase-02-ai-extraction-endpoint.md) | `src/app/api/ai/extract-from-url/route.ts` | ✅ done | API endpoint: URL → BusinessInfo extraction via GPT-4o-mini |
+| [Phase 3](phase-03-builder-ui.md) | `BusinessInfoForm.tsx` + `builderStore.ts` | ✅ done | UI: URL input toggle + auto-fill form from extraction |
+| [Phase 4](phase-04-validation-safety.md) | `ai.ts` + `content-safety.ts` | ✅ done | Zod schema update + URL domain safety + SSRF middleware |
+| [Phase 5](phase-05-testing.md) | `__tests__/` | ✅ done | Unit tests + integration tests (900+ lines, 40+ TC-IDs) |
 
 ## Dependencies
 
@@ -90,8 +90,8 @@ npm i open-graph-scraper @mozilla/readability cheerio
 
 ### Action Items (cần update phase files)
 
-- [ ] Phase 2: Thêm `suggestedTheme.primaryColor` + `secondaryColor` vào extraction prompt (đã có trong schema nhưng cần confirm priority)
-- [ ] Phase 3: Thêm i18n cho error messages (EN + MS)
-- [ ] Phase 3: Thêm color suggestion UI (optional color swatches từ extraction)
-- [ ] Phase 3: Warning banner cho low confidence case
-- [ ] Phase 4: Không cần plan-gating logic — extraction endpoint mở cho tất cả authenticated users
+- [x] Phase 2: Thêm `suggestedTheme.primaryColor` + `secondaryColor` vào extraction prompt ✅
+- [x] Phase 3: Thêm i18n cho error messages (EN + MS) ✅ 17+ messages
+- [x] Phase 3: Thêm color suggestion UI (optional color swatches từ extraction) ✅
+- [x] Phase 3: Warning banner cho low confidence case ✅
+- [x] Phase 4: Không cần plan-gating logic — extraction endpoint mở cho tất cả authenticated users ✅

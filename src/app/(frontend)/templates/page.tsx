@@ -62,13 +62,18 @@ export default function TemplatesPage() {
                 credentials: 'include',
                 body: JSON.stringify({ templateId }),
             })
-            if (res.ok) {
-                const data = await res.json()
+            const data = await res.json()
+            if (res.ok && data.success) {
                 toast.success('Template applied! Redirecting to editor...')
                 router.push(`/editor/${data.siteId}`)
+            } else if (res.status === 401) {
+                toast.error('Please login first to use templates')
+                router.push('/login')
+            } else {
+                toast.error(data.error || `Failed to apply template (${res.status})`)
             }
         } catch {
-            toast.error('Failed to apply template')
+            toast.error('Network error — failed to apply template')
         } finally {
             setIsApplying(null)
         }

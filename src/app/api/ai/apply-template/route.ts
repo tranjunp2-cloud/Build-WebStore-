@@ -6,7 +6,6 @@ import { applyTemplateSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
-import { blockRegistry } from '@/blocks/registry'
 
 /**
  * POST /api/ai/apply-template
@@ -58,36 +57,100 @@ export const POST = withAuth(async (user, req) => {
 
         const blocks = (template.defaultBlocks as Record<string, unknown>[]) || []
 
-        // Sanitize block variants — blueprint templates may have variant names not in registry
-        const VARIANT_ALIASES: Record<string, Record<string, string>> = {
-            hero: {
-                'split': 'split-left', 'split-image': 'split-left', 'editorial': 'magazine',
-                'fullscreen-image': 'fullscreen', 'fullscreen-video': 'video',
-                'video-background': 'video', 'video-bg': 'video',
-                'overlay': 'cards-overlay', 'story': 'split-left',
-                'hero-centered': 'centered', 'image-left': 'split-right', 'image-right': 'split-left',
-            },
+        // ── Sanitize blocks to match Pages.ts Payload schema (DB source of truth) ──
+        // Only 14 block types have DB tables. Each has specific field names + enum values.
+
+        const PAGES_BLOCK_WHITELIST = new Set([
+            'navigation', 'hero', 'about', 'features', 'testimonials',
+            'contact', 'gallery', 'footer', 'stats', 'pricing',
+            'faq', 'team', 'socialWidget', 'cartWidget',
+        ])
+
+        // Pages.ts schema per block: which field holds variant, what values are valid
+        // null = block has NO variant/layout field → strip any variant data
+        const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fallback: string } | null> = {
+            hero:         { field: 'variant', values: ['centered', 'split-left', 'split-right', 'fullscreen', 'video'], fallback: 'centered' },
+            navigation:   { field: 'style',   values: ['fixed', 'sticky', 'static', 'transparent'], fallback: 'fixed' },
+            about:        { field: 'layout',  values: ['image-right', 'image-left', 'centered', 'cards'], fallback: 'image-right' },
+            features:     { field: 'layout',  values: ['grid-3', 'grid-2', 'alternating', 'centered-list'], fallback: 'grid-3' },
+            testimonials: { field: 'variant', values: ['carousel', 'grid', 'masonry', 'single'], fallback: 'carousel' },
+            gallery:      { field: 'layout',  values: ['masonry', 'grid', 'carousel', 'lightbox'], fallback: 'masonry' },
+            socialWidget: { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
+            cartWidget:   { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
+            contact: null, footer: null, stats: null, pricing: null, faq: null, team: null,
         }
+
+        // Map blueprint variant names → Pages.ts valid values
+        const ALIASES: Record<string, Record<string, string>> = {
+            hero: {
+                'split': 'split-left', 'split-image': 'split-left', 'editorial': 'centered',
+                'fullscreen-image': 'fullscreen', 'fullscreen-video': 'video',
+                'video-background': 'video', 'video-bg': 'video', 'overlay': 'fullscreen',
+                'story': 'split-left', 'magazine': 'split-left', 'minimal': 'centered',
+                'cards-overlay': 'fullscreen', 'gradient': 'centered', 'parallax': 'fullscreen',
+                'slideshow': 'centered', 'split-video': 'video',
+            },
+            about: { 'simple': 'centered', 'split': 'image-right', 'story': 'image-right', 'single-column': 'centered', 'two-column': 'image-right', 'timeline': 'image-right' },
+            features: { 'grid': 'grid-3', 'list': 'centered-list', 'icon-grid': 'grid-3', 'card-grid': 'grid-3', 'cards': 'grid-3', 'detailed': 'centered-list', 'detailed-list': 'centered-list', 'icon-top': 'grid-3', 'icon-left': 'grid-2', 'zigzag': 'alternating', 'carousel': 'grid-3', 'minimal-list': 'centered-list' },
+            testimonials: { 'cards': 'grid', 'simple': 'carousel', 'spotlight': 'single', 'minimal-quote': 'single', 'avatar-row': 'carousel', 'video-text': 'carousel', 'featured': 'single', 'marquee': 'carousel', 'quote': 'single', 'single-highlight': 'single', 'slider': 'carousel' },
+            gallery: { 'filmstrip': 'carousel', 'justified': 'grid', 'fullscreen-grid': 'grid', 'slider': 'carousel', 'spotlight': 'lightbox' },
+            navigation: { 'simple': 'fixed', 'centered': 'fixed', 'mega-menu': 'fixed', 'sidebar': 'fixed', 'pill': 'fixed' },
+        }
+
+        // Strip each block to ONLY fields Pages.ts defines. Everything else → dropped.
+        // This prevents Payload validation errors from unknown/invalid field values.
+        const PAGES_FIELDS: Record<string, string[]> = {
+            hero: ['variant', 'headline', 'subheadline', 'videoUrl'],
+            navigation: ['style', 'logoText'],
+            about: ['layout', 'sectionLabel', 'headline', 'body'],
+            features: ['sectionLabel', 'headline', 'subheadline', 'layout', 'features'],
+            testimonials: ['headline', 'variant', 'testimonials'],
+            gallery: ['headline', 'layout'],
+            contact: ['headline', 'subtext', 'email', 'phone', 'address', 'showMap', 'mapEmbedUrl'],
+            footer: ['logoText', 'logo', 'tagline', 'columns', 'copyrightText', 'showSocialLinks'],
+            stats: ['headline', 'stats'],
+            pricing: ['headline', 'subheadline'],
+            faq: ['headline', 'faqs'],
+            team: ['headline'],
+            socialWidget: ['variant', 'headline', 'links'],
+            cartWidget: ['variant', 'label', 'showLabel'],
+        }
+
         function sanitizeBlocks(blockList: Record<string, unknown>[]): Record<string, unknown>[] {
-            return blockList.map(block => {
-                const bt = block.blockType as string
-                const v = block.variant as string | undefined
-                if (!bt || !v) return block
+            return blockList
+                .filter(b => PAGES_BLOCK_WHITELIST.has(b.blockType as string))
+                .map(block => {
+                    const bt = block.blockType as string
+                    const schema = PAGES_SCHEMA[bt]
+                    const allowedFields = PAGES_FIELDS[bt] || []
 
-                // Apply aliases
-                const aliases = VARIANT_ALIASES[bt]
-                let sanitizedVariant = (aliases && aliases[v]) ? aliases[v] : v
+                    // Start with only blockType
+                    const result: Record<string, unknown> = { blockType: bt }
 
-                // Validate against registry
-                if (blockRegistry.has(bt)) {
-                    const meta = blockRegistry.getBlockMeta(bt)
-                    if (meta && meta.variants.length > 0 && !meta.variants.includes(sanitizedVariant!)) {
-                        sanitizedVariant = meta.defaultVariant || meta.variants[0]
+                    // Copy only allowed fields from template data
+                    for (const field of allowedFields) {
+                        if (block[field] !== undefined) {
+                            result[field] = block[field]
+                        }
                     }
-                }
 
-                return { ...block, variant: sanitizedVariant }
-            })
+                    // Handle variant/layout field mapping + validation
+                    if (schema) {
+                        const raw = (block.variant ?? block.layout) as string | undefined
+                        const aliased = raw && ALIASES[bt]?.[raw] ? ALIASES[bt]![raw]! : raw
+                        const resolved = aliased && schema.values.includes(aliased) ? aliased : schema.fallback
+                        result[schema.field] = resolved
+                        // Remove the other field if it was copied
+                        if (schema.field === 'variant') delete result.layout
+                        if (schema.field === 'layout') delete result.variant
+                    } else {
+                        // No variant/layout schema → remove both
+                        delete result.variant
+                        delete result.layout
+                    }
+
+                    return result
+                })
         }
 
         const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
@@ -212,7 +275,11 @@ export const POST = withAuth(async (user, req) => {
                 name: String(template.name || 'Untitled'),
                 tenant: tenantId,
                 status: 'draft',
-                siteType: Array.isArray(template.category) ? String(template.category[0]) : String(template.category || 'business'),
+                siteType: (() => {
+                    const VALID_SITE_TYPES = new Set(['business', 'ecommerce', 'restaurant', 'tech', 'health', 'education', 'realestate', 'fitness', 'creative', 'beauty', 'blog'])
+                    const raw = Array.isArray(template.category) ? String(template.category[0]) : String(template.category || 'business')
+                    return VALID_SITE_TYPES.has(raw) ? raw : 'business'
+                })(),
                 theme: templateTheme,
             },
         })
