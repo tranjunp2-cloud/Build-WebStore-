@@ -531,6 +531,37 @@ const MIGRATIONS = [
       tag varchar
     );`,
   },
+  // ── Templates: Multi-page array sub-table (F31) ──
+  {
+    name: 'templates_template_pages.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS templates_template_pages (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar NOT NULL,
+      slug varchar NOT NULL,
+      is_homepage boolean DEFAULT false,
+      layout jsonb
+    );`,
+  },
+  // ── Templates: Add new category enum values (F31: fnb, events, blog, travel) ──
+  {
+    name: 'templates_category.add_fnb',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'fnb'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'templates_category.add_events',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'events'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'templates_category.add_blog',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'blog'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'templates_category.add_travel',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'travel'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
   // ── Pages: Block tables (Payload blocks field → separate table per block type) ──
   // Each block has metadata + block-specific field columns (per Codex P1 review)
   {
@@ -1406,7 +1437,7 @@ const COLLECTION_SLUGS = [
   'tenants', 'users', 'sites', 'pages', 'media',
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
-  'seo_meta_jobs', 'notifications',
+  'seo_meta_jobs', 'notifications', 'subscribers',
 ];
 
 /**
