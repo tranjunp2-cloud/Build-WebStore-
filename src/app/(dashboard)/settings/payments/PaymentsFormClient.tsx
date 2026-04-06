@@ -16,11 +16,7 @@ type Media = {
 
 function getImageUrl(image: Media | string | null): string | null {
     if (!image || typeof image === 'string') return null;
-    let url = image.url || image.thumbnailURL || null;
-    if (url && url.includes('minio:9000')) {
-        url = url.replace('minio:9000', 'localhost:9000');
-    }
-    return url || null;
+    return image.url || image.thumbnailURL || null;
 }
 
 function isLocalOrBlob(urlStr: string | null): boolean {
@@ -67,7 +63,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                     if (data.qr_image) {
                         const qrImg = data.qr_image;
                         setQrImageId(typeof qrImg === 'string' ? qrImg : qrImg.id);
-                        
+
                         const url = getImageUrl(qrImg as Media);
                         setQrPreviewUrl(url);
                     }
@@ -83,23 +79,23 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
     }, [tenantId]);
 
     const saveTenantSettings = async (updates: PaymentUpdates) => {
-            if (!tenantId) return false;
-            try {
-                const res = await updatePaymentSettings({
-                    payment_cod: paymentCod,
-                    payment_qr: paymentQr,
-                    qr_image: qrImageId,
-                    ...updates
-                });
-                if (!res.success) throw new Error(res.error || "Failed to save settings");
-                return true;
-            } catch (error: unknown) {
-                console.error("Save error:", error);
-                const errorMessage = error instanceof Error ? error.message : "Failed to save changes. Please try again.";
-                toast.error(errorMessage);
-                return false;
-            }
-        };
+        if (!tenantId) return false;
+        try {
+            const res = await updatePaymentSettings({
+                payment_cod: paymentCod,
+                payment_qr: paymentQr,
+                qr_image: qrImageId,
+                ...updates
+            });
+            if (!res.success) throw new Error(res.error || "Failed to save settings");
+            return true;
+        } catch (error: unknown) {
+            console.error("Save error:", error);
+            const errorMessage = error instanceof Error ? error.message : "Failed to save changes. Please try again.";
+            toast.error(errorMessage);
+            return false;
+        }
+    };
 
     const handleToggleCod = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const checked = e.target.checked;
@@ -121,7 +117,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
         }
         setPaymentQr(checked);
         if (!checked) setQrWidgetExpanded(false);
-        
+
         const success = await saveTenantSettings({ payment_qr: checked });
         if (success) {
             toast.success(pt.successSave);
@@ -144,34 +140,34 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
         const objectUrl = URL.createObjectURL(file);
         setQrPreviewUrl(objectUrl);
         // Do not auto-activate here; wait until success
-            toast.loading(pt.uploadingQr, { id: 'upload-qr' });
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-    
-                const uploadRes = await uploadQrMedia(formData);
-    
-                if (!uploadRes.success || !uploadRes.doc) {
-                    throw new Error(uploadRes.error || "Upload failed");
-                }
-                
-                const qrDocId = uploadRes.doc.id;
-                setQrImageId(qrDocId);
+        toast.loading(pt.uploadingQr, { id: 'upload-qr' });
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
 
-                // Update preview URL to the server URL so it persists after navigation.
-                // getImageUrl handles minio:9000 → localhost:9000 for local dev;
-                // on staging it returns the S3/CDN URL directly.
-                const serverUrl = getImageUrl(uploadRes.doc as Media);
-                if (serverUrl) {
-                    setQrPreviewUrl(serverUrl);
-                }
-                // If serverUrl is somehow unavailable, blob URL from above is already showing.
-            
+            const uploadRes = await uploadQrMedia(formData);
+
+            if (!uploadRes.success || !uploadRes.doc) {
+                throw new Error(uploadRes.error || "Upload failed");
+            }
+
+            const qrDocId = uploadRes.doc.id;
+            setQrImageId(qrDocId);
+
+            // Update preview URL to the server URL so it persists after navigation.
+            // getImageUrl handles minio:9000 → localhost:9000 for local dev;
+            // on staging it returns the S3/CDN URL directly.
+            const serverUrl = getImageUrl(uploadRes.doc as Media);
+            if (serverUrl) {
+                setQrPreviewUrl(serverUrl);
+            }
+            // If serverUrl is somehow unavailable, blob URL from above is already showing.
+
             setPaymentQr(true); // Now activate
-            
+
             // Auto-save setting
             const success = await saveTenantSettings({ payment_qr: true, qr_image: qrDocId });
-            
+
             toast.dismiss('upload-qr');
             if (success) {
                 toast.success(pt.successSave);
@@ -200,7 +196,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
-        
+
         const success = await saveTenantSettings({ payment_qr: false, qr_image: null });
         if (success) {
             toast.success(pt.removeSuccess);
