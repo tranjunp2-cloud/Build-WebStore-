@@ -133,7 +133,7 @@ export default buildConfig({
               media: {
                 disableLocalStorage: true,
                 disablePayloadAccessControl: true,
-                generateFileURL: ({ filename, prefix }) => {
+                generateFileURL: ({ filename, prefix }: { filename: string; prefix?: string }) => {
                   const s3Endpoint = process.env.S3_ENDPOINT || ''
                   const publicEndpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || s3Endpoint
                   const bucket = process.env.S3_BUCKET || ''

@@ -7,12 +7,27 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         const { slug } = await params
         const payload = await getPayload({ config })
         
-        const tenantsResult = await payload.find({
-            collection: 'tenants',
-            where: { slug: { equals: slug } },
-            limit: 1,
-        })
-        const [tenant] = tenantsResult.docs
+        let tenant;
+        let hostname = '';
+
+        if (slug === 'custom') {
+            hostname = _req.headers.get('x-tenant-hostname') || ''
+            if (!hostname) return new Response('Not found', { status: 404 })
+            const tenantsResult = await payload.find({
+                collection: 'tenants',
+                where: { 'customDomains.domain': { equals: hostname } },
+                limit: 1,
+            })
+            tenant = tenantsResult.docs[0]
+        } else {
+            const tenantsResult = await payload.find({
+                collection: 'tenants',
+                where: { slug: { equals: slug } },
+                limit: 1,
+            })
+            tenant = tenantsResult.docs[0]
+        }
+
         if (!tenant) {
             return new Response('Not found', { status: 404 })
         }
@@ -46,7 +61,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
         })
 
         const rootDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
-        const baseUrl = `https://${slug}.${rootDomain}`
+        const baseUrl = slug === 'custom' ? `https://${hostname}` : `https://${slug}.${rootDomain}`
 
         const xmlLines = pagesResult.docs.map(p => {
             const isHome = p.isHomepage || p.slug === '/' || p.slug === 'home' || !p.slug

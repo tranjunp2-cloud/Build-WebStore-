@@ -30,7 +30,7 @@ const protectedPaths = [
     '/help',
 ]
 
-const authPaths = ['/login', '/register']
+const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password']
 
 /**
  * Multi-tenant middleware
@@ -55,8 +55,9 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next()
     }
 
-    // ── Admin subdomain: admin.primeweb.app ─────────────────────────────────
-    if (hostname === `admin.${PLATFORM_DOMAIN}`) {
+    // ── Admin domain: web-cms-v2.dev.ecommercehub.my (explicit or fallback to admin.PLATFORM_DOMAIN) ──
+    const ADMIN_DOMAIN = process.env.NEXT_PUBLIC_ADMIN_DOMAIN || `admin.${PLATFORM_DOMAIN}`
+    if (hostname === ADMIN_DOMAIN) {
         url.pathname = `/admin${pathname}`
         return NextResponse.rewrite(url)
     }
@@ -81,11 +82,11 @@ export async function middleware(req: NextRequest) {
         }
     }
 
-    // ── Tenant subdomain: {slug}.primeweb.app ───────────────────────────
+    // ── Tenant subdomain: {slug}.web-v2.dev.ecommercehub.my ─────────────
     const isSubdomain =
         hostname.endsWith(`.${PLATFORM_DOMAIN}`) &&
         hostname !== `www.${PLATFORM_DOMAIN}` &&
-        hostname !== `admin.${PLATFORM_DOMAIN}`
+        hostname !== ADMIN_DOMAIN
 
     if (isSubdomain) {
         const tenantSlug = hostname.replace(`.${PLATFORM_DOMAIN}`, '')
@@ -96,27 +97,24 @@ export async function middleware(req: NextRequest) {
         return response
     }
 
-    // ── Custom domain: anything that's not the platform domain ─────────────
-    // Note: Docker sets HOSTNAME=0.0.0.0, so standalone server may resolve
-    // req.nextUrl.hostname as '0.0.0.0' — treat as platform domain.
-    if (
-        hostname !== PLATFORM_DOMAIN &&
-        hostname !== `www.${PLATFORM_DOMAIN}` &&
-        hostname !== '0.0.0.0' &&
-        !hostname.includes('localhost') &&
-        !hostname.includes('127.0.0.1') &&
-        !hostname.includes('vercel.app') &&
-        !hostname.includes('ondigitalocean.app')
-    ) {
+    // ── Custom domain: hostname không phải platform, không phải admin, không phải DO app URL ──
+    const isDoInternalHost =
+        hostname === PLATFORM_DOMAIN ||
+        hostname === `www.${PLATFORM_DOMAIN}` ||
+        hostname === ADMIN_DOMAIN ||
+        hostname === '0.0.0.0' ||
+        hostname.includes('localhost') ||
+        hostname.includes('127.0.0.1') ||
+        hostname.includes('ondigitalocean.app') // DO internal app URL – không phải custom domain
+
+    if (!isDoInternalHost) {
         // REQ-F19-06: 301 redirect non-primary custom domains → primary domain
-        // Check via internal API to avoid DB access in edge middleware
         try {
             const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || `https://${PLATFORM_DOMAIN}`
             const checkUrl = `${serverUrl}/api/domain-primary?host=${encodeURIComponent(hostname)}`
             const checkRes = await fetch(checkUrl, { cache: 'no-store' })
             if (checkRes.ok) {
                 const { primaryDomain, isPrimary } = await checkRes.json()
-                // If this domain is NOT the primary, 301 redirect to primary
                 if (!isPrimary && primaryDomain && primaryDomain !== hostname) {
                     const redirectUrl = `https://${primaryDomain}${pathname}`
                     return NextResponse.redirect(redirectUrl, { status: 301 })

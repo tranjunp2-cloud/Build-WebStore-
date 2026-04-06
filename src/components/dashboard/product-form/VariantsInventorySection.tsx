@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { useI18n } from '@/i18n'
 
 export function VariantsInventorySection() {
-    const { register, watch, setValue, getValues, control, formState } = useFormContext<ProductFormValues>()
+    const { register, watch, setValue, getValues, control, formState, trigger } = useFormContext<ProductFormValues>()
     const { t } = useI18n()
     
     const hasVariants = watch('hasVariants')
@@ -28,7 +28,11 @@ export function VariantsInventorySection() {
 
     const [newOptionInputs, setNewOptionInputs] = useState<Record<number, string>>({})
 
-    const generateSkuTable = () => {
+    const generateSkuTable = async () => {
+        // Evaluate master fields validation before generating matrix
+        const isValid = await trigger(['basePrice', 'compareAtPrice', 'baseSku', 'baseInventory']);
+        if (!isValid) return;
+
         // Cartesian Product to generate variants Matrix
         const liveTiers = getValues('tiers') || []
         if (!liveTiers || liveTiers.length === 0) return
@@ -51,6 +55,11 @@ export function VariantsInventorySection() {
             combinations = newCombinations
         }
 
+        const basePrice = getValues('basePrice') || 0;
+        const compareAtPrice = getValues('compareAtPrice') || 0;
+        const baseInventory = getValues('baseInventory') || 0;
+        const baseSku = getValues('baseSku') || 'SKU';
+
         const newVariants = combinations.map((combo) => {
             const variantName = combo.join(' - ')
             
@@ -59,14 +68,15 @@ export function VariantsInventorySection() {
             const existing = currentVariants.find(v => v.variantName === variantName)
             if (existing) return existing
 
-            const skuCode = `SKU-${combo.map(c => c.substring(0,2).toUpperCase()).join('-')}`
+            const suffix = combo.map(c => c.substring(0,2).toUpperCase()).join('-')
+            const skuCode = `${baseSku}-${suffix}`
             return {
                 id: crypto.randomUUID(),
                 variantName,
                 skuCode,
-                price: 0,
-                stock: 0,
-                compareAtPrice: 0,
+                price: basePrice,
+                stock: baseInventory,
+                compareAtPrice: compareAtPrice,
             }
         })
 
@@ -112,79 +122,79 @@ export function VariantsInventorySection() {
                     </button>
                 </div>
 
-                {!hasVariants ? (
-                    /* Base Information (No Variants) */
-                    <div className="flex flex-col gap-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                                    {t.dashboard.products.form.sections?.price || 'Price (RM)'} <span className="text-[#F8FAFC]">*</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    {...register('basePrice')}
-                                    placeholder="0"
-                                    className={cn(
-                                        "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                        errors.basePrice ? "border-red-500" : "border-white/[0.08] focus:border-white"
-                                    )}
-                                />
-                                {errors.basePrice && <p className="text-xs text-red-500">{errors.basePrice.message}</p>}
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                                    {t.dashboard.products.form.sections?.comparePrice || 'Compare price (RM)'}
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    {...register('compareAtPrice')}
-                                    placeholder="0"
-                                    className={cn(
-                                        "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                        errors.compareAtPrice ? "border-red-500" : "border-white/[0.08] focus:border-white"
-                                    )}
-                                />
-                                {errors.compareAtPrice && <p className="text-xs text-red-500">{errors.compareAtPrice.message}</p>}
-                            </div>
+                {/* Base Information (Always Visible as Master Values) */}
+                <div className="flex flex-col gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                {t.dashboard.products.form.sections?.price || 'Price (RM)'} <span className="text-[#F8FAFC]">*</span>
+                            </label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                {...register('basePrice')}
+                                placeholder="0"
+                                className={cn(
+                                    "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
+                                    errors.basePrice ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                                )}
+                            />
+                            {errors.basePrice && <p className="text-xs text-red-500">{errors.basePrice.message}</p>}
                         </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                                    {t.dashboard.products.form.sections?.sku || 'SKU code'} <span className="text-[#F8FAFC]">*</span>
-                                </label>
-                                <input
-                                    {...register('baseSku')}
-                                    placeholder="SKU-001"
-                                    className={cn(
-                                        "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                        errors.baseSku ? "border-red-500" : "border-white/[0.08] focus:border-white"
-                                    )}
-                                />
-                                {errors.baseSku && <p className="text-xs text-red-500">{errors.baseSku.message}</p>}
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
-                                    {t.dashboard.products.form.sections?.inventory || 'Inventory'} <span className="text-[#F8FAFC]">*</span>
-                                </label>
-                                <input
-                                    type="number"
-                                    {...register('baseInventory')}
-                                    placeholder="0"
-                                    className={cn(
-                                        "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
-                                        errors.baseInventory ? "border-red-500" : "border-white/[0.08] focus:border-white"
-                                    )}
-                                />
-                                {errors.baseInventory && <p className="text-xs text-red-500">{errors.baseInventory.message}</p>}
-                            </div>
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                {t.dashboard.products.form.sections?.comparePrice || 'Compare price (RM)'}
+                            </label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                {...register('compareAtPrice')}
+                                placeholder="0"
+                                className={cn(
+                                    "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
+                                    errors.compareAtPrice ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                                )}
+                            />
+                            {errors.compareAtPrice && <p className="text-xs text-red-500">{errors.compareAtPrice.message}</p>}
                         </div>
                     </div>
-                ) : (
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                {t.dashboard.products.form.sections?.sku || 'SKU code'} <span className="text-[#F8FAFC]">*</span>
+                            </label>
+                            <input
+                                {...register('baseSku')}
+                                placeholder="SKU-001"
+                                className={cn(
+                                    "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
+                                    errors.baseSku ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                                )}
+                            />
+                            {errors.baseSku && <p className="text-xs text-red-500">{errors.baseSku.message}</p>}
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <label className="text-[14px] font-medium text-[#F8FAFC] leading-[1.43] m-0">
+                                {t.dashboard.products.form.sections?.inventory || 'Inventory'} <span className="text-[#F8FAFC]">*</span>
+                            </label>
+                            <input
+                                type="number"
+                                {...register('baseInventory')}
+                                placeholder="0"
+                                className={cn(
+                                    "w-full rounded-2xl border bg-[#0B1120] px-4 py-3 text-[16px] text-[#F8FAFC] placeholder:text-[#F8FAFC]/40 focus:ring-1 focus:ring-white outline-none transition-colors",
+                                    errors.baseInventory ? "border-red-500" : "border-white/[0.08] focus:border-white"
+                                )}
+                            />
+                            {errors.baseInventory && <p className="text-xs text-red-500">{errors.baseInventory.message}</p>}
+                        </div>
+                    </div>
+                </div>
+
+                {hasVariants && (
                     /* Multiple Variants UI */
-                    <div className="space-y-6">
+                    <div className="space-y-6 pt-6 border-t border-white/[0.08]">
                         
                         {/* Tiers List */}
                         <div className="space-y-4" id="tiers">
@@ -241,7 +251,7 @@ export function VariantsInventorySection() {
                                                 const newOptions = [...(liveTier.options || []), '']
                                                 updateTier(index, { ...liveTier, options: newOptions })
                                             }}
-                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-transparent py-3 text-[14px] font-medium text-[#F8FAFC]/60 hover:bg-white/5 transition-colors"
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-solid border-white/10 bg-transparent py-3 text-[14px] font-medium text-[#F8FAFC]/60 hover:bg-white/5 transition-colors"
                                         >
                                             <Plus className="h-4 w-4" />
                                             {t.dashboard.products.form.sections?.addOption || 'Add option'}
@@ -296,8 +306,8 @@ export function VariantsInventorySection() {
                                         </thead>
                                         <tbody>
                                             {variants.map((v, i) => (
-                                                <tr key={v.id} className="group">
-                                                    <td className="px-4 py-2 text-[#F8FAFC] text-[14px] font-normal min-w-[120px]">{v.variantName}</td>
+                                                <tr key={v.id} className="group align-top">
+                                                    <td className="px-4 py-3 text-[#F8FAFC] text-[14px] font-normal min-w-[120px]">{v.variantName}</td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
                                                             <input 

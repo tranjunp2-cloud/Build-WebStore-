@@ -257,6 +257,43 @@ describe('BusinessInfoForm Component', () => {
             expect(screen.getByText('Please describe your products / services')).toBeInTheDocument()
         })
 
+        it('TC-F01.07: enforces minimum 3 characters (excluding spaces) for text fields', async () => {
+            render(<BusinessInfoForm onSubmit={vi.fn()} />)
+            await waitFor(() => expect(screen.getByTestId('submit-button')).toBeInTheDocument())
+            
+            await waitFor(() => expect(screen.getByTestId('option-Food & Beverage')).toBeInTheDocument())
+            fireEvent.click(screen.getByTestId('option-Food & Beverage'))
+
+            const inputs = screen.getAllByTestId('builder-text-input')
+            const textareas = screen.getAllByTestId('builder-textarea')
+
+            // Case 1: 0 characters (empty)
+            expect(screen.getByTestId('submit-button')).toBeDisabled()
+
+            // Case 2: 2 characters
+            fireEvent.change(inputs[0], { target: { value: 'ab' } })
+            fireEvent.change(textareas[0], { target: { value: 'cd' } })
+            fireEvent.change(textareas[1], { target: { value: 'ef' } })
+            expect(screen.getByTestId('submit-button')).toBeDisabled()
+
+            // Trigger submit manually to see validation errors
+            const form = screen.getByTestId('left-body').querySelector('form')!
+            fireEvent.submit(form)
+            await waitFor(() => {
+                expect(screen.getByText('Please enter your business name')).toBeInTheDocument()
+            })
+
+            // Case 3: 3 valid characters
+            fireEvent.change(inputs[0], { target: { value: 'abc' } })
+            fireEvent.change(textareas[0], { target: { value: 'cde' } })
+            fireEvent.change(textareas[1], { target: { value: 'fgh' } })
+            expect(screen.getByTestId('submit-button')).not.toBeDisabled()
+
+            // Case 4: padding spaces (< 3 actual characters)
+            fireEvent.change(inputs[0], { target: { value: ' a ' } }) // 1 char
+            expect(screen.getByTestId('submit-button')).toBeDisabled()
+        })
+
         it('does not call onSubmit when validation fails', async () => {
             const onSubmit = vi.fn()
             render(<BusinessInfoForm onSubmit={onSubmit} />)

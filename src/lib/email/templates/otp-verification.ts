@@ -33,8 +33,8 @@ export function otpVerificationEmail({ userName, otpCode, locale = 'en' }: OTPEm
 
     const subject = t.subject || 'Your PrimeWeb verification code 🔐'
 
-    // Format OTP code with letter spacing for readability
-    const formattedOtp = otpCode.split('').join('  ')
+    // Do not inject physical spaces otherwise Gmail mobile will wrap it. Use letter-spacing instead.
+    const formattedOtp = otpCode
 
     const html = `
 <!DOCTYPE html>
@@ -59,7 +59,7 @@ export function otpVerificationEmail({ userName, otpCode, locale = 'en' }: OTPEm
 
                 <!-- OTP Code Box -->
                 <div style="text-align: center; padding: 28px 24px; background: #f0fdfa; border: 1px solid rgba(13,148,136,0.2); border-radius: 12px; margin-bottom: 24px;">
-                    <div style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #0d9488; font-family: 'Courier New', monospace;">${formattedOtp}</div>
+                    <span style="display: inline-block; font-size: 36px; font-weight: 700; letter-spacing: 12px; color: #0d9488; font-family: 'Courier New', Courier, monospace; white-space: nowrap;">${formattedOtp}</span>
                     <p style="color: #94a3b8; font-size: 12px; margin: 12px 0 0; font-family: Inter, -apple-system, sans-serif;">${t.expiry}</p>
                 </div>
 
