@@ -5,8 +5,8 @@
  * Provides consistent, premium animations across all blocks.
  */
 
-import { motion, type Variants } from 'framer-motion'
-import type { ComponentProps } from 'react'
+import { motion, useReducedMotion, type Variants } from 'framer-motion'
+import type { ComponentProps, ReactNode } from 'react'
 
 // ── Animation Variants ──────────────────────────────────────────────────────
 
@@ -55,8 +55,14 @@ type MotionSectionProps = ComponentProps<typeof motion.section> & {
     delay?: number
 }
 
-/** Animated section that fades in when scrolled into view */
+/** Animated section that fades in when scrolled into view. Respects prefers-reduced-motion. */
 export function AnimatedSection({ children, delay = 0, ...props }: MotionSectionProps) {
+    const shouldReduce = useReducedMotion()
+
+    if (shouldReduce) {
+        return <section {...(props as Record<string, unknown>)}>{children}</section>
+    }
+
     return (
         <motion.section
             initial="hidden"
@@ -77,8 +83,14 @@ export function AnimatedSection({ children, delay = 0, ...props }: MotionSection
     )
 }
 
-/** Animated grid/list container with staggered children */
+/** Animated grid/list container with staggered children. Respects prefers-reduced-motion. */
 export function StaggerGrid({ children, className, ...props }: ComponentProps<typeof motion.div>) {
+    const shouldReduce = useReducedMotion()
+
+    if (shouldReduce) {
+        return <div className={className}>{children}</div>
+    }
+
     return (
         <motion.div
             initial="hidden"
@@ -93,8 +105,14 @@ export function StaggerGrid({ children, className, ...props }: ComponentProps<ty
     )
 }
 
-/** Individual stagger item */
+/** Individual stagger item. Falls back to plain div when reduced motion. */
 export function StaggerItem({ children, className, ...props }: ComponentProps<typeof motion.div>) {
+    const shouldReduce = useReducedMotion()
+
+    if (shouldReduce) {
+        return <div className={className}>{children}</div>
+    }
+
     return (
         <motion.div variants={staggerItem} className={className} {...props}>
             {children}
@@ -102,8 +120,14 @@ export function StaggerItem({ children, className, ...props }: ComponentProps<ty
     )
 }
 
-/** Hover lift effect for cards */
+/** Hover lift effect for cards. Respects prefers-reduced-motion. */
 export function HoverCard({ children, className, style, ...props }: ComponentProps<typeof motion.div>) {
+    const shouldReduce = useReducedMotion()
+
+    if (shouldReduce) {
+        return <div className={className} style={style}>{children}</div>
+    }
+
     return (
         <motion.div
             className={className}

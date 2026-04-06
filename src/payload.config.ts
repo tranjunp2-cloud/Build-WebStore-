@@ -14,6 +14,7 @@ import { Pages } from './collections/Pages'
 import { Media } from './collections/Media'
 import { Templates } from './collections/Templates'
 import { Subscriptions } from './collections/Subscriptions'
+import { Subscribers } from './collections/Subscribers'
 import { Products } from './collections/Products'
 import { Orders } from './collections/Orders'
 import { Analytics } from './collections/Analytics'
@@ -100,6 +101,7 @@ export default buildConfig({
     Media,
     Templates,
     Subscriptions,
+    Subscribers,
     Products,
     Orders,
     Analytics,

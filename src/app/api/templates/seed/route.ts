@@ -170,6 +170,12 @@ export const POST = withAuth(async (_user, request) => {
                                 category: seed.category,
                                 defaultTheme: seed.theme as Record<string, unknown>,
                                 defaultBlocks: seed.pages[0]?.layout ?? [],
+                                templatePages: seed.pages.map((page, idx) => ({
+                                    title: page.title || (idx === 0 ? 'Home' : `Page ${idx + 1}`),
+                                    slug: page.slug || (idx === 0 ? 'home' : `page-${idx + 1}`),
+                                    isHomepage: idx === 0,
+                                    layout: page.layout,
+                                })),
                                 tags: [seed.category, seed.tier],
                                 sortOrder: 0,
                                 isPremium: seed.isPremium,
