@@ -160,9 +160,6 @@ describe('POST /api/ai/apply-template', () => {
         })
         mockPayloadInstance.update.mockResolvedValue({})
         mockPayloadInstance.delete.mockResolvedValue({})
-        mockPayloadInstance.db.beginTransaction.mockResolvedValue(mockTransaction)
-        mockTransaction.commitTransaction.mockResolvedValue(undefined)
-        mockTransaction.rollbackTransaction.mockResolvedValue(undefined)
     })
 
     // ── TC-F07.022: Rate limiting ─────────────────────────────────────────────

@@ -7,9 +7,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { buildFullHTML } from '@/lib/htmlBuilder'
 import { THEMES } from '../../preview/renderers'
-import { withAuth } from '@/lib/auth'
-
-export const GET = withAuth(async (_user, req) => {
+export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url)
         const id = searchParams.get('id')
@@ -89,4 +87,4 @@ export const GET = withAuth(async (_user, req) => {
         const message = e instanceof Error ? e.message : 'Preview error'
         return new NextResponse(`Error: ${message}`, { status: 500 })
     }
-})
+}

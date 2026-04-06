@@ -106,13 +106,13 @@ export default function TemplatesPage() {
             <div className="border-b border-white/10 bg-[#0B1120]/95 backdrop-blur-md sticky top-0 z-20">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                        <Link
-                            href="/onboarding"
-                            aria-label="Back to onboarding"
+                        <button
+                            onClick={() => router.back()}
+                            aria-label="Go back"
                             className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition-colors shrink-0"
                         >
                             <ArrowLeft className="h-4 w-4" />
-                        </Link>
+                        </button>
                         <div className="min-w-0">
                             <h1 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                                 <LayoutTemplate className="hidden sm:block h-5 w-5 text-blue-400 shrink-0" />
@@ -154,8 +154,7 @@ export default function TemplatesPage() {
                             <span className="text-xs font-medium text-gray-400 whitespace-nowrap">{t.gallery.sort}:</span>
                             <select
                                 value={sortBy}
-                                // @ts-ignore
-                                onChange={(e) => setSortBy(e.target.value)}
+                                onChange={(e) => setSortBy(e.target.value as 'newest' | 'featured' | 'name')}
                                 className="w-full sm:w-auto appearance-none rounded-xl border border-white/10 bg-[#1E293B] px-4 py-2.5 pr-8 text-sm text-white outline-none focus:border-blue-500/50 transition-colors cursor-pointer"
                             >
                                 <option value="newest">{t.gallery.sortNewest}</option>
@@ -174,7 +173,7 @@ export default function TemplatesPage() {
                                 className={cn(
                                     'rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-300',
                                     activeCategory === key
-                                        ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+                                        ? 'bg-blue-600/30 text-blue-300 border border-blue-400/50 shadow-[0_0_20px_rgba(59,130,246,0.25)] font-semibold'
                                         : 'text-gray-400 hover:bg-white/5 hover:text-gray-200 border border-transparent hover:border-white/10'
                                 )}
                             >

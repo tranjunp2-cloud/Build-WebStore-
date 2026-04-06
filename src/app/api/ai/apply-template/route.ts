@@ -190,67 +190,46 @@ export const POST = withAuth(async (user, req) => {
                 : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
             const pagesToCreate = rawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
 
-            // Transaction: delete old pages → update theme → create new pages
-            // Note: Payload 3 Drizzle transaction returns a req-like object with commit/rollback
-            const txReq = await payload.db.beginTransaction()
-            try {
-                // 1. Delete all existing pages for this site
-                const existingPages = await payload.find({
-                    collection: 'pages',
-                    where: { site: { equals: Number(siteId) } },
-                    limit: 100,
-                    req: txReq as never,
-                })
-                for (const page of existingPages.docs) {
-                    await payload.delete({
-                        collection: 'pages',
-                        id: page.id,
-                        req: txReq as never,
-                    })
-                }
-
-                // 2. Update site theme
-                await payload.update({
-                    collection: 'sites',
-                    id: Number(siteId),
-                    data: { theme: templateTheme },
-                    req: txReq as never,
-                })
-
-                // 3. Create new pages from template
-                for (const [idx, page] of pagesToCreate.entries()) {
-                    await payload.create({
-                        collection: 'pages',
-                        data: {
-                            title: page.title,
-                            slug: page.slug,
-                            site: Number(siteId),
-                            tenant: tenantId,
-                            isHomepage: page.isHomepage ?? idx === 0,
-                            status: 'draft',
-                            layout: page.layout,
-                        },
-                        req: txReq as never,
-                    })
-                }
-
-                // 4. Increment template usage count
-                await payload.update({
-                    collection: 'templates',
-                    id: templateId,
-                    data: { usageCount: (Number(template.usageCount) || 0) + 1 },
-                    req: txReq as never,
-                })
-
-                if (txReq && typeof txReq === 'object' && 'commitTransaction' in txReq) {
-                    await (txReq as { commitTransaction: () => Promise<void> }).commitTransaction()
-                }
-            } catch (txError) {
-                if (txReq && typeof txReq === 'object' && 'rollbackTransaction' in txReq) {
-                    await (txReq as { rollbackTransaction: () => Promise<void> }).rollbackTransaction()
-                }
-                throw txError
+            // Delete old pages → update theme → create new pages (sequential)
+            // 1. Delete all existing pages for this site
+            const existingPages = await payload.find({
+                collection: 'pages',
+                where: { site: { equals: Number(siteId) } },
+                limit: 100,
+            })
+            for (const page of existingPages.docs) {
+                await payload.delete({ collection: 'pages', id: page.id })
             }
+
+            // 2. Update site theme
+            await payload.update({
+                collection: 'sites',
+                id: Number(siteId),
+                data: { theme: templateTheme },
+            })
+
+            // 3. Create new pages from template
+            for (const [idx, page] of pagesToCreate.entries()) {
+                await payload.create({
+                    collection: 'pages',
+                    data: {
+                        title: page.title,
+                        slug: page.slug,
+                        site: Number(siteId),
+                        tenant: tenantId,
+                        isHomepage: page.isHomepage ?? idx === 0,
+                        status: 'draft',
+                        layout: page.layout,
+                    },
+                })
+            }
+
+            // 4. Increment template usage count
+            await payload.update({
+                collection: 'templates',
+                id: templateId,
+                data: { usageCount: (Number(template.usageCount) || 0) + 1 },
+            })
 
             return NextResponse.json({
                 success: true,
