@@ -16,7 +16,24 @@ type Media = {
 
 function getImageUrl(image: Media | string | null): string | null {
     if (!image || typeof image === 'string') return null;
-    return image.url || image.thumbnailURL || null;
+    let url = image.url || image.thumbnailURL || null;
+    if (!url) return null;
+
+    // Fix existing broken local URLs directly to S3 because MinIO stores them
+    if (url.includes('/api/media/file/') || url.includes('minio:') || url.includes('localhost:9000')) {
+        if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
+            const filename = url.split('/').pop();
+            url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`;
+        }
+    }
+
+    // CRITICAL: NextJS image optimization crashes if 'minio' is missing from next.config.ts after a cache clear.
+    // Browser also cannot resolve 'minio' natively. Map to localhost safely, specifically for Local Dev.
+    if (process.env.NODE_ENV === 'development' && url.includes('minio:')) {
+        url = url.replace(/minio:\d+/, 'localhost:9000');
+    }
+
+    return url;
 }
 
 function isLocalOrBlob(urlStr: string | null): boolean {
@@ -24,7 +41,7 @@ function isLocalOrBlob(urlStr: string | null): boolean {
     if (urlStr.startsWith('blob:')) return true;
     try {
         const url = new URL(urlStr);
-        return ['localhost', '127.0.0.1', 'minio'].includes(url.hostname);
+        return process.env.NODE_ENV === 'development' && ['localhost', '127.0.0.1'].includes(url.hostname);
     } catch {
         return false;
     }
