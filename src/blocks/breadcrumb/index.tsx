@@ -5,7 +5,6 @@ import type { BreadcrumbConfig } from './config'
 
 export function BreadcrumbBlock({ block, theme }: BlockProps<BreadcrumbConfig>) {
     const { items = [], variant = 'simple' } = block
-    const pc = theme.primaryColor
 
     return (
         <section className="py-4">
@@ -35,7 +34,7 @@ export function BreadcrumbBlock({ block, theme }: BlockProps<BreadcrumbConfig>) 
                                     {isLast || !item.url ? (
                                         <span
                                             className={isLast ? 'font-medium' : 'opacity-70'}
-                                            style={isLast ? { color: pc } : undefined}
+                                            style={isLast ? { color: 'var(--brand-primary)' } : undefined}
                                         >
                                             {item.label}
                                         </span>

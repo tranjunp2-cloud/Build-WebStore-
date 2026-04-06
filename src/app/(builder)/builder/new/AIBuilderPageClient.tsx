@@ -16,6 +16,7 @@ import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
+import { getGenerationError, formatErrorMessage } from '@/lib/generation-errors'
 
 export interface AIBuilderPageClientProps {
     /** Server-resolved current user ID — used to detect cross-user localStorage contamination */
@@ -25,30 +26,8 @@ export interface AIBuilderPageClientProps {
 const BUILDER_SESSION_META_KEY = 'prime-builder-session-meta'
 const BUILDER_SESSION_TTL_MS = 24 * 60 * 60 * 1000
 
-function getGenerationErrorMessage(errorData: unknown) {
-    if (typeof errorData !== 'object' || errorData === null) return 'Generation failed'
-
-    const data = errorData as Record<string, unknown>
-
-    if (typeof data.error === 'string') {
-        return data.error
-    }
-
-    if (typeof data.error === 'object' && data.error !== null) {
-        const err = data.error as Record<string, unknown>
-        if (typeof err.details === 'string') return err.details
-
-        const fieldErrors = (err.details as Record<string, unknown> | undefined)?.fieldErrors
-        if (fieldErrors && typeof fieldErrors === 'object') {
-            const firstFieldError = Object.values(fieldErrors).find(
-                (messages): messages is string[] => Array.isArray(messages) && messages.length > 0,
-            )
-            if (firstFieldError?.[0]) return firstFieldError[0]
-        }
-    }
-
-    return 'Generation failed'
-}
+/** Locale for generation error messages — defaults to 'en'. */
+const GENERATION_ERROR_LOCALE: 'en' | 'ms' = 'en'
 
 function formatSavedAt(timestamp: number | null) {
     if (!timestamp) return null
@@ -166,6 +145,12 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const [draftSaveState, setDraftSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle')
     const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const abortControllerRef = useRef<AbortController | null>(null)
+    const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const hardTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const [elapsedSeconds, setElapsedSeconds] = useState(0)
+    const [showTimeoutWarning, setShowTimeoutWarning] = useState(false)
 
     const {
         step,
@@ -403,11 +388,68 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         }
     }, [addBlock, addMessage, setError, setProgress, setSiteId, setSiteName, setStatus, setTheme])
 
+    const clearGenerationTimers = useCallback(() => {
+        if (elapsedIntervalRef.current) {
+            clearInterval(elapsedIntervalRef.current)
+            elapsedIntervalRef.current = null
+        }
+        if (warningTimeoutRef.current) {
+            clearTimeout(warningTimeoutRef.current)
+            warningTimeoutRef.current = null
+        }
+        if (hardTimeoutRef.current) {
+            clearTimeout(hardTimeoutRef.current)
+            hardTimeoutRef.current = null
+        }
+        setElapsedSeconds(0)
+        setShowTimeoutWarning(false)
+    }, [])
+
+    const cancelGeneration = useCallback(() => {
+        abortControllerRef.current?.abort()
+        abortControllerRef.current = null
+        clearGenerationTimers()
+        setStatus('idle')
+        setStep('info')
+        // businessInfo is preserved — user can retry without re-entering
+    }, [clearGenerationTimers, setStatus, setStep])
+
+    // Cleanup all timers and abort on unmount
+    useEffect(() => {
+        return () => {
+            abortControllerRef.current?.abort()
+            clearGenerationTimers()
+        }
+    }, [clearGenerationTimers])
+
     const startSSEGeneration = useCallback(async (
         info: BusinessInfo,
         extraInstructions?: string,
         briefSnapshot?: Record<string, unknown> | null,
     ) => {
+        const controller = new AbortController()
+        abortControllerRef.current = controller
+
+        // Elapsed timer — tick every second
+        const elapsedInterval = setInterval(() => setElapsedSeconds((s) => s + 1), 1000)
+        elapsedIntervalRef.current = elapsedInterval
+
+        // 60s warning timeout (v2: increased from 30s — larger prompts take longer)
+        const warningTimeout = setTimeout(() => setShowTimeoutWarning(true), 60_000)
+        warningTimeoutRef.current = warningTimeout
+
+        // 120s hard timeout — auto-abort (v2: increased from 60s for richer extraction prompts)
+        const hardTimeout = setTimeout(() => {
+            controller.abort()
+            clearGenerationTimers()
+            const genError = getGenerationError(408)
+            const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
+            setError({ code: 'timeout', message, retryable: true })
+            setStep('info')
+            toast.error(message)
+        }, 120_000)
+        hardTimeoutRef.current = hardTimeout
+
         try {
             // Use briefSnapshot (captured before reset) if provided, fallback to store
             const brief = briefSnapshot ?? contentBrief
@@ -421,11 +463,17 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     ...(brief ? { contentBrief: brief } : {}),
                 }),
                 credentials: 'include',
+                signal: controller.signal,
             })
 
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(getGenerationErrorMessage(errorData))
+                const errorBody = await response.json().catch(() => null)
+                const genError = getGenerationError(response.status, errorBody)
+                const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
+                setError({ code: genError.code, message, retryable: genError.retryable })
+                setStep('info')
+                toast.error(message)
+                return
             }
 
             const reader = response.body?.getReader()
@@ -469,18 +517,22 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     currentEvent = ''
                 }
             }
-        } catch (error: any) {
-            const message = error?.message || 'Generation failed'
-
-            setError({
-                code: 'generation_failed',
-                message,
-                retryable: true,
-            })
+        } catch (err: unknown) {
+            if (err instanceof Error && err.name === 'AbortError') {
+                // User cancelled or hard timeout — already handled
+                return
+            }
+            // SSE disconnect or network error
+            const genError = getGenerationError(0, 'SSE_DISCONNECT')
+            const message = formatErrorMessage(genError, GENERATION_ERROR_LOCALE)
+            setError({ code: genError.code, message, retryable: genError.retryable })
             setStep('info')
             toast.error(message)
+        } finally {
+            clearGenerationTimers()
+            abortControllerRef.current = null
         }
-    }, [handleSSEEvent, setError, setStep, contentBrief])
+    }, [clearGenerationTimers, handleSSEEvent, setError, setStep, contentBrief])
 
     const handleGenerateStart = useCallback((info: BusinessInfo) => {
         // Capture contentBrief BEFORE reset() clears it from the store
@@ -642,8 +694,11 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             <>
                 {saveStatusBadge}
                 <BuilderGenerationView
+                    elapsedSeconds={elapsedSeconds}
                     message={generationMessage}
+                    onCancel={cancelGeneration}
                     progress={progress.progress || 52}
+                    showTimeoutWarning={showTimeoutWarning}
                 />
             </>
         )

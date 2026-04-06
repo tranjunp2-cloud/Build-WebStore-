@@ -6,14 +6,13 @@ import type { MenuFoodConfig, MenuItem } from './config'
 
 export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
     const { headline, categories = [], variant = 'classic' } = block
-    const pc = theme.primaryColor
 
     const [activeTab, setActiveTab] = useState(0)
 
     const TagBadge = ({ tag }: { tag: string }) => (
         <span
             className="px-2 py-0.5 rounded-full text-xs font-semibold"
-            style={{ background: `${pc}20`, color: pc }}
+            style={{ background: `rgba(var(--brand-primary-rgb), 0.125)`, color: 'var(--brand-primary)' }}
         >
             {tag}
         </span>
@@ -31,9 +30,9 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
             <div className="flex items-center gap-1 shrink-0">
                 <span
                     className="flex-1 border-b border-dotted mx-3 min-w-[40px]"
-                    style={{ borderColor: `${pc}30` }}
+                    style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.188)` }}
                 />
-                <span className="text-lg font-bold" style={{ color: pc }}>
+                <span className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
                     {item.currency || 'RM'} {item.price}
                 </span>
             </div>
@@ -44,7 +43,7 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
         <div
             key={i}
             className="rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg"
-            style={{ border: `1px solid ${pc}15` }}
+            style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
         >
             {item.imageUrl && (
                 <div className="aspect-[16/10] overflow-hidden">
@@ -57,7 +56,7 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
                     {item.tag && <TagBadge tag={item.tag} />}
                 </div>
                 {item.description && <p className="text-sm opacity-50 mb-3">{item.description}</p>}
-                <p className="text-lg font-bold" style={{ color: pc }}>
+                <p className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
                     {item.currency || 'RM'} {item.price}
                 </p>
             </div>
@@ -68,13 +67,13 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
         <div
             key={i}
             className="flex items-center justify-between py-3"
-            style={{ borderBottom: `1px solid ${pc}10` }}
+            style={{ borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }}
         >
             <div className="flex items-center gap-3">
                 <span className="font-medium">{item.name}</span>
                 {item.tag && <TagBadge tag={item.tag} />}
             </div>
-            <span className="font-bold text-sm" style={{ color: pc }}>
+            <span className="font-bold text-sm" style={{ color: 'var(--brand-primary)' }}>
                 {item.currency || 'RM'} {item.price}
             </span>
         </div>
@@ -99,8 +98,8 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
                                 onClick={() => setActiveTab(i)}
                                 className="px-5 py-2 rounded-full text-sm font-medium transition-all duration-200"
                                 style={activeTab === i
-                                    ? { background: pc, color: '#fff' }
-                                    : { background: `${pc}10`, border: `1px solid ${pc}20` }
+                                    ? { background: 'var(--brand-primary)', color: '#fff' }
+                                    : { background: `rgba(var(--brand-primary-rgb), 0.063)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }
                                 }
                             >
                                 {cat.name}
@@ -115,7 +114,7 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
                         {categories.length === 1 && (
                             <h3
                                 className="text-2xl font-bold font-heading mb-8 text-center"
-                                style={{ color: pc }}
+                                style={{ color: 'var(--brand-primary)' }}
                             >
                                 {activeCategory.name}
                             </h3>
@@ -123,7 +122,7 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
 
                         {/* Items */}
                         {variant === 'classic' && (
-                            <div className="divide-y" style={{ borderColor: `${pc}10` }}>
+                            <div className="divide-y" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                                 {activeCategory.items.map((item, i) => renderClassicItem(item, i))}
                             </div>
                         )}

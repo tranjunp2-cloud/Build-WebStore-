@@ -19,7 +19,7 @@ function DownloadButton({ fileUrl, label, pc }: { fileUrl: string; label: string
             href={fileUrl}
             download
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-sm text-white transition-all duration-300 hover:opacity-90"
-            style={{ background: `linear-gradient(135deg, ${pc}, ${pc}cc)`, boxShadow: `0 8px 30px ${pc}35` }}
+            style={{ background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`, boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)` }}
         >
             <DownloadIcon color="#fff" />
             {label}
@@ -42,12 +42,12 @@ function EmailGate({ onSubmit, pc, label }: { onSubmit: () => void; pc: string; 
                 placeholder="Enter your email"
                 required
                 className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-sm outline-none transition-colors"
-                style={{ border: `1px solid ${pc}30` }}
+                style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.188)` }}
             />
             <button
                 type="submit"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm text-white transition-all duration-300 hover:opacity-90 whitespace-nowrap"
-                style={{ background: pc }}
+                style={{ background: 'var(--brand-primary)' }}
             >
                 <DownloadIcon color="#fff" />
                 {label}
@@ -67,7 +67,6 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
         buttonLabel = 'Download',
         requireEmail = false,
     } = block
-    const pc = theme.primaryColor
     const [unlocked, setUnlocked] = useState(!requireEmail)
 
     const fileMeta = (fileName || fileSize) && (
@@ -77,9 +76,9 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
     )
 
     const action = unlocked ? (
-        <DownloadButton fileUrl={fileUrl} label={buttonLabel} pc={pc} />
+        <DownloadButton fileUrl={fileUrl} label={buttonLabel} pc={theme.primaryColor} />
     ) : (
-        <EmailGate onSubmit={() => setUnlocked(true)} pc={pc} label={buttonLabel} />
+        <EmailGate onSubmit={() => setUnlocked(true)} pc={theme.primaryColor} label={buttonLabel} />
     )
 
     if (variant === 'minimal') {
@@ -104,8 +103,8 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
                     <div
                         className="rounded-3xl p-10 md:p-16 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden"
                         style={{
-                            background: `linear-gradient(135deg, ${pc}18 0%, ${pc}06 100%)`,
-                            border: `1px solid ${pc}20`,
+                            background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.094) 0%, rgba(var(--brand-primary-rgb), 0.024) 100%)`,
+                            border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`,
                         }}
                     >
                         <div className="flex-1">
@@ -126,13 +125,13 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
             <div className="container mx-auto px-6 flex justify-center">
                 <div
                     className="rounded-2xl p-8 md:p-12 text-center max-w-lg w-full"
-                    style={{ background: `${pc}08`, border: `1px solid ${pc}20` }}
+                    style={{ background: `rgba(var(--brand-primary-rgb), 0.031)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
                 >
                     <div
                         className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6"
-                        style={{ background: `${pc}15` }}
+                        style={{ background: `rgba(var(--brand-primary-rgb), 0.082)` }}
                     >
-                        <DownloadIcon color={pc} />
+                        <DownloadIcon color={theme.primaryColor} />
                     </div>
                     <h2 className="text-2xl md:text-3xl font-bold font-heading mb-3">{headline}</h2>
                     {description && <p className="opacity-50 mb-6 max-w-sm mx-auto">{description}</p>}

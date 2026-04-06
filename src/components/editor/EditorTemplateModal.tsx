@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, Search, X, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { TemplateCard, type Template } from '@/components/frontend/TemplateCard'
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 const CATEGORIES = [
     { value: 'all', label: 'All' },
     { value: 'restaurant', label: 'Restaurant' },
+    { value: 'ecommerce', label: 'E-Commerce' },
     { value: 'beauty', label: 'Beauty' },
     { value: 'tech', label: 'Tech' },
     { value: 'health', label: 'Health' },
@@ -18,6 +19,7 @@ const CATEGORIES = [
     { value: 'fitness', label: 'Fitness' },
     { value: 'creative', label: 'Creative' },
     { value: 'business', label: 'Business' },
+    { value: 'fnb', label: 'Cafe & Bakery' },
 ]
 
 interface EditorTemplateModalProps {
@@ -30,11 +32,29 @@ interface EditorTemplateModalProps {
 export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: EditorTemplateModalProps) {
     const [templates, setTemplates] = useState<Template[]>([])
     const [isLoading, setIsLoading] = useState(true)
-    const [search, setSearch] = useState('')
+    const [searchInput, setSearchInput] = useState('')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
     const [activeCategory, setActiveCategory] = useState('all')
     const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null)
     const [isApplying, setIsApplying] = useState<string | null>(null)
     const [confirmTemplate, setConfirmTemplate] = useState<Template | null>(null)
+
+    // Hover preview state (desktop only)
+    const [hoverPreview, setHoverPreview] = useState<{ template: Template; rect: DOMRect } | null>(null)
+    const hoverTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+    // Debounced search (300ms)
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchInput), 300)
+        return () => clearTimeout(timer)
+    }, [searchInput])
+
+    // Clean up hover timer on unmount
+    useEffect(() => {
+        return () => {
+            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+        }
+    }, [])
 
     // Fetch templates on mount
     useEffect(() => {
@@ -70,20 +90,28 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
         return () => document.removeEventListener('keydown', handler)
     }, [isOpen, onClose, previewTemplate, confirmTemplate])
 
-    // Filter templates
+    // Filter templates using debounced search + category match on name, description, and category
     const filtered = templates.filter((t) => {
         const matchesCategory = activeCategory === 'all' || t.category?.includes(activeCategory)
-        const matchesSearch = !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.description?.toLowerCase().includes(search.toLowerCase())
+        const q = debouncedSearch.toLowerCase()
+        const matchesSearch =
+            !q ||
+            t.name.toLowerCase().includes(q) ||
+            t.description?.toLowerCase().includes(q) ||
+            t.category?.some((cat) => cat.toLowerCase().includes(q))
         return matchesCategory && matchesSearch
     })
 
-    const handleUseTemplate = useCallback((templateId: string) => {
-        const template = templates.find((t) => t.id === templateId)
-        if (template) {
-            setPreviewTemplate(null)
-            setConfirmTemplate(template)
-        }
-    }, [templates])
+    const handleUseTemplate = useCallback(
+        (templateId: string) => {
+            const template = templates.find((t) => t.id === templateId)
+            if (template) {
+                setPreviewTemplate(null)
+                setConfirmTemplate(template)
+            }
+        },
+        [templates],
+    )
 
     const handleConfirmApply = useCallback(async () => {
         if (!confirmTemplate) return
@@ -119,6 +147,19 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
         }
     }, [confirmTemplate, siteId, onApplied])
 
+    // Hover preview handlers (desktop)
+    const handleCardMouseEnter = useCallback((template: Template, e: React.MouseEvent) => {
+        hoverTimerRef.current = setTimeout(() => {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            setHoverPreview({ template, rect })
+        }, 500)
+    }, [])
+
+    const handleCardMouseLeave = useCallback(() => {
+        if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+        setHoverPreview(null)
+    }, [])
+
     if (!isOpen) return null
 
     return (
@@ -143,27 +184,27 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                     </div>
 
                     {/* Filters */}
-                    <div className="flex flex-wrap items-center gap-3 border-b border-white/5 px-6 py-3">
+                    <div className="flex flex-col gap-3 border-b border-white/5 px-6 py-3 sm:flex-row sm:flex-wrap sm:items-center">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
                             <input
                                 type="text"
                                 placeholder="Search templates..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="rounded-lg border border-white/10 bg-white/5 py-1.5 pl-9 pr-3 text-sm text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:outline-none"
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                className="w-full rounded-lg border border-white/10 bg-white/5 py-1.5 pl-9 pr-3 text-sm text-white placeholder:text-gray-500 focus:border-blue-500/50 focus:outline-none sm:w-auto"
                             />
                         </div>
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide sm:flex-wrap sm:pb-0">
                             {CATEGORIES.map((cat) => (
                                 <button
                                     key={cat.value}
                                     onClick={() => setActiveCategory(cat.value)}
                                     className={cn(
-                                        'rounded-lg px-3 py-1 text-xs font-medium transition-colors',
+                                        'shrink-0 rounded-lg px-3 py-1 text-xs font-medium transition-colors',
                                         activeCategory === cat.value
                                             ? 'bg-blue-600 text-white'
-                                            : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                                            : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white',
                                     )}
                                 >
                                     {cat.label}
@@ -171,6 +212,13 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                             ))}
                         </div>
                     </div>
+
+                    {/* Results info */}
+                    {!isLoading && templates.length > 0 && (
+                        <div className="px-6 pt-3 text-xs text-gray-500">
+                            Showing {filtered.length} of {templates.length} templates
+                        </div>
+                    )}
 
                     {/* Grid */}
                     <div className="flex-1 overflow-y-auto p-6">
@@ -182,28 +230,63 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                         ) : templates.length === 0 ? (
                             <div className="flex h-40 flex-col items-center justify-center gap-2 text-sm text-gray-500">
                                 <p>No templates available yet.</p>
-                                <p className="text-xs text-gray-600">Run POST /api/templates/seed to create templates.</p>
+                                <p className="text-xs text-gray-600">
+                                    Run POST /api/templates/seed to create templates.
+                                </p>
                             </div>
                         ) : filtered.length === 0 ? (
                             <div className="flex h-40 items-center justify-center text-sm text-gray-500">
                                 No templates match this filter
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                                 {filtered.map((template) => (
-                                    <TemplateCard
+                                    <div
                                         key={template.id}
-                                        template={template}
-                                        onPreview={setPreviewTemplate}
-                                        onUse={handleUseTemplate}
-                                        isApplying={isApplying}
-                                    />
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleUseTemplate(template.id)
+                                        }}
+                                        onMouseEnter={(e) => handleCardMouseEnter(template, e)}
+                                        onMouseLeave={handleCardMouseLeave}
+                                        className="outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B1120] rounded-2xl"
+                                    >
+                                        <TemplateCard
+                                            template={template}
+                                            onPreview={setPreviewTemplate}
+                                            onUse={handleUseTemplate}
+                                            isApplying={isApplying}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         )}
                     </div>
                 </div>
             </div>
+
+            {/* Hover preview tooltip (desktop only) */}
+            {hoverPreview && (
+                <div
+                    className="fixed z-[100] hidden lg:block rounded-xl border border-white/10 bg-[#0B1120] p-3 shadow-2xl w-[420px]"
+                    style={{
+                        top: Math.min(hoverPreview.rect.top, typeof window !== 'undefined' ? window.innerHeight - 380 : 400),
+                        left: hoverPreview.rect.right + 16,
+                    }}
+                >
+                    <div className="aspect-[4/3] rounded-lg overflow-hidden bg-slate-800 mb-3">
+                        <iframe
+                            src={`/api/templates/preview?id=${hoverPreview.template.id}`}
+                            className="w-[1200px] h-[900px] origin-top-left scale-[0.34] pointer-events-none border-0"
+                            loading="lazy"
+                            title={`Preview: ${hoverPreview.template.name}`}
+                        />
+                    </div>
+                    <h4 className="font-semibold text-sm text-white">{hoverPreview.template.name}</h4>
+                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">{hoverPreview.template.description}</p>
+                </div>
+            )}
 
             {/* Preview modal (nested) */}
             {previewTemplate && (
@@ -218,7 +301,10 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
             {/* Confirmation dialog */}
             {confirmTemplate && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center">
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !isApplying && setConfirmTemplate(null)} />
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => !isApplying && setConfirmTemplate(null)}
+                    />
                     <div
                         className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1120] p-6"
                         onClick={(e) => e.stopPropagation()}
@@ -228,7 +314,9 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                                 <AlertTriangle className="h-5 w-5 text-amber-400" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-white">Apply &ldquo;{confirmTemplate.name}&rdquo;?</h3>
+                                <h3 className="font-semibold text-white">
+                                    Apply &ldquo;{confirmTemplate.name}&rdquo;?
+                                </h3>
                                 <p className="mt-1 text-sm text-gray-400">
                                     This will replace your current page layout and theme. This action cannot be undone.
                                 </p>

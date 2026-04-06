@@ -26,7 +26,6 @@ const MOCK_FEATURED = [
 
 export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeaturedConfig>) {
     const { headline = 'Featured Collection', subheadline, variant = 'hero-product' } = block
-    const pc = theme.primaryColor
 
     const product = MOCK_FEATURED[0] // For hero-product we just show the first one
     const products = MOCK_FEATURED // For carousel we'd show all
@@ -34,10 +33,10 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
     if (variant === 'carousel') {
         return (
             <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={pc} className="top-1/4 right-0" size={600} opacity={0.05} />
+                <GradientBlob color={theme.primaryColor} className="top-1/4 right-0" size={600} opacity={0.05} />
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
-                        {block.sectionLabel && <SectionLabel color={pc}>{block.sectionLabel}</SectionLabel>}
+                        {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline}</h2>
                         {subheadline && <p className="opacity-60 text-lg">{subheadline}</p>}
                     </div>
@@ -49,7 +48,7 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
                                 <img src={p.image} alt={p.name} className="w-full h-[500px] object-cover mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-700" />
                                 <div className="absolute bottom-0 left-0 p-8 z-20 w-full text-white">
                                     <h3 className="text-2xl font-heading mb-2">{p.name}</h3>
-                                    <p className="text-xl font-medium" style={{ color: pc }}>{p.price}</p>
+                                    <p className="text-xl font-medium" style={{ color: 'var(--brand-primary)' }}>{p.price}</p>
                                 </div>
                             </div>
                         ))}
@@ -66,7 +65,7 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     {/* Left: Huge Product Image */}
                     <div className="relative group">
-                        <GradientBlob color={pc} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.15} />
+                        <GradientBlob color={theme.primaryColor} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.15} />
                         <div className="relative z-10 rounded-2xl overflow-hidden animate-float" style={{ animationDuration: '6s' }}>
                             <img 
                                 src={product.image} 
@@ -78,12 +77,12 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
 
                     {/* Right: Info */}
                     <div className="flex flex-col justify-center">
-                        {block.sectionLabel && <SectionLabel color={pc}>{block.sectionLabel}</SectionLabel>}
+                        {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
                         
                         <div className="flex flex-wrap gap-2 mb-6">
                             {product.tags.map((tag) => (
                                 <span key={tag} className="px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase" 
-                                    style={{ backgroundColor: `${pc}15`, color: pc, border: `1px solid ${pc}30` }}>
+                                    style={{ backgroundColor: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)', border: `1px solid rgba(var(--brand-primary-rgb), 0.188)` }}>
                                     {tag}
                                 </span>
                             ))}
@@ -91,7 +90,7 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
 
                         <h2 className="text-5xl lg:text-7xl font-bold font-heading mb-6 leading-tight">{product.name}</h2>
                         
-                        <p className="text-4xl font-heading mb-6" style={{ color: pc }}>{product.price}</p>
+                        <p className="text-4xl font-heading mb-6" style={{ color: 'var(--brand-primary)' }}>{product.price}</p>
                         
                         <p className="text-lg opacity-70 leading-relaxed mb-10 max-w-lg">
                             {product.description}
@@ -100,13 +99,13 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
                         <div className="flex flex-col sm:flex-row gap-4">
                             <button 
                                 className="px-8 py-4 rounded-full font-bold text-lg transition-transform hover:scale-105"
-                                style={{ backgroundColor: pc, color: theme.colorMode === 'dark' ? '#000' : '#fff' }}
+                                style={{ backgroundColor: 'var(--brand-primary)', color: theme.colorMode === 'dark' ? '#000' : '#fff' }}
                             >
                                 Add to Cart
                             </button>
                             <button 
                                 className="px-8 py-4 rounded-full font-bold text-lg transition-colors"
-                                style={{ border: `2px solid ${pc}50`, color: theme.colorMode === 'dark' ? '#fff' : '#000' }}
+                                style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.314)`, color: theme.colorMode === 'dark' ? '#fff' : '#000' }}
                             >
                                 View Details
                             </button>

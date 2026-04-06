@@ -6,7 +6,6 @@ import type { PortfolioGridConfig } from './config'
 
 export function PortfolioGridBlock({ block, theme }: BlockProps<PortfolioGridConfig>) {
     const { headline, subheadline, projects = [], variant = 'grid' } = block
-    const pc = theme.primaryColor
 
     const categories = useMemo(() => {
         const cats = Array.from(new Set(projects.map((p) => p.category)))
@@ -31,7 +30,7 @@ export function PortfolioGridBlock({ block, theme }: BlockProps<PortfolioGridCon
                 />
                 {/* Hover overlay */}
                 <div className="absolute inset-0 flex flex-col justify-end p-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    style={{ background: `linear-gradient(to top, ${pc}dd, ${pc}40, transparent)` }}>
+                    style={{ background: `linear-gradient(to top, rgba(var(--brand-primary-rgb), 0.867), rgba(var(--brand-primary-rgb), 0.251), transparent)` }}>
                     <span className="text-xs font-semibold uppercase tracking-wider text-white/80 mb-1">{project.category}</span>
                     <h3 className="text-lg font-bold font-heading text-white mb-1">{project.title}</h3>
                     <p className="text-sm text-white/80 line-clamp-2">{project.description}</p>
@@ -57,8 +56,8 @@ export function PortfolioGridBlock({ block, theme }: BlockProps<PortfolioGridCon
                             onClick={() => setActiveCategory(cat)}
                             className="px-5 py-2 rounded-full text-sm font-medium transition-all duration-200"
                             style={activeCategory === cat
-                                ? { background: pc, color: '#fff' }
-                                : { background: `${pc}10`, color: 'inherit', border: `1px solid ${pc}20` }
+                                ? { background: 'var(--brand-primary)', color: '#fff' }
+                                : { background: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'inherit', border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }
                             }
                         >
                             {cat}

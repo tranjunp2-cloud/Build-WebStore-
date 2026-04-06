@@ -13,7 +13,6 @@ export function VideoBackgroundBlock({ block, theme }: BlockProps<VideoBackgroun
         overlayOpacity = 50,
         cta,
     } = block
-    const pc = theme.primaryColor
     const opacity = overlayOpacity / 100
 
     const content = (
@@ -32,7 +31,7 @@ export function VideoBackgroundBlock({ block, theme }: BlockProps<VideoBackgroun
                 <a
                     href={cta.url}
                     className="inline-flex items-center gap-2 px-10 py-4 rounded-xl font-semibold text-sm text-white transition-all duration-300 hover:opacity-90"
-                    style={{ background: `linear-gradient(135deg, ${pc}, ${pc}cc)`, boxShadow: `0 8px 30px ${pc}35` }}
+                    style={{ background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`, boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)` }}
                 >
                     {cta.label}
                 </a>
@@ -60,7 +59,7 @@ export function VideoBackgroundBlock({ block, theme }: BlockProps<VideoBackgroun
         return (
             <section className="py-24">
                 <div className="container mx-auto px-6">
-                    <div className="relative rounded-3xl overflow-hidden" style={{ border: `1px solid ${pc}20` }}>
+                    <div className="relative rounded-3xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
                         {videoEl}
                         {overlay}
                         {content}

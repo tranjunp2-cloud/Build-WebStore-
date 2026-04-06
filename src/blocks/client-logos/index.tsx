@@ -24,7 +24,6 @@ function LogoImage({ logo, className }: { logo: LogoItem; className?: string }) 
 
 export function ClientLogosBlock({ block, theme }: BlockProps<ClientLogosConfig>) {
     const { headline, logos = [], variant = 'scroll' } = block
-    const pc = theme.primaryColor
 
     if (variant === 'grid') {
         return (
@@ -33,7 +32,7 @@ export function ClientLogosBlock({ block, theme }: BlockProps<ClientLogosConfig>
                     {headline && <h2 className="text-lg font-heading font-semibold text-center mb-12 opacity-60">{headline}</h2>}
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 items-center justify-items-center max-w-5xl mx-auto">
                         {logos.map((logo, i) => (
-                            <div key={i} className="p-4 rounded-xl border flex items-center justify-center w-full" style={{ borderColor: `${pc}10` }}>
+                            <div key={i} className="p-4 rounded-xl border flex items-center justify-center w-full" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                                 <LogoImage logo={logo} />
                             </div>
                         ))}

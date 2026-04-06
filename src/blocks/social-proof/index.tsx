@@ -77,7 +77,6 @@ function ReviewCard({ review, color, variant }: { review: SocialProofReview; col
 
 export function SocialProofBlock({ block, theme }: BlockProps<SocialProofConfig>) {
     const { variant = 'cards', headline, reviews = [] } = block
-    const pc = theme.primaryColor
 
     return (
         <section className="py-24">
@@ -91,13 +90,13 @@ export function SocialProofBlock({ block, theme }: BlockProps<SocialProofConfig>
                 {variant === 'minimal' ? (
                     <div className="max-w-2xl mx-auto">
                         {reviews.map((review, i) => (
-                            <ReviewCard key={i} review={review} color={pc} variant={variant} />
+                            <ReviewCard key={i} review={review} color={theme.primaryColor} variant={variant} />
                         ))}
                     </div>
                 ) : (
                     <div className={`grid grid-cols-1 md:grid-cols-2 ${variant === 'grid' ? 'lg:grid-cols-3' : 'lg:grid-cols-3'} gap-6 max-w-6xl mx-auto`}>
                         {reviews.map((review, i) => (
-                            <ReviewCard key={i} review={review} color={pc} variant={variant} />
+                            <ReviewCard key={i} review={review} color={theme.primaryColor} variant={variant} />
                         ))}
                     </div>
                 )}

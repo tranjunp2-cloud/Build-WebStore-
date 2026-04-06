@@ -16,13 +16,13 @@ function calcTimeLeft(target: string) {
     }
 }
 
-function TimeBox({ value, label, pc }: { value: number; label: string; pc: string }) {
+function TimeBox({ value, label }: { value: number; label: string }) {
     return (
         <div
             className="flex flex-col items-center gap-2 rounded-xl px-4 py-3 md:px-6 md:py-4 min-w-[70px]"
-            style={{ background: `${pc}12`, border: `1px solid ${pc}20` }}
+            style={{ background: `rgba(var(--brand-primary-rgb), 0.071)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
         >
-            <span className="text-3xl md:text-5xl font-bold font-heading" style={{ color: pc }}>
+            <span className="text-3xl md:text-5xl font-bold font-heading" style={{ color: 'var(--brand-primary)' }}>
                 {String(value).padStart(2, '0')}
             </span>
             <span className="text-xs uppercase tracking-wider opacity-50">{label}</span>
@@ -41,7 +41,6 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
         showMinutes = true,
         showSeconds = true,
     } = block
-    const pc = theme.primaryColor
     const [timeLeft, setTimeLeft] = useState(calcTimeLeft(targetDate))
 
     useEffect(() => {
@@ -68,7 +67,7 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
                     {!timeLeft ? (
                         <p className="text-lg opacity-60">{expiredMessage}</p>
                     ) : (
-                        <p className="text-xl md:text-2xl font-heading" style={{ color: pc }}>
+                        <p className="text-xl md:text-2xl font-heading" style={{ color: 'var(--brand-primary)' }}>
                             {units.map((u, i) => (
                                 <span key={u.label}>
                                     {i > 0 && <span className="opacity-30 mx-1">:</span>}
@@ -89,7 +88,7 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
                 <div className="container mx-auto px-6 flex justify-center">
                     <div
                         className="rounded-2xl p-8 md:p-12 text-center max-w-lg w-full"
-                        style={{ background: `${pc}08`, border: `1px solid ${pc}20` }}
+                        style={{ background: `rgba(var(--brand-primary-rgb), 0.031)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
                     >
                         <h2 className="text-2xl md:text-4xl font-bold font-heading mb-8">{headline}</h2>
                         {!timeLeft ? (
@@ -97,7 +96,7 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
                         ) : (
                             <div className="flex justify-center gap-3 md:gap-4">
                                 {units.map((u) => (
-                                    <TimeBox key={u.label} value={u.value} label={u.label} pc={pc} />
+                                    <TimeBox key={u.label} value={u.value} label={u.label} />
                                 ))}
                             </div>
                         )}
@@ -114,8 +113,8 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
                 <div
                     className="rounded-3xl p-10 md:p-16 text-center relative overflow-hidden"
                     style={{
-                        background: `linear-gradient(135deg, ${pc}18 0%, ${pc}06 100%)`,
-                        border: `1px solid ${pc}20`,
+                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.094) 0%, rgba(var(--brand-primary-rgb), 0.024) 100%)`,
+                        border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`,
                     }}
                 >
                     <h2 className="text-3xl md:text-5xl font-bold font-heading mb-10">{headline}</h2>
@@ -124,7 +123,7 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
                     ) : (
                         <div className="flex justify-center gap-4 md:gap-6">
                             {units.map((u) => (
-                                <TimeBox key={u.label} value={u.value} label={u.label} pc={pc} />
+                                <TimeBox key={u.label} value={u.value} label={u.label} />
                             ))}
                         </div>
                     )}

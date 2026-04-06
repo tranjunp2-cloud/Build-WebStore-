@@ -6,7 +6,6 @@ import type { CarouselConfig } from './config'
 
 export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
     const { headline, items = [], variant = 'images', autoplay = true, interval = 5000 } = block
-    const pc = theme.primaryColor
     const [currentIndex, setCurrentIndex] = useState(0)
     const total = items.length
 
@@ -33,7 +32,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
             className="absolute top-1/2 -translate-y-1/2 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 z-20 backdrop-blur-sm"
             style={{
                 [direction === 'left' ? 'left' : 'right']: '12px',
-                background: `${pc}30`,
+                background: `rgba(var(--brand-primary-rgb), 0.188)`,
                 color: '#fff',
             }}
             aria-label={direction === 'left' ? 'Previous slide' : 'Next slide'}
@@ -52,7 +51,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                     onClick={() => goTo(i)}
                     className="w-2.5 h-2.5 rounded-full transition-all duration-300"
                     style={{
-                        background: i === currentIndex ? pc : `${pc}30`,
+                        background: i === currentIndex ? theme.primaryColor : `rgba(var(--brand-primary-rgb), 0.188)`,
                         transform: i === currentIndex ? 'scale(1.3)' : 'scale(1)',
                     }}
                     aria-label={`Go to slide ${i + 1}`}
@@ -130,7 +129,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                                         <Wrapper
                                             {...linkProps}
                                             className="block rounded-2xl overflow-hidden transition-shadow hover:shadow-lg"
-                                            style={{ border: `1px solid ${pc}15` }}
+                                            style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
                                         >
                                             <div className="aspect-[16/10] overflow-hidden">
                                                 <img src={item.imageUrl} alt={item.title || ''} className="w-full h-full object-cover" />
@@ -175,14 +174,14 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                             <div key={i} className="w-full shrink-0 px-4">
                                 <div
                                     className="p-8 md:p-12 rounded-2xl text-center"
-                                    style={{ background: `${pc}06`, border: `1px solid ${pc}12` }}
+                                    style={{ background: `rgba(var(--brand-primary-rgb), 0.024)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.071)` }}
                                 >
                                     {item.imageUrl && (
                                         <img
                                             src={item.imageUrl}
                                             alt={item.title || ''}
                                             className="w-16 h-16 rounded-full mx-auto mb-6 object-cover"
-                                            style={{ border: `2px solid ${pc}30` }}
+                                            style={{ border: `2px solid rgba(var(--brand-primary-rgb), 0.188)` }}
                                         />
                                     )}
                                     {item.description && (
@@ -191,7 +190,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                                         </blockquote>
                                     )}
                                     {item.title && (
-                                        <p className="font-bold font-heading" style={{ color: pc }}>{item.title}</p>
+                                        <p className="font-bold font-heading" style={{ color: 'var(--brand-primary)' }}>{item.title}</p>
                                     )}
                                 </div>
                             </div>

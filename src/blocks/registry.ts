@@ -45,6 +45,15 @@ import { PortfolioGridBlock } from './portfolio-grid'
 import { MenuFoodBlock } from './menu-food'
 import { ServiceCardsBlock } from './service-cards'
 import { CarouselBlock } from './carousel'
+// v2.0 — Industry Block Components
+import { MenuDisplayBlock } from './menu-display'
+import { BookingWidgetBlock } from './booking-widget'
+import { ClassScheduleBlock } from './class-schedule'
+import { ReviewCardsBlock } from './review-cards'
+import { VideoShowcaseBlock } from './video-showcase'
+import { DoctorProfileBlock } from './doctor-profile'
+import { PropertyCardBlock } from './property-card'
+import { ProductQuickViewBlock } from './product-quick-view'
 
 // ── Block Configs (Schemas + Meta) ───────────────────────────────────────────
 import { NavigationConfigSchema, navigationMeta } from './navigation/config'
@@ -90,6 +99,15 @@ import { PortfolioGridConfigSchema, portfolioGridMeta } from './portfolio-grid/c
 import { MenuFoodConfigSchema, menuFoodMeta } from './menu-food/config'
 import { ServiceCardsConfigSchema, serviceCardsMeta } from './service-cards/config'
 import { CarouselConfigSchema, carouselMeta } from './carousel/config'
+// v2.0 — Industry Block Configs
+import { MenuDisplayConfigSchema, menuDisplayMeta } from './menu-display/config'
+import { BookingWidgetConfigSchema, bookingWidgetMeta } from './booking-widget/config'
+import { ClassScheduleConfigSchema, classScheduleMeta } from './class-schedule/config'
+import { ReviewCardsConfigSchema, reviewCardsMeta } from './review-cards/config'
+import { VideoShowcaseConfigSchema, videoShowcaseMeta } from './video-showcase/config'
+import { DoctorProfileConfigSchema, doctorProfileMeta } from './doctor-profile/config'
+import { PropertyCardConfigSchema, propertyCardMeta } from './property-card/config'
+import { ProductQuickViewConfigSchema, productQuickViewMeta } from './product-quick-view/config'
 
 // ── Registry ─────────────────────────────────────────────────────────────────
 
@@ -144,6 +162,15 @@ const REGISTRY: Record<string, BlockRegistryEntry> = {
     'menu-food': { component: MenuFoodBlock, schema: MenuFoodConfigSchema, meta: menuFoodMeta },
     'service-cards': { component: ServiceCardsBlock, schema: ServiceCardsConfigSchema, meta: serviceCardsMeta },
     carousel: { component: CarouselBlock, schema: CarouselConfigSchema, meta: carouselMeta },
+    // v2.0 — Industry Blocks
+    'menu-display': { component: MenuDisplayBlock, schema: MenuDisplayConfigSchema, meta: menuDisplayMeta },
+    'booking-widget': { component: BookingWidgetBlock, schema: BookingWidgetConfigSchema, meta: bookingWidgetMeta },
+    'class-schedule': { component: ClassScheduleBlock, schema: ClassScheduleConfigSchema, meta: classScheduleMeta },
+    'review-cards': { component: ReviewCardsBlock, schema: ReviewCardsConfigSchema, meta: reviewCardsMeta },
+    'video-showcase': { component: VideoShowcaseBlock, schema: VideoShowcaseConfigSchema, meta: videoShowcaseMeta },
+    'doctor-profile': { component: DoctorProfileBlock, schema: DoctorProfileConfigSchema, meta: doctorProfileMeta },
+    'property-card': { component: PropertyCardBlock, schema: PropertyCardConfigSchema, meta: propertyCardMeta },
+    'product-quick-view': { component: ProductQuickViewBlock, schema: ProductQuickViewConfigSchema, meta: productQuickViewMeta },
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────

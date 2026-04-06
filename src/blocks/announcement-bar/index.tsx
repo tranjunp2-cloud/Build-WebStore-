@@ -6,20 +6,19 @@ import type { AnnouncementBarConfig } from './config'
 
 export function AnnouncementBarBlock({ block, theme }: BlockProps<AnnouncementBarConfig>) {
     const { message, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor } = block
-    const pc = theme.primaryColor
     const [dismissed, setDismissed] = useState(false)
 
     if (dismissed) return null
 
     const bgStyle = (() => {
-        const bg = backgroundColor || pc
+        const bg = backgroundColor || theme.primaryColor
         switch (variant) {
             case 'gradient':
                 return { background: `linear-gradient(135deg, ${bg}, ${bg}cc)` }
             case 'solid':
                 return { backgroundColor: bg }
             case 'minimal':
-                return { backgroundColor: 'transparent', borderBottom: `1px solid ${pc}20` }
+                return { backgroundColor: 'transparent', borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }
             default:
                 return {}
         }

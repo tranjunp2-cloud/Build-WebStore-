@@ -5,7 +5,6 @@ import type { DividerConfig } from './config'
 
 export function DividerBlock({ block, theme }: BlockProps<DividerConfig>) {
     const { variant = 'line', height = 40, color } = block
-    const pc = color || theme.primaryColor
 
     if (variant === 'spacer') {
         return <div style={{ height: `${height}px` }} aria-hidden="true" />
@@ -18,7 +17,7 @@ export function DividerBlock({ block, theme }: BlockProps<DividerConfig>) {
                     <span
                         key={i}
                         className="w-1.5 h-1.5 rounded-full"
-                        style={{ backgroundColor: `${pc}60` }}
+                        style={{ backgroundColor: `rgba(var(--brand-primary-rgb), 0.376)` }}
                     />
                 ))}
             </div>
@@ -36,7 +35,7 @@ export function DividerBlock({ block, theme }: BlockProps<DividerConfig>) {
                     <path
                         d="M0 30 Q150 0 300 30 T600 30 T900 30 T1200 30"
                         fill="none"
-                        stroke={`${pc}40`}
+                        stroke={`rgba(var(--brand-primary-rgb), 0.251)`}
                         strokeWidth="2"
                     />
                 </svg>
@@ -49,7 +48,7 @@ export function DividerBlock({ block, theme }: BlockProps<DividerConfig>) {
         <div className="flex items-center justify-center" style={{ height: `${height}px` }} role="separator">
             <div
                 className="w-full max-w-4xl mx-auto h-px"
-                style={{ backgroundColor: `${pc}20` }}
+                style={{ backgroundColor: `rgba(var(--brand-primary-rgb), 0.125)` }}
             />
         </div>
     )

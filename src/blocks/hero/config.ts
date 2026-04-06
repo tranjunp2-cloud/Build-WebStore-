@@ -6,6 +6,7 @@ import type { CTAButton, ImageRef } from '../types'
 export type HeroConfig = {
     blockType: 'hero'
     variant?: 'centered' | 'split-left' | 'split-right' | 'fullscreen' | 'video'
+        | 'magazine' | 'minimal' | 'cards-overlay' | 'gradient' | 'parallax' | 'slideshow' | 'split-video'
     headline: string
     subheadline?: string
     ctaButtons?: CTAButton[]
@@ -14,11 +15,18 @@ export type HeroConfig = {
     overlay?: boolean
     overlayOpacity?: number
     height?: string
+    // New optional fields
+    videoUrl?: string
+    gradientPreset?: 'aurora' | 'sunset' | 'ocean' | 'forest'
+    images?: ImageRef[]
 }
 
 export const HeroConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('hero'),
-    variant: z.enum(['centered', 'split-left', 'split-right', 'fullscreen', 'video']).default('centered'),
+    variant: z.enum([
+        'centered', 'split-left', 'split-right', 'fullscreen', 'video',
+        'magazine', 'minimal', 'cards-overlay', 'gradient', 'parallax', 'slideshow', 'split-video',
+    ]).default('centered'),
     headline: z.string(),
     subheadline: z.string().optional(),
     ctaButtons: z.array(CTAButtonSchema).default([]),
@@ -27,6 +35,9 @@ export const HeroConfigSchema = BaseBlockSchema.extend({
     overlay: z.boolean().default(false),
     overlayOpacity: z.number().min(0).max(1).default(0.4),
     height: z.string().default('90vh'),
+    videoUrl: z.string().optional(),
+    gradientPreset: z.enum(['aurora', 'sunset', 'ocean', 'forest']).optional(),
+    images: z.array(ImageRefSchema).optional(),
 })
 
 export const heroMeta = {
@@ -34,8 +45,11 @@ export const heroMeta = {
     name: 'Hero',
     description: 'Main hero/banner section with headline, CTA, and optional image',
     icon: '🏔️',
-    variants: ['centered', 'split-left', 'split-right', 'fullscreen', 'video'],
+    variants: [
+        'centered', 'split-left', 'split-right', 'fullscreen', 'video',
+        'magazine', 'minimal', 'cards-overlay', 'gradient', 'parallax', 'slideshow', 'split-video',
+    ],
     defaultVariant: 'centered',
-    editableFields: ['headline', 'subheadline', 'ctaButtons', 'image', 'badge'],
+    editableFields: ['headline', 'subheadline', 'ctaButtons', 'image', 'badge', 'videoUrl', 'gradientPreset', 'images'],
     quickActions: ['Rewrite headline', 'Change CTA', 'Change style'],
 }

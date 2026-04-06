@@ -9,18 +9,17 @@ import { getAboutImage } from '@/lib/images/industry-images'
 
 export function AboutBlock({ block, theme, site }: BlockProps<AboutConfig>) {
     const { headline, sectionLabel, layout = 'image-right' } = block
-    const pc = theme.primaryColor
     const category = (site?.siteType as string) || 'business'
     const fallbackAboutUrl = getAboutImage(category)
 
     return (
         <AnimatedSection className="py-24 relative overflow-hidden">
-            <GradientBlob color={pc} className="bottom-[0%] right-[-10%]" size={400} opacity={0.06} />
+            <GradientBlob color={theme.primaryColor} className="bottom-[0%] right-[-10%]" size={400} opacity={0.06} />
 
             <div className="container mx-auto px-6 relative z-10">
                 {sectionLabel && (
                     <div className={layout === 'centered' ? 'text-center' : ''}>
-                        <SectionLabel color={pc}>{sectionLabel}</SectionLabel>
+                        <SectionLabel color={theme.primaryColor}>{sectionLabel}</SectionLabel>
                     </div>
                 )}
 

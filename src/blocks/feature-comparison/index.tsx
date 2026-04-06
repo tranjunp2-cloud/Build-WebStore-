@@ -22,7 +22,6 @@ function CrossIcon() {
 
 export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureComparisonConfig>) {
     const { variant = 'table', headline, products = [], features = [] } = block
-    const pc = theme.primaryColor
 
     if (variant === 'cards') {
         return (
@@ -37,13 +36,13 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
                                 key={pIdx}
                                 className="rounded-2xl p-6 md:p-8"
                                 style={{
-                                    background: product.highlighted ? `${pc}10` : `${pc}06`,
-                                    border: `1px solid ${product.highlighted ? pc : `${pc}20`}`,
+                                    background: product.highlighted ? `rgba(var(--brand-primary-rgb), 0.063)` : `rgba(var(--brand-primary-rgb), 0.024)`,
+                                    border: `1px solid ${product.highlighted ? theme.primaryColor : `rgba(var(--brand-primary-rgb), 0.125)`}`,
                                 }}
                             >
                                 <h3
                                     className="text-xl font-bold font-heading mb-6"
-                                    style={product.highlighted ? { color: pc } : undefined}
+                                    style={product.highlighted ? { color: 'var(--brand-primary)' } : undefined}
                                 >
                                     {product.name}
                                 </h3>
@@ -52,7 +51,7 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
                                         const has = feature.values[pIdx] ?? false
                                         return (
                                             <li key={fIdx} className="flex items-center gap-3">
-                                                {has ? <CheckIcon color={pc} /> : <CrossIcon />}
+                                                {has ? <CheckIcon color={theme.primaryColor} /> : <CrossIcon />}
                                                 <span className={has ? '' : 'opacity-40 line-through'}>{feature.name}</span>
                                             </li>
                                         )
@@ -73,10 +72,10 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
                 {headline && (
                     <h2 className="text-3xl md:text-5xl font-bold font-heading text-center mb-12">{headline}</h2>
                 )}
-                <div className="overflow-x-auto rounded-2xl" style={{ border: `1px solid ${pc}20` }}>
+                <div className="overflow-x-auto rounded-2xl" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
                     <table className="w-full text-left">
                         <thead>
-                            <tr style={{ background: `${pc}08` }}>
+                            <tr style={{ background: `rgba(var(--brand-primary-rgb), 0.031)` }}>
                                 <th className="p-4 md:p-6 font-heading font-semibold text-sm uppercase tracking-wider opacity-60">
                                     Feature
                                 </th>
@@ -84,7 +83,7 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
                                     <th
                                         key={pIdx}
                                         className="p-4 md:p-6 text-center font-heading font-bold"
-                                        style={product.highlighted ? { color: pc, background: `${pc}12` } : undefined}
+                                        style={product.highlighted ? { color: 'var(--brand-primary)', background: `rgba(var(--brand-primary-rgb), 0.071)` } : undefined}
                                     >
                                         {product.name}
                                     </th>
@@ -93,7 +92,7 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
                         </thead>
                         <tbody>
                             {features.map((feature, fIdx) => (
-                                <tr key={fIdx} className="border-t" style={{ borderColor: `${pc}12` }}>
+                                <tr key={fIdx} className="border-t" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.071)` }}>
                                     <td className="p-4 md:p-6 font-medium">{feature.name}</td>
                                     {products.map((product, pIdx) => {
                                         const has = feature.values[pIdx] ?? false
@@ -101,10 +100,10 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
                                             <td
                                                 key={pIdx}
                                                 className="p-4 md:p-6 text-center"
-                                                style={product.highlighted ? { background: `${pc}06` } : undefined}
+                                                style={product.highlighted ? { background: `rgba(var(--brand-primary-rgb), 0.024)` } : undefined}
                                             >
                                                 <span className="inline-flex justify-center">
-                                                    {has ? <CheckIcon color={pc} /> : <CrossIcon />}
+                                                    {has ? <CheckIcon color={theme.primaryColor} /> : <CrossIcon />}
                                                 </span>
                                             </td>
                                         )

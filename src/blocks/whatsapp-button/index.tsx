@@ -11,7 +11,6 @@ const WhatsAppIcon = () => (
 
 export function WhatsappButtonBlock({ block, theme }: BlockProps<WhatsappButtonConfig>) {
     const { variant = 'floating', phoneNumber, message, label = 'Chat with us', position = 'bottom-right' } = block
-    const pc = theme.primaryColor
 
     const cleanPhone = phoneNumber?.replace(/[^0-9]/g, '') || ''
     const whatsappUrl = `https://wa.me/${cleanPhone}${message ? `?text=${encodeURIComponent(message)}` : ''}`
@@ -51,7 +50,7 @@ export function WhatsappButtonBlock({ block, theme }: BlockProps<WhatsappButtonC
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white text-lg transition-all duration-200 hover:opacity-90 hover:scale-105 shadow-lg"
-                    style={{ backgroundColor: pc }}
+                    style={{ backgroundColor: 'var(--brand-primary)' }}
                 >
                     <WhatsAppIcon />
                     {label}

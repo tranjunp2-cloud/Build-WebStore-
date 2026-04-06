@@ -5,7 +5,6 @@ import type { GalleryMasonryConfig } from './config'
 
 export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryConfig>) {
     const { variant = 'masonry', headline, images = [] } = block
-    const pc = theme.primaryColor
 
     const columnsClass = variant === 'grid-4'
         ? 'columns-2 md:columns-3 lg:columns-4'
@@ -36,7 +35,7 @@ export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryC
                                 />
                                 <div
                                     className="absolute inset-0 flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                                    style={{ background: `linear-gradient(to top, ${pc}cc, transparent)` }}
+                                    style={{ background: `linear-gradient(to top, rgba(var(--brand-primary-rgb), 0.800), transparent)` }}
                                 >
                                     {img.caption && <p className="text-white text-sm font-medium">{img.caption}</p>}
                                 </div>
@@ -54,7 +53,7 @@ export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryC
                                 />
                                 <div
                                     className="absolute inset-0 flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                                    style={{ background: `linear-gradient(to top, ${pc}cc, transparent)` }}
+                                    style={{ background: `linear-gradient(to top, rgba(var(--brand-primary-rgb), 0.800), transparent)` }}
                                 >
                                     {img.caption && <p className="text-white text-sm font-medium">{img.caption}</p>}
                                 </div>

@@ -6,7 +6,6 @@ import type { AccordionConfig } from './config'
 
 export function AccordionBlock({ block, theme }: BlockProps<AccordionConfig>) {
     const { headline, description, items = [], variant = 'bordered' } = block
-    const pc = theme.primaryColor
     const [openIndexes, setOpenIndexes] = useState<Set<number>>(new Set())
 
     const toggle = (i: number) => {
@@ -23,19 +22,19 @@ export function AccordionBlock({ block, theme }: BlockProps<AccordionConfig>) {
             case 'bordered':
                 return {
                     wrapper: 'border rounded-xl overflow-hidden',
-                    wrapperStyle: { borderColor: `${pc}20` },
+                    wrapperStyle: { borderColor: `rgba(var(--brand-primary-rgb), 0.125)` },
                     container: 'space-y-3',
                 }
             case 'separated':
                 return {
                     wrapper: 'rounded-xl overflow-hidden',
-                    wrapperStyle: { backgroundColor: `${pc}06` },
+                    wrapperStyle: { backgroundColor: `rgba(var(--brand-primary-rgb), 0.024)` },
                     container: 'space-y-4',
                 }
             case 'flush':
                 return {
                     wrapper: 'border-b',
-                    wrapperStyle: { borderColor: `${pc}15` },
+                    wrapperStyle: { borderColor: `rgba(var(--brand-primary-rgb), 0.082)` },
                     container: 'divide-y-0',
                 }
             default:
@@ -68,7 +67,7 @@ export function AccordionBlock({ block, theme }: BlockProps<AccordionConfig>) {
                                     <span className="font-heading">{item.title}</span>
                                     <span
                                         className="transition-transform duration-300 flex-shrink-0 ml-4"
-                                        style={{ transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)', color: pc }}
+                                        style={{ transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)', color: 'var(--brand-primary)' }}
                                     >
                                         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                                             <path d="M9 3v12M3 9h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />

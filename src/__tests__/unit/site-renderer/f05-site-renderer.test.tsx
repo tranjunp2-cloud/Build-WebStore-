@@ -557,3 +557,156 @@ describe('[TC-F04-SR-07] SiteRenderer renders GoogleFontsLoader with correct fon
         expect(style?.textContent).toContain("--font-body: 'Lato'")
     })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-S1-003 — SiteRenderer injects 20+ CSS variables via generateThemeCSS
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-S1-003] SiteRenderer injects 20+ CSS variables from resolveTheme + generateThemeCSS', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockReturnValue(null)
+    })
+
+    it('injects all color CSS variables', () => {
+        // Arrange
+        const site = {
+            theme: {
+                primaryColor: '#0ea5e9',
+                secondaryColor: '#d946ef',
+                accentColor: '#7dd3fc',
+                surfaceColor: '#111111',
+                textColor: '#fafafa',
+                mutedColor: '#a1a1aa',
+                colorMode: 'dark' as const,
+                backgroundColor: '#09090b',
+            },
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={site} page={{ layout: [] }} />)
+
+        // Assert
+        const style = container.querySelector('style')
+        const css = style?.textContent || ''
+        expect(css).toContain('--brand-primary: #0ea5e9')
+        expect(css).toContain('--brand-secondary: #d946ef')
+        expect(css).toContain('--brand-accent: #7dd3fc')
+        expect(css).toContain('--surface: #111111')
+        expect(css).toContain('--text: #fafafa')
+        expect(css).toContain('--muted: #a1a1aa')
+        expect(css).toContain('--background: #09090b')
+    })
+
+    it('injects RGB variants for opacity support', () => {
+        // Arrange
+        const site = { theme: { primaryColor: '#0ea5e9', secondaryColor: '#d946ef' } }
+
+        // Act
+        const { container } = render(<SiteRenderer site={site} page={{ layout: [] }} />)
+
+        // Assert
+        const css = container.querySelector('style')?.textContent || ''
+        expect(css).toContain('--brand-primary-rgb:')
+        expect(css).toContain('--brand-secondary-rgb:')
+        expect(css).toContain('--brand-accent-rgb:')
+    })
+
+    it('injects spacing CSS variables', () => {
+        // Arrange
+        const site = { theme: { spacingPreset: 'default' as const } }
+
+        // Act
+        const { container } = render(<SiteRenderer site={site} page={{ layout: [] }} />)
+
+        // Assert
+        const css = container.querySelector('style')?.textContent || ''
+        expect(css).toContain('--space-xs:')
+        expect(css).toContain('--space-sm:')
+        expect(css).toContain('--space-md:')
+        expect(css).toContain('--space-lg:')
+        expect(css).toContain('--space-xl:')
+        expect(css).toContain('--space-2xl:')
+        expect(css).toContain('--section-padding:')
+    })
+
+    it('injects radius and shadow CSS variables', () => {
+        // Arrange
+        const site = { theme: { borderRadius: 'rounded' as const, shadowPreset: 'subtle' as const } }
+
+        // Act
+        const { container } = render(<SiteRenderer site={site} page={{ layout: [] }} />)
+
+        // Assert
+        const css = container.querySelector('style')?.textContent || ''
+        expect(css).toContain('--radius-sm:')
+        expect(css).toContain('--radius-md:')
+        expect(css).toContain('--radius-lg:')
+        expect(css).toContain('--radius-full:')
+        expect(css).toContain('--shadow-sm:')
+        expect(css).toContain('--shadow-md:')
+        expect(css).toContain('--shadow-lg:')
+    })
+
+    it('body uses var(--background) and var(--text)', () => {
+        // Act
+        const { container } = render(<SiteRenderer site={{ name: 'Test' }} page={{ layout: [] }} />)
+
+        // Assert
+        const css = container.querySelector('style')?.textContent || ''
+        expect(css).toContain('background: var(--background)')
+        expect(css).toContain('color: var(--text)')
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-S1-004 — Backward compat — legacy site with only 2 colors renders with derived tokens
+// ═══════════════════════════════════════════════════════════════════════════
+describe('[TC-S1-004] SiteRenderer backward compat — legacy site with 2 colors renders with derived tokens', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        mockGetComponent.mockReturnValue(null)
+    })
+
+    it('legacy site with only primaryColor + secondaryColor still generates all CSS vars', () => {
+        // Arrange — minimal v1 config
+        const site = {
+            theme: {
+                primaryColor: '#0ea5e9',
+                secondaryColor: '#d946ef',
+                colorMode: 'dark' as const,
+            },
+        }
+
+        // Act
+        const { container } = render(<SiteRenderer site={site} page={{ layout: [] }} />)
+
+        // Assert — all CSS vars should still be present
+        const css = container.querySelector('style')?.textContent || ''
+        expect(css).toContain('--brand-primary: #0ea5e9')
+        expect(css).toContain('--brand-secondary: #d946ef')
+        expect(css).toContain('--brand-accent:')
+        expect(css).toContain('--surface: #111111')
+        expect(css).toContain('--text: #fafafa')
+        expect(css).toContain('--muted: #a1a1aa')
+        expect(css).toContain('--space-xs:')
+        expect(css).toContain('--radius-sm:')
+        expect(css).toContain('--shadow-sm:')
+    })
+
+    it('legacy site without any theme still renders with default tokens', () => {
+        // Arrange — no theme at all
+        const site = { name: 'Legacy Site No Theme' }
+
+        // Act
+        const { container } = render(<SiteRenderer site={site} page={{ layout: [] }} />)
+
+        // Assert
+        const css = container.querySelector('style')?.textContent || ''
+        expect(css).toContain('--brand-primary: #0ea5e9')
+        expect(css).toContain('--brand-secondary: #d946ef')
+        expect(css).toContain('--font-heading:')
+        expect(css).toContain('--font-body:')
+        expect(css).toContain('--space-md:')
+        expect(css).toContain('--radius-md:')
+    })
+})

@@ -7,7 +7,6 @@ import { AnimatedSection } from '../shared/animations'
 
 export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>) {
     const { variant = 'slider', headline, beforeImage, afterImage } = block
-    const pc = theme.primaryColor
 
     const containerRef = useRef<HTMLDivElement>(null)
     const [position, setPosition] = useState(50)
@@ -52,23 +51,23 @@ export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>
                         <h2 className="text-3xl md:text-5xl font-bold font-heading text-center mb-12">{headline}</h2>
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid ${pc}20` }}>
+                        <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
                             <img src={beforeImage.url} alt={beforeImage.alt || 'Before'} className="w-full h-auto object-cover" />
                             {beforeImage.label && (
                                 <span
                                     className="absolute top-4 left-4 px-3 py-1 rounded-full text-sm font-medium text-white"
-                                    style={{ background: pc }}
+                                    style={{ background: 'var(--brand-primary)' }}
                                 >
                                     {beforeImage.label}
                                 </span>
                             )}
                         </div>
-                        <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid ${pc}20` }}>
+                        <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
                             <img src={afterImage.url} alt={afterImage.alt || 'After'} className="w-full h-auto object-cover" />
                             {afterImage.label && (
                                 <span
                                     className="absolute top-4 left-4 px-3 py-1 rounded-full text-sm font-medium text-white"
-                                    style={{ background: pc }}
+                                    style={{ background: 'var(--brand-primary)' }}
                                 >
                                     {afterImage.label}
                                 </span>
@@ -90,7 +89,7 @@ export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>
                 <div
                     ref={containerRef}
                     className="relative rounded-2xl overflow-hidden select-none touch-none cursor-ew-resize max-w-4xl mx-auto"
-                    style={{ border: `1px solid ${pc}20` }}
+                    style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
                     onPointerDown={onPointerDown}
                     onPointerMove={onPointerMove}
                     onPointerUp={onPointerUp}
@@ -110,10 +109,10 @@ export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>
                     </div>
 
                     {/* Divider line */}
-                    <div className="absolute inset-y-0 z-10 w-0.5" style={{ left: `${position}%`, background: pc }}>
+                    <div className="absolute inset-y-0 z-10 w-0.5" style={{ left: `${position}%`, background: 'var(--brand-primary)' }}>
                         <div
                             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 rounded-full flex items-center justify-center shadow-lg"
-                            style={{ background: pc }}
+                            style={{ background: 'var(--brand-primary)' }}
                         >
                             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-white">
                                 <path d="M6 10L2 10M2 10L5 7M2 10L5 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />

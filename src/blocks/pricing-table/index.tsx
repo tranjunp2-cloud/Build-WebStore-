@@ -6,7 +6,6 @@ import type { PricingTableConfig } from './config'
 
 export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfig>) {
     const { variant = 'columns', headline, subheadline, billingToggle = 'monthly', plans = [] } = block
-    const pc = theme.primaryColor
     const [billing, setBilling] = useState<'monthly' | 'yearly'>(billingToggle)
 
     const isHorizontal = variant === 'horizontal'
@@ -26,7 +25,7 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                         type="button"
                         onClick={() => setBilling(billing === 'monthly' ? 'yearly' : 'monthly')}
                         className="relative w-14 h-7 rounded-full transition-colors duration-200"
-                        style={{ backgroundColor: billing === 'yearly' ? pc : `${pc}40` }}
+                        style={{ backgroundColor: billing === 'yearly' ? theme.primaryColor : `rgba(var(--brand-primary-rgb), 0.251)` }}
                         aria-label="Toggle billing period"
                     >
                         <span
@@ -48,19 +47,19 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                                 <div
                                     key={i}
                                     className={`flex flex-col md:flex-row items-start md:items-center gap-6 p-8 rounded-2xl border transition-shadow duration-200 ${plan.popular ? 'shadow-lg' : ''}`}
-                                    style={{ borderColor: plan.popular ? pc : `${pc}20` }}
+                                    style={{ borderColor: plan.popular ? theme.primaryColor : `rgba(var(--brand-primary-rgb), 0.125)` }}
                                 >
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2">
                                             <h3 className="text-xl font-bold font-heading">{plan.name}</h3>
                                             {plan.popular && (
-                                                <span className="text-xs font-semibold px-3 py-1 rounded-full text-white" style={{ backgroundColor: pc }}>Popular</span>
+                                                <span className="text-xs font-semibold px-3 py-1 rounded-full text-white" style={{ backgroundColor: 'var(--brand-primary)' }}>Popular</span>
                                             )}
                                         </div>
                                         {plan.description && <p className="opacity-60 text-sm mb-3">{plan.description}</p>}
                                         <div className="flex flex-wrap gap-3">
                                             {plan.features.map((f, j) => (
-                                                <span key={j} className="text-xs px-3 py-1 rounded-full" style={{ backgroundColor: `${pc}10`, color: pc }}>{f}</span>
+                                                <span key={j} className="text-xs px-3 py-1 rounded-full" style={{ backgroundColor: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'var(--brand-primary)' }}>{f}</span>
                                             ))}
                                         </div>
                                     </div>
@@ -72,7 +71,7 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                                         <a
                                             href={plan.cta.url}
                                             className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-200 hover:opacity-90 whitespace-nowrap"
-                                            style={plan.popular ? { backgroundColor: pc, color: '#fff' } : { border: `2px solid ${pc}`, color: pc }}
+                                            style={plan.popular ? { backgroundColor: 'var(--brand-primary)', color: '#fff' } : { border: `2px solid var(--brand-primary)`, color: 'var(--brand-primary)' }}
                                         >
                                             {plan.cta.label}
                                         </a>
@@ -85,11 +84,11 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                             <div
                                 key={i}
                                 className={`relative p-8 rounded-2xl border transition-all duration-200 ${plan.popular ? 'shadow-xl scale-105 z-10' : 'hover:shadow-md'}`}
-                                style={{ borderColor: plan.popular ? pc : `${pc}20` }}
+                                style={{ borderColor: plan.popular ? theme.primaryColor : `rgba(var(--brand-primary-rgb), 0.125)` }}
                             >
                                 {plan.popular && (
                                     <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                                        <span className="text-xs font-bold px-4 py-1.5 rounded-full text-white shadow-md" style={{ backgroundColor: pc }}>Most Popular</span>
+                                        <span className="text-xs font-bold px-4 py-1.5 rounded-full text-white shadow-md" style={{ backgroundColor: 'var(--brand-primary)' }}>Most Popular</span>
                                     </div>
                                 )}
                                 <h3 className="text-xl font-bold font-heading mb-2">{plan.name}</h3>
@@ -101,14 +100,14 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                                 <ul className="space-y-3 mb-8">
                                     {plan.features.map((f, j) => (
                                         <li key={j} className="flex items-center gap-2 text-sm">
-                                            <span style={{ color: pc }}>✓</span> {f}
+                                            <span style={{ color: 'var(--brand-primary)' }}>✓</span> {f}
                                         </li>
                                     ))}
                                 </ul>
                                 <a
                                     href={plan.cta.url}
                                     className={`block w-full py-3 rounded-xl font-semibold text-center transition-all duration-200 hover:opacity-90 ${plan.popular ? 'text-white' : 'border'}`}
-                                    style={plan.popular ? { backgroundColor: pc } : { borderColor: pc, color: pc }}
+                                    style={plan.popular ? { backgroundColor: 'var(--brand-primary)' } : { borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' }}
                                 >
                                     {plan.cta.label}
                                 </a>
