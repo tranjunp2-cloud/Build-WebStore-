@@ -20,7 +20,6 @@ const MOCK_PRODUCTS = [
 
 export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfig>) {
     const { headline = 'Featured Products', subheadline, limit = 6, variant = 'grid-3' } = block
-    const pc = theme.primaryColor
 
     const products = MOCK_PRODUCTS.slice(0, limit)
 
@@ -32,12 +31,12 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
 
     return (
         <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={pc} className="bottom-[10%] left-[-5%]" size={500} opacity={0.04} />
+            <GradientBlob color={theme.primaryColor} className="bottom-[10%] left-[-5%]" size={500} opacity={0.04} />
 
             <div className="container mx-auto px-6 relative z-10">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
-                    {block.sectionLabel && <SectionLabel color={pc}>{block.sectionLabel}</SectionLabel>}
+                    {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline}</h2>
                     {subheadline && <p className="opacity-60 text-lg">{subheadline}</p>}
                 </div>
@@ -49,7 +48,7 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
                             <HoverCard
                                 className={`group overflow-hidden rounded-2xl h-full flex ${variant === 'list' ? 'flex-row items-center gap-6 p-4' : 'flex-col'}`}
                                 style={{
-                                    border: `1px solid ${pc}20`,
+                                    border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`,
                                     background: `linear-gradient(135deg, ${theme.colorMode === 'dark' ? '#ffffff03' : '#00000003'}, transparent)`,
                                 }}
                             >
@@ -72,27 +71,27 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
 
                                 <div className={variant === 'list' ? 'flex-1 py-2' : 'p-6 flex flex-col flex-1'}>
                                     <h3 className="font-body font-semibold text-lg mb-2">{product.name}</h3>
-                                    <p className="text-xl font-heading mb-4" style={{ color: pc }}>{product.price}</p>
+                                    <p className="text-xl font-heading mb-4" style={{ color: 'var(--brand-primary)' }}>{product.price}</p>
                                     
                                     {variant !== 'list' && <div className="mt-auto" />}
                                     
                                     <button 
                                         className={`px-4 py-2 font-medium transition-all duration-300 ${variant === 'list' ? 'rounded-lg text-sm w-max' : 'rounded-xl w-full text-center'}`}
                                         style={{ 
-                                            backgroundColor: variant === 'list' ? `${pc}15` : 'transparent',
-                                            color: pc,
-                                            border: variant === 'list' ? 'none' : `1px solid ${pc}30`,
+                                            backgroundColor: variant === 'list' ? `rgba(var(--brand-primary-rgb), 0.082)` : 'transparent',
+                                            color: 'var(--brand-primary)',
+                                            border: variant === 'list' ? 'none' : `1px solid rgba(var(--brand-primary-rgb), 0.188)`,
                                         }}
                                         onMouseEnter={(e) => {
                                             if (variant !== 'list') {
-                                                e.currentTarget.style.backgroundColor = pc;
+                                                e.currentTarget.style.backgroundColor = theme.primaryColor;
                                                 e.currentTarget.style.color = theme.colorMode === 'dark' ? '#000' : '#fff';
                                             }
                                         }}
                                         onMouseLeave={(e) => {
                                             if (variant !== 'list') {
                                                 e.currentTarget.style.backgroundColor = 'transparent';
-                                                e.currentTarget.style.color = pc;
+                                                e.currentTarget.style.color = theme.primaryColor;
                                             }
                                         }}
                                     >

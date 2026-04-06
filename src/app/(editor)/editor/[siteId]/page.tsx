@@ -16,6 +16,7 @@ import { useEditorStore } from '@/store/editorStore'
 import type { AIAction } from '@/types/editor'
 import { PrePublishModal } from '@/components/editor/PrePublishModal'
 import { UnpublishModal } from '@/components/editor/UnpublishModal'
+import { EditorTemplateModal } from '@/components/editor/EditorTemplateModal'
 
 type SiteData = {
     id: string
@@ -86,6 +87,8 @@ export default function EditorPage() {
     const [isCompactLayout, setIsCompactLayout] = useState(false)
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
+    const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+    const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
 
     const blocks = useEditorStore(state => state.blocks)
     const theme = useEditorStore(state => state.theme)
@@ -149,6 +152,16 @@ export default function EditorPage() {
         return () => mediaQuery.removeEventListener('change', handleChange)
     }, [])
 
+    // Phase 1: Reset store when siteId changes to prevent stale data flash
+    const storeSiteId = useEditorStore(state => state.siteId)
+    const resetStore = useEditorStore(state => state.reset)
+
+    useEffect(() => {
+        if (storeSiteId && storeSiteId !== siteId) {
+            resetStore()
+        }
+    }, [siteId, storeSiteId, resetStore])
+
     useEffect(() => {
         if (!siteId) return
 
@@ -211,6 +224,9 @@ export default function EditorPage() {
         const snapshot = useEditorStore.getState()
         const currentBlocks = snapshot.blocks
         const currentTheme = snapshot.theme
+        // Use pageId from store snapshot (not from closure) to prevent race condition
+        // when page switch happens during auto-save
+        const savePageId = snapshot.currentPageId
 
         if (currentBlocks.length === 0 && !page) return false
 
@@ -218,8 +234,8 @@ export default function EditorPage() {
 
         try {
             const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
-            if (currentPageId) {
-                saveUrl.searchParams.set('pageId', currentPageId)
+            if (savePageId) {
+                saveUrl.searchParams.set('pageId', savePageId)
             }
 
             const res = await fetch(saveUrl.toString(), {
@@ -258,7 +274,7 @@ export default function EditorPage() {
         } finally {
             setIsSaving(false)
         }
-    }, [currentPageId, markSaved, page, setIsSaving, siteId])
+    }, [markSaved, page, setIsSaving, siteId])
 
     useEffect(() => {
         if (!siteId || !hasUnsavedChanges || !autoSaveEnabled) return
@@ -455,6 +471,10 @@ export default function EditorPage() {
                 if (nextBlock) {
                     addBlock(afterIndex, nextBlock)
                     setSelectedBlock(Math.max(0, afterIndex + 1))
+                    // Auto-save + refresh preview to show new block
+                    setTimeout(() => {
+                        void handleSave({ showToast: false, refreshPreview: true })
+                    }, 300)
                 } else {
                     toast.error('Unable to add this section yet')
                 }
@@ -470,6 +490,10 @@ export default function EditorPage() {
                     if (prev > blockIndex) return prev - 1
                     return prev
                 })
+                // Auto-save + refresh preview
+                setTimeout(() => {
+                    void handleSave({ showToast: false, refreshPreview: true })
+                }, 300)
                 break
             }
 
@@ -555,9 +579,18 @@ export default function EditorPage() {
     }, [handleSave, hasUnsavedChanges, isPublishing, site?.status, siteId, siteName])
 
     const handlePageSelected = useCallback((pageId: string) => {
+        // Cancel any pending auto-save to prevent saving wrong page's blocks
+        const store = useEditorStore.getState()
+        if (store.hasUnsavedChanges) {
+            store.markSaved() // Discard unsaved changes from previous page
+        }
+
         const nextParams = new URLSearchParams(searchParams.toString())
         nextParams.set('pageId', pageId)
         router.replace(`/editor/${siteId}?${nextParams.toString()}`)
+        // Force iframe refresh to show new page content
+        setIframeKey(k => k + 1)
+        setSelectedBlock(null)
     }, [router, searchParams, siteId])
 
     const handlePageUpdate = useCallback(async (pageId: string, changes: Partial<PageData>) => {
@@ -598,6 +631,13 @@ export default function EditorPage() {
         }
     }, [siteId, updatePageInState])
 
+    const handleMobileBlockSelect = useCallback((blockIndex: number | null) => {
+        setSelectedBlock(blockIndex)
+        if (isCompactLayout && blockIndex !== null) {
+            setIsMobileSettingsOpen(true)
+        }
+    }, [isCompactLayout])
+
     const sidebarTabs = [
         { id: 'chat' as const, label: 'AI Chat', icon: <span aria-hidden="true">💬</span> },
         { id: 'components' as const, label: 'Components', icon: <span aria-hidden="true">⚡</span> },
@@ -623,7 +663,7 @@ export default function EditorPage() {
                 <BlockLibraryPanel
                     blocks={blocks}
                     selectedBlock={selectedBlock}
-                    onBlockSelect={setSelectedBlock}
+                    onBlockSelect={handleMobileBlockSelect}
                     onAIAction={handleAIAction}
                 />
             ) : null}
@@ -634,6 +674,7 @@ export default function EditorPage() {
                     currentPageId={currentPageId}
                     onPageSelected={handlePageSelected}
                     onPagesChanged={() => setIframeKey(key => key + 1)}
+                    onEditPage={() => setActiveSidebarTab('chat')}
                 />
             ) : null}
         </>
@@ -664,7 +705,7 @@ export default function EditorPage() {
                 viewport={viewport}
                 compact={isCompactLayout}
                 onOpenMenu={() => setIsMenuOpen(true)}
-                onOpenTemplates={() => toast.info('Template gallery will be connected in the next step.')}
+                onOpenTemplates={() => setIsTemplateModalOpen(true)}
                 onPageSelected={handlePageSelected}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
@@ -683,6 +724,65 @@ export default function EditorPage() {
                     >
                         {sidebarContent}
                     </EditorSidebar>
+
+                    {/* F05 FR-29: FAB chat button on mobile */}
+                    {activeSidebarTab !== 'chat' && (
+                        <button
+                            type="button"
+                            onClick={() => setActiveSidebarTab('chat')}
+                            className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-lg shadow-blue-500/25 transition-transform active:scale-95"
+                            aria-label="Open AI Chat"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </button>
+                    )}
+
+                    {/* F05 FR-31: Bottom sheet for block settings on mobile */}
+                    {isMobileSettingsOpen && currentBlock && (
+                        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+                            <div
+                                className="absolute inset-0 bg-black/60"
+                                onClick={() => setIsMobileSettingsOpen(false)}
+                                onKeyDown={(e) => e.key === 'Escape' && setIsMobileSettingsOpen(false)}
+                                role="button"
+                                tabIndex={0}
+                                aria-label="Close settings"
+                            />
+                            <div className="relative max-h-[70vh] overflow-y-auto rounded-t-2xl border-t border-white/10 bg-[#0F172A]">
+                                <div className="sticky top-0 flex items-center justify-between border-b border-white/10 bg-[#0F172A] px-4 py-3">
+                                    <span className="text-sm font-medium text-white">Block Settings</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMobileSettingsOpen(false)}
+                                        className="rounded-lg p-1.5 text-gray-400 hover:bg-white/10 hover:text-white"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    </button>
+                                </div>
+                                <SettingsPanel
+                                    block={currentBlock}
+                                    blockIndex={selectedBlock}
+                                    theme={theme}
+                                    site={site}
+                                    siteName={siteName || site?.name || ''}
+                                    siteStatus={site?.status || 'draft'}
+                                    headerBlock={headerBlock}
+                                    footerBlock={footerBlock}
+                                    pages={pages}
+                                    currentPageId={currentPageId}
+                                    onThemeChange={handleThemeChange}
+                                    onDeleteBlock={handleDeleteBlock}
+                                    onDuplicateBlock={handleDuplicateBlock}
+                                    onBlockFieldChange={handleBlockFieldChange}
+                                    onBlockUpdate={handleBlockUpdate}
+                                    onHeaderUpdate={(changes) => updateHeaderBlock(changes)}
+                                    onFooterUpdate={(changes) => updateFooterBlock(changes)}
+                                    onSiteSettingsChange={handleSiteSettingsChange}
+                                    onPageUpdate={handlePageUpdate}
+                                />
+                            </div>
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="flex flex-1 overflow-hidden">
@@ -713,6 +813,7 @@ export default function EditorPage() {
                             }}
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}
+                            onPageNavigate={handlePageSelected}
                         />
                     </div>
 
@@ -754,6 +855,17 @@ export default function EditorPage() {
                 onOpenChange={setIsUnpublishModalOpen}
                 onUnpublish={handlePublish}
                 isPublishing={isPublishing}
+            />
+
+            <EditorTemplateModal
+                isOpen={isTemplateModalOpen}
+                onClose={() => setIsTemplateModalOpen(false)}
+                siteId={siteId}
+                onApplied={() => {
+                    setIsTemplateModalOpen(false)
+                    // Reload editor with new template data
+                    window.location.reload()
+                }}
             />
         </div>
     )

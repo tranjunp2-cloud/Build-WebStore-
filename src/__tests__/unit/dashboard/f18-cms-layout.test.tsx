@@ -76,22 +76,24 @@ describe('F18 CMS Core Layout', () => {
         it('[TC-F18.01] Renders Desktop sidebar and links correctly', () => {
             render(<DashboardSidebar {...defaultProps} />)
             expect(screen.getAllByText('Dashboard').length).toBeGreaterThan(0)
-            expect(screen.getAllByText('Products').length).toBeGreaterThan(0)
-            
+            // v1.0: Products/Orders removed — verify "My Website" and "Site Settings" present
+            expect(screen.getAllByText('My Website').length).toBeGreaterThan(0)
+            expect(screen.getAllByText('Site Settings').length).toBeGreaterThan(0)
+
             // Check hrefs
             const dashboardLinks = screen.getAllByRole('link', { name: /Dashboard/i })
             expect(dashboardLinks[0]).toHaveAttribute('href', '/dashboard')
         })
 
-        it('[TC-F18.21] Expands My Webstore to reveal Editor and Blog', () => {
+        it('[TC-F18.21] Expands My Website to reveal Editor and Blog', () => {
             render(<DashboardSidebar {...defaultProps} />)
-            
-            const webstoreBtn = screen.getAllByRole('button', { name: /My Webstore/i })[0]
-            expect(webstoreBtn).toHaveAttribute('aria-expanded', 'false')
-            
-            fireEvent.click(webstoreBtn)
-            expect(webstoreBtn).toHaveAttribute('aria-expanded', 'true')
-            
+
+            const websiteBtn = screen.getAllByRole('button', { name: /My Website/i })[0]
+            expect(websiteBtn).toHaveAttribute('aria-expanded', 'false')
+
+            fireEvent.click(websiteBtn)
+            expect(websiteBtn).toHaveAttribute('aria-expanded', 'true')
+
             expect(screen.getAllByText('Editor').length).toBeGreaterThan(0)
             expect(screen.getAllByText('Blog').length).toBeGreaterThan(0)
         })
