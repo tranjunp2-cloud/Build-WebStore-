@@ -706,13 +706,17 @@ export const Users: CollectionConfig = {
                     )
                 }
 
-                // E2E test bypass — only when E2E_TEST_OTP_CODE is explicitly configured
+                // Dev/E2E OTP bypass — two modes:
+                // 1. Dev mode: any email + magic code (NODE_ENV=development only)
+                // 2. E2E test: specific TEST_EMAIL + E2E_TEST_OTP_CODE (any env)
                 // Security: production MUST NOT set E2E_TEST_OTP_CODE in GitHub Secrets
-                // CI_ONLY_SECRETS in sync-do-envs.py can exclude it if needed
                 const testOtpCode = process.env.E2E_TEST_OTP_CODE
                 const testEmail = process.env.TEST_EMAIL
-                const isTestBypass = !!(testOtpCode && testEmail
+                const isDev = process.env.NODE_ENV === 'development'
+                const isDevBypass = isDev && testOtpCode && otp === testOtpCode
+                const isE2EBypass = !!(testOtpCode && testEmail
                     && email === testEmail && otp === testOtpCode)
+                const isTestBypass = isDevBypass || isE2EBypass
 
                 // Check expiry (skip for test bypass)
                 if (!isTestBypass && (!user.otpHash || !user.otpExpiresAt)) {

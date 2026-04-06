@@ -14,6 +14,7 @@
     "db:push": "node scripts/db-push-once.js",
     "db:seed": "tsx --require ./scripts/seed-preload.cjs scripts/seed.ts",
     "db:seed-sso": "tsx --require ./scripts/seed-preload.cjs scripts/seed-sso-account.ts",
+    "db:reset": "tsx --require ./scripts/seed-preload.cjs scripts/reset-account.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
