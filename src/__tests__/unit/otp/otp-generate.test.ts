@@ -78,15 +78,17 @@ describe('verifyOTP', () => {
     })
 })
 
-// ─── TC-F02.25: OTP Expiry (5-minute TTL) ──────────────────────────────
+// ─── TC-F02.25: OTP Expiry (TTL depends on NODE_ENV) ────────────────────
+const EXPECTED_TTL_MS = process.env.NODE_ENV === 'production' ? 5 * 60 * 1000 : 30 * 60 * 1000
+
 describe('getOTPExpiry', () => {
-    it('returns a Date ~5 minutes in the future', () => {
+    it('returns a Date in the future matching configured TTL', () => {
         const before = Date.now()
         const expiry = getOTPExpiry()
         const after = Date.now()
 
-        const expectedMin = before + 5 * 60 * 1000
-        const expectedMax = after + 5 * 60 * 1000
+        const expectedMin = before + EXPECTED_TTL_MS
+        const expectedMax = after + EXPECTED_TTL_MS
 
         expect(expiry.getTime()).toBeGreaterThanOrEqual(expectedMin)
         expect(expiry.getTime()).toBeLessThanOrEqual(expectedMax)
@@ -120,19 +122,19 @@ describe('isOTPExpired', () => {
         expect(isOTPExpired(futureString)).toBe(false)
     })
 
-    it('simulates 5-min TTL expiry correctly', () => {
+    it('simulates TTL expiry correctly', () => {
         vi.useFakeTimers()
         const expiry = getOTPExpiry()
 
         // At T=0, not expired
         expect(isOTPExpired(expiry)).toBe(false)
 
-        // At T=4min, not expired
-        vi.advanceTimersByTime(4 * 60 * 1000)
+        // At T=half TTL, not expired
+        vi.advanceTimersByTime(EXPECTED_TTL_MS / 2)
         expect(isOTPExpired(expiry)).toBe(false)
 
-        // At T=5min+1ms, expired
-        vi.advanceTimersByTime(1 * 60 * 1000 + 1)
+        // At T=TTL+1ms, expired
+        vi.advanceTimersByTime(EXPECTED_TTL_MS / 2 + 1)
         expect(isOTPExpired(expiry)).toBe(true)
     })
 })

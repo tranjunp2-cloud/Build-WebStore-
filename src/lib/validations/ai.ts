@@ -52,10 +52,22 @@ export const extractionResultSchema = z.object({
             address: z.string().nullish(),
         }).nullish(),
         footerText: z.string().nullish(),
+        // v2 fields
+        collectionsList: z.array(z.string()).nullish(),
+        brandTagline: z.string().nullish(),
+        socialProofStats: z.array(z.object({
+            number: z.string(),
+            label: z.string(),
+        })).nullish(),
+        blogPostTitles: z.array(z.string()).nullish(),
+        ctaTexts: z.array(z.string()).nullish(),
+        navigationItems: z.array(z.string()).nullish(),
+        sectionOrder: z.array(z.string()).nullish(),
     }).default({}),
     suggestedTheme: z.object({
         primaryColor: z.string().nullish(),
         secondaryColor: z.string().nullish(),
+        backgroundColor: z.string().nullish(),
         siteType: z.string().nullish(),
         mood: z.string().nullish(),
     }).nullish(),

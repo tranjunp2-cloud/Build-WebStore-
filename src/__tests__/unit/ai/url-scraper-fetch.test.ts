@@ -290,7 +290,7 @@ describe('scrapeUrl', () => {
 
         // Assert
         expect(result.raw.preprocessedText).toContain('--- META ---')
-        expect(result.raw.preprocessedText).toContain('--- CONTENT ---')
+        expect(result.raw.preprocessedText).toContain('--- MAIN CONTENT ---')
         expect(result.raw.charCount).toBeGreaterThan(0)
     })
 

@@ -206,6 +206,27 @@ export async function POST(req: NextRequest) {
         // Generate with AI (or fallback)
         const { result, events } = await generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt)
 
+        // Override AI theme with extracted visual style (URL extraction provides specific colors)
+        const brief = rawContentBrief as Record<string, unknown> | null
+        const visualStyle = brief?.visualStyle as Record<string, string> | undefined
+        if (visualStyle) {
+            if (visualStyle.primaryColor && /^#[0-9A-Fa-f]{6}$/.test(visualStyle.primaryColor)) {
+                result.theme.primaryColor = visualStyle.primaryColor
+            }
+            if (visualStyle.secondaryColor && /^#[0-9A-Fa-f]{6}$/.test(visualStyle.secondaryColor)) {
+                result.theme.secondaryColor = visualStyle.secondaryColor
+            }
+            // Auto-detect colorMode from extracted background color
+            if (visualStyle.backgroundColor && /^#[0-9A-Fa-f]{6}$/.test(visualStyle.backgroundColor)) {
+                const hex = visualStyle.backgroundColor.replace('#', '')
+                const r = parseInt(hex.substring(0, 2), 16)
+                const g = parseInt(hex.substring(2, 4), 16)
+                const b = parseInt(hex.substring(4, 6), 16)
+                const brightness = (r * 299 + g * 587 + b * 114) / 1000
+                result.theme.colorMode = brightness > 128 ? 'light' : 'dark'
+            }
+        }
+
         // Wait for hero image if it hasn't finished yet
         let heroMedia: { id: string } | null = null
         try {

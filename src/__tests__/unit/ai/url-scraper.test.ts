@@ -229,12 +229,12 @@ describe('extractStructure', () => {
         expect(navLinks[0]).toEqual({ label: 'Home', url: '/' })
     })
 
-    it('limits headings to 20 and navLinks to 15', () => {
-        const headings = Array.from({ length: 30 }, (_, i) => `<h2>H${i}</h2>`).join('')
+    it('limits headings to 50 and navLinks to 30', () => {
+        const headings = Array.from({ length: 60 }, (_, i) => `<h2>H${i}</h2>`).join('')
         const html = `<html><body>${headings}</body></html>`
         const result = extractStructure(html)
 
-        expect(result.headings.length).toBeLessThanOrEqual(20)
+        expect(result.headings.length).toBeLessThanOrEqual(50)
     })
 })
 
@@ -258,12 +258,13 @@ describe('preprocessForAI', () => {
             navLinks: [{ label: 'Home', url: '/' }],
         }
 
-        const result = preprocessForAI(meta, content)
+        const html = '<html><body><p>' + 'A'.repeat(10000) + '</p></body></html>'
+        const result = preprocessForAI(meta, content, html, 'https://example.com')
 
-        // Meta (500) + body (6000) + separators
-        expect(result.length).toBeLessThanOrEqual(7000)
+        // v2: Meta (1500) + body (12000) + sections → capped at ~19500
+        expect(result.length).toBeLessThanOrEqual(20000)
         expect(result).toContain('--- META ---')
-        expect(result).toContain('--- CONTENT ---')
+        expect(result).toContain('--- MAIN CONTENT ---')
         expect(result).toContain('Test Business')
     })
 

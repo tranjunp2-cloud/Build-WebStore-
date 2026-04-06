@@ -25,6 +25,14 @@ export type ContentBrief = {
         faqItems?: { question: string; answer: string }[]
         contactInfo?: { phone?: string; email?: string; address?: string }
         footerText?: string
+        // v2 fields
+        collectionsList?: string[]
+        brandTagline?: string
+        socialProofStats?: { number: string; label: string }[]
+        blogPostTitles?: string[]
+        ctaTexts?: string[]
+        navigationItems?: string[]
+        sectionOrder?: string[]
     }
 
     visualStyle: {
@@ -96,16 +104,37 @@ export function contentBriefToReferencePrompt(brief: ContentBrief): string {
     if (brief.visualStyle.fontStyle) styleHints.push(`Font Style: ${brief.visualStyle.fontStyle}`)
     if (styleHints.length) sections.push(`VISUAL STYLE:\n  ${styleHints.join('\n  ')}`)
 
-    if (brief.suggestedBlocks?.length) {
+    // v2 fields
+    if (ref.collectionsList?.length) {
+        sections.push(`COLLECTIONS/CATEGORIES:\n  ${ref.collectionsList.join(', ')}`)
+    }
+    if (ref.brandTagline) {
+        sections.push(`BRAND TAGLINE: "${ref.brandTagline}"`)
+    }
+    if (ref.socialProofStats?.length) {
+        sections.push(`SOCIAL PROOF STATS:\n  ${ref.socialProofStats.map(s => `${s.number} ${s.label}`).join('\n  ')}`)
+    }
+    if (ref.blogPostTitles?.length) {
+        sections.push(`BLOG POST TITLES:\n  ${ref.blogPostTitles.slice(0, 5).join('\n  ')}`)
+    }
+    if (ref.ctaTexts?.length) {
+        sections.push(`CTA BUTTON TEXTS: ${ref.ctaTexts.join(', ')}`)
+    }
+    if (ref.navigationItems?.length) {
+        sections.push(`NAVIGATION ITEMS: ${ref.navigationItems.join(' | ')}`)
+    }
+    if (ref.sectionOrder?.length) {
+        sections.push(`SECTION ORDER (MUST follow this order): ${ref.sectionOrder.join(' → ')}`)
+    } else if (brief.suggestedBlocks?.length) {
         sections.push(`SUGGESTED BLOCK ORDER: ${brief.suggestedBlocks.join(' → ')}`)
     }
 
     if (sections.length === 0) return ''
 
-    // Truncate to ~4000 chars to fit within GPT-4o token budget
-    let result = `\n## REFERENCE CONTENT (from source website — USE THIS CONTENT, do not invent new)\n\n${sections.join('\n\n')}`
-    if (result.length > 4000) {
-        result = result.slice(0, 3950) + '\n\n[...truncated for token budget]'
+    // Truncate to ~6000 chars (v2: increased from 4000)
+    let result = `\n## REFERENCE CONTENT (from source website — adapt this content for the generated website)\n\n${sections.join('\n\n')}`
+    if (result.length > 6000) {
+        result = result.slice(0, 5950) + '\n\n[...truncated for token budget]'
     }
 
     return result

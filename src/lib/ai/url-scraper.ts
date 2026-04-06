@@ -32,6 +32,7 @@ export type ScrapeResult = {
         excerpt: string
         navLinks: { label: string; url: string }[]
     }
+    images: ExtractedImage[]
     raw: {
         preprocessedText: string
         charCount: number
@@ -44,8 +45,8 @@ export type ScrapeResult = {
 
 const FETCH_TIMEOUT_MS = 10_000
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024 // 5 MB
-const MAX_BODY_CHARS = 6_000
-const MAX_META_CHARS = 500
+const MAX_BODY_CHARS = 15_000  // v2: increased from 6,000 for richer extraction
+const MAX_META_CHARS = 1_500   // v2: increased from 500
 const MAX_REDIRECTS = 3
 
 const BLOCKED_IP_RANGES = [
@@ -254,32 +255,140 @@ export function extractStructure(html: string): {
     })
 
     return {
-        headings: headings.slice(0, 20),
-        navLinks: navLinks.slice(0, 15),
+        headings: headings.slice(0, 50),
+        navLinks: navLinks.slice(0, 30),
     }
 }
 
-// ── Preprocess for AI ────────────────────────────────────────────────────
+// ── Section Extraction (v2) ──────────────────────────────────────────────
 
-export function preprocessForAI(meta: ScrapeResult['meta'], content: ScrapeResult['content']): string {
+export function extractSections(html: string): string {
+    const dom = new JSDOM(html)
+    const document = dom.window.document
+    const sections: string[] = []
+
+    document.querySelectorAll('section').forEach(section => {
+        const heading = section.querySelector('h1,h2,h3')?.textContent?.trim()
+        const text = section.querySelector('p')?.textContent?.trim()
+        if (heading && heading.length > 1) sections.push(`[Section] ${heading}: ${text?.slice(0, 200) || ''}`)
+    })
+
+    document.querySelectorAll('.testimonial, .review, .quote, [class*="testimonial"], [class*="review"]').forEach(el => {
+        const quote = el.querySelector('p, blockquote')?.textContent?.trim()
+        const author = el.querySelector('.author, .name, cite')?.textContent?.trim()
+        if (quote && quote.length > 10) sections.push(`[Testimonial] "${quote.slice(0, 200)}" — ${author || 'Anonymous'}`)
+    })
+
+    document.querySelectorAll('.pricing, [class*="price"], [class*="plan"]').forEach(el => {
+        const name = el.querySelector('h2,h3,h4,.plan-name')?.textContent?.trim()
+        const price = el.querySelector('.price, [class*="price"]')?.textContent?.trim()
+        if (name || price) sections.push(`[Pricing] ${name || 'Plan'}: ${price || ''}`)
+    })
+
+    document.querySelectorAll('details, .faq, [class*="faq"], .accordion').forEach(el => {
+        const question = el.querySelector('summary, .question, h3, h4')?.textContent?.trim()
+        const answer = el.querySelector('p, .answer')?.textContent?.trim()
+        if (question) sections.push(`[FAQ] Q: ${question} A: ${answer?.slice(0, 150) || ''}`)
+    })
+
+    document.querySelectorAll('.feature, .service, [class*="feature"], [class*="service"]').forEach(el => {
+        const title = el.querySelector('h3,h4,.title')?.textContent?.trim()
+        const desc = el.querySelector('p,.description')?.textContent?.trim()
+        if (title && title.length > 1) sections.push(`[Feature] ${title}: ${desc?.slice(0, 150) || ''}`)
+    })
+
+    return sections.slice(0, 30).join('\n')
+}
+
+export function extractFooter(html: string): string {
+    const dom = new JSDOM(html)
+    const footer = dom.window.document.querySelector('footer')
+    if (!footer) return ''
+    const links = Array.from(footer.querySelectorAll('a'))
+        .map(a => a.textContent?.trim())
+        .filter((t): t is string => !!t && t.length > 0 && t.length < 100)
+        .slice(0, 20)
+    const copyright = footer.querySelector('[class*="copyright"], small')?.textContent?.trim()
+    return `[Footer] Links: ${links.join(', ')}${copyright ? ` | ${copyright}` : ''}`
+}
+
+export function extractJsonLd(html: string): string {
+    const dom = new JSDOM(html)
+    const scripts = dom.window.document.querySelectorAll('script[type="application/ld+json"]')
+    const items: string[] = []
+    scripts.forEach(script => {
+        try {
+            const raw = JSON.parse(script.textContent || '')
+            const dataItems = Array.isArray(raw) ? raw : raw['@graph'] ? raw['@graph'] : [raw]
+            for (const data of dataItems) {
+                if (!data || typeof data !== 'object') continue
+                const type = data['@type']
+                if (type === 'Organization' && data.name) items.push(`[Org] ${data.name}: ${(data.description || '').slice(0, 150)}`)
+                if (type === 'Product' && data.name) items.push(`[Product] ${data.name}: ${data.offers?.price || ''}`)
+                if (type === 'FAQPage' && Array.isArray(data.mainEntity)) {
+                    for (const faq of data.mainEntity.slice(0, 10)) {
+                        items.push(`[FAQ] ${faq.name || ''}: ${(faq.acceptedAnswer?.text || '').slice(0, 100)}`)
+                    }
+                }
+            }
+        } catch { /* ignore malformed JSON-LD */ }
+    })
+    return items.slice(0, 15).join('\n')
+}
+
+export type ExtractedImage = { url: string; alt: string; section: string }
+
+export function extractImageUrls(html: string, baseUrl: string): ExtractedImage[] {
+    const $ = cheerio.load(html)
+    const images: ExtractedImage[] = []
+    const seen = new Set<string>()
+    $('img').each((_, el) => {
+        const src = $(el).attr('src') || $(el).attr('data-src') || $(el).attr('data-lazy-src') || ''
+        if (!src || src.startsWith('data:')) return
+        let absoluteUrl: string
+        try { absoluteUrl = new URL(src, baseUrl).href } catch { return }
+        if (seen.has(absoluteUrl)) return
+        seen.add(absoluteUrl)
+        const alt = $(el).attr('alt')?.trim() || ''
+        const parent = $(el).closest('section, [class*="hero"], [class*="about"], [class*="gallery"], header')
+        const cls = parent.attr('class') || ''
+        const section = cls.includes('hero') ? 'hero' : cls.includes('about') ? 'about' : cls.includes('gallery') ? 'gallery' : 'content'
+        images.push({ url: absoluteUrl, alt, section })
+    })
+    return images.slice(0, 10)
+}
+
+// ── Preprocess for AI (v2 — enriched) ───────────────────────────────────
+
+export function preprocessForAI(meta: ScrapeResult['meta'], content: ScrapeResult['content'], html?: string, baseUrl?: string): string {
     const metaHeader = [
         meta.title ? `Title: ${meta.title}` : '',
         meta.description ? `Description: ${meta.description}` : '',
         meta.siteName ? `Site: ${meta.siteName}` : '',
         meta.locale ? `Language: ${meta.locale}` : '',
         meta.themeColor ? `Theme Color: ${meta.themeColor}` : '',
-        content.headings.length > 0 ? `Headings: ${content.headings.slice(0, 10).join(' | ')}` : '',
+        content.headings.length > 0 ? `Headings: ${content.headings.slice(0, 20).join(' | ')}` : '',
         content.navLinks.length > 0
-            ? `Navigation: ${content.navLinks.slice(0, 8).map((l) => l.label).join(', ')}`
+            ? `Navigation: ${content.navLinks.slice(0, 15).map((l) => l.label).join(', ')}`
             : '',
     ]
         .filter(Boolean)
         .join('\n')
         .slice(0, MAX_META_CHARS)
 
-    const bodyText = content.mainText.replace(/\s+/g, ' ').trim().slice(0, MAX_BODY_CHARS)
+    const bodyText = content.mainText.replace(/\s+/g, ' ').trim().slice(0, 12_000)
+    const parts = ['--- META ---', metaHeader, '', '--- MAIN CONTENT ---', bodyText]
 
-    return `--- META ---\n${metaHeader}\n\n--- CONTENT ---\n${bodyText}`
+    if (html) {
+        const sections = extractSections(html)
+        const footer = extractFooter(html)
+        const jsonLd = extractJsonLd(html)
+        if (sections) parts.push('', '--- SECTIONS ---', sections)
+        if (jsonLd) parts.push('', '--- STRUCTURED DATA ---', jsonLd)
+        if (footer) parts.push('', '--- FOOTER ---', footer)
+    }
+
+    return parts.join('\n').slice(0, MAX_BODY_CHARS + MAX_META_CHARS + 3000)
 }
 
 // ── Confidence Scoring ───────────────────────────────────────────────────
@@ -341,16 +450,20 @@ export async function scrapeUrl(urlString: string): Promise<ScrapeResult> {
         navLinks: structure.navLinks,
     }
 
-    // Step 7: Preprocess for AI
-    const preprocessedText = preprocessForAI(meta, content)
+    // Step 7: Extract images (v2)
+    const images = extractImageUrls(html, url.href)
 
-    // Step 8: Calculate confidence
+    // Step 8: Preprocess for AI (v2 — enriched)
+    const preprocessedText = preprocessForAI(meta, content, html, url.href)
+
+    // Step 9: Calculate confidence
     const { confidence, warnings } = calculateConfidence(meta, content)
 
     return {
         url: url.href,
         meta,
         content,
+        images,
         raw: {
             preprocessedText,
             charCount: preprocessedText.length,
