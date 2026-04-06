@@ -24,29 +24,38 @@ export const GET = withAuth(async (_user, req) => {
         const categories = (template as any).category || []
         const cat = Array.isArray(categories) ? categories[0] : categories
 
-        // Resolve theme — prefer template's own theme over generic category theme
-        const templateTheme = (template as any).defaultTheme || {}
+        // Base theme from category
+        const baseTheme = THEMES[cat] || THEMES.business
+
+        // Template-specific theme overrides (map DB field names → TemplateTheme names)
+        const dt = (template as any).defaultTheme || {}
         const theme = {
-            ...(THEMES[cat] || THEMES.business),
-            // Override with template-specific colors if available
-            ...(templateTheme.primaryColor ? { primaryColor: templateTheme.primaryColor } : {}),
-            ...(templateTheme.secondaryColor ? { secondaryColor: templateTheme.secondaryColor } : {}),
-            ...(templateTheme.fontHeading ? { fontHeading: templateTheme.fontHeading } : {}),
-            ...(templateTheme.fontBody ? { fontBody: templateTheme.fontBody } : {}),
-            ...(templateTheme.colorMode ? { colorMode: templateTheme.colorMode } : {}),
+            ...baseTheme,
+            ...(dt.primaryColor ? { primary: dt.primaryColor } : {}),
+            ...(dt.secondaryColor ? { secondary: dt.secondaryColor } : {}),
+            ...(dt.fontHeading ? { fontHeading: dt.fontHeading } : {}),
+            ...(dt.fontBody ? { fontBody: dt.fontBody } : {}),
+            // Dark mode: swap bg/text colors
+            ...(dt.colorMode === 'dark' ? {
+                bg: '#0f172a',
+                text: '#f8fafc',
+                muted: '#94a3b8',
+            } : dt.colorMode === 'light' ? {
+                bg: '#ffffff',
+                text: '#111827',
+                muted: '#6b7280',
+            } : {}),
         }
 
         // Resolve blocks — v3 templatePages first, fallback to defaultBlocks
         let blocks: Record<string, unknown>[] = []
         const templatePages = (template as any).templatePages
         if (Array.isArray(templatePages) && templatePages.length > 0) {
-            // Find requested page (default: homepage)
             const page = templatePages.find(
                 (p: any) => p.slug === pageSlug || p.isHomepage === true
             ) || templatePages[0]
             blocks = page?.layout || []
         } else {
-            // Legacy fallback
             blocks = (template as any).defaultBlocks || []
         }
 
