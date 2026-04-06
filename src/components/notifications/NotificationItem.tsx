@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from 'date-fns'
-import { ShoppingCart, Megaphone, CircleAlert, FileText, ShoppingBag } from 'lucide-react'
+import { ShoppingCart, Megaphone, CircleAlert, FileText, ShoppingBag, type LucideIcon } from 'lucide-react'
 import type { NotificationItem as NotificationItemType } from '@/types/notification'
 
 interface Props {
@@ -9,7 +9,7 @@ interface Props {
 export function NotificationItem({ notification }: Props) {
   const { type, title, message, isRead, createdAt } = notification
 
-  let Icon: any = ShoppingCart
+  let Icon: LucideIcon = ShoppingCart
   let iconBgClass = 'bg-[#00BC7D]/10 text-[#00BC7D]'
 
   if (type === 'SYSTEM_ALERT') {
