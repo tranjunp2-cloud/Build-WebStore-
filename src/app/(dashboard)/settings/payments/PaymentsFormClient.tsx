@@ -18,8 +18,7 @@ function getImageUrl(image: Media | string | null): string | null {
     if (!image || typeof image === 'string') return null;
     let url = image.url || image.thumbnailURL || null;
     if (url && url.includes('minio:9000')) {
-        const publicHost = process.env.NEXT_PUBLIC_MINIO_PUBLIC_HOST || 'localhost:9000';
-        url = url.replace('minio:9000', publicHost);
+        url = url.replace('minio:9000', 'localhost:9000');
     }
     return url || null;
 }
