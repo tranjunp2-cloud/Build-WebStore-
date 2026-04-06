@@ -452,11 +452,15 @@ export function sanitizeBlockData(block: Record<string, unknown>): Record<string
             safePlan.ctaLabel = String(pObj.ctaLabel || pObj.buttonText || 'Buy Now')
             safePlan.ctaUrl = String(pObj.ctaUrl || pObj.url || '#')
             
+            // Payload expects features as [{text: string, included: boolean}], NOT plain strings
             if (Array.isArray(pObj.features)) {
                 safePlan.features = pObj.features.map((f: unknown) => {
-                    if (typeof f === 'string') return f
+                    if (typeof f === 'string') return { text: f, included: true }
                     const fObj = (typeof f === 'object' && f !== null ? f : {}) as Record<string, unknown>
-                    return String(fObj.text || fObj.name || fObj.feature || '')
+                    return {
+                        text: String(fObj.text || fObj.name || fObj.feature || ''),
+                        included: typeof fObj.included === 'boolean' ? fObj.included : true,
+                    }
                 })
             } else {
                 safePlan.features = []

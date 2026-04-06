@@ -891,11 +891,15 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                 safePlan.ctaLabel = String(plan.ctaLabel || plan.buttonText || 'Buy Now')
                 safePlan.ctaUrl = String(plan.ctaUrl || plan.url || '#')
                 
+                // Payload expects features as [{text: string, included: boolean}], NOT plain strings
                 if (Array.isArray(plan.features)) {
                     safePlan.features = plan.features.map((fRaw: unknown) => {
-                        if (typeof fRaw === 'string') return fRaw;
-                        const f = (typeof fRaw === 'object' && fRaw !== null) ? fRaw as Record<string, unknown> : {};
-                        return String(f.text || f.name || f.feature || '')
+                        if (typeof fRaw === 'string') return { text: fRaw, included: true }
+                        const f = (typeof fRaw === 'object' && fRaw !== null) ? fRaw as Record<string, unknown> : {}
+                        return {
+                            text: String(f.text || f.name || f.feature || ''),
+                            included: typeof f.included === 'boolean' ? f.included : true,
+                        }
                     })
                 } else {
                     safePlan.features = []
