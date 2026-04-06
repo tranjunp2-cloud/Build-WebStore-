@@ -58,9 +58,9 @@ export const POST = withAuth(async (_user, request) => {
             const payload = await getPayload({ config })
 
             if (force) {
-                const existing = await payload.find({ collection: 'templates', limit: 200 })
+                const existing = await payload.find({ collection: 'templates', limit: 200, overrideAccess: true })
                 for (const doc of existing.docs) {
-                    await payload.delete({ collection: 'templates', id: doc.id })
+                    await payload.delete({ collection: 'templates', id: doc.id, overrideAccess: true })
                 }
                 console.log(`[Seed v3] Deleted ${existing.totalDocs} existing templates`)
             }
@@ -74,10 +74,11 @@ export const POST = withAuth(async (_user, request) => {
                         const preset = TEMPLATE_PRESETS[i + idx]!
                         await payload.create({
                             collection: 'templates',
+                            overrideAccess: true,
                             data: {
                                 name: seed.name,
                                 description: seed.description,
-                                category: seed.category,
+                                category: [seed.category],
                                 defaultTheme: seed.theme as Record<string, unknown>,
                                 defaultBlocks: seed.pages[0]?.layout ?? [],
                                 templatePages: seed.pages.map((page, pidx) => ({
@@ -86,7 +87,7 @@ export const POST = withAuth(async (_user, request) => {
                                     isHomepage: pidx === 0,
                                     layout: page.layout,
                                 })),
-                                tags: [seed.category, preset.personality, ...preset.tags],
+                                tags: [seed.category, preset.personality, ...preset.tags].map(t => ({ tag: t })),
                                 sortOrder: 0,
                                 isPremium: true,
                                 isFeatured: false,
@@ -106,12 +107,13 @@ export const POST = withAuth(async (_user, request) => {
 
             const created = results.filter((r) => r.status === 'fulfilled').length
             const failed = results.filter((r) => r.status === 'rejected').length
+            const failReasons = results.filter((r) => r.status === 'rejected').map((r) => r.reason).slice(0, 5)
 
             return NextResponse.json({
                 success: true,
                 data: {
                     total: TEMPLATE_PRESETS.length,
-                    created, skipped: 0, failed,
+                    created, skipped: 0, failed, failReasons,
                     templates: results.filter((r) => r.status === 'fulfilled' && r.value).map((r) => r.value),
                 },
             })
