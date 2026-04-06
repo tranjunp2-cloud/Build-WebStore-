@@ -32,26 +32,34 @@ vi.mock('date-fns', () => ({
 }))
 
 // ── Mock framer-motion ───────────────────────────────────────────────────
-vi.mock('framer-motion', () => ({
-    motion: {
-        div: React.forwardRef(({ children, ...props }: any, ref: any) =>
-            React.createElement('div', { ...props, ref }, children)),
-    },
-    AnimatePresence: ({ children }: any) => children,
-}))
+vi.mock('framer-motion', () => {
+    const MotionDiv = React.forwardRef(({ children, ...props }: any, ref: any) =>
+        React.createElement('div', { ...props, ref }, children))
+    MotionDiv.displayName = 'MotionDiv'
+    return {
+        motion: { div: MotionDiv },
+        AnimatePresence: ({ children }: any) => children,
+    }
+})
 
 // ── Mock Radix Dialog ────────────────────────────────────────────────────
-vi.mock('@radix-ui/react-dialog', () => ({
-    Root: ({ children, open }: any) => open ? React.createElement('div', { 'data-testid': 'dialog-root' }, children) : null,
-    Portal: ({ children }: any) => React.createElement('div', null, children),
-    Overlay: React.forwardRef(({ children, ...props }: any, ref: any) =>
-        React.createElement('div', { ...props, ref }, children)),
-    Content: React.forwardRef(({ children, ...props }: any, ref: any) =>
-        React.createElement('div', { ...props, ref, role: 'dialog' }, children)),
-    Title: ({ children }: any) => React.createElement('h2', null, children),
-    Description: ({ children }: any) => React.createElement('p', null, children),
-    Close: ({ children, asChild, ...props }: any) => asChild ? children : React.createElement('button', props, children),
-}))
+vi.mock('@radix-ui/react-dialog', () => {
+    const Overlay = React.forwardRef(({ children, ...props }: any, ref: any) =>
+        React.createElement('div', { ...props, ref }, children))
+    Overlay.displayName = 'DialogOverlay'
+    const Content = React.forwardRef(({ children, ...props }: any, ref: any) =>
+        React.createElement('div', { ...props, ref, role: 'dialog' }, children))
+    Content.displayName = 'DialogContent'
+    return {
+        Root: ({ children, open }: any) => open ? React.createElement('div', { 'data-testid': 'dialog-root' }, children) : null,
+        Portal: ({ children }: any) => React.createElement('div', null, children),
+        Overlay,
+        Content,
+        Title: ({ children }: any) => React.createElement('h2', null, children),
+        Description: ({ children }: any) => React.createElement('p', null, children),
+        Close: ({ children, asChild, ...props }: any) => asChild ? children : React.createElement('button', props, children),
+    }
+})
 
 // ── Mock editorStore — use actual Zustand store ──────────────────────────
 vi.mock('@/store/editorStore', async () => {
