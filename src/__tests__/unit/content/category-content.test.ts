@@ -18,9 +18,9 @@ const MY_ADDRESS_KEYWORDS = [
 ]
 
 describe('[TC-S3-009] categoryMap structure', () => {
-  it('has exactly 11 entries', () => {
+  it('has exactly 14 entries', () => {
     // Assert
-    expect(Object.keys(categoryMap)).toHaveLength(11)
+    expect(Object.keys(categoryMap)).toHaveLength(14)
   })
 
   it('contains all expected categories', () => {
@@ -30,12 +30,12 @@ describe('[TC-S3-009] categoryMap structure', () => {
     }
   })
 
-  it('getAllCategories returns 11 categories', () => {
+  it('getAllCategories returns 14 categories', () => {
     // Act
     const categories = getAllCategories()
 
     // Assert
-    expect(categories).toHaveLength(11)
+    expect(categories).toHaveLength(14)
     for (const cat of ALL_CATEGORIES) {
       expect(categories).toContain(cat)
     }
