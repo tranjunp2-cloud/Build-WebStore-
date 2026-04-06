@@ -1,11 +1,52 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CreditCard, Banknote, Upload, UploadCloud, X, Save, Check } from 'lucide-react';
+import NextImage from 'next/image';
+import { CreditCard, Banknote, Upload, UploadCloud, X, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, type PaymentUpdates } from './actions';
 import { useI18n } from '@/i18n';
+
+type Media = {
+    id: string | number;
+    url?: string;
+    thumbnailURL?: string;
+};
+
+function getImageUrl(image: Media | string | null): string | null {
+    if (!image || typeof image === 'string') return null;
+    let url = image.url || image.thumbnailURL || null;
+    if (!url) return null;
+
+    // Fix existing broken local URLs directly to S3 because MinIO stores them
+    if (url.includes('/api/media/file/') || url.includes('minio:') || url.includes('localhost:9000')) {
+        if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
+            const filename = url.split('/').pop();
+            if (!filename) return null;
+            url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`;
+        }
+    }
+
+    // CRITICAL: NextJS image optimization crashes if 'minio' is missing from next.config.ts after a cache clear.
+    // Browser also cannot resolve 'minio' natively. Map to localhost safely, specifically for Local Dev.
+    if (process.env.NODE_ENV === 'development' && url.includes('minio:')) {
+        url = url.replace(/minio:\d+/, 'localhost:9000');
+    }
+
+    return url;
+}
+
+function isLocalOrBlob(urlStr: string | null): boolean {
+    if (!urlStr) return false;
+    if (urlStr.startsWith('blob:')) return true;
+    try {
+        const url = new URL(urlStr);
+        return process.env.NODE_ENV === 'development' && ['localhost', '127.0.0.1'].includes(url.hostname);
+    } catch {
+        return false;
+    }
+}
 
 export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined }) {
     const [paymentCod, setPaymentCod] = useState(false);
@@ -40,18 +81,8 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                     if (data.qr_image) {
                         const qrImg = data.qr_image;
                         setQrImageId(typeof qrImg === 'string' ? qrImg : qrImg.id);
-                        
-                        let url = typeof qrImg === 'object' && qrImg.url ? qrImg.url : null;
-                        if (url) {
-                            if (url.includes('http://minio:9000')) {
-                                const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000';
-                                url = url.replace('http://minio:9000', s3Endpoint);
-                            } else if (url.includes('/api/media/file/')) {
-                                const filename = url.split('/').pop();
-                                const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000';
-                                url = `${s3Endpoint}/primeweb-media/${filename}`;
-                            }
-                        }
+
+                        const url = getImageUrl(qrImg as Media);
                         setQrPreviewUrl(url);
                     }
                 }
@@ -66,23 +97,23 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
     }, [tenantId]);
 
     const saveTenantSettings = async (updates: PaymentUpdates) => {
-            if (!tenantId) return false;
-            try {
-                const res = await updatePaymentSettings({
-                    payment_cod: paymentCod,
-                    payment_qr: paymentQr,
-                    qr_image: qrImageId,
-                    ...updates
-                });
-                if (!res.success) throw new Error(res.error || "Failed to save settings");
-                return true;
-            } catch (error: unknown) {
-                console.error("Save error:", error);
-                const errorMessage = error instanceof Error ? error.message : "Failed to save changes. Please try again.";
-                toast.error(errorMessage);
-                return false;
-            }
-        };
+        if (!tenantId) return false;
+        try {
+            const res = await updatePaymentSettings({
+                payment_cod: paymentCod,
+                payment_qr: paymentQr,
+                qr_image: qrImageId,
+                ...updates
+            });
+            if (!res.success) throw new Error(res.error || "Failed to save settings");
+            return true;
+        } catch (error: unknown) {
+            console.error("Save error:", error);
+            const errorMessage = error instanceof Error ? error.message : "Failed to save changes. Please try again.";
+            toast.error(errorMessage);
+            return false;
+        }
+    };
 
     const handleToggleCod = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const checked = e.target.checked;
@@ -104,7 +135,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
         }
         setPaymentQr(checked);
         if (!checked) setQrWidgetExpanded(false);
-        
+
         const success = await saveTenantSettings({ payment_qr: checked });
         if (success) {
             toast.success(pt.successSave);
@@ -123,30 +154,38 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
             return;
         }
 
-        // Preview
+        // Preview instantly with blob URL
         const objectUrl = URL.createObjectURL(file);
         setQrPreviewUrl(objectUrl);
         // Do not auto-activate here; wait until success
-            toast.loading(pt.uploadingQr, { id: 'upload-qr' });
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-    
-                const uploadRes = await uploadQrMedia(formData);
-    
-                if (!uploadRes.success || !uploadRes.doc) {
-                    throw new Error(uploadRes.error || "Upload failed");
-                }
-                
-                const qrDocId = uploadRes.doc.id;
-                setQrImageId(qrDocId);
-                // Keep the original high-quality objectUrl for preview instead of the server response url which might not be immediate available. 
-            
+        toast.loading(pt.uploadingQr, { id: 'upload-qr' });
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadRes = await uploadQrMedia(formData);
+
+            if (!uploadRes.success || !uploadRes.doc) {
+                throw new Error(uploadRes.error || "Upload failed");
+            }
+
+            const qrDocId = uploadRes.doc.id;
+            setQrImageId(qrDocId);
+
+            // Update preview URL to the server URL so it persists after navigation.
+            // getImageUrl handles minio:9000 → localhost:9000 for local dev;
+            // on staging it returns the S3/CDN URL directly.
+            const serverUrl = getImageUrl(uploadRes.doc as Media);
+            if (serverUrl) {
+                setQrPreviewUrl(serverUrl);
+            }
+            // If serverUrl is somehow unavailable, blob URL from above is already showing.
+
             setPaymentQr(true); // Now activate
-            
+
             // Auto-save setting
             const success = await saveTenantSettings({ payment_qr: true, qr_image: qrDocId });
-            
+
             toast.dismiss('upload-qr');
             if (success) {
                 toast.success(pt.successSave);
@@ -175,7 +214,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
-        
+
         const success = await saveTenantSettings({ payment_qr: false, qr_image: null });
         if (success) {
             toast.success(pt.removeSuccess);
@@ -365,10 +404,13 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                             <div className="flex flex-col w-full">
                                 {qrPreviewUrl ? (
                                     <div className="relative inline-flex self-start border border-white/[0.08] rounded-2xl overflow-hidden bg-[#0B1120]/50 p-3">
-                                        <img
+                                        <NextImage
                                             src={qrPreviewUrl}
                                             alt="QR Code"
-                                            className="w-48 h-48 object-contain bg-white rounded-xl shadow-inner"
+                                            width={192}
+                                            height={192}
+                                            unoptimized={isLocalOrBlob(qrPreviewUrl)}
+                                            className="object-contain bg-white rounded-xl shadow-inner"
                                         />
                                         <button
                                             type="button"
