@@ -5,7 +5,7 @@ import type { CTAButton, ImageRef } from '../types'
 // ── Navigation Config ────────────────────────────────────────────────────────
 export type NavigationConfig = {
     blockType: 'navigation'
-    variant?: 'simple' | 'centered' | 'mega-menu'
+    variant?: 'simple' | 'centered' | 'mega-menu' | 'transparent' | 'sidebar' | 'pill'
     logoText?: string
     logo?: ImageRef
     links: { label: string; url: string }[]
@@ -14,7 +14,7 @@ export type NavigationConfig = {
 
 export const NavigationConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('navigation'),
-    variant: z.enum(['simple', 'centered', 'mega-menu']).default('simple'),
+    variant: z.enum(['simple', 'centered', 'mega-menu', 'transparent', 'sidebar', 'pill']).default('simple'),
     logoText: z.string().optional(),
     logo: ImageRefSchema.optional(),
     links: z.array(z.object({ label: z.string(), url: z.string() })).default([]),
@@ -30,7 +30,7 @@ export const navigationMeta = {
     name: 'Navigation',
     description: 'Site navigation bar with logo, links, and optional CTA',
     icon: '🧭',
-    variants: ['simple', 'centered', 'mega-menu'],
+    variants: ['simple', 'centered', 'mega-menu', 'transparent', 'sidebar', 'pill'],
     defaultVariant: 'simple',
     editableFields: ['logoText', 'links', 'ctaButton'],
     quickActions: ['Add link', 'Change logo', 'Toggle CTA'],

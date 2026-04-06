@@ -1,14 +1,155 @@
 'use client'
 
+import { useState, useRef, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { FeaturesConfig } from './config'
-import { StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
+import { StaggerGrid, StaggerItem, HoverCard, staggerContainer, staggerItem } from '../shared/animations'
 import { IconContainer, SectionLabel, GradientBlob } from '../shared/decorative'
 
 export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
     const { headline, subheadline, features = [], variant = 'grid-3' } = block
-    const pc = theme.primaryColor
 
+    // ── icon-top variant ──────────────────────────────────────────────────
+    if (variant === 'icon-top') {
+        return (
+            <section className="py-24 relative overflow-hidden">
+                <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+                <div className="container mx-auto px-6 relative z-10">
+                    <div className="text-center max-w-2xl mx-auto mb-16">
+                        {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
+                        {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    </div>
+                    <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        {features.map((feature, i) => (
+                            <StaggerItem key={i}>
+                                <HoverCard
+                                    className="p-8 rounded-2xl h-full text-center group transition-all duration-300 hover:shadow-xl"
+                                    style={{
+                                        border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
+                                        background: 'var(--surface)',
+                                    }}
+                                >
+                                    {feature.icon && (
+                                        <div className="flex justify-center mb-6">
+                                            <IconContainer color={theme.primaryColor} size="lg" className="group-hover:scale-110 transition-transform duration-300">
+                                                {feature.icon}
+                                            </IconContainer>
+                                        </div>
+                                    )}
+                                    <h3 className="text-xl font-bold font-heading mb-3">{feature.title}</h3>
+                                    <p className="opacity-50 leading-relaxed text-sm">{feature.description}</p>
+                                </HoverCard>
+                            </StaggerItem>
+                        ))}
+                    </StaggerGrid>
+                </div>
+            </section>
+        )
+    }
+
+    // ── icon-left variant ─────────────────────────────────────────────────
+    if (variant === 'icon-left') {
+        return (
+            <section className="py-24 relative overflow-hidden">
+                <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+                <div className="container mx-auto px-6 relative z-10">
+                    <div className="text-center max-w-2xl mx-auto mb-16">
+                        {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
+                        {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    </div>
+                    <StaggerGrid className="flex flex-col gap-6 max-w-3xl mx-auto">
+                        {features.map((feature, i) => (
+                            <StaggerItem key={i}>
+                                <div className="flex items-start gap-5 p-6 rounded-2xl transition-all duration-300 hover:shadow-lg"
+                                    style={{
+                                        border: '1px solid rgba(var(--brand-primary-rgb), 0.071)',
+                                        background: 'linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)',
+                                    }}
+                                >
+                                    {feature.icon && (
+                                        <div
+                                            className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-xl"
+                                            style={{
+                                                background: 'rgba(var(--brand-primary-rgb), 0.1)',
+                                                color: 'var(--brand-primary)',
+                                            }}
+                                        >
+                                            {feature.icon}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <h3 className="text-lg font-bold font-heading mb-1">{feature.title}</h3>
+                                        <p className="opacity-50 leading-relaxed text-sm">{feature.description}</p>
+                                    </div>
+                                </div>
+                            </StaggerItem>
+                        ))}
+                    </StaggerGrid>
+                </div>
+            </section>
+        )
+    }
+
+    // ── zigzag variant ────────────────────────────────────────────────────
+    if (variant === 'zigzag') {
+        return (
+            <section className="py-24 relative overflow-hidden">
+                <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+                <div className="container mx-auto px-6 relative z-10">
+                    <div className="text-center max-w-2xl mx-auto mb-16">
+                        {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
+                        {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    </div>
+                    <motion.div
+                        initial="hidden"
+                        whileInView="visible"
+                        viewport={{ once: true, margin: '-50px' }}
+                        variants={staggerContainer}
+                        className="flex flex-col gap-16 max-w-5xl mx-auto"
+                    >
+                        {features.map((feature, i) => {
+                            const isEven = i % 2 === 1
+                            return (
+                                <motion.div
+                                    key={i}
+                                    variants={staggerItem}
+                                    className={`flex flex-col md:flex-row items-center gap-8 ${isEven ? 'md:flex-row-reverse' : ''}`}
+                                >
+                                    {/* Icon side */}
+                                    <div className="flex-shrink-0 flex items-center justify-center w-24 h-24 rounded-3xl"
+                                        style={{
+                                            background: 'rgba(var(--brand-primary-rgb), 0.08)',
+                                            border: '1px solid rgba(var(--brand-primary-rgb), 0.12)',
+                                        }}
+                                    >
+                                        {feature.icon && (
+                                            <span className="text-4xl" style={{ color: 'var(--brand-primary)' }}>{feature.icon}</span>
+                                        )}
+                                    </div>
+                                    {/* Content side */}
+                                    <div className={`flex-1 ${isEven ? 'md:text-right' : ''}`}>
+                                        <h3 className="text-2xl font-bold font-heading mb-3">{feature.title}</h3>
+                                        <p className="opacity-50 leading-relaxed">{feature.description}</p>
+                                    </div>
+                                </motion.div>
+                            )
+                        })}
+                    </motion.div>
+                </div>
+            </section>
+        )
+    }
+
+    // ── carousel variant ──────────────────────────────────────────────────
+    if (variant === 'carousel') {
+        return <FeaturesCarousel block={block} theme={theme} headline={headline} subheadline={subheadline} features={features} />
+    }
+
+    // ── Default grid variants (grid-2, grid-3, grid-4, list) ─────────────
     const gridCols = {
         'grid-2': 'grid-cols-1 md:grid-cols-2',
         'grid-3': 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
@@ -18,13 +159,13 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
 
     return (
         <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={pc} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
 
             <div className="container mx-auto px-6 relative z-10">
                 {/* Section Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     {block.sectionLabel && (
-                        <SectionLabel color={pc}>{block.sectionLabel}</SectionLabel>
+                        <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>
                     )}
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
                     {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
@@ -35,16 +176,16 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                     {features.map((feature, i) => (
                         <StaggerItem key={i}>
                             <HoverCard
-                                className="p-8 rounded-2xl h-full transition-all duration-300 group"
+                                className="p-8 rounded-2xl h-full transition-all duration-300 group hover:shadow-xl"
                                 style={{
-                                    background: `linear-gradient(135deg, ${pc}06, transparent)`,
-                                    border: `1px solid ${pc}12`,
-                                    boxShadow: `0 2px 8px ${pc}05`,
+                                    background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)`,
+                                    border: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
+                                    boxShadow: `0 2px 8px rgba(var(--brand-primary-rgb), 0.02)`,
                                 }}
                             >
                                 {/* Icon */}
                                 {feature.icon && (
-                                    <IconContainer color={pc} className="mb-5 group-hover:scale-110 transition-transform duration-300">
+                                    <IconContainer color={theme.primaryColor} className="mb-5 group-hover:scale-110 transition-transform duration-300">
                                         {feature.icon}
                                     </IconContainer>
                                 )}
@@ -57,12 +198,117 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                 {/* Bottom accent line on hover */}
                                 <div
                                     className="mt-6 h-0.5 w-0 group-hover:w-12 transition-all duration-500 rounded-full"
-                                    style={{ background: `linear-gradient(90deg, ${pc}, transparent)` }}
+                                    style={{ background: `linear-gradient(90deg, var(--brand-primary), transparent)` }}
                                 />
                             </HoverCard>
                         </StaggerItem>
                     ))}
                 </StaggerGrid>
+            </div>
+        </section>
+    )
+}
+
+// ── Carousel sub-component (uses useState) ────────────────────────────────
+function FeaturesCarousel({
+    block,
+    theme,
+    headline,
+    subheadline,
+    features,
+}: {
+    block: BlockProps<FeaturesConfig>['block']
+    theme: BlockProps<FeaturesConfig>['theme']
+    headline: string
+    subheadline?: string
+    features: FeaturesConfig['features']
+}) {
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const [canScrollLeft, setCanScrollLeft] = useState(false)
+    const [canScrollRight, setCanScrollRight] = useState(true)
+
+    const updateScrollState = useCallback(() => {
+        const el = scrollRef.current
+        if (!el) return
+        setCanScrollLeft(el.scrollLeft > 0)
+        setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10)
+    }, [])
+
+    const scroll = useCallback((direction: 'left' | 'right') => {
+        const el = scrollRef.current
+        if (!el) return
+        const amount = direction === 'left' ? -320 : 320
+        el.scrollBy({ left: amount, behavior: 'smooth' })
+        setTimeout(updateScrollState, 350)
+    }, [updateScrollState])
+
+    return (
+        <section className="py-24 relative overflow-hidden">
+            <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            <div className="container mx-auto px-6 relative z-10">
+                <div className="text-center max-w-2xl mx-auto mb-16">
+                    {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
+                    {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                </div>
+
+                <div className="relative">
+                    {/* Nav arrows — desktop only */}
+                    <button
+                        onClick={() => scroll('left')}
+                        className={`hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollLeft ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
+                        style={{
+                            background: 'var(--surface)',
+                            borderColor: 'rgba(var(--brand-primary-rgb), 0.2)',
+                            color: 'var(--brand-primary)',
+                        }}
+                        aria-label="Scroll left"
+                    >
+                        &#8592;
+                    </button>
+                    <button
+                        onClick={() => scroll('right')}
+                        className={`hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollRight ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
+                        style={{
+                            background: 'var(--surface)',
+                            borderColor: 'rgba(var(--brand-primary-rgb), 0.2)',
+                            color: 'var(--brand-primary)',
+                        }}
+                        aria-label="Scroll right"
+                    >
+                        &#8594;
+                    </button>
+
+                    <div
+                        ref={scrollRef}
+                        onScroll={updateScrollState}
+                        className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-4 scrollbar-hide"
+                        style={{ scrollbarWidth: 'none' }}
+                    >
+                        {features.map((feature, i) => (
+                            <motion.div
+                                key={i}
+                                initial={{ opacity: 0, y: 20 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: i * 0.1, duration: 0.4 }}
+                                className="flex-shrink-0 w-[300px] snap-start p-8 rounded-2xl group transition-all duration-300 hover:shadow-xl"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)',
+                                    border: '1px solid rgba(var(--brand-primary-rgb), 0.071)',
+                                }}
+                            >
+                                {feature.icon && (
+                                    <IconContainer color={theme.primaryColor} className="mb-5 group-hover:scale-110 transition-transform duration-300">
+                                        {feature.icon}
+                                    </IconContainer>
+                                )}
+                                <h3 className="text-xl font-bold font-heading mb-3">{feature.title}</h3>
+                                <p className="opacity-50 leading-relaxed text-sm">{feature.description}</p>
+                            </motion.div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </section>
     )

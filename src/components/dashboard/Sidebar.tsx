@@ -27,9 +27,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
     LayoutDashboard,
     Globe,
-    Store,
-    Package,
-    ShoppingCart,
+    LayoutTemplate,
     Settings,
     Headphones,
     LogOut,
@@ -64,8 +62,8 @@ const NAV_ITEMS: NavItemConfig[] = [
         href: '/dashboard',
     },
     {
-        label: { en: 'My Webstore', ms: 'Webstore Saya' },
-        icon: Store,
+        label: { en: 'My Website', ms: 'Laman Web Saya' },
+        icon: LayoutTemplate,
         href: '/editor',
         children: [
             { label: { en: 'Editor', ms: 'Editor' }, href: '/editor' },
@@ -73,22 +71,11 @@ const NAV_ITEMS: NavItemConfig[] = [
         ],
     },
     {
-        label: { en: 'Products', ms: 'Produk' },
-        icon: Package,
-        href: '/products',
-    },
-    {
-        label: { en: 'Orders', ms: 'Pesanan' },
-        icon: ShoppingCart,
-        href: '/orders',
-    },
-    {
-        label: { en: 'Store Config', ms: 'Tetapan Kedai' },
+        label: { en: 'Site Settings', ms: 'Tetapan Laman' },
         icon: Settings,
         href: '/settings',
         children: [
             { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains' },
-            { label: { en: 'Payments', ms: 'Pembayaran' }, href: '/settings/payments' },
             { label: { en: 'Staff', ms: 'Kakitangan' }, href: '/settings/staff' },
         ],
     },

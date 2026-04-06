@@ -9,7 +9,7 @@ export type FeatureItem = {
 
 export type FeaturesConfig = {
     blockType: 'features'
-    variant?: 'grid-2' | 'grid-3' | 'grid-4' | 'list'
+    variant?: 'grid-2' | 'grid-3' | 'grid-4' | 'list' | 'icon-top' | 'icon-left' | 'zigzag' | 'carousel'
     headline: string
     subheadline?: string
     sectionLabel?: string
@@ -18,7 +18,7 @@ export type FeaturesConfig = {
 
 export const FeaturesConfigSchema = BaseBlockSchema.extend({
     blockType: z.literal('features'),
-    variant: z.enum(['grid-2', 'grid-3', 'grid-4', 'list']).default('grid-3'),
+    variant: z.enum(['grid-2', 'grid-3', 'grid-4', 'list', 'icon-top', 'icon-left', 'zigzag', 'carousel']).default('grid-3'),
     headline: z.string(),
     subheadline: z.string().optional(),
     features: z.array(z.object({
@@ -33,7 +33,7 @@ export const featuresMeta = {
     name: 'Features',
     description: 'Feature/service grid with icons and descriptions',
     icon: '✨',
-    variants: ['grid-2', 'grid-3', 'grid-4', 'list'],
+    variants: ['grid-2', 'grid-3', 'grid-4', 'list', 'icon-top', 'icon-left', 'zigzag', 'carousel'],
     defaultVariant: 'grid-3',
     editableFields: ['headline', 'subheadline', 'features'],
     quickActions: ['Add feature', 'Rewrite all', 'Change icons'],

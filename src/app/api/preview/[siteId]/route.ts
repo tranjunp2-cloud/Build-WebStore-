@@ -36,7 +36,9 @@ type BlockData = {
     [key: string]: unknown;
 }
 
-export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string; ogTitle?: string; ogDescription?: string }, site?: Record<string, unknown>): string {
+type NavPageRef = { id: string | number; slug?: string; title?: string }
+
+export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, category?: string, meta?: { name?: string; description?: string; lang?: string; ogTitle?: string; ogDescription?: string }, site?: Record<string, unknown>, pages?: NavPageRef[]): string {
   const cat = category || 'business'
   const t = theme || THEMES[cat] || THEMES.business
 
@@ -64,7 +66,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
     return html.replace(/^<([a-z0-9]+)\s/i, `<$1 data-block-index="${index}" data-block-type="${type}" `)
   }
 
-  const navHtml = blocks.map((b, i) => b.blockType === 'navigation' ? addDataAttr(renderNav(b, t), i, b.blockType) : '').filter(Boolean).join('\n')
+  const navHtml = blocks.map((b, i) => b.blockType === 'navigation' ? addDataAttr(renderNav(b, t, pages), i, b.blockType) : '').filter(Boolean).join('\n')
   const heroHtml = blocks.map((b, i) => b.blockType === 'hero' ? addDataAttr(renderHero(b as RenderHeroBlock, t, cat), i, b.blockType) : '').filter(Boolean).join('\n')
   const footerHtml = blocks.map((b, i) => b.blockType === 'footer' ? addDataAttr(renderSections(b as RenderBlock, t, cat, site as Record<string, unknown>), i, b.blockType) : '').filter(Boolean).join('\n')
   const mainHtml = blocks
@@ -103,6 +105,7 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
   </main>
   ${footerHtml}
 
+  <script id="page-map" type="application/json">${JSON.stringify((pages || []).map(function(p) { return { id: p.id, slug: p.slug || '', title: p.title || '' } }))}</script>
   <script>
     let parentOrigin;
     try {
@@ -414,6 +417,97 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
         }
       })
 
+      // Intercept nav link clicks — navigate to page via editor
+      var pageMap = [];
+      try {
+        var pmEl = document.getElementById('page-map');
+        if (pmEl) pageMap = JSON.parse(pmEl.textContent || '[]');
+      } catch(ex) {}
+      // Smart-assign page IDs to nav links by keyword matching
+      var KEYWORD_MAP = {
+        'home': ['home','trang chủ','trang chu','homepage','beranda','laman utama'],
+        'about': ['about','về chúng tôi','ve chung toi','giới thiệu','gioi thieu','tentang kami','perihal'],
+        'products': ['product','sản phẩm','san pham','produk','cửa hàng','cua hang','shop','store'],
+        'contact': ['contact','liên hệ','lien he','hubungi','hubungi kami'],
+        'services': ['service','dịch vụ','dich vu','perkhidmatan'],
+        'blog': ['blog','bài viết','bai viet','tin tức','tin tuc'],
+        'faq': ['faq','câu hỏi','cau hoi','soalan']
+      };
+      if (pageMap.length > 0) {
+        var navLinks = document.querySelectorAll('nav a:not(.nav-cta)');
+        navLinks.forEach(function(a) {
+          if (a.getAttribute('data-page-id')) return;
+          var text = (a.textContent || '').trim().toLowerCase();
+          // Try keyword matching against page slugs
+          for (var si = 0; si < pageMap.length; si++) {
+            var pg = pageMap[si];
+            var slug = (pg.slug || '').toLowerCase();
+            var title = (pg.title || '').toLowerCase();
+            // Check if nav text matches any keyword group that also matches page slug/title
+            for (var cat in KEYWORD_MAP) {
+              var keywords = KEYWORD_MAP[cat];
+              var navMatches = keywords.some(function(kw) { return text.includes(kw) || kw.includes(text); });
+              var pageMatches = keywords.some(function(kw) { return slug.includes(kw) || title.includes(kw) || cat === slug; });
+              if (navMatches && pageMatches) {
+                a.setAttribute('data-page-id', String(pg.id));
+                return;
+              }
+            }
+            // Direct title match
+            if (title === text) {
+              a.setAttribute('data-page-id', String(pg.id));
+              return;
+            }
+          }
+        });
+      }
+
+      function findPageByLink(el) {
+        // 1. Check data-page-id attribute (set by renderNav)
+        var pid = el.getAttribute('data-page-id');
+        if (pid) return pid;
+        // 2. Match by link text against page titles
+        var text = (el.textContent || '').trim().toLowerCase();
+        for (var i = 0; i < pageMap.length; i++) {
+          if (pageMap[i].title && pageMap[i].title.toLowerCase().trim() === text) return String(pageMap[i].id);
+        }
+        // 3. Match by href slug against page slugs
+        var href = (el.getAttribute('href') || '').replace(/^[/#]+/, '').toLowerCase();
+        if (href) {
+          for (var j = 0; j < pageMap.length; j++) {
+            var ps = (pageMap[j].slug || '').toLowerCase();
+            if (ps && (ps === href || ps.includes(href) || href.includes(ps))) return String(pageMap[j].id);
+          }
+        }
+        return null;
+      }
+
+      var isInIframe = window !== window.parent;
+
+      document.addEventListener('click', function(e) {
+        var el = e.target;
+        while (el && el.tagName !== 'A') el = el.parentElement;
+        if (!el) return;
+        var href = el.getAttribute('href') || '';
+        // Only intercept internal links (# or /)
+        if (href && !href.startsWith('#') && !href.startsWith('/')) return;
+        var pid = findPageByLink(el);
+        if (pid) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isInIframe) {
+            // Inside editor iframe — notify parent to switch page
+            window.parent.postMessage({ type: 'PAGE_NAVIGATE', pageId: pid }, parentOrigin);
+          } else {
+            // Standalone preview — navigate via URL
+            var url = new URL(window.location.href);
+            url.searchParams.set('pageId', pid);
+            url.hash = '';
+            window.location.href = url.toString();
+          }
+        }
+      }, true)
+
       window.addEventListener('load', postLayouts)
       window.addEventListener('resize', postLayouts)
       window.addEventListener('scroll', postLayouts, { passive: true })
@@ -456,11 +550,16 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
       if (!/^\d+$/.test(pageId)) {
         return new NextResponse('Invalid pageId', { status: 400 })
       }
-      const requestedPage = await payload.findByID({
-        collection: 'pages',
-        id: pageId,
-        draft: true, // From staging: include drafts
-      })
+      let requestedPage: Awaited<ReturnType<typeof payload.findByID>> | null = null
+      try {
+        requestedPage = await payload.findByID({
+          collection: 'pages',
+          id: pageId,
+          draft: true,
+        })
+      } catch {
+        // Page not found — fall through to homepage
+      }
 
       const requestedPageSiteId =
         typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
@@ -493,7 +592,23 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
       page = pagesResult.docs[0] || null
     }
 
-    const blocks = page?.layout || []
+    const pageLayout = page?.layout || []
+    const isEmptyPage = pageId && page && pageLayout.filter((b: { blockType: string }) => !['navigation', 'footer'].includes(b.blockType)).length === 0
+
+    // If requested page has no content blocks, fall back to homepage layout
+    let blocks = pageLayout
+    if (isEmptyPage) {
+      const homepageResult = await payload.find({
+        collection: 'pages',
+        where: { site: { equals: numericSiteId }, isHomepage: { equals: true } },
+        limit: 1,
+        draft: true,
+      })
+      const homepage = homepageResult.docs[0]
+      if (homepage?.layout && homepage.layout.length > 0) {
+        blocks = homepage.layout
+      }
+    }
 
     const visiblePagesResult = await payload.find({
       collection: 'pages',
@@ -527,14 +642,23 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
     if (normalizedFooter) combinedBlocks.push(normalizedFooter)
 
     const cat = detectCategory(combinedBlocks, site.name || '')
-    const t = THEMES[cat] || THEMES.business
+    const baseTheme = THEMES[cat] || THEMES.business
+    // Merge site's actual theme (user-chosen fonts/colors) over industry defaults
+    const siteTheme = (site as Record<string, unknown>).theme as Record<string, string> | undefined
+    const t: TemplateTheme = {
+      ...baseTheme,
+      ...(siteTheme?.fontHeading ? { fontHeading: siteTheme.fontHeading } : {}),
+      ...(siteTheme?.fontBody ? { fontBody: siteTheme.fontBody } : {}),
+      ...(siteTheme?.primaryColor ? { primary: siteTheme.primaryColor } : {}),
+      ...(siteTheme?.secondaryColor ? { secondary: siteTheme.secondaryColor } : {}),
+    }
     const html = buildFullHTML(combinedBlocks, t, cat, {
       name: page?.seo?.title || site.seo?.metaTitle || site.name,
       description: page?.seo?.description || site.seo?.metaDescription || site.description,
       ogTitle: page?.seo?.title || site.seo?.metaTitle || site.name,
       ogDescription: page?.seo?.description || site.seo?.metaDescription || site.description,
       lang: site.locale || 'en',
-    }, site)
+    }, site, visiblePagesResult.docs as unknown as NavPageRef[])
 
     return new NextResponse(html, {
       headers: {

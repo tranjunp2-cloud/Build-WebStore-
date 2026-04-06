@@ -17,8 +17,9 @@ import { cn } from '@/lib/utils'
 import { TemplateCard, type Template } from '@/components/frontend/TemplateCard'
 import { TemplatePreviewModal } from '@/components/frontend/TemplatePreviewModal'
 
+// v1.0: ecommerce category hidden (deferred to v1.1)
 const CATEGORY_KEYS = [
-    'all', 'restaurant', 'ecommerce', 'beauty', 'tech',
+    'all', 'restaurant', 'beauty', 'tech',
     'health', 'education', 'realestate', 'fitness', 'creative', 'business',
 ] as const
 

@@ -187,7 +187,28 @@
                 "industry": "Sila pilih industri",
                 "shortDescription": "Sila terangkan perniagaan anda",
                 "products": "Sila terangkan produk / perkhidmatan anda"
-            }
+            },
+            "tabManual": "Huraikan Perniagaan",
+            "tabUrl": "Import dari URL",
+            "urlLabel": "URL Laman Web",
+            "urlPlaceholder": "https://laman-web-anda.com",
+            "urlHint": "Tampal URL laman web sedia ada anda",
+            "extractButton": "Ekstrak",
+            "extracting": "Mengekstrak...",
+            "analyzingWebsite": "Mengakses laman web...",
+            "extractingInfo": "Mengekstrak maklumat perniagaan...",
+            "confidenceHigh": "Diekstrak dari URL",
+            "confidenceMedium": "Sebahagian diekstrak",
+            "confidenceLow": "Maklumat terhad diekstrak",
+            "warningLow": "Kami tidak dapat mengekstrak banyak maklumat. Sila semak dan lengkapkan.",
+            "warningMedium": "Sesetengah medan mungkin perlu pengeditan manual.",
+            "errorTimeout": "Kami tidak dapat mengakses laman web ini.",
+            "errorBlocked": "Laman web ini menghalang permintaan kami. Sila masukkan maklumat secara manual.",
+            "errorInvalid": "Ini bukan URL laman web yang sah.",
+            "errorUnsafe": "URL ini mengandungi kandungan yang tidak dibenarkan.",
+            "errorRateLimit": "Terlalu banyak permintaan. Sila tunggu sebentar.",
+            "errorGeneric": "Sesuatu telah berlaku. Sila cuba lagi atau masukkan maklumat secara manual.",
+            "tryManual": "Cuba masukkan secara manual"
         }
     },
     "email": {
