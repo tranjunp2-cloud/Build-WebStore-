@@ -11,6 +11,9 @@ export const TEMPLATE_CATEGORY_OPTIONS = [
     { label: '💪 Gym / Fitness / Yoga', value: 'fitness' },
     { label: '🎨 Portfolio / Freelancer / Agency', value: 'creative' },
     { label: '🏢 Business / Corporate', value: 'business' },
+    { label: '🎉 Events / Wedding', value: 'events' },
+    { label: '📝 Blog / Media / Magazine', value: 'blog' },
+    { label: '✈️ Travel / Tourism', value: 'travel' },
 ]
 
 export const Templates: CollectionConfig = {
