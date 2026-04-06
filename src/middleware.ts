@@ -74,10 +74,14 @@ export async function middleware(req: NextRequest) {
         const parts = pathname.split('/')
         if (parts.length >= 3) {
             const tenantSlug = parts[2]
+            // Gate ecom storefront routes (v1.0: landing pages only, ecom deferred to v1.1)
+            const remainingPath = '/' + parts.slice(3).join('/')
+            if (remainingPath.startsWith('/products') || remainingPath.startsWith('/checkout')) {
+                return NextResponse.rewrite(new URL('/not-found', req.url))
+            }
             const response = NextResponse.next()
             response.headers.set('x-tenant-slug', tenantSlug)
             response.headers.set('x-tenant-type', 'local')
-            // Auth Guard paths do not overlap with /sites/, so early return is safe.
             return response
         }
     }
@@ -89,6 +93,10 @@ export async function middleware(req: NextRequest) {
         hostname !== ADMIN_DOMAIN
 
     if (isSubdomain) {
+        // Gate ecom routes on subdomain (v1.0: landing pages only)
+        if (pathname.startsWith('/products') || pathname.startsWith('/checkout')) {
+            return NextResponse.rewrite(new URL('/not-found', req.url))
+        }
         const tenantSlug = hostname.replace(`.${PLATFORM_DOMAIN}`, '')
         url.pathname = `/sites/${tenantSlug}${pathname}`
         const response = NextResponse.rewrite(url)

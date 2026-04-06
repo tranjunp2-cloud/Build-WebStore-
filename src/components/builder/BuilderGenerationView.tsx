@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2, X } from 'lucide-react'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useI18n } from '@/i18n'
 
@@ -9,9 +9,22 @@ interface BuilderGenerationViewProps {
     message?: string
     progress: number
     floatingControls?: ReactNode
+    elapsedSeconds?: number
+    onCancel?: () => void
+    showTimeoutWarning?: boolean
 }
 
-function BuilderGenerationCard({ progress }: { progress: number }) {
+function BuilderGenerationCard({
+    progress,
+    elapsedSeconds,
+    onCancel,
+    showTimeoutWarning,
+}: {
+    progress: number
+    elapsedSeconds?: number
+    onCancel?: () => void
+    showTimeoutWarning?: boolean
+}) {
     const { t } = useI18n()
     return (
         <div className="mx-auto flex w-full max-w-[864px] items-center justify-center px-12">
@@ -67,7 +80,31 @@ function BuilderGenerationCard({ progress }: { progress: number }) {
                                 style={{ width: `${Math.max(10, progress)}%` }}
                             />
                         </div>
+                        {typeof elapsedSeconds === 'number' && elapsedSeconds > 0 && (
+                            <div className="mt-1 text-center text-xs text-[#64748b]">
+                                Elapsed: {elapsedSeconds}s
+                            </div>
+                        )}
                     </div>
+
+                    {showTimeoutWarning && onCancel && (
+                        <div
+                            className="mt-5 flex flex-col items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4"
+                            role="alert"
+                        >
+                            <p className="text-center text-sm text-amber-300/90">
+                                Taking longer than expected...
+                            </p>
+                            <button
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                                onClick={onCancel}
+                                type="button"
+                            >
+                                <X className="size-3.5" />
+                                Cancel generation
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -78,9 +115,12 @@ export default function BuilderGenerationView({
     message,
     progress,
     floatingControls,
+    elapsedSeconds,
+    onCancel,
+    showTimeoutWarning,
 }: BuilderGenerationViewProps) {
     const { t } = useI18n()
-    
+
     const leftBody = (
         <div className="flex flex-col gap-6">
             <div className="flex items-start gap-3">
@@ -96,7 +136,12 @@ export default function BuilderGenerationView({
             </div>
 
             <div className="lg:hidden">
-                <BuilderGenerationCard progress={progress} />
+                <BuilderGenerationCard
+                    elapsedSeconds={elapsedSeconds}
+                    onCancel={onCancel}
+                    progress={progress}
+                    showTimeoutWarning={showTimeoutWarning}
+                />
             </div>
         </div>
     )
@@ -105,7 +150,14 @@ export default function BuilderGenerationView({
         <BuilderStepScreen
             floatingControls={floatingControls}
             leftBody={leftBody}
-            right={<BuilderGenerationCard progress={progress} />}
+            right={
+                <BuilderGenerationCard
+                    elapsedSeconds={elapsedSeconds}
+                    onCancel={onCancel}
+                    progress={progress}
+                    showTimeoutWarning={showTimeoutWarning}
+                />
+            }
             subtitle={t.onboarding.generating.subtitle}
             title={t.onboarding.generating.title}
         />

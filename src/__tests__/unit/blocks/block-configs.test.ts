@@ -8,8 +8,8 @@ import { blockRegistry } from '@/blocks/registry'
 // ─── TC-F01.08: Block registry for AI generation ─────────────────────
 
 describe('Block Types & Base Schemas [TC-F04]', () => {
-    it('BLOCK_TYPES has all 22 registered types', () => {
-        expect(BLOCK_TYPES.length).toBe(22)
+    it('BLOCK_TYPES has all 50 registered types', () => {
+        expect(BLOCK_TYPES.length).toBe(50)
         expect(BLOCK_TYPES).toContain('hero')
         expect(BLOCK_TYPES).toContain('navigation')
         expect(BLOCK_TYPES).toContain('contact')
@@ -62,6 +62,86 @@ describe('ThemeConfigSchema [TC-F04]', () => {
         expect(result.success).toBe(true)
         if (result.success) {
             expect(result.data.colorMode).toBe('dark')
+        }
+    })
+
+    // ─── TC-S1-001: ThemeConfig expanded type — all 14 fields ───────
+    it('TC-S1-001: validates full theme with all 14 fields', () => {
+        const result = ThemeConfigSchema.safeParse({
+            primaryColor: '#0ea5e9',
+            secondaryColor: '#d946ef',
+            accentColor: '#7dd3fc',
+            surfaceColor: '#111111',
+            textColor: '#fafafa',
+            mutedColor: '#a1a1aa',
+            fontPairingId: 'modern-clean',
+            fontHeading: 'Inter',
+            fontBody: 'Inter',
+            spacingPreset: 'compact',
+            borderRadius: 'pill',
+            shadowPreset: 'dramatic',
+            colorMode: 'dark',
+            backgroundColor: '#09090b',
+        })
+        expect(result.success).toBe(true)
+    })
+
+    // ─── TC-S1-002: Zod validation edge cases ──────────────────────
+    it('TC-S1-002: rejects transparent as primaryColor', () => {
+        const result = ThemeConfigSchema.safeParse({ primaryColor: 'transparent' })
+        expect(result.success).toBe(false)
+    })
+
+    it('TC-S1-002: rejects empty string as primaryColor', () => {
+        const result = ThemeConfigSchema.safeParse({ primaryColor: '' })
+        expect(result.success).toBe(false)
+    })
+
+    it('TC-S1-002: rejects 3-char hex shorthand', () => {
+        const result = ThemeConfigSchema.safeParse({ primaryColor: '#FFF' })
+        expect(result.success).toBe(false)
+    })
+
+    it('TC-S1-002: rejects 8-char hex with alpha', () => {
+        const result = ThemeConfigSchema.safeParse({ primaryColor: '#0ea5e9ff' })
+        expect(result.success).toBe(false)
+    })
+
+    it('TC-S1-002: rejects invalid spacingPreset', () => {
+        const result = ThemeConfigSchema.safeParse({ spacingPreset: 'huge' })
+        expect(result.success).toBe(false)
+    })
+
+    it('TC-S1-002: rejects invalid borderRadius', () => {
+        const result = ThemeConfigSchema.safeParse({ borderRadius: 'mega' })
+        expect(result.success).toBe(false)
+    })
+
+    it('TC-S1-002: rejects invalid shadowPreset', () => {
+        const result = ThemeConfigSchema.safeParse({ shadowPreset: 'extreme' })
+        expect(result.success).toBe(false)
+    })
+
+    it('TC-S1-002: accepts fontPairingId as null', () => {
+        const result = ThemeConfigSchema.safeParse({ fontPairingId: null })
+        expect(result.success).toBe(true)
+        if (result.success) {
+            expect(result.data.fontPairingId).toBeNull()
+        }
+    })
+
+    it('TC-S1-002: empty {} fills all defaults correctly', () => {
+        const result = ThemeConfigSchema.safeParse({})
+        expect(result.success).toBe(true)
+        if (result.success) {
+            expect(result.data.primaryColor).toBe('#0ea5e9')
+            expect(result.data.secondaryColor).toBe('#d946ef')
+            expect(result.data.spacingPreset).toBe('default')
+            expect(result.data.borderRadius).toBe('rounded')
+            expect(result.data.shadowPreset).toBe('subtle')
+            expect(result.data.fontPairingId).toBeNull()
+            expect(result.data.fontHeading).toBe('Outfit')
+            expect(result.data.fontBody).toBe('Inter')
         }
     })
 })
@@ -165,7 +245,7 @@ describe('heroMeta [TC-F01.08]', () => {
 
     it('lists expected variants', () => {
         expect(heroMeta.variants).toContain('centered')
-        expect(heroMeta.variants).toContain('split')
+        expect(heroMeta.variants).toContain('split-left')
     })
 
     it('has editableFields', () => {

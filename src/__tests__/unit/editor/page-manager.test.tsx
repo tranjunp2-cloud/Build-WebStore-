@@ -60,8 +60,8 @@ describe('PageManagerPanel', () => {
         // Assert
         expect(screen.getAllByText('Trang chủ')[0]).toBeInTheDocument()
         expect(screen.getByText('About Us')).toBeInTheDocument()
-        // Check badges
-        expect(screen.getByText('Live')).toBeInTheDocument() // Page 1
+        // Check badges — current page shows "Editing", others show status
+        expect(screen.getByText('Editing')).toBeInTheDocument() // Page 1 (current)
         expect(screen.getByText('Draft')).toBeInTheDocument() // Page 2
     })
 

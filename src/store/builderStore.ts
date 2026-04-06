@@ -31,6 +31,8 @@ export type BusinessInfo = {
     industry: string
     products: string
     language?: 'en' | 'ms' | 'vi' | 'auto'
+    businessUrl?: string
+    source?: 'form' | 'url'
 }
 
 type BuilderState = {
@@ -52,6 +54,9 @@ type BuilderState = {
     siteName: string | null
     progress: ProgressStep
 
+    // ContentBrief (from URL/Image extraction — passed to generator for high-fidelity output)
+    contentBrief: Record<string, unknown> | null
+
     // Error
     error: { code: string; message: string; retryable: boolean } | null
 }
@@ -59,6 +64,9 @@ type BuilderState = {
 type BuilderActions = {
     // Business Info
     setBusinessInfo: (info: BusinessInfo) => void
+    /** Update businessInfo WITHOUT changing step — for extraction pre-fill */
+    setBusinessInfoDraft: (info: Partial<BusinessInfo>) => void
+    setContentBrief: (brief: Record<string, unknown> | null) => void
     setStep: (step: BuilderState['step']) => void
 
     // Chat
@@ -94,6 +102,7 @@ const INITIAL_STATE: BuilderState = {
     siteId: null,
     siteName: null,
     progress: { step: '', label: '', progress: 0 },
+    contentBrief: null,
     error: null,
 }
 
@@ -132,6 +141,13 @@ export const useBuilderStore = create<BuilderState & BuilderActions>()(
                     step: 'chat',
                     messages: [],
                 }),
+
+            setBusinessInfoDraft: (draft) =>
+                set((state) => ({
+                    businessInfo: { ...state.businessInfo, ...draft } as BusinessInfo,
+                })),
+
+            setContentBrief: (brief) => set({ contentBrief: brief }),
 
             setStep: (step) => set({ step }),
 

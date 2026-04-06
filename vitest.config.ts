@@ -77,6 +77,22 @@ export default defineConfig({
                 'src/components/dashboard/AnalyticsEmptyState.tsx',
                 'src/components/dashboard/AnalyticsHeader.tsx',
                 'src/components/dashboard/DashboardBanner.tsx',
+                // Dashboard heavy UI — presentation + Payload deps, tested via E2E
+                'src/components/dashboard/ProductQuickViewModal.tsx',
+                'src/components/dashboard/product-form/**',
+                'src/components/dashboard/DashboardSiteGrid.tsx',
+                // Blog editor/management — heavy WYSIWYG, tested via E2E
+                'src/app/(dashboard)/blog/_components/**',
+                // Orders management — heavy data table + drawer, tested via E2E
+                'src/app/(dashboard)/orders/_components/**',
+                'src/app/(dashboard)/orders/components/**',
+                // Products/categories server actions — Payload deps, tested via integration
+                'src/app/(dashboard)/products/actions.ts',
+                'src/app/(dashboard)/products/categories/**',
+                // Dashboard actions — server-side Payload, tested via integration
+                'src/app/(dashboard)/actions/**',
+                // Storefront UI components — presentation, tested via E2E
+                'src/components/storefront/**',
                 // Storefront pages — public-facing, tested via E2E
                 'src/app/sites/**',
                 // Editor and AI components — heavy DOM/events, tested via E2E
