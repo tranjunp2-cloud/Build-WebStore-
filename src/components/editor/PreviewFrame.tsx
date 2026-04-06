@@ -628,7 +628,7 @@ function PreviewFrameInner({
         )
     }
 
-    const previewUrl = new URL(`/api/preview/${siteId}`, 'http://localhost')
+    const previewUrl = new URL(`/preview/${siteId}`, 'http://localhost')
     previewUrl.searchParams.set('v', String(iframeKey))
     if (pageId) {
         previewUrl.searchParams.set('pageId', pageId)

@@ -175,22 +175,21 @@ function renderCartWidget(b: RenderBlock, t: TemplateTheme) {
 
 function renderFeatures(b: RenderBlock, t: TemplateTheme) {
   const items = b.features || []
-  const cardBg = `${t.text}05`
-  const cardBorder = `${t.text}08`
-  return `<section class="section">
-    <div class="container">
-      <div style="text-align:center;margin-bottom:60px;">
-        ${b.sectionLabel ? `<div class="section-label fade-up">${b.sectionLabel}</div>` : ''}
-        <h2 class="section-title fade-up fade-up-d1">${b.headline || ''}</h2>
-        <p class="section-subtitle fade-up fade-up-d2" style="margin:0 auto;">${b.subheadline || ''}</p>
+  const layout = b.variant || 'grid' // grid, cards
+
+  return `<section class="py-24 relative overflow-hidden bg-white/5">
+    <div class="container mx-auto px-6 relative z-10">
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        ${b.sectionLabel ? `<div class="fade-up inline-flex px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-6" style="color:${t.primary};background:${t.primary}15;">${b.sectionLabel}</div>` : ''}
+        <h2 class="fade-up fade-up-d1 text-4xl md:text-5xl font-bold font-heading mb-6">${b.headline || ''}</h2>
+        ${b.subheadline ? `<p class="fade-up fade-up-d2 text-lg opacity-60 leading-relaxed">${b.subheadline}</p>` : ''}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         ${items.map((f: FeatureItem, i: number) => `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 4)} card-hover" style="padding:36px 28px;background:${cardBg};border:1px solid ${cardBorder};border-radius:16px;position:relative;overflow:hidden;">
-            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,${t.primary},${t.secondary});opacity:0;transition:opacity .3s;"></div>
-            <div style="width:52px;height:52px;border-radius:14px;background:${t.primary}15;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:20px;">${f.icon || '✦'}</div>
-            <h3 style="font-size:18px;font-weight:700;margin-bottom:10px;">${f.title}</h3>
-            <p style="font-size:14px;color:${t.muted};line-height:1.7;">${f.description || ''}</p>
+          <div class="fade-up fade-up-d${Math.min(i + 1, 4)} p-8 rounded-3xl transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl" style="${layout === 'cards' ? `background:white; border:1px solid ${t.primary}11;` : `border:1px solid ${t.primary}11;`}">
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-sm" style="background:${t.primary}15; color:${t.primary};">${f.icon || '✦'}</div>
+            <h3 class="text-xl font-bold mb-4 font-heading">${f.title}</h3>
+            <p class="opacity-60 leading-relaxed">${f.description || ''}</p>
           </div>
         `).join('')}
       </div>
@@ -199,16 +198,27 @@ function renderFeatures(b: RenderBlock, t: TemplateTheme) {
 }
 
 function renderAbout(b: RenderBlock, t: TemplateTheme) {
-  const aboutImg = getAboutImage(_category)
-  return `<section class="section" style="background:${t.primary}06;">
-    <div class="container" style="display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;">
-      <div>
-        ${b.sectionLabel ? `<div class="section-label fade-up">${b.sectionLabel}</div>` : ''}
-        <h2 class="section-title fade-up fade-up-d1">${b.headline || ''}</h2>
-        <p class="fade-up fade-up-d2" style="font-size:16px;color:${t.muted};line-height:1.8;">${b.body || ''}</p>
-      </div>
-      <div style="aspect-ratio:4/3;border-radius:20px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,.1);" class="hide-mobile">
-        <img src="${aboutImg}" alt="About Us" loading="lazy" style="width:100%;height:100%;object-fit:cover;transition:transform .5s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" />
+  const aboutImg = (b.image as { url?: string })?.url || getAboutImage(_category)
+  const layout = b.variant || 'image-right' // image-right, image-left, centered
+  
+  const imgHtml = aboutImg ? `<img src="${aboutImg}" alt="${escapeAttr(b.headline || 'About')}" loading="lazy" class="w-full h-auto rounded-3xl shadow-xl" />` : `<div class="w-full aspect-[4/3] rounded-3xl bg-neutral-100 flex items-center justify-center border text-neutral-300">Image missing</div>`
+  
+  const contentHtml = `
+    <div class="${layout === 'centered' ? 'text-center max-w-3xl mx-auto' : ''}">
+      ${b.sectionLabel ? `<div class="fade-up inline-flex px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-6" style="color:${t.primary};background:${t.primary}15;">${b.sectionLabel}</div>` : ''}
+      <h2 class="fade-up fade-up-d1 text-4xl md:text-5xl font-bold font-heading mb-6 leading-tight">${b.headline || ''}</h2>
+      ${b.body ? `<div class="fade-up fade-up-d2 opacity-60 leading-relaxed text-lg space-y-4"><p>${typeof b.body === 'string' ? b.body : ''}</p></div>` : ''}
+    </div>
+  `
+
+  return `<section class="py-24 relative overflow-hidden">
+    <div class="absolute bottom-[0%] right-[-10%] w-[400px] h-[400px] rounded-full blur-[100px] pointer-events-none" style="background:${t.primary};opacity:0.06;"></div>
+    
+    <div class="container mx-auto px-6 relative z-10">
+      <div class="grid grid-cols-1 ${layout !== 'centered' ? 'lg:grid-cols-2' : ''} gap-14 items-center">
+        ${layout === 'image-left' ? `<div class="fade-up">${imgHtml}</div>` : ''}
+        ${contentHtml}
+        ${(layout === 'image-right' || !layout) ? `<div class="fade-up">${imgHtml}</div>` : ''}
       </div>
     </div>
   </section>`
@@ -301,7 +311,7 @@ function renderFaq(b: RenderBlock, t: TemplateTheme) {
 }
 
 function renderGallery(b: RenderBlock, t: TemplateTheme) {
-  const galleryImages = getGalleryImages(_category, 6)
+  const galleryImages = (b.images as { url?: string }[])?.map(img => img.url).filter((url): url is string => Boolean(url)) || getGalleryImages(_category, 6)
   return `<section class="section">
     <div class="container">
       <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
@@ -327,7 +337,7 @@ function renderTeam(b: RenderBlock, t: TemplateTheme) {
     const avatar = getTeamAvatar(_category, i)
     return `
           <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="text-align:center;padding:32px 20px;background:${t.text}04;border-radius:16px;border:1px solid ${t.text}06;">
-            <img src="${avatar}" alt="${m.name}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin:0 auto 16px;border:3px solid ${t.primary}25;" />
+            <img src="${m.image || avatar}" alt="${m.name}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin:0 auto 16px;border:3px solid ${t.primary}25;" />
             <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">${m.name}</h3>
             <p style="font-size:13px;color:${t.muted};">${m.role || ''}</p>
           </div>`
@@ -338,15 +348,24 @@ function renderTeam(b: RenderBlock, t: TemplateTheme) {
 }
 
 function renderCta(b: RenderBlock, t: TemplateTheme) {
-  const img = getAboutImage(_category)
-  return `<section style="padding:80px 0;">
-    <div class="container">
-      <div class="fade-up" style="text-align:center;padding:64px 40px;border-radius:24px;position:relative;overflow:hidden;">
-        <img src="${img}" alt="CTA Background" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
-        <div style="position:absolute;inset:0;background:linear-gradient(135deg,${t.primary}e6,${t.secondary}cc);"></div>
-        <h2 style="font-size:clamp(24px,3vw,36px);font-weight:800;color:#fff;margin-bottom:12px;position:relative;z-index:1;">${b.headline || ''}</h2>
-        <p style="font-size:16px;color:rgba(255,255,255,.85);margin-bottom:32px;position:relative;z-index:1;">${b.subheadline || ''}</p>
-        <a href="${b.ctaUrl || '#'}" style="display:inline-flex;padding:14px 36px;background:#fff;color:${t.primary};border-radius:12px;font-weight:700;font-size:15px;position:relative;z-index:1;transition:all .2s;box-shadow:0 8px 24px rgba(0,0,0,.2);">${b.ctaLabel || 'Get Started'}</a>
+  const img = (b.image as { url?: string })?.url || ''
+  const layout = b.variant || 'centered'
+
+  return `<section class="py-24 relative overflow-hidden">
+    <div class="container mx-auto px-6 relative z-10">
+      <div class="fade-up relative overflow-hidden rounded-3xl" style="background: linear-gradient(135deg, ${t.primary}, ${t.secondary});">
+        ${img ? `<div class="absolute inset-0 opacity-20"><img src="${img}" alt="CTA Background" class="w-full h-full object-cover mix-blend-overlay" loading="lazy" /></div>` : ''}
+        <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(white 1.5px, transparent 1.5px); background-size: 24px 24px;"></div>
+        
+        <div class="relative z-10 px-8 py-20 md:p-24 ${layout === 'split' ? 'flex flex-col md:flex-row items-center justify-between gap-12' : 'text-center'}">
+          <div class="${layout === 'split' ? 'md:max-w-xl text-left' : 'max-w-3xl mx-auto'} text-white">
+            <h2 class="text-4xl md:text-5xl font-bold font-heading mb-6 leading-tight">${b.headline || ''}</h2>
+            <p class="text-lg opacity-80 leading-relaxed mb-10">${b.subheadline || ''}</p>
+            <div class="${layout === 'split' ? 'flex justify-start' : 'flex justify-center'} gap-4">
+              <a href="${b.ctaUrl || '#'}" class="px-8 py-4 bg-white rounded-xl font-bold transition-all duration-300 hover:scale-105 hover:shadow-xl inline-block" style="color: ${t.primary};">${b.ctaLabel || 'Get Started'}</a>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>`

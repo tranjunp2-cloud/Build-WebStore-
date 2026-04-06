@@ -26,9 +26,10 @@ export type SiteRendererProps = {
         [key: string]: unknown
     }
     pages?: NavPage[]
+    isEditor?: boolean
 }
 
-export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [], isEditor = false }: SiteRendererProps) {
     const theme: ThemeConfig = {
         primaryColor: site.theme?.primaryColor || '#0ea5e9',
         secondaryColor: site.theme?.secondaryColor || '#d946ef',
@@ -79,11 +80,26 @@ export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
                     }
                     : block
 
-                return (
+                const blockContent = (
                     <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
                         <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
                     </BlockErrorBoundary>
                 )
+
+                if (isEditor) {
+                    return (
+                        <div 
+                            key={`${block.blockType}-${index}`}
+                            data-block-index={index}
+                            data-block-type={block.blockType}
+                            className="group/block relative w-full"
+                        >
+                            {blockContent}
+                        </div>
+                    )
+                }
+
+                return blockContent
             })}
         </>
     )

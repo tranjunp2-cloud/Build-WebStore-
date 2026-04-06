@@ -91,7 +91,7 @@ function SiteCard({ site, t }: { site: SiteCardData, t: any }) {
                         <Pencil className="h-3 w-3" /> {t.dashboard.sites.edit}
                     </Link>
                     <Link
-                        href={`/api/preview/${site.id}`}
+                        href={`/preview/${site.id}`}
                         target="_blank"
                         className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-gray-300 hover:bg-white/10 transition-colors"
                     >

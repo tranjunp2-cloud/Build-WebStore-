@@ -142,7 +142,7 @@ export function EditorToolbar({
 
                     <Button variant="ghost" size="icon" asChild className="h-9 w-9 rounded-xl text-slate-300 hover:bg-white/5 hover:text-white">
                         <a
-                            href={currentPageId ? `/api/preview/${siteId}?pageId=${currentPageId}` : `/api/preview/${siteId}`}
+                            href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Open preview"
@@ -287,7 +287,7 @@ export function EditorToolbar({
 
                 <Button variant="ghost" size="sm" asChild className="h-9 rounded-[10px] border border-[rgba(59,130,246,0.07)] px-3 text-xs font-medium text-[#F8FAFC] hover:bg-white/5">
                     <a
-                        href={currentPageId ? `/api/preview/${siteId}?pageId=${currentPageId}` : `/api/preview/${siteId}`}
+                        href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
                         target="_blank"
                         rel="noopener noreferrer"
                     >
