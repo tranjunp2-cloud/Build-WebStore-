@@ -1,22 +1,21 @@
-# Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F11 - Undo/Redo Engine & AI Editor (Tích hợp F05)
-> **Phiên bản:** 2.0 | **Cập nhật:** 2026-03-25 | **Thực hiện:** QA Team
-> **Nguồn Tham chiếu:** PRD (`F11-undo-redo.md`), F05 PRD (`F05-ai-editor.md`), User Stories (F11-01, F11-02, F05-01 tới F05-14)
-> **Kỹ năng ứng dụng (.agent):** End-User E2E Flow, BDD (Gherkin Expectations), Locator Healer, Memory Boundaries Customization.
+# Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F11 - Undo/Redo Engine & AI Editor
+> **Phiên bản:** 2.0 | **Cập nhật:** 2026-04-06 | **Thực hiện:** QA Team
+> **Nguồn Tham chiếu:** PRD (`F11-undo-redo.md`), F05 PRD (`F05-ai-editor.md`)
+> **Kỹ năng ứng dụng:** End-User E2E Flow, BDD (Gherkin Expectations), Locator Healer, Memory Boundaries Customization.
 
 ---
 
 ## 1. Mục Tiêu (Objective)
 Tài liệu Test Case phiên bản 2.0 mở rộng độ phủ lên 100% bằng cách đặt F11 Undo/Redo vào bối cảnh người dùng thực tế đang sử dụng **F05 AI Editor**. Mục tiêu là phát hiện mọi rủi ro khi Undo tác động lên các hành vi phức tạp: Sửa Inline, Kéo thả Widget, Đổi cấu hình Global, Auto-save và xử lý AI Chat liên hoàn.
 
-Bộ kiểm thử được thiết kế theo đúng chuẩn Template Ma trận, với sự kết hợp chặt chẽ `GIVEN/WHEN/THEN` và kết quả mong đợi sát với góc nhìn Backend/Frontend.
-
 ---
 
 ## 2. Test Environment (Môi trường Kiểm thử)
+
 | Biến (Variable) | Yêu cầu (Requirements) |
 |---|---|
 | Môi trường (Env) | Staging / Localhost. (Không test Offline Mode vì Undo/Redo là Local-State). |
-| Browsers | Chrome (v110+), Safari (Mobile iOS). Test đặc biệt với phím ảo trên Ipad. |
+| Browsers | Chrome (v110+), Safari (Mobile iOS). Test đặc biệt với phím ảo trên iPad. |
 | Devices | Desktop rộng > 1024px, Mobile iPhone chuẩn Width 375px. |
 | Test Data & SLA | Text đầu vào > 500 ký tự (Giới hạn F05), Image test > 2MB. Tốc độ Undo DOM `< 200ms`. |
 
@@ -24,56 +23,108 @@ Bộ kiểm thử được thiết kế theo đúng chuẩn Template Ma trận, 
 
 ## 3. Unified Test Cases (Traceability Matrix)
 
-| ID | Tham chiếu | LOẠI | TIÊU ĐỀ (Scenario) | CÁC BƯỚC THỰC HIỆN & DỮ LIỆU | KẾT QUẢ MONG ĐỢI GHERKIN & DB CHECKS (Expected) | MỨC ĐỘ | AUTO |
+### US-F11-01: Hoàn Tác Mọi Thay Đổi — Thao tác Thủ công (3 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **[US-F11-01] Hoàn Tác Mọi Thay Đổi - Tương tác Thao tác Thủ công (Tham chiếu F05-06)** |
-| **TC-F11.01** | `F05-06` | `UI/Func` | Undo sửa chữ nội tuyến (Inline ContentEditable) | **1.** Click đúp vào tiêu đề "Shop Ban".<br>**2.** Gõ lại thành "Shop Táo". Xóa focus (Blur).<br>**3.** Bấm Undo (Ctrl+Z). | **GIVEN** Giao diện đã blur mốc State lưu lại chữ mới.<br>**WHEN** User nhấn Undo<br>**THEN** Trữ lượng hiển thị "Undo(1)". Tiêu đề trả về chữ cũ "Shop Ban" trong nháy mắt `< 200ms`. | Blocker | [x] |
-| **TC-F11.02** | `F05-06` | `UI` | Undo định dạng chữ (Formatting Floating Toolbar) | **1.** Bôi đen chữ "Táo".<br>**2.** Chọn công cụ bôi đậm (B) và nghiêng (I) từ Toolbar.<br>**3.** Ctrl+Z hai lần. | **THEN** Chữ tước bỏ định dạng (B), sau đó tước bỏ định dạng (I). Lùi từng bước độc lập. HTML Markup không bị vỡ. Nút Redo nháy sáng. | High | [ ] |
-| **TC-F11.03** | `F05-08` | `Logic` | Undo thay ảnh tự động Compress (>2MB) | **1.** Click vào Hero Image.<br>**2.** Up file ảnh 5MB. Quá trình Compress nén thành 200KB và render.<br>**3.** Bấm Ctrl+Z. | **GIVEN** Ảnh mới đã vẽ ra màn hình<br>**WHEN** Bấm Undo<br>**THEN** Thẻ `<img src>` cũ lập tức trở lại. Không load lại vòng chéo Network chặn băng thông. Cấu trúc Width/Height Banner không bị sụp lún. | High | [ ] |
-| **[US-F11-01] Hoàn Tác Mọi Thay Đổi - Kéo Thả & Component Library (Tham chiếu F05-05, F05-08)** |
-| **TC-F11.04** | `F05-08` | `E2E/UI` | Undo chèn Block mới từ Panel (Library) | **1.** Mở tab Components.<br>**2.** Kéo thả 1 khối "Product List" vào giữa iFrame.<br>**3.** Nhấn Undo. | **GIVEN** Trạng thái DOM đã chèn thêm 1 Component lớn<br>**THEN** Cả cụm Component đó và Placeholder Data (hàng ảo) bốc hơi sạch sẽ. Iframe thu lại Layout như cũ. Nút Redo có số 1. | Blocker | [x] |
-| **TC-F11.05** | `F05-05` | `Func` | Undo/Redo Hoán đổi Vị trí (Reordering) | **1.** Hover lấy Drag Handle (⠿).<br>**2.** Kéo Testimonial xuống dưới Footer.<br>**3.** Undo -> Sau đó bấm Redo. | **WHEN** Bấm Undo **THEN** Testimonial quay lại trên Footer. **WHEN** Bấm Redo **THEN** Nhảy thụt lại vị trí dưới cùng. UI Auto-Scroll bám theo Block. | High | [ ] |
-| **[US-F11-01] Hoàn Tác Mọi Thay Đổi - AI Chat "Gom Cụm" & Nút Hoàn Tác Phụ (Tham chiếu F05-01)** |
-| **TC-F11.06** | `F05-01` | `E2E` | Hoàn tác Gom Cụm Lệnh Gen Giao Diện Lớn (AI Single Action) | **1.** Gõ lệnh: "Đổi màu nền đen, thêm 3 cột giá, xóa thẻ About".<br>**2.** AI Gen liên hoàn 3 thay đổi.<br>**3.** Bấm Undo. | **GIVEN** Cột trạng thái đã nhận 1 Giao Dịch AI cực lớn<br>**THEN** Toàn bộ 3 mục (Màu, 3 Cột, thẻ About) đồng thời phục hồi 100% trong 1 click. TUYỆT ĐỐI không chia nhỏ ra 3 nhịp lắt nhắt bắt User Undo mỏi tay. | Blocker | [ ] |
-| **TC-F11.07** | `F05-01` | `UI` | Nút "Hoàn Tác" nội trú trong Lịch sử Chat AI | **1.** Xem lại khung Left Panel (Chat History).<br>**2.** Các message AI trả về "Đã đổi thành màu mint xanh".<br>**3.** Click nút "Hoàn Tác" ngay trong thẻ chat. | **THEN** Tác dụng giống hệt như bấm Nút Undo trên thanh công cụ. Message chat đó bị gạch ngang mờ (Greyed out) kèm nhãn "Undone". Nhấn Redo trên Toolbar sẽ hồi sinh lại. | High | [ ] |
-| **TC-F11.08** | `F05-03` | `Logic` | Undo Mini Edit Popup (Click ✨) | **1.** Hover Text 200ms -> Nhấn ✨ Edit.<br>**2.** Mở Input ngắn gõ "Sửa giọng văn hài hước".<br>**3.** Chữ nhảy -> Bấm Ctrl+Z. | **GIVEN** Chỉ Component bị thu hẹp thao tác<br>**THEN** Nội dung lùi về dạng trước lệnh chat mini. Dữ liệu lệnh nội bộ được đưa vào chung 1 Stack Tổng (Master History) của hệ thống. | Medium | [ ] |
-| **[US-F11-01] Hoàn Tác Mọi Thay Đổi - Global Settings, Data-Binding, SEO (Tham chiếu F05)** |
-| **TC-F11.09** | `F05-07` | `Data` | Undo Dropdown Menu Đa Cấp (Nested) | **1.** Click Header.<br>**2.** Panel Setting phải mở.<br>**3.** Kéo Sub-menu 2 nhét vô Level 1.<br>**4.** Ctrl+Z. | **THEN** Cấu trúc Menu Panel nhả Sub-Menu về bậc ngang hàng. Đồng thời Iframe Live Preview Navbar bung xòe ra như cũ một cách realtime rực rỡ. | High | [x] |
-| **TC-F11.10** | `F05-12` | `Data` | Đảo Undo Số điện thoại / Contact Binding Tức thì | **1.** Nhấn click ra nền trắng ngoài Iframe.<br>**2.** Mở Tab Cấu hình Liên Hệ. Đổi SĐT 091 thành 099.<br>**3.** Bấm biểu tượng ↩ trên top. | **GIVEN** Data được truyền vào Redux/Zustand Global<br>**THEN** Dữ liệu SĐT Input Panel đảo về 091. Tất cả Footer / Header Widget đang bind (gắn) với Data này ĐỒNG LOẠT giật nhảy về "091" nhanh như cắt. | Blocker | [ ] |
-| **TC-F11.11** | `F05-13` | `Func` | Undo Metadata AI Generate (Page-Level SEO) | **1.** Nhấn nút "✨ Tự động Tối ưu SEO".<br>**2.** Input Meta Title / Desc tự nhảy đầy chữ.<br>**3.** Bấm Ctrl+Z. | **THEN** Dữ liệu input trả dội lại chuỗi cũ. Không thực hiện Update database lén lút (Cho đến khi debounce AutoSave 3s quét). | Medium | [ ] |
-| **[US-F11-01] Cơ Chế Lõi Cắt Khúc Lịch Sử & Xử Lý Debounce (Tham chiếu AC-2, AC-3)** |
-| **TC-F11.12** | `Logic` | Băm Nát Trục Redo (Branch Cut-Off) | **1.** Sửa 5 mục A,B,C,D,E.<br>**2.** Ctrl+Z về B.<br>**3.** Bật chức năng HIDE Page (Toggle Visibility F05-02). | **GIVEN** Rẽ nhánh hoạt động (Action C,D,E thành dĩ vãng)<br>**WHEN** Phát sinh Save state F mới<br>**THEN** Ngay lập tức Nút Redo Xám Xịt (Count = 0). History `redoStack` Tẩy Trắng. Tránh User click Y để đè Data hỏng bét lên Layout mới F. | Critical | [x] |
-| **TC-F11.13** | `Perf` | Debounce API với Spam Click Undo (Nghẽn Mạng Xã Hội 429) | **1.** Nhấn đè dính phím Ctrl+Z (Spamming tốc độ bàn thờ) để lùi 20 nấc trong 1.5 giây. | **GIVEN** Hoạt động Undo chỉ ở Client Context Zustand<br>**THEN** DOM giật nhảy lùi 20 trạng thái cực nhanh. Hệ thống API Auto-Save (Patch State F05) chỉ được gọi duy nhất 1 lần (Chờ 3s im lặng). DB không dính bão Request lỗi 429. | Blocker | [ ] |
-| **[US-F11-01] Cơ Chế Lõi Phân Lập Môi Trường Kín & Giới Hạn Tối Đa (Tham chiếu AC-4)** |
-| **TC-F11.14** | `Func` | Xóa Page Quản Lý Tách Biệt Store Component (Cách ly Undo) | **1.** Sửa Text (Undo+1).<br>**2.** Click biểu tượng Xóa Mềm 1 Trang khác.<br>**3.** Bấm Ctrl+Z. | **GIVEN** User hối hận vì xóa Trượt Trang.<br>**THEN** Ctrl+Z không cứu được Trang bị Soft-delete. (Form Page Manager có chức năng Undo riêng Toast Popup báo vàng 5 giây `US-F05-02`). Độc lập tuyệt đối! | High | [ ] |
-| **TC-F11.15** | `Mem` | Tràn Chảo Bộ Đệm FIFO (50 Tối Đa) | **1.** Liên tục chạy Script bấm Nút "Thêm Text" đếm đúng 51 Lần. (Từ nấc Text 1 -> Text 51).<br>**2.** Nhắp mỏ neo Undo kéo lùi 51 cái. | **THEN** Màn hình đứng im lại ở nấc Text 2. Nấc Text 1 mất tích vĩnh cữu khỏi bộ nhớ của Client JS để tránh Quá tải RAM. Nút mũi tên gập lùi tắt lịm đi. | Critical | [x] |
-| **TC-F11.16** | `Sec` | Phân Hóa Session F5 (Tái Tải Tẩy Trắng)| **1.** Đổi Theme Website thành Hồng.<br>**2.** Nhấn F5 Window.<br>**3.** Render xong gõ Ctrl+Z. | **THEN** Màu dính cứng chết ở màu Hồng (Lưu theo DB), bộ nhớ Zustand Undo trống hoắc rỗng trơn. Nút hông xám xịt ảm đạm. Không Persist LocalStorage chống đụng Cache. | Medium | [ ] |
-| **[US-F11-02] Tối ưu Trải nghiệm Mobile UX & Đặc Thù Đụng Chạm** |
-| **TC-F11.17** | `Res` | Toolbar Đính Đáy Mobile Adaptive (F05-14) | **1.** Rút khung Viewport Console Chrome xuống 375px. Kéo cuộn sờ ngón.<br>**2.** Quan sát chỗ đặt Nút Lùi/Tiến. | **THEN** Cụm Icon chắp cánh rời Top Nav phễu xuống Bottom FAB Toolbar (Bottom Sheet). Lướt tới đoạn Footer nút vẫn Nằm Ghim cứng đó cho tay ấn. Diện tích bắt Tap `>= 44px`. | Critical | [ ] |
-| **TC-F11.18** | `E2E/UX` | Haptic Rung Mát - Chống Zoom Chập Nhanh Màn (Mống tay Lớn) | **1.** Test trực tiệp iOS/Safari.<br>**2.** Type chữ, bấm lùi lùi lùi lùi (Spam Tab). | **THEN** OS chạy Cục rung đàm ứng Haptic nhẹ (`navigator.vibrate`). Lệnh `touch-action: manipulation` chặn hiện tượng chớp nháy Panning Zoom phiền phức trên Browser Điện Thoại khi Touch nhanh. | Low | [ ] |
-| **[NHÓM 8] Các Kịch Bản Bắt Lỗi Mù (Blind Spot / Concurrency / UX Edge Cases)** |
-| **TC-F11.19** | `Logic` | Xung đột Native Undo của Trình duyệt (Browser vs Zustand) | **1.** Click đúp vào thẻ H1 để mở `<div contentEditable>`.<br>**2.** Gõ chữ "Hello", CHƯA bấm Enter hay Blur click ra ngoài.<br>**3.** Bấm Ctrl+Z. | **GIVEN** Focus vẫn còn nằm kẹt bên trong Text Input<br>**THEN** Hành động Ctrl+Z KIỂM SOÁT BỞI TRÌNH DUYỆT (Native Browser Undo) => Chỉ xóa chữ "Hello". KHÔNG ĐƯỢC lùi trạng thái Zustand Array (Prevent app-level Undo misfire). | Blocker | [ ] |
-| **TC-F11.20** | `E2E` | Bóp cò Undo khi AI đang Streaming (Race Condition Crash) | **1.** Chat: "Đổi toàn bộ giao diện thành giáng sinh".<br>**2.** AI Bắt đầu nhích DOM đổi nền (Đang loading quay quay).<br>**3.** User mất kiên nhẫn, Bấm Nút Undo trên thanh Top. | **GIVEN** Promise Streaming chưa hoàn thành<br>**THEN** Hệ thống chặn 100% không nhận thao tác Undo (Nút bị Xám / Disabled) cho tới khi End Stream. Nếu không sẽ dính Bug Rách DOM (Half-baked State) tràn RAM gãy Web. | Blocker | [ ] |
-| **TC-F11.21** | `UI/Mobile` | Bàn Phím Ảo (Virtual Keyboard) Khóa Chèn Nút | **1.** Dùng Mobile (Nút Undo nằm bẹp dưới đáy).<br>**2.** Nhấn vào thẻ Input Text để gõ -> Bàn phím ảo bật lên che nửa màn hình dưới. | **THEN** Thanh Toolbar BottomToolbar chứa nút Undo/Redo phải BỊ ĐẨY nổi hẳn lên trên đỉnh của Bàn Phím Ảo, HOẶC tàng hình tạm thời. Không bị Bàn phím vật lý đè mất dấu (Z-index issue). | High | [ ] |
-| **[ĐẶC NHIỆM: KỊCH BẢN BẮT LỖI REACT JS & BẤT ĐỒNG BỘ NGUY HIỂM NHẤT]** ||||||
-| **TC-F11.22** | `Logic` | Lỗi Bắt Dính Khối Lệnh Cũ (React Stale Closure Override) | **1.** Sửa Text thành "A". <br>**2.** Vài tích tắc sau Sửa Text thành "B". <br>**3.** Bấm NGAY LẬP TỨC Ctrl+Z Lùi về "A" trước khi cơ chế AutoSave 3s kịp chớp.<br>**4.** Đợi Auto-save Submit Network. | **GIVEN** Auto-save dùng React Hook/Closure bọc setTimeout 3s.<br>**THEN** Rất nhiều Dev Dởm bị dính `Stale State`. Bắt buộc Payload bắn lên API phải chứa chuỗi "A" (Current State). Tuyệt đối cấm bắn trạng thái tương lai Tạm "B" lên DB hủy hoại công sức lùi Undo của User! | Blocker | [ ] |
-| **TC-F11.23** | `Perf`  | Undo Đổi Khung CSS Kéo Sụp Iframe (FOUC Reload Edgecase) | **1.** Global Settings -> Đổi Màu Nền Web sang Đỏ.<br>**2.** Ctrl+Z Đảo về Xanh. | **GIVEN** Màu sắc chi phối bằng Custom CSS Variables. <br>**THEN** Trang web Iframe đảo màu mềm mượt `< 200ms` theo biến in-memory. Cấm Tuyệt Đối trình trạng Load Chớp Trắng/FOUC (Flash of Unstyled Content) Tải Lại Tree DOM từ đầu vì Undo! | High | [ ] |
-| **[ĐẶC NHIỆM: BÓC LỖI TƯƠNG QUAN VỚI WIREFRAME ĐỒ HOẠ (F05 DESIGN)]** ||||||
-| **TC-F11.24** | `UI/UX` | Fix Lỗ Hổng Design Mobile (Floating Pinned Undo) | **1.** Soi Wireframe F05 Mobile không thấy Nút Undo đâu.<br>**2.** Test bắt buộc Dev phải đính (Pin) Cụm nút Undo/Redo Nổi (Floating) ngay trên góc màn hình Canvas. | **THEN** Không chôn giấu nút Undo vào sâu trong Menu Hamburger hay Bottom Sheet (cực kỳ vướng tay khi Edit). Tuân thủ nghiêm ngặt chuẩn PRD F11 v1.1. | Blocker | [ ] |
-| **TC-F11.25** | `Flow`  | Kháng Xoá Bộ Nhớ Khi Bấm "🚀 Publish" (Action Survival) | **1.** Chỉnh sửa chán chê xong bấm Nút Publish lên Live.<br>**2.** Modal Publish báo Success.<br>**3.** Quay qua test Nút Undo (Ctrl+Z). | **GIVEN** Mệnh lệnh xuất bản không làm tháo rời Session.<br>**THEN** Cây Lịch sử (Undo Stack) CHẮC CHẮN PHẢI ĐƯỢC BẢO TOÀN (Không tàng hình!). User có cơ hội lập tức bấm Undo và Publish lại nếu thấy Layout vừa Live bị cấn. | Critical | [ ] |
+| **TC-F11.01** | `F05-06` | `UI/Func` | **[Positive]** Undo sửa chữ nội tuyến (Inline ContentEditable) | 1. Click đúp vào tiêu đề "Shop Ban".<br>2. Gõ lại thành "Shop Táo".<br>3. Xóa focus (Blur) ra ngoài.<br>4. Nhấn Undo (Ctrl+Z). | - Số lượng Undo hiển thị "Undo(1)".<br>- Tiêu đề trả về chữ cũ "Shop Ban" ngay lập tức (< 200ms). | Blocker | [x] |
+| **TC-F11.02** | `F05-06` | `UI` | **[Positive]** Undo định dạng chữ (Formatting Floating Toolbar) | 1. Bôi đen chữ "Táo".<br>2. Chọn công cụ Bôi đậm (B) và Nghiêng (I).<br>3. Nhấn Ctrl+Z hai lần. | - Chữ lần lượt tước bỏ định dạng (B), sau đó (I).<br>- Lùi từng bước độc lập, HTML Markup không bị vỡ.<br>- Nút Redo nháy sáng. | High | [ ] |
+| **TC-F11.03** | `F05-08` | `Logic` | **[Positive]** Undo thay ảnh tự động Compress (> 2MB) | 1. Click vào Hero Image.<br>2. Upload file ảnh 5MB, nén thành 200KB và render.<br>3. Nhấn Ctrl+Z. | - Thẻ `<img src>` cũ lập tức trở lại.<br>- Không load lại toàn bộ Network gây nghẽn băng thông.<br>- Kích thước thẻ bao bọc (Width/Height) không bị sụp lún. | High | [ ] |
+
+---
+
+### US-F11-01: Hoàn Tác Mọi Thay Đổi — Kéo Thả & Component Library (2 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F11.04** | `F05-08` | `E2E/UI` | **[Positive]** Undo chèn Block mới từ Panel | 1. Mở tab Components.<br>2. Kéo thả 1 khối "Product List" vào giữa iFrame.<br>3. Nhấn Undo. | - Cụm Component đó và Placeholder Data ảo biến mất sạch sẽ.<br>- Iframe thu lại Layout như cũ.<br>- Nút Redo hiện có số (1). | Blocker | [x] |
+| **TC-F11.05** | `F05-05` | `Func` | **[Positive]** Undo/Redo Hoán đổi Vị trí (Reordering) | 1. Hover lấy Drag Handle (⠿) của Testimonial.<br>2. Kéo thả xuống dưới Footer.<br>3. Nhấn Undo.<br>4. Nhấn Redo. | - **Undo**: Testimonial quay lại trên Footer.<br>- **Redo**: Testimonial nhảy lại vị trí dưới cùng.<br>- UI Auto-Scroll bám theo Block. | High | [ ] |
+
+---
+
+### US-F11-01: Hoàn Tác Mọi Thay Đổi — AI Chat Góc Màn Hình (3 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F11.06** | `F05-01` | `E2E` | **[Positive]** Hoàn tác cụm AI Gen lớn (Single AI Action) | 1. Chat: "Đổi màu nền đen, thêm 3 cột giá, xóa About".<br>2. AI tự động thực hiện 3 thay đổi.<br>3. Nhấn Undo trên Toolbar. | - Cả 3 mục thay đổi phục hồi đồng thời trong **1 click**.<br>- Tuyệt đối không xé lẻ ra 3 lần Undo. | Blocker | [ ] |
+| **TC-F11.07** | `F05-01` | `UI` | **[Positive]** Dùng nút "Hoàn Tác" ngay trong khung Chat AI | 1. Gửi AI đổi một section.<br>2. AI trả lời "Đã đổi thành màu mint xanh".<br>3. Click nút "Hoàn Tác" trong bong bóng chat AI. | - Chức năng tương đương nút Undo trên Navbar.<br>- Message chat đó bị gạch ngang và xám mờ (Undone).<br>- Nhấn Redo trên Navbar khôi phục lại (nếu cần). | High | [ ] |
+| **TC-F11.08** | `F05-03` | `Logic` | **[Positive]** Undo nội dung từ Mini Edit Popup (✨) | 1. Hover vào Text nào đó, nhấn ✨ Edit.<br>2. Nhập prompt "Sửa giọng văn hài hước".<br>3. Text nhảy nội dung mới, sau đó bấm Ctrl+Z. | - Dữ liệu nội dung lùi về dạng nguyên bản.<br>- Lịch sử thao tác (History Stack) của Mini Edit được gộp chung vào Master Stack của hệ thống. | Medium | [ ] |
+
+---
+
+### US-F11-01: Hoàn Tác Mọi Thay Đổi — Global Settings & SEO Binding (3 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F11.09** | `F05-07` | `Data` | **[Positive]** Undo Dropdown Menu (Nested Array) | 1. Click cấu hình Header.<br>2. Ở Menu Panel, kéo Sub-menu 2 nhét vào Level 1.<br>3. Bấm Ctrl+Z. | - Cấu trúc Menu trên Panel nhả về bậc ngang hàng.<br>- Iframe Live Preview cập nhật Navbar xòe ra như cũ realtime. | High | [x] |
+| **TC-F11.10** | `F05-12` | `Data` | **[Positive]** Undo Global Data Binding (Số điện thoại) | 1. Mở Cấu hình Liên Hệ (Global Setting).<br>2. Đổi đuôi SĐT `091` thành `099`.<br>3. Nhấn nút ↩ Undo. | - Panel cập nhật ngược về `091`.<br>- Tất cả các widget trên Footer/Header đang liên kết với SĐT đồng loạt cập nhật nội dung thành `091` tức thì. | Blocker | [ ] |
+| **TC-F11.11** | `F05-13` | `Func` | **[Positive]** Undo Metadata AI Generate (Page SEO) | 1. Nhấn nút "✨ Tự động Tối ưu SEO" cho Page.<br>2. Meta Title/Desc tự chèn text.<br>3. Nhấn Ctrl+Z. | - Dữ liệu input nhả về chuỗi rỗng/cũ.<br>- Backend không update lừa (cho tới khi Auto-Save trigger 3s sau đó). | Medium | [ ] |
+
+---
+
+### US-F11-01: Branching & Giới Hạn Hoạt Động Cốt Lõi (3 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F11.12** | `Logic`| `Func` | **[Edge]** Băm nát trục Redo (Branch Cut-Off) | 1. Sửa 5 mục A, B, C, D, E vào History.<br>2. Nhấn Undo lùi về B.<br>3. Bật thêm tính năng HIDE Page (phát sinh state F). | - Nút Redo xám xịt (Count=0). Stack `redoStack` tự xóa trắng.<br>- Các Action Tương lai (C, D, E) biến mất, tránh tình huống user Redo làm hỏng State F hiện tại. | Critical | [x] |
+| **TC-F11.13** | `Perf` | `Perf` | **[Negative]** Tránh đụng độ bão API khi Spam Undo Undo | 1. Nhấn đè dính Ctrl+Z (spam Undo) lùi 20 trạng thái trong 1.5 giây. | - DOM giật nhảy 20 state rất mượt.<br>- **API Debounce**: Lệnh update PATCH API chỉ gọi **duy nhất 1 lần khép lại** sau khi xả phím 3s, tránh dội DB HTTP 429 Limit. | Blocker | [ ] |
+| **TC-F11.14** | `Func` | `Flow` | **[Negative]** Chức năng Undo không xen vào thao tác Page Manager | 1. Sửa đoạn Text ở Homepage.<br>2. Đi ra phần Page Quản Lý, xóa (Soft-delete) một trang tên "About".<br>3. Vào lại trang Home, nhấn Ctrl+Z. | - Ctrl+Z chỉ rút lại đoạn text chỉnh sửa.<br>- Hành động Undo hoàn toàn không khôi phục lệnh xóa Trang (việc đó là luồng độc lập). | High | [ ] |
+
+---
+
+### US-F11-01: Giới Hạn Tối Đa Môi Trường Kín & Session Lifecycle (2 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F11.15** | `Mem` | `Logic` | **[Boundary]** Giới hạn nhớ 50 bước FIFO (Max Stack) | 1. Dùng lệnh tự động thêm text lần lượt đúng 51 bước.<br>2. Nhấn lùi Undo 51 lần liên tiếp. | - Sẽ bị kẹt dừng ở mốc 2.<br>- Item Text thứ nhất (đầu tiên) đã bị đánh rơi ra khỏi bộ nhớ (Max 50) để chống quá tải RAM. Mũi tên lùi không hoạt động nữa. | Critical | [x] |
+| **TC-F11.16** | `Sec` | `Func` | **[Negative]** Session tàn lụi khi F5 trình duyệt | 1. Đổi Navbar thành màu Hồng.<br>2. Nhấn F5 trình duyệt (Reload window).<br>3. Nhấn Ctrl+Z. | - Background màu Hồng lưu chặt ở lại Server.<br>- History Client rỗng, Nút tắt ngòm (xám xịt).<br>- Không đụng Cache cũ lưu Persistence lỏng lẻo. | Medium | [ ] |
+
+---
+
+### US-F11-02: Mobile UX & Xung Đột Đặc Thù Giao Diện (5 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F11.17** | `Res` | `UX` | **[Positive]** Toolbar Undo ghim đáy (Bottom FAB) Mobile | 1. Chuyển thiết bị sang kích thước Mobile 375px.<br>2. Cuộn trang lên xuống dọc nội dung Iframe. | - Cụm nút Undo/Redo tước khỏi TopNav, di chuyển bám đáy dạng Bottom Sheet (hoặc Floating Button).<br>- Size Click Target `>= 44px`. | Critical | [ ] |
+| **TC-F11.18** | `E2E/UX`| `Func` | **[Positive]** Tránh Zoom Mobile loạn xạ khi Double/Tap nhanh | 1. Mở Editor trên Chrome Mobile vật lý / Safari.<br>2. Chạm Tap-tap-tap nhanh tục Nút Undo. | - Bấm liên hoàn mượt.<br>- Thiết bị có Haptic Rung nhẹ, nhưng màn hình **Không tự Panning/Zoom** to phình ra do Safari mặc định khi tap lẹ. | Low | [ ] |
+| **TC-F11.19** | `Logic`| `Flow` | **[Negative]** Phân biệt Native Browser Undo và App Undo | 1. Click vô thẻ Heading ContentEditable, gõ "Hello" (đang focus, con trỏ nháy).<br>2. Không nhấn đi đâu, gõ thẳng Ctrl+Z. | - Trình duyệt Browser sẽ dùng Native Undo (xóa chữ).<br>- App không ghi đè History Stack cấp độ System Zustand.<br>- Không lỗi nhảy Mảng dữ liệu lung tung. | Blocker | [ ] |
+| **TC-F11.20** | `E2E` | `Flow` | **[Negative]** Chặn thao tác Undo khi AI đang Streaming | 1. Gõ Lệnh Cho AI Edit giao diện.<br>2. Đang loading bốc bong bóng xoay chờ mượt.<br>3. Cố tình nhấn Undo Toolbar dội lại. | - Nút Undo bị Disable cấm chỉ hoàn toàn (Click vô dụng).<br>- Server Promise Stream chạy XONG HOÀN TOÀN thì mới mở cờ cho user lùi (Chống Half-baked DOM Data rác sập app). | Blocker | [ ] |
+| **TC-F11.21** | `UI` | `Mob` | **[Negative]** Xung đột che lấp Bàn Phím Ảo (Virtual Keyboard) | 1. Dùng Ipad / Điện thoại bấm vô 1 thẻ Form.<br>2. Bàn phím QWERTY ảo nhảy bốc lên dưới đáy. | - Nút Toolbar chứa Undo/Redo phải tránh nằm chôn chung đáy bị che khuất mà không với ấn được.<br>- Phải tự neo lên đỉnh của mép Bàn Phím. | High | [ ] |
+
+---
+
+### Các Kịch Bản Bug Nâng Cao (React Edge Cases) (4 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F11.22** | `Logic`| `Sec` | **[Negative]** Lỗi Stale Closure (Lưu đứt đoạn sai Data) | 1. Sửa text thành "A".<br>2. Ngay lập tức đổi "B".<br>3. Trong nháy mắt chưa kịp AutoSave (3s timer), bấm Undo lại thành "A".<br>4. Chờ 3s quan sát Network Payload bắn đi. | - Khi API Patch Auto-save kích hoạt, nó **Bắt Buộc Bắn Data "A"**. Tuyệt đối cấm găm mảng Cache Closure chui của React Hook lén mang chữ "B" đi đè ghi lại hư nát kho của User! | Blocker | [ ] |
+| **TC-F11.23** | `Perf` | `UI` | **[Negative]** Lỗi Chớp Trắng Giao diện do Re-mount Style | 1. Vào Đổi Giao Diện Màu Background Dark Mode.<br>2. Nhấn Undo lùi dội lại Light Mode. | - Các thẻ CSS Node đổi Variables `< 200ms` mượt mà.<br>- Không re-load nguyên cục JS Iframe Component gây FOUC Flash chớp giật mắt trắng Layout. | High | [ ] |
+| **TC-F11.24** | `UI/UX`| `Flow` | **[Negative]** Kẽ hở Wireframe thiếu nút Mobile | 1. Soi bộ Wireframe F05 có thể bị vẽ thiếu Nút Hover Undo đỏ trên Ipad View.<br>2. Verify Team Frontend đắp đúng thiết kế nổi Pinned Redo/Undo riêng biệt. | - Không giấu nút vào chung menu Hamburger hay Drawer ẩn. | Blocker | [ ] |
+| **TC-F11.25** | `Flow` | `Logic`| **[Positive]** Nhấn Publish (Lên sóng) thì Cây Undo được duy trì | 1. Sửa Web 5 bước, nhấn nút 🚀 Publish để Launch website ra trần đời.<br>2. Xong việc tắt Modal đi, sau đó bấm Ctrl+Z lùi Layout. | - Luồng Launch Publish hoàn toàn tách biệt. Session Cây Undo Stack KHÔNG bị Clear trống tẩy bẩn.<br>- User vừa thấy "Oops nhầm", lùi lại UI rồi nhấp Publish Cập Nhật Sóng Vàng cứu hộ lẹ tay được. | Critical | [ ] |
 
 ---
 
 ## 4. Biên Bản Kiểm Định QC & Chống Tái Lỗi (Sanity Check List)
 > Khung này phải được Auto QC tích xanh trước bản Release Cứng.
 
-1.  **[ ] Tích 1 Cụm AI Đơn Lập:** Hủy kết quả khối chat của AI bắt buộc rút dọn 100% sự đống nát của lệnh Gen, không tách rời rác component rụng sót mảng.
-2.  **[ ] Bóp Debounce Save API:** Liên thoanh Phím Tắt Undo/Redo KHÔNG ĐƯỢC sinh ra hàng ngũ Loading đếm 3s dồn dập dội bom API backend. Auto-save bắt trọn cục thay đổi cuối cùng.
-3.  **[ ] Cây Độc Lập Page-State:** Hoàn Tác Nội Diện Preview Iframe không nhảy dây sang can thiệp Delete Trang (Page Manager).
-4.  **[ ] Kéo Thả Khôi Phục Liền Mạch:** Thả Widget Lệch Vị Trí bấm Hoàn Tác nhảy lại Cũ không nháy trắng Iframe.
-5.  **[ ] Touch Pinned Size:** Size bấm chuẩn luật Quốc Tế > 44px (Khoanh vòng CSS Padding lớn chống hụt tay mờ viền).
-6.  **[ ] Vô Hiện Input Field Rỗng:** Gõ xong gắp Undo (Backspace) nhả Empty, Form Field required không văng Error đỏ chặn Nấc Đỗ nếu không thực bấm Save Cứng.
+| # | Tiêu Chí Kiểm Tra (Sanity) | Trạng Thái |
+|:---:|:---|:---:|
+| 1 | **Tích 1 Cụm AI Lớn:** AI Gen nguyên cục (Màu, Layout, Content), Undo phát phải thu về tròn vẹn đủ 3 thứ, không rụng rớt rời rạc. | [ ] |
+| 2 | **Chặn Debounce Dội Bão API:** Bấm phím tắt lùi Undo chục lần thì API AutoSave không được bắn ra liên hồi chục Nhịp, chờ 3s chỉ gom ném Cục cuối cùng! | [ ] |
+| 3 | **Cách Ly Dữ Liệu Trang Tĩnh:** Hoàn Tác Nội Dung Page Iframe A tuyệt đối không khơi dậy lại Xóa Lấp Mất Trang Giao Diện Page B. | [ ] |
+| 4 | **Bấm Đặt Drag Gọn Gàng:** Thả Widget Lệch, bấm Hoàn Tác nhảy lại Cũ không nháy màn hình (Render mượt Local DOM CSS Node). | [ ] |
+| 5 | **Target Icon Mobile Lớn Nét:** Size bấm trên UI iPhone cho Button này > 44px (Khoanh vòng lớn, khó nhấn hụt nhầm ngón bè). | [ ] |
+| 6 | **Form Field Gõ Xóa Trống Hoàn Đẹp:** Dùng Delete hay Backslash lùi nhả Contentedittable về Empty (""), Form không Văng Toast đỏ Chặn Đóng khi chưa Mới lưu! | [ ] |
 
 ---
-**PHÊ DUYỆT BỞI:** QA Team ETE  
-**NGÀY:** ___ / ___ / 2026
+
+## 5. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates)
+
+| Nhóm Kiểm thử | Trạng Thái | Ghi chú |
+|---|---|---|
+| **1. Trải Nghiệm Mượt UI** | [ ] Đã chạy 0/8 TC | Phục Trạng, Băm Tree, Pinned Khóa Tránh Nền |
+| **2. Logic Function Core** | [ ] Đã chạy 0/10 TC | Redo Stack Cutoff, FIFO Limited Bộ, Native Browser Text Focus Chặn |
+| **3. API Auto Save Synergy** | [ ] Đã chạy 0/4 TC | Debounce Đúp Click, Stale React Closure Bugs |
+| **4. AI Xuyên Flow Gắn Bọt** | [ ] Đã chạy 0/3 TC | Button Float Chat Hộp Nhắn Nhỏ Góc Dưới Của Ngăn Panel Trái |
+
+> **Khuyến Nghị Release:** Lỗi Tối Quan Trọng Nhất Để Thả Website Trôi Live Là Sụp Nghẽn React Cây Đứt Layout Đoạn **Nhịp Save Đè Phủ Closure Cuối (Bug số 22)**. Developer phải móc Log Debug Rõ Chống React Lấy Biến Giá Trị Cũ Nát Trả Về. Mảnh Khác Ổn.
