@@ -17,6 +17,9 @@ type Media = {
 function getImageUrl(image: Media | string | null): string | null {
     if (!image || typeof image === 'string') return null;
     let url = image.url || image.thumbnailURL || null;
+    if (url && url.includes('minio:9000')) {
+        url = url.replace('minio:9000', 'localhost:9000');
+    }
     return url || null;
 }
 
