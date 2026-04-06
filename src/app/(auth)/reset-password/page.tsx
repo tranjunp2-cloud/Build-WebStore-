@@ -11,33 +11,29 @@ import { Lock, Eye, EyeOff, Loader2, ArrowLeft, Check, ShieldCheck } from 'lucid
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { useI18n } from '@/i18n'
 
-const resetSchema = z
-    .object({
-        password: z.string().min(8, 'Password must be at least 8 characters'),
-        confirmPassword: z.string(),
-    })
-    .refine((d) => d.password === d.confirmPassword, {
-        message: 'Passwords don\'t match',
-        path: ['confirmPassword'],
-    })
+function createResetSchema(t: ReturnType<typeof useI18n>['t']) {
+    return z
+        .object({
+            password: z.string().min(8, t.auth.reset.passwordMin),
+            confirmPassword: z.string(),
+        })
+        .refine((d) => d.password === d.confirmPassword, {
+            message: t.auth.reset.passwordMismatch,
+            path: ['confirmPassword'],
+        })
+}
 
-type ResetForm = z.infer<typeof resetSchema>
+type ResetForm = z.infer<ReturnType<typeof createResetSchema>>
 
-function getPasswordStrength(password: string): { score: number; label: string; color: string } {
+const STRENGTH_COLORS = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-emerald-400', 'bg-emerald-500']
+
+function getPasswordStrength(password: string): { score: number; color: string } {
     let score = 0
     if (password.length >= 8) score++
     if (/[A-Z]/.test(password)) score++
     if (/[0-9]/.test(password)) score++
     if (/[^A-Za-z0-9]/.test(password)) score++
-
-    const levels: { label: string; color: string }[] = [
-        { label: 'Too weak', color: 'bg-red-500' },
-        { label: 'Weak', color: 'bg-orange-500' },
-        { label: 'Fair', color: 'bg-yellow-500' },
-        { label: 'Good', color: 'bg-emerald-400' },
-        { label: 'Strong', color: 'bg-emerald-500' },
-    ]
-    return { score, ...levels[score] }
+    return { score, color: STRENGTH_COLORS[score] }
 }
 
 function ResetPasswordForm() {
@@ -47,6 +43,7 @@ function ResetPasswordForm() {
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
     const { t } = useI18n()
+    const resetSchema = useMemo(() => createResetSchema(t), [t])
 
     const {
         register,
@@ -61,6 +58,13 @@ function ResetPasswordForm() {
 
     const watchPassword = watch('password', '')
     const strength = useMemo(() => getPasswordStrength(watchPassword), [watchPassword])
+    const strengthLabels = useMemo(() => [
+        t.auth.reset.strengthTooWeak,
+        t.auth.reset.strengthWeak,
+        t.auth.reset.strengthFair,
+        t.auth.reset.strengthGood,
+        t.auth.reset.strengthStrong,
+    ], [t])
 
     // No token → error state
     if (!token) {
@@ -265,7 +269,7 @@ function ResetPasswordForm() {
                                     />
                                 ))}
                             </div>
-                            <p className="mt-1 text-xs text-gray-500">{strength.label}</p>
+                            <p className="mt-1 text-xs text-gray-500">{strengthLabels[strength.score]}</p>
                         </div>
                     )}
                 </div>
