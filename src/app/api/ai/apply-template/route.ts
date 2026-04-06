@@ -6,6 +6,7 @@ import { applyTemplateSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { blockRegistry } from '@/blocks/registry'
 
 /**
  * POST /api/ai/apply-template
@@ -56,6 +57,39 @@ export const POST = withAuth(async (user, req) => {
         }
 
         const blocks = (template.defaultBlocks as Record<string, unknown>[]) || []
+
+        // Sanitize block variants — blueprint templates may have variant names not in registry
+        const VARIANT_ALIASES: Record<string, Record<string, string>> = {
+            hero: {
+                'split': 'split-left', 'split-image': 'split-left', 'editorial': 'magazine',
+                'fullscreen-image': 'fullscreen', 'fullscreen-video': 'video',
+                'video-background': 'video', 'video-bg': 'video',
+                'overlay': 'cards-overlay', 'story': 'split-left',
+                'hero-centered': 'centered', 'image-left': 'split-right', 'image-right': 'split-left',
+            },
+        }
+        function sanitizeBlocks(blockList: Record<string, unknown>[]): Record<string, unknown>[] {
+            return blockList.map(block => {
+                const bt = block.blockType as string
+                const v = block.variant as string | undefined
+                if (!bt || !v) return block
+
+                // Apply aliases
+                const aliases = VARIANT_ALIASES[bt]
+                let sanitizedVariant = (aliases && aliases[v]) ? aliases[v] : v
+
+                // Validate against registry
+                if (blockRegistry.has(bt)) {
+                    const meta = blockRegistry.getBlockMeta(bt)
+                    if (meta && meta.variants.length > 0 && !meta.variants.includes(sanitizedVariant!)) {
+                        sanitizedVariant = meta.defaultVariant || meta.variants[0]
+                    }
+                }
+
+                return { ...block, variant: sanitizedVariant }
+            })
+        }
+
         const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
         // Pick only valid theme fields — Payload groups may have extra metadata
         const templateTheme = {
@@ -88,9 +122,10 @@ export const POST = withAuth(async (user, req) => {
 
             // Build pages list from templatePages or fallback to defaultBlocks
             const templatePages = (template.templatePages as Array<{ title: string; slug: string; isHomepage?: boolean; layout: unknown }>)
-            const pagesToCreate = templatePages?.length
+            const rawPages = templatePages?.length
                 ? templatePages
                 : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
+            const pagesToCreate = rawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
 
             // Transaction: delete old pages → update theme → create new pages
             // Note: Payload 3 Drizzle transaction returns a req-like object with commit/rollback
@@ -165,10 +200,11 @@ export const POST = withAuth(async (user, req) => {
         }
 
         // === CREATE NEW SITE FROM TEMPLATE (multi-page) ===
-        const templatePages = (template.templatePages as Array<{ title: string; slug: string; isHomepage?: boolean; layout: unknown }>)
-        const pagesToCreate = templatePages?.length
-            ? templatePages
+        const newSiteTemplatePages = (template.templatePages as Array<{ title: string; slug: string; isHomepage?: boolean; layout: unknown }>)
+        const newSiteRawPages = newSiteTemplatePages?.length
+            ? newSiteTemplatePages
             : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
+        const pagesToCreate = newSiteRawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
 
         const site = await payload.create({
             collection: 'sites',
