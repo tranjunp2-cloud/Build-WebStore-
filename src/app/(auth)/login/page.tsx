@@ -25,7 +25,7 @@ type LoginForm = z.infer<typeof loginSchema>
  * - Staff → /admin (Payload CMS workspace)
  */
 function getRedirectByRole(
-    user: { roles?: string[]; tenants?: { tenant: unknown }[] },
+    user: { roles?: string[]; tenants?: { tenant: any }[] },
     returnUrl: string,
 ): string {
     const roles = user.roles || []
@@ -35,9 +35,17 @@ function getRedirectByRole(
         return '/admin'
     }
 
-    // Owner without any tenant → onboarding
-    if (roles.includes('tenant-owner') && (!user.tenants || user.tenants.length === 0)) {
-        return '/onboarding'
+    // Owner without any tenant or not onboarded → onboarding
+    if (roles.includes('tenant-owner')) {
+        if (!user.tenants || user.tenants.length === 0) {
+            return '/onboarding'
+        }
+        
+        // If Payload login auth returns populated tenant (depth=1), check onboarding status
+        const firstTenant = user.tenants[0]?.tenant
+        if (firstTenant && typeof firstTenant === 'object' && firstTenant.onboardingCompleted === false) {
+            return '/onboarding'
+        }
     }
 
     // Owner with tenant → returnUrl or dashboard
@@ -213,6 +221,9 @@ function LoginFormContent() {
             const user = responseData?.user
             const userEmail = user?.email || data.email.trim()
 
+            // Get correct post-login destination (e.g. /onboarding for new users)
+            const actualReturnUrl = user ? getRedirectByRole(user, returnUrl) : returnUrl
+
             // Trigger OTP send
             try {
                 await fetch('/api/users/send-otp', {
@@ -233,7 +244,7 @@ function LoginFormContent() {
             })
 
             // Redirect to OTP verification page
-            const returnParam = returnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(returnUrl)}` : ''
+            const returnParam = actualReturnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(actualReturnUrl)}` : ''
             router.replace(`/verify-otp?email=${encodeURIComponent(userEmail)}${returnParam}`)
         } catch {
             setFormError('root', { message: t.auth.errors.connection })
