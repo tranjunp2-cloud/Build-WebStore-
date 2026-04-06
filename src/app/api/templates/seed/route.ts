@@ -19,8 +19,9 @@ import { withAuth } from '@/lib/auth'
  */
 export const POST = withAuth(async (_user, request) => {
     try {
-        // Only super-admin can seed templates
-        if (!_user?.roles?.includes('super-admin')) {
+        // Only super-admin can seed in production; allow any auth user in dev
+        const isDev = process.env.NODE_ENV === 'development'
+        if (!isDev && !_user?.roles?.includes('super-admin')) {
             return NextResponse.json({
                 success: false,
                 error: { code: 'FORBIDDEN', message: 'Only super-admin can seed templates' },
@@ -73,13 +74,23 @@ export const POST = withAuth(async (_user, request) => {
                 console.log(`[Seed v3] Deleted ${existing.totalDocs} existing templates`)
             }
 
+            // Check existing templates to skip duplicates
+            const existingTemplates = await payload.find({ collection: 'templates', limit: 200, overrideAccess: true })
+            const existingNames = new Set(existingTemplates.docs.map((d: any) => d.name))
+
             const results: { status: 'fulfilled' | 'rejected'; value?: { name: string; category: string; personality: string; status: string }; reason?: string }[] = []
+            let skipped = 0
 
             for (let i = 0; i < seeds.length; i += batchSize) {
                 const batch = seeds.slice(i, i + batchSize)
                 const batchResults = await Promise.allSettled(
                     batch.map(async (seed, idx) => {
                         const preset = TEMPLATE_PRESETS[i + idx]!
+                        // Skip if template with same name already exists
+                        if (existingNames.has(seed.name)) {
+                            skipped++
+                            return { name: seed.name, category: seed.category, personality: preset.personality, status: 'skipped' as const }
+                        }
                         await payload.create({
                             collection: 'templates',
                             overrideAccess: true,
@@ -113,7 +124,7 @@ export const POST = withAuth(async (_user, request) => {
                 }
             }
 
-            const created = results.filter((r) => r.status === 'fulfilled').length
+            const created = results.filter((r) => r.status === 'fulfilled' && r.value?.status === 'created').length
             const failed = results.filter((r) => r.status === 'rejected').length
             const failReasons = results.filter((r) => r.status === 'rejected').map((r) => r.reason).slice(0, 5)
 
@@ -121,7 +132,7 @@ export const POST = withAuth(async (_user, request) => {
                 success: true,
                 data: {
                     total: TEMPLATE_PRESETS.length,
-                    created, skipped: 0, failed, failReasons,
+                    created, skipped, failed, failReasons,
                     templates: results.filter((r) => r.status === 'fulfilled' && r.value).map((r) => r.value),
                 },
             })
