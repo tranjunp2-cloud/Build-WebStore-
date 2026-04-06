@@ -18,14 +18,18 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>
 
+/** Minimal shape of a populated tenant returned by Payload login at depth=1. */
+type TenantLite = { onboardingCompleted?: boolean } | null
+
 /**
  * Determine post-login redirect based on user role (BR-02, AC-5).
  * - Owner without tenant/site → /onboarding
+ * - Owner with tenant but onboardingCompleted=false → /onboarding
  * - Owner with tenant → /dashboard (or returnUrl)
  * - Staff → /admin (Payload CMS workspace)
  */
 function getRedirectByRole(
-    user: { roles?: string[]; tenants?: { tenant: any }[] },
+    user: { roles?: string[]; tenants?: { tenant: TenantLite | string }[] },
     returnUrl: string,
 ): string {
     const roles = user.roles || []

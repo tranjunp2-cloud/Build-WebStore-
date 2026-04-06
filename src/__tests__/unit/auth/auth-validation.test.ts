@@ -59,13 +59,23 @@ function generateSlug(name: string): string {
         .substring(0, 30)
 }
 
+/** Mirrors TenantLite from login/page.tsx */
+type TenantLite = { onboardingCompleted?: boolean } | null
+
 function getRedirectByRole(
-    user: { roles?: string[]; tenants?: { tenant: unknown }[] },
+    user: { roles?: string[]; tenants?: { tenant: TenantLite | string }[] },
     returnUrl: string,
 ): string {
     const roles = user.roles || []
     if (roles.includes('editor') || roles.includes('viewer')) return '/admin'
-    if (roles.includes('tenant-owner') && (!user.tenants || user.tenants.length === 0)) return '/onboarding'
+    if (roles.includes('tenant-owner')) {
+        if (!user.tenants || user.tenants.length === 0) return '/onboarding'
+        // Check onboardingCompleted from populated tenant (depth=1)
+        const firstTenant = user.tenants[0]?.tenant
+        if (firstTenant && typeof firstTenant === 'object' && firstTenant.onboardingCompleted === false) {
+            return '/onboarding'
+        }
+    }
     return returnUrl
 }
 
@@ -234,5 +244,51 @@ describe('getRedirectByRole (TC-F02.34, TC-F02.35: role-based redirect)', () => 
 
     it('handles user with no roles (fallback to returnUrl)', () => {
         expect(getRedirectByRole({}, '/login')).toBe('/login')
+    })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TC-F06.01b: onboardingCompleted flag — routing (new logic in US-F06-02)
+// ═══════════════════════════════════════════════════════════════════════════
+describe('getRedirectByRole — onboardingCompleted branch (TC-F06.01b)', () => {
+    it('redirects to /onboarding when tenant.onboardingCompleted is false', () => {
+        const user = {
+            roles: ['tenant-owner'],
+            tenants: [{ tenant: { onboardingCompleted: false } }],
+        }
+        expect(getRedirectByRole(user, '/dashboard')).toBe('/onboarding')
+    })
+
+    it('does NOT redirect to /onboarding when onboardingCompleted is true', () => {
+        const user = {
+            roles: ['tenant-owner'],
+            tenants: [{ tenant: { onboardingCompleted: true } }],
+        }
+        expect(getRedirectByRole(user, '/dashboard')).toBe('/dashboard')
+    })
+
+    it('does NOT redirect to /onboarding when onboardingCompleted is undefined (legacy tenant)', () => {
+        const user = {
+            roles: ['tenant-owner'],
+            tenants: [{ tenant: { onboardingCompleted: undefined } }],
+        }
+        expect(getRedirectByRole(user, '/dashboard')).toBe('/dashboard')
+    })
+
+    it('does NOT redirect to /onboarding when tenant is a string id (depth=0)', () => {
+        // Payload at depth=0 returns just the tenant id string — should NOT trigger onboarding redirect
+        const user = {
+            roles: ['tenant-owner'],
+            tenants: [{ tenant: 'tenant-id-string' }],
+        }
+        expect(getRedirectByRole(user, '/dashboard')).toBe('/dashboard')
+    })
+
+    it('redirects to /onboarding when onboardingCompleted is false with custom returnUrl', () => {
+        const user = {
+            roles: ['tenant-owner'],
+            tenants: [{ tenant: { onboardingCompleted: false } }],
+        }
+        expect(getRedirectByRole(user, '/builder/new')).toBe('/onboarding')
     })
 })
