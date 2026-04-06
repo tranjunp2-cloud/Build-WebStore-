@@ -409,13 +409,9 @@ function PreviewFrameInner({
                                 }
                             }
 
-                            // Sanitize any infinitely nested block wrappers left from prior edits
-                            // Example: <h6><h4><i>Coffee...</i></h4></h6> becomes <h4><i>Coffee...</i></h4>
-                            let prevValue
-                            do {
-                                prevValue = nextValue
-                                nextValue = nextValue.replace(/<([hH][1-6]|[pP])[^>]*>(\s*<([hH][1-6]|[pP])[^>]*>.*?<\/\3>\s*)<\/\1>/gi, '$2')
-                            } while (nextValue !== prevValue)
+                            // Intentionally removed regex sanitization here because route.ts now handles un-nesting explicitly,
+                            // and preserving the nested tag structure is required to keep structural parents (data-field-path) intact.
+
                         }
                         
                         const clone = JSON.parse(JSON.stringify(blocks))
