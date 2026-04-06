@@ -390,7 +390,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                                             alt="QR Code"
                                             width={192}
                                             height={192}
-                                            unoptimized={qrPreviewUrl.startsWith('blob:') || qrPreviewUrl.includes('localhost:9000')}
+                                            unoptimized={qrPreviewUrl.startsWith('blob:')}
                                             className="object-contain bg-white rounded-xl shadow-inner"
                                         />
                                         <button
