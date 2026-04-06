@@ -59,7 +59,27 @@ export const GET = withAuth(async (_user, req) => {
             blocks = (template as any).defaultBlocks || []
         }
 
-        const html = buildFullHTML(blocks, theme, cat)
+        // Map hero block.variant → theme.heroStyle for the HTML renderer
+        const heroBlock = blocks.find((b: Record<string, unknown>) => b.blockType === 'hero')
+        const heroVariantMap: Record<string, string> = {
+            'centered': 'centered',
+            'split-left': 'split',
+            'split-right': 'split',
+            'fullscreen': 'fullscreen-search',
+            'video': 'video-bg',
+            'split-video': 'video-bg',
+            'gradient': 'gradient-mockup',
+            'parallax': 'geometric',
+            'magazine': 'diagonal',
+            'slideshow': 'slider',
+            'cards-overlay': 'masonry',
+            'minimal': 'centered',
+        }
+        const heroVariant = (heroBlock?.variant as string) || ''
+        const mappedHeroStyle = heroVariantMap[heroVariant] || theme.heroStyle
+        const finalTheme = { ...theme, heroStyle: mappedHeroStyle }
+
+        const html = buildFullHTML(blocks, finalTheme, cat)
         return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
     } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Preview error'

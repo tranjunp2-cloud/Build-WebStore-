@@ -260,27 +260,93 @@ function renderCartWidget(b: RenderBlock, t: TemplateTheme) {
 
 function renderFeatures(b: RenderBlock, t: TemplateTheme) {
   const items = b.features || []
+  const variant = b.variant || 'default'
   const cardBg = `${t.text}05`
   const cardBorder = `${t.text}08`
-  return `<section class="section">
-    <div class="container">
-      <div style="text-align:center;margin-bottom:60px;">
-        ${b.sectionLabel ? `<div class="section-label fade-up">${b.sectionLabel}</div>` : ''}
-        <h2 class="section-title fade-up fade-up-d1">${b.headline || ''}</h2>
-        <p class="section-subtitle fade-up fade-up-d2" style="margin:0 auto;">${b.subheadline || ''}</p>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;">
-        ${items.map((f: FeatureItem, i: number) => `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 4)} card-hover" style="padding:36px 28px;background:${cardBg};border:1px solid ${cardBorder};border-radius:16px;position:relative;overflow:hidden;">
-            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,${t.primary},${t.secondary});opacity:0;transition:opacity .3s;"></div>
-            <div style="width:52px;height:52px;border-radius:14px;background:${t.primary}15;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:20px;">${f.icon || '✦'}</div>
-            <h3 style="font-size:18px;font-weight:700;margin-bottom:10px;">${f.title}</h3>
-            <p style="font-size:14px;color:${t.muted};line-height:1.7;">${f.description || ''}</p>
+
+  const header = `<div style="text-align:center;margin-bottom:60px;">
+    ${b.sectionLabel ? `<div class="section-label fade-up">${b.sectionLabel}</div>` : ''}
+    <h2 class="section-title fade-up fade-up-d1">${b.headline || ''}</h2>
+    <p class="section-subtitle fade-up fade-up-d2" style="margin:0 auto;">${b.subheadline || ''}</p>
+  </div>`
+
+  switch (variant) {
+    case 'icon-left':
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="display:flex;flex-direction:column;gap:20px;max-width:700px;margin:0 auto;">
+            ${items.map((f: FeatureItem, i: number) => `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 4)} card-hover" style="display:flex;gap:20px;align-items:flex-start;padding:24px;background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;">
+                <div style="flex-shrink:0;width:52px;height:52px;border-radius:14px;background:${t.primary}15;display:flex;align-items:center;justify-content:center;font-size:24px;">${f.icon || '✦'}</div>
+                <div>
+                  <h3 style="font-size:17px;font-weight:700;margin-bottom:6px;">${f.title}</h3>
+                  <p style="font-size:14px;color:${t.muted};line-height:1.7;">${f.description || ''}</p>
+                </div>
+              </div>
+            `).join('')}
           </div>
-        `).join('')}
-      </div>
-    </div>
-  </section>`
+        </div>
+      </section>`
+
+    case 'zigzag':
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="display:flex;flex-direction:column;gap:48px;">
+            ${items.map((f: FeatureItem, i: number) => {
+              const imgSrc = getAboutImage(_category)
+              const isEven = i % 2 === 0
+              return `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 4)}" style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;">
+                <div style="order:${isEven ? 1 : 2};">
+                  <div style="width:44px;height:44px;border-radius:12px;background:${t.primary}15;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:16px;">${f.icon || '✦'}</div>
+                  <h3 style="font-size:22px;font-weight:700;margin-bottom:10px;">${f.title}</h3>
+                  <p style="font-size:15px;color:${t.muted};line-height:1.8;">${f.description || ''}</p>
+                </div>
+                <div style="order:${isEven ? 2 : 1};aspect-ratio:4/3;border-radius:16px;overflow:hidden;">
+                  <img src="${imgSrc}" alt="${f.title}" loading="lazy" style="width:100%;height:100%;object-fit:cover;" />
+                </div>
+              </div>`
+            }).join('')}
+          </div>
+        </div>
+      </section>`
+
+    case 'list':
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="max-width:640px;margin:0 auto;">
+            ${items.map((f: FeatureItem, i: number) => `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 4)}" style="padding:20px 0;${i < items.length - 1 ? `border-bottom:1px solid ${t.text}10;` : ''}">
+                <h3 style="font-size:17px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:10px;">
+                  <span style="color:${t.primary};font-size:20px;">${f.icon || '✦'}</span> ${f.title}
+                </h3>
+                <p style="font-size:14px;color:${t.muted};line-height:1.7;padding-left:30px;">${f.description || ''}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </section>`
+
+    default:
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;">
+            ${items.map((f: FeatureItem, i: number) => `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 4)} card-hover" style="padding:36px 28px;background:${cardBg};border:1px solid ${cardBorder};border-radius:16px;position:relative;overflow:hidden;">
+                <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,${t.primary},${t.secondary});opacity:0;transition:opacity .3s;"></div>
+                <div style="width:52px;height:52px;border-radius:14px;background:${t.primary}15;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:20px;">${f.icon || '✦'}</div>
+                <h3 style="font-size:18px;font-weight:700;margin-bottom:10px;">${f.title}</h3>
+                <p style="font-size:14px;color:${t.muted};line-height:1.7;">${f.description || ''}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </section>`
+  }
 }
 
 function renderAbout(b: RenderBlock, t: TemplateTheme) {
@@ -301,30 +367,99 @@ function renderAbout(b: RenderBlock, t: TemplateTheme) {
 
 function renderTestimonials(b: RenderBlock, t: TemplateTheme) {
   const items = b.testimonials || []
-  return `<section class="section">
-    <div class="container">
-      <div style="text-align:center;margin-bottom:60px;">
-        <h2 class="section-title fade-up">${b.headline || ''}</h2>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;">
-        ${items.map((t2: TestimonialItem, i: number) => {
-    const avatar = getTeamAvatar(_category, i)
-    return `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="padding:32px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:16px;">
-            <div style="display:flex;gap:4px;margin-bottom:16px;">${'⭐'.repeat(t2.rating || 5)}</div>
-            <p style="font-size:15px;color:${t.muted};line-height:1.7;margin-bottom:20px;font-style:italic;">"${t2.quote}"</p>
-            <div style="display:flex;align-items:center;gap:12px;">
-              <img src="${avatar}" alt="${t2.name}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid ${t.primary}30;" />
-              <div>
-                <div style="font-size:14px;font-weight:700;">${t2.name}</div>
-                <div style="font-size:12px;color:${t.muted};">${t2.title || ''}</div>
+  const variant = b.variant || 'default'
+
+  const header = `<div style="text-align:center;margin-bottom:60px;">
+    <h2 class="section-title fade-up">${b.headline || ''}</h2>
+  </div>`
+
+  switch (variant) {
+    case 'carousel': {
+      const first = items[0]
+      if (!first) return `<section class="section"><div class="container">${header}</div></section>`
+      const avatar = getTeamAvatar(_category, 0)
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div class="fade-up" style="max-width:700px;margin:0 auto;text-align:center;padding:48px 40px;background:${t.text}04;border-radius:20px;border:1px solid ${t.text}08;">
+            <div style="font-size:64px;line-height:1;color:${t.primary};margin-bottom:16px;">&ldquo;</div>
+            <p style="font-size:20px;line-height:1.8;color:${t.text};font-style:italic;margin-bottom:24px;">${first.quote}</p>
+            <div style="display:flex;gap:4px;justify-content:center;margin-bottom:20px;">${'⭐'.repeat(first.rating || 5)}</div>
+            <img src="${avatar}" alt="${first.name}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;margin:0 auto 12px;border:3px solid ${t.primary}30;" />
+            <div style="font-size:16px;font-weight:700;">${first.name}</div>
+            <div style="font-size:13px;color:${t.muted};">${first.title || ''}</div>
+            ${items.length > 1 ? `<div style="display:flex;gap:8px;justify-content:center;margin-top:24px;">${items.map((_: TestimonialItem, i: number) => `<span style="width:${i === 0 ? 24 : 8}px;height:8px;border-radius:4px;background:${i === 0 ? t.primary : t.text + '20'};display:inline-block;"></span>`).join('')}</div>` : ''}
+          </div>
+        </div>
+      </section>`
+    }
+
+    case 'spotlight': {
+      const featured = items[0]
+      const rest = items.slice(1, 3)
+      if (!featured) return `<section class="section"><div class="container">${header}</div></section>`
+      const featAvatar = getTeamAvatar(_category, 0)
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:stretch;">
+            <div class="fade-up card-hover" style="padding:40px;background:${t.primary}08;border:2px solid ${t.primary}20;border-radius:20px;display:flex;flex-direction:column;justify-content:center;">
+              <div style="font-size:48px;line-height:1;color:${t.primary};margin-bottom:12px;">&ldquo;</div>
+              <p style="font-size:18px;line-height:1.8;color:${t.text};font-style:italic;margin-bottom:24px;">${featured.quote}</p>
+              <div style="display:flex;gap:4px;margin-bottom:16px;">${'⭐'.repeat(featured.rating || 5)}</div>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <img src="${featAvatar}" alt="${featured.name}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:2px solid ${t.primary}30;" />
+                <div>
+                  <div style="font-size:15px;font-weight:700;">${featured.name}</div>
+                  <div style="font-size:13px;color:${t.muted};">${featured.title || ''}</div>
+                </div>
               </div>
             </div>
-          </div>`
-  }).join('')}
-      </div>
-    </div>
-  </section>`
+            <div style="display:flex;flex-direction:column;gap:24px;">
+              ${rest.map((t2: TestimonialItem, i: number) => {
+                const av = getTeamAvatar(_category, i + 1)
+                return `
+                <div class="fade-up fade-up-d${i + 1} card-hover" style="padding:28px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:16px;flex:1;">
+                  <p style="font-size:14px;color:${t.muted};line-height:1.7;margin-bottom:16px;font-style:italic;">"${t2.quote}"</p>
+                  <div style="display:flex;align-items:center;gap:10px;">
+                    <img src="${av}" alt="${t2.name}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" />
+                    <div>
+                      <div style="font-size:13px;font-weight:700;">${t2.name}</div>
+                      <div style="font-size:11px;color:${t.muted};">${t2.title || ''}</div>
+                    </div>
+                  </div>
+                </div>`
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      </section>`
+    }
+
+    default:
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px;">
+            ${items.map((t2: TestimonialItem, i: number) => {
+              const avatar = getTeamAvatar(_category, i)
+              return `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="padding:32px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:16px;">
+                <div style="display:flex;gap:4px;margin-bottom:16px;">${'⭐'.repeat(t2.rating || 5)}</div>
+                <p style="font-size:15px;color:${t.muted};line-height:1.7;margin-bottom:20px;font-style:italic;">"${t2.quote}"</p>
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <img src="${avatar}" alt="${t2.name}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid ${t.primary}30;" />
+                  <div>
+                    <div style="font-size:14px;font-weight:700;">${t2.name}</div>
+                    <div style="font-size:12px;color:${t.muted};">${t2.title || ''}</div>
+                  </div>
+                </div>
+              </div>`
+            }).join('')}
+          </div>
+        </div>
+      </section>`
+  }
 }
 
 function renderStats(b: RenderBlock, t: TemplateTheme) {
@@ -346,95 +481,279 @@ function renderStats(b: RenderBlock, t: TemplateTheme) {
 
 function renderPricing(b: RenderBlock, t: TemplateTheme) {
   const plans = b.plans || []
-  return `<section class="section">
-    <div class="container">
-      <div style="text-align:center;margin-bottom:60px;">
-        <h2 class="section-title fade-up">${b.headline || ''}</h2>
-        <p class="section-subtitle fade-up fade-up-d1" style="margin:0 auto;">${b.subheadline || ''}</p>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;max-width:900px;margin:0 auto;">
-        ${plans.map((p: PricingPlan, i: number) => `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="padding:36px 28px;border-radius:20px;border:${p.isPopular ? `2px solid ${t.primary}` : `1px solid ${t.text}10`};background:${p.isPopular ? `${t.primary}08` : `${t.text}03`};position:relative;${p.isPopular ? `box-shadow:0 20px 40px ${t.primary}15;transform:scale(1.03);` : ''}">
-            ${p.isPopular ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 16px;background:${t.primary};color:#fff;border-radius:100px;font-size:11px;font-weight:700;">POPULAR</div>` : ''}
-            <h3 style="font-size:18px;font-weight:700;margin-bottom:4px;">${p.name}</h3>
-            <p style="font-size:13px;color:${t.muted};margin-bottom:16px;">${p.description || ''}</p>
-            <div style="font-size:32px;font-weight:800;color:${t.primary};margin-bottom:24px;">${p.price}</div>
-            <ul style="list-style:none;margin-bottom:28px;">
-              ${(p.features || []).map((f: string | { text: string }) => `<li style="padding:8px 0;font-size:14px;color:${t.muted};border-bottom:1px solid ${t.text}06;display:flex;align-items:center;gap:8px;"><span style="color:${t.primary};">✓</span> ${typeof f === 'string' ? f : (f.text || '')}</li>`).join('')}
-            </ul>
-            <a href="${p.ctaUrl || '#'}" class="${p.isPopular ? 'btn-primary' : 'btn-outline'}" style="display:block;text-align:center;width:100%;">${p.ctaLabel || 'Choose Plan'}</a>
+  const variant = b.variant || 'default'
+
+  const header = `<div style="text-align:center;margin-bottom:60px;">
+    <h2 class="section-title fade-up">${b.headline || ''}</h2>
+    <p class="section-subtitle fade-up fade-up-d1" style="margin:0 auto;">${b.subheadline || ''}</p>
+  </div>`
+
+  switch (variant) {
+    case 'table': {
+      const allFeatures: string[] = []
+      plans.forEach((p: PricingPlan) => {
+        (p.features || []).forEach((f: string | { text: string }) => {
+          const txt = typeof f === 'string' ? f : (f.text || '')
+          if (txt && !allFeatures.includes(txt)) allFeatures.push(txt)
+        })
+      })
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div class="fade-up" style="overflow-x:auto;max-width:900px;margin:0 auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:14px;">
+              <thead>
+                <tr>
+                  <th style="text-align:left;padding:16px;border-bottom:2px solid ${t.primary};color:${t.muted};font-size:13px;">Features</th>
+                  ${plans.map((p: PricingPlan) => `<th style="text-align:center;padding:16px;border-bottom:2px solid ${p.isPopular ? t.primary : t.text + '15'};${p.isPopular ? `background:${t.primary}08;` : ''}">
+                    <div style="font-size:16px;font-weight:700;margin-bottom:4px;">${p.name}</div>
+                    <div style="font-size:24px;font-weight:800;color:${t.primary};">${p.price}</div>
+                  </th>`).join('')}
+                </tr>
+              </thead>
+              <tbody>
+                ${allFeatures.map((feat: string, i: number) => `
+                  <tr style="background:${i % 2 === 0 ? 'transparent' : t.text + '03'};">
+                    <td style="padding:12px 16px;border-bottom:1px solid ${t.text}08;color:${t.muted};">${feat}</td>
+                    ${plans.map((p: PricingPlan) => {
+                      const has = (p.features || []).some((f: string | { text: string }) => (typeof f === 'string' ? f : (f.text || '')) === feat)
+                      return `<td style="text-align:center;padding:12px 16px;border-bottom:1px solid ${t.text}08;${p.isPopular ? `background:${t.primary}08;` : ''}"><span style="color:${has ? t.primary : t.text + '20'};font-size:16px;">${has ? '✓' : '—'}</span></td>`
+                    }).join('')}
+                  </tr>
+                `).join('')}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td style="padding:16px;"></td>
+                  ${plans.map((p: PricingPlan) => `<td style="text-align:center;padding:16px;${p.isPopular ? `background:${t.primary}08;` : ''}"><a href="${p.ctaUrl || '#'}" class="${p.isPopular ? 'btn-primary' : 'btn-outline'}" style="display:inline-block;">${p.ctaLabel || 'Choose Plan'}</a></td>`).join('')}
+                </tr>
+              </tfoot>
+            </table>
           </div>
-        `).join('')}
-      </div>
-    </div>
-  </section>`
+        </div>
+      </section>`
+    }
+
+    case 'horizontal':
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="display:flex;gap:16px;overflow-x:auto;max-width:1000px;margin:0 auto;">
+            ${plans.map((p: PricingPlan, i: number) => `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="flex:1;min-width:200px;padding:28px 20px;border-radius:16px;border:${p.isPopular ? `2px solid ${t.primary}` : `1px solid ${t.text}10`};background:${p.isPopular ? `${t.primary}06` : `${t.text}02`};text-align:center;">
+                ${p.isPopular ? `<div style="display:inline-block;padding:3px 12px;background:${t.primary};color:#fff;border-radius:100px;font-size:10px;font-weight:700;margin-bottom:10px;">POPULAR</div>` : ''}
+                <h3 style="font-size:15px;font-weight:700;margin-bottom:8px;">${p.name}</h3>
+                <div style="font-size:28px;font-weight:800;color:${t.primary};margin-bottom:8px;">${p.price}</div>
+                <p style="font-size:12px;color:${t.muted};margin-bottom:16px;">${p.description || ''}</p>
+                <ul style="list-style:none;margin-bottom:20px;text-align:left;">
+                  ${(p.features || []).map((f: string | { text: string }) => `<li style="padding:5px 0;font-size:13px;color:${t.muted};display:flex;align-items:center;gap:6px;"><span style="color:${t.primary};font-size:12px;">✓</span> ${typeof f === 'string' ? f : (f.text || '')}</li>`).join('')}
+                </ul>
+                <a href="${p.ctaUrl || '#'}" class="${p.isPopular ? 'btn-primary' : 'btn-outline'}" style="display:block;text-align:center;width:100%;font-size:13px;">${p.ctaLabel || 'Choose Plan'}</a>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </section>`
+
+    default:
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;max-width:900px;margin:0 auto;">
+            ${plans.map((p: PricingPlan, i: number) => `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="padding:36px 28px;border-radius:20px;border:${p.isPopular ? `2px solid ${t.primary}` : `1px solid ${t.text}10`};background:${p.isPopular ? `${t.primary}08` : `${t.text}03`};position:relative;${p.isPopular ? `box-shadow:0 20px 40px ${t.primary}15;transform:scale(1.03);` : ''}">
+                ${p.isPopular ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);padding:4px 16px;background:${t.primary};color:#fff;border-radius:100px;font-size:11px;font-weight:700;">POPULAR</div>` : ''}
+                <h3 style="font-size:18px;font-weight:700;margin-bottom:4px;">${p.name}</h3>
+                <p style="font-size:13px;color:${t.muted};margin-bottom:16px;">${p.description || ''}</p>
+                <div style="font-size:32px;font-weight:800;color:${t.primary};margin-bottom:24px;">${p.price}</div>
+                <ul style="list-style:none;margin-bottom:28px;">
+                  ${(p.features || []).map((f: string | { text: string }) => `<li style="padding:8px 0;font-size:14px;color:${t.muted};border-bottom:1px solid ${t.text}06;display:flex;align-items:center;gap:8px;"><span style="color:${t.primary};">✓</span> ${typeof f === 'string' ? f : (f.text || '')}</li>`).join('')}
+                </ul>
+                <a href="${p.ctaUrl || '#'}" class="${p.isPopular ? 'btn-primary' : 'btn-outline'}" style="display:block;text-align:center;width:100%;">${p.ctaLabel || 'Choose Plan'}</a>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </section>`
+  }
 }
 
 function renderFaq(b: RenderBlock, t: TemplateTheme) {
   const items = b.faqs || []
-  return `<section class="section">
-    <div class="container" style="max-width:700px;">
-      <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
-      ${items.map((f: FaqItem, i: number) => `
-        <div class="fade-up fade-up-d${Math.min(i + 1, 3)}" style="border-bottom:1px solid ${t.text}10;padding:24px 0;">
-          <h3 style="font-size:16px;font-weight:600;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">${f.question} <span style="color:${t.primary};font-size:20px;">+</span></h3>
-          <p style="font-size:14px;color:${t.muted};line-height:1.7;">${f.answer}</p>
+  const variant = b.variant || 'default'
+
+  switch (variant) {
+    case 'grid':
+      return `<section class="section">
+        <div class="container">
+          <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;max-width:900px;margin:0 auto;">
+            ${items.map((f: FaqItem, i: number) => `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 4)} card-hover" style="padding:24px;background:${t.text}04;border:1px solid ${t.text}08;border-radius:14px;">
+                <h3 style="font-size:15px;font-weight:700;margin-bottom:10px;color:${t.text};">${f.question}</h3>
+                <p style="font-size:14px;color:${t.muted};line-height:1.7;">${f.answer}</p>
+              </div>
+            `).join('')}
+          </div>
         </div>
-      `).join('')}
-    </div>
-  </section>`
+      </section>`
+
+    default:
+      return `<section class="section">
+        <div class="container" style="max-width:700px;">
+          <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
+          ${items.map((f: FaqItem, i: number) => `
+            <div class="fade-up fade-up-d${Math.min(i + 1, 3)}" style="border-bottom:1px solid ${t.text}10;padding:24px 0;">
+              <h3 style="font-size:16px;font-weight:600;margin-bottom:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">${f.question} <span style="color:${t.primary};font-size:20px;">+</span></h3>
+              <p style="font-size:14px;color:${t.muted};line-height:1.7;">${f.answer}</p>
+            </div>
+          `).join('')}
+        </div>
+      </section>`
+  }
 }
 
 function renderGallery(b: RenderBlock, t: TemplateTheme) {
-  const galleryImages = getGalleryImages(_category, 6)
-  return `<section class="section">
-    <div class="container">
-      <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
-        ${galleryImages.map((imgUrl: string, i: number) => `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 4)}" style="aspect-ratio:${i % 3 === 0 ? '4/3' : '1/1'};border-radius:12px;overflow:hidden;position:relative;cursor:pointer;">
-            <img src="${imgUrl}" alt="Gallery ${i + 1}" loading="lazy" style="width:100%;height:100%;object-fit:cover;transition:transform .5s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'" />
-            <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.3));opacity:0;transition:opacity .3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'"></div>
+  const variant = b.variant || 'default'
+  const header = `<h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>`
+
+  switch (variant) {
+    case 'masonry': {
+      const galleryImages = getGalleryImages(_category, 6)
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;grid-auto-rows:180px;">
+            ${galleryImages.map((imgUrl: string, i: number) => {
+              const tall = i === 0 || i % 3 === 0
+              return `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 4)}" style="${tall ? 'grid-row:span 2;' : ''}border-radius:12px;overflow:hidden;position:relative;cursor:pointer;">
+                <img src="${imgUrl}" alt="Gallery ${i + 1}" loading="lazy" style="width:100%;height:100%;object-fit:cover;transition:transform .5s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'" />
+                <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.3));opacity:0;transition:opacity .3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'"></div>
+              </div>`
+            }).join('')}
           </div>
-        `).join('')}
-      </div>
-    </div>
-  </section>`
+        </div>
+      </section>`
+    }
+
+    case 'two-col': {
+      const galleryImages = getGalleryImages(_category, 2)
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            ${galleryImages.map((imgUrl: string, i: number) => `
+              <div class="fade-up fade-up-d${i + 1}" style="aspect-ratio:3/2;border-radius:16px;overflow:hidden;position:relative;cursor:pointer;">
+                <img src="${imgUrl}" alt="Gallery ${i + 1}" loading="lazy" style="width:100%;height:100%;object-fit:cover;transition:transform .5s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'" />
+                <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.25));opacity:0;transition:opacity .3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'"></div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </section>`
+    }
+
+    default: {
+      const galleryImages = getGalleryImages(_category, 6)
+      return `<section class="section">
+        <div class="container">
+          ${header}
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+            ${galleryImages.map((imgUrl: string, i: number) => `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 4)}" style="aspect-ratio:${i % 3 === 0 ? '4/3' : '1/1'};border-radius:12px;overflow:hidden;position:relative;cursor:pointer;">
+                <img src="${imgUrl}" alt="Gallery ${i + 1}" loading="lazy" style="width:100%;height:100%;object-fit:cover;transition:transform .5s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'" />
+                <div style="position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.3));opacity:0;transition:opacity .3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'"></div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </section>`
+    }
+  }
 }
 
 function renderTeam(b: RenderBlock, t: TemplateTheme) {
   const members = b.members || []
-  return `<section class="section" style="background:${t.primary}04;">
-    <div class="container">
-      <h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px;max-width:800px;margin:0 auto;">
-        ${members.map((m: MemberItem, i: number) => {
-    const avatar = getTeamAvatar(_category, i)
-    return `
-          <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="text-align:center;padding:32px 20px;background:${t.text}04;border-radius:16px;border:1px solid ${t.text}06;">
-            <img src="${avatar}" alt="${m.name}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin:0 auto 16px;border:3px solid ${t.primary}25;" />
-            <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">${m.name}</h3>
-            <p style="font-size:13px;color:${t.muted};">${m.role || ''}</p>
-          </div>`
-  }).join('')}
-      </div>
-    </div>
-  </section>`
+  const variant = b.variant || 'default'
+
+  const header = `<h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>`
+
+  switch (variant) {
+    case 'cards':
+      return `<section class="section" style="background:${t.primary}04;">
+        <div class="container">
+          ${header}
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:24px;max-width:900px;margin:0 auto;">
+            ${members.map((m: MemberItem, i: number) => {
+              const avatar = getTeamAvatar(_category, i)
+              return `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="background:${t.bg};border:1px solid ${t.text}10;border-radius:16px;overflow:hidden;">
+                <div style="aspect-ratio:4/3;overflow:hidden;">
+                  <img src="${avatar}" alt="${m.name}" style="width:100%;height:100%;object-fit:cover;transition:transform .5s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" />
+                </div>
+                <div style="padding:20px;">
+                  <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">${m.name}</h3>
+                  <p style="font-size:13px;color:${t.muted};">${m.role || ''}</p>
+                </div>
+              </div>`
+            }).join('')}
+          </div>
+        </div>
+      </section>`
+
+    default:
+      return `<section class="section" style="background:${t.primary}04;">
+        <div class="container">
+          ${header}
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px;max-width:800px;margin:0 auto;">
+            ${members.map((m: MemberItem, i: number) => {
+              const avatar = getTeamAvatar(_category, i)
+              return `
+              <div class="fade-up fade-up-d${Math.min(i + 1, 3)} card-hover" style="text-align:center;padding:32px 20px;background:${t.text}04;border-radius:16px;border:1px solid ${t.text}06;">
+                <img src="${avatar}" alt="${m.name}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin:0 auto 16px;border:3px solid ${t.primary}25;" />
+                <h3 style="font-size:16px;font-weight:700;margin-bottom:4px;">${m.name}</h3>
+                <p style="font-size:13px;color:${t.muted};">${m.role || ''}</p>
+              </div>`
+            }).join('')}
+          </div>
+        </div>
+      </section>`
+  }
 }
 
 function renderCta(b: RenderBlock, t: TemplateTheme) {
-  const img = getAboutImage(_category)
-  return `<section style="padding:80px 0;">
-    <div class="container">
-      <div class="fade-up" style="text-align:center;padding:64px 40px;border-radius:24px;position:relative;overflow:hidden;">
-        <img src="${img}" alt="CTA Background" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
-        <div style="position:absolute;inset:0;background:linear-gradient(135deg,${t.primary}e6,${t.secondary}cc);"></div>
-        <h2 style="font-size:clamp(24px,3vw,36px);font-weight:800;color:#fff;margin-bottom:12px;position:relative;z-index:1;">${b.headline || ''}</h2>
-        <p style="font-size:16px;color:rgba(255,255,255,.85);margin-bottom:32px;position:relative;z-index:1;">${b.subheadline || ''}</p>
-        <a href="${b.ctaUrl || '#'}" style="display:inline-flex;padding:14px 36px;background:#fff;color:${t.primary};border-radius:12px;font-weight:700;font-size:15px;position:relative;z-index:1;transition:all .2s;box-shadow:0 8px 24px rgba(0,0,0,.2);">${b.ctaLabel || 'Get Started'}</a>
-      </div>
-    </div>
-  </section>`
+  const variant = b.variant || 'default'
+
+  switch (variant) {
+    case 'banner':
+      return `<section style="padding:0;">
+        <div class="fade-up" style="background:linear-gradient(135deg,${t.primary},${t.secondary});padding:40px 0;">
+          <div class="container" style="display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+              <h2 style="font-size:clamp(20px,2.5vw,28px);font-weight:800;color:#fff;margin-bottom:8px;">${b.headline || ''}</h2>
+              <p style="font-size:15px;color:rgba(255,255,255,.8);">${b.subheadline || ''}</p>
+            </div>
+            <a href="${b.ctaUrl || '#'}" class="btn-primary" style="flex-shrink:0;display:inline-flex;padding:14px 36px;background:#fff;color:${t.primary};border-radius:12px;font-weight:700;font-size:15px;box-shadow:0 8px 24px rgba(0,0,0,.15);">${b.ctaLabel || 'Get Started'}</a>
+          </div>
+        </div>
+      </section>`
+
+    default: {
+      const img = getAboutImage(_category)
+      return `<section style="padding:80px 0;">
+        <div class="container">
+          <div class="fade-up" style="text-align:center;padding:64px 40px;border-radius:24px;position:relative;overflow:hidden;">
+            <img src="${img}" alt="CTA Background" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
+            <div style="position:absolute;inset:0;background:linear-gradient(135deg,${t.primary}e6,${t.secondary}cc);"></div>
+            <h2 style="font-size:clamp(24px,3vw,36px);font-weight:800;color:#fff;margin-bottom:12px;position:relative;z-index:1;">${b.headline || ''}</h2>
+            <p style="font-size:16px;color:rgba(255,255,255,.85);margin-bottom:32px;position:relative;z-index:1;">${b.subheadline || ''}</p>
+            <a href="${b.ctaUrl || '#'}" style="display:inline-flex;padding:14px 36px;background:#fff;color:${t.primary};border-radius:12px;font-weight:700;font-size:15px;position:relative;z-index:1;transition:all .2s;box-shadow:0 8px 24px rgba(0,0,0,.2);">${b.ctaLabel || 'Get Started'}</a>
+          </div>
+        </div>
+      </section>`
+    }
+  }
 }
 
 function renderContact(b: RenderBlock, t: TemplateTheme, site?: SiteSocialLinks) {
