@@ -42,6 +42,9 @@ const CATEGORY_HERO_VARIANTS: Record<string, string[]> = {
   creative: ['magazine', 'parallax', 'cards-overlay', 'minimal', 'gradient'],
   business: ['centered', 'split-left', 'gradient', 'minimal', 'parallax'],
   fnb: ['split-left', 'gradient', 'magazine', 'parallax', 'fullscreen'],
+  events: ['fullscreen', 'gradient', 'split-left', 'centered', 'parallax'],
+  blog: ['minimal', 'split-left', 'fullscreen', 'centered', 'magazine'],
+  travel: ['fullscreen', 'parallax', 'split-left', 'gradient', 'slideshow'],
 }
 
 // ── Industry block mapping per category ─────────────────────────────────────
@@ -58,6 +61,9 @@ const CATEGORY_INDUSTRY_BLOCKS: Record<string, string[]> = {
   creative: ['portfolio-grid', 'video-showcase', 'review-cards'],
   business: ['service-cards', 'review-cards', 'client-logos'],
   fnb: ['menu-display', 'review-cards'],
+  events: ['countdown-timer', 'booking-widget', 'review-cards'],
+  blog: ['blog-list', 'social-proof', 'review-cards'],
+  travel: ['booking-widget', 'review-cards', 'video-showcase'],
 }
 
 // ── Block builders ──────────────────────────────────────────────────────────
@@ -150,6 +156,21 @@ function buildFeatures(biz: BusinessSample, category: string): Record<string, un
       { icon: 'Coffee', title: 'Quality Ingredients', description: 'We source premium beans and ingredients to deliver the authentic taste you love.' },
       { icon: 'Wifi', title: 'Work-Friendly Space', description: 'Free Wi-Fi, power outlets at every table, and a quiet corner for focused work.' },
       { icon: 'Heart', title: 'Made with Love', description: 'Every drink and dish is prepared fresh, following recipes perfected over decades.' },
+    ],
+    events: [
+      { icon: 'Calendar', title: 'Flawless Planning', description: 'From venue selection to day-of coordination, we handle every detail so you can enjoy the moment.' },
+      { icon: 'Users', title: 'Experienced Team', description: 'Over 500 events delivered across weddings, corporate functions, and private celebrations.' },
+      { icon: 'Star', title: 'Custom Packages', description: 'Tailored packages from intimate gatherings of 20 to grand celebrations of 500+ guests.' },
+    ],
+    blog: [
+      { icon: 'PenTool', title: 'Expert Writers', description: 'Our team of experienced writers and editors deliver well-researched, engaging content daily.' },
+      { icon: 'TrendingUp', title: 'Trending Topics', description: 'Stay ahead with the latest insights, trends, and stories that matter to Malaysians.' },
+      { icon: 'Mail', title: 'Weekly Newsletter', description: 'Get the best stories delivered to your inbox every week. Join 10,000+ subscribers.' },
+    ],
+    travel: [
+      { icon: 'Map', title: 'Local Expertise', description: 'Born and raised in Malaysia — we know the hidden gems, best routes, and insider tips.' },
+      { icon: 'Shield', title: 'Safe & Insured', description: 'All tours include travel insurance and are led by licensed, first-aid certified guides.' },
+      { icon: 'DollarSign', title: 'Best Price Guarantee', description: 'Competitive RM pricing with no hidden fees. Price match guarantee on all packages.' },
     ],
   }
 

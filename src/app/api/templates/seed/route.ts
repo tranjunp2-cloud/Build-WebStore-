@@ -19,6 +19,14 @@ import { withAuth } from '@/lib/auth'
  */
 export const POST = withAuth(async (_user, request) => {
     try {
+        // Only super-admin can seed templates
+        if (!_user?.roles?.includes('super-admin')) {
+            return NextResponse.json({
+                success: false,
+                error: { code: 'FORBIDDEN', message: 'Only super-admin can seed templates' },
+            }, { status: 403 })
+        }
+
         const url = new URL(request.url)
         const force = url.searchParams.get('force') === 'true'
         const v2 = url.searchParams.get('v2') === 'true'
