@@ -60,7 +60,8 @@ export function AnimatedSection({ children, delay = 0, ...props }: MotionSection
     const shouldReduce = useReducedMotion()
 
     if (shouldReduce) {
-        return <section {...(props as Record<string, unknown>)}>{children}</section>
+        const { className, style } = props as { className?: string; style?: React.CSSProperties }
+        return <section className={className} style={style}>{children as ReactNode}</section>
     }
 
     return (
@@ -88,7 +89,7 @@ export function StaggerGrid({ children, className, ...props }: ComponentProps<ty
     const shouldReduce = useReducedMotion()
 
     if (shouldReduce) {
-        return <div className={className}>{children}</div>
+        return <div className={className}>{children as ReactNode}</div>
     }
 
     return (
@@ -110,7 +111,7 @@ export function StaggerItem({ children, className, ...props }: ComponentProps<ty
     const shouldReduce = useReducedMotion()
 
     if (shouldReduce) {
-        return <div className={className}>{children}</div>
+        return <div className={className}>{children as ReactNode}</div>
     }
 
     return (
@@ -125,7 +126,7 @@ export function HoverCard({ children, className, style, ...props }: ComponentPro
     const shouldReduce = useReducedMotion()
 
     if (shouldReduce) {
-        return <div className={className} style={style}>{children}</div>
+        return <div className={className} style={style as React.CSSProperties}>{children as ReactNode}</div>
     }
 
     return (

@@ -159,10 +159,9 @@ function TimelineEntry({ item, index }: { item: TimelineItem; index: number; isL
 
                 {/* Dot */}
                 <div
-                    className="relative z-10 w-3 h-3 rounded-full flex-shrink-0 ring-4"
+                    className="relative z-10 w-3 h-3 rounded-full flex-shrink-0 ring-4 ring-[var(--background)]"
                     style={{
                         background: 'var(--brand-primary)',
-                        ringColor: 'var(--background)',
                     }}
                     aria-hidden="true"
                 />
