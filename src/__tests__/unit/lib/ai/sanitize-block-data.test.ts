@@ -351,8 +351,8 @@ describe('sanitizeBlockData — faq items [TC-F01.08]', () => {
 // ─── Pricing plans extended (lines 452-475) ──────────────────────────────────
 
 describe('sanitizeBlockData — pricing plans extended [TC-F01.08]', () => {
-    it('maps object features inside plans to string array [TC-F01.08]', () => {
-        // Arrange — plans with object features inside
+    it('maps features inside plans to {text, included} objects [TC-F01.08]', () => {
+        // Arrange — plans with mixed features (objects + strings)
         const input = {
             blockType: 'pricing',
             plans: [{
@@ -362,7 +362,7 @@ describe('sanitizeBlockData — pricing plans extended [TC-F01.08]', () => {
                     { text: 'Unlimited pages' },
                     { name: 'Custom domain' },
                     { feature: 'SSL certificate' },
-                    'Priority support',  // plain string — should pass through
+                    'Priority support',  // plain string → {text, included: true}
                 ],
             }],
         }
@@ -370,13 +370,13 @@ describe('sanitizeBlockData — pricing plans extended [TC-F01.08]', () => {
         // Act
         const output = sanitizeBlockData(input)
 
-        // Assert
-        const plans = output.plans as Array<{ name: string; features: string[] }>
+        // Assert — Payload expects {text, included} objects
+        const plans = output.plans as Array<{ name: string; features: Array<{ text: string; included: boolean }> }>
         expect(plans[0].features).toEqual([
-            'Unlimited pages',
-            'Custom domain',
-            'SSL certificate',
-            'Priority support',
+            { text: 'Unlimited pages', included: true },
+            { text: 'Custom domain', included: true },
+            { text: 'SSL certificate', included: true },
+            { text: 'Priority support', included: true },
         ])
     })
 

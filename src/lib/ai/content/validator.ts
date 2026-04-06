@@ -1,7 +1,7 @@
 import type { CategoryContent } from './types'
 
 const RM_PRICE_REGEX = /RM\s?\d/
-const MY_PHONE_REGEX = /^\+60\d[\d\s-]{7,}/
+const MY_PHONE_REGEX = /^\+60\s?\d[\d\s-]{7,}/
 const MY_ADDRESS_KEYWORDS = [
   'Jalan',
   'Lorong',

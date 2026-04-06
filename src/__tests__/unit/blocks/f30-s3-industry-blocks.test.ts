@@ -224,7 +224,7 @@ describe('[TC-S3-009] All 11 content files have valid Malaysian data', () => {
 
             it('all phones use +60 Malaysian format', () => {
                 // Arrange
-                const myPhoneRegex = /^\+60\d[\d\s-]{7,}/
+                const myPhoneRegex = /^\+60\s?\d[\d\s-]{7,}/
 
                 // Assert
                 for (const biz of content.businesses) {

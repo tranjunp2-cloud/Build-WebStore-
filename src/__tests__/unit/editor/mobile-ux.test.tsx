@@ -206,13 +206,13 @@ describe('PreviewFrame — disableDragDrop prop', () => {
 // =============================================================================
 
 describe('blockRegistry — block count', () => {
-    it('[TC-F04.15] registry contains exactly 42 blocks', () => {
-        expect(blockRegistry.count).toBe(42)
+    it('[TC-F04.15] registry contains exactly 50 blocks', () => {
+        expect(blockRegistry.count).toBe(50)
     })
 
-    it('[TC-F04.15] getBlockTypes returns 42 entries', () => {
+    it('[TC-F04.15] getBlockTypes returns 50 entries', () => {
         const types = blockRegistry.getBlockTypes()
-        expect(types.length).toBe(42)
+        expect(types.length).toBe(50)
     })
 
     it('[TC-F04.15] all v1.1 blocks are registered', () => {
