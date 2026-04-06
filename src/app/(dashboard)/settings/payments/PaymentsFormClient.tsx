@@ -17,16 +17,18 @@ type Media = {
 function getImageUrl(image: Media | string | null): string | null {
     if (!image || typeof image === 'string') return null;
     let url = image.url || image.thumbnailURL || null;
-    if (!url) return null;
+    return url || null;
+}
 
-    // On local Docker dev: Payload generates internal minio:9000 URLs which are not browser-accessible.
-    // Replace with localhost:9000 so the browser can reach MinIO's mapped port.
-    // On staging: Payload generates direct S3/CDN URLs (https://...) which are already accessible.
-    if (url.includes('minio:9000')) {
-        url = url.replace('minio:9000', 'localhost:9000');
+function isLocalOrBlob(urlStr: string | null): boolean {
+    if (!urlStr) return false;
+    if (urlStr.startsWith('blob:')) return true;
+    try {
+        const url = new URL(urlStr);
+        return ['localhost', '127.0.0.1', 'minio'].includes(url.hostname);
+    } catch {
+        return false;
     }
-
-    return url;
 }
 
 export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined }) {
@@ -390,7 +392,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                                             alt="QR Code"
                                             width={192}
                                             height={192}
-                                            unoptimized={qrPreviewUrl.startsWith('blob:')}
+                                            unoptimized={isLocalOrBlob(qrPreviewUrl)}
                                             className="object-contain bg-white rounded-xl shadow-inner"
                                         />
                                         <button
