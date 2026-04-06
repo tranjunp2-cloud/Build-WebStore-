@@ -46,15 +46,15 @@ export async function GET(request: Request): Promise<Response> {
                 closed = true
                 if (heartbeatTimer) clearInterval(heartbeatTimer)
                 if (pgClient) {
-                    pgClient.query('UNLISTEN *').catch(() => {})
-                    pgClient.end().catch(() => {})
+                    pgClient.query('UNLISTEN *').catch((e) => console.warn('UNLISTEN failed', e))
+                    pgClient.end().catch((e) => console.warn('pgClient.end failed', e))
                 }
             }
 
             // Abort when client disconnects
             request.signal.addEventListener('abort', () => {
                 cleanup()
-                try { controller.close() } catch { /* already closed */ }
+                try { controller.close() } catch (e) { console.warn('close controller failed', e) }
             })
 
             try {
@@ -109,19 +109,21 @@ export async function GET(request: Request): Promise<Response> {
                             tenantId: payload.tenantId,
                         })
                         controller.enqueue(encoder.encode(`event: notification\ndata: ${data}\n\n`))
-                    } catch {
+                    } catch (e) {
                         // Malformed payload — ignore silently
+                        console.warn('Malformed SSE NOTIFY payload', e)
                     }
                 })
 
-                pgClient.on('error', () => {
+                pgClient.on('error', (e) => {
+                    console.error('pgClient emitted error', e)
                     cleanup()
-                    try { controller.close() } catch { /* already closed */ }
+                    try { controller.close() } catch (ce) { console.warn('close controller failed', ce) }
                 })
             } catch (err) {
                 console.error('[SSE Stream Error]', err)
                 cleanup()
-                try { controller.close() } catch { /* already closed */ }
+                try { controller.close() } catch (ce) { console.warn('close controller failed', ce) }
             }
         },
     })

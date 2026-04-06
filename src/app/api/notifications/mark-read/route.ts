@@ -4,6 +4,15 @@ import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import type { MarkReadPayload } from '@/types/notification'
 
+import { z } from 'zod'
+
+const MarkReadSchema = z.object({
+    mark_all: z.boolean().optional(),
+    notificationIds: z.array(z.string()).optional(),
+}).refine(data => data.mark_all || (data.notificationIds && data.notificationIds.length > 0), {
+    message: "Must provide either mark_all=true or an array of notificationIds",
+})
+
 export const dynamic = 'force-dynamic'
 
 /**
@@ -16,7 +25,13 @@ export const dynamic = 'force-dynamic'
 export const POST = withAuth(async (user, request) => {
     try {
         const payload = await getPayload({ config })
-        const body = (await request.json()) as MarkReadPayload
+        const jsonBody = await request.json()
+        const parsed = MarkReadSchema.safeParse(jsonBody)
+
+        if (!parsed.success) {
+            return NextResponse.json({ success: false, error: parsed.error.errors[0].message }, { status: 400 })
+        }
+        const body = parsed.data as MarkReadPayload
 
         // Resolve tenant ID
         const userWithTenants = user as unknown as {

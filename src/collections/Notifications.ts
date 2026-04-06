@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, AccessResult } from 'payload'
 
 /**
  * F16 — Notifications Collection
@@ -16,17 +16,37 @@ export const Notifications: CollectionConfig = {
     access: {
         // Only server-side inserts allowed (from API routes/hooks)
         create: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
-        // Users can only read their own notifications
+        // Users can only read their own notifications within their tenant
         read: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            return { user: { equals: req.user.id } }
+            
+            const tenants = (req.user as { tenants?: Array<{ tenant: string | { id: string } }> }).tenants || []
+            const tenantIds = tenants.map((t) => typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
+
+            const query: Record<string, unknown> = {
+                and: [
+                    { user: { equals: req.user.id } },
+                    { tenant: { in: tenantIds } }
+                ]
+            }
+            return query as AccessResult
         },
-        // Users can only update (mark-read) their own notifications
+        // Users can only update (mark-read) their own notifications within their tenant
         update: ({ req }) => {
             if (!req.user) return false
             if (req.user.roles?.includes('super-admin')) return true
-            return { user: { equals: req.user.id } }
+            
+            const tenants = (req.user as { tenants?: Array<{ tenant: string | { id: string } }> }).tenants || []
+            const tenantIds = tenants.map((t) => typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
+
+            const query: Record<string, unknown> = {
+                and: [
+                    { user: { equals: req.user.id } },
+                    { tenant: { in: tenantIds } }
+                ]
+            }
+            return query as AccessResult
         },
         delete: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
     },
