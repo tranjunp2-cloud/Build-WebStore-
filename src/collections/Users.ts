@@ -716,14 +716,15 @@ export const Users: CollectionConfig = {
                     )
                 }
 
-                // Dev/E2E OTP bypass — two modes:
-                // 1. Dev mode: any email + magic code (NODE_ENV=development only)
-                // 2. E2E test: specific TEST_EMAIL + E2E_TEST_OTP_CODE (any env)
+                // Dev/E2E OTP bypass — three modes:
+                // 1. Dev mode: ANY 6-digit OTP passes (NODE_ENV=development only)
+                // 2. Dev + magic code: specific E2E_TEST_OTP_CODE matches
+                // 3. E2E test: specific TEST_EMAIL + E2E_TEST_OTP_CODE (any env)
                 // Security: production MUST NOT set E2E_TEST_OTP_CODE in GitHub Secrets
                 const testOtpCode = process.env.E2E_TEST_OTP_CODE
                 const testEmail = process.env.TEST_EMAIL
                 const isDev = process.env.NODE_ENV === 'development'
-                const isDevBypass = isDev && testOtpCode && otp === testOtpCode
+                const isDevBypass = isDev && /^\d{6}$/.test(otp) // Dev: any 6-digit code passes
                 const isE2EBypass = !!(testOtpCode && testEmail
                     && email === testEmail && otp === testOtpCode)
                 const isTestBypass = isDevBypass || isE2EBypass
