@@ -66,7 +66,7 @@ export const POST = withAuth(async (user, req) => {
             colorMode: String(rawTheme.colorMode || 'dark'),
         }
 
-        // === APPLY TO EXISTING SITE ===
+        // === APPLY TO EXISTING SITE (multi-page + transaction) ===
         if (siteId) {
             let existingSite: Record<string, unknown>
             try {
@@ -86,48 +86,89 @@ export const POST = withAuth(async (user, req) => {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
             }
 
-            // Update site theme
-            await payload.update({
-                collection: 'sites',
-                id: Number(siteId),
-                data: { theme: templateTheme },
-            })
+            // Build pages list from templatePages or fallback to defaultBlocks
+            const templatePages = (template.templatePages as Array<{ title: string; slug: string; isHomepage?: boolean; layout: unknown }>)
+            const pagesToCreate = templatePages?.length
+                ? templatePages
+                : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
 
-            // Find and update homepage blocks
-            const homepageResult = await payload.find({
-                collection: 'pages',
-                where: {
-                    site: { equals: Number(siteId) },
-                    isHomepage: { equals: true },
-                },
-                limit: 1,
-            })
-
-            if (homepageResult.docs[0]) {
-                await payload.update({
+            // Transaction: delete old pages → update theme → create new pages
+            const txReq = await payload.db.beginTransaction()
+            try {
+                // 1. Delete all existing pages for this site
+                const existingPages = await payload.find({
                     collection: 'pages',
-                    id: homepageResult.docs[0].id,
-                    data: { layout: blocks },
+                    where: { site: { equals: Number(siteId) } },
+                    limit: 100,
+                    req: txReq as never,
                 })
-            }
+                for (const page of existingPages.docs) {
+                    await payload.delete({
+                        collection: 'pages',
+                        id: page.id,
+                        req: txReq as never,
+                    })
+                }
 
-            // Increment template usage count
-            await payload.update({
-                collection: 'templates',
-                id: templateId,
-                data: { usageCount: (Number(template.usageCount) || 0) + 1 },
-            })
+                // 2. Update site theme
+                await payload.update({
+                    collection: 'sites',
+                    id: Number(siteId),
+                    data: { theme: templateTheme },
+                    req: txReq as never,
+                })
+
+                // 3. Create new pages from template
+                for (const [idx, page] of pagesToCreate.entries()) {
+                    await payload.create({
+                        collection: 'pages',
+                        data: {
+                            title: page.title,
+                            slug: page.slug,
+                            site: Number(siteId),
+                            tenant: tenantId,
+                            isHomepage: page.isHomepage ?? idx === 0,
+                            status: 'draft',
+                            layout: page.layout,
+                        },
+                        req: txReq as never,
+                    })
+                }
+
+                // 4. Increment template usage count
+                await payload.update({
+                    collection: 'templates',
+                    id: templateId,
+                    data: { usageCount: (Number(template.usageCount) || 0) + 1 },
+                    req: txReq as never,
+                })
+
+                if (txReq && typeof txReq === 'object' && 'commitTransaction' in txReq) {
+                    await (txReq as { commitTransaction: () => Promise<void> }).commitTransaction()
+                }
+            } catch (txError) {
+                if (txReq && typeof txReq === 'object' && 'rollbackTransaction' in txReq) {
+                    await (txReq as { rollbackTransaction: () => Promise<void> }).rollbackTransaction()
+                }
+                throw txError
+            }
 
             return NextResponse.json({
                 success: true,
                 siteId: Number(siteId),
                 siteName: existingSite.name,
                 templateName: template.name,
+                pagesCreated: pagesToCreate.length,
                 applied: true,
             })
         }
 
-        // === CREATE NEW SITE FROM TEMPLATE ===
+        // === CREATE NEW SITE FROM TEMPLATE (multi-page) ===
+        const templatePages = (template.templatePages as Array<{ title: string; slug: string; isHomepage?: boolean; layout: unknown }>)
+        const pagesToCreate = templatePages?.length
+            ? templatePages
+            : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
+
         const site = await payload.create({
             collection: 'sites',
             data: {
@@ -139,21 +180,23 @@ export const POST = withAuth(async (user, req) => {
             },
         })
 
-        // Homepage
-        await payload.create({
-            collection: 'pages',
-            data: {
-                title: 'Home',
-                slug: 'home',
-                site: site.id,
-                tenant: tenantId,
-                isHomepage: true,
-                status: 'draft',
-                layout: blocks,
-            },
-        })
+        // Create all template pages
+        for (const [idx, page] of pagesToCreate.entries()) {
+            await payload.create({
+                collection: 'pages',
+                data: {
+                    title: page.title,
+                    slug: page.slug,
+                    site: site.id,
+                    tenant: tenantId,
+                    isHomepage: page.isHomepage ?? idx === 0,
+                    status: 'draft',
+                    layout: page.layout,
+                },
+            })
+        }
 
-        // 404 Page
+        // 404 Page (always created)
         await payload.create({
             collection: 'pages',
             data: {
@@ -163,7 +206,7 @@ export const POST = withAuth(async (user, req) => {
                 tenant: tenantId,
                 isHomepage: false,
                 status: 'draft',
-                layout: blocks,
+                layout: [],
                 seo: {
                     title: '404 - Page Not Found',
                     description: 'The page you are looking for does not exist.',
@@ -184,6 +227,7 @@ export const POST = withAuth(async (user, req) => {
             siteId: site.id,
             siteName: site.name,
             templateName: template.name,
+            pagesCreated: pagesToCreate.length + 1, // +1 for 404
         })
 
     } catch (error: unknown) {
