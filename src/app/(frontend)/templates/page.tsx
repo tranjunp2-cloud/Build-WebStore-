@@ -21,6 +21,7 @@ import { TemplatePreviewModal } from '@/components/frontend/TemplatePreviewModal
 const CATEGORY_KEYS = [
     'all', 'restaurant', 'beauty', 'tech',
     'health', 'education', 'realestate', 'fitness', 'creative', 'business',
+    'fnb', 'events', 'blog', 'travel',
 ] as const
 
 // ─── Main Page ──────────────────────────────────────────────────────────

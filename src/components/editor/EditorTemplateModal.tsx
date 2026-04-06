@@ -20,6 +20,9 @@ const CATEGORIES = [
     { value: 'creative', label: 'Creative' },
     { value: 'business', label: 'Business' },
     { value: 'fnb', label: 'Cafe & Bakery' },
+    { value: 'events', label: 'Events' },
+    { value: 'blog', label: 'Blog' },
+    { value: 'travel', label: 'Travel' },
 ]
 
 interface EditorTemplateModalProps {
