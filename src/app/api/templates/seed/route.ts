@@ -20,7 +20,7 @@ import { withAuth } from '@/lib/auth'
 export const POST = withAuth(async (_user, request) => {
     try {
         // Only super-admin can seed in production; allow any auth user in dev
-        const isDev = process.env.NODE_ENV === 'development'
+        const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
         if (!isDev && !_user?.roles?.includes('super-admin')) {
             return NextResponse.json({
                 success: false,

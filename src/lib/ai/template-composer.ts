@@ -1039,6 +1039,18 @@ function buildBlockFromSpec(
       return { blockType: 'social-proof', variant: spec.variant ?? 'counter' }
     case 'products-grid':
       return { blockType: 'products-grid', variant: spec.variant ?? 'grid-3', count: spec.count ?? 6 }
+    // ── Aliases: map preset blockType names to actual block builders ──
+    case 'contact-form':
+      return { ...buildContact(biz), blockType: 'contact', ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'map':
+    case 'map-embed':
+    case 'google-maps':
+      return { blockType: 'google-maps', variant: spec.variant ?? 'default', address: biz.address, height: '400px' }
+    case 'content':
+    case 'content-block':
+      return { ...buildAbout(biz), blockType: 'about', ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'timeline':
+      return { ...buildAbout(biz), blockType: 'about', variant: 'timeline' }
     default:
       // Try industry block builder as fallback
       const industryBlock = buildIndustryBlock(spec.blockType, content, biz, category)
@@ -1131,3 +1143,4 @@ export function composeTemplate(input: ComposerInput): TemplateSeed {
     pages: templatePages,
   }
 }
+
