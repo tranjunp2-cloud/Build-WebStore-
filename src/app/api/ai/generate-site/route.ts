@@ -9,6 +9,8 @@ import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
+import { blockRegistry } from '@/blocks/registry'
+import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -76,7 +78,7 @@ export async function POST(req: NextRequest) {
         const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
         if (errorResponse) return errorResponse
 
-        const { businessInfo, extraInstructions, language = 'en' } = data!
+        const { businessInfo, extraInstructions, language = 'en', contentBrief: rawContentBrief } = data!
 
         // Authenticate — handles both Payload JWT and custom Jose JWT (from verify-otp)
         const user = await getCurrentUser()
@@ -154,10 +156,12 @@ export async function POST(req: NextRequest) {
         }
 
         // FR-15: Rate Limit - Free tier is limited to 1 AI generation
+        // Bypass in development mode for testing
+        const isDev = process.env.NODE_ENV === 'development'
         const tenant = typeof payload.findByID === 'function'
             ? await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
             : { plan: 'pro', aiGenerationsCount: 0 }
-        if (tenant.plan === 'free') {
+        if (!isDev && tenant.plan === 'free') {
             const currentCount = tenant.aiGenerationsCount || 0
             if (currentCount >= 1) {
                 return NextResponse.json(
@@ -189,8 +193,39 @@ export async function POST(req: NextRequest) {
         // ────────────────────────────────────────────────────────────────────
         const heroImagePromise = generateAndUploadHeroImage(businessInfo, String(resolvedTenantId), payload)
 
+        // Build reference prompt from ContentBrief (if provided from URL/Image extraction)
+        let referencePrompt: string | undefined
+        if (rawContentBrief && typeof rawContentBrief === 'object') {
+            try {
+                referencePrompt = contentBriefToReferencePrompt(rawContentBrief as ContentBrief)
+            } catch {
+                // Invalid ContentBrief — ignore, generate without reference
+            }
+        }
+
         // Generate with AI (or fallback)
-        const { result, events } = await generateSiteWithAI(businessInfo, extraInstructions, language)
+        const { result, events } = await generateSiteWithAI(businessInfo, extraInstructions, language, referencePrompt)
+
+        // Override AI theme with extracted visual style (URL extraction provides specific colors)
+        const brief = rawContentBrief as Record<string, unknown> | null
+        const visualStyle = brief?.visualStyle as Record<string, string> | undefined
+        if (visualStyle) {
+            if (visualStyle.primaryColor && /^#[0-9A-Fa-f]{6}$/.test(visualStyle.primaryColor)) {
+                result.theme.primaryColor = visualStyle.primaryColor
+            }
+            if (visualStyle.secondaryColor && /^#[0-9A-Fa-f]{6}$/.test(visualStyle.secondaryColor)) {
+                result.theme.secondaryColor = visualStyle.secondaryColor
+            }
+            // Auto-detect colorMode from extracted background color
+            if (visualStyle.backgroundColor && /^#[0-9A-Fa-f]{6}$/.test(visualStyle.backgroundColor)) {
+                const hex = visualStyle.backgroundColor.replace('#', '')
+                const r = parseInt(hex.substring(0, 2), 16)
+                const g = parseInt(hex.substring(2, 4), 16)
+                const b = parseInt(hex.substring(4, 6), 16)
+                const brightness = (r * 299 + g * 587 + b * 114) / 1000
+                result.theme.colorMode = brightness > 128 ? 'light' : 'dark'
+            }
+        }
 
         // Wait for hero image if it hasn't finished yet
         let heroMedia: { id: string } | null = null
@@ -300,6 +335,32 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Map common AI variant names to Payload-valid variants
+        const VARIANT_ALIASES: Record<string, Record<string, string>> = {
+            hero: { 'split': 'split-left', 'minimal': 'centered', 'gradient': 'centered', 'hero-centered': 'centered', 'image-left': 'split-right', 'image-right': 'split-left' },
+        }
+        for (const block of sanitizedBlocks) {
+            if (typeof block.blockType === 'string' && typeof block.variant === 'string') {
+                const aliases = VARIANT_ALIASES[block.blockType]
+                if (aliases && aliases[block.variant]) {
+                    block.variant = aliases[block.variant]
+                }
+            }
+        }
+
+        // Final variant sanitization — ensure all block variants match registry schemas
+        // This catches any variants that slipped through openai-generator sanitization
+        for (const block of sanitizedBlocks) {
+            if (typeof block.blockType === 'string' && blockRegistry.has(block.blockType)) {
+                const meta = blockRegistry.getBlockMeta(block.blockType)
+                if (meta && meta.variants.length > 0) {
+                    if (typeof block.variant !== 'string' || !meta.variants.includes(block.variant)) {
+                        block.variant = meta.defaultVariant || meta.variants[0]
+                    }
+                }
+            }
+        }
+
         const pageDefinitions = buildGeneratedPages({
             blocks: sanitizedBlocks,
             businessInfo,
@@ -309,6 +370,22 @@ export async function POST(req: NextRequest) {
         const createdPages: Record<string, unknown>[] = []
 
         for (const pageDefinition of pageDefinitions) {
+            // Sanitize variants in each page's layout blocks (safety net for cloned heroes)
+            const sanitizedLayout = Array.isArray(pageDefinition.layout)
+                ? pageDefinition.layout.map((block: AIBlock | null) => {
+                    if (!block) return block
+                    if (typeof block.blockType === 'string' && blockRegistry.has(block.blockType)) {
+                        const meta = blockRegistry.getBlockMeta(block.blockType)
+                        if (meta && meta.variants.length > 0) {
+                            if (typeof block.variant !== 'string' || !meta.variants.includes(block.variant)) {
+                                return { ...block, variant: meta.defaultVariant || meta.variants[0] }
+                            }
+                        }
+                    }
+                    return block
+                })
+                : pageDefinition.layout
+
             const createdPage = await payload.create({
                 collection: 'pages',
                 data: {
@@ -316,7 +393,7 @@ export async function POST(req: NextRequest) {
                     slug: pageDefinition.slug,
                     site: site.id,
                     isHomepage: pageDefinition.isHomepage,
-                    layout: pageDefinition.layout,
+                    layout: sanitizedLayout,
                     seo: pageDefinition.seo,
                 },
             })
@@ -394,9 +471,11 @@ export async function POST(req: NextRequest) {
         })
 
     } catch (error: unknown) {
-        console.error('[AI Generate Site Error]', error)
+        const errMsg = error instanceof Error ? error.message : String(error)
+        const errStack = error instanceof Error ? error.stack : ''
+        console.error('[AI Generate Site Error]', errMsg, errStack)
         return NextResponse.json(
-            { error: 'Failed to generate website. Please try again.' },
+            { error: `Failed to generate website. Please try again. (${errMsg})` },
             { status: 500 },
         )
     }
@@ -494,7 +573,12 @@ function createPageHero(baseHero: AIBlock | null, options: {
     })
 
     hero.blockType = 'hero'
-    hero.variant = hero.variant || 'centered'
+    // Validate variant against registry — AI may produce invalid variants
+    const heroMeta = blockRegistry.getBlockMeta('hero')
+    const validVariants = heroMeta?.variants || ['centered', 'split', 'video', 'minimal']
+    hero.variant = (typeof hero.variant === 'string' && validVariants.includes(hero.variant))
+        ? hero.variant
+        : 'centered'
     hero.headline = options.headline
     hero.subheadline = options.subheadline
     hero.badge = options.badgeText
@@ -828,11 +912,15 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
                 safePlan.ctaLabel = String(plan.ctaLabel || plan.buttonText || 'Buy Now')
                 safePlan.ctaUrl = String(plan.ctaUrl || plan.url || '#')
                 
+                // Payload expects features as [{text: string, included: boolean}], NOT plain strings
                 if (Array.isArray(plan.features)) {
                     safePlan.features = plan.features.map((fRaw: unknown) => {
-                        if (typeof fRaw === 'string') return fRaw;
-                        const f = (typeof fRaw === 'object' && fRaw !== null) ? fRaw as Record<string, unknown> : {};
-                        return String(f.text || f.name || f.feature || '')
+                        if (typeof fRaw === 'string') return { text: fRaw, included: true }
+                        const f = (typeof fRaw === 'object' && fRaw !== null) ? fRaw as Record<string, unknown> : {}
+                        return {
+                            text: String(f.text || f.name || f.feature || ''),
+                            included: typeof f.included === 'boolean' ? f.included : true,
+                        }
                     })
                 } else {
                     safePlan.features = []

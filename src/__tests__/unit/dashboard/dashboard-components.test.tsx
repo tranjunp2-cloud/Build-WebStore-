@@ -145,43 +145,33 @@ describe('DashboardStats', () => {
         views: 1200,
         leads: 50,
         engagement: 300,
-        revenue: 4500,
-        pendingOrdersCount: 3,
-        currency: 'MYR',
     }
 
-    it('[TC-F03.07] renders all 4 default stat cards when no preferences', () => {
+    it('[TC-F03.07] renders all 3 default stat cards (v1.0: no revenue)', () => {
         render(<DashboardStats {...defaultProps} />)
         expect(screen.getByText('Views')).toBeInTheDocument()
         expect(screen.getByText('Leads')).toBeInTheDocument()
         expect(screen.getByText('Engagement')).toBeInTheDocument()
-        expect(screen.getByText('Revenue')).toBeInTheDocument()
+        // v1.0: Revenue card removed (ecom deferred to v1.1)
+        expect(screen.queryByText('Revenue')).not.toBeInTheDocument()
     })
 
     it('[TC-F03.18] hides "views" card when excluded from preferences', () => {
-        render(<DashboardStats {...defaultProps} preferences={['leads', 'engagement', 'revenue']} />)
+        render(<DashboardStats {...defaultProps} preferences={['leads', 'engagement']} />)
         expect(screen.queryByText('Views')).not.toBeInTheDocument()
         expect(screen.getByText('Leads')).toBeInTheDocument()
     })
 
     it('[TC-F03.19] respects custom preferences order', () => {
-        render(<DashboardStats {...defaultProps} preferences={['revenue', 'views']} />)
-        expect(screen.getByText('Revenue')).toBeInTheDocument()
+        render(<DashboardStats {...defaultProps} preferences={['engagement', 'views']} />)
+        expect(screen.getByText('Engagement')).toBeInTheDocument()
         expect(screen.getByText('Views')).toBeInTheDocument()
-        // Engagement and Leads should not appear
-        expect(screen.queryByText('Engagement')).not.toBeInTheDocument()
         expect(screen.queryByText('Leads')).not.toBeInTheDocument()
     })
 
     it('displays formatted views value', () => {
         render(<DashboardStats {...defaultProps} views={1_200} />)
-        // toLocaleString() in jsdom → "1,200"
         expect(screen.getByText('1,200')).toBeInTheDocument()
-    })
-
-    it('displays pending orders count inside revenue card', () => {
-        render(<DashboardStats {...defaultProps} pendingOrdersCount={7} />)
-        expect(screen.getByText(/7 pending orders/i)).toBeInTheDocument()
     })
 })
 

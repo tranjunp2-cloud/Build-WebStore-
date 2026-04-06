@@ -5,49 +5,7 @@ import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
-import { normalizeSocialWidgetConfig } from '@/blocks/social-widget/config'
-
-function normalizeBlocksForPersistence(blocks: Record<string, unknown>[]) {
-    return blocks.map(block => {
-        let b = { ...block }
-        
-        if (b.blockType === 'socialWidget') {
-            b = normalizeSocialWidgetConfig(b) as Record<string, unknown>
-        }
-
-        // Defensively sanitize navigation links (legacy drafts might lack 'label')
-        if (b.blockType === 'navigation' && Array.isArray(b.links)) {
-            b.links = b.links.map((linkRaw: unknown) => {
-                const link = (typeof linkRaw === 'object' && linkRaw !== null) ? linkRaw as Record<string, unknown> : {}
-                return {
-                    ...link,
-                    label: String(link.label || link.text || link.title || link.name || 'Link'),
-                    url: String(link.url || link.href || link.link || '#')
-                }
-            })
-        }
-
-        // Defensively sanitize footer links
-        if (b.blockType === 'footer' && Array.isArray(b.columns)) {
-            b.columns = b.columns.map((col: Record<string, unknown>) => {
-                if (!col || typeof col !== 'object') return col
-                return {
-                    ...col,
-                    links: Array.isArray(col.links) ? col.links.map((linkRaw: unknown) => {
-                        const link = (typeof linkRaw === 'object' && linkRaw !== null) ? linkRaw as Record<string, unknown> : {}
-                        return {
-                            ...link,
-                            label: String(link.label || link.text || link.title || link.name || 'Link'),
-                            url: String(link.url || link.href || link.link || '#')
-                        }
-                    }) : col.links
-                }
-            })
-        }
-
-        return b
-    })
-}
+import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 
 /**
  * PATCH /api/sites/[siteId]/save
@@ -131,17 +89,20 @@ export async function PATCH(
                 if (!/^\d+$/.test(pageId)) {
                     return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
                 }
-                const requestedPage = await payload.findByID({
-                    collection: 'pages',
-                    id: pageId,
-                })
+                let requestedPage: PageDoc | null = null
+                try {
+                    requestedPage = await payload.findByID({
+                        collection: 'pages',
+                        id: pageId,
+                    })
+                } catch {
+                    // Page not found — fall through to homepage
+                }
                 const requestedPageSiteId =
                     typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
 
                 if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
                     page = requestedPage
-                } else {
-                    return NextResponse.json({ error: 'Page not found or does not belong to site' }, { status: 404 })
                 }
             }
 
@@ -182,9 +143,14 @@ export async function PATCH(
         })
 
     } catch (error: unknown) {
-        console.error('[Save Error]', error)
+        const errMsg = error instanceof Error ? error.message : String(error)
+        const errName = error instanceof Error ? error.name : 'Unknown'
+        console.error('[Save Error]', errName + ':', errMsg)
+        if (error && typeof error === 'object' && 'data' in error) {
+            console.error('[Save Error] Validation data:', JSON.stringify((error as Record<string, unknown>).data, null, 2))
+        }
         return NextResponse.json(
-            { error: 'Save failed' },
+            { error: 'Save failed: ' + errMsg },
             { status: 500 },
         )
     }

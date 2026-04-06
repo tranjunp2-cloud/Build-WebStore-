@@ -20,6 +20,8 @@ interface PreviewFrameProps {
     onInlineEditApplied?: (content: string, blockIndex: number) => void
     onReorderBlocks?: (fromIndex: number, toIndex: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
+    onPageNavigate?: (pageId: string) => void
+    disableDragDrop?: boolean
 }
 
 type HoverRect = {
@@ -146,14 +148,28 @@ function PreviewFrameInner({
     onInlineEditApplied,
     onReorderBlocks,
     onBlockDrop,
+    onPageNavigate,
+    disableDragDrop = false,
 }: PreviewFrameProps) {
     const { blocks, updateBlock } = useEditorStore()
+    const blocksRef = useRef(blocks)
+    useEffect(() => { blocksRef.current = blocks }, [blocks])
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [blockHover, setBlockHover] = useState<BlockLayoutRect | null>(null)
     const [blockLayouts, setBlockLayouts] = useState<BlockLayoutRect[]>([])
-    const [dragState, setDragState] = useState<DragState | null>(null)
+    const [dragState, setDragStateRaw] = useState<DragState | null>(null)
     const [dropIndex, setDropIndex] = useState<number | null>(null)
-    const [isEditing, setIsEditing] = useState(false)
+    const [isEditing, setIsEditingState] = useState(false)
+    const isEditingRef = useRef(false)
+    const dragStateRef = useRef<DragState | null>(null)
+    const setIsEditing = useCallback((val: boolean) => { isEditingRef.current = val; setIsEditingState(val) }, [])
+    const setDragState = useCallback((val: DragState | null | ((prev: DragState | null) => DragState | null)) => {
+        setDragStateRaw(prev => {
+            const next = typeof val === 'function' ? val(prev) : val
+            dragStateRef.current = next
+            return next
+        })
+    }, [])
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number } | null>(null)
     const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string } | null>(null)
@@ -262,12 +278,15 @@ function PreviewFrameInner({
 
     useEffect(() => {
         const handleMessage = (e: MessageEvent) => {
+            // Security: only accept messages from own origin or sandboxed iframe ('null')
+            if (e.origin !== window.location.origin && e.origin !== 'null') return
+
             if (e.data?.type === 'BLOCK_HOVERED') {
-                if (isEditing || dragState) return
+                if (isEditingRef.current || dragStateRef.current) return
                 cancelPendingHoverClear()
 
                 const nextData = e.data as Omit<HoveredElementData, 'fieldPath'> & { rect: HoverRect | null }
-                const block = blocks[nextData.blockIndex]
+                const block = blocksRef.current[nextData.blockIndex]
                 const fieldPath = block ? findStringFieldPath(block, nextData.text) : null
 
                 setHoverData({
@@ -275,21 +294,21 @@ function PreviewFrameInner({
                     fieldPath,
                 })
             } else if (e.data?.type === 'BLOCK_CONTAINER_HOVERED') {
-                if (isEditing || dragState) return
+                if (isEditingRef.current || dragStateRef.current) return
                 setBlockHover(e.data.layout as BlockLayoutRect)
             } else if (e.data?.type === 'BLOCK_LAYOUT') {
                 setBlockLayouts((e.data.layouts || []) as BlockLayoutRect[])
             } else if (e.data?.type === 'BLOCK_MOUSEOUT') {
-                if (!isEditing && !dragState && !isHoveringControlsRef.current) {
+                if (!isEditingRef.current && !dragStateRef.current && !isHoveringControlsRef.current) {
                     cancelPendingHoverClear()
                     clearHoverTimerRef.current = window.setTimeout(() => {
                         setHoverData(null)
                         setBlockHover(null)
                         clearHoverTimerRef.current = null
-                    }, 180)
+                    }, 120)
                 }
             } else if (e.data?.type === 'PREVIEW_POINTER_DOWN') {
-                if (isEditing) {
+                if (isEditingRef.current) {
                     setIsEditing(false)
                 }
             } else if (e.data?.type === 'BLOCK_CONTAINER_CLICKED') {
@@ -310,15 +329,16 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'TEXT_EDITED') {
                 const { oldText, newText, blockIndex } = e.data
                 if (oldText !== newText && newText !== undefined) {
-                    const block = blocks[blockIndex]
+                    const currentBlocks = blocksRef.current
+                    const block = currentBlocks[blockIndex]
                     const fieldPath = block ? findStringFieldPath(block, oldText) : null
                     if (fieldPath && block) {
                         const currentValue = getValueAtPath(block as Record<string, unknown>, fieldPath)
                         const nextValue = typeof currentValue === 'string' && currentValue.includes(oldText)
                             ? currentValue.replace(oldText, newText)
                             : newText
-                        
-                        const clone = JSON.parse(JSON.stringify(blocks))
+
+                        const clone = JSON.parse(JSON.stringify(currentBlocks))
                         const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, nextValue)
                         updateBlock(blockIndex, nextBlock)
                     }
@@ -330,6 +350,8 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'EDITOR_BLOCK_DROP') {
                 const { index, blockData } = e.data.payload
                 onBlockDrop?.(index, blockData)
+            } else if (e.data?.type === 'PAGE_NAVIGATE') {
+                onPageNavigate?.(String(e.data.pageId))
             }
         }
         window.addEventListener('message', handleMessage)
@@ -337,7 +359,8 @@ function PreviewFrameInner({
             cancelPendingHoverClear()
             window.removeEventListener('message', handleMessage)
         }
-    }, [blocks, cancelPendingHoverClear, dragState, isEditing, onBlockDrop, onBlockSelect])
+    // Stable deps only — blocks/dragState/isEditing accessed via refs to prevent listener churn
+    }, [cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, setIsEditing, updateBlock])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -381,7 +404,7 @@ function PreviewFrameInner({
             type: 'EXEC_COMMAND',
             command,
             value
-        }, '*')
+        }, window.location.origin)
     }, [frameElement])
 
     const handleImageReplace = useCallback(async (file: File) => {
@@ -704,7 +727,7 @@ function PreviewFrameInner({
                         const activeLayout = blockHover || (selectedBlock !== null
                             ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
                             : null)
-                        if (!activeLayout || !overlayOffset || dragState || ['navigation', 'footer'].includes(activeLayout.blockType)) {
+                        if (!activeLayout || !overlayOffset || dragState || disableDragDrop || ['navigation', 'footer'].includes(activeLayout.blockType)) {
                             return null
                         }
 
