@@ -14,7 +14,7 @@ phase: 1
 - **Date:** 2026-04-06
 - **Description:** Replace 3 stub blocks (stats, team, newsletter) with real implementations including variants, design tokens, responsive layout
 - **Priority:** P0
-- **Implementation status:** pending
+- **Implementation status:** done
 - **Review status:** not started
 
 ## Key Insights

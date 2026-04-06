@@ -14,7 +14,7 @@ phase: 2
 - **Date:** 2026-04-06
 - **Description:** Upgrade 3 partial blocks (about, faq, cta) from basic to production quality with proper variants and design tokens
 - **Priority:** P0
-- **Implementation status:** pending
+- **Implementation status:** done
 - **Review status:** not started
 
 ## Key Insights

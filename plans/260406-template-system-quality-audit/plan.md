@@ -1,7 +1,7 @@
 ---
 title: "Template System Quality — Fill Gaps for Production"
 description: "Fix stub blocks, multi-page seeding, and polish partials so templates deliver real quality"
-status: pending
+status: done
 priority: P0
 effort: 3d
 branch: staging-2
@@ -32,8 +32,8 @@ Template System v2 configs/schemas/registry are 100% complete. But **block compo
 | 1 | [stats](phase-01-fix-stub-blocks.md) | 23 lines, no variants | 150+ lines, 3 variants (numbers, cards, progress-bars) | 2h |
 | 2 | team | 24 lines, no variants | 150+ lines, 3 variants (grid, cards, carousel) | 2h |
 | 3 | newsletter | 18 lines, no variants | 100+ lines, 2 variants (inline, card) | 1h |
-- **Status:** pending
-- **Progress:** 0/3 blocks
+- **Status:** done
+- **Progress:** 3/3 blocks
 
 ### Phase 2: Polish Partial Blocks (1d) — P0
 | # | Block | Current | Target | Effort |
@@ -41,23 +41,23 @@ Template System v2 configs/schemas/registry are 100% complete. But **block compo
 | 1 | [about](phase-02-polish-partial-blocks.md) | 78 lines, basic | 200+ lines, 3 variants (split, full-width, timeline) | 3h |
 | 2 | faq | 54 lines, basic | 120+ lines, 2 variants (accordion, two-column) | 2h |
 | 3 | cta | 55 lines, basic | 120+ lines, 3 variants (centered, split, banner) | 2h |
-- **Status:** pending
-- **Progress:** 0/3 blocks
+- **Status:** done
+- **Progress:** 3/3 blocks
 
 ### Phase 3: Multi-Page Template Seeding (0.5d) — P1
 - [Details](phase-03-multi-page-seeding.md)
 - Add `pages` JSON field to Templates collection
 - Update seed endpoint to store ALL pages (not just homepage)
 - Update apply-template to create multi-page sites
-- **Status:** pending
-- **Progress:** 0/3 steps
+- **Status:** done
+- **Progress:** 3/3 steps
 
 ### Phase 4: Template Seed Automation + Smoke Test (0.5d) — P1
 - [Details](phase-04-seed-automation.md)
 - Auto-seed on first admin visit or startup
 - Smoke test: apply each template category, verify blocks render
-- **Status:** pending
-- **Progress:** 0/2 steps
+- **Status:** done
+- **Progress:** 2/2 steps
 
 ## Dependency Graph
 
