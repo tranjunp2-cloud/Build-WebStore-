@@ -11,6 +11,50 @@ import { mergeContactInfoWithSite, mergeFooterSocialsWithSite, mergeSocialWidget
 let _category = 'business'
 export function setSectionCategory(cat: string) { _category = cat }
 
+// ── Variant alias mapping ──────────────────────────────────────────────────
+// Blueprint presets use various variant names — normalize to renderer-supported ones
+const VARIANT_ALIASES: Record<string, string> = {
+  // Features
+  'icon-grid': 'icon-left',
+  'icon-top': 'icon-left',
+  'alternating': 'zigzag',
+  'two-column': 'zigzag',
+  'card-grid': 'icon-left',
+  // Testimonials
+  'slider': 'carousel',
+  'single': 'carousel',
+  'featured': 'spotlight',
+  'quote': 'spotlight',
+  // Gallery
+  'fullscreen-image': 'masonry',
+  '2-col': 'two-col',
+  'grid-2': 'two-col',
+  // Pricing
+  'three-tier': 'table',
+  'tiers': 'table',
+  'comparison': 'table',
+  'detailed': 'horizontal',
+  // FAQ
+  'two-column-faq': 'grid',
+  'cards-faq': 'grid',
+  // CTA
+  'split-image': 'banner',
+  'overlay': 'banner',
+  'fullscreen': 'banner',
+  // Team
+  'detailed-cards': 'cards',
+  'list-team': 'cards',
+  // General
+  'compact': 'list',
+  'counters': 'grid',
+  'counter': 'grid',
+  'minimal': 'list',
+}
+function resolveVariant(v: string | undefined): string {
+  const raw = v || 'default'
+  return VARIANT_ALIASES[raw] || raw
+}
+
 export type SocialLink = { platform: string; url: string; enabled?: boolean; [key: string]: unknown }
 export type RenderSocialWidgetBlock = Record<string, unknown> & { links?: SocialLink[]; variant?: string; headline?: string }
 
@@ -260,7 +304,7 @@ function renderCartWidget(b: RenderBlock, t: TemplateTheme) {
 
 function renderFeatures(b: RenderBlock, t: TemplateTheme) {
   const items = b.features || []
-  const variant = b.variant || 'default'
+  const variant = resolveVariant(b.variant as string)
   const cardBg = `${t.text}05`
   const cardBorder = `${t.text}08`
 
@@ -367,7 +411,7 @@ function renderAbout(b: RenderBlock, t: TemplateTheme) {
 
 function renderTestimonials(b: RenderBlock, t: TemplateTheme) {
   const items = b.testimonials || []
-  const variant = b.variant || 'default'
+  const variant = resolveVariant(b.variant as string)
 
   const header = `<div style="text-align:center;margin-bottom:60px;">
     <h2 class="section-title fade-up">${b.headline || ''}</h2>
@@ -481,7 +525,7 @@ function renderStats(b: RenderBlock, t: TemplateTheme) {
 
 function renderPricing(b: RenderBlock, t: TemplateTheme) {
   const plans = b.plans || []
-  const variant = b.variant || 'default'
+  const variant = resolveVariant(b.variant as string)
 
   const header = `<div style="text-align:center;margin-bottom:60px;">
     <h2 class="section-title fade-up">${b.headline || ''}</h2>
@@ -580,7 +624,7 @@ function renderPricing(b: RenderBlock, t: TemplateTheme) {
 
 function renderFaq(b: RenderBlock, t: TemplateTheme) {
   const items = b.faqs || []
-  const variant = b.variant || 'default'
+  const variant = resolveVariant(b.variant as string)
 
   switch (variant) {
     case 'grid':
@@ -614,7 +658,7 @@ function renderFaq(b: RenderBlock, t: TemplateTheme) {
 }
 
 function renderGallery(b: RenderBlock, t: TemplateTheme) {
-  const variant = b.variant || 'default'
+  const variant = resolveVariant(b.variant as string)
   const header = `<h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>`
 
   switch (variant) {
@@ -675,7 +719,7 @@ function renderGallery(b: RenderBlock, t: TemplateTheme) {
 
 function renderTeam(b: RenderBlock, t: TemplateTheme) {
   const members = b.members || []
-  const variant = b.variant || 'default'
+  const variant = resolveVariant(b.variant as string)
 
   const header = `<h2 class="section-title fade-up" style="text-align:center;margin-bottom:48px;">${b.headline || ''}</h2>`
 
@@ -723,7 +767,7 @@ function renderTeam(b: RenderBlock, t: TemplateTheme) {
 }
 
 function renderCta(b: RenderBlock, t: TemplateTheme) {
-  const variant = b.variant || 'default'
+  const variant = resolveVariant(b.variant as string)
 
   switch (variant) {
     case 'banner':
