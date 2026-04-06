@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { GET } from '@/app/api/notifications/route'
 import { POST } from '@/app/api/notifications/mark-read/route'
 import { NextRequest } from 'next/server'
+import type { Payload } from 'payload'
 
 // Mock payload
 vi.mock('payload', () => ({
@@ -56,7 +57,7 @@ describe('/api/notifications', () => {
             const { getPayload } = await import('payload')
             vi.mocked(getPayload).mockResolvedValueOnce({
                 find: vi.fn().mockRejectedValue(new Error('DB Error')),
-            } as any)
+            } as unknown as Payload)
 
             const res = await GET(createRequest('/api/notifications'))
             expect(res.status).toBe(500)
@@ -96,7 +97,7 @@ describe('/api/notifications', () => {
             const { getPayload } = await import('payload')
             vi.mocked(getPayload).mockResolvedValueOnce({
                 find: vi.fn().mockRejectedValue(new Error('DB Bulk Error')),
-            } as any)
+            } as unknown as Payload)
 
             const res = await POST(createRequest('/api/notifications/mark-read', 'POST', {
                 mark_all: true
