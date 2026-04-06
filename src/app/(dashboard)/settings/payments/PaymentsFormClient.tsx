@@ -1,11 +1,33 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CreditCard, Banknote, Upload, UploadCloud, X, Save, Check } from 'lucide-react';
+import NextImage from 'next/image';
+import { CreditCard, Banknote, Upload, UploadCloud, X, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getPaymentSettings, updatePaymentSettings, uploadQrMedia, type PaymentUpdates } from './actions';
 import { useI18n } from '@/i18n';
+
+type Media = {
+    id: string | number;
+    url?: string;
+    thumbnailURL?: string;
+};
+
+function getImageUrl(image: Media | string | null): string | null {
+    if (!image || typeof image === 'string') return null;
+    let url = image.url || image.thumbnailURL || null;
+    if (!url) return null;
+
+    // On local Docker dev: Payload generates internal minio:9000 URLs which are not browser-accessible.
+    // Replace with localhost:9000 so the browser can reach MinIO's mapped port.
+    // On staging: Payload generates direct S3/CDN URLs (https://...) which are already accessible.
+    if (url.includes('minio:9000')) {
+        url = url.replace('minio:9000', 'localhost:9000');
+    }
+
+    return url;
+}
 
 export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined }) {
     const [paymentCod, setPaymentCod] = useState(false);
@@ -41,17 +63,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                         const qrImg = data.qr_image;
                         setQrImageId(typeof qrImg === 'string' ? qrImg : qrImg.id);
                         
-                        let url = typeof qrImg === 'object' && qrImg.url ? qrImg.url : null;
-                        if (url) {
-                            if (url.includes('http://minio:9000')) {
-                                const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000';
-                                url = url.replace('http://minio:9000', s3Endpoint);
-                            } else if (url.includes('/api/media/file/')) {
-                                const filename = url.split('/').pop();
-                                const s3Endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000';
-                                url = `${s3Endpoint}/primeweb-media/${filename}`;
-                            }
-                        }
+                        const url = getImageUrl(qrImg as Media);
                         setQrPreviewUrl(url);
                     }
                 }
@@ -123,7 +135,7 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
             return;
         }
 
-        // Preview
+        // Preview instantly with blob URL
         const objectUrl = URL.createObjectURL(file);
         setQrPreviewUrl(objectUrl);
         // Do not auto-activate here; wait until success
@@ -140,7 +152,15 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                 
                 const qrDocId = uploadRes.doc.id;
                 setQrImageId(qrDocId);
-                // Keep the original high-quality objectUrl for preview instead of the server response url which might not be immediate available. 
+
+                // Update preview URL to the server URL so it persists after navigation.
+                // getImageUrl handles minio:9000 → localhost:9000 for local dev;
+                // on staging it returns the S3/CDN URL directly.
+                const serverUrl = getImageUrl(uploadRes.doc as Media);
+                if (serverUrl) {
+                    setQrPreviewUrl(serverUrl);
+                }
+                // If serverUrl is somehow unavailable, blob URL from above is already showing.
             
             setPaymentQr(true); // Now activate
             
@@ -365,10 +385,13 @@ export function PaymentsFormClient({ tenantId }: { tenantId: string | undefined 
                             <div className="flex flex-col w-full">
                                 {qrPreviewUrl ? (
                                     <div className="relative inline-flex self-start border border-white/[0.08] rounded-2xl overflow-hidden bg-[#0B1120]/50 p-3">
-                                        <img
+                                        <NextImage
                                             src={qrPreviewUrl}
                                             alt="QR Code"
-                                            className="w-48 h-48 object-contain bg-white rounded-xl shadow-inner"
+                                            width={192}
+                                            height={192}
+                                            unoptimized={qrPreviewUrl.startsWith('blob:')}
+                                            className="object-contain bg-white rounded-xl shadow-inner"
                                         />
                                         <button
                                             type="button"
