@@ -23,6 +23,7 @@ function getImageUrl(image: Media | string | null): string | null {
     if (url.includes('/api/media/file/') || url.includes('minio:') || url.includes('localhost:9000')) {
         if (process.env.NEXT_PUBLIC_S3_ENDPOINT) {
             const filename = url.split('/').pop();
+            if (!filename) return null;
             url = `${process.env.NEXT_PUBLIC_S3_ENDPOINT}/primeweb-media/${filename}`;
         }
     }
