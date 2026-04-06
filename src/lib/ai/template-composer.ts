@@ -931,6 +931,142 @@ function buildBlogPage(biz: BusinessSample, pages: string[]): TemplatePage {
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
+// ── Blueprint-driven composer (NEW — replaces algorithmic composition) ──────
+
+import type { TemplatePreset, BlockSpec } from './template-definitions'
+
+/**
+ * Build a single block from a BlockSpec blueprint.
+ * Dispatches to existing block builders, passing optional variant/count overrides.
+ */
+function buildBlockFromSpec(
+  spec: BlockSpec,
+  content: CategoryContent,
+  biz: BusinessSample,
+  category: string,
+  pageNames: string[],
+): Record<string, unknown> {
+  switch (spec.blockType) {
+    case 'navigation':
+      return { ...buildNavigation(biz, pageNames), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'hero':
+      return {
+        ...buildHero(biz, category, 0),
+        ...(spec.variant ? { variant: spec.variant } : {}),
+        ...(spec.overrides ?? {}),
+      }
+    case 'features':
+      return { ...buildFeatures(biz, category), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'testimonials':
+      return { ...buildTestimonials(content), ...(spec.variant ? { variant: spec.variant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
+    case 'contact':
+      return { ...buildContact(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'footer':
+      return { ...buildFooter(biz, pageNames), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'stats':
+      return { ...buildStats(category), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'gallery':
+    case 'gallery-masonry':
+      return { ...buildGallery(biz), blockType: spec.blockType, ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'faq':
+      return { ...buildFAQ(content), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'cta':
+      return { ...buildCTA(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'about':
+      return { ...buildAbout(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'pricing':
+      return { ...buildPricing(category), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'team':
+      return { ...buildTeam(category), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'newsletter':
+      return { ...buildNewsletter(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+    case 'logo-cloud':
+    case 'client-logos':
+      return { ...buildClientLogos(), blockType: spec.blockType, ...(spec.variant ? { variant: spec.variant } : {}) }
+    // Industry-specific blocks
+    case 'menu-display':
+      return buildMenuDisplay(content)
+    case 'booking-widget':
+      return buildBookingWidget(content, category)
+    case 'class-schedule':
+      return buildClassSchedule()
+    case 'review-cards':
+      return buildReviewCards(content)
+    case 'video-showcase':
+      return buildVideoShowcase()
+    case 'doctor-profile':
+      return buildDoctorProfile(content)
+    case 'property-card':
+      return buildPropertyCard()
+    case 'product-quick-view':
+      return buildProductQuickView()
+    case 'portfolio-grid':
+      return buildPortfolioGrid()
+    case 'service-cards':
+      return buildServiceCards(biz, category)
+    case 'feature-comparison':
+      return buildFeatureComparison()
+    case 'pricing-table':
+      return buildPricingTable()
+    case 'before-after':
+      return { blockType: 'before-after', variant: spec.variant ?? 'slider' }
+    case 'countdown-timer':
+      return { blockType: 'countdown-timer', variant: spec.variant ?? 'elegant', targetDate: '2026-12-31T00:00:00' }
+    case 'blog-list':
+      return { blockType: 'blog-list', variant: spec.variant ?? 'grid', count: spec.count ?? 3 }
+    case 'social-proof':
+      return { blockType: 'social-proof', variant: spec.variant ?? 'counter' }
+    case 'products-grid':
+      return { blockType: 'products-grid', variant: spec.variant ?? 'grid-3', count: spec.count ?? 6 }
+    default:
+      // Try industry block builder as fallback
+      const industryBlock = buildIndustryBlock(spec.blockType, content, biz, category)
+      if (industryBlock) return industryBlock
+      // Unknown block — return minimal spec to avoid silent skip
+      console.warn(`[Composer] Unknown blockType: ${spec.blockType}`)
+      return { blockType: spec.blockType, variant: spec.variant ?? 'default' }
+  }
+}
+
+/**
+ * Compose a template from a TemplatePreset blueprint.
+ * Reads pages[].blocks[] and builds each block — no algorithmic guessing.
+ */
+export function composeFromBlueprint(preset: TemplatePreset): TemplateSeed {
+  const content = getCategoryContent(preset.category)
+  if (!content) {
+    throw new Error(`[composeFromBlueprint] Content not found for category: ${preset.category}`)
+  }
+
+  const biz = content.businesses[preset.businessIndex]
+  if (!biz) {
+    throw new Error(`[composeFromBlueprint] businessIndex ${preset.businessIndex} out of range for ${preset.category} (has ${content.businesses.length})`)
+  }
+
+  const pageNames = preset.pages.map((p) => p.name)
+
+  const pages: TemplatePage[] = preset.pages.map((page) => ({
+    title: page.name,
+    slug: page.slug,
+    layout: page.blocks.map((spec) =>
+      buildBlockFromSpec(spec, content, biz, preset.category, pageNames),
+    ),
+  }))
+
+  return {
+    name: preset.name,
+    description: preset.description,
+    category: preset.category,
+    tier: 'premium',
+    isPremium: true,
+    theme: preset.themePreset,
+    pages,
+  }
+}
+
+// ── Legacy composer (deprecated — kept for backward compat) ────────────────
+
+/** @deprecated Use composeFromBlueprint() with TemplatePreset instead */
 export function composeTemplate(input: ComposerInput): TemplateSeed {
   const content = getCategoryContent(input.category)
   if (!content) {
