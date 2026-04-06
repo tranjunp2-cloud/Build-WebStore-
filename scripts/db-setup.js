@@ -1330,6 +1330,58 @@ const MIGRATIONS = [
       show_label boolean
     );`,
   },
+  // ── F16: Notifications table ─────────────────────────────────────
+  {
+    name: 'notifications.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS notifications (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL,
+      user_id integer NOT NULL,
+      type varchar NOT NULL,
+      title varchar NOT NULL,
+      message text,
+      action_url varchar,
+      is_read boolean DEFAULT false,
+      created_at timestamptz DEFAULT now() NOT NULL,
+      expires_at timestamptz
+    );`,
+  },
+  {
+    name: 'notifications.tenant_user_idx',
+    sql: `CREATE INDEX IF NOT EXISTS notifications_tenant_user_idx ON notifications (tenant_id, user_id);`,
+  },
+  {
+    name: 'notifications.is_read_idx',
+    sql: `CREATE INDEX IF NOT EXISTS notifications_is_read_idx ON notifications (is_read);`,
+  },
+  {
+    name: 'notifications.created_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS notifications_created_at_idx ON notifications (created_at DESC);`,
+  },
+  // pg LISTEN/NOTIFY trigger — SSE realtime bridge
+  {
+    name: 'notifications.notify_fn',
+    sql: `CREATE OR REPLACE FUNCTION notify_new_notification()
+      RETURNS trigger AS $$
+      BEGIN
+        PERFORM pg_notify(
+          'notification_channel',
+          json_build_object(
+            'userId', NEW.user_id,
+            'tenantId', NEW.tenant_id,
+            'id', NEW.id
+          )::text
+        );
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;`,
+  },
+  {
+    name: 'notifications.notify_trigger',
+    sql: `CREATE OR REPLACE TRIGGER after_notification_insert
+      AFTER INSERT ON notifications
+      FOR EACH ROW EXECUTE FUNCTION notify_new_notification();`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -1354,7 +1406,7 @@ const COLLECTION_SLUGS = [
   'tenants', 'users', 'sites', 'pages', 'media',
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
-  'seo_meta_jobs',
+  'seo_meta_jobs', 'notifications',
 ];
 
 /**
