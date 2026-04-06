@@ -79,7 +79,11 @@ export const GET = withAuth(async (_user, req) => {
         const mappedHeroStyle = heroVariantMap[heroVariant] || theme.heroStyle
         const finalTheme = { ...theme, heroStyle: mappedHeroStyle }
 
-        const html = buildFullHTML(blocks, finalTheme, cat)
+        // Derive hero image index from template ID for deterministic unique images
+        const templateId = Number(id) || 0
+        const heroImageIndex = templateId % 5
+
+        const html = buildFullHTML(blocks, finalTheme, cat, undefined, heroImageIndex)
         return new NextResponse(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
     } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Preview error'
