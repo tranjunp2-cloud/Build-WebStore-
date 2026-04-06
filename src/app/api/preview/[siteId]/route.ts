@@ -451,7 +451,14 @@ export function buildFullHTML(blocks: BlockData[], theme?: TemplateTheme, catego
                  justifyLeft: document.queryCommandState('justifyLeft'),
                  justifyRight: document.queryCommandState('justifyRight'),
                  justifyFull: document.queryCommandState('justifyFull'),
-                 formatBlock: document.queryCommandValue('formatBlock')
+                 formatBlock: (() => {
+                     if (!currentEditingEl) return document.queryCommandValue('formatBlock');
+                     const blockTags = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'DIV'];
+                     const innerBlock = currentEditingEl.querySelector(blockTags.join(','));
+                     if (innerBlock) return innerBlock.tagName;
+                     if (blockTags.includes(currentEditingEl.tagName)) return currentEditingEl.tagName;
+                     return document.queryCommandValue('formatBlock') || 'P';
+                 })()
              }
          }, parentOrigin)
       }
