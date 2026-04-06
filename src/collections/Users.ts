@@ -632,8 +632,14 @@ export const Users: CollectionConfig = {
                     }
                 }
 
-                // Generate OTP
-                const otp = generateOTP()
+                // Dev/E2E bypass: use magic code instead of generating real OTP
+                const testOtpCode = process.env.E2E_TEST_OTP_CODE
+                const isDev = process.env.NODE_ENV === 'development'
+                const testEmail = process.env.TEST_EMAIL
+                const useDevBypass = isDev && !!testOtpCode
+                const useE2EBypass = !!(testOtpCode && testEmail && email === testEmail)
+
+                const otp = (useDevBypass || useE2EBypass) ? testOtpCode! : generateOTP()
                 const otpHash = hashOTP(otp)
                 const otpExpiry = getOTPExpiry()
 
@@ -648,19 +654,23 @@ export const Users: CollectionConfig = {
                     },
                 })
 
-                // Send OTP email via Payload's nodemailer adapter (AWS SES)
-                const { subject, html } = otpVerificationEmail({ userName, otpCode: otp })
-                req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
-                    console.error(`[Users] Failed to send OTP email to ${email}:`, err)
-                })
-
-                // Never log OTP codes — mask email to avoid leaking PII
+                // Mask email for logging
                 const [local, domain] = email.split('@')
                 const safeLocal = local.length <= 2 ? '*'.repeat(local.length) : local.slice(0, 2) + '***'
                 const maskedEmail = `${safeLocal}@${domain}`
-                if (process.env.NODE_ENV !== 'production') {
-                    console.log(`[DEV OTP] Code dispatched for ${maskedEmail} (check your email)`)
+
+                if (useDevBypass || useE2EBypass) {
+                    // Dev/E2E: log the bypass code, skip sending email
+                    console.log(`[DEV OTP] ════════════════════════════════════`)
+                    console.log(`[DEV OTP] Email: ${maskedEmail}`)
+                    console.log(`[DEV OTP] Code:  ${otp}`)
+                    console.log(`[DEV OTP] ════════════════════════════════════`)
                 } else {
+                    // Production: send real email, never log code
+                    const { subject, html } = otpVerificationEmail({ userName, otpCode: otp })
+                    req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
+                        console.error(`[Users] Failed to send OTP email to ${email}:`, err)
+                    })
                     console.log(`[OTP] Code dispatched for ${maskedEmail}`)
                 }
                 return Response.json({ message: 'If the email exists, an OTP has been sent.' })
