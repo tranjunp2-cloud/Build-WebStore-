@@ -125,7 +125,7 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false }: SiteR
                     }
                     : block
 
-                const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes)
+                const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
                 
                 const blockContent = (
                     <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
