@@ -137,6 +137,23 @@ describe('[TC-F16.13] POST /api/admin/broadcasts', () => {
         expect(res.status).toBe(400)
         expect(mockCreateBroadcast).not.toHaveBeenCalled()
     })
+
+    it('passes valid http:// actionUrl (allowed for local dev)', async () => {
+        // Act
+        const res = await POST(createRequest({
+            title: 'Test',
+            message: 'Body',
+            actionUrl: 'http://localhost:3005/dashboard',
+        }))
+        const data = await res.json()
+
+        // Assert
+        expect(res.status).toBe(200)
+        expect(data.success).toBe(true)
+        expect(mockCreateBroadcast).toHaveBeenCalledWith(
+            expect.objectContaining({ actionUrl: 'http://localhost:3005/dashboard' }),
+        )
+    })
 })
 
 describe('[TC-F16.12] Broadcast API — RBAC', () => {

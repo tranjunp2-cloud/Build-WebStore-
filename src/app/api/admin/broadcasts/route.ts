@@ -84,7 +84,7 @@ export const POST = withAuth(async (user, request) => {
         const trimmedActionUrl = actionUrl?.trim() || undefined
         if (trimmedActionUrl && !isSafeActionUrl(trimmedActionUrl)) {
             return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'actionUrl must be a relative path (/) or https:// URL' } },
+                { success: false, error: { code: 'VALIDATION_ERROR', message: 'actionUrl must be a relative path (/) or http(s):// URL' } },
                 { status: 400 },
             )
         }
@@ -127,7 +127,7 @@ function stripHtml(input: string): string {
 /**
  * Validate actionUrl — only allow:
  * - Internal paths starting with /
- * - http:// or https:// URLs
+ * - http:// or https:// URLs (http allowed for local dev)
  * Blocks javascript:, data:, vbscript: and other dangerous protocols.
  */
 function isSafeActionUrl(url: string): boolean {
