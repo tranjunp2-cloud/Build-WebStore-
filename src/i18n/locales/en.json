@@ -1423,6 +1423,17 @@
             }
         }
     },
+    "notifications": {
+        "title": "Notifications",
+        "markAllRead": "Mark all as read",
+        "empty": "You have no new notifications right now.",
+        "loadError": "Failed to load notifications.",
+        "retry": "Retry",
+        "viewAll": "View all notifications",
+        "close": "Close notifications",
+        "ariaUnread": "{count} unread notifications",
+        "ariaDefault": "Notifications"
+    },
     "Staff": {
         "title": "Staff Management",
         "description": "Manage your team members and their access permissions",
