@@ -8,8 +8,8 @@ import { inviteStaffAction, updateStaff } from './actions';
 import type { StaffMember } from './StaffDirectoryClient';
 
 const CUSTOM_FEATURES = [
-    { id: 'products', label: 'Products & Inventory' },
-    { id: 'orders', label: 'Orders & Fulfillment' },
+    // { id: 'products', label: 'Products & Inventory' },
+    // { id: 'orders', label: 'Orders & Fulfillment' },
     { id: 'blog', label: 'Blog Management' },
     { id: 'builder', label: 'Store Design (Builder)' },
     { id: 'settings', label: 'Settings & Domain' },

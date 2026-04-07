@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url)
         const limit = parseInt(searchParams.get('limit') || '50', 10)
-        const sort = searchParams.get('sort') || 'sortOrder'
+        const sort = searchParams.get('sort') || '-createdAt'
 
         const payload = await getPayload({ config })
         const result = await payload.find({
@@ -23,10 +23,6 @@ export async function GET(req: Request) {
         return NextResponse.json(result)
     } catch (error: unknown) {
         console.error('Templates list error:', error)
-        return NextResponse.json({
-            docs: [],
-            totalDocs: 0,
-            error: 'Failed to load templates',
-        }, { status: 500 })
+        return NextResponse.json({ docs: [], totalDocs: 0 }, { status: 500 })
     }
 }

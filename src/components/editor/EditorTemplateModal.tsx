@@ -63,7 +63,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
     useEffect(() => {
         if (!isOpen) return
         setIsLoading(true)
-        fetch('/api/templates/list?limit=50&sort=sortOrder', { credentials: 'include' })
+        fetch('/api/templates/list?limit=50', { credentials: 'include' })
             .then((res) => {
                 if (!res.ok) throw new Error(`Server returned ${res.status}`)
                 return res.json()
