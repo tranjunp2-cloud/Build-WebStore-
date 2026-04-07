@@ -4,9 +4,10 @@ import type { NotificationItem as NotificationItemType } from '@/types/notificat
 
 interface Props {
   notification: NotificationItemType
+  onClick?: (notification: NotificationItemType) => void
 }
 
-export function NotificationItem({ notification }: Props) {
+export function NotificationItem({ notification, onClick }: Props) {
   const { type, title, message, isRead, createdAt } = notification
 
   let Icon: LucideIcon = ShoppingCart
@@ -27,7 +28,12 @@ export function NotificationItem({ notification }: Props) {
   }
 
   return (
-    <div className={`relative flex items-start gap-[10px] sm:gap-[12px] px-[8px] py-[12px] sm:px-[20px] sm:py-[16px] transition-colors hover:bg-white/5 cursor-pointer border-b border-t-0 border-r-0 border-white/5 last:border-b-0 bg-transparent`}>
+    <div
+      onClick={() => onClick?.(notification)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(notification) } }}
+      className={`relative flex items-start gap-[10px] sm:gap-[12px] px-[8px] py-[12px] sm:px-[20px] sm:py-[16px] transition-colors hover:bg-white/5 cursor-pointer border-b border-t-0 border-r-0 border-white/5 last:border-b-0 bg-transparent`}>
       {!isRead && (
         <div className="absolute left-[2px] sm:left-[6px] top-[29px] sm:top-[33px] h-[6px] w-[6px] rounded-full bg-[#3B82F6]" />
       )}
