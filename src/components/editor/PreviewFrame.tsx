@@ -651,7 +651,7 @@ function PreviewFrameInner({
         )
     }
 
-    const previewUrl = new URL(`/api/preview/${siteId}`, 'http://localhost')
+    const previewUrl = new URL(`/preview/${siteId}`, 'http://localhost')
     previewUrl.searchParams.set('v', String(iframeKey))
     if (pageId) {
         previewUrl.searchParams.set('pageId', pageId)
@@ -734,10 +734,11 @@ function PreviewFrameInner({
                         return (
                         <button
                             type="button"
-                            className="absolute inline-flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-400/20 bg-[#0F172A]/95 text-cyan-300 shadow-lg transition-colors hover:bg-[#162136] hover:text-cyan-200"
+                            title="Drag to reorder section"
+                            className="group/drag absolute inline-flex items-center gap-2 rounded-full border border-white/20 bg-white px-3 py-2 text-slate-700 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)] active:scale-95 cursor-grab active:cursor-grabbing"
                             style={{
                                 top: overlayOffset.top + activeLayout.top + 10,
-                                left: overlayOffset.left + activeLayout.left - 20,
+                                left: overlayOffset.left + activeLayout.left - 24,
                                 zIndex: 45,
                             }}
                             onMouseEnter={() => {
@@ -775,7 +776,8 @@ function PreviewFrameInner({
                                 syncDragPosition(event.clientY, activeLayout.blockIndex)
                             }}
                         >
-                            <GripVertical className="h-4 w-4" />
+                            <GripVertical className="h-4 w-4 text-slate-400 group-hover/drag:text-slate-600" />
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 group-hover/drag:text-slate-700">Drag</span>
                         </button>
                         )
                     })()}

@@ -9,6 +9,7 @@ module.exports = {
         './src/app/(dashboard)/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/(editor)/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/(frontend)/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/(preview)/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/sites/**/*.{js,ts,jsx,tsx,mdx}',
         './src/app/templates/**/*.{js,ts,jsx,tsx,mdx}',
     ],

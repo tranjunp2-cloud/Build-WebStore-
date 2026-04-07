@@ -31,7 +31,7 @@ describe('PreviewFrame', () => {
         render(<PreviewFrame {...defaultProps} />)
         const iframe = screen.getByTitle('Site Preview') as HTMLIFrameElement
         expect(iframe).toBeInTheDocument()
-        expect(iframe.getAttribute('src')).toContain('/api/preview/site-123?v=1')
+        expect(iframe.getAttribute('src')).toContain('/preview/site-123?v=1')
     })
 
     it('switches from loading to iframe when isLoading changes', () => {
