@@ -4,7 +4,7 @@ import { PreviewScripts } from '@/components/editor/PreviewScripts'
 
 describe('PreviewScripts', () => {
     let mockPostMessage: ReturnType<typeof vi.fn>
-    let originalParent: any
+    let originalParent: Window
 
     beforeEach(() => {
         vi.useFakeTimers()
