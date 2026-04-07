@@ -101,7 +101,7 @@ export const POST = withAuth(async (user, req) => {
         // This prevents Payload validation errors from unknown/invalid field values.
         const PAGES_FIELDS: Record<string, string[]> = {
             hero: ['variant', 'headline', 'subheadline', 'videoUrl'],
-            navigation: ['style', 'logoText'],
+            navigation: ['style', 'logoText', 'links'],
             about: ['layout', 'sectionLabel', 'headline', 'body'],
             features: ['sectionLabel', 'headline', 'subheadline', 'layout', 'features'],
             testimonials: ['headline', 'variant', 'testimonials'],
@@ -153,6 +153,31 @@ export const POST = withAuth(async (user, req) => {
                 })
         }
 
+        // Auto-generate navigation links from template pages
+        function injectNavLinks(
+            sanitizedPages: Array<{ title: string; slug: string; isHomepage?: boolean; layout: Record<string, unknown>[] }>,
+        ) {
+            const navLinks = sanitizedPages
+                .filter(p => p.slug !== '404')
+                .map(p => ({
+                    label: p.title,
+                    url: p.isHomepage ? '/' : `/${p.slug}`,
+                    newTab: false,
+                }))
+
+            for (const page of sanitizedPages) {
+                for (const block of page.layout) {
+                    if (block.blockType === 'navigation') {
+                        // Only inject if no links already present
+                        const existing = block.links as unknown[] | undefined
+                        if (!existing || existing.length === 0) {
+                            block.links = navLinks
+                        }
+                    }
+                }
+            }
+        }
+
         const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
         // Pick only valid theme fields — Payload groups may have extra metadata
         const templateTheme = {
@@ -189,6 +214,7 @@ export const POST = withAuth(async (user, req) => {
                 ? templatePages
                 : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
             const pagesToCreate = rawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
+            injectNavLinks(pagesToCreate)
 
             // Delete old pages → update theme → create new pages (sequential)
             // 1. Delete all existing pages for this site
@@ -218,7 +244,7 @@ export const POST = withAuth(async (user, req) => {
                         site: Number(siteId),
                         tenant: tenantId,
                         isHomepage: page.isHomepage ?? idx === 0,
-                        status: 'draft',
+                        _status: 'published',
                         layout: page.layout,
                     },
                 })
@@ -247,6 +273,7 @@ export const POST = withAuth(async (user, req) => {
             ? newSiteTemplatePages
             : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
         const pagesToCreate = newSiteRawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
+        injectNavLinks(pagesToCreate)
 
         const site = await payload.create({
             collection: 'sites',
@@ -273,7 +300,7 @@ export const POST = withAuth(async (user, req) => {
                     site: site.id,
                     tenant: tenantId,
                     isHomepage: page.isHomepage ?? idx === 0,
-                    status: 'draft',
+                    _status: 'published',
                     layout: page.layout,
                 },
             })
@@ -288,7 +315,7 @@ export const POST = withAuth(async (user, req) => {
                 site: site.id,
                 tenant: tenantId,
                 isHomepage: false,
-                status: 'draft',
+                _status: 'published',
                 layout: [],
                 seo: {
                     title: '404 - Page Not Found',
