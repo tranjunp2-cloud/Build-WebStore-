@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { GET } from '@/app/api/data/industries/route'
 import { TEMPLATE_CATEGORY_OPTIONS } from '@/collections/Templates'
 
+type IndustryDoc = { value: string; label: string; icon: string }
+
 // ── TC-F01-industries: GET /api/data/industries ───────────────────────────────
 describe('[TC-F01-industries] GET /api/data/industries', () => {
 
@@ -24,7 +26,8 @@ describe('[TC-F01-industries] GET /api/data/industries', () => {
         const body = await res.json()
 
         // Assert
-        const values = body.docs.map((d: any) => d.value)
+        const docs = body.docs as IndustryDoc[]
+        const values = docs.map((d) => d.value)
         const expectedValues = TEMPLATE_CATEGORY_OPTIONS.map((o) => o.value)
         expect(values).toEqual(expectedValues)
     })
@@ -65,7 +68,8 @@ describe('[TC-F01-industries] GET /api/data/industries', () => {
         const body = await res.json()
 
         // Assert
-        const values = body.docs.map((d: any) => d.value)
+        const docs = body.docs as IndustryDoc[]
+        const values = docs.map((d) => d.value)
         const uniqueValues = new Set(values)
         expect(uniqueValues.size).toBe(values.length)
     })
