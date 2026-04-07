@@ -1427,6 +1427,17 @@
             }
         }
     },
+    "notifications": {
+        "title": "Pemberitahuan",
+        "markAllRead": "Tandakan semua telah dibaca",
+        "empty": "Tiada pemberitahuan baharu buat masa ini.",
+        "loadError": "Gagal memuatkan pemberitahuan.",
+        "retry": "Cuba Semula",
+        "viewAll": "Lihat semua pemberitahuan",
+        "close": "Tutup pemberitahuan",
+        "ariaUnread": "{count} pemberitahuan belum dibaca",
+        "ariaDefault": "Pemberitahuan"
+    },
     "Staff": {
         "title": "Pengurusan Kakitangan",
         "description": "Urus ahli pasukan anda dan kebenaran akses mereka",

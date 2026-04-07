@@ -262,7 +262,7 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
     }
 
     /* ── Modal Trigger ───────────────────────────────────────────────────────── */
-    return (
+    if (variant === 'modal-trigger') return (
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto">
@@ -316,6 +316,21 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
                     </motion.div>
                 )}
             </AnimatePresence>
+        </AnimatedSection>
+    )
+
+    /* ── Default: same as inline ────────────────────────────────────────────── */
+    return (
+        <AnimatedSection className="py-24">
+            <div className="container mx-auto px-6">
+                <div className="text-center max-w-2xl mx-auto mb-12">
+                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
+                    {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                </div>
+                <div className="max-w-2xl mx-auto">
+                    <BookingForm {...formProps} />
+                </div>
+            </div>
         </AnimatedSection>
     )
 }

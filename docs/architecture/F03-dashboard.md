@@ -56,9 +56,21 @@ page.tsx (Server Component)
 
 Sử dụng **collections có sẵn** hoặc third-party APIs:
 - `orders` — Lấy pending orders và doanh thu (từ F10).
-- `analytics_events` — (Tương lai/F12) Lấy page views, clicks.
-- `seo_keywords` — Lưu trữ top 5 keywords (tạo collection mới hoặc JSON field trong tenant).
-- `tenants` — Lưu preferences dashboard (widgetOrder, hiddenWidgets).
+- `Google Analytics Data API` — Proxy backend query tới GA4, cache tại Redis.
+- `Google Search Console API` — Khai thác Click, Impression, Keyword Ranking.
+- `Google Site Verification API` — Tự động cấp quyền sở hữu tên miền.
+- `tenants` — Lưu preferences dashboard (widgetOrder, hiddenWidgets) VÀ `google_access_token`, `refresh_token` phân quyền nghiêm ngặt.
+
+## Tiêu chuẩn Mạch máu OAuth 2.0 (Google Integration)
+
+Dev cần tuân thủ 3 mốc Checkpoint kỹ thuật để đảm bảo luồng Authentication an toàn với GCP:
+
+1. **GCP Setup:** Cấp đủ Quota và quyền hạn cho 3 Library API (Analytics Data, Search Console, Site Verification). Thiết lập bắt buộc `Authorized redirect URIs` trỏ về trạm trung chuyển `/api/google/callback`.
+2. **Hạ tầng & Entity:** Bảo vệ `GOOGLE_CLIENT_SECRET` ở môi trường server. Field Database cấp Tenant bắt buộc có 3 key: `google_access_token`, `google_refresh_token` (Long-lived để tái cấp), `token_expiry_date`.
+3. **Route Logic (Next.js Routes):**
+   - Lớp 1 (Init): `GET /api/google/auth` -> Phục vụ Trigger trỏ URL ra bảng Consent Screen của Google.
+   - Lớp 2 (Callback): `GET /api/google/callback` -> Parse Auth Code, Trade lấy Tokens, Update vào Payload CMS Tenant object.
+   - Lớp 3 (Auto-Renew Middleware): Kiểm tra `token_expiry_date` trước mọi function gọi Analytics, tự bẻ khoá tráo Token mới bằng `Refresh_Token` nếu Token hiện tại hết hạn 1 Giờ.
 
 ## 6-Layer Checklist
 
@@ -69,18 +81,19 @@ Sử dụng **collections có sẵn** hoặc third-party APIs:
 
 ✅ Layer 2 — API/BACKEND:
    - Tách API endpoints cho metrics, analytics, và SEO. ✅
+   - Redis Cache layer đáp ứng Rate Limit fallback. (Mới)
 
 ✅ Layer 3 — DATA/STORAGE:
    - Scoped by tenant ✅
-   - Preference lưu theo User/Tenant session. ✅
+   - Preference & Google Access Token lưu an toàn theo Tenant session. ✅
 
 ✅ Layer 4 — SECURITY/AUTH:
-   - API endpoints require auth (401). ✅
+   - API endpoints require auth (401) và check token revoke. ✅
    - Payload access control enforces tenant ✅
 
 ⬜ Layer 5 — OPS/RELIABILITY:
-   - Timeout config cho AI SSE Stream. (TODO)
+   - SSE Retry mechanisms & Timeout config cho Vercel AI Streaming. (TODO)
 
 ⬜ Layer 6 — BUSINESS:
-   - AI SEO limit based on plan.
+   - Prompt Engineering: Gom Batch & Cắt input còn 150 ký tự để tối ưu chi phí Token. (TODO)
 ```

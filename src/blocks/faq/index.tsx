@@ -5,15 +5,16 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { FAQConfig, FAQItem } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 function SectionHeader({ headline, subheadline }: { headline?: string; subheadline?: string }) {
     if (!headline) return null
     return (
         <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-3" style={{ fontFamily: 'var(--font-heading)', color: 'var(--text)' }}>
+            <h2 className="text-3xl md:text-4xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
                 {headline}
             </h2>
-            {subheadline && <p className="max-w-2xl mx-auto" style={{ color: 'var(--muted)' }}>{subheadline}</p>}
+            {subheadline && <p className="max-w-2xl mx-auto" style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
         </div>
     )
 }
@@ -47,7 +48,7 @@ function AccordionVariant({ headline, subheadline, items }: { headline?: string;
     }, [items.length])
 
     return (
-        <AnimatedSection className="py-16 md:py-24" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6 max-w-3xl">
                 <SectionHeader headline={headline} subheadline={subheadline} />
                 <div className="space-y-3" role="presentation">
@@ -62,8 +63,8 @@ function AccordionVariant({ headline, subheadline, items }: { headline?: string;
                                 className="overflow-hidden transition-shadow"
                                 style={{
                                     border: '1px solid rgba(var(--brand-primary-rgb), 0.12)',
-                                    borderRadius: 'var(--radius-lg)',
-                                    background: 'var(--surface)',
+                                    borderRadius: CSS_VARS.radiusLg,
+                                    background: CSS_VARS.surface,
                                 }}
                             >
                                 <h3>
@@ -75,7 +76,7 @@ function AccordionVariant({ headline, subheadline, items }: { headline?: string;
                                         onClick={() => toggle(i)}
                                         onKeyDown={e => handleKeyDown(e, i)}
                                         className="w-full px-6 py-4 flex items-center justify-between text-left font-medium transition-colors hover:bg-[rgba(var(--brand-primary-rgb),0.04)]"
-                                        style={{ color: 'var(--text)', fontFamily: 'var(--font-heading)' }}
+                                        style={{ color: CSS_VARS.text, fontFamily: CSS_VARS.fontHeading }}
                                     >
                                         <span>{item.question}</span>
                                         <svg
@@ -102,7 +103,7 @@ function AccordionVariant({ headline, subheadline, items }: { headline?: string;
                                             transition={{ duration: 0.2, ease: 'easeOut' }}
                                             className="overflow-hidden"
                                         >
-                                            <div className="px-6 pb-5 text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
+                                            <div className="px-6 pb-5 text-sm leading-relaxed" style={{ color: CSS_VARS.muted }}>
                                                 {item.answer}
                                             </div>
                                         </motion.div>
@@ -119,7 +120,7 @@ function AccordionVariant({ headline, subheadline, items }: { headline?: string;
 
 function GridVariant({ headline, subheadline, items }: { headline?: string; subheadline?: string; items: FAQItem[] }) {
     return (
-        <AnimatedSection className="py-16 md:py-24" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6">
                 <SectionHeader headline={headline} subheadline={subheadline} />
                 <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
@@ -128,15 +129,15 @@ function GridVariant({ headline, subheadline, items }: { headline?: string; subh
                             key={i}
                             className="p-6"
                             style={{
-                                background: 'var(--surface)',
+                                background: CSS_VARS.surface,
                                 border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
-                                borderRadius: 'var(--radius-lg)',
+                                borderRadius: CSS_VARS.radiusLg,
                             }}
                         >
-                            <h3 className="font-semibold mb-2" style={{ fontFamily: 'var(--font-heading)', color: 'var(--text)' }}>
+                            <h3 className="font-semibold mb-2" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
                                 {item.question}
                             </h3>
-                            <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
+                            <p className="text-sm leading-relaxed" style={{ color: CSS_VARS.muted }}>
                                 {item.answer}
                             </p>
                         </StaggerItem>
@@ -149,7 +150,7 @@ function GridVariant({ headline, subheadline, items }: { headline?: string; subh
 
 function SimpleVariant({ headline, subheadline, items }: { headline?: string; subheadline?: string; items: FAQItem[] }) {
     return (
-        <AnimatedSection className="py-16 md:py-24" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6 max-w-3xl">
                 <SectionHeader headline={headline} subheadline={subheadline} />
                 <StaggerGrid className="flex flex-col">
@@ -159,10 +160,10 @@ function SimpleVariant({ headline, subheadline, items }: { headline?: string; su
                             className="py-6"
                             style={{ borderBottom: i < items.length - 1 ? '1px solid rgba(var(--brand-primary-rgb), 0.1)' : 'none' }}
                         >
-                            <h3 className="font-semibold mb-2" style={{ fontFamily: 'var(--font-heading)', color: 'var(--text)' }}>
+                            <h3 className="font-semibold mb-2" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
                                 {item.question}
                             </h3>
-                            <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
+                            <p className="text-sm leading-relaxed" style={{ color: CSS_VARS.muted }}>
                                 {item.answer}
                             </p>
                         </StaggerItem>

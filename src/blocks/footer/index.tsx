@@ -282,7 +282,160 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
         )
     }
 
-    // ── Default: simple / expanded / minimal (existing) ───────────────────
+    // ── Expanded variant ────────────────────────────────────────────────
+    if (variant === 'expanded') {
+        return (
+            <footer className="pt-20 pb-8 relative">
+                <GradientLine from={CSS_VARS.primary} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
+
+                <div className="container mx-auto px-6">
+                    {/* 4-column links section */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+                        {/* Brand column as first of 4 */}
+                        <div>
+                            <div className="font-bold text-2xl font-heading mb-4">
+                                {mergedBlock.logo?.url ? (
+                                    <img src={mergedBlock.logo.url} alt={logoText} className="h-8 w-auto" />
+                                ) : (
+                                    <span style={{
+                                        background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text',
+                                    }}>
+                                        {logoText}
+                                    </span>
+                                )}
+                            </div>
+                            {tagline && <p className="opacity-40 text-sm leading-relaxed max-w-xs">{tagline}</p>}
+                            {socialsArr.length > 0 && (
+                                <div className="flex gap-3 mt-6">
+                                    {socialsArr.map((social, i) => (
+                                        <a
+                                            key={i}
+                                            href={social.url || '#'}
+                                            className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold transition-all duration-200 hover:scale-110"
+                                            style={{
+                                                background: `rgba(var(--brand-primary-rgb), 0.063)`,
+                                                border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
+                                                color: 'var(--brand-primary)',
+                                            }}
+                                        >
+                                            <SocialIcon platform={social.platform || ''} />
+                                        </a>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Link columns (up to 3) */}
+                        {columns.slice(0, 3).map((col, i) => (
+                            <div key={i}>
+                                <h4 className="font-semibold text-sm mb-5 opacity-80">{col.title}</h4>
+                                <ul className="space-y-3">
+                                    {(col.links || []).map((link, j) => (
+                                        <li key={j}>
+                                            <a
+                                                href={link.url}
+                                                className="text-sm opacity-40 hover:opacity-80 transition-all duration-200 hover:translate-x-1 inline-block"
+                                            >
+                                                {link.label}
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Divider */}
+                    <div style={{ borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }} />
+
+                    {/* Newsletter row */}
+                    <div className="py-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div>
+                            <h4 className="font-semibold text-sm mb-1">Subscribe to our newsletter</h4>
+                            <p className="text-xs opacity-40">Get the latest updates delivered to your inbox.</p>
+                        </div>
+                        <div className="flex gap-2 w-full md:w-auto">
+                            <input
+                                type="email"
+                                placeholder="Enter your email"
+                                className="flex-1 md:w-64 px-4 py-2.5 rounded-lg text-sm outline-none transition-colors"
+                                style={{
+                                    background: 'rgba(var(--brand-primary-rgb), 0.04)',
+                                    border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
+                                    color: 'inherit',
+                                }}
+                            />
+                            <button
+                                className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 flex-shrink-0"
+                                style={{ background: 'var(--brand-primary)' }}
+                            >
+                                Subscribe
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Copyright bar */}
+                    <div className="pt-6 text-center" style={{ borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }}>
+                        <p className="text-xs opacity-30">{copyrightLine}</p>
+                    </div>
+                </div>
+            </footer>
+        )
+    }
+
+    // ── Minimal variant ──────────────────────────────────────────────────
+    if (variant === 'minimal') {
+        // All flat links from all columns
+        const allLinks = columns.flatMap(col => col.links || [])
+
+        return (
+            <footer className="py-6 relative">
+                <GradientLine from={CSS_VARS.primary} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
+                <div className="container mx-auto px-6">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                        {/* Logo / brand text — left */}
+                        <div className="font-bold text-lg font-heading flex items-center gap-2 flex-shrink-0">
+                            {mergedBlock.logo?.url ? (
+                                <img src={mergedBlock.logo.url} alt={logoText} className="h-6 w-auto" />
+                            ) : (
+                                <span style={{
+                                    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text',
+                                }}>
+                                    {logoText}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Links — center */}
+                        {allLinks.length > 0 && (
+                            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
+                                {allLinks.slice(0, 6).map((link, i) => (
+                                    <a
+                                        key={i}
+                                        href={link.url}
+                                        className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200"
+                                    >
+                                        {link.label}
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Copyright — right */}
+                        <p className="text-xs opacity-30 flex-shrink-0">{copyrightLine}</p>
+                    </div>
+                </div>
+            </footer>
+        )
+    }
+
+    // ── Default: simple ──────────────────────────────────────────────────
     return (
         <footer className="pt-20 pb-8 relative">
             {/* Top gradient line */}

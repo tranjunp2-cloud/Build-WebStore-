@@ -1,94 +1,201 @@
-# Tài Liệu Kiểm Thử Kỹ Thuật: F10 - Quản Lý Đơn Hàng (Orders Management)
-> **Phiên bản:** 5.0 (Cấu trúc AC-Grouped & Kịch bản Chuyên sâu) | **Cập nhật:** 2026-04-02 | **Thực hiện:** QA Team
-> **Nguồn Tham chiếu:** PRD (`F10-orders-management.md`), User Stories (5 US Dịch vụ)
-> **Phương pháp kiểm thử:** Áp dụng BDD (Gherkin Expectations), Security Contexting, Performance Boundaries, State Machine Validation, Concurrency (Kiểm thử đồng thời).
+# Tai Lieu Kiem Thu: F10 - Quan Ly Don Hang (Orders Management)
+> **Phien ban:** 6.0 (Comprehensive) | **Cap nhat:** 2026-04-06 | **Thuc hien:** QA Team
+> **Nguon:** PRD F10 v2.1, User Stories US-F10-01 -> US-F10-05 (13 FRs, 7 BRs, 9 ACs)
+> **Ky thuat:** BVA, State Transition (State Machine), Error Guessing, Concurrency/Idempotency, UI/UX States (10-Point)
 
 ---
 
-## 1. Mục Tiêu (Objective)
-Tài liệu cung cấp bộ kịch bản kiểm thử toàn diện cho module Quản lý Đơn Hàng (Orders Fulfillment - F10). Do tính chất nhạy cảm liên quan đến doanh thu và tồn kho, bộ kịch bản thiết lập các giới hạn kiểm thử nghiêm ngặt. Hệ thống phải đảm bảo tính toàn vẹn dữ liệu, chống lại các lỗ hổng bảo mật (IDOR, XSS), xử lý tốt lỗi tương tranh (Race Condition) và kiểm soát chặt chẽ máy trạng thái luồng đơn hàng (State Machine).
+## 1. Muc Tieu Kiem Thu
+
+Vet can toan bo AC va Business Rules cua F10, dac biet la: tinh toan ven State Machine don hang, bao mat (IDOR, XSS, Price Spoofing), Idempotency chong nhan ban kho, Race Condition, va trai nghiem Mobile. Moi AC Happy Path co it nhat 3 case Negative/Edge tuong ung.
 
 ---
 
-## 2. Thông Tin Môi Trường (Test Environment)
-| Thông số | Yêu cầu kiểm thử |
+## 2. Moi Truong Kiem Thu
+
+| Thong so | Yeu cau |
 |---|---|
-| Thiết lập | Staging (`https://web-cms-v2.dev.ecommercehub.my/`) / Localhost với khối lượng dữ liệu tĩnh > 10,000 đơn hàng. |
-| Phân quyền | Cửa hàng (Admin/Merchant), Khách hàng vãng lai (Guest), Hệ thống xử lý nền (Background Job Worker). |
-| Múi giờ | Tương tác đa vùng (Cross-timezone): Khách đặt mua tại UTC-5 (Hoa Kỳ), Cửa hàng quản lý tại UTC+8. |
-| Giới hạn SLA | Kiểm tra tính Idempotency khi gọi API liên tục (Cancel/Refund), Kiểm tra giới hạn Rate Limit cho Bulk Actions. |
+| Moi truong | Staging / Localhost voi > 10,000 don hang ao |
+| Phan quyen | Owner (Merchant), Staff Custom, Guest Customer |
+| Mui gio | Cross-timezone: Khach UTC-5 (US), Cua hang UTC+8 (MY) |
+| SLA | API response < 60s notification, Idempotency key, Rate Limit Bulk |
 
 ---
 
-## 3. Ma Trận Kịch Bản Kiểm Thử (Traceability Matrix)
+## 3. Ma Tran Test Case Theo User Story
 
-**Quy chuẩn Định danh:** `TC-F10-[Story]-[Seq]`. Vd: `TC-F10-01-01` (US-01, Case 01).
+### US-F10-01: Quan Ly & Cap Nhat Trang Thai Don Hang
 
-| ID | Tham chiếu | LOẠI (Type) | TIÊU ĐỀ (Scenario) | CÁC BƯỚC THỰC HIỆN | KẾT QUẢ MONG ĐỢI | MỨC ĐỘ | AUTO |
-|:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **[US-F10-01: Quản lý Luồng Đơn Hàng & Cập nhật Trạng thái]** (19 Cases) | | | | | | | |
-| **TC-F10-01-01**| `US-01/AC1` | `Perf`  | Cập nhật thông báo đơn hàng theo thời gian thực (Realtime) | Khách hoàn tất đặt hàng. Quản trị viên đang mở trang Danh sách Đơn hàng. | Đơn hàng mới tự động xuất hiện đầu danh sách trong `< 60s` (Giao thức SSE/WebSockets). Hiển thị Toast thông báo. | Critical | [ ] |
-| **TC-F10-01-02**| `US-01/AC1` | `Func`  | Hệ thống gửi Email xác nhận tự động | Khách hàng hoàn tất thanh toán 01 đơn hàng. | Hệ thống đẩy tác vụ (AWS SES/Resend) gửi Email xác nhận tới tài khoản khách hàng. Email chứa liên kết tra cứu đơn. | Blocker | [x] |
-| **TC-F10-01-03**| `US-01/AC1.1`| `UI`   | Hiển thị giao diện dữ liệu trống (Empty State) | Quản trị viên truy cập bảng `/orders` khi cửa hàng chưa có đơn hàng nào. | Hiển thị Component "Không có dữ liệu/Chưa có đơn hàng" theo thiết kế UI/UX. Bố cục trang giữ nguyên, không bị lệch. | Low | [x] |
-| **TC-F10-01-04**| `US-01/AC1.2`| `UI`   | Xem và phóng to Hình ảnh hóa đơn (QR Proof) | Trong màn hình Chi tiết Đơn hàng thanh toán QR, người dùng nhấp vào hình ảnh bằng chứng giao dịch. | Hệ thống mở hình ảnh dưới dạng Modal (Lightbox popup) cho phép phóng to. Không làm tràn hoặc vỡ Layout màn hình. | High | [ ] |
-| **TC-F10-01-05**| `US-01/Bulk`| `Logic` | Xử lý hàng loạt Xác nhận đơn hàng (Bulk Confirm) | Chọn 05 đơn hàng có trạng thái "Pending" và sử dụng tính năng "Xác nhận hàng loạt". | Trạng thái hiển thị của 05 đơn chuyển sang "Confirmed". Hệ thống đẩy lệnh gửi 05 Email xác nhận độc lập. | Blocker | [x] |
-| **TC-F10-01-06**| `US-01/Bulk`| `Perf`  | Chặn nguy cơ sập hệ thống khi Bulk Update số lượng lớn | Chọn 1,000 đơn hàng ảo, thực thi tính năng "Xác nhận hàng loạt". | Hệ thống sử dụng truy vấn `UpdateMany` và hàng đợi (Job Queue). Tránh được lỗi quá dòng bộ nhớ (OOM) hoặc nghẽn cổng kết nối N+1 Query. | Blocker | [ ] |
-| **TC-F10-01-07**| `US-01/Stat`| `Logic` | Tính toàn vẹn quy trình (FSM): Chặn tiến trình đi lùi | Truy cập hiển thị Chi tiết đơn hàng đang ở mốc "Shipped". | Giao diện tự động ẩn đi các tùy chọn "Pending" hoặc "Confirm". Trạng thái đơn hàng chỉ được phép di chuyển về đích (Completed) hoặc bị Huỷ (Cancelled). | Blocker | [x] |
-| **TC-F10-01-08**| `US-01/Sec` | `Sec`   | Kiểm chứng bảo mật API: Chặn gọi hàm can thiệp State Machine | Gọi Patch/Put API để ép giảm cấp trạng thái Đơn hàng từ "Completed" về "Pending". | Validation API chặn yêu cầu và trả về lỗi `HTTP 400 - Invalid State Transition`. Đảm bảo hệ thống tồn kho khoá chiều truy xuất lùi. | Blocker | [ ] |
-| **TC-F10-01-09**| `US-01/Ref` | `UI`    | Khóa tính năng Hoàn tiền (Refund) khi chưa thiết yếu | Truy cập một đơn hàng đang ở trạng thái "Pending" hoặc "Confirmed". | Nút chức năng "Hoàn tiền (Refund)" bị vô hiệu hóa (Disabled). Quản trị viên chỉ có thể sử dụng tính năng "Hủy Đơn (Cancel)" kèm lý do. | High | [ ] |
-| **TC-F10-01-10**| `US-01/Ref` | `Logic` | Cấp phép tính năng Hoàn tiền sau mốc Vận chuyển | Truy cập Đơn hàng đã ở trạng thái "Shipped" hoặc "Completed". | Nút "Refund" được kích hoạt sáng màu. Khi nhấp, Modal Hoàn tiền xuất hiện yêu cầu nhập số tiền khấu trừ. | High | [ ] |
-| **TC-F10-01-11**| `US-01/Sec` | `Sec`   | Chống lỗi IDOR rò rỉ dữ liệu chéo tổ chức (Cross-Tenant) | Sử dụng mã Auth Token của Cửa Hàng A gọi API truy xuất/chỉnh sửa mã Đơn Hàng của Cửa Hàng B (Tenant B). | Hệ thống middleware nhận diện và khóa truy cập, trả về `HTTP 403 Forbidden`. Admin không được phép xem thông tin chéo hệ thống. | Blocker | [x] |
-| **TC-F10-01-12**| `US-01/UX`  | `UI`    | Cập nhật thanh Hành trình Đơn hàng (Progress Timeline)| Chuyển trạng thái giao hàng của 01 Đơn sang mốc "Ready to Ship". Kiểm tra chi tiết đơn hàng. | Thanh Timeline trên Modal thay đổi vạch sáng chuẩn ở mốc "Ready". Các mốc phía sau tiếp tục hiển thị trạng thái xám/mờ. | High | [ ] |
-| **TC-F10-01-13**| `US-01/Tme` | `Edge`  | Quy đổi Múi giờ hiển thị hiển thị người bán (Timezone Sync)| Khách hàng cấu hình UTC-5 đặt mua sản phẩm lúc 01:00 AM. Chủ cửa hàng truy cập tại UTC+8 trong ca làm sáng. | Thời gian đặt hàng được hệ thống tự quy đổi hợp lý sang mốc UTC+8 trên Giao diện Chủ cửa hàng để thống nhất quy trình vận hành trong ngày. | High | [ ] |
-| **TC-F10-01-14**| `US-01/Num` | `Val`   | Xác thực số liệu kế toán Đơn hàng (Order Summary)| Kiểm tra và đối chiếu thủ công phép toán ở biểu tổng (Subtotal, Tax, Shipping). | Dữ liệu phép toán chính xác tuyệt đối: Cước sản phẩm + Cước vận chuyển + Thuế VAT = Giá cuối. Không bị làm tròn ngẫu nhiên lưu lỡ trong Database. | Blocker | [ ] |
-| **TC-F10-01-15**| `US-01/Sec` | `Sec`   | Ngăn chặn lây nhiễm chéo XSS qua Input Khách hàng | Khách mua hàng để lại Ghi chú có cài đặt mã độc script: `<script>alert("XSS")</script>`. | Dữ liệu Text List được giải mã an toàn (Sanitization) khi hiển thị lên bảng Orders CMS. HTML DOM không thực thi mã độc tại mảng Front-End quản trị. | Blocker | [x] |
-| **TC-F10-01-16**| `US-01/Race`| `Race`  | Chống lỗi giao tranh tương đồng (Concurrency Race Condition) | Quản trị A và B cùng bấm "Xác nhận Đơn hàng" tại một millisecond tương đồng. | Hệ thống áp dụng Optimistic Lock ở cấp DB. Dữ liệu thay đổi bởi truy vấn đến đầu tiên được lưu, trả lỗi mâu thuẫn cho Admin sau thao tác ("Đơn đã được cập nhật bởi bên khác"). | Blocker | [ ] |
-| **TC-F10-01-17**| `US-01/Stt` | `Logic` | Hiệu suất thống kê Biểu đồ Thẻ Status (Summary Metrics) | Thêm tải 1,000 Đơn Mới trên Staging, Reload trang Orders. | 4 dãy thẻ Chỉ Số (Đang chờ, Đã Giao...) render kết quả nhanh chóng. Hệ thống gọi Cache Layer phù hợp, không bị nghẽn ở Pipeline Aggregation MongoDB. | Medium | [ ] |
-| **TC-F10-01-18**| `US-01/Ref` | `Edge`  | Trình kiểm tra Giới hạn trị giá Refund Số thập phân | Tiến hành Refund Đơn và cấu hình số tiền Hoàn vượt quá trị giá Tổng Bill của đơn. | Form Validation bắt lỗi tức khắc, báo hiệu Đỏ yêu cầu mức Hoàn không được phép lớn hơn tổng đơn. API từ chối ghi nhận Refund. | Blocker | [ ] |
-| **TC-F10-01-19**| `US-01/SPA` | `UX`    | Tích hợp kết nối tĩnh Component (SPA Navigation) | Di chuyển công cụ từ Tab Sản Phẩm sang Tab Orders từ Menu Sidebar. | Chuyển luồng nhanh chóng (SPA Routing). Các thành tố Cấu trúc (Sidebar, Header) không bị khởi động tải lại (White Flash Frame). | High | [ ] |
-| **[US-F10-02: Quy trình Thanh toán Giao Hàng (Customer Checkout)]** (9 Cases) | | | | | | | |
-| **TC-F10-02-01**| `US-02/AC1` | `E2E`   | Flow Ẩn danh (Guest) Xác nhận mã COD Checkout | Khách sử dụng Account Khách Truy Lệnh tiến hành đặt hàng dạng COD (Giao nhận tiền mặt). | Dòng lệnh xác nhận Thành Công. Khách chuyển trang Redirect thông báo đơn hoàn tất. Hệ thống gửi xác nhận đơn hàng ẩn danh thông qua trường Email khai báo. | Blocker | [x] |
-| **TC-F10-02-02**| `US-02/AC2` | `Edge`  | Ngắt kết nối Mua Lệnh vì Cạn Stock Giỏ Hàng (In-flight OOS) | Khách Mua Hàng chờ tại trang Checkout. Một luồng khác tại Backend vừa cướp món hàng tồn sót lại về bằng (0). Khách nhấn Thanh toán. | Form ngắt tiến trình báo lỗi Toast: "Sản phẩm đã ngoài tầm Tồn Kho/Hết hạn mức". Giỏ hàng được bảo toàn để khách tự sửa điều kiện mà không phải chọn mua lại từ đầu. | Blocker | [x] |
-| **TC-F10-02-03**| `US-02/AC3` | `UI`    | Luồng QR Payment (Phép đính kèm Biểu Giao dịch) | Chuyển tùy chọn giao dịch về ô "Chuyển khoản QR Bank". | Giao diện hiện Modal mã Thanh toán QR Cửa tiệm. Nút Confirm Purchase bị làm lu mờ. Nút này chỉ mở khi người dùng đẩy thành công biên lai đính kèm. | Blocker | [ ] |
-| **TC-F10-02-04**| `US-02/Val` | `Sec`   | Phê chuẩn Mime/Capacity Tải File Xác thức | Dùng File mồi (PDF, Executable) hoặc hình ảnh dung lượng 25MB nhét lên hộp QR Upload Validation. | Tường ngăn Browser Error báo Lỗi. Không tải hình kích thước đồ sộ gây lưu trú Rác lên S3 Server. Chỉ thị đuôi file hỗ trợ là dạng Tranh (JPEG/PNG). | High | [ ] |
-| **TC-F10-02-05**| `US-02/UX`  | `Mob`   | Kiểm duyệt Khuyến Nghị Màn Hình 375px Checkout | Tải Layout Mua Hàng Trên App Device 375px Frame Khổ Cực Hẹp. | Khối Order Summary cùng Cột Lịch Form Biến từ Ngang (Row) thành Trục Chồng (Stacked Column). Render chuẩn trên Màn điện thoại không trượt thanh Ngang màn. | High | [ ] |
-| **TC-F10-02-06**| `US-02/Race`| `Race`  | Bắt Double Trùng Lặp Cụm Click Pay Spam| Bấm Nhấn Double Nút Gửi Payload Thanh Toán Chỉ Trong `< 0.2` Giây. | Rào Lọc Form Thao Tác Ngưng Nút Bấm. Không kích hoạt 02 Post Request Gây Chia Giỏ Hàng Và Lặp 2 Mã Đơn Dạng Mẫu Giống Hệt. | Blocker | [ ] |
-| **TC-F10-02-07**| `US-02/Lim` | `Val`   | Bức Cắt Input Độ Dài Khủng (Address Flood) | Điền Chuẩn 2,000 ký tự dạng rác vô thanh Văn bản "Địa Chỉ Nhận", Bấm Save. | Schema Validation Giới Ngắn Độ Dài Limit Bằng Độ Đạt Thông (150-200 Ký tự). Error Cảnh Báo "Địa Cấu Không Nhập Lược Ký". | High | [ ] |
-| **TC-F10-02-08**| `US-02/Guest`| `UX`   | Tồn Cấu Trúc Khách Không Buộc Login | Đẩy Đơn Tồn Ẩn Nhưng Cố Trống Thả Văn Email Nhận Thông. | Hệ Yêu Cầu Field "Email Phục Vụ Bill" Là Bắt Buộc Dù Non-Login. Ngắt Yêu Trả API Error Và Block Send Dữ Kiện Tới BE Khi Frontend Trắng Ô Email Xác. | High | [ ] |
-| **TC-F10-02-09**| `US-02/Sec` | `Logic` | Rào Tính Toán Bảng Tiền Client-Side Spoof | Gửi Postman Payload Thay Giá Trị `total_price` Thay Đổi Bàn Lòng Total = 1$. | Toán Pháp Lọc Back-End Kháng Cứ, Bắt Luồng Tính Lại Tổng Tiền Sub Khớp Theo Product Item Trong Hệ Cơ Sở Dữ Liệu Mà Không Nghe Báo Client Total Truy Của Khách Giả Bể Giá. | Blocker | [x] |
-| **[US-F10-03: Xử lý Hủy Đơn & Kích hoạt Kho phục hồi (Restock)]** (7 Cases) | | | | | | | |
-| **TC-F10-03-01**| `US-03/AC1` | `Func`  | Xác Thực Kèm Gốc Hủy Hàng Cancel | Cửa CMS Khai Chọn Chấp Hủy Đơn. Để Box Nguyên Nhân Quãng Trống, Save Submit. | Gắn Required Cờ Ở Field Tờ Trình "Cancel Reason". Alert Gọi Không Xét Di Duyệt Đi Kèm Backend Chức Kháng Form Null Mảnh Trống Ngõ. | Blocker | [ ] |
-| **TC-F10-03-02**| `US-03/Mail`| `Func`  | Định Hình Quản Hoàn API Và Trục Hủy Mail | Tại Đơn Ở Bước Khởi Đầu Pending, Trạng Chọn Cancel, Viết Kèm Nguyên Nhân. | Trục CSDL Hạ Thành Cancelled Hợp. Email Trở Nhận Cảnh Báo Ghi Quá "Xác Đơn Hủy... Lý Do:...". CSDL Trục Sáng Đảo Không Lưu Tiếng Tạm Bợ Cũ. | High | [x] |
-| **TC-F10-03-03**| `US-03/AC2` | `Data`  | Mệnh Tính Job Trigger Bùng Inventory Restock Chót | Kho Đầu Hiện: Táo=5. Đơn A Mua: Táo=2 -> Tồn Còn Lại 3. Lãnh Thủy Cảnh Hủy Đơn A (Bằng Chức Hủy Lệnh). | Mệnh Hệ API Bùng Dậy Background Job -> Tính Restock Táo=2 Đảo Vòng Nhập Lại Bảng Gốc Product Kho. Tồn Hiện Hiện: Táo=5 Lần Lặp Chuẩn. | Blocker | [x] |
-| **TC-F10-03-04**| `US-03/Edge`| `Edge`  | Cấp Nhất Lệnh Khai Xóa Hàng DB Ghost Rắn Null | Tiến Hành Thủ Tục Hủy Đối Đơn X Mà Trong Đơn Món 00 Mua Bị Removed (Delete) Ở Database Rền Lượt Chống. | Quy Chế Hủy Cancelled Vẫn Hành Động Cả Nước Lệnh Vững, Lệnh Nhập Lên Giao Lưu Tồn Restock Bỏ Qua (Skip Mute) Trục Bị Hỏng DB ID Tránh Cớ Lệnh Drop Web Component (Crashed Mute Null). | Blocker | [x] |
-| **TC-F10-03-05**| `US-03/Sec` | `Sec`   | Phớt Lờ API Spam Vòi Lặp Tồn (Idempotency Key)| Gắn Lệnh Postman Đưa Script Bắn Endpoint Lệnh Hủy Nhanh API Dày Đặc Vào Đúng 1 Order ID Châm Đồng Yêu.| Bảo Vệ Lồng Lệnh Hệ. Tồn API Check Cancel/Restock Báo Flag Khẳng Đã Rót Chỉ Gọi Job Chóp 1 Cử Lần Duy Đích Idempotent Cấp Bảo Vệ Restock Inventory Không Khống Quặng Kho Xương Triệu Món Tiền Lạm Lập Ảo. | Blocker | [ ] |
-| **TC-F10-03-06**| `US-03/Stat`| `Func`  | Lỗi Logic Khóa Hủy Khi Hàng Xuất | Check Tại Đơn Order Khớp Khung Cục Cứ "Shipped". | Option Nhánh Cancel Đơn Bị Bóp Bỏ Cấn UI Che Block Nằm Ẩn. Không Được Rút Lại Giữa Khi Cục Hàng Vững Di Lịch Đưa Ra Cửa Chứ Buộc Thao Trúc Refund Về Giải Hòa. | High | [ ] |
-| **TC-F10-03-07**| `US-03/UX`  | `UI`    | Modal Có Text Modal Cảnh | Chọn Action Trigger Rút Thao Hủy Đơn. | Bản Chấn Modal "Gồm Có Văn Bản Khéo: Kho Tồn Kho Phục Hoàn Inventory". Text Giúp An Ổn Chủ Shop Định Rành Logic Đỡ Nhờ Yếu Thót Đóng Trác Xoay Lo Lắng Sợ Rớt Căn Dòng Inventory Cột Hàng Hóa. | Medium | [ ] |
-| **[US-F10-04: Hệ thống Kéo Lọc Phức Hợp (Querie & Trải Lọc)]** (6 Cases) | | | | | | | |
-| **TC-F10-04-01**| `US-04/AC1` | `Search`| Hoạt Truy Thanh Lọc Đa Vị Mã Client/Gốc ID | Lọc Dòng Nhập Bằng Tên Cửa Đơn Gắn User Mã Hay Ký Lệnh Rút Gắn ID String. | Result Tống Bảng Dò Lọc Dồn Vết Ốp Chắn Ký Khớp Với Lệnh Nhập Mà Lướt Ngõ List Table Vượt Code Không Lặp Delay Hoặc Giật Ẩn Trễ Tưởng Liện. | High | [x] |
-| **TC-F10-04-02**| `US-04/AC1` | `Query` | Bật Multi-Filter Ghép Ngắn Ngày / Trạng Trúc | Cắp Check Mốc Option Tại Form Trọn "Trả Hôm Nay Lệnh" Cùng Drop Form Payment "C.O.D". | Cửa Gọng Data MongoDB Bưng Trọn Nút Filter Query Ghép Bằng Mảng Toán Tử AND `(&&)` Và Đẩy Text Danh Tách Ngọt Khớp Hai Điệu. | High | [ ] |
-| **TC-F10-04-03**| `US-04/AC2` | `Sort`  | Lỗi Định Sort Tổng Numeric Int JavaScript Bạc Chấm | Kick Đánh Nắp Dõi Form Chức Nút Sort Lớn Tiền Total Trục Thẳng | Đề Quy Lưới Hàng Tổng Trị Trả Value Bằng Phân Tác Sort Dạng Con Số Đực Number Không Dính String So ("20" < "9" Bệnh Code Láo JavaScript Trắng Số Đập Chống Lối Lề). | Blocker | [ ] |
-| **TC-F10-04-04**| `US-04/UX`  | `Pagi`  | Đẩy Đóng Bảng Pagination Truy Bạc | Nhấn Kẹp Chọn Load Sang Bảng Lọc Phân Vạch Trang 2 Của Lưới Mảng Chạy. | Vượt Tuyến Lọc Đọc Route Query. Đẩy Thùng Trận Render Sang Khối Data Số 2 API Call Khớp Chữ Lề. Web Trơn Phục Không Reset Tụt Lên Lại Dọc Scroll Top Đánh Flassh Load Véo Chớp Page. | High | [ ] |
-| **TC-F10-04-05**| `US-04/Sec` | `Edge`  | Mã Lộc Lọc Cứ Ngăn Rác Text Unicode Bức | Tìm Mã Search Điền Character Kỳ Chép Rác Tệp 🌈 Hoặc Lũ Text Quá Kẹt Bức Cố Nhập | Server Decoder Nhận Giải DB Kẹp Unicode 8 Thẳng Điền Format Dọn Vắn Kệ Mã Đọc Trơn Rớt Code Thẳng Rỉ Kết API Trả HTTP Không Crashed Error Nhờ Vướng Kẹt Giải Lỗi URL Cực Gẫy Mã. | High | [ ] |
-| **TC-F10-04-06**| `US-04/Sec` | `Sec`   | Hack Tống XSS Lòng Mả URL Tìm Kệ Search Cắn DB | Đưa Dưới Thanh Khung Nhập Lọc Chứa Kép Code Mảng Dộc Lệnh `<a onmouseover=Rác Lại">Kịch Test</a>`| Hệ Chữ Đọc Mọc Code Rớt DOM Nhét Bị Escape Mã Kép Biến Lệnh Regex Form Tái Chín An Lành Chấp Dàn Data XSS Block Sáng Chấp Tắt Ngòi API Gọi Server Mongo Hàng Đè Kịch Chạm Lọt Kíp Tựa. | Blocker | [x] |
-| **[US-F10-05: Giao mạn Hình Di Động App (Web Mobile Viewport)]** (4 Cases) | | | | | | | |
-| **TC-F10-05-01**| `US-05/AC1` | `Mob`   | Điểm Break Cửa Biến Table Rút Cáp Mobile Form | Điều Console Về Bảng Giới 320px Gọng App Device Điện Khổ | Dây Table List Mỏng Ngắn Nhường Khúc Gọn Bỏ Kéo Trục Scroll Tới Chéo (Overflow-X). UX Nhảy Stack Trượt Block Dạng Panel Card Chồng Dọc Chuẩn Tốt Nét View. | Blocker | [ ] |
-| **TC-F10-05-02**| `US-05/AC2` | `UI`    | Modal Chi Tiết UX Trừ Bề Trồi Drawer Quãng | Click Popup Item Box Ở Order Ngõ Cửa Nhấn App View Khung Mobile Thiết | Drawer Layout Chấm Bờ Thay Mảng Trở Thành Modal Cửa Kéo Bề Form Full-Screen Ngóng Trải Mềm Góc Bo Cầm Cho Diệu. Mạn Screen Ngăn Layout Kẹp Phím X Tốt. | High | [ ] |
-| **TC-F10-05-03**| `US-05/AC2` | `Mob`   | Nút Thanh Trạng Lệnh Gọi Dịch Sticky Ngón Ngang Bot | Full Modal Chạm Cuộn Scroll Nội Thất Order Chi Màn Khúc | Khung Ngóng Ba Phím Quyền Confirm, Chặt Ship Lược Bám Rễ Trúc Component Sticky Gọn Gắn Liền Đoạn Cuối Ngang Chữ Mép Màn. Giúp Trỏ Ngón Finger Thumb Tap Nhẹ Mỏi Chạm Kịp Nút Đều Ngay Dấu Nhấc. | Critical | [ ] |
-| **TC-F10-05-04**| `US-05/Lim` | `Bound` | Bóc Break Overflow Box Đựng Ngừa Mở Văn Quá | Cột Detail Order Điền Component Memo Ghi Chú Đè Văn Rút Đặc Bức Dài 200 Chars Tép Khép | CSS Grid / Flex Dịch Đục Word Break Đè Chèn Dữ Lỗ Word-Wrap Chữ Cản Mép Card Phình Layout Chiều Trục X Xấu UI Form Không Cho Vượt Vác Nát Hỏng Bọc Khung Trúc Sụp Mảnh Rõ Xoắn Móp Form. | High | [ ] |
+#### Nhom 1A — Thong Bao & Tong Quan Danh Sach
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-01-01** | `[Positive]` | Thong bao don hang moi trong vong 60 giay | 1. Khach hoan tat dat hang (COD hoac QR).<br>2. Admin dang mo trang `/orders`. | - Don moi xuat hien **trong < 60 giay** (SSE hoac WebSocket).<br>- Toast thong bao don moi hien thi goc tren phai. | Critical | [ ] |
+| **TC-F10-01-02** | `[Positive]` | Gui Email xac nhan tu dong toi khach | 1. Khach hoan tat thanh toan 1 don hang. | - He thong day task gui email (qua Payload SMTP) toi dia chi cua khach.<br>- Email chua tom tat don va link tra cuu. | Blocker | [x] |
+| **TC-F10-01-03** | `[Positive]` | Gui Email thong bao Merchant khi co don moi | 1. Khach dat hang thanh cong. | - Email gui toi Email dang ky cua Merchant.<br>- Noi dung: Ma don, ten khach, tong tien, phuong thuc thanh toan. | High | [ ] |
+| **TC-F10-01-04** | `[UI State]` | Empty State — Chua co don hang nao | 1. Admin vao `/orders` khi chua co don nao. | - Hien thi minh hoa dung theo UI Design ("Chua co don hang nao").<br>- Layout khong bi lech. Co nut huong dan chia se link store. | Low | [x] |
+| **TC-F10-01-05** | `[UI State]` | Loading Skeleton khi trang Orders dang fetch | 1. Lam cham mang (Devtools Throttle).<br>2. Mo trang `/orders`. | - Hien thi skeleton loader (Table skeleton lines).<br>- Khong trang trang, khong flash layout. | Medium | [ ] |
+| **TC-F10-01-06** | `[Positive]` | Stats Bar hien thi dung so lieu theo trang thai | 1. Co san cac don o nhieu trang thai Pending, Confirmed, Shipped.<br>2. Mo trang `/orders`. | - Thanh Stats Bar hien thi dung so luong don moi trang thai.<br>- Click vao tung o loc dung theo trang thai do. | High | [ ] |
+| **TC-F10-01-07** | `[Perf]` | Stats Bar render nhanh voi 1,000+ don | 1. Them 1,000 don ao vao staging.<br>2. Reload trang Orders. | - 4 the thong ke render dung va nhanh.<br>- Dung Cache Layer, khong bi N+1 Query goi tung don. | Medium | [ ] |
+
+#### Nhom 1B — State Machine Luong Trang Thai Don Hang
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-01-08** | `[State]` | Flow day du: Pending -> Confirmed -> Ready -> Shipped -> Completed | 1. Chuyen don qua tung trang thai theo dung thu tu.<br>2. Kiem tra Timeline UI sau moi buoc. | - Moi chuyen tiep thanh cong.<br>- Timeline sang dung moc hien tai, cac moc sau van mo. | Blocker | [x] |
+| **TC-F10-01-09** | `[Negative]` | State Machine: Chan di lui trang thai qua UI | 1. Mo don dang "Shipped".<br>2. Kiem tra dropdown/nut trang thai. | - Khong co option "Pending", "Confirmed" trong danh sach.<br>- Chi cho phep tien toi "Completed" hoac "Cancel/Refund". | Blocker | [x] |
+| **TC-F10-01-10** | `[Security]` | API chan downgrade trang thai (Backend Enforcement) | 1. Dung Postman goi `PATCH /api/orders/:id` doi `status: "completed"` ve `status: "pending"`. | - API tra ve **HTTP 400** "Invalid State Transition".<br>- DB khong bi thay doi. | Blocker | [x] |
+| **TC-F10-01-11** | `[State]` | Email khach tu dong gui khi Confirmed | 1. Chuyen don tu Pending -> Confirmed. | - Email "Don hang da duoc xac nhan" gui toi khach ngay lap tuc (FR-07). | High | [x] |
+| **TC-F10-01-12** | `[State]` | Email khach tu dong gui khi Shipped | 1. Chuyen don tu Ready to Ship -> Shipped. | - Email "Don hang dang duoc giao" gui toi dia chi khach hang. | High | [x] |
+| **TC-F10-01-13** | `[State]` | Progress Timeline UI cap nhat dung moc | 1. Chuyen trang thai don sang "Ready to Ship".<br>2. Mo lai chi tiet don. | - Thanh Timeline sang dung o moc "Ready to Ship", cac moc truoc do cung sang ke thua. | High | [ ] |
+| **TC-F10-01-14** | `[Negative]` | Chan chuyen trang thai don da Cancelled/Completed | 1. Mo don da o trang thai "Cancelled".<br>2. Tim nut Update Status. | - Tat ca nut thay doi trang thai bi disable hoac an.<br>- Trang thai cuoi (Completed, Cancelled) la Terminal State. | Blocker | [x] |
+
+#### Nhom 1C — Xem Chi Tiet Don Hang
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-01-15** | `[Positive]` | Chi tiet don hien thi day du thong tin | 1. Nhan vao ma don hang bat ky. | - Drawer/Page hien thi: Ten khach, SDT, Dia chi, Danh sach san pham, Subtotal, SST 6%, Shipping, Grand Total, Phuong thuc TT. | High | [ ] |
+| **TC-F10-01-16** | `[Positive]` | Xem & phong to anh bien lai QR (Lightbox) | 1. Mo chi tiet don thanh toan QR.<br>2. Nhap vao anh bien lai. | - Anh mo dang Modal Lightbox toan man hinh.<br>- Co the zoom, khong tran/vo layout. | High | [ ] |
+| **TC-F10-01-17** | `[Val]` | Kiem tra phep tinh Subtotal + SST + Shipping = Total | 1. Mo chi tiet don hang bat ky.<br>2. Tinh thu cong: Subtotal + Shipping + SST 6% = Total. | - Ket qua tinh chinh xac tuyet doi.<br>- Khong bi loi lam tron float trong DB. | Blocker | [ ] |
+| **TC-F10-01-18** | `[Edge]` | Mui gio tren don hang hien thi dung Merchant TZ | 1. Khach UTC-5 dat hang luc 01:00 AM.<br>2. Merchant UTC+8 mo Orders. | - Thoi gian dat hang duoc quy doi sang **UTC+8** (gio cua Merchant). | High | [ ] |
+| **TC-F10-01-19** | `[Security]` | Chan XSS trong ghi chu cua khach | 1. Khach nhap ghi chu: `<script>alert("XSS")</script>`.<br>2. Merchant xem Orders tren CMS. | - Text duoc sanitize hoan toan, khong thuc thi JS.<br>- DOM hien thi chuoi literal an toan. | Blocker | [x] |
+| **TC-F10-01-20** | `[Security]` | Chan IDOR — Khong truy cap don cua tenant khac | 1. Dung Auth Token cua Store A.<br>2. Goi `GET /api/orders/{OrderID_of_Store_B}`. | - Tra ve **HTTP 403 Forbidden**.<br>- Khong lo bat ky du lieu cua Store B. | Blocker | [x] |
+
+#### Nhom 1D — Refund & Hoan Tien
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-01-21** | `[Negative]` | Khoa nut Refund khi don chua Shipped | 1. Mo don o trang thai "Pending" hoac "Confirmed". | - Nut "Refund" bi Disabled.<br>- Chi co the dung "Huy don (Cancel)". | High | [ ] |
+| **TC-F10-01-22** | `[Positive]` | Mo khoa nut Refund khi don Shipped/Completed | 1. Mo don o trang thai "Shipped" hoac "Completed". | - Nut "Refund" duoc kich hoat.<br>- Nhan -> Modal nhap so tien hoan hien ra. | High | [ ] |
+| **TC-F10-01-23** | `[Negative]` | Chan Refund vuot tong gia tri don | 1. Nhap so tien Refund lon hon Grand Total cua don. | - Validation highlight do ngay lap tuc.<br>- API tu choi voi loi "So tien hoan vuot qua tong don hang". | Blocker | [ ] |
+| **TC-F10-01-24** | `[BVA]` | Refund dung bang 100% tong don (Full Refund) | 1. Nhap so tien Refund bang dung Grand Total.<br>2. Xac nhan. | - Refund thanh cong.<br>- Trang thai don chuyen sang "Refunded". | High | [ ] |
+| **TC-F10-01-25** | `[Cancel]` | Huy Modal Refund giua chung | 1. Nhan nut Refund, Modal nhap so tien mo ra.<br>2. Nhan Cancel hoac dong Modal. | - Modal dong lai.<br>- Don hang **khong bi thay doi trang thai**. | Medium | [ ] |
+
+#### Nhom 1E — Bulk Action Chinh Trang Thai Hang Loat
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-01-26** | `[Positive]` | Bulk Confirm 5 don hang cung luc | 1. Chon 5 don o trang thai "Pending".<br>2. Nhan "Xac nhan hang loat". | - 5 don chuyen sang "Confirmed" thanh cong.<br>- 5 email xac nhan duoc gui toi tung khach doc lap. | Blocker | [x] |
+| **TC-F10-01-27** | `[Negative]` | Bulk Confirm khi chon lan don trang thai khac | 1. Chon 3 don Pending + 2 don Shipped.<br>2. Nhan "Confirm hang loat". | - He thong chi thay doi 3 don Pending.<br>- 2 don Shipped skip qua hoac bao loi ro "Khong the Confirm vi da Shipped". | High | [ ] |
+| **TC-F10-01-28** | `[Perf]` | Bulk Update 1,000 don khong gay OOM | 1. Chon 1,000 don ao.<br>2. Thuc thi Bulk Confirm. | - Backend dung `UpdateMany` + Job Queue.<br>- Khong gay Out-Of-Memory Node.js, khong N+1 Query. | Blocker | [ ] |
+| **TC-F10-01-29** | `[Negative]` | Bulk Action khi khong chon don nao | 1. Khong chon don nao.<br>2. Tim nut Bulk Action. | - Nut Bulk Action bi disable hoac an khi khong co selection.<br>- Khong cho phep submit rong. | Medium | [ ] |
+
+#### Nhom 1F — Race Condition & SPA UX
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-01-30** | `[Concurrency]` | Race Condition: 2 Admin cung Confirm 1 don | 1. Admin A va B cung nhan "Xac nhan" cung 1 don trong 0.1 giay. | - Optimistic Lock trong DB.<br>- Admin nhan sau nhan loi: "Don da duoc cap nhat boi nguoi khac". | Blocker | [ ] |
+| **TC-F10-01-31** | `[Concurrency]` | Spam nut Update Status nhieu lan nhanh | 1. Nhan nut chuyen trang thai 5-10 lan nhanh. | - Nut chuyen sang Loading/Disabled sau lan nhan dau.<br>- Chi 1 PATCH request duoc gui. | Medium | [ ] |
+| **TC-F10-01-32** | `[Network Drop]` | Mat mang khi dang cap nhat trang thai | 1. Nhan nut Confirm order.<br>2. Ngay sau do ngat mang. | - Toast loi "Cap nhat that bai, vui long thu lai".<br>- Trang thai don **khong bi thay doi mot nua** (Atomic). | High | [ ] |
+| **TC-F10-01-33** | `[UX]` | SPA Navigation khong flash trang | 1. Tu Tab San pham chuyen sang Tab Orders qua Sidebar. | - Chuyen man nhanh (SPA Routing).<br>- Sidebar va Header khong bi reload hoac nhap nhay trang. | High | [ ] |
 
 ---
 
-## 4. Biên Bản Kiểm Định Chất Lượng 10-Point Checklist (Sign-Off Requirement)
-> *Bộ điều kiện tối bách cần QA xác nhận đạt (Passed) trước khi triển khai lên môi trường Production.*
+### US-F10-02: Luong Checkout Cua Khach Hang
 
-1. **[ ] Bảo mật Tenant Isolation (Cross-Tenant HTTP 403):** Đảm bảo mã xác thực (Auth Token) được kiểm định phân lập. Quản trị viên của Cửa hàng A hoàn toàn không có quyền xem, sửa, hay can thiệp vào Đơn hàng của Cửa hàng B.
-2. **[ ] Xác thực Kế toán Từ Phía Máy Chủ (Server-Side Calculation):** Hệ thống Backend phải tự tính toán độc lập tổng hóa đơn (Tổng giá trị = Giá trị sản phẩm + Cước vận chuyển + Thuế). Tuyệt đối cấm sử dụng tham số `total_price` từ API POST do Client gửi lên để chặn rủi ro giả mạo giá trị đơn hàng.
-3. **[ ] Xử lý Phục hồi Tồn kho (Restock) An Toàn:** Chức năng Hủy đơn chứa sản phẩm đã bị xóa khỏi hệ thống (Xóa cứng/mềm) phải chạy bình thường, bỏ qua (Skip) tham chiếu sản phẩm hỏng, không gây crash hoặc trả về lỗi HTTP 500 Node.js API.
-4. **[ ] Thuật toán Idempotency Chống Nhân Bản Tồn Kho (Race Condition Shield):** Hệ thống Backend phải tích hợp Khóa Idempotency Key, đảm bảo thao tác Hủy đơn/Hoàn kho dù bị nhấn spam gọi API liên tục cũng chỉ thực thi lệnh trả tồn kho (Restock) chính xác **01 lần duy nhất**, ngăn chặn tình trạng tạo khống hàng tồn ảo.
-5. **[ ] Cơ Chế Hàng Đợi cho Thao Tác Hàng Loạt (Bulk Action Job Queue Limit):** Khi thao tác cập nhật trạng thái đồng loạt cho 1,000+ đơn, hệ thống buộc phải sử dụng hàm `UpdateMany()` đi kèm Background Job Queue (bullMQ/RabbitMQ). Tránh lạm dụng vòng lặp `forEach` gây vượt giới hạn bộ nhớ (OOM) làm sập Node.js.
-6. **[ ] Toàn Vẹn Máy Trạng Thái Đơn Hàng (State Machine Validation):** Khóa luồng cập nhật trạng thái theo quy tắc 1 chiều tiến (Forward-Only: Pending > Confirm > Ready > Ship). Nghiêm cấm mọi hành vi gọi hàm API cố ý hạ lùi trạng thái đơn hàng (Ví dụ: Từ Ship lùi về Confirm), buộc API trả HTTP 400 Invalid Transition.
-7. **[ ] Khả Năng Tích Ứng Thiết Kế Di Động (Mobile Viewport CSS Breakpoint 320px):** Màn hình hiển thị thay đổi giao diện theo cấu trúc Stack Component/Vertical Card Mode trên màn hình điện thoại khổ cực hẹp (320px), ẩn đi thay vì ép giãn các thành tố chiều ngang (Table scroll-X).
-8. **[ ] Bảo Mật Định Dạng Tải Lên Hóa Đơn Phụ Phí (MIME & Capacity Payload Validation):** Hệ thống chặn cứng các tệp tải lên > 20MB hoặc tệp độc hại trái định dạng (PDF, EXE, ZIP) tại module xác minh hóa đơn (QR Upload).
-9. **[ ] Kết Nối Trang Đơn Luồng Mượt Mà (SPA Navigation Without Reload):** Đảm bảo chuyển tuyến (Route Navigation) giữa các mục Đơn hàng <-> Bảng sản phẩm hoạt động mượt mà, tĩnh khung Header/Sidebar, không phát sinh lỗi nháy chớp trang (White Flash Reset) tải lại toàn khung.
-10. **[ ] Thiết Lập Ngăn Chặn Mã Độc (Data Length Limitation & XSS Sanitization):** Rào chắn Schema/Zod Validation cắt mọi Input chữ vượt quá 200 ký tự tại các ô điền `Địa Chỉ`, `Ghi chú`. Kết hợp Sanitize chống thực thi lệnh DOM `<script>alert</script>` khi In dòng Ghi Chú hiển thị lên bảng điều khiển CMS, bảo vệ tài khoản Quản trị khỏi Payload nguy hại.
+#### Nhom 2A — Checkout COD
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-02-01** | `[Positive]` | Guest Checkout thanh cong bang COD | 1. Khong dang nhap (Guest).<br>2. Them hang vao gio, chon COD, dien dia chi va Email.<br>3. Nhan Dat Hang. | - Don tao thanh cong.<br>- Redirect ve `/order/{id}/confirm` hien thi tom tat don.<br>- Email xac nhan gui toi email khai bao. | Blocker | [x] |
+| **TC-F10-02-02** | `[Positive]` | Trang xac nhan don hien thi day du thong tin | 1. Sau khi Checkout thanh cong, xem trang `/order/{id}/confirm`. | - Hien thi: Ma don, danh sach san pham, dia chi giao hang, phuong thuc thanh toan, ngay giao du kien. | High | [ ] |
+| **TC-F10-02-03** | `[Negative]` | Guest Checkout thieu Email — Bi chan | 1. Dien form Checkout nhung de trong o Email.<br>2. Nhan Submit. | - Field Email do, hien bao bat buoc.<br>- Khong tao don hang. | High | [ ] |
+| **TC-F10-02-04** | `[Negative]` | San pham het hang giua chung (In-flight OOS) | 1. Khach dang o trang Checkout.<br>2. Backend cap nhat ton kho ve 0.<br>3. Khach nhan Dat Hang. | - Toast loi "San pham X da het hang".<br>- Gio hang duoc bao toan de khach tiep tuc chinh sua. | Blocker | [x] |
+| **TC-F10-02-05** | `[Concurrency]` | Double-click Submit Checkout — Chong tao 2 don trung | 1. Double-click nut "Dat Hang" trong < 0.2 giay. | - Nut Disabled ngay sau lan click dau.<br>- Chi 1 POST request duoc gui.<br>- Khong tao 2 don hang trung. | Blocker | [ ] |
+| **TC-F10-02-06** | `[BVA]` | Dia chi nhan hang — Nhap toi da 200 ky tu | 1. Nhap chuoi 2,000 ky tu rac vao o Dia Chi. | - Validation cat tai gioi han hoac bao "Dia chi qua dai".<br>- Khong luu chuoi vuot gioi han vao DB. | High | [ ] |
+| **TC-F10-02-07** | `[Security]` | Chan Price Spoofing tu Client | 1. Dung Postman gui Order request voi `total_price: 1` (sua payload). | - Backend tinh lai tong tu DB, phat hien sai lech.<br>- Tra ve **HTTP 400** "Price Integrity Check Failed".<br>- Don khong duoc tao. | Blocker | [x] |
+
+#### Nhom 2B — Checkout QR Banking
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-02-08** | `[Positive]` | QR Payment: Hien thi ma QR cua hang | 1. Chon "QR Banking" tai trang Checkout. | - Ma QR cua Merchant hien thi ro rang (anh QR da cai dat o F19).<br>- Nut "Xac nhan dat hang" bi disable cho den khi upload bien lai. | Blocker | [ ] |
+| **TC-F10-02-09** | `[Positive]` | Upload bien lai chuyen khoan hop le | 1. Upload anh bien lai JPG < 2MB dung chuan. | - Anh preview hien thi.<br>- Nut "Xac nhan dat hang" duoc kich hoat. | High | [ ] |
+| **TC-F10-02-10** | `[Negative]` | Chan upload bien lai file sai dinh dang | 1. Upload file `.pdf`, `.exe`, hoac anh > 25MB. | - Tu choi file, bao loi dinh dang/dung luong.<br>- Nut dat hang van disable. | High | [ ] |
+| **TC-F10-02-11** | `[Negative]` | Gia mao file (Magic Byte) — chong upload exe gia jpg | 1. Doi ten file `.exe` thanh `.jpg`.<br>2. Upload vao o bien lai. | - Server phat hien Magic Bytes khong phai JPEG.<br>- Tra ve HTTP 400. Khong luu file doc hai. | Blocker | [x] |
+| **TC-F10-02-12** | `[BVA]` | Upload anh bien lai dung 2MB (bien tren) | 1. Upload file JPG dung 2048KB. | - Can lam ro: `< 2MB` hay `<= 2MB`.<br>- He thong xu ly nhat quan. | Medium | [ ] |
+| **TC-F10-02-13** | `[Edge]` | Inventory Reservation het han sau 30 phut (BR-07) | 1. Khach bat dau Checkout nhung khong hoan tat trong 30 phut.<br>2. Kiem tra ton kho sau do. | - He thong tu dong release reservation cua san pham sau 30 phut.<br>- Ton kho duoc khoi phuc de khach khac mua duoc. | High | [ ] |
+| **TC-F10-02-14** | `[Mobile]` | Checkout hien thi dung tren man 375px | 1. Tai trang Checkout tren dien thoai 375px. | - Form chuyen sang layout Stack Column (1 cot).<br>- Khong co thanh cuon ngang. | High | [ ] |
+
+---
+
+### US-F10-03: Huy Don & Hoan Kho Tu Dong
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-03-01** | `[Positive]` | Huy don Pending thanh cong — Co ly do | 1. Mo don trang thai "Pending".<br>2. Nhan Huy, nhap ly do ro rang.<br>3. Xac nhan. | - Trang thai doi sang "Cancelled".<br>- Email huy gui toi khach hang ngay lap tuc. | Blocker | [x] |
+| **TC-F10-03-02** | `[Positive]` | Huy don Confirmed thanh cong | 1. Mo don trang thai "Confirmed".<br>2. Nhan Huy, nhap ly do.<br>3. Xac nhan. | - Trang thai doi sang "Cancelled".<br>- Kho duoc hoan tu dong (Restock). | Blocker | [x] |
+| **TC-F10-03-03** | `[Negative]` | Bat buoc nhap ly do huy — Khong de trong | 1. Nhan Huy don.<br>2. De trong o "Ly do huy".<br>3. Nhan Submit. | - Required validation bat len tren field ly do.<br>- API khong gui khi chua co ly do. | Blocker | [ ] |
+| **TC-F10-03-04** | `[Negative]` | Chan huy don da Shipped | 1. Mo don o trang thai "Shipped".<br>2. Tim nut "Huy don". | - Nut Cancel bi an hoac disable.<br>- Chi co the dung "Refund". | High | [ ] |
+| **TC-F10-03-05** | `[Data]` | Restock ton kho sau khi huy don | 1. Ton kho ban dau: SP A = 5.<br>2. Dat don mua 2 SP A (ton con 3).<br>3. Huy don do. | - He thong cong lai SP A = +2.<br>- Ton kho cuoi: SP A = 5 (dung). | Blocker | [x] |
+| **TC-F10-03-06** | `[Edge]` | Restock skip san pham da bi xoa khoi DB | 1. Don hang chua San pham B da bi hard delete trong DB.<br>2. Huy don do. | - Luong huy hoan thanh binh thuong.<br>- Buoc Restock skip qua SP da xoa (khong crash HTTP 500). | Blocker | [x] |
+| **TC-F10-03-07** | `[Security]` | Idempotency: Spam API huy don — Kho khong bi nhan ban | 1. Dung Postman gui lien tuc 10 request huy cung Order ID. | - He thong check idempotency key.<br>- Job Restock chi chay **1 lan duy nhat**.<br>- Ton kho khong bi cong ao nhieu lan. | Blocker | [ ] |
+| **TC-F10-03-08** | `[Cancel]` | Huy Modal Huy Don — Nhan Cancel trong Modal | 1. Nhan vao nut "Huy Don".<br>2. Modal xac nhan xuat hien -> nhan "Khong, quay lai". | - Modal dong lai.<br>- Don hang **khong bi huy**, trang thai giu nguyen. | Medium | [ ] |
+| **TC-F10-03-09** | `[Email]` | Email huy don gui toi khach chua ly do | 1. Huy don voi ly do "Khach yeu cau doi dia chi". | - Email gui toi khach co noi dung ly do huy cu the.<br>- Khong gui email voi ly do trong. | High | [x] |
+| **TC-F10-03-10** | `[UI State]` | Modal huy mo ta ro rang ve Restock tu dong | 1. Nhan "Huy Don" tren bat ky don nao. | - Modal hien thi canh bao: "Huy don se tu dong hoan lai ton kho san pham."<br>- Giup Admin tu tin thao tac. | Medium | [ ] |
+| **TC-F10-03-11** | `[BVA]` | Ly do huy don vuot Max Length | 1. Nhap chuoi ly do huy dai hon 500 ky tu.<br>2. Nhan Submit. | - Validation cat hoac bao loi do dai.<br>- Khong luu chuoi vuot gioi han vao DB. | Medium | [ ] |
+
+---
+
+### US-F10-04: Loc, Tim Kiem & Sap Xep Don Hang
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-04-01** | `[Positive]` | Tim don theo Ma don hang | 1. Nhap ma don chinh xac vao o tim kiem. | - Danh sach loc con dung 1 don hang tuong ung.<br>- Ket qua nhanh, khong lag. | High | [x] |
+| **TC-F10-04-02** | `[Positive]` | Tim don theo Ten khach hang (mot phan) | 1. Nhap "Nguyen" (mot phan ten) vao o tim kiem. | - Danh sach loc ra tat ca don cua khach ten chua "Nguyen". | High | [x] |
+| **TC-F10-04-03** | `[Positive]` | Multi-Filter: Ket hop Ngay + Phuong thuc TT | 1. Chon filter "Hom nay" + "COD". | - Ket qua khop chinh xac ca 2 dieu kien (AND logic). | High | [ ] |
+| **TC-F10-04-04** | `[Positive]` | Sort theo Tong tien Cao -> Thap | 1. Nhan Sort "Tong tien Cao -> Thap". | - Sap xep dung theo gia tri so hoc, khong bi loi so sanh chuoi nhu "20" < "9". | Blocker | [ ] |
+| **TC-F10-04-05** | `[Positive]` | Sort theo Ngay Moi Nhat -> Cu Nhat | 1. Nhan Sort "Moi nhat". | - Don hang moi nhat theo timestamp hien thi dau tien. | High | [ ] |
+| **TC-F10-04-06** | `[UI State]` | Empty State khi Filter khong co ket qua | 1. Loc theo ngay "Hom qua" nhung khong co don trong ngay do. | - Hien thi man trong co thong bao: "Khong tim thay don nao phu hop".<br>- Khong crash hoac hang trang ma khong co gi. | Medium | [ ] |
+| **TC-F10-04-07** | `[UX]` | Giu nguyen Filter khi chuyen trang phan trang | 1. Dang o trang 2 cua danh sach da filter "COD".<br>2. Click sang trang 3. | - Bo loc COD van giu nguyen trong URL query params.<br>- Ket qua dung, khong reset ve tat ca. | High | [ ] |
+| **TC-F10-04-08** | `[Edge]` | Tim kiem voi ky tu Unicode, Emoji | 1. Nhap emoji hoac ky tu dac biet vao o tim kiem. | - Server decode UTF-8 dung, khong crash.<br>- Tra ve ket qua hop le hoac danh sach rong. | High | [ ] |
+| **TC-F10-04-09** | `[Security]` | Chan XSS trong thanh tim kiem Orders | 1. Nhap `<a onmouseover="alert('xss')">test</a>` vao o tim kiem. | - Escape HTML, DOM khong render tag.<br>- API khong bi anh huong. | Blocker | [x] |
+| **TC-F10-04-10** | `[BVA]` | Tim kiem voi o trong / chi dau cach | 1. Nhap toan bo khoang trang vao o tim kiem.<br>2. Nhan Enter. | - Danh sach hien thi toan bo don hang (khong filter).<br>- Khong goi API voi search query rong gay loi. | Medium | [ ] |
+| **TC-F10-04-11** | `[Perf]` | Tim kiem Debounce — Khong spam API moi ky tu | 1. Go nhanh "Nguyen Van A" tung ky tu lien tiep. | - API tim kiem chi goi sau khi nguoi dung ngung go ~300ms (Debounce).<br>- Khong gui 10 request cho 10 ky tu go lien tiep. | Medium | [ ] |
+
+---
+
+### US-F10-05: Giao Dien Mobile (< 768px)
+
+| ID | Loai | Tieu De | Cac Buoc Thuc Hien | Ket Qua Mong Doi | Muc Do | AUTO |
+|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F10-05-01** | `[Positive]` | Table Orders chuyen thanh Card Stack tren 320px | 1. Mo trang `/orders` tren thiet bi 320px. | - Table an, thay bang Card doc (Ma don, Ten khach, Tong tien, Trang thai).<br>- Khong co thanh cuon ngang. | Blocker | [ ] |
+| **TC-F10-05-02** | `[Positive]` | Chi tiet don mo dang Full-Screen tren Mobile | 1. Tap vao mot don hang tren Mobile. | - Detail mo Full-Screen (thay vi Drawer ben phai).<br>- Co nut dong (X) ro rang, de dieu huong. | High | [ ] |
+| **TC-F10-05-03** | `[Positive]` | Nut Action Sticky o day man hinh | 1. Mo chi tiet don tren Mobile, cuon xuong. | - Cac nut Confirm/Ship/Cancel Sticky o day man hinh khi cuon.<br>- De tap bang ngon cai. | Critical | [ ] |
+| **TC-F10-05-04** | `[Edge]` | Ghi chu dai khong tran Card tren Mobile | 1. Xem don co ghi chu 200+ ky tu tren Mobile. | - CSS word-break xu ly dung, text khong phinh Card, khong tran ngang. | High | [ ] |
+| **TC-F10-05-05** | `[UI State]` | Loading skeleton tren Mobile | 1. Lam cham mang, mo Orders tren Mobile. | - Skeleton Card hien thi thay vi trang trang. | Medium | [ ] |
+| **TC-F10-05-06** | `[Mobile]` | Stats Bar responsive tren Mobile | 1. Xem trang Orders tren man 375px. | - Stats Bar cac the (Pending, Confirmed...) co gian hoac xep thanh 2 hang, khong tran ngang. | Medium | [ ] |
+
+---
+
+## 4. Bien Ban Kiem Dinh — 10-Point Checklist (Sign-Off)
+
+| # | Tieu Chi | Trang Thai |
+|:---:|:---|:---:|
+| 1 | **Tenant Isolation (IDOR 403):** Token Store A khong GET/PATCH don cua Store B. | [ ] |
+| 2 | **Price Integrity:** Backend tu tinh tong tu DB, tu choi `total_price` gia mao tu Client. | [ ] |
+| 3 | **State Machine Forward-Only:** Pending->Confirmed->Ready->Shipped->Completed chi tien, API chan 400 khi downgrade. | [ ] |
+| 4 | **Restock An Toan:** Huy don chua SP deleted van chay binh thuong, skip Restock SP hong, khong crash 500. | [ ] |
+| 5 | **Idempotency Chong Nhan Ban Kho:** API Huy/Restock du spam chi chay **1 lan**. | [ ] |
+| 6 | **Inventory Reservation Release (BR-07):** Reservation tu het han sau 30 phut neu Checkout khong hoan tat. | [ ] |
+| 7 | **Bulk Action Job Queue:** Bulk Update 1,000+ dung UpdateMany + Queue, khong OOM Node.js. | [ ] |
+| 8 | **Mobile Breakpoint 320px:** Table -> Stack Card, khong scroll ngang. Sticky CTA o day. | [ ] |
+| 9 | **MIME & Capacity Validation:** Chan file > 2MB hoac gia mao dinh dang (Magic Byte) tai QR Upload. | [ ] |
+| 10 | **XSS & Input Sanitization:** Ghi chu khach hang, thanh tim kiem deu duoc escape khi hien thi tren CMS. | [ ] |
+
+---
+
+## 5. Quality Gates
+
+| Nhom | Trang Thai | Ghi Chu |
+|---|---|---|
+| **1. State Machine & Logic** | [ ] Not Run | FSM Forward-Only, Bulk Confirm, Refund Lock, Email per status |
+| **2. Security** | [ ] Not Run | IDOR 403, XSS, Price Spoofing, MIME Magic Byte, Tenant Isolation |
+| **3. Concurrency & Idempotency** | [ ] Not Run | Race Condition DB Lock, Idempotency Restock, Double Submit, Inventory Release |
+| **4. Performance** | [ ] Not Run | Notification < 60s, Bulk OOM, Search Debounce, Stats Bar Cache |
+| **5. Mobile UX** | [ ] Not Run | 320px Cards, Sticky CTA, Word-wrap, Loading Skeleton |
+
+> **Khuyen Nghi Release:** Tat ca 10 diem Checklist va 5 Quality Gates phai dat **100% Passed** truoc khi trien khai Production. Dac biet P0 Blockers: State Machine, IDOR, Idempotency, Price Integrity, Inventory Release.
+
+---
+**PHE DUYET BOI:** .................................... **NGAY:** ..../..../2026

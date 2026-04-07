@@ -1673,38 +1673,44 @@ function spawnServer(env) {
 }
 
 /**
- * Auto-seed v2 templates if the templates table is empty.
+ * Auto-seed v3 templates (56 premium blueprints).
  * Uses the running dev server's seed API endpoint.
- * Idempotent: skips if templates already exist.
+ * Re-seeds if count < 56 (old templates or partial seed).
  */
 async function autoSeedTemplates() {
   const pool = createPool();
   if (!pool) return;
 
+  const EXPECTED_COUNT = 56;
+
   try {
     const result = await pool.query('SELECT COUNT(*)::int AS cnt FROM templates');
     const count = result.rows[0]?.cnt || 0;
 
-    if (count > 0) {
-      console.log(`[db-setup] 📦 Templates: ${count} exist — skipping auto-seed`);
+    if (count >= EXPECTED_COUNT) {
+      console.log(`[db-setup] 📦 Templates: ${count} exist (>= ${EXPECTED_COUNT}) — skipping auto-seed`);
       await pool.end();
       return;
     }
 
-    console.log('[db-setup] 📦 Templates: 0 found — auto-seeding v2 templates...');
+    console.log(`[db-setup] 📦 Templates: ${count} found (expected ${EXPECTED_COUNT}) — re-seeding v3 templates...`);
     await pool.end();
 
-    // Call seed API on the running dev server
+    // Call seed API on the running dev server (force=true to replace old templates)
     const http = require('http');
     const seedResult = await new Promise((resolve) => {
       const postData = '';
       const req = http.request({
         hostname: 'localhost',
         port: 3000,
-        path: '/api/templates/seed?v2=true',
+        path: `/api/templates/seed?v3=true&force=${count > 0 ? 'true' : 'false'}`,
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': 0 },
-        timeout: 60000,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': 0,
+          'x-db-setup-key': process.env.PAYLOAD_SECRET || '',
+        },
+        timeout: 120000,
       }, (res) => {
         let data = '';
         res.on('data', (chunk) => { data += chunk; });
@@ -1731,7 +1737,7 @@ async function autoSeedTemplates() {
       console.log(`[db-setup] ✅ Auto-seeded ${seedResult.data.created || 0} templates (${seedResult.data.failed || 0} failed)`);
     } else {
       console.warn(`[db-setup] ⚠️ Template auto-seed failed: ${seedResult.error || 'unknown error'}`);
-      console.warn('[db-setup]    Run POST /api/templates/seed?v2=true manually after deploy');
+      console.warn('[db-setup]    Run POST /api/templates/seed?v3=true&force=true manually after deploy');
     }
   } catch (err) {
     console.warn(`[db-setup] ⚠️ Template auto-seed check failed: ${err.message}`);

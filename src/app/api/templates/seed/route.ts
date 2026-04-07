@@ -16,18 +16,16 @@ import { withAuth } from '@/lib/auth'
  *   - ?v3=true: seeds 56 premium blueprint templates (NEW — Category DNA)
  *   - ?force=true: delete existing templates before seeding
  *   - ?dry=true: return composed seeds without writing to DB
+ *
+ * Auth:
+ *   - Normal: withAuth (JWT) — super-admin required in production
+ *   - Internal: x-db-setup-key header matching PAYLOAD_SECRET (for db-setup.js auto-seed)
  */
-export const POST = withAuth(async (_user, request) => {
-    try {
-        // Only super-admin can seed in production; allow any auth user in dev
-        const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
-        if (!isDev && !_user?.roles?.includes('super-admin')) {
-            return NextResponse.json({
-                success: false,
-                error: { code: 'FORBIDDEN', message: 'Only super-admin can seed templates' },
-            }, { status: 403 })
-        }
 
+// ── Internal seed logic (shared by both auth paths) ──────────────────────
+
+async function handleSeed(request: Request): Promise<NextResponse> {
+    try {
         const url = new URL(request.url)
         const force = url.searchParams.get('force') === 'true'
         const v2 = url.searchParams.get('v2') === 'true'
@@ -86,7 +84,6 @@ export const POST = withAuth(async (_user, request) => {
                 const batchResults = await Promise.allSettled(
                     batch.map(async (seed, idx) => {
                         const preset = TEMPLATE_PRESETS[i + idx]!
-                        // Skip if template with same name already exists
                         if (existingNames.has(seed.name)) {
                             skipped++
                             return { name: seed.name, category: seed.category, personality: preset.personality, status: 'skipped' as const }
@@ -148,16 +145,10 @@ export const POST = withAuth(async (_user, request) => {
                     success: true,
                     data: {
                         total: seeds.length,
-                        created: 0,
-                        skipped: 0,
-                        failed: 0,
-                        dry: true,
+                        created: 0, skipped: 0, failed: 0, dry: true,
                         templates: seeds.map((s) => ({
-                            name: s.name,
-                            category: s.category,
-                            tier: s.tier,
-                            isPremium: s.isPremium,
-                            pageCount: s.pages.length,
+                            name: s.name, category: s.category, tier: s.tier,
+                            isPremium: s.isPremium, pageCount: s.pages.length,
                             blockCount: s.pages.reduce((acc, p) => acc + p.layout.length, 0),
                         })),
                     },
@@ -166,7 +157,6 @@ export const POST = withAuth(async (_user, request) => {
 
             const payload = await getPayload({ config })
 
-            // Force mode: delete existing templates first
             if (force) {
                 const existing = await payload.find({ collection: 'templates', limit: 200 })
                 for (const doc of existing.docs) {
@@ -184,48 +174,36 @@ export const POST = withAuth(async (_user, request) => {
                         await payload.create({
                             collection: 'templates',
                             data: {
-                                name: seed.name,
-                                description: seed.description,
+                                name: seed.name, description: seed.description,
                                 category: seed.category,
                                 defaultTheme: seed.theme as Record<string, unknown>,
                                 defaultBlocks: seed.pages[0]?.layout ?? [],
                                 templatePages: seed.pages.map((page, idx) => ({
                                     title: page.title || (idx === 0 ? 'Home' : `Page ${idx + 1}`),
                                     slug: page.slug || (idx === 0 ? 'home' : `page-${idx + 1}`),
-                                    isHomepage: idx === 0,
-                                    layout: page.layout,
+                                    isHomepage: idx === 0, layout: page.layout,
                                 })),
                                 tags: [seed.category, seed.tier],
-                                sortOrder: 0,
-                                isPremium: seed.isPremium,
-                                isFeatured: false,
+                                sortOrder: 0, isPremium: seed.isPremium, isFeatured: false,
                             },
                         })
                         return { name: seed.name, category: seed.category, tier: seed.tier, status: 'created' as const }
                     })
                 )
                 for (const r of batchResults) {
-                    if (r.status === 'fulfilled') {
-                        results.push({ status: 'fulfilled', value: r.value })
-                    } else {
-                        results.push({ status: 'rejected', reason: String(r.reason) })
-                    }
+                    if (r.status === 'fulfilled') results.push({ status: 'fulfilled', value: r.value })
+                    else results.push({ status: 'rejected', reason: String(r.reason) })
                 }
             }
-
-            const created = results.filter((r) => r.status === 'fulfilled').length
-            const failed = results.filter((r) => r.status === 'rejected').length
 
             return NextResponse.json({
                 success: true,
                 data: {
                     total: TEMPLATE_DEFINITIONS.length,
-                    created,
+                    created: results.filter((r) => r.status === 'fulfilled').length,
                     skipped: 0,
-                    failed,
-                    templates: results
-                        .filter((r) => r.status === 'fulfilled' && r.value)
-                        .map((r) => r.value),
+                    failed: results.filter((r) => r.status === 'rejected').length,
+                    templates: results.filter((r) => r.status === 'fulfilled' && r.value).map((r) => r.value),
                 },
             })
         }
@@ -253,15 +231,10 @@ export const POST = withAuth(async (_user, request) => {
             const doc = await payload.create({
                 collection: 'templates',
                 data: {
-                    name: tpl.name,
-                    description: tpl.description,
-                    category: tpl.category,
-                    defaultTheme: tpl.defaultTheme,
-                    defaultBlocks: tpl.defaultBlocks,
-                    tags: tpl.tags,
-                    sortOrder: tpl.sortOrder,
-                    isPremium: tpl.isPremium,
-                    isFeatured: tpl.isFeatured,
+                    name: tpl.name, description: tpl.description, category: tpl.category,
+                    defaultTheme: tpl.defaultTheme, defaultBlocks: tpl.defaultBlocks,
+                    tags: tpl.tags, sortOrder: tpl.sortOrder,
+                    isPremium: tpl.isPremium, isFeatured: tpl.isFeatured,
                 },
             })
             results.push({ id: doc.id, name: doc.name })
@@ -279,4 +252,33 @@ export const POST = withAuth(async (_user, request) => {
             error: { code: 'INTERNAL_ERROR', message },
         }, { status: 500 })
     }
+}
+
+// ── Route handler with dual auth ─────────────────────────────────────────
+// 1. Internal: x-db-setup-key header matching PAYLOAD_SECRET (db-setup.js auto-seed)
+// 2. External: withAuth JWT — super-admin required in production
+
+export async function POST(request: Request) {
+    // Check internal auth first (db-setup.js auto-seed on same container)
+    const internalKey = request.headers.get('x-db-setup-key')
+    const payloadSecret = process.env.PAYLOAD_SECRET
+    if (internalKey && payloadSecret && internalKey === payloadSecret) {
+        console.log('[Seed] Internal auth via x-db-setup-key — bypassing JWT')
+        return handleSeed(request)
+    }
+
+    // Fall back to normal JWT auth
+    return withAuthSeed(request, {} as never)
+}
+
+const withAuthSeed = withAuth(async (_user, req) => {
+    const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
+    const roles = (_user as { roles?: string[] })?.roles || []
+    if (!isDev && !roles.includes('super-admin')) {
+        return NextResponse.json({
+            success: false,
+            error: { code: 'FORBIDDEN', message: 'Only super-admin can seed templates' },
+        }, { status: 403 })
+    }
+    return handleSeed(req)
 })
