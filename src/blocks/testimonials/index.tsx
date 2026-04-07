@@ -146,6 +146,45 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
         )
     }
 
+    // ── carousel variant ───────────────────────────────────────────────
+    if (variant === 'carousel') {
+        return <TestimonialsCarousel headline={headline} testimonials={testimonials} theme={theme} category={category} />
+    }
+
+    // ── simple variant ───────────────────────────────────────────────────
+    if (variant === 'simple') {
+        return (
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <div className="container mx-auto px-6 relative z-10">
+                    <div className="text-center max-w-2xl mx-auto mb-16">
+                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'What Our Clients Say'}</h2>
+                    </div>
+                    <div className="max-w-3xl mx-auto flex flex-col gap-10">
+                        {testimonials.map((t, i) => (
+                            <motion.div
+                                key={i}
+                                initial={{ opacity: 0, y: 16 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: i * 0.08, duration: 0.4 }}
+                            >
+                                <blockquote
+                                    className="text-lg md:text-xl italic leading-relaxed opacity-70 mb-3"
+                                    style={{ borderLeft: `3px solid rgba(var(--brand-primary-rgb), 0.3)`, paddingLeft: '1.25rem' }}
+                                >
+                                    {t.quote}
+                                </blockquote>
+                                <p className="text-sm font-medium opacity-60 pl-5">
+                                    &mdash; {t.name}{(t.title || t.company) ? `, ${[t.title, t.company].filter(Boolean).join(' at ')}` : ''}
+                                </p>
+                            </motion.div>
+                        ))}
+                    </div>
+                </div>
+            </AnimatedSection>
+        )
+    }
+
     // ── Default: cards variant ────────────────────────────────────────────
     return (
         <AnimatedSection className="py-24 relative overflow-hidden">
@@ -406,6 +445,134 @@ function TestimonialsMinimalQuote({
                     {/* Dot indicators */}
                     {testimonials.length > 1 && (
                         <div className="flex justify-center gap-2 mt-10">
+                            {testimonials.map((_, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => setCurrentIndex(i)}
+                                    className="w-2.5 h-2.5 rounded-full transition-all duration-200"
+                                    style={{
+                                        background: i === currentIndex ? 'var(--brand-primary)' : 'rgba(var(--brand-primary-rgb), 0.2)',
+                                    }}
+                                    aria-label={`View testimonial ${i + 1}`}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </AnimatedSection>
+    )
+}
+
+// ── Carousel sub-component (auto-rotate, arrows, dots, fade) ────────────
+function TestimonialsCarousel({
+    headline,
+    testimonials,
+    theme,
+    category,
+}: {
+    headline?: string
+    testimonials: TestimonialItem[]
+    theme: BlockProps<TestimonialsConfig>['theme']
+    category: string
+}) {
+    const [currentIndex, setCurrentIndex] = useState(0)
+
+    const goTo = useCallback((idx: number) => {
+        if (idx < 0) setCurrentIndex(testimonials.length - 1)
+        else if (idx >= testimonials.length) setCurrentIndex(0)
+        else setCurrentIndex(idx)
+    }, [testimonials.length])
+
+    useEffect(() => {
+        if (testimonials.length <= 1) return
+        const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+        if (mq.matches) return
+
+        const timer = setInterval(() => {
+            setCurrentIndex(prev => (prev + 1) % testimonials.length)
+        }, 5000)
+        return () => clearInterval(timer)
+    }, [testimonials.length])
+
+    if (testimonials.length === 0) return null
+    const t = testimonials[currentIndex]
+
+    return (
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
+            <div className="container mx-auto px-6 relative z-10">
+                <div className="text-center max-w-2xl mx-auto mb-16">
+                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'What Our Clients Say'}</h2>
+                    <p className="text-lg opacity-40">Genuine reviews from our customers</p>
+                </div>
+
+                <div className="relative max-w-2xl mx-auto">
+                    {/* Previous / Next arrows */}
+                    {testimonials.length > 1 && (
+                        <>
+                            <button
+                                onClick={() => goTo(currentIndex - 1)}
+                                className="absolute -left-4 md:-left-14 top-1/2 -translate-y-1/2 z-20 w-10 h-10 flex items-center justify-center rounded-full border transition-opacity duration-200 hover:opacity-80"
+                                style={{
+                                    background: 'rgba(var(--brand-primary-rgb), 0.06)',
+                                    borderColor: 'rgba(var(--brand-primary-rgb), 0.15)',
+                                    color: 'var(--brand-primary)',
+                                }}
+                                aria-label="Previous testimonial"
+                            >
+                                &#8592;
+                            </button>
+                            <button
+                                onClick={() => goTo(currentIndex + 1)}
+                                className="absolute -right-4 md:-right-14 top-1/2 -translate-y-1/2 z-20 w-10 h-10 flex items-center justify-center rounded-full border transition-opacity duration-200 hover:opacity-80"
+                                style={{
+                                    background: 'rgba(var(--brand-primary-rgb), 0.06)',
+                                    borderColor: 'rgba(var(--brand-primary-rgb), 0.15)',
+                                    color: 'var(--brand-primary)',
+                                }}
+                                aria-label="Next testimonial"
+                            >
+                                &#8594;
+                            </button>
+                        </>
+                    )}
+
+                    {/* Single testimonial with fade transition */}
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={currentIndex}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.5 }}
+                            className="p-8 md:p-10 rounded-2xl text-center"
+                            style={{
+                                background: 'linear-gradient(160deg, rgba(var(--brand-primary-rgb), 0.031), transparent 60%)',
+                                border: '1px solid rgba(var(--brand-primary-rgb), 0.063)',
+                            }}
+                        >
+                            <div className="flex justify-center mb-6">
+                                <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={72} />
+                            </div>
+                            <div className="flex justify-center gap-0.5 mb-5">
+                                {Array.from({ length: t.rating || 5 }).map((_, j) => (
+                                    <span key={j} className="text-lg" style={{ color: 'var(--brand-primary)' }}>&#9733;</span>
+                                ))}
+                            </div>
+                            <p className="text-lg md:text-xl italic opacity-70 leading-relaxed mb-6">
+                                &ldquo;{t.quote}&rdquo;
+                            </p>
+                            <p className="font-bold">{t.name}</p>
+                            {(t.title || t.company) && (
+                                <p className="text-sm opacity-45 mt-1">{[t.title, t.company].filter(Boolean).join(' \u2022 ')}</p>
+                            )}
+                        </motion.div>
+                    </AnimatePresence>
+
+                    {/* Dot indicators */}
+                    {testimonials.length > 1 && (
+                        <div className="flex justify-center gap-2 mt-8">
                             {testimonials.map((_, i) => (
                                 <button
                                     key={i}

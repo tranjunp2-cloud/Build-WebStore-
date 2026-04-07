@@ -5,6 +5,7 @@ import { useReducedMotion, useInView } from 'framer-motion'
 import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { StatsConfig, StatItem } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 function CountUp({ value, duration = 1200 }: { value: string; duration?: number }) {
     const ref = useRef<HTMLSpanElement>(null)
@@ -51,10 +52,10 @@ function StatValue({ stat }: { stat: StatItem }) {
 
 function RowVariant({ headline, stats }: { headline?: string; stats: StatItem[] }) {
     return (
-        <AnimatedSection className="py-16 md:py-20" style={{ color: 'var(--text)', background: 'var(--surface)' }}>
+        <AnimatedSection className="py-16 md:py-20" style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
             <div className="container mx-auto px-6">
                 {headline && (
-                    <h2 className="text-3xl font-bold text-center mb-10" style={{ fontFamily: 'var(--font-heading)' }}>
+                    <h2 className="text-3xl font-bold text-center mb-10" style={{ fontFamily: CSS_VARS.fontHeading }}>
                         {headline}
                     </h2>
                 )}
@@ -63,12 +64,12 @@ function RowVariant({ headline, stats }: { headline?: string; stats: StatItem[] 
                         <StaggerItem key={i} className="flex-1 min-w-[140px] text-center">
                             <p
                                 className="text-4xl md:text-5xl font-bold mb-2"
-                                style={{ fontFamily: 'var(--font-heading)', color: 'var(--brand-primary)' }}
+                                style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary }}
                                 aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}
                             >
                                 <StatValue stat={stat} />
                             </p>
-                            <p className="text-sm" style={{ color: 'var(--muted)' }}>{stat.label}</p>
+                            <p className="text-sm" style={{ color: CSS_VARS.muted }}>{stat.label}</p>
                         </StaggerItem>
                     ))}
                 </StaggerGrid>
@@ -79,10 +80,10 @@ function RowVariant({ headline, stats }: { headline?: string; stats: StatItem[] 
 
 function GridVariant({ headline, stats }: { headline?: string; stats: StatItem[] }) {
     return (
-        <AnimatedSection className="py-16 md:py-20" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-20" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6">
                 {headline && (
-                    <h2 className="text-3xl font-bold text-center mb-10" style={{ fontFamily: 'var(--font-heading)' }}>
+                    <h2 className="text-3xl font-bold text-center mb-10" style={{ fontFamily: CSS_VARS.fontHeading }}>
                         {headline}
                     </h2>
                 )}
@@ -92,19 +93,19 @@ function GridVariant({ headline, stats }: { headline?: string; stats: StatItem[]
                             key={i}
                             className="text-center p-6 transition-shadow hover:shadow-md"
                             style={{
-                                background: 'var(--surface)',
+                                background: CSS_VARS.surface,
                                 borderRadius: 'var(--radius-lg)',
                                 boxShadow: 'var(--shadow-sm)',
                             }}
                         >
                             <p
                                 className="text-4xl font-bold mb-2"
-                                style={{ fontFamily: 'var(--font-heading)', color: 'var(--brand-primary)' }}
+                                style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary }}
                                 aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}
                             >
                                 <StatValue stat={stat} />
                             </p>
-                            <p className="text-sm" style={{ color: 'var(--muted)' }}>{stat.label}</p>
+                            <p className="text-sm" style={{ color: CSS_VARS.muted }}>{stat.label}</p>
                         </StaggerItem>
                     ))}
                 </StaggerGrid>
@@ -117,11 +118,11 @@ function HighlightVariant({ headline, stats }: { headline?: string; stats: StatI
     return (
         <AnimatedSection
             className="py-16 md:py-20"
-            style={{ color: 'var(--text)', background: 'rgba(var(--brand-primary-rgb), 0.05)' }}
+            style={{ color: CSS_VARS.text, background: 'rgba(var(--brand-primary-rgb), 0.05)' }}
         >
             <div className="container mx-auto px-6 max-w-3xl">
                 {headline && (
-                    <h2 className="text-3xl font-bold text-center mb-10" style={{ fontFamily: 'var(--font-heading)' }}>
+                    <h2 className="text-3xl font-bold text-center mb-10" style={{ fontFamily: CSS_VARS.fontHeading }}>
                         {headline}
                     </h2>
                 )}
@@ -133,12 +134,12 @@ function HighlightVariant({ headline, stats }: { headline?: string; stats: StatI
                         return (
                             <StaggerItem key={i} className="w-full">
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                                    <span className="text-sm font-medium" style={{ color: CSS_VARS.text }}>
                                         {stat.label}
                                     </span>
                                     <span
                                         className="text-lg font-bold"
-                                        style={{ fontFamily: 'var(--font-heading)', color: 'var(--brand-primary)', fontVariantNumeric: 'tabular-nums' }}
+                                        style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.primary, fontVariantNumeric: 'tabular-nums' }}
                                         aria-label={`${stat.prefix || ''}${stat.value}${stat.suffix || ''} ${stat.label}`}
                                     >
                                         <StatValue stat={stat} />
@@ -152,7 +153,7 @@ function HighlightVariant({ headline, stats }: { headline?: string; stats: StatI
                                         className="h-full transition-all duration-1000 ease-out"
                                         style={{
                                             width: percentage !== null ? `${percentage}%` : '75%',
-                                            background: 'var(--brand-primary)',
+                                            background: CSS_VARS.primary,
                                             borderRadius: 'var(--radius-full)',
                                         }}
                                     />

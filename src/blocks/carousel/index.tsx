@@ -159,7 +159,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
     }
 
     // Testimonials variant
-    return (
+    if (variant === 'testimonials') return (
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
@@ -209,4 +209,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
             </div>
         </AnimatedSection>
     )
+
+    // Default: images
+    return null
 }
