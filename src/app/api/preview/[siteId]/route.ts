@@ -70,6 +70,24 @@ export function buildFullHTML(blocks: any[], theme?: TemplateTheme, category?: s
     ${mainHtml}
   </main>
   ${footerHtml}
+  <script>
+  // Preview mode: intercept all link clicks to prevent 404 navigation
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest('a');
+    if (!link) return;
+    var href = link.getAttribute('href');
+    if (!href || href === '#') { e.preventDefault(); return; }
+    // Hash links → smooth scroll to section
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      var target = document.querySelector(href) || document.getElementById(href.slice(1));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    // All other links → prevent navigation in preview
+    e.preventDefault();
+  });
+  </script>
 </body>
 </html>`
 }
