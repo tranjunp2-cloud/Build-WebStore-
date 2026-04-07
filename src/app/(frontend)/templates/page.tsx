@@ -180,26 +180,32 @@ export default function TemplatesPage() {
                         </div>
                     </div>
 
-                    {/* Category Chips — horizontal scroll on mobile */}
-                    <div className="relative -mx-4 sm:mx-0">
-                        <div className="flex gap-2 overflow-x-auto px-4 sm:px-0 pb-2 scrollbar-none sm:flex-wrap sm:overflow-visible">
-                            {CATEGORY_KEYS.map((key) => (
-                                <button
-                                    key={key}
-                                    onClick={() => setActiveCategory(key)}
-                                    className={cn(
-                                        'shrink-0 rounded-full px-4 py-2 text-xs font-medium transition-all duration-300 whitespace-nowrap',
-                                        activeCategory === key
-                                            ? 'bg-blue-500/15 text-blue-300 border border-blue-400/30 shadow-[0_0_16px_rgba(59,130,246,0.15)] font-semibold'
-                                            : 'text-gray-500 hover:bg-white/[0.04] hover:text-gray-300 border border-transparent hover:border-white/[0.06]'
-                                    )}
-                                >
-                                    {t.gallery.categories[key as keyof typeof t.gallery.categories] || key}
-                                </button>
-                            ))}
+                    {/* Category Chips — horizontal scroll with fade edges */}
+                    <div className="relative -mx-4 sm:-mx-6">
+                        {/* Left fade */}
+                        <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-[#060918] to-transparent pointer-events-none z-10 sm:hidden" />
+                        <div className="flex gap-2 overflow-x-auto px-6 sm:px-6 py-1 scrollbar-none sm:flex-wrap sm:overflow-visible">
+                            {CATEGORY_KEYS.map((key) => {
+                                const label = t.gallery.categories[key as keyof typeof t.gallery.categories] || key
+                                const isActive = activeCategory === key
+                                return (
+                                    <button
+                                        key={key}
+                                        onClick={() => setActiveCategory(key)}
+                                        className={cn(
+                                            'shrink-0 rounded-full px-4 py-2 text-[13px] font-medium transition-all duration-200 whitespace-nowrap',
+                                            isActive
+                                                ? 'bg-white text-gray-900 shadow-[0_1px_8px_rgba(255,255,255,0.12)] font-semibold scale-[1.02]'
+                                                : 'text-gray-400 bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] hover:text-gray-200 hover:border-white/[0.12]'
+                                        )}
+                                    >
+                                        {label}
+                                    </button>
+                                )
+                            })}
                         </div>
-                        {/* Fade edges on mobile */}
-                        <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-[#060918] to-transparent pointer-events-none sm:hidden" />
+                        {/* Right fade */}
+                        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#060918] to-transparent pointer-events-none z-10 sm:hidden" />
                     </div>
                 </div>
             </div>
