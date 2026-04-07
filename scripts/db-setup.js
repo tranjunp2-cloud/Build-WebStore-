@@ -1702,7 +1702,11 @@ async function autoSeedTemplates() {
         port: 3000,
         path: `/api/templates/seed?v3=true&force=${count > 0 ? 'true' : 'false'}`,
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': 0 },
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': 0,
+          'x-db-setup-key': process.env.PAYLOAD_SECRET || '',
+        },
         timeout: 120000,
       }, (res) => {
         let data = '';
