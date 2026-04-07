@@ -5,7 +5,8 @@ import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
 import { generatePageSchemas } from '@/lib/seo/json-ld'
-import { HeadingProvider, getBlockHeadingLevel } from '@/lib/seo/heading-context'
+import { HeadingProvider } from '@/lib/seo/heading-context'
+import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 

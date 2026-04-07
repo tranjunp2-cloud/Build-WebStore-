@@ -518,6 +518,9 @@ const MIGRATIONS = [
   { name: 'sites_seo_tracked_keywords.current_rank', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS current_rank numeric;` },
   { name: 'sites_seo_tracked_keywords.previous_rank', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS previous_rank numeric;` },
   { name: 'sites_seo_tracked_keywords.last_checked_at', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS last_checked_at timestamptz;` },
+  // templates
+  { name: 'templates.sort_order', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS sort_order numeric DEFAULT 0;` },
+  { name: 'templates.usage_count', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS usage_count numeric DEFAULT 0;` },
   // templates_tags
   { name: 'templates_tags.tag', sql: `ALTER TABLE templates_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
   // ── Templates: Tags array table ──
