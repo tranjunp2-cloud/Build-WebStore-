@@ -67,6 +67,9 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                 draft: true,
                 depth: 3,
             })
+            if (!page) {
+                return notFound()
+            }
             // Verify page belongs to the current site (P0 Security Rule - prevent cross-site page access)
             const pageSiteId = typeof page.site === 'object' ? page.site?.id : page.site
             if (pageSiteId !== siteId) {
