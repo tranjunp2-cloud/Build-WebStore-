@@ -1,0 +1,48 @@
+name: "📋 Task / Chore"
+description: "Technical task, refactor, config, dependency update"
+labels: ["chore"]
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: "Loai task"
+      options:
+        - Refactor
+        - Dependency update
+        - Config / Infrastructure
+        - Documentation
+        - Performance
+        - Security
+        - CI/CD
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Mo ta"
+      description: "Can lam gi? Tai sao?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: "Files lien quan"
+      description: "List files/directories se bi anh huong"
+      placeholder: |
+        - src/lib/...
+        - scripts/...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: "Muc do rui ro"
+      options:
+        - Low — khong anh huong user
+        - Medium — co the anh huong 1 feature
+        - High — anh huong nhieu features
+    validations:
+      required: true

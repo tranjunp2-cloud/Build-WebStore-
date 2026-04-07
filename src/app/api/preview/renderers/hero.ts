@@ -22,7 +22,9 @@ export type RenderHeroBlock = Record<string, unknown> & {
 }
 
 let _category = 'business'
+let _heroImageIndex = 0
 export function setHeroCategory(cat: string) { _category = cat }
+export function setHeroImageIndex(idx: number) { _heroImageIndex = idx }
 
 export function renderHero(block: RenderHeroBlock, t: TemplateTheme, category?: string): string {
   if (category) _category = category
@@ -47,7 +49,7 @@ export function renderHero(block: RenderHeroBlock, t: TemplateTheme, category?: 
 }
 
 function heroSplit(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
-  const img = getHeroImage(_category, 0)
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="min-height:100vh;display:grid;grid-template-columns:1fr 1fr;position:relative;overflow:hidden;">
     <div style="display:flex;flex-direction:column;justify-content:center;padding:80px 60px 80px 80px;position:relative;z-index:2;">
       <div class="fade-up" style="font-size:13px;font-weight:600;color:${t.primary};text-transform:uppercase;letter-spacing:2px;margin-bottom:20px;">✨ Welcome</div>
@@ -63,7 +65,7 @@ function heroSplit(h: string, sub: string, btn1: string, btn2: string, t: Templa
 }
 
 function heroSlider(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
-  const img = getHeroImage(_category, 0)
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:90vh;overflow:hidden;">
     <img src="${img}" alt="Hero Background" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
     <div style="position:absolute;inset:0;background:linear-gradient(135deg,${t.bg}e6 40%,${t.bg}80 100%);"></div>
@@ -84,7 +86,7 @@ function heroSlider(h: string, sub: string, btn1: string, btn2: string, t: Templ
 }
 
 function heroVideoBg(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
-  const img = getHeroImage(_category, 0)
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:85vh;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;">
     <img src="${img}" alt="Hero Background" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,${t.bg}cc,${t.bg}e6);"></div>
@@ -98,7 +100,7 @@ function heroVideoBg(h: string, sub: string, btn1: string, btn2: string, t: Temp
 }
 
 function heroGradientMockup(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
-  const img = getHeroImage(_category, 0)
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:100vh;overflow:hidden;display:flex;align-items:center;">
     <div style="position:absolute;top:-200px;right:-150px;width:600px;height:600px;border-radius:50%;background:${t.primary};filter:blur(150px);opacity:.12;"></div>
     <div style="position:absolute;bottom:-200px;left:-150px;width:500px;height:500px;border-radius:50%;background:${t.accent};filter:blur(120px);opacity:.08;"></div>
@@ -124,7 +126,7 @@ function heroGradientMockup(h: string, sub: string, btn1: string, btn2: string, 
 }
 
 function heroCentered(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
-  const img = getHeroImage(_category, 0)
+  const img = getHeroImage(_category, _heroImageIndex)
   const isDark = t.bg.startsWith('#0') || t.bg.startsWith('#1')
   return `<section style="position:relative;min-height:85vh;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;">
     <img src="${img}" alt="Hero Background" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.15;" />
@@ -141,7 +143,7 @@ function heroCentered(h: string, sub: string, btn1: string, btn2: string, t: Tem
 }
 
 function heroFullscreenSearch(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
-  const img = getHeroImage(_category, 0)
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;">
     <img src="${img}" alt="Hero Background" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,${t.bg}dd 0%,${t.bg}ee 100%);"></div>
@@ -163,7 +165,7 @@ function heroFullscreenSearch(h: string, sub: string, btn1: string, btn2: string
 }
 
 function heroDiagonal(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
-  const img = getHeroImage(_category, 0)
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:100vh;overflow:hidden;">
     <img src="${img}" alt="Hero Background" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
     <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,0,0,.7),rgba(0,0,0,.4));"></div>
@@ -186,7 +188,7 @@ function heroDiagonal(h: string, sub: string, btn1: string, btn2: string, t: Tem
 }
 
 function heroMasonry(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
-  const img = getHeroImage(_category, 0)
+  const img = getHeroImage(_category, _heroImageIndex)
   const img2 = getHeroImage(_category, 1)
   const img3 = getHeroImage(_category, 2)
   return `<section style="min-height:90vh;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;">
@@ -212,7 +214,7 @@ function heroMasonry(h: string, sub: string, btn1: string, btn2: string, t: Temp
 }
 
 function heroGeometric(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
-  const img = getHeroImage(_category, 0)
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:85vh;display:flex;align-items:center;overflow:hidden;">
     <div style="position:absolute;right:0;top:0;bottom:0;width:45%;overflow:hidden;" class="hide-mobile">
       <img src="${img}" alt="Hero" loading="eager" style="width:100%;height:100%;object-fit:cover;" />

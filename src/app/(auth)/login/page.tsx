@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useState, useEffect, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -11,21 +11,27 @@ import { Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Globe } from 'lucide-reac
 import { useI18n } from '@/i18n'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
 
-const loginSchema = z.object({
-    email: z.string().min(1, 'Email is required').email('Please enter a valid email'),
-    password: z.string().min(8, 'Password must be at least 8 characters'),
-})
+function createLoginSchema() {
+    return z.object({
+        email: z.string().min(1, 'emailRequired').email('invalidEmail'),
+        password: z.string().min(8, 'passwordMinLength'),
+    })
+}
 
-type LoginForm = z.infer<typeof loginSchema>
+type LoginForm = z.infer<ReturnType<typeof createLoginSchema>>
+
+/** Minimal shape of a populated tenant returned by Payload login at depth=1. */
+type TenantLite = { onboardingCompleted?: boolean } | null
 
 /**
  * Determine post-login redirect based on user role (BR-02, AC-5).
  * - Owner without tenant/site → /onboarding
+ * - Owner with tenant but onboardingCompleted=false → /onboarding
  * - Owner with tenant → /dashboard (or returnUrl)
  * - Staff → /admin (Payload CMS workspace)
  */
 function getRedirectByRole(
-    user: { roles?: string[]; tenants?: { tenant: unknown }[] },
+    user: { roles?: string[]; tenants?: { tenant: TenantLite | string }[] },
     returnUrl: string,
 ): string {
     const roles = user.roles || []
@@ -35,9 +41,17 @@ function getRedirectByRole(
         return '/admin'
     }
 
-    // Owner without any tenant → onboarding
-    if (roles.includes('tenant-owner') && (!user.tenants || user.tenants.length === 0)) {
-        return '/onboarding'
+    // Owner without any tenant or not onboarded → onboarding
+    if (roles.includes('tenant-owner')) {
+        if (!user.tenants || user.tenants.length === 0) {
+            return '/onboarding'
+        }
+        
+        // If Payload login auth returns populated tenant (depth=1), check onboarding status
+        const firstTenant = user.tenants[0]?.tenant
+        if (firstTenant && typeof firstTenant === 'object' && firstTenant.onboardingCompleted === false) {
+            return '/onboarding'
+        }
     }
 
     // Owner with tenant → returnUrl or dashboard
@@ -107,9 +121,31 @@ function LoginFormContent() {
         resetField,
         getValues,
     } = useForm<LoginForm>({
-        resolver: zodResolver(loginSchema),
+        resolver: zodResolver(useMemo(() => createLoginSchema(), [])),
         defaultValues: { email: '', password: '' },
     })
+
+    const rootErrorMsg = useMemo(() => {
+        if (!errors.root) return null
+        const msg = errors.root.message
+        const authErrs = t.auth.errors as Record<string, string | undefined>
+
+        switch (msg) {
+            case 'serviceAccountUI': return authErrs.serviceAccountUI || 'Service accounts cannot access the web UI.'
+            case 'timeout': return authErrs.timeout || 'Request timeout'
+            case 'incorrect': return t.auth.errors.incorrect
+            case 'missingCredentials': return authErrs.missingCredentials || 'Missing credentials'
+            case 'accountLocked': return authErrs.accountLocked || 'Account locked'
+            case 'connection': return t.auth.errors.connection
+            default: return msg
+        }
+    }, [errors.root, t])
+
+    const getFieldError = (msg?: string) => {
+        if (!msg) return null;
+        const authErrs = t.auth.errors as Record<string, string | undefined>;
+        return authErrs[msg] || (msg === 'passwordMinLength' ? t.auth.reset.passwordMin : msg);
+    }
 
     // FR-07/FR-08: Smart forgot-password — Owner → SSO direct, Staff → internal
     const handleForgotPassword = async (e: React.MouseEvent) => {
@@ -154,9 +190,9 @@ function LoginFormContent() {
     const onSubmit = async (data: LoginForm) => {
         if (data.email.trim().toLowerCase() === 'sso-service@primeweb.app') {
             const authErrors = t.auth.errors as Record<string, string | undefined>
-            const message = authErrors.serviceAccountUI || 'Service accounts cannot access the web UI.'
-            setFormError('root', { message })
-            toast.error(message)
+            const msg = authErrors.serviceAccountUI || 'Service accounts cannot access the web UI.'
+            setFormError('root', { message: 'serviceAccountUI' })
+            toast.error(msg)
             return
         }
 
@@ -178,7 +214,7 @@ function LoginFormContent() {
                 })
             } catch (err) {
                 if (err instanceof DOMException && err.name === 'AbortError') {
-                    setFormError('root', { message: t.auth.errors.timeout })
+                    setFormError('root', { message: 'timeout' })
                     toast.error(t.auth.errors.timeout)
                     return
                 }
@@ -194,17 +230,23 @@ function LoginFormContent() {
                 // Map known Payload CMS backend English errors to i18n
                 const authErrors = t.auth.errors as Record<string, string | undefined>
 
+                let errorCode = 'unknown'
+                let localizedMsg = message
+
                 if (message === 'Email and password are required' || message === 'Missing credentials') {
-                    message = authErrors.missingCredentials || message
+                    errorCode = 'missingCredentials'
+                    localizedMsg = authErrors.missingCredentials || message
                 } else if (message.includes('locked due to having too many failed login attempts')) {
-                    message = authErrors.accountLocked || message
+                    errorCode = 'accountLocked'
+                    localizedMsg = authErrors.accountLocked || message
                 } else if (message === 'Email or password incorrect' || message === 'Login failed') {
-                    message = t.auth.errors.incorrect
+                    errorCode = 'incorrect'
+                    localizedMsg = t.auth.errors.incorrect
                 }
 
-                setFormError('root', { message })
+                setFormError('root', { message: errorCode })
                 resetField('password')
-                toast.error(message)
+                toast.error(localizedMsg)
                 return
             }
 
@@ -212,6 +254,9 @@ function LoginFormContent() {
             const responseData = await res.json().catch(() => ({ user: null }))
             const user = responseData?.user
             const userEmail = user?.email || data.email.trim()
+
+            // Get correct post-login destination (e.g. /onboarding for new users)
+            const actualReturnUrl = user ? getRedirectByRole(user, returnUrl) : returnUrl
 
             // Trigger OTP send
             try {
@@ -233,10 +278,10 @@ function LoginFormContent() {
             })
 
             // Redirect to OTP verification page
-            const returnParam = returnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(returnUrl)}` : ''
+            const returnParam = actualReturnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(actualReturnUrl)}` : ''
             router.replace(`/verify-otp?email=${encodeURIComponent(userEmail)}${returnParam}`)
         } catch {
-            setFormError('root', { message: t.auth.errors.connection })
+            setFormError('root', { message: 'connection' })
             toast.error(t.auth.errors.connection)
         }
     }
@@ -266,7 +311,7 @@ function LoginFormContent() {
                         <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                         </svg>
-                        {errors.root.message}
+                        {rootErrorMsg}
                     </div>
                 )}
 
@@ -300,7 +345,7 @@ function LoginFormContent() {
                         />
                     </div>
                     {errors.email && (
-                        <p className="text-xs text-red-400">{errors.email.message}</p>
+                        <p className="text-xs text-red-400">{getFieldError(errors.email.message)}</p>
                     )}
                 </div>
 
@@ -342,7 +387,7 @@ function LoginFormContent() {
                         </button>
                     </div>
                     {errors.password && (
-                        <p className="text-xs text-red-400">{errors.password.message}</p>
+                        <p className="text-xs text-red-400">{getFieldError(errors.password.message)}</p>
                     )}
                 </div>
 
@@ -369,7 +414,7 @@ function LoginFormContent() {
                             )}
                         </div>
                         <span className="text-sm font-medium text-[#94A3B8]" style={{ lineHeight: '1.43' }}>
-                            Remember me
+                            {t.auth.rememberMe || 'Remember me'}
                         </span>
                     </label>
                     <button

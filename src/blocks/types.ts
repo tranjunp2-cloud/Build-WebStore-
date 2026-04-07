@@ -2,21 +2,55 @@ import { z } from 'zod'
 
 // ── Theme Configuration ─────────────────────────────────────────────────────
 export type ThemeConfig = {
+    // Colors (6 tokens)
     primaryColor: string
     secondaryColor: string
-    backgroundColor: string
+    accentColor: string
+    surfaceColor: string
+    textColor: string
+    mutedColor: string
+
+    // Typography
+    fontPairingId: string | null
     fontHeading: string
     fontBody: string
+
+    // Spacing
+    spacingPreset: 'compact' | 'default' | 'relaxed'
+
+    // Shape
+    borderRadius: 'sharp' | 'subtle' | 'rounded' | 'soft' | 'pill'
+    shadowPreset: 'none' | 'subtle' | 'medium' | 'dramatic'
+
+    // Mode
     colorMode: 'light' | 'dark'
+    backgroundColor: string
 }
 
 export const ThemeConfigSchema = z.object({
+    // Colors
     primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default('#0ea5e9'),
     secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default('#d946ef'),
-    backgroundColor: z.string().default('#09090b'),
+    accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).default('#f59e0b'),
+    surfaceColor: z.string().default('#ffffff'),
+    textColor: z.string().default('#09090b'),
+    mutedColor: z.string().default('#71717a'),
+
+    // Typography
+    fontPairingId: z.string().nullable().default(null),
     fontHeading: z.string().default('Outfit'),
     fontBody: z.string().default('Inter'),
+
+    // Spacing
+    spacingPreset: z.enum(['compact', 'default', 'relaxed']).default('default'),
+
+    // Shape
+    borderRadius: z.enum(['sharp', 'subtle', 'rounded', 'soft', 'pill']).default('rounded'),
+    shadowPreset: z.enum(['none', 'subtle', 'medium', 'dramatic']).default('subtle'),
+
+    // Mode
     colorMode: z.enum(['light', 'dark']).default('dark'),
+    backgroundColor: z.string().default('#09090b'),
 })
 
 // ── Block Types Enum ─────────────────────────────────────────────────────────
@@ -27,6 +61,14 @@ export const BLOCK_TYPES = [
     'products-grid', 'products-featured',
     'video', 'logo-cloud', 'blog-list', 'custom-html',
     'socialWidget', 'cartWidget',
+    // v1.1 — Block Library Expansion
+    'pricing-table', 'gallery-masonry', 'whatsapp-button', 'google-maps', 'social-proof',
+    'countdown-timer', 'before-after', 'feature-comparison', 'download-cta', 'video-background',
+    'breadcrumb', 'divider', 'announcement-bar', 'client-logos', 'accordion',
+    'step-process', 'portfolio-grid', 'menu-food', 'service-cards', 'carousel',
+    // v2.0 — Industry Blocks
+    'menu-display', 'booking-widget', 'class-schedule', 'review-cards',
+    'video-showcase', 'doctor-profile', 'property-card', 'product-quick-view',
 ] as const
 
 export type BlockType = (typeof BLOCK_TYPES)[number]
@@ -101,7 +143,7 @@ export type ImageRef = {
 
 export const ImageRefSchema = z.object({
     url: z.string(),
-    alt: z.string().optional(),
-    width: z.number().optional(),
-    height: z.number().optional(),
+    alt: z.string().default(''),
+    width: z.number().default(800),
+    height: z.number().default(600),
 })

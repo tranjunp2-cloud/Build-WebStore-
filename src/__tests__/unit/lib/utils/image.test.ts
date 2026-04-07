@@ -1,7 +1,7 @@
 /**
  * Tests for src/lib/utils/image.ts — processImageFile()
  *
- * TC-IDs: TC-F08.03f, TC-F08.03g (image upload validation)
+ * TC-IDs: TC-F08-01-15, TC-F08-01-14 (image upload validation)
  * Browser APIs (FileReader, Image, Canvas) are mocked via jsdom + vi.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -100,8 +100,8 @@ function setupBrowserApiMocks(compressedSizeBytes = 50_000) {
     return { mockReadAsDataURL, mockToBlob, mockGetContext }
 }
 
-// ─── TC-F08.03f: File Size Validation ───────────────────────────────────────
-describe('[TC-F08.03f] processImageFile — File Size & Type Validation', () => {
+// ─── TC-F08-01-15: File Size Validation ───────────────────────────────────────
+describe('[TC-F08-01-15] processImageFile — File Size & Type Validation', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
@@ -110,7 +110,7 @@ describe('[TC-F08.03f] processImageFile — File Size & Type Validation', () => 
         vi.restoreAllMocks()
     })
 
-    it('TC-F08.03f: returns file unchanged when under size limit (1MB image)', async () => {
+    it('TC-F08-01-15: returns file unchanged when under size limit (1MB image)', async () => {
         // Arrange — 1MB file, default limit is 2MB
         const file = makeFile('photo.jpg', sizeInMB(1), 'image/jpeg')
 
@@ -123,7 +123,7 @@ describe('[TC-F08.03f] processImageFile — File Size & Type Validation', () => 
         expect(result.name).toBe('photo.jpg')
     })
 
-    it('TC-F08.03f: returns file unchanged when exactly at size limit (2MB)', async () => {
+    it('TC-F08-01-15: returns file unchanged when exactly at size limit (2MB)', async () => {
         // Arrange — exactly 2MB = 2 * 1024 * 1024 bytes
         const file = makeFile('photo.jpg', sizeInMB(2), 'image/jpeg')
 
@@ -134,7 +134,7 @@ describe('[TC-F08.03f] processImageFile — File Size & Type Validation', () => 
         expect(result).toBe(file)
     })
 
-    it('TC-F08.03f: returns SVG unchanged regardless of size (non-compressible format)', async () => {
+    it('TC-F08-01-15: returns SVG unchanged regardless of size (non-compressible format)', async () => {
         // Arrange — SVG type does NOT start with 'image/' in the check:
         // !file.type.startsWith('image/') covers non-image types
         // But SVG IS 'image/svg+xml' which starts with 'image/'
@@ -150,7 +150,7 @@ describe('[TC-F08.03f] processImageFile — File Size & Type Validation', () => 
         expect(result.type).toBe('image/svg+xml')
     })
 
-    it('TC-F08.03f: returns GIF unchanged (non-standard image format bypass)', async () => {
+    it('TC-F08-01-15: returns GIF unchanged (non-standard image format bypass)', async () => {
         // Arrange — GIF > 2MB, but starts with 'image/' — however gif does not compress well
         // processImageFile checks file.type.startsWith('image/') — GIF passes
         // but the condition is: sizeMB <= maxSizeMB || !file.type.startsWith('image/')
@@ -165,7 +165,7 @@ describe('[TC-F08.03f] processImageFile — File Size & Type Validation', () => 
         expect(result).toBe(file)
     })
 
-    it('TC-F08.03f: returns non-image file unchanged even if large (PDF > 2MB)', async () => {
+    it('TC-F08-01-15: returns non-image file unchanged even if large (PDF > 2MB)', async () => {
         // Arrange — PDF file, not an image type
         const file = makeFile('invoice.pdf', sizeInMB(5), 'application/pdf')
 
@@ -177,7 +177,7 @@ describe('[TC-F08.03f] processImageFile — File Size & Type Validation', () => 
         expect(result.type).toBe('application/pdf')
     })
 
-    it('TC-F08.03f: respects custom maxSizeMB parameter', async () => {
+    it('TC-F08-01-15: respects custom maxSizeMB parameter', async () => {
         // Arrange — 3MB file with custom 5MB limit
         const file = makeFile('large.jpg', sizeInMB(3), 'image/jpeg')
 
@@ -189,8 +189,8 @@ describe('[TC-F08.03f] processImageFile — File Size & Type Validation', () => 
     })
 })
 
-// ─── TC-F08.03f: Compression Logic ──────────────────────────────────────────
-describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () => {
+// ─── TC-F08-01-15: Compression Logic ──────────────────────────────────────────
+describe('[TC-F08-01-15] processImageFile — Compression & WebP Conversion', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
@@ -199,7 +199,7 @@ describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () =
         vi.restoreAllMocks()
     })
 
-    it('TC-F08.03f: compresses oversized JPEG and converts to WebP', async () => {
+    it('TC-F08-01-15: compresses oversized JPEG and converts to WebP', async () => {
         // Arrange — 5MB JPEG, over 2MB limit
         setupBrowserApiMocks(50_000) // compressed to 50KB
         const file = makeFile('product.jpg', sizeInMB(5), 'image/jpeg')
@@ -212,7 +212,7 @@ describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () =
         expect(result.name).toBe('product.webp')
     })
 
-    it('TC-F08.03f: renames output file to .webp extension', async () => {
+    it('TC-F08-01-15: renames output file to .webp extension', async () => {
         // Arrange — 3MB PNG
         setupBrowserApiMocks()
         const file = makeFile('banner.png', sizeInMB(3), 'image/png')
@@ -224,7 +224,7 @@ describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () =
         expect(result.name).toBe('banner.webp')
     })
 
-    it('TC-F08.03f: replaces any extension with .webp (multi-dot filename)', async () => {
+    it('TC-F08-01-15: replaces any extension with .webp (multi-dot filename)', async () => {
         // Arrange — filename with multiple dots
         setupBrowserApiMocks()
         const file = makeFile('my.product.photo.jpeg', sizeInMB(3), 'image/jpeg')
@@ -236,7 +236,7 @@ describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () =
         expect(result.name).toBe('my.product.photo.webp')
     })
 
-    it('TC-F08.03f: returns original file when canvas context is unavailable', async () => {
+    it('TC-F08-01-15: returns original file when canvas context is unavailable', async () => {
         // Arrange — 3MB image, canvas returns null context (headless env edge case)
         vi.spyOn(global, 'FileReader').mockImplementation(() => {
             const instance = {
@@ -295,7 +295,7 @@ describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () =
         expect(result).toBe(file)
     })
 
-    it('TC-F08.03f: returns original file when canvas toBlob returns null', async () => {
+    it('TC-F08-01-15: returns original file when canvas toBlob returns null', async () => {
         // Arrange — toBlob callback receives null blob (browser limitation)
         vi.spyOn(global, 'FileReader').mockImplementation(() => {
             const instance = {
@@ -355,8 +355,8 @@ describe('[TC-F08.03f] processImageFile — Compression & WebP Conversion', () =
     })
 })
 
-// ─── TC-F08.03f: Image Dimension Scaling ────────────────────────────────────
-describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)', () => {
+// ─── TC-F08-01-15: Image Dimension Scaling ────────────────────────────────────
+describe('[TC-F08-01-15] processImageFile — Dimension Constraints (Max 1920px)', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
@@ -365,7 +365,7 @@ describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)',
         vi.restoreAllMocks()
     })
 
-    it('TC-F08.03f: scales down wide image to max 1920px width while preserving aspect ratio', async () => {
+    it('TC-F08-01-15: scales down wide image to max 1920px width while preserving aspect ratio', async () => {
         // Arrange — 4K wide landscape image
         let capturedCanvas: { width: number; height: number } | null = null
 
@@ -435,7 +435,7 @@ describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)',
         expect((capturedCanvas as unknown as HTMLCanvasElement).height).toBe(1080)
     })
 
-    it('TC-F08.03f: scales down tall portrait image to max 1920px height', async () => {
+    it('TC-F08-01-15: scales down tall portrait image to max 1920px height', async () => {
         // Arrange — tall portrait image: 1080 x 2400
         let capturedCanvas: HTMLCanvasElement | null = null
 
@@ -500,7 +500,7 @@ describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)',
         expect(capturedCanvas!.width).toBe(864)
     })
 
-    it('TC-F08.03f: does not scale down small images under 1920px', async () => {
+    it('TC-F08-01-15: does not scale down small images under 1920px', async () => {
         // Arrange — small 800x600 image that is over 2MB (synthetic)
         let capturedCanvas: HTMLCanvasElement | null = null
 
@@ -564,8 +564,8 @@ describe('[TC-F08.03f] processImageFile — Dimension Constraints (Max 1920px)',
     })
 })
 
-// ─── TC-F08.03f: Error Handling ─────────────────────────────────────────────
-describe('[TC-F08.03f] processImageFile — Error Handling', () => {
+// ─── TC-F08-01-15: Error Handling ─────────────────────────────────────────────
+describe('[TC-F08-01-15] processImageFile — Error Handling', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })
@@ -574,7 +574,7 @@ describe('[TC-F08.03f] processImageFile — Error Handling', () => {
         vi.restoreAllMocks()
     })
 
-    it('TC-F08.03f: rejects when FileReader fails (onerror triggered)', async () => {
+    it('TC-F08-01-15: rejects when FileReader fails (onerror triggered)', async () => {
         // Arrange
         vi.spyOn(global, 'FileReader').mockImplementation(() => {
             const instance = {
@@ -599,7 +599,7 @@ describe('[TC-F08.03f] processImageFile — Error Handling', () => {
         await expect(processImageFile(file)).rejects.toBeDefined()
     })
 
-    it('TC-F08.03f: rejects when Image fails to load (onerror triggered)', async () => {
+    it('TC-F08-01-15: rejects when Image fails to load (onerror triggered)', async () => {
         // Arrange
         vi.spyOn(global, 'FileReader').mockImplementation(() => {
             const instance = {

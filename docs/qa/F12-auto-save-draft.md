@@ -1,73 +1,99 @@
 # Quyết Định Kiểm Thử & Kiểm Thử Chi Tiết: F12 - Auto-Save & Draft
-> **Phiên bản:** 1.0 | **Cập nhật:** 2026-03-25 | **Thực hiện:** QA Team
-> **Nguồn Tham chiếu:** PRD (`F12-auto-save-draft.md`), User Stories (3 ACs), Figma Design (Toolbar Indicator)
-> **Kỹ năng ứng dụng (.agent):** BDD (Gherkin Expectations), Performance SLA Validators, Security Contexting, Automation Locator Healer, Payload CMS DB Assertions.
+> **Phiên bản:** 1.0 (Kiểm thử chức năng lưu nháp tự động) | **Cập nhật:** 2026-04-06 | **Thực hiện:** QA Team
+> **Nguồn Tham chiếu:** PRD (`F12-auto-save-draft.md`), User Stories (3 ACs), Figma Design
+> **Kỹ năng ứng dụng:** Kiểm thử Tự động (BDD Gherkin), Kiểm thử Luồng gián đoạn mạng (Network Exceptions), Kiểm tra Bảo mật Phiên (Session Limits) & Cấu trúc Dữ liệu Payload CMS.
 
 ---
 
 ## 1. Mục Tiêu (Objective)
-Tài liệu Test Case này được xây dựng nhằm đảm bảo chất lượng toàn diện cho tính năng Auto-Save & Draft. Mục tiêu cốt lõi là đạt độ phủ (Coverage) 100% cho 3 User Stories, bao quát chính xác **3 Acceptance Criteria (ACs)** đã định nghĩa tại tài liệu đặc tả và các yêu cầu từ bản thiết kế Figma hiện tại.
+Tài liệu cung cấp bộ kịch bản kiểm thử toàn diện cho hệ thống **Auto-Save & Draft (Lưu nháp tự động)**. Mục tiêu là phủ 100% cho 3 User Stories theo chuẩn Acceptance Criteria (ACs) đã quy định.
 
-Bộ kiểm thử bao gồm **15 kịch bản chi tiết** (Positive + Negative edge cases). Toàn bộ kịch bản được tổng hợp trong Unified Matrix.
+Trọng tâm kiểm thử đặc biệt nhắm đến các rủi ro hệ thống: đứt gãy kết nối mạng, nghẽn băng thông API (Rate Limit), mất đồng bộ dữ liệu giao diện (State Stale), và thao tác chỉnh sửa đồng thời trên nhiều thiết bị hoặc giao diện Tab khác nhau. Độ phủ bao gồm 17 kịch bản chi tiết.
+
 ---
 
-## 2. Test Environment (Môi trường Kiểm thử)
-| Biến (Variable) | Yêu cầu (Requirements) |
+## 2. Thông Tin Môi Trường (Test Environment)
+
+| Thông số | Yêu cầu kiểm thử |
 |---|---|
-| Môi trường (Env) | Staging / Pre-Production |
-| Browsers | Chrome (v110+), Firefox (v105+), Safari |
-| Devices (Responsive) | Desktop (1920x1080), Mobile (iPhone 14 Pro 375px) |
-| Test Data & SLA | Network Throttling, Offline Mode Simulation, Typing Speed Simulation |
+| Môi trường | Staging / Pre-Production (Áp dụng cho mọi tính năng thời gian thực) |
+| Trình duyệt | Chrome (v110+), Firefox (v105+), Safari |
+| Kích thước | Màn hình Desktop (1920x1080), Giao diện Mobile (375px) |
+| Chuyên biệt | Network Throttling (3G/Offline), Tần suất nhập liệu cao (High Typing Rate) |
 
 ---
 
-## 3. Unified Test Cases (Traceability Matrix)
+## 3. Ma Trận Kịch Bản Kiểm Thử (Traceability Matrix)
 
-| ID | Tham chiếu | LOẠI | TIÊU ĐỀ (Scenario) | CÁC BƯỚC THỰC HIỆN & DỮ LIỆU (Steps & Test Data) | KẾT QUẢ MONG ĐỢI GHERKIN & DB CHECKS (Expected) | MỨC ĐỘ | AUTO |
+### US-F12-01: Bộ Đệm Thời Gian 3s (Debounce) & Tính Năng Lưu Thủ Công (5 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
 |:---|:---|:---|:---|:---|:---|:---:|:---:|
-| **[US-F12-01: Auto-Save debounce 3s & Manual Save]** |
-| **TC-F12.01** | `US-01 / AC-1` | `Func` | **[Positive]** Auto-save ngầm kích hoạt sau 3s dừng thao tác | **1.** Mở Editor.<br>**2.** Gõ thêm text vào khối (isDirty = true) rồi buông tay không sửa nữa. | **GIVEN** Sửa content **WHEN** Đợi 3s không thao tác **THEN** Nhãn UI Status đổi sang "Saving..." kèm Spin -> Gọi API `PATCH /api/pages` -> Trả về mượt "Saved just now". | Blocker | [ ] |
-| **TC-F12.02** | `US-01 / AC-1` | `Perf` | **[Negative]** Chặn nghẽn mạng spam API khi gõ text liên tục (Debounce Test) | **1.** Viết Script Bot gõ input text liên tục không ngừng nghỉ suốt 30 giây.<br>**2.** Soi Network Tab. | KHÔNG ĐƯỢC bắn bất kỳ Request API `PATCH` nào lên DB trong 30s. Chỉ gửi đúng 1 lệnh duy nhất sau khi Bot ngưng gõ hoàn toàn 3 giây. | High | [ ] |
-| **TC-F12.03** | `US-01 / AC-2` | `Func` | **[Positive]** Lưu thủ công xuyên Timer (Manual Save Override) | **1.** Sửa 1 text block.<br>**2.** Trực tiếp ấn tổ hợp phím `Ctrl+S` (Wind) hoặc `Cmd+S` (Mac) chỉ sau 1s. | **WHEN** Bấm phím lưu **THEN** Override (xóa) timer 3s của Debounce. API chọc NGAY LẬP TỨC lên server. Kèm theo Toast màu xanh nổ lên "Saved!". | High | [ ] |
-| **TC-F12.04** | `US-01 / AC-2` | `Perf` | **[Negative]** Hạn chế Spam Bơm nút Manual Save | **1.** Bấm đúp phím `Ctrl+S` chớp nhoáng 10 lần trong vòng 2 giây. | Hệ thống sử dụng Back-pressure Request: Gạt đi 9 nhịp trùng, chỉ cho 1 Request đơn lẻ vượt ống Pống. Frontend không bị sập cứng Đơ màn hình. | Medium | [ ] |
-| **TC-F12.05** | `PRD / FR-08` | `Logic` | **[Edge]** Lưới chắn đóng Tab rơi dữ liệu (Browser Dialog `beforeunload`) | **1.** Thêm Image mới (isDirty=true).<br>**2.** ẤN (X) ĐÓNG NÓNG TAB CHROME ngay khi UI chưa hiện "Saved" trong chu kỳ 3s. | Chrome DOM phải lập tức đóng băng, tạt Pop-up rào lại: "Leave Site? Changes you made may not be saved" để giữ tay User khỏi sự cố ngoài ý muốn. | Blocker | [ ] |
-| **[US-F12-02: Draft Recovery]** |
-| **TC-F12.06** | `US-02 / AC-1` | `Func` | **[Positive]** Khôi phục Load đúng bản Draft mới nhất sau khi ngắt trình duyệt | **1.** Edit nội dung háp -> UI xác nhận "Saved just now".<br>**2.** Tuyệt đối KHÔNG ấn Publish. Đóng hẳn Browser Window Chrome.<br>**3.** Mở lại trình duyệt, vào lại `editor/:siteId`. | **THEN** Backend GET Data dò logic `isDraft = true` khớp mã thời gian gần nhất. Layout ném ra hình hài Edit dở khuyết ban nãy (Giữ trọn vẹn chứ không trượt). | Blocker | [ ] |
-| **TC-F12.07** | `PRD / BR-02` | `Logic` | **[Negative]** Giới hạn hiệu lực rụng Draft DB sau 24h vòng đời | **1.** Cài Mock DB lưu Draft từ >26 giờ trước.<br>**2.** User truy cập lại Editor Board. | Logic khắt khe Backend chặn rác -> Xóa / Từ chối Fetch bản nháp rỗng cũ. Trả về đúng bản Published chính thống bảo vệ Integrity trang. Cảnh báo quá hạn. | Medium | [ ] |
-| **[US-F12-03: Mobile Web UX — Compact Auto-Save Indicator]** |
-| **TC-F12.08** | `US-03 / AC-1` | `UI/UX`| **[Positive]** Hiển thị chế độ CSS Icon-Only gọn trên Mobile (< 768px) | **1.** Bóp Cửa Sổ Trình Duyệt thu hẹp Viewport xuống 375px (iPhone).<br>**2.** Sửa text để Save chạy. | Selector Span Text "Saved just now" rơi thẳng trạng thái ẩn (`display: none`). Toolbar chừa lại duy nhất biểu tượng Icon Mây Checkmark chớp báo mượt. | Trung bình | [ ] |
-| **TC-F12.09** | `US-03 / AC-1` | `UI` | **[Negative]** Tránh bể/đùn khối Layout nút Cụm Toolbar | **1.** Ép hiển thị luồng Loading (Icon tròn Spin xoay) trên màn hình 375px cực bé.<br>**2.** Check soi kỹ label CTAs ([Publish], Dropdown). | Bố cục Layout Flex/Grid ổn định tuyệt đối -> Chữ CTAs không bị rớt xuống dòng, che lấp lún text tạo U-gò lởm chởm do diện tích Loading chiếm dụng vô duyên. | High | [ ] |
-| **[Network Exceptions \& Error Handling (Retry Backoff)]** |
-| **TC-F12.10** | `PRD / FR-05` | `Edge` | **[Negative]** Rớt Mạng Trigger Auto-Retry ngầm hồi sinh (5s, 10s) | **1.** Cài Network Option DevTools: `Offline` ngay khi bộ đếm 3s Save nổ.<br>**2.** Đếm giờ và quan sát Tab Network ném lỗi. | UI Tắt Spinner -> Trả Alert Check đỏ "⚠️ Not saved". Editor tự âm thầm gửi lại gói PATCH API chuẩn xác vào mốc Nhịp +5s và Nhịp +10s sau khi đứt. | Blocker | [ ] |
-| **TC-F12.11** | `PRD / FR-06` | `UI` | **[Negative]** Kiên nhẫn Retry vượt mốc bế tắc Limit >3 Lần | **1.** Thả trôi không cắm cáp mạng Offline vĩnh viễn.<br>**2.** Quan sát qua mức cố nhịp Retry 3 (+20s Cuối). | Ngưng rải Retry cứu hộ. Lập tức Drop Cờ -> Rớt hẳn một dải Banner Cứng Dính Nền chữ Đỏ: "Changes not saved. Check connection." Buộc User chú ý thao tác lại. | High | [ ] |
-| **[Security & Concurrency Edge Cases (Hiểm họa ngầm)]** |
-| **TC-F12.12** | `Sec` | `Sec` | **[Boundary]** Hết hạn Token (401 Unauthorized) khi đang Auto-save | **1.** Đang ở màn hình Editor (isDirty=true).<br>**2.** Mở Tab khác ấn Đăng XUẤT (Hoặc xóa HTTPOnly Token gốc).<br>**3.** Đợi 3s cho Auto-save chạy. | Server từ chối `HTTP 401`. UI KHÔNG ĐƯỢC retry mù quáng để xả DDoS. Phải hiện Popup cản màn hình: "Phiên đăng nhập hết hạn", yêu cầu log-in lại tại chỗ, tuyệt đối không refresh làm mất data. | Blocker | [ ] |
-| **TC-F12.13** | `Data` | `Logic` | **[Negative]** Auto-save khối Payload Rỗng (Empty Content) | **1.** `Ctrl + A` hoặc bấm phím DEL xóa SẠCH TOÀN BỘ blocks (Về 0 Component).<br>**2.** Dừng tay 3s cho Auto-save bắt. | Payload `blocks: []` gửi đi thành công mà CMS không nổ bug crash API (Validation). Web chỉ lưu thành 1 trang trống trắng trơn. | High | [ ] |
-| **TC-F12.14** | `DB` | `Perf` | **[Edge]** Đụng độ Race Condition 2 luồng Auto và Manual Save | **1.** Set mạng throttled (Slow 3G). Viết text chờ mốc 3s (Auto-Save đang *Pending*).<br>**2.** Lập tức Bấm đúp `Ctrl + S`. | Router nhận Request 2 đánh sập Request 1 (Cancel Token Axios) hoặc Xử lý đồng bộ DB. Không văng lỗi dội Version ID Data Mismatch hay Deadlock Database CMS. | Blocker | [ ] |
-| **[ĐẶC NHIỆM: LIÊN KẾT CHÉO TÍNH NĂNG (UNDO & TAB COLLISION) + WIREFRAME GAP]** ||||||
-| **TC-F12.15** | `Logic`| `Flow` | **[Positive]** Auto-Save Kích Hoạt Xuyên Thấu Undo/Redo (F11 Synergy) | **1.** User đang ở trạng thái chuẩn tĩnh.<br>**2.** Bấm Cick vào nút [Undo] lùi 1 block text (hoặc AI Revert).<br>**3.** Thả tay chờ 3 giây. | Việc bấm Lùi Undo BẮT BUỘC phải làm State (Zustand) bị `isDirty = true`! Gây nổ API Auto-save ghi Trạng Thái Vừa Undo Lên DB. Dev dởm thường chỉ bắt sự kiện `Keypress` để Save. | Blocker | [ ] |
-| **TC-F12.16** | `Sec`  | `Edge` | **[Negative]** Tranh chấp Dữ Liệu Hai Tab Trình Duyệt Ngầm (Cross-Tab Override) | **1.** Mở Tab A Edit Page `Home`.<br>**2.** Mở Tab B song song Edit Page `Home`.<br>**3.** Gõ Text ở Tab A (Auto-save).<br>**4.** Qua Tab B (Đang chứa version cũ) gõ nhẹ 1 phím (Auto-save gọi lên). | Server từ chối Request Tab B do **Version Mismatch** (Hoặc Lỗi Khác Token Optimistic). UI Tab B Phải Kích Hoạt Popup "Trang đã được thay đổi từ một phiên làm việc khác. Tải lại trang!" Cấm cướp Data ghi đè ngược. | Critical | [ ] |
-| **TC-F12.17** | `UI`   | `Layout`| **[Negative]** Lỗi Nhảy Giật Labels Toolbar (Cumulative Layout Shift) | **1.** Viết Text chờ Auto-save chạy.<br>**2.** Text đổi từ "Saving..." (9 kí tự) sang "Saved 12 mins ago" dài sọc.<br>**3.** Soi sát vị trí nút `🚀 Publish` lân cận. | Wrapper Text Của Status Toolbar TƯƠNG ĐƯƠNG VỚI DESIGN F05 WIREFRAME Cố Định Kích Thước (VD: `width: 120px` cố định). Không làm mớ Button lân cận nhảy nhót giật giật (CLS Jiggle Bug) phá nát trải nghiệm. | High | [ ] |
+| **TC-F12.01** | `US-01/AC-1` | `Func` | **[Positive]** Hệ thống kích hoạt lưu tự động sau 3 giây dừng thao tác | 1. Mở giao diện AI Editor.<br>2. Chỉnh sửa nội dung văn bản (đặt cờ trạng thái `isDirty = true`).<br>3. Dừng thao tác hoàn toàn trong 3 giây. | - Icon trạng thái chuyển từ tĩnh sang Loading "Saving...".<br>- Hệ thống gọi hàm API PATCH cập nhật dữ liệu.<br>- Khi hoàn tất, Label thông báo "Saved just now". | Blocker | [ ] |
+| **TC-F12.02** | `US-01/AC-1` | `Perf` | **[Negative]** Chặn yêu cầu API chồng chéo khi nhập liệu liên tục | 1. Thực hiện kịch bản nhập liệu nội dung văn bản liên tục không ngừng nghỉ trong 30 giây.<br>2. Quan sát băng thông API qua thẻ Network. | - Hệ thống đình chỉ các yêu cầu cập nhật API trong quá trình nhập liệu.<br>- Gửi đi đúng **01 yêu cầu duy nhất** sau khi đã dừng thao tác hơn 3 giây. | High | [ ] |
+| **TC-F12.03** | `US-01/AC-2` | `Func` | **[Positive]** Thao tác lưu thủ công bỏ qua thời gian đệm | 1. Chỉnh sửa một phân đoạn văn bản.<br>2. Trong vòng 1 giây, nhấn ngay tổ hợp phím thủ công `Ctrl+S` (Windows) hoặc `Cmd+S` (Mac). | - Bộ đếm giờ tự động 3 giây lập tức bị vô hiệu hóa.<br>- API cập nhật được gọi ngay về Backend.<br>- Hệ thống hiển thị rõ thông báo Toast "Saved!". | High | [ ] |
+| **TC-F12.04** | `US-01/AC-2` | `Perf` | **[Negative]** Ngăn ngừa tình trạng spam quá tải bằng nút Lưu thủ công | 1. Liên tục kích hoạt tổ hợp phím `Ctrl+S` 10 lần với tốc độ cao trong 2 giây. | - Trình điều phối (Back-pressure) tự động loại bỏ 9 yêu cầu trùng lặp.<br>- Chỉ duy nhất 01 tín hiệu lưu được chuyển giao xuống hệ API Backend. | Medium | [ ] |
+| **TC-F12.05** | `FR-08` | `Logic` | **[Edge]** Chặn đóng Tab trình duyệt đột ngột khi tiến trình lưu chưa kết thúc | 1. Kích hoạt thay đổi mới lên giao diện Editor.<br>2. Lập tức ấn `(X)` trên thẻ Tab Chrome lúc trạng thái vẫn ghi nhận "Saving...". | - Trình duyệt kích hoạt cảnh báo sự cố Native Dialog: "Leave Site? Changes you made may not be saved".<br>- Ngăn rủi ro thoát sai làm hụt dữ liệu đầu vào. | Blocker | [ ] |
 
+---
+
+### US-F12-02: Phục Hồi Lưu Nháp Từ Máy Chủ (Draft Recovery) (2 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F12.06** | `US-02/AC-1` | `Func` | **[Positive]** Phục dựng trạng thái bản Draft mới nhất khi đóng phiên làm việc nửa chừng | 1. Phát sinh thay đổi và nhận thông báo "Saved just now".<br>2. Không thực hiện việc "🚀 Publish", trực tiếp đóng hẳn trình duyệt.<br>3. Mở lại đường dẫn cấu hình trang `/editor/:siteId`. | - Backend tiếp nhận và đọc trả bản thảo lưu trữ dựa trên trạng thái `isDraft = true`.<br>- Bố cục trang giữ nguyên trạng thái chưa hoàn thiện trước lúc đóng mạng. | Blocker | [ ] |
+| **TC-F12.07** | `BR-02` | `Logic` | **[Negative]** Thu hồi vòng đời Bản Nháp (Draft Limit) vượt quá hạn mức 24H | 1. Giả lập Backend mang một mẩu dữ liệu Bản Draft quá hạn lớn hơn 26 giờ đồng hồ.<br>2. Thực hiện truy cập Editor Board từ phía Client. | - Quy chuẩn Backend từ chối lấy Draft đã hết hạn.<br>- Hệ thống trình bày Bản cuối cùng đã Phát hành (Published State) thay vì cấu trúc soạn thảo rủi ro hỏng thời điểm cũ. | Medium | [ ] |
+
+---
+
+### US-F12-03: Trải Nghiệm Thanh Công Cụ Mobile UX Kích Thước Nhỏ (2 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F12.08** | `US-03/AC-1` | `UI` | **[Positive]** Tự động thu gọn cấu trúc hiển thị trạng thái (< 768px) | 1. Mở Cửa Sổ Trình Duyệt thu hẹp Viewport xuống 375px cực bé.<br>2. Chỉnh thay đổi khối ảnh. | - Văn bản label trạng thái "Saved just now" hoặc "Saving..." bị ẩn đi hoàn toàn.<br>- Trên Navbar chỉ hiện diện độc lập biểu tượng Icon Checkmark/Spin báo hiệu. | Medium | [ ] |
+| **TC-F12.09** | `US-03/AC-1` | `UI` | **[Negative]** Khoanh vùng bố cục hiển thị tránh xô lệch biểu tượng xung quanh | 1. Giả lập nghẽn Delay Load nhằm neo Cụm Icon Spin xoay liên tục.<br>2. Test View 325px soi các nút hành động kề cận. | - Dữ kiện Toolbar Navbar ổn định.<br>- Icon không đẩy các Nút Lệnh CTA khác chênh dòng làm giao diện bị đùn biến dạng. | High | [ ] |
+
+---
+
+### Xử Lý Ứng Cứu Ngoại Lệ: Sập Kết Nối & Phiên Hết Hạn (Network Timeout) (5 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F12.10** | `FR-05` | `Edge` | **[Negative]** Tự động thực hiện lại lệnh (Retry) khi phát hiện mất kết nối API | 1. Vào bảng Network set mức `Offline` ngay tại giây tiến trình Gọi mạng `Auto-save` xuất kích.<br>2. Để yên không thao tác và quan sát. | - Giao diện hiển thị Alert Icon Lỗi đỏ "⚠️ Not saved".<br>- Hệ thống Editor tự lặp lại tiến trình Gửi Yêu Cầu (Retry) ở 2 mốc đệm: Trễ 5 giây và Trễ 10 giây. | Blocker | [ ] |
+| **TC-F12.11** | `FR-06` | `UI` | **[Negative]** Treo báo hiệu cảnh báo sau khi thất bại hơn 3 mốc Retry | 1. Vô Mốc Offline cố định không dây.<br>2. Để luồng gọi vượt quá mức 3 Nhịp cho chót lỗi. | - Trình Client đình chỉ các chuỗi gọi Retry tiếp theo đè lên Database.<br>- Thả mảng Alert Header thông báo bền cứng: "Changes not saved. Check connection." Yêu cầu khách can thiệp. | High | [ ] |
+| **TC-F12.12** | `Sec` | `Sec` | **[Boundary]** Xử lý luồng Error Token Phiên Làm Việc (401 Unauthorized) | 1. Tại Tab 1 Đang Chỉnh Sửa Dở Giang trang.<br>2. Tại Tab 2 Mở trang chủ rồi Bấm Nút Đăng Xuất Account.<br>3. Chờ Lệnh Auto-Save tại Tab 1 chớp xử lý chạy ngầm. | - Máy chủ Ngăn Quyền báo lỗi HTTP 401.<br>- UI tuyệt đối cấm xả vòng lặp Retry khống. Cần kích hoạt khung cảnh báo lớn: "Phiên đăng nhập hết hạn", yêu cầu Mật khẩu Ngay tại Vị trí Màn, Không Cho Browser f5. | Blocker | [ ] |
+| **TC-F12.13** | `Data`| `Logic`| **[Negative]** Định hình gửi luồng Data Payload Trống rỗng (Blank Components) | 1. Xóa toàn bộ Data Blocks thuộc giao diện Editor (`Ctrl+A` > `Delete`).<br>2. Dừng tay chờ hệ thống bắt Timer Save Ghi nhận. | - API không văng bắt lỗi Validation Block trống. Backend thu nạp thông tin Payload Rỗng và đồng ý Save Layout "Trang Trắng Nguyên Sơ" cho User. | High | [ ] |
+| **TC-F12.14** | `Logic`| `Flow` | **[Edge]** Chống Deadlock xung đột Auto-Save và Thủ Công cùng chạm vạch | 1. Mạng Throttled Chậm chờ 3s API Auto-Save văng lưới Chậm lửng lơ Request.<br>2. Không dừng chờ, tiếp tục tay Nhấn Cứng Nút Thủ công `Ctrl+S`. | - Cơ Chế Axios Cancellation tự nhận dạng vứt bỏ Request Tương Trùng Điển Hình. Lọc chỉ 1 Tiến Vào Backend Tránh Lưu DB Hỏng Cấp Version 2 Hướng Song Song. | Blocker | [ ] |
+
+---
+
+### Kháo Sát Luồng Chạy Liên Kết & Xung Đột Nhiều Tab (Concurrency Limit) (2 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F12.15** | `Flow`| `Flow` | **[Positive]** Auto-Save Đồng Biên Cùng Hành Động Undo F11 | 1. Khách Hàng chọn tính năng Lùi Nội Dung (Undo) trên một Card UI Hình ảnh.<br>2. Buông thao tác Chuột nằm đợi tĩnh 3 giây. | - Hành vi Lùi Về Undo bắt buộc Kích Hoạt Cờ thay đổi `isDirty=true`. Hệ Auto-Save phải Nhận và Push Dữ data Mốc Sau Undo này Ghi Vào Database để Không Trôi Quên Cấu trúc. | Blocker | [ ] |
+| **TC-F12.16** | `Sec` | `Edge` | **[Negative]** Chặn quyền ghi đè Dữ liệu Cũ khi Người Dùng xử lý nhiều Tab cùng Mở | 1. Tại Cửa Sổ Trình Duyệt Chrome mở Song Ngang 2 Tab A và Tab B vô chung Phòng Edit Page Cũ.<br>2. Dùng Tab A gõ Dày Chữ, Quá Trình Load Lưu Chốt Bảng Vàng Hoàn Tất.<br>3. Chuyển Qua Màn Tab B Tĩnh (Giao diện Version Cũ Lạc Hậu) gõ Nhè 1 Chữ. | - Trình Mạng Tự Động Push Của Tab B Chạm DB Backend Bị Cảnh báo (Version Mismatch). Phương Tiện Request Chặn Đứng Khóa Quyền Sửa Khống. Bật Thông Báo: "Trang Của Bạn Thiết Cập Thay Đổi Phiên Làm Khác, Tiến Hành Refresh". | Critical | [ ] |
 
 ---
 
 ## 4. Hành trình Trải nghiệm End-to-End (E2E UAT Flow)
-_Mô tả kịch bản kiểm thử dựa trên hành vi tổng thể của Website Owner tham gia hệ thống Editor._
+_Trải nghiệm khách hàng cốt lõi cho vòng đời lưu trữ An Toàn._
 
-**Kịch bản E2E Cấu Trúc:** 
-1. **[E2E Flow] Giữ Tay Chống Văng Không Rớt Mạng - Test Cảnh Quản Khôi Phục Liền Mạch:** User đang Build Web Tưng Bừng -> Thêm chèn cục Header Image (Mọc Cờ isDirty=true) -> Nghỉ Ngơi Gõ Delay Khoảng 3 giây trôi qua để Tool ngầm nhức UI chớp báo Mây "Saved..." -> Đột ngột Rớt Wifi chập chờn -> Tool Toolbar báo đỏ Lập lòe Nháy tự khơi Mào lệnh Retry ngầm 1 Nhịp nhưng Vẫn Mất Kết Nối Rụng 100% -> Chán nản User Cay Cú Rê Chuột (X) Đóng Sập Trình Duyệt Tab Editor Bỏ Đi Nấu Cơm -> DOM Kháng chèn cứng Native Dialog Cảnh báo Rời trang hỏi móc lại: "Leave Site? Bị Rụng Data Ráng Chịu" khiến khách giật mình chọn "Cancel" Ở lại Đợi Mạng. Vài Tuần Sau Quay Trở Lại Truy cập -> Server Đón Lệnh Auth, Móc Nối Bắt Load DB Trả Gọn File Draft Dạng isDraft=true lên lại Ngay Ngắn. Khối Header Image còn kề trên Web Gọn Trơn Ko thiếu 1 dòng mầu HTML, chưa Push Ra Thằng Link Public Chữ Chuyên Báo Cấp Live Gây Sập Khách Lạ Xem.
+1. **[E2E Luồng Tiêu Chuẩn]:** Người dùng tiến hành cập nhật Background Image trang Web. Hệ thống ghi nhận thay đổi (isDirty = true). Người dùng buông tay tìm ý tưởng mới trong 3 giây. Thanh trạng thái chuyển mượt từ "Saving..." sang "Saved just now".
+2. **[E2E Xử Lý Cắt Rút Mạng]:** Sau quá trình chỉnh sửa, thiết lập môi trường Client mất mạng (Wifi Drop). Ngay khi bộ đếm hệ thống nạp request lên CMS báo Time-out, thanh Toolbar nhấp nháy Đỏ. Tiến hành chức năng Auto-Retry phục hồi trong mốc 5s và 10s. Nếu vượt mức kiên nhận, Panel đỏ hiển thị cảnh cáo người dùng trực diện.
+3. **[E2E Lưu Lẫn Phiên Bản Tab Ngầm]:** Mở 1 trang Web khác song song và chỉnh sửa lỗi, hệ thống từ Server gửi luồng từ chối bảo vệ tệp DB đã Save vững trước đó tránh bị rác Tab ngầm ghi đè phiên bản lạc hậu.
+4. **[E2E Bảo Toàn Load Nháp]:** Tắt ngang Browser nóng, hai ngày sau mở lại tài khoản, DB nạp trạng thái `isDraft = true` Load chuẩn Layout không mất dữ kiện Text nào.
 
 ---
 
 ## 5. Tiêu chí Đánh giá Chất lượng Phát hành (Quality Gates)
 
-| Nhóm Kiểm thử (Criteria) | Trạng Thái (Status) | Ghi chú (Notes & Rules .Agent Trích Chọn) |
+| Nhóm Kiểm thử (Criteria) | Trạng Thái | Ghi chú Trọng tâm |
 |---|---|---|
-| **1. UI/UX Coverage** | [ ] Đã chạy 0/2 TC | Layout Icon Only Mobile Toolbars |
-| **2. Logic & Functions** | [ ] Đã chạy 0/5 TC | Khắc Lõi Mở `BDD Cucumber Agent` Gắn Expected luồng Data Cứng |
-| **3. Edge Cases & Retry** | [ ] Đã chạy 0/3 TC | Bóc Tách Mock Mạng Ngắt Wifi Kích Retry Auto Dữ Đội Giới |
-| **4. Performance SLA** | [ ] Not Run | Kéo `Performance Load Tester Agent` Set Rate Limit Limit Vùng Data |
-| **5. E2E UAT Approval** | [ ] Not Run | Chốt Test File Mạch Core Khó Vỡ Này P0 Trước Khi Cho QA Đẩy Bản Prod Ký Xong. |
+| **1. Trải Nghệm Thao Tác Cơ Sở** | [ ] Not Run | Xác thực bộ đếm Debounce 3s, Hotkey Manual Crtl+S, Browser Dialog Prevent Close |
+| **2. Layout Compact Mép Di Động** | [ ] Not Run | Auto Hide Văn Bản Label 325px, Giữ Vững CTA Buttons. |
+| **3. Cứu Nạn Trục Trặc Đứt Quãng Lưới** | [ ] Not Run | Retry Backoff SLA 3 Lần (5s, 10s, Drop). Warning Label Đỏ Đạt Yêu Cầu. |
+| **4. Các Kẽ Xung Đột Concurrency** | [ ] Not Run | Cross-Tab Edit Version Control, Hóa Nhịp Kịch Đuổi Session Hết Hạn HTTP 401 |
+| **5. E2E UAT Phủ Phê Duyệt** | [ ] Not Run | Sign-off P0 Blockers cho luồng Timeout & Draft Recovery. |
 
-> **Khuyến Nghị Release:** Các Nhóm Case Timeout Lỗi Mạng (Network Retry Drop Cờ Red Array Backoff) và Tab Hook Khống Chế Điểm Văng Rời Trang (`beforeunload`) vô cùng quan trọng cấm lơi là, Rất dễ Bug đè mất Data khách điên cuồng sinh Ticket chửi rủa Cấp độ nghiêm trọng 1. Yêu cầu QA chạy đủ Auto Suite Mock Tool ngắt mạng không trượt phát nào.
+> **Khuyến Nghị Release:** Các kịch bản P0 quan trọng nhất là việc Hệ thống cần khóa cứng (stale closure lock) khi Phát Sinh Hành Vi Sửa Đổi Đồng Thời Ở Cùng Một Mốc Hoặc 2 Cửa Sổ Trình Duyệt Cùng Lệnh Auto-Save (TC.16). Cần đảm bảo Version Data Update trên Backend là phiên bản lạc quan được chấp thuận cuối cùng.

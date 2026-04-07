@@ -614,13 +614,17 @@ THEN  hiển thị các form fields: URL Slug, Meta Title, Meta Description
 GIVEN user đang ở Page-level SEO Settings
 WHEN  click nút "✨ Tự động Tối ưu SEO"
 THEN  AI sẽ phân tích toàn bộ text content hiện có trên trang
+  AND kết hợp trackedKeywords từ cài đặt site để từ khoá mục tiêu xuất hiện tự nhiên trong meta
   AND tự động điền Meta Title và Meta Description tối ưu
   AND URL Slug tự động đồng bộ theo Title (nếu page chưa publish)
+  AND nếu trường meta đã có nội dung thủ công → hiển thị so sánh bản cũ vs bản mới, chỉ ghi đè khi người dùng đồng ý
 ```
 
 ### Definition of Done
 - [ ] 9-Point Checklist pass.
 - [ ] Dữ liệu SEO lưu thành công vào Database field của riêng page đó (`pages.metaTitle`, `pages.metaDescription`).
+- [ ] AI Generate sử dụng trackedKeywords từ site settings khi sinh meta.
+- [ ] Nếu meta đã có nội dung → hiển thị so sánh, chỉ ghi đè khi đồng ý.
 
 ---
 

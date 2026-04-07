@@ -34,23 +34,33 @@ export default async function AnalyticsDashboardPage({ searchParams }: Props) {
 
     const payload = await getPayload({ config })
 
-    // Fetch both current and previous period, optimizing limit
-    const { docs: allDocs } = await payload.find({
-        collection: 'analytics',
-        where: {
-            tenant: { equals: tenantId },
-            createdAt: { greater_than_equal: prevSince.toISOString() }
-        },
-        limit: 10000
-    })
+    const clickEvents = ['click', 'add_to_cart', 'checkout']
 
-    // Split into current and previous
-    const sinceTime = since.getTime()
-    const currentDocs = allDocs.filter(d => new Date(d.createdAt).getTime() >= sinceTime)
-    const prevDocs = allDocs.filter(d => new Date(d.createdAt).getTime() < sinceTime)
+    // Use count() for accurate summary metrics (no limit issue)
+    const [currentViewsRes, prevViewsRes, currentClicksRes, prevClicksRes] = await Promise.all([
+        payload.count({
+            collection: 'analytics',
+            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { not_in: clickEvents } }
+        }),
+        payload.count({
+            collection: 'analytics',
+            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevSince.toISOString(), less_than: since.toISOString() }, event: { not_in: clickEvents } }
+        }),
+        payload.count({
+            collection: 'analytics',
+            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { in: clickEvents } }
+        }),
+        payload.count({
+            collection: 'analytics',
+            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevSince.toISOString(), less_than: since.toISOString() }, event: { in: clickEvents } }
+        }),
+    ])
+
+    const currentMetrics = { views: currentViewsRes.totalDocs, clicks: currentClicksRes.totalDocs }
+    const prevMetrics = { views: prevViewsRes.totalDocs, clicks: prevClicksRes.totalDocs }
 
     // If completely empty in current
-    if (currentDocs.length === 0) {
+    if (currentMetrics.views === 0 && currentMetrics.clicks === 0) {
         return (
             <div className="space-y-6">
                 <AnalyticsHeader />
@@ -59,20 +69,13 @@ export default async function AnalyticsDashboardPage({ searchParams }: Props) {
         )
     }
 
-    // Helper function to process docs into metrics
-    const processMetrics = (docs: any[]) => {
-        let views = 0
-        let clicks = 0
-        for (const doc of docs) {
-            const isClick = doc.event === 'click' || doc.event === 'add_to_cart' || doc.event === 'checkout'
-            if (isClick) clicks++
-            else views++
-        }
-        return { views, clicks }
-    }
-
-    const currentMetrics = processMetrics(currentDocs)
-    const prevMetrics = processMetrics(prevDocs)
+    // Fetch current period docs for chart/list aggregation (capped at 5000, most recent first)
+    const { docs: currentDocs } = await payload.find({
+        collection: 'analytics',
+        where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() } },
+        limit: 5000,
+        sort: '-createdAt',
+    })
 
     // Aggregation for lists and charts (only for current period)
     const dailyCounts: Record<string, { views: number, clicks: number }> = {}

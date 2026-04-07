@@ -10,10 +10,11 @@ interface StaffInvitationEmailData {
     workspaceName: string
     loginUrl?: string
     locale?: EmailLocale
+    temporaryPassword?: string
 }
 
 export function staffInvitationEmail(data: StaffInvitationEmailData): { subject: string; html: string } {
-    const { userName, workspaceName, loginUrl = 'https://primeweb.app/login', locale = 'en' } = data
+    const { userName, workspaceName, loginUrl = 'https://primeweb.app/login', locale = 'en', temporaryPassword } = data
     
     // Hardcoded en for now
     const subject = `You've been invited to join ${workspaceName} on PrimeWeb`
@@ -23,6 +24,14 @@ export function staffInvitationEmail(data: StaffInvitationEmailData): { subject:
     const body = `You have been invited to join the workspace <strong>${workspaceName}</strong> as a staff member. Please log in to accept the invitation and access the workspace dashboard.`
     const cta = 'Log In to Accept'
     const footer = 'PrimeWeb \u00A9 2026. All rights reserved.'
+
+    const passwordBlock = temporaryPassword ? `
+        <div style="background: rgba(13, 148, 136, 0.1); border-left: 4px solid #0d9488; padding: 16px; margin: 24px 0; border-radius: 4px;">
+            <p style="margin: 0 0 8px; font-size: 14px; color: #555;"><strong>Your Temporary Password:</strong></p>
+            <p style="margin: 0; font-family: monospace; font-size: 18px; color: #0d9488; letter-spacing: 1px;">${temporaryPassword}</p>
+            <p style="margin: 8px 0 0; font-size: 12px; color: #777;">Please use this to log in, you will then receive a 6-digit OTP code to your email.</p>
+        </div>
+    ` : ''
 
     return {
         subject,
@@ -42,9 +51,10 @@ export function staffInvitationEmail(data: StaffInvitationEmailData): { subject:
             <!-- Body -->
             <div style="padding: 32px;">
                 <p style="font-size: 16px; margin: 0 0 16px;">${greeting} <strong>${userName}</strong>,</p>
-                <p style="font-size: 14px; color: #555; line-height: 1.7; margin: 0 0 24px;">
+                <p style="font-size: 14px; color: #555; line-height: 1.7; margin: 0;">
                     ${body}
                 </p>
+                ${passwordBlock}
 
                 <!-- CTA -->
                 <div style="text-align: center;">

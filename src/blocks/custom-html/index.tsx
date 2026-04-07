@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import type { BlockProps } from '../types'
 import type { CustomHtmlConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function CustomHtmlBlock({ block }: BlockProps<CustomHtmlConfig>) {
     const { html = '' } = block
@@ -27,11 +29,10 @@ export function CustomHtmlBlock({ block }: BlockProps<CustomHtmlConfig>) {
     }, [html])
 
     return (
-
-        <section className="py-16 relative overflow-hidden custom-html-block">
+        <AnimatedSection className="py-16 relative overflow-hidden custom-html-block">
             <div className="container mx-auto px-6 relative z-10 w-full prose prose-lg dark:prose-invert max-w-none prose-headings:font-heading prose-a:text-[var(--brand-primary)]">
                 <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

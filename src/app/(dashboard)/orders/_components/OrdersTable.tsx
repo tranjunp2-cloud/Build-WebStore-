@@ -482,7 +482,7 @@ export function OrdersTable({
                 onSelectionChange={onSelectionChange || (() => { })}
             />
 
-            <div className="flex items-center justify-center px-6 py-3">
+            <div className="flex items-center justify-end px-6 py-3">
                 <OrdersPagination
                     currentPage={page}
                     totalPages={totalPages}
