@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { normalizeTenants } from '@/lib/normalize-tenants'
+import type { TenantMembership } from '@/lib/normalize-tenants'
 
 // ─── Mocks ────────────────────────────────────────────────────────────
 
@@ -83,22 +85,11 @@ describe('inviteStaffAction [TC-F19.23]', () => {
     })
 })
 
-// ─── normalizeTenants helper ─────────────────────────────────────────
-// Inline replica for unit testing (the real function is not exported)
-function normalizeTenants(tenants: Array<{ tenant: string | { id: string }; role: string; status?: string; permissions?: string[] }>) {
-    return tenants.map((t) => ({
-        tenant: (t.tenant && typeof t.tenant === 'object') ? t.tenant.id : t.tenant,
-        role: t.role,
-        status: t.status,
-        permissions: t.permissions || [],
-    }))
-}
-
 describe('normalizeTenants [TC-F19.28]', () => {
     it('extracts ID from populated tenant objects', () => {
-        const populated = [
-            { tenant: { id: '1' } as any, role: 'admin', status: 'active', permissions: ['blog'] },
-            { tenant: { id: '2' } as any, role: 'owner', status: 'active', permissions: [] },
+        const populated: TenantMembership[] = [
+            { tenant: { id: '1' }, role: 'admin', status: 'active', permissions: ['blog'] },
+            { tenant: { id: '2' }, role: 'owner', status: 'active', permissions: [] },
         ]
         const result = normalizeTenants(populated)
         expect(result[0].tenant).toBe('1')

@@ -6,14 +6,8 @@ import { staffInvitationEmail } from '@/lib/email/templates/staff-invitation'
 import { forgotPasswordEmail } from '@/lib/email/templates/forgot-password'
 import { generateOTP, hashOTP, getOTPExpiry } from '@/lib/otp/generate'
 import { otpVerificationEmail } from '@/lib/email/templates/otp-verification'
-
-/** Minimal shape of a user's tenant membership returned by Payload queries */
-interface TenantMembership {
-    tenant: string | { id: string }
-    role: string
-    status?: string
-    permissions?: string[]
-}
+import { normalizeTenants } from '@/lib/normalize-tenants'
+import type { TenantMembership } from '@/lib/normalize-tenants'
 
 /**
  * afterChange hook: send Welcome email to new users.
@@ -35,16 +29,6 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
     })
 
     return doc
-}
-
-/** Normalize populated tenant objects → extract relationship IDs for safe Payload updates */
-function normalizeTenants(tenants: TenantMembership[]): TenantMembership[] {
-    return tenants.map((t: TenantMembership) => ({
-        tenant: (t.tenant && typeof t.tenant === 'object') ? t.tenant.id : t.tenant,
-        role: t.role,
-        status: t.status,
-        permissions: t.permissions || [],
-    }))
 }
 
 async function injectUser(req: any) {
