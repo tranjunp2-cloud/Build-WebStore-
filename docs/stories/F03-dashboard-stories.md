@@ -175,7 +175,9 @@ So that Google index site tốt hơn
 GIVEN user ở /dashboard/seo
 WHEN  page load
 THEN  Overall SEO Score (0-100) hiển thị rõ
-  AND breakdown: Meta Tags, Content, Technical
+  AND breakdown 3 hạng mục có trọng số: Meta Tags (40%), Nội dung (35%), Kỹ thuật (25%)
+  AND mỗi hạng mục hiển thị điểm riêng (0-100) dạng thanh tiến trình hoặc con số
+  AND người dùng nhìn vào biết ngay cần cải thiện phần nào
 ```
 
 #### AC-2: Generate Sitemap
@@ -199,6 +201,7 @@ THEN  hiển thị state lỗi cho widget thay vì score
 ### Analytics / Tracking Notes
 - Track sự kiện `view_seo_dashboard`.
 - Track sự kiện `generate_sitemap_clicked`.
+- Track sự kiện `seo_category_breakdown_viewed`.
 
 ### Definition of Done
 
@@ -228,6 +231,7 @@ WHEN  publish action completes
 THEN  all published pages have AI-generated:
       meta title (≤ 60 chars, includes business name + primary keyword)
   AND meta description (≤ 160 chars, compelling, includes a call-to-action)
+  AND AI sử dụng trackedKeywords từ cài đặt site để kết hợp từ khoá mục tiêu vào meta một cách tự nhiên (không nhồi nhét)
 ```
 
 #### AC-2: Retry mechanism if generation fails
@@ -236,6 +240,16 @@ THEN  all published pages have AI-generated:
 GIVEN AI service fail khi đang generate meta tags
 WHEN  tiến trình publish hoàn tất
 THEN  hệ thống lưu lại log lỗi và queue để tự động retry background
+```
+
+#### AC-3: AI đề xuất chỉnh sửa meta đã có sẵn
+
+```gherkin
+GIVEN một trang đã có meta title/description do người dùng nhập thủ công
+WHEN  AI sinh meta mới (qua Fix All hoặc Auto-generate khi publish)
+THEN  hiển thị so sánh bản cũ vs bản mới
+  AND người dùng có thể chọn "Giữ bản cũ" hoặc "Áp dụng bản mới"
+  AND chỉ ghi đè khi người dùng đồng ý
 ```
 
 ### Analytics / Tracking Notes
@@ -247,6 +261,8 @@ THEN  hệ thống lưu lại log lỗi và queue để tự động retry backg
 - [ ] Homepage: format = "{Shop Name} | {Business Category} Online Malaysia"
 - [ ] JSON-LD Product schema auto-injected on every product page
 - [ ] Sitemap.xml auto-generated on publish
+- [ ] AI Generate sử dụng trackedKeywords từ site settings
+- [ ] Nếu meta đã có nội dung thủ công → hiển thị so sánh, chỉ ghi đè khi đồng ý
 
 ### Definition of Done
 
@@ -285,7 +301,18 @@ THEN  AI proposes changes — user can approve or skip individual fixes
 GIVEN I click "AI Fix All Issues"
 WHEN  tiến trình bị quá 15 giây hoặc lỗi nội bộ
 THEN  hiển thị toast lỗi: "Không thể hoàn tất AI Fix All, vui lòng thử lại"
-  AND rollback bất kỳ thay đổi nào chưa hoàn tất (nếu có thể)
+  AND giữ nguyên tiến trình đã sinh và cho phép resume (Thử lại)
+```
+
+#### AC-3: Prompt Cost Optimization & Content Standards
+
+```gherkin
+GIVEN hệ thống chuẩn bị gửi lệnh Prompt đến LLM cho AI Fix All
+WHEN  phân tích đầu vào (Input Context)
+THEN  hệ thống chỉ gửi mảng batch 5-10 items gồm [Tên, Chuyên mục, 150 chữ đầu tiên của bài]
+  AND ép Output dưới định dạng JSON thuần
+  AND sinh Meta Tags tuân thủ chuẩn SEO: Title 50-60 ký tự, Meta Desc 150-160 ký tự kết hợp CTA.
+  AND sử dụng trackedKeywords từ cài đặt site để từ khoá mục tiêu xuất hiện tự nhiên trong meta sinh ra
 ```
 
 ### Analytics / Tracking Notes
@@ -400,5 +427,43 @@ THEN  instead of drag-and-drop, the user can reorder widgets using large native 
 - [ ] Responsive UI grid breaks down smoothly from 4-col (desktop) to 2-col (tablet/mobile).
 - [ ] Recharts/Chart.js mobile touch events verified.
 
+---
 
+## US-F03-08: Google API Integration & Domain Verification
 
+**Wave 3** | **P0 🌟** | **L** | **Status:** Ready
+
+### Story
+
+```
+As a   site owner trên hệ thống
+I want kết nối tự động tài khoản Google và Custom Domain
+So that tôi nhận được dữ liệu Analytics mà không cần copy paste HTML Code
+```
+
+### Acceptance Criteria
+
+#### AC-1: OAuth 2.0 Access Token
+```gherkin
+GIVEN user đang ở Dashboard nhưng chưa có Data
+WHEN  click "Kết nối"
+THEN  hệ thống mở OAuth Popup, hỏi quyền GSC và GA4
+  AND lưu trữ Access Token cấp Tenant vào Database
+```
+
+#### AC-2: Auto Verification (Custom Domain)
+```gherkin
+GIVEN user đã uỷ quyền Google thành công
+WHEN  user đổi Tên miền (Custom Domain)
+THEN  backend tự động xin chuỗi Hash qua Verification API
+  AND frontend Next.js tự động inject `<meta>` vào Header tên miền
+  AND backend ping Webmaster để verify Ownership trong nền
+```
+
+#### AC-3: Fallback Rate Limit (Cache Database)
+```gherkin
+GIVEN user truy cập dữ liệu quá đà gây lỗi HTTP 429
+WHEN  hệ thống fetch data thất bại
+THEN  giao diện không bị trắng (crash)
+  AND hệ thống tự động đổ raw snapshot Data từ Redis Cache vào View hiển thị
+```
