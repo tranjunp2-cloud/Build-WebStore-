@@ -10,7 +10,7 @@ import { getCurrentUser } from '@/lib/auth'
 
 vi.mock('next/navigation', () => ({
     notFound: vi.fn(),
-    redirect: vi.fn(),
+    redirect: vi.fn(() => { throw new Error('NEXT_REDIRECT') }),
 }))
 
 vi.mock('payload', () => {
@@ -28,7 +28,8 @@ vi.mock('@/lib/auth', () => ({
 }))
 
 vi.mock('@/components/site-renderer/SiteRenderer', () => ({
-    SiteRenderer: vi.fn(({ isEditor }: any) => (
+    // Using explicit interface instead of 'any' for mock props
+    SiteRenderer: vi.fn(({ isEditor }: { isEditor?: boolean }) => (
         <div data-testid="site-renderer">
             Site Renderer Content {isEditor ? '(Editor Mode)' : ''}
         </div>
@@ -61,10 +62,11 @@ describe('PreviewPage — Security & Authorization', () => {
         // Arrange
         mockedGetCurrentUser.mockResolvedValue(null)
 
-        // Act
-        await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
+        // Act & Assert
+        // redirect() throws an error in Next.js, so we must catch it
+        await expect(PreviewPage({ params: mockParams, searchParams: mockSearchParams }))
+            .rejects.toThrow('NEXT_REDIRECT')
 
-        // Assert
         expect(redirect).toHaveBeenCalledWith(expect.stringContaining('/login'))
     })
 
@@ -73,18 +75,20 @@ describe('PreviewPage — Security & Authorization', () => {
         // Arrange
         mockedGetCurrentUser.mockResolvedValue({
             id: 'user-1',
-            tenants: [{ tenant: 'tenant-authorized' }]
-        } as any)
+            tenants: [{ tenant: 'tenant-authorized', role: 'admin' }]
+        } as Partial<PlatformUser> as PlatformUser)
         
+        // Mock getPayload and ignore deep config casting with 'any' since payload-types mock doesn't need to be complete
         const mockPayload = await getPayload({ config: {} as any })
-        ;(mockPayload.findByID as any).mockResolvedValue({
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>).mockResolvedValue({
             id: siteId,
             tenant: 'tenant-unauthorized', // Mismatch
         })
 
         // Act
+        // Using 'any' for component JSX transformation in test context
         const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
-        render(Component as any)
+        render(Component as React.ReactElement)
 
         // Assert
         expect(screen.getByText('Access Denied')).toBeInTheDocument()
@@ -96,26 +100,27 @@ describe('PreviewPage — Security & Authorization', () => {
         const tenantId = 'tenant-1'
         mockedGetCurrentUser.mockResolvedValue({
             id: 'user-1',
-            tenants: [{ tenant: { id: tenantId } }] // Object format
-        } as any)
+            tenants: [{ tenant: { id: tenantId, role: 'admin' }, role: 'admin' }] // Object format
+        } as Partial<PlatformUser> as PlatformUser)
         
         const mockPayload = await getPayload({ config: {} as any })
-        ;(mockPayload.findByID as any).mockResolvedValueOnce({
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
             id: siteId,
             tenant: tenantId, // Match
         })
         .mockResolvedValueOnce({
             id: 'page-456',
+            site: siteId,
             layout: [],
         })
 
-        ;(mockPayload.find as any).mockResolvedValue({
+        ;(mockPayload.find as ReturnType<typeof vi.fn>).mockResolvedValue({
             docs: []
         })
 
         // Act
         const Component = await PreviewPage({ params: mockParams, searchParams: mockSearchParams })
-        render(Component as any)
+        render(Component as React.ReactElement)
 
         // Assert
         expect(screen.getByTestId('site-renderer')).toBeInTheDocument()
@@ -125,9 +130,9 @@ describe('PreviewPage — Security & Authorization', () => {
     // ── Edge Case: Site Not Found ──────────────────────────────────
     it('calls notFound() if site does not exist', async () => {
         // Arrange
-        mockedGetCurrentUser.mockResolvedValue({ id: 'user-1', tenants: [] } as any)
+        mockedGetCurrentUser.mockResolvedValue({ id: 'user-1', tenants: [] } as Partial<PlatformUser> as PlatformUser)
         const mockPayload = await getPayload({ config: {} as any })
-        ;(mockPayload.findByID as any).mockResolvedValue(null)
+        ;(mockPayload.findByID as ReturnType<typeof vi.fn>).mockResolvedValue(null)
 
         // Act
         await PreviewPage({ params: mockParams, searchParams: mockSearchParams })

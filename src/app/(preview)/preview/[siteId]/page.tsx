@@ -40,7 +40,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
 
         // 3. Tenant Isolation Check (P0 Security Rule - Tenant Isolation)
         // Ensure user has access to this site's tenant
-        const userTenants = user.tenants?.map((t: any) => typeof t.tenant === 'object' ? t.tenant.id : t.tenant) || []
+        const userTenants = user.tenants?.map((t: NonNullable<PlatformUser['tenants']>[number]) => typeof t.tenant === 'object' ? t.tenant.id : t.tenant) || []
         const siteTenantId = typeof site.tenant === 'object' ? site.tenant?.id : site.tenant
         
         if (!userTenants.includes(siteTenantId)) {
@@ -58,6 +58,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
         }
 
         // 4. Fetch Page Data
+        // Using 'any' as fallback type for generated Payload Page interface
         let page: any = null
         if (pageId) {
             page = await payload.findByID({
@@ -66,6 +67,11 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
                 draft: true,
                 depth: 3,
             })
+            // Verify page belongs to the current site (P0 Security Rule - prevent cross-site page access)
+            const pageSiteId = typeof page.site === 'object' ? page.site?.id : page.site
+            if (pageSiteId !== siteId) {
+                return notFound()
+            }
         } else {
             // Find Homepage
             const pagesResult = await payload.find({
