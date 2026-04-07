@@ -2,6 +2,8 @@
 
 import type { BlockProps } from '../types'
 import type { ClientLogosConfig, LogoItem } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 function LogoImage({ logo, className }: { logo: LogoItem; className?: string }) {
     const img = (
@@ -27,7 +29,7 @@ export function ClientLogosBlock({ block, theme }: BlockProps<ClientLogosConfig>
 
     if (variant === 'grid') {
         return (
-            <section className="py-24">
+            <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     {headline && <h2 className="text-lg font-heading font-semibold text-center mb-12 opacity-60">{headline}</h2>}
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 items-center justify-items-center max-w-5xl mx-auto">
@@ -38,13 +40,13 @@ export function ClientLogosBlock({ block, theme }: BlockProps<ClientLogosConfig>
                         ))}
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     if (variant === 'fade') {
         return (
-            <section className="py-24">
+            <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     {headline && <h2 className="text-lg font-heading font-semibold text-center mb-12 opacity-60">{headline}</h2>}
                     <div className="flex flex-wrap items-center justify-center gap-10 max-w-5xl mx-auto">
@@ -55,14 +57,14 @@ export function ClientLogosBlock({ block, theme }: BlockProps<ClientLogosConfig>
                         ))}
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     // Default: scroll (infinite marquee)
     const duplicatedLogos = [...logos, ...logos]
     return (
-        <section className="py-24 overflow-hidden">
+        <AnimatedSection className="py-24 overflow-hidden">
             <div className="container mx-auto px-6">
                 {headline && <h2 className="text-lg font-heading font-semibold text-center mb-12 opacity-60">{headline}</h2>}
             </div>
@@ -89,6 +91,6 @@ export function ClientLogosBlock({ block, theme }: BlockProps<ClientLogosConfig>
                     animation-play-state: paused;
                 }
             `}</style>
-        </section>
+        </AnimatedSection>
     )
 }

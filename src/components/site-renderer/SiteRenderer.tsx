@@ -4,6 +4,8 @@ import type { ThemeConfig } from '@/blocks/types'
 import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
+import { generatePageSchemas } from '@/lib/seo/json-ld'
+import { HeadingProvider, getBlockHeadingLevel } from '@/lib/seo/heading-context'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
@@ -62,6 +64,13 @@ export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
     type PreviewBlock = { blockType: string; links?: NavLinkItem[]; [key: string]: unknown }
     const blocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
 
+    // JSON-LD schemas — auto-detect from blocks present
+    const isHomepage = blocks.some(b => b.blockType === 'hero') && blocks[0]?.blockType === 'navigation'
+    const jsonLdSchemas = generatePageSchemas({ blocks, site, page, isHomepage })
+
+    // Heading hierarchy — compute levels for all blocks
+    const allBlockTypes = blocks.map(b => b.blockType).filter(Boolean)
+
     return (
         <>
             <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
@@ -78,8 +87,26 @@ export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
           .container { max-width: 1200px; margin: 0 auto; }
           img { max-width: 100%; height: auto; }
           a { color: inherit; text-decoration: none; }
+          /* Print — show all content, no animations */
+          @media print {
+            * { opacity: 1 !important; transform: none !important; animation: none !important; }
+          }
         `}</style>
-            
+
+            {/* No-JS fallback — Framer Motion initial="hidden" sets opacity:0 */}
+            <noscript>
+                <style>{`[style*="opacity: 0"], [style*="opacity:0"] { opacity: 1 !important; transform: none !important; }`}</style>
+            </noscript>
+
+            {/* JSON-LD Structured Data */}
+            {jsonLdSchemas.map((schema, i) => (
+                <script
+                    key={`jsonld-${i}`}
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+                />
+            ))}
+
             {blocks.map((block, index) => {
                 if (!block.blockType) return null
 
@@ -96,9 +123,13 @@ export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
                     }
                     : block
 
+                const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes)
+
                 return (
                     <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
-                        <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
+                        <HeadingProvider level={headingLevel}>
+                            <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
+                        </HeadingProvider>
                     </BlockErrorBoundary>
                 )
             })}

@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { BlockProps } from '../types'
 import type { GalleryConfig } from './config'
-import { StaggerGrid, StaggerItem } from '../shared/animations'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import { SectionLabel } from '../shared/decorative'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -28,11 +29,11 @@ export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
 
     // ── Default: grid / masonry / carousel (existing) ─────────────────────
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-14">
-                        <SectionLabel color={theme.primaryColor}>Gallery</SectionLabel>
+                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
                         <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
                     </div>
                 )}
@@ -67,7 +68,7 @@ export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
                     ))}
                 </StaggerGrid>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
 
@@ -100,11 +101,11 @@ function LightboxGallery({ headline, images, theme }: { headline?: string; image
     }, [selectedIndex, handleClose, handlePrev, handleNext])
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-14">
-                        <SectionLabel color={theme.primaryColor}>Gallery</SectionLabel>
+                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
                         <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
                     </div>
                 )}
@@ -201,7 +202,7 @@ function LightboxGallery({ headline, images, theme }: { headline?: string; image
                     </motion.div>
                 )}
             </AnimatePresence>
-        </section>
+        </AnimatedSection>
     )
 }
 
@@ -211,11 +212,11 @@ function FilmstripGallery({ headline, images, theme }: { headline?: string; imag
     const [activeIndex, setActiveIndex] = useState(0)
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-14">
-                        <SectionLabel color={theme.primaryColor}>Gallery</SectionLabel>
+                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
                         <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
                     </div>
                 )}
@@ -291,7 +292,7 @@ function FilmstripGallery({ headline, images, theme }: { headline?: string; imag
                     </div>
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
 
@@ -299,11 +300,11 @@ function FilmstripGallery({ headline, images, theme }: { headline?: string; imag
 
 function JustifiedGallery({ headline, images, theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-14">
-                        <SectionLabel color={theme.primaryColor}>Gallery</SectionLabel>
+                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
                         <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
                     </div>
                 )}
@@ -355,6 +356,6 @@ function JustifiedGallery({ headline, images, theme }: { headline?: string; imag
                     })}
                 </StaggerGrid>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
