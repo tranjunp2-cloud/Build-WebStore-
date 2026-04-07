@@ -72,7 +72,7 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
             }
             // Verify page belongs to the current site (P0 Security Rule - prevent cross-site page access)
             const pageSiteId = typeof page.site === 'object' ? page.site?.id : page.site
-            if (pageSiteId !== siteId) {
+            if (String(pageSiteId) !== String(siteId)) {
                 return notFound()
             }
         } else {

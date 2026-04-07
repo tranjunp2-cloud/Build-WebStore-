@@ -202,7 +202,7 @@ export function PreviewScripts() {
         const onClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement
             let anchor = target.closest('a')
-            if (anchor) {
+            if (anchor && window !== window.parent) {
                 e.preventDefault()
                 e.stopPropagation()
             }
