@@ -100,7 +100,11 @@
             "realestate": "🏠 Hartanah",
             "fitness": "💪 Kecergasan",
             "creative": "🎨 Portfolio",
-            "business": "🏢 Perniagaan"
+            "business": "🏢 Perniagaan",
+            "fnb": "🍜 Kafe & Bakeri",
+            "events": "🎉 Acara",
+            "blog": "📝 Blog",
+            "travel": "✈️ Pelancongan"
         },
         "sort": "Susun mengikut",
         "sortNewest": "Terbaharu",

@@ -100,7 +100,11 @@
             "realestate": "🏠 Property",
             "fitness": "💪 Fitness",
             "creative": "🎨 Portfolio",
-            "business": "🏢 Business"
+            "business": "🏢 Business",
+            "fnb": "🍜 Cafe & Bakery",
+            "events": "🎉 Events",
+            "blog": "📝 Blog",
+            "travel": "✈️ Travel"
         },
         "sort": "Sort by",
         "sortNewest": "Newest",

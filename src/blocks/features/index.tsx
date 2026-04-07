@@ -4,8 +4,9 @@ import { useState, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { FeaturesConfig } from './config'
-import { StaggerGrid, StaggerItem, HoverCard, staggerContainer, staggerItem } from '../shared/animations'
+import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard, staggerContainer, staggerItem } from '../shared/animations'
 import { IconContainer, SectionLabel, GradientBlob } from '../shared/decorative'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
     const { headline, subheadline, features = [], variant = 'grid-3' } = block
@@ -13,11 +14,11 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
     // ── icon-top variant ──────────────────────────────────────────────────
     if (variant === 'icon-top') {
         return (
-            <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
-                        {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
                         {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
                     </div>
@@ -33,7 +34,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                                 >
                                     {feature.icon && (
                                         <div className="flex justify-center mb-6">
-                                            <IconContainer color={theme.primaryColor} size="lg" className="group-hover:scale-110 transition-transform duration-300">
+                                            <IconContainer color={CSS_VARS.primary} size="lg" className="group-hover:scale-110 transition-transform duration-300">
                                                 {feature.icon}
                                             </IconContainer>
                                         </div>
@@ -45,18 +46,18 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                         ))}
                     </StaggerGrid>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     // ── icon-left variant ─────────────────────────────────────────────────
     if (variant === 'icon-left') {
         return (
-            <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
-                        {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
                         {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
                     </div>
@@ -89,18 +90,18 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                         ))}
                     </StaggerGrid>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     // ── zigzag variant ────────────────────────────────────────────────────
     if (variant === 'zigzag') {
         return (
-            <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
-                        {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
                         {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
                     </div>
@@ -140,7 +141,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                         })}
                     </motion.div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
@@ -149,23 +150,61 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
         return <FeaturesCarousel block={block} theme={theme} headline={headline} subheadline={subheadline} features={features} />
     }
 
-    // ── Default grid variants (grid-2, grid-3, grid-4, list) ─────────────
+    // ── list variant ─────────────────────────────────────────────────────
+    if (variant === 'list') {
+        return (
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+                <div className="container mx-auto px-6 relative z-10">
+                    <div className="text-center max-w-2xl mx-auto mb-16">
+                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
+                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
+                        {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    </div>
+                    <StaggerGrid className="flex flex-col gap-5 max-w-3xl mx-auto">
+                        {features.map((feature, i) => (
+                            <StaggerItem key={i}>
+                                <HoverCard
+                                    className="flex items-center gap-6 p-6 rounded-2xl h-full group transition-all duration-300 hover:shadow-xl"
+                                    style={{
+                                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)`,
+                                        border: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
+                                    }}
+                                >
+                                    {feature.icon && (
+                                        <IconContainer color={CSS_VARS.primary} className="flex-shrink-0 group-hover:scale-110 transition-transform duration-300">
+                                            {feature.icon}
+                                        </IconContainer>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-lg font-bold font-heading mb-1">{feature.title}</h3>
+                                        <p className="opacity-50 leading-relaxed text-sm">{feature.description}</p>
+                                    </div>
+                                </HoverCard>
+                            </StaggerItem>
+                        ))}
+                    </StaggerGrid>
+                </div>
+            </AnimatedSection>
+        )
+    }
+
+    // ── Default grid variants (grid-2, grid-3, grid-4) ───────────────────
     const gridCols = {
         'grid-2': 'grid-cols-1 md:grid-cols-2',
         'grid-3': 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
         'grid-4': 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
-        'list': 'grid-cols-1 max-w-2xl mx-auto',
     }[variant] || 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
 
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
 
             <div className="container mx-auto px-6 relative z-10">
                 {/* Section Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     {block.sectionLabel && (
-                        <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>
+                        <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>
                     )}
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
                     {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
@@ -185,7 +224,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                             >
                                 {/* Icon */}
                                 {feature.icon && (
-                                    <IconContainer color={theme.primaryColor} className="mb-5 group-hover:scale-110 transition-transform duration-300">
+                                    <IconContainer color={CSS_VARS.primary} className="mb-5 group-hover:scale-110 transition-transform duration-300">
                                         {feature.icon}
                                     </IconContainer>
                                 )}
@@ -205,7 +244,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                     ))}
                 </StaggerGrid>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
 
@@ -243,11 +282,11 @@ function FeaturesCarousel({
     }, [updateScrollState])
 
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
             <div className="container mx-auto px-6 relative z-10">
                 <div className="text-center max-w-2xl mx-auto mb-16">
-                    {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
                     {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
                 </div>
@@ -299,7 +338,7 @@ function FeaturesCarousel({
                                 }}
                             >
                                 {feature.icon && (
-                                    <IconContainer color={theme.primaryColor} className="mb-5 group-hover:scale-110 transition-transform duration-300">
+                                    <IconContainer color={CSS_VARS.primary} className="mb-5 group-hover:scale-110 transition-transform duration-300">
                                         {feature.icon}
                                     </IconContainer>
                                 )}
@@ -310,6 +349,6 @@ function FeaturesCarousel({
                     </div>
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

@@ -3,7 +3,8 @@
 import React from 'react'
 import type { BlockProps } from '../types'
 import type { ProductsGridConfig } from './config'
-import { StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import { SectionLabel, GradientBlob } from '../shared/decorative'
 
 // Mock Data
@@ -30,13 +31,13 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
     }[variant] || 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
 
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="bottom-[10%] left-[-5%]" size={500} opacity={0.04} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="bottom-[10%] left-[-5%]" size={500} opacity={0.04} />
 
             <div className="container mx-auto px-6 relative z-10">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
-                    {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline}</h2>
                     {subheadline && <p className="opacity-60 text-lg">{subheadline}</p>}
                 </div>
@@ -84,14 +85,14 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
                                         }}
                                         onMouseEnter={(e) => {
                                             if (variant !== 'list') {
-                                                e.currentTarget.style.backgroundColor = theme.primaryColor;
+                                                e.currentTarget.style.backgroundColor = CSS_VARS.primary;
                                                 e.currentTarget.style.color = theme.colorMode === 'dark' ? '#000' : '#fff';
                                             }
                                         }}
                                         onMouseLeave={(e) => {
                                             if (variant !== 'list') {
                                                 e.currentTarget.style.backgroundColor = 'transparent';
-                                                e.currentTarget.style.color = theme.primaryColor;
+                                                e.currentTarget.style.color = CSS_VARS.primary;
                                             }
                                         }}
                                     >
@@ -103,6 +104,6 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
                     ))}
                 </StaggerGrid>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

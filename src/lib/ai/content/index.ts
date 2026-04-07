@@ -19,6 +19,9 @@ export { fitnessContent } from './fitness'
 export { creativeContent } from './creative'
 export { businessContent } from './business'
 export { fnbContent } from './fnb'
+export { eventsContent } from './events'
+export { travelContent } from './travel'
+export { blogContent } from './blog'
 
 import type { CategoryContent } from './types'
 import { restaurantContent } from './restaurant'
@@ -32,6 +35,9 @@ import { fitnessContent } from './fitness'
 import { creativeContent } from './creative'
 import { businessContent } from './business'
 import { fnbContent } from './fnb'
+import { eventsContent } from './events'
+import { travelContent } from './travel'
+import { blogContent } from './blog'
 
 export const categoryMap: Record<string, CategoryContent> = {
   restaurant: restaurantContent,
@@ -45,6 +51,9 @@ export const categoryMap: Record<string, CategoryContent> = {
   creative: creativeContent,
   business: businessContent,
   fnb: fnbContent,
+  events: eventsContent,
+  travel: travelContent,
+  blog: blogContent,
 }
 
 export function getCategoryContent(

@@ -3,53 +3,122 @@
 import type { BlockProps } from '../types'
 import type { CTAConfig } from './config'
 import { AnimatedSection } from '../shared/animations'
-import { motion } from 'framer-motion'
-import { GradientBlob, DotGrid } from '../shared/decorative'
+import { motion, useReducedMotion } from 'framer-motion'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
-export function CTABlock({ block, theme }: BlockProps<CTAConfig>) {
-    const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary' } = block
+function CTAButton({ label, url, style, variant }: { label: string; url: string; style: 'primary' | 'outline'; variant: string }) {
+    const shouldReduce = useReducedMotion()
+    const isPrimary = style === 'primary'
+
+    const buttonStyle = isPrimary
+        ? variant === 'banner'
+            ? { background: '#ffffff', color: CSS_VARS.primary, borderRadius: CSS_VARS.radiusMd }
+            : { background: CSS_VARS.primary, color: '#ffffff', borderRadius: CSS_VARS.radiusMd, boxShadow: '0 4px 20px rgba(var(--brand-primary-rgb), 0.25)' }
+        : { border: '2px solid rgba(var(--brand-primary-rgb), 0.3)', color: CSS_VARS.primary, background: 'transparent', borderRadius: CSS_VARS.radiusMd }
+
+    if (shouldReduce) {
+        return (
+            <a href={url} rel="noopener noreferrer" className="inline-block px-8 py-3.5 font-semibold text-sm transition-colors hover:opacity-90" style={buttonStyle}>
+                {label}
+            </a>
+        )
+    }
 
     return (
-        <AnimatedSection className="py-20">
-            <div className="container mx-auto px-6">
-                <div
-                    className="rounded-3xl p-12 md:p-16 text-center relative overflow-hidden"
-                    style={{
-                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.094) 0%, rgba(var(--brand-primary-rgb), 0.024) 100%)`,
-                        border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`,
-                    }}
-                >
-                    <GradientBlob color={theme.primaryColor} className="top-[-30%] right-[-10%]" size={400} opacity={0.15} />
-                    <GradientBlob color={theme.primaryColor} className="bottom-[-20%] left-[-5%]" size={300} opacity={0.1} />
-                    <DotGrid color={theme.primaryColor} spacing={28} />
+        <motion.a
+            href={url}
+            rel="noopener noreferrer"
+            whileHover={{ scale: 1.03, y: -2 }}
+            whileTap={{ scale: 0.97 }}
+            className="inline-block px-8 py-3.5 font-semibold text-sm transition-colors"
+            style={buttonStyle}
+        >
+            {label}
+        </motion.a>
+    )
+}
 
-                    <div className="relative z-10">
-                        <h2 className="text-3xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                        {subheadline && (
-                            <p className="text-lg opacity-50 mb-10 max-w-xl mx-auto leading-relaxed">{subheadline}</p>
-                        )}
-                        <motion.a
-                            href={ctaUrl}
-                            whileHover={{ scale: 1.04, y: -2 }}
-                            whileTap={{ scale: 0.97 }}
-                            className="inline-block px-10 py-4 rounded-xl font-semibold text-sm transition-all duration-300"
-                            style={ctaStyle === 'primary'
-                                ? {
-                                    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                                    color: '#fff',
-                                    boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)`,
-                                }
-                                : {
-                                    border: `2px solid rgba(var(--brand-primary-rgb), 0.314)`,
-                                    color: 'var(--brand-primary)',
-                                    background: `rgba(var(--brand-primary-rgb), 0.031)`,
-                                }}
-                        >
-                            {ctaLabel}
-                        </motion.a>
+function BannerVariant({ block }: { block: CTAConfig }) {
+    const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary' } = block
+    return (
+        <AnimatedSection
+            className="py-16 md:py-20"
+            style={{
+                background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
+                color: '#ffffff',
+            }}
+        >
+            <div className="container mx-auto px-6 text-center max-w-3xl">
+                <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                    {headline}
+                </h2>
+                {subheadline && (
+                    <p className="text-lg opacity-85 mb-8 max-w-xl mx-auto">{subheadline}</p>
+                )}
+                <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="banner" />
+            </div>
+        </AnimatedSection>
+    )
+}
+
+function InlineVariant({ block }: { block: CTAConfig }) {
+    const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary' } = block
+    return (
+        <AnimatedSection className="py-12 md:py-16" style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
+            <div className="container mx-auto px-6">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6 max-w-4xl mx-auto">
+                    <div className="flex-1 text-center md:text-left">
+                        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                            {headline}
+                        </h2>
+                        {subheadline && <p style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
+                    </div>
+                    <div className="flex-shrink-0">
+                        <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="inline" />
                     </div>
                 </div>
             </div>
         </AnimatedSection>
     )
+}
+
+function FloatingVariant({ block }: { block: CTAConfig }) {
+    const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary' } = block
+    return (
+        <AnimatedSection className="py-16 md:py-20" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
+            <div className="container mx-auto px-6">
+                <div
+                    className="max-w-xl mx-auto text-center p-10 md:p-12"
+                    style={{
+                        background: CSS_VARS.surface,
+                        borderRadius: CSS_VARS.radiusLg,
+                        boxShadow: CSS_VARS.shadowLg,
+                        border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
+                    }}
+                >
+                    <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                        {headline}
+                    </h2>
+                    {subheadline && (
+                        <p className="mb-8" style={{ color: CSS_VARS.muted }}>{subheadline}</p>
+                    )}
+                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="floating" />
+                </div>
+            </div>
+        </AnimatedSection>
+    )
+}
+
+export function CTABlock({ block }: BlockProps<CTAConfig>) {
+    const { variant = 'banner' } = block
+
+    switch (variant) {
+        case 'inline':
+            return <InlineVariant block={block} />
+        case 'floating':
+            return <FloatingVariant block={block} />
+        case 'banner':
+        default:
+            return <BannerVariant block={block} />
+    }
 }

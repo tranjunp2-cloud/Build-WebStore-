@@ -202,12 +202,12 @@ describe('[TC-S3-009] All 11 content files have valid Malaysian data', () => {
         }
     })
 
-    it('getAllCategories() returns exactly 11 categories', () => {
+    it('getAllCategories() returns exactly 14 categories', () => {
         // Act
         const categories = getAllCategories()
 
         // Assert
-        expect(categories).toHaveLength(11)
+        expect(categories).toHaveLength(14)
     })
 
     for (const content of ALL_CONTENT_FILES) {

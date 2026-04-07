@@ -7,6 +7,7 @@ import { GradientBlob, SectionLabel, GlassCard } from '../shared/decorative'
 import { motion } from 'framer-motion'
 import { mergeContactInfoWithSite } from '@/lib/site-settings'
 import { Mail, Phone, MapPin } from 'lucide-react'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 // ── Shared form input styles ─────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                 <div className="container mx-auto px-6 relative z-10">
                     {/* Header */}
                     <div className="text-center max-w-2xl mx-auto mb-10">
-                        <SectionLabel color={theme.primaryColor}>Contact</SectionLabel>
+                        <SectionLabel color={CSS_VARS.primary}>Contact</SectionLabel>
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'Contact Us'}</h2>
                         {subtext && <p className="text-lg opacity-50 leading-relaxed">{subtext}</p>}
                     </div>
@@ -136,30 +137,40 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     if (variant === 'map-split') {
         return (
             <AnimatedSection className="py-24 relative overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="top-[20%] left-[-5%]" size={400} opacity={0.06} />
+                <GradientBlob color={CSS_VARS.primary} className="top-[20%] left-[-5%]" size={400} opacity={0.06} />
                 <div className="container mx-auto px-6 relative z-10">
                     {/* Header */}
                     <div className="text-center max-w-2xl mx-auto mb-16">
-                        <SectionLabel color={theme.primaryColor}>Contact</SectionLabel>
+                        <SectionLabel color={CSS_VARS.primary}>Contact</SectionLabel>
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'Contact Us'}</h2>
                         {subtext && <p className="text-lg opacity-50 leading-relaxed">{subtext}</p>}
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-5xl mx-auto">
-                        {/* Map placeholder */}
+                        {/* Map + Contact Info */}
                         <div
-                            className="rounded-xl aspect-video lg:aspect-auto flex flex-col items-center justify-center p-8"
+                            className="rounded-xl aspect-video lg:aspect-auto flex flex-col items-center justify-center p-8 overflow-hidden"
                             style={{
                                 background: `rgba(var(--brand-primary-rgb), 0.04)`,
                                 border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
                             }}
                         >
-                            <div
-                                className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl mb-4"
-                                style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}
-                            >
-                                <MapPin size={28} />
-                            </div>
+                            {address ? (
+                                <iframe
+                                    title="Location map"
+                                    src={`https://maps.google.com/maps?q=${encodeURIComponent(address)}&output=embed`}
+                                    className="w-full h-48 rounded-lg mb-4 border-0"
+                                    loading="lazy"
+                                    referrerPolicy="no-referrer-when-downgrade"
+                                />
+                            ) : (
+                                <div
+                                    className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl mb-4"
+                                    style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}
+                                >
+                                    <MapPin size={28} />
+                                </div>
+                            )}
                             {address && <p className="text-sm font-medium text-center opacity-70">{address}</p>}
                             {email && (
                                 <p className="text-sm opacity-50 mt-2">
@@ -176,7 +187,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                         </div>
 
                         {/* Contact form */}
-                        <GlassCard color={theme.primaryColor} className="p-8">
+                        <GlassCard color={CSS_VARS.primary} className="p-8">
                             <form className="space-y-5" onSubmit={e => e.preventDefault()}>
                                 {formFields.map((field, i) => (
                                     <div key={i}>
@@ -264,15 +275,141 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
         )
     }
 
-    // ── Default: form / info-only / split (existing) ──────────────────────
+    // ── Info Only variant ───────────────────────────────────────────────
+    if (variant === 'info-only') {
+        return (
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-[20%] left-[-5%]" size={400} opacity={0.06} />
+                <div className="container mx-auto px-6 relative z-10">
+                    <div className="text-center max-w-2xl mx-auto mb-16">
+                        <SectionLabel color={CSS_VARS.primary}>Contact</SectionLabel>
+                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'Contact Us'}</h2>
+                        {subtext && <p className="text-lg opacity-50 leading-relaxed">{subtext}</p>}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                        {email && (
+                            <GlassCard color={CSS_VARS.primary} className="p-6 text-center">
+                                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-lg mx-auto mb-4"
+                                    style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}>
+                                    <Mail size={22} />
+                                </div>
+                                <p className="text-xs uppercase tracking-wider opacity-40 mb-1">Email</p>
+                                <p className="text-sm font-medium">{email}</p>
+                            </GlassCard>
+                        )}
+                        {phone && (
+                            <GlassCard color={CSS_VARS.primary} className="p-6 text-center">
+                                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-lg mx-auto mb-4"
+                                    style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}>
+                                    <Phone size={22} />
+                                </div>
+                                <p className="text-xs uppercase tracking-wider opacity-40 mb-1">Phone</p>
+                                <p className="text-sm font-medium">{phone}</p>
+                            </GlassCard>
+                        )}
+                        {address && (
+                            <GlassCard color={CSS_VARS.primary} className="p-6 text-center">
+                                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-lg mx-auto mb-4"
+                                    style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}>
+                                    <MapPin size={22} />
+                                </div>
+                                <p className="text-xs uppercase tracking-wider opacity-40 mb-1">Address</p>
+                                <p className="text-sm font-medium">{address}</p>
+                            </GlassCard>
+                        )}
+                    </div>
+                </div>
+            </AnimatedSection>
+        )
+    }
+
+    // ── Split variant ────────────────────────────────────────────────────
+    if (variant === 'split') {
+        return (
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-[20%] left-[-5%]" size={400} opacity={0.06} />
+                <div className="container mx-auto px-6 relative z-10">
+                    <div className="text-center max-w-2xl mx-auto mb-16">
+                        <SectionLabel color={CSS_VARS.primary}>Contact</SectionLabel>
+                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'Contact Us'}</h2>
+                        {subtext && <p className="text-lg opacity-50 leading-relaxed">{subtext}</p>}
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-5xl mx-auto">
+                        {/* Form */}
+                        <GlassCard color={CSS_VARS.primary} className="p-8">
+                            <form className="space-y-5" onSubmit={e => e.preventDefault()}>
+                                {formFields.map((field, i) => (
+                                    <div key={i}>
+                                        <label className="block text-sm font-medium mb-2 opacity-70">
+                                            {field.label}
+                                            {field.required && <span style={{ color: 'var(--brand-primary)' }}> *</span>}
+                                        </label>
+                                        <FormFieldInput field={field} />
+                                    </div>
+                                ))}
+                                <SubmitButton />
+                            </form>
+                        </GlassCard>
+                        {/* Contact Info */}
+                        <div className="space-y-6">
+                            {email && (
+                                <GlassCard color={CSS_VARS.primary} className="p-5">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                                            style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}>
+                                            <Mail size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs opacity-40 mb-0.5">Email</p>
+                                            <p className="text-sm font-medium">{email}</p>
+                                        </div>
+                                    </div>
+                                </GlassCard>
+                            )}
+                            {phone && (
+                                <GlassCard color={CSS_VARS.primary} className="p-5">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                                            style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}>
+                                            <Phone size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs opacity-40 mb-0.5">Phone</p>
+                                            <p className="text-sm font-medium">{phone}</p>
+                                        </div>
+                                    </div>
+                                </GlassCard>
+                            )}
+                            {address && (
+                                <GlassCard color={CSS_VARS.primary} className="p-5">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                                            style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}>
+                                            <MapPin size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs opacity-40 mb-0.5">Address</p>
+                                            <p className="text-sm font-medium">{address}</p>
+                                        </div>
+                                    </div>
+                                </GlassCard>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </AnimatedSection>
+        )
+    }
+
+    // ── Default: form ────────────────────────────────────────────────────
     return (
         <AnimatedSection className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="top-[20%] left-[-5%]" size={400} opacity={0.06} />
+            <GradientBlob color={CSS_VARS.primary} className="top-[20%] left-[-5%]" size={400} opacity={0.06} />
 
             <div className="container mx-auto px-6 relative z-10">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
-                    <SectionLabel color={theme.primaryColor}>Contact</SectionLabel>
+                    <SectionLabel color={CSS_VARS.primary}>Contact</SectionLabel>
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'Contact Us'}</h2>
                     {subtext && <p className="text-lg opacity-50 leading-relaxed">{subtext}</p>}
                 </div>
@@ -281,11 +418,11 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                     {/* Contact Info */}
                     <div className="lg:col-span-2 space-y-6">
                         {email && (
-                            <GlassCard color={theme.primaryColor} className="p-5">
+                            <GlassCard color={CSS_VARS.primary} className="p-5">
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
                                         style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}>
-                                        ✉️
+                                        <Mail size={18} />
                                     </div>
                                     <div>
                                         <p className="text-xs opacity-40 mb-0.5">Email</p>
@@ -295,11 +432,11 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                             </GlassCard>
                         )}
                         {phone && (
-                            <GlassCard color={theme.primaryColor} className="p-5">
+                            <GlassCard color={CSS_VARS.primary} className="p-5">
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
                                         style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}>
-                                        📞
+                                        <Phone size={18} />
                                     </div>
                                     <div>
                                         <p className="text-xs opacity-40 mb-0.5">Phone</p>
@@ -309,11 +446,11 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                             </GlassCard>
                         )}
                         {address && (
-                            <GlassCard color={theme.primaryColor} className="p-5">
+                            <GlassCard color={CSS_VARS.primary} className="p-5">
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
                                         style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}>
-                                        📍
+                                        <MapPin size={18} />
                                     </div>
                                     <div>
                                         <p className="text-xs opacity-40 mb-0.5">Address</p>
@@ -326,7 +463,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
 
                     {/* Contact Form */}
                     <div className="lg:col-span-3">
-                        <GlassCard color={theme.primaryColor} className="p-8">
+                        <GlassCard color={CSS_VARS.primary} className="p-8">
                             <form className="space-y-5" onSubmit={e => e.preventDefault()}>
                                 {formFields.map((field, i) => (
                                     <div key={i}>

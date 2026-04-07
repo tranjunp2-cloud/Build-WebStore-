@@ -4,6 +4,8 @@ import React from 'react'
 import type { BlockProps } from '../types'
 import type { ProductsFeaturedConfig } from './config'
 import { GradientBlob, SectionLabel } from '../shared/decorative'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 const MOCK_FEATURED = [
     {
@@ -32,11 +34,11 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
 
     if (variant === 'carousel') {
         return (
-            <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="top-1/4 right-0" size={600} opacity={0.05} />
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-1/4 right-0" size={600} opacity={0.05} />
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
-                        {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline}</h2>
                         {subheadline && <p className="opacity-60 text-lg">{subheadline}</p>}
                     </div>
@@ -54,18 +56,18 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
                         ))}
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     // Default: hero-product split view
     return (
-        <section className="py-24 relative overflow-hidden">
+        <AnimatedSection className="py-24 relative overflow-hidden">
             <div className="container mx-auto px-6 relative z-10">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     {/* Left: Huge Product Image */}
                     <div className="relative group">
-                        <GradientBlob color={theme.primaryColor} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.15} />
+                        <GradientBlob color={CSS_VARS.primary} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.15} />
                         <div className="relative z-10 rounded-2xl overflow-hidden animate-float" style={{ animationDuration: '6s' }}>
                             <img 
                                 src={product.image} 
@@ -77,7 +79,7 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
 
                     {/* Right: Info */}
                     <div className="flex flex-col justify-center">
-                        {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                        {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                         
                         <div className="flex flex-wrap gap-2 mb-6">
                             {product.tags.map((tag) => (
@@ -124,6 +126,6 @@ export function ProductsFeaturedBlock({ block, theme }: BlockProps<ProductsFeatu
                     animation: float ease-in-out infinite;
                 }
             `}</style>
-        </section>
+        </AnimatedSection>
     )
 }

@@ -531,6 +531,37 @@ const MIGRATIONS = [
       tag varchar
     );`,
   },
+  // ── Templates: Multi-page array sub-table (F31) ──
+  {
+    name: 'templates_template_pages.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS templates_template_pages (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar NOT NULL,
+      slug varchar NOT NULL,
+      is_homepage boolean DEFAULT false,
+      layout jsonb
+    );`,
+  },
+  // ── Templates: Add new category enum values (F31: fnb, events, blog, travel) ──
+  {
+    name: 'templates_category.add_fnb',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'fnb'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'templates_category.add_events',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'events'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'templates_category.add_blog',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'blog'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'templates_category.add_travel',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'travel'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
   // ── Pages: Block tables (Payload blocks field → separate table per block type) ──
   // Each block has metadata + block-specific field columns (per Codex P1 review)
   {
@@ -1382,6 +1413,36 @@ const MIGRATIONS = [
       AFTER INSERT ON notifications
       FOR EACH ROW EXECUTE FUNCTION notify_new_notification();`,
   },
+  // ── Templates — multi-page array sub-table ──
+  {
+    name: 'templates_template_pages.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS templates_template_pages (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar NOT NULL,
+      slug varchar NOT NULL,
+      is_homepage boolean DEFAULT false,
+      layout jsonb
+    );`,
+  },
+  // ── Subscribers (newsletter email collection) ──
+  {
+    name: 'subscribers.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS subscribers (
+      id serial PRIMARY KEY,
+      email varchar NOT NULL,
+      site_id integer NOT NULL,
+      source varchar DEFAULT 'newsletter',
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'subscribers.email_site_unique',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS subscribers_email_site_uniq ON subscribers (email, site_id);`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -1406,7 +1467,7 @@ const COLLECTION_SLUGS = [
   'tenants', 'users', 'sites', 'pages', 'media',
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
-  'seo_meta_jobs', 'notifications',
+  'seo_meta_jobs', 'notifications', 'subscribers',
 ];
 
 /**
@@ -1608,6 +1669,79 @@ function spawnServer(env) {
   return spawn('node', ['server.js'], { stdio: 'inherit', env });
 }
 
+/**
+ * Auto-seed v3 templates (56 premium blueprints).
+ * Uses the running dev server's seed API endpoint.
+ * Re-seeds if count < 56 (old templates or partial seed).
+ */
+async function autoSeedTemplates() {
+  const pool = createPool();
+  if (!pool) return;
+
+  const EXPECTED_COUNT = 56;
+
+  try {
+    const result = await pool.query('SELECT COUNT(*)::int AS cnt FROM templates');
+    const count = result.rows[0]?.cnt || 0;
+
+    if (count >= EXPECTED_COUNT) {
+      console.log(`[db-setup] 📦 Templates: ${count} exist (>= ${EXPECTED_COUNT}) — skipping auto-seed`);
+      await pool.end();
+      return;
+    }
+
+    console.log(`[db-setup] 📦 Templates: ${count} found (expected ${EXPECTED_COUNT}) — re-seeding v3 templates...`);
+    await pool.end();
+
+    // Call seed API on the running dev server (force=true to replace old templates)
+    const http = require('http');
+    const seedResult = await new Promise((resolve) => {
+      const postData = '';
+      const req = http.request({
+        hostname: 'localhost',
+        port: 3000,
+        path: `/api/templates/seed?v3=true&force=${count > 0 ? 'true' : 'false'}`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': 0,
+          'x-db-setup-key': process.env.PAYLOAD_SECRET || '',
+        },
+        timeout: 120000,
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            resolve(json);
+          } catch {
+            resolve({ success: false, error: 'Invalid JSON response' });
+          }
+        });
+      });
+      req.on('error', (err) => {
+        resolve({ success: false, error: err.message });
+      });
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ success: false, error: 'Seed request timed out (60s)' });
+      });
+      req.end(postData);
+    });
+
+    if (seedResult.success && seedResult.data) {
+      console.log(`[db-setup] ✅ Auto-seeded ${seedResult.data.created || 0} templates (${seedResult.data.failed || 0} failed)`);
+    } else {
+      console.warn(`[db-setup] ⚠️ Template auto-seed failed: ${seedResult.error || 'unknown error'}`);
+      console.warn('[db-setup]    Run POST /api/templates/seed?v3=true&force=true manually after deploy');
+    }
+  } catch (err) {
+    console.warn(`[db-setup] ⚠️ Template auto-seed check failed: ${err.message}`);
+    try { await pool.end(); } catch { /* ignore */ }
+  }
+}
+
 async function main() {
   console.log('[db-setup] NODE_ENV:', process.env.NODE_ENV);
 
@@ -1661,6 +1795,9 @@ async function main() {
     }
 
     if (schemaReady) {
+      // ── Auto-seed templates if empty ──
+      await autoSeedTemplates();
+
       // ── Phase 2: Restart with NODE_ENV=production ──
       console.log('[db-setup] Phase 2: Restarting server with NODE_ENV=production...');
       devServer.kill('SIGTERM');

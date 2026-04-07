@@ -56,6 +56,128 @@ export const POST = withAuth(async (user, req) => {
         }
 
         const blocks = (template.defaultBlocks as Record<string, unknown>[]) || []
+
+        // ── Sanitize blocks to match Pages.ts Payload schema (DB source of truth) ──
+        // Only 14 block types have DB tables. Each has specific field names + enum values.
+
+        const PAGES_BLOCK_WHITELIST = new Set([
+            'navigation', 'hero', 'about', 'features', 'testimonials',
+            'contact', 'gallery', 'footer', 'stats', 'pricing',
+            'faq', 'team', 'socialWidget', 'cartWidget',
+        ])
+
+        // Pages.ts schema per block: which field holds variant, what values are valid
+        // null = block has NO variant/layout field → strip any variant data
+        const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fallback: string } | null> = {
+            hero:         { field: 'variant', values: ['centered', 'split-left', 'split-right', 'fullscreen', 'video'], fallback: 'centered' },
+            navigation:   { field: 'style',   values: ['fixed', 'sticky', 'static', 'transparent'], fallback: 'fixed' },
+            about:        { field: 'layout',  values: ['image-right', 'image-left', 'centered', 'cards'], fallback: 'image-right' },
+            features:     { field: 'layout',  values: ['grid-3', 'grid-2', 'alternating', 'centered-list'], fallback: 'grid-3' },
+            testimonials: { field: 'variant', values: ['carousel', 'grid', 'masonry', 'single'], fallback: 'carousel' },
+            gallery:      { field: 'layout',  values: ['masonry', 'grid', 'carousel', 'lightbox'], fallback: 'masonry' },
+            socialWidget: { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
+            cartWidget:   { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
+            contact: null, footer: null, stats: null, pricing: null, faq: null, team: null,
+        }
+
+        // Map blueprint variant names → Pages.ts valid values
+        const ALIASES: Record<string, Record<string, string>> = {
+            hero: {
+                'split': 'split-left', 'split-image': 'split-left', 'editorial': 'centered',
+                'fullscreen-image': 'fullscreen', 'fullscreen-video': 'video',
+                'video-background': 'video', 'video-bg': 'video', 'overlay': 'fullscreen',
+                'story': 'split-left', 'magazine': 'split-left', 'minimal': 'centered',
+                'cards-overlay': 'fullscreen', 'gradient': 'centered', 'parallax': 'fullscreen',
+                'slideshow': 'centered', 'split-video': 'video',
+            },
+            about: { 'simple': 'centered', 'split': 'image-right', 'story': 'image-right', 'single-column': 'centered', 'two-column': 'image-right', 'timeline': 'image-right' },
+            features: { 'grid': 'grid-3', 'list': 'centered-list', 'icon-grid': 'grid-3', 'card-grid': 'grid-3', 'cards': 'grid-3', 'detailed': 'centered-list', 'detailed-list': 'centered-list', 'icon-top': 'grid-3', 'icon-left': 'grid-2', 'zigzag': 'alternating', 'carousel': 'grid-3', 'minimal-list': 'centered-list' },
+            testimonials: { 'cards': 'grid', 'simple': 'carousel', 'spotlight': 'single', 'minimal-quote': 'single', 'avatar-row': 'carousel', 'video-text': 'carousel', 'featured': 'single', 'marquee': 'carousel', 'quote': 'single', 'single-highlight': 'single', 'slider': 'carousel' },
+            gallery: { 'filmstrip': 'carousel', 'justified': 'grid', 'fullscreen-grid': 'grid', 'slider': 'carousel', 'spotlight': 'lightbox' },
+            navigation: { 'simple': 'fixed', 'centered': 'fixed', 'mega-menu': 'fixed', 'sidebar': 'fixed', 'pill': 'fixed' },
+        }
+
+        // Strip each block to ONLY fields Pages.ts defines. Everything else → dropped.
+        // This prevents Payload validation errors from unknown/invalid field values.
+        const PAGES_FIELDS: Record<string, string[]> = {
+            hero: ['variant', 'headline', 'subheadline', 'videoUrl'],
+            navigation: ['style', 'logoText', 'links'],
+            about: ['layout', 'sectionLabel', 'headline', 'body'],
+            features: ['sectionLabel', 'headline', 'subheadline', 'layout', 'features'],
+            testimonials: ['headline', 'variant', 'testimonials'],
+            gallery: ['headline', 'layout'],
+            contact: ['headline', 'subtext', 'email', 'phone', 'address', 'showMap', 'mapEmbedUrl'],
+            footer: ['logoText', 'logo', 'tagline', 'columns', 'copyrightText', 'showSocialLinks'],
+            stats: ['headline', 'stats'],
+            pricing: ['headline', 'subheadline'],
+            faq: ['headline', 'faqs'],
+            team: ['headline'],
+            socialWidget: ['variant', 'headline', 'links'],
+            cartWidget: ['variant', 'label', 'showLabel'],
+        }
+
+        function sanitizeBlocks(blockList: Record<string, unknown>[]): Record<string, unknown>[] {
+            return blockList
+                .filter(b => PAGES_BLOCK_WHITELIST.has(b.blockType as string))
+                .map(block => {
+                    const bt = block.blockType as string
+                    const schema = PAGES_SCHEMA[bt]
+                    const allowedFields = PAGES_FIELDS[bt] || []
+
+                    // Start with only blockType
+                    const result: Record<string, unknown> = { blockType: bt }
+
+                    // Copy only allowed fields from template data
+                    for (const field of allowedFields) {
+                        if (block[field] !== undefined) {
+                            result[field] = block[field]
+                        }
+                    }
+
+                    // Handle variant/layout field mapping + validation
+                    if (schema) {
+                        const raw = (block.variant ?? block.layout) as string | undefined
+                        const aliased = raw && ALIASES[bt]?.[raw] ? ALIASES[bt]![raw]! : raw
+                        const resolved = aliased && schema.values.includes(aliased) ? aliased : schema.fallback
+                        result[schema.field] = resolved
+                        // Remove the other field if it was copied
+                        if (schema.field === 'variant') delete result.layout
+                        if (schema.field === 'layout') delete result.variant
+                    } else {
+                        // No variant/layout schema → remove both
+                        delete result.variant
+                        delete result.layout
+                    }
+
+                    return result
+                })
+        }
+
+        // Auto-generate navigation links from template pages
+        function injectNavLinks(
+            sanitizedPages: Array<{ title: string; slug: string; isHomepage?: boolean; layout: Record<string, unknown>[] }>,
+        ) {
+            const navLinks = sanitizedPages
+                .filter(p => p.slug !== '404')
+                .map(p => ({
+                    label: p.title,
+                    url: p.isHomepage ? '/' : `/${p.slug}`,
+                    newTab: false,
+                }))
+
+            for (const page of sanitizedPages) {
+                for (const block of page.layout) {
+                    if (block.blockType === 'navigation') {
+                        // Only inject if no links already present
+                        const existing = block.links as unknown[] | undefined
+                        if (!existing || existing.length === 0) {
+                            block.links = navLinks
+                        }
+                    }
+                }
+            }
+        }
+
         const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
         // Pick only valid theme fields — Payload groups may have extra metadata
         const templateTheme = {
@@ -66,7 +188,7 @@ export const POST = withAuth(async (user, req) => {
             colorMode: String(rawTheme.colorMode || 'dark'),
         }
 
-        // === APPLY TO EXISTING SITE ===
+        // === APPLY TO EXISTING SITE (multi-page + transaction) ===
         if (siteId) {
             let existingSite: Record<string, unknown>
             try {
@@ -86,32 +208,49 @@ export const POST = withAuth(async (user, req) => {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
             }
 
-            // Update site theme
+            // Build pages list from templatePages or fallback to defaultBlocks
+            const templatePages = (template.templatePages as Array<{ title: string; slug: string; isHomepage?: boolean; layout: unknown }>)
+            const rawPages = templatePages?.length
+                ? templatePages
+                : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
+            const pagesToCreate = rawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
+            injectNavLinks(pagesToCreate)
+
+            // Delete old pages → update theme → create new pages (sequential)
+            // 1. Delete all existing pages for this site
+            const existingPages = await payload.find({
+                collection: 'pages',
+                where: { site: { equals: Number(siteId) } },
+                limit: 100,
+            })
+            for (const page of existingPages.docs) {
+                await payload.delete({ collection: 'pages', id: page.id })
+            }
+
+            // 2. Update site theme
             await payload.update({
                 collection: 'sites',
                 id: Number(siteId),
                 data: { theme: templateTheme },
             })
 
-            // Find and update homepage blocks
-            const homepageResult = await payload.find({
-                collection: 'pages',
-                where: {
-                    site: { equals: Number(siteId) },
-                    isHomepage: { equals: true },
-                },
-                limit: 1,
-            })
-
-            if (homepageResult.docs[0]) {
-                await payload.update({
+            // 3. Create new pages from template
+            for (const [idx, page] of pagesToCreate.entries()) {
+                await payload.create({
                     collection: 'pages',
-                    id: homepageResult.docs[0].id,
-                    data: { layout: blocks },
+                    data: {
+                        title: page.title,
+                        slug: page.slug,
+                        site: Number(siteId),
+                        tenant: tenantId,
+                        isHomepage: page.isHomepage ?? idx === 0,
+                        _status: 'published',
+                        layout: page.layout,
+                    },
                 })
             }
 
-            // Increment template usage count
+            // 4. Increment template usage count
             await payload.update({
                 collection: 'templates',
                 id: templateId,
@@ -123,37 +262,51 @@ export const POST = withAuth(async (user, req) => {
                 siteId: Number(siteId),
                 siteName: existingSite.name,
                 templateName: template.name,
+                pagesCreated: pagesToCreate.length,
                 applied: true,
             })
         }
 
-        // === CREATE NEW SITE FROM TEMPLATE ===
+        // === CREATE NEW SITE FROM TEMPLATE (multi-page) ===
+        const newSiteTemplatePages = (template.templatePages as Array<{ title: string; slug: string; isHomepage?: boolean; layout: unknown }>)
+        const newSiteRawPages = newSiteTemplatePages?.length
+            ? newSiteTemplatePages
+            : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
+        const pagesToCreate = newSiteRawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
+        injectNavLinks(pagesToCreate)
+
         const site = await payload.create({
             collection: 'sites',
             data: {
                 name: String(template.name || 'Untitled'),
                 tenant: tenantId,
                 status: 'draft',
-                siteType: Array.isArray(template.category) ? String(template.category[0]) : String(template.category || 'business'),
+                siteType: (() => {
+                    const VALID_SITE_TYPES = new Set(['business', 'ecommerce', 'restaurant', 'tech', 'health', 'education', 'realestate', 'fitness', 'creative', 'beauty', 'blog'])
+                    const raw = Array.isArray(template.category) ? String(template.category[0]) : String(template.category || 'business')
+                    return VALID_SITE_TYPES.has(raw) ? raw : 'business'
+                })(),
                 theme: templateTheme,
             },
         })
 
-        // Homepage
-        await payload.create({
-            collection: 'pages',
-            data: {
-                title: 'Home',
-                slug: 'home',
-                site: site.id,
-                tenant: tenantId,
-                isHomepage: true,
-                status: 'draft',
-                layout: blocks,
-            },
-        })
+        // Create all template pages
+        for (const [idx, page] of pagesToCreate.entries()) {
+            await payload.create({
+                collection: 'pages',
+                data: {
+                    title: page.title,
+                    slug: page.slug,
+                    site: site.id,
+                    tenant: tenantId,
+                    isHomepage: page.isHomepage ?? idx === 0,
+                    _status: 'published',
+                    layout: page.layout,
+                },
+            })
+        }
 
-        // 404 Page
+        // 404 Page (always created)
         await payload.create({
             collection: 'pages',
             data: {
@@ -162,8 +315,8 @@ export const POST = withAuth(async (user, req) => {
                 site: site.id,
                 tenant: tenantId,
                 isHomepage: false,
-                status: 'draft',
-                layout: blocks,
+                _status: 'published',
+                layout: [],
                 seo: {
                     title: '404 - Page Not Found',
                     description: 'The page you are looking for does not exist.',
@@ -184,6 +337,7 @@ export const POST = withAuth(async (user, req) => {
             siteId: site.id,
             siteName: site.name,
             templateName: template.name,
+            pagesCreated: pagesToCreate.length + 1, // +1 for 404
         })
 
     } catch (error: unknown) {

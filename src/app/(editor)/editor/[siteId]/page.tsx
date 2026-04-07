@@ -578,11 +578,18 @@ export default function EditorPage() {
         }
     }, [handleSave, hasUnsavedChanges, isPublishing, site?.status, siteId, siteName])
 
-    const handlePageSelected = useCallback((pageId: string) => {
-        // Cancel any pending auto-save to prevent saving wrong page's blocks
+    const handlePageSelected = useCallback(async (pageId: string) => {
         const store = useEditorStore.getState()
+
+        // Cancel any pending auto-save timer to prevent cross-page data save
+        if (store.autoSaveTimer) {
+            clearTimeout(store.autoSaveTimer)
+            useEditorStore.setState({ autoSaveTimer: null })
+        }
+
+        // Save current page before switching to prevent data loss
         if (store.hasUnsavedChanges) {
-            store.markSaved() // Discard unsaved changes from previous page
+            await handleSave({ showToast: false, refreshPreview: false })
         }
 
         const nextParams = new URLSearchParams(searchParams.toString())
@@ -591,7 +598,7 @@ export default function EditorPage() {
         // Force iframe refresh to show new page content
         setIframeKey(k => k + 1)
         setSelectedBlock(null)
-    }, [router, searchParams, siteId])
+    }, [handleSave, router, searchParams, siteId])
 
     const handlePageUpdate = useCallback(async (pageId: string, changes: Partial<PageData>) => {
         try {

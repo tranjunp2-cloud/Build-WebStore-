@@ -4,6 +4,8 @@ import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { ProductQuickViewConfig, QuickViewProduct } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 function QuickViewModal({
     product,
@@ -293,7 +295,7 @@ export function ProductQuickViewBlock({ block }: BlockProps<ProductQuickViewConf
     )
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-12">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
@@ -314,6 +316,6 @@ export function ProductQuickViewBlock({ block }: BlockProps<ProductQuickViewConf
                     />
                 )}
             </AnimatePresence>
-        </section>
+        </AnimatedSection>
     )
 }

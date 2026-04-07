@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { DoctorProfileConfig, DoctorItem } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -214,7 +216,7 @@ export function DoctorProfileBlock({ block }: BlockProps<DoctorProfileConfig>) {
     )
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-12">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
@@ -225,6 +227,6 @@ export function DoctorProfileBlock({ block }: BlockProps<DoctorProfileConfig>) {
                 {variant === 'detailed' && renderDetailed()}
                 {variant === 'list' && renderList()}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

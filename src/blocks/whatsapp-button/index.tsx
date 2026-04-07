@@ -2,6 +2,7 @@
 
 import type { BlockProps } from '../types'
 import type { WhatsappButtonConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 const WhatsAppIcon = () => (
     <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -15,47 +16,48 @@ export function WhatsappButtonBlock({ block, theme }: BlockProps<WhatsappButtonC
     const cleanPhone = phoneNumber?.replace(/[^0-9]/g, '') || ''
     const whatsappUrl = `https://wa.me/${cleanPhone}${message ? `?text=${encodeURIComponent(message)}` : ''}`
 
-    if (variant === 'floating') {
+    // ── Inline variant ─────────────────────────────────────────────────
+    if (variant === 'inline') {
         return (
-            <div
-                className={`fixed z-50 ${position === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6`}
-            >
-                <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="group flex items-center gap-3 bg-[#25D366] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                    aria-label={label}
-                >
-                    {/* Pulse animation ring */}
-                    <span className="absolute inset-0 rounded-full bg-[#25D366] animate-ping opacity-20" />
-
-                    <span className="relative flex items-center gap-3 px-5 py-3">
+            <section className="py-24">
+                <div className="container mx-auto px-6 text-center">
+                    <a
+                        href={whatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white text-lg transition-all duration-200 hover:opacity-90 hover:scale-105 shadow-lg"
+                        style={{ backgroundColor: '#25D366' }}
+                    >
                         <WhatsAppIcon />
-                        <span className="text-sm font-semibold max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">
-                            {label}
-                        </span>
-                    </span>
-                </a>
-            </div>
+                        {label}
+                    </a>
+                </div>
+            </section>
         )
     }
 
-    // Inline variant
+    // ── Default: floating variant ────────────────────────────────────────
     return (
-        <section className="py-24">
-            <div className="container mx-auto px-6 text-center">
-                <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white text-lg transition-all duration-200 hover:opacity-90 hover:scale-105 shadow-lg"
-                    style={{ backgroundColor: 'var(--brand-primary)' }}
-                >
+        <div
+            className={`fixed z-50 ${position === 'bottom-left' ? 'left-6' : 'right-6'} bottom-6`}
+        >
+            <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex items-center gap-3 bg-[#25D366] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                aria-label={label}
+            >
+                {/* Pulse animation ring */}
+                <span className="absolute inset-0 rounded-full bg-[#25D366] animate-ping opacity-20" />
+
+                <span className="relative flex items-center gap-3 px-5 py-3">
                     <WhatsAppIcon />
-                    {label}
-                </a>
-            </div>
-        </section>
+                    <span className="text-sm font-semibold max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 whitespace-nowrap">
+                        {label}
+                    </span>
+                </span>
+            </a>
+        </div>
     )
 }
