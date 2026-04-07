@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { BookingWidgetConfig, BookingService } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -208,7 +210,7 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
     /* ── Inline ──────────────────────────────────────────────────────────────── */
     if (variant === 'inline') {
         return (
-            <section className="py-24">
+            <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     <div className="text-center max-w-2xl mx-auto mb-12">
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
@@ -218,14 +220,14 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
                         <BookingForm {...formProps} />
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     /* ── Sidebar ─────────────────────────────────────────────────────────────── */
     if (variant === 'sidebar') {
         return (
-            <section className="py-24">
+            <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
                         <div>
@@ -255,13 +257,13 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
                         </div>
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     /* ── Modal Trigger ───────────────────────────────────────────────────────── */
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
@@ -314,6 +316,6 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
                     </motion.div>
                 )}
             </AnimatePresence>
-        </section>
+        </AnimatedSection>
     )
 }

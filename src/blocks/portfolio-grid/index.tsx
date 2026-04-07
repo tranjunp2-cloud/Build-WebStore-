@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react'
 import type { BlockProps } from '../types'
 import type { PortfolioGridConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function PortfolioGridBlock({ block, theme }: BlockProps<PortfolioGridConfig>) {
     const { headline, subheadline, projects = [], variant = 'grid' } = block
@@ -40,7 +42,7 @@ export function PortfolioGridBlock({ block, theme }: BlockProps<PortfolioGridCon
     }
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-12">
@@ -108,6 +110,6 @@ export function PortfolioGridBlock({ block, theme }: BlockProps<PortfolioGridCon
                     </div>
                 )}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

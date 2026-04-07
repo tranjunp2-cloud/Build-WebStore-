@@ -2,6 +2,8 @@
 
 import type { BlockProps } from '../types'
 import type { ServiceCardsConfig, ServiceItem } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfig>) {
     const { headline, subheadline, services = [], variant = 'grid' } = block
@@ -115,7 +117,7 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
     }
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
@@ -138,6 +140,6 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
 
                 {variant === 'featured' && renderFeatured()}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

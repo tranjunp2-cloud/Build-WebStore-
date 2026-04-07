@@ -83,6 +83,11 @@ let mockSite: Record<string, unknown> | null = { ...DEFAULT_SITE }
 let mockHomepage: Record<string, unknown> | null = { ...DEFAULT_HOMEPAGE }
 let mockCreatedSite = { id: 999, name: DEFAULT_TEMPLATE.name }
 
+const mockTransaction = {
+    commitTransaction: vi.fn().mockResolvedValue(undefined),
+    rollbackTransaction: vi.fn().mockResolvedValue(undefined),
+}
+
 const mockPayloadInstance = {
     findByID: vi.fn().mockImplementation(async ({ collection }: { collection: string }) => {
         if (collection === 'templates') return mockTemplate
@@ -99,6 +104,10 @@ const mockPayloadInstance = {
         return { id: 1000 + Math.random() }
     }),
     update: vi.fn().mockResolvedValue({}),
+    delete: vi.fn().mockResolvedValue({}),
+    db: {
+        beginTransaction: vi.fn().mockResolvedValue(mockTransaction),
+    },
 }
 
 // ── Route handler — imported AFTER all mocks ─────────────────────────────────
@@ -150,6 +159,7 @@ describe('POST /api/ai/apply-template', () => {
             return { id: 1000 }
         })
         mockPayloadInstance.update.mockResolvedValue({})
+        mockPayloadInstance.delete.mockResolvedValue({})
     })
 
     // ── TC-F07.022: Rate limiting ─────────────────────────────────────────────
@@ -369,20 +379,26 @@ describe('POST /api/ai/apply-template', () => {
             expect(siteUpdateCall[0].data.theme).toEqual(DEFAULT_TEMPLATE.defaultTheme)
         })
 
-        it('updates homepage layout with template defaultBlocks', async () => {
+        it('deletes existing pages and creates new homepage with template defaultBlocks', async () => {
             // Arrange
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
             // Act
             await POST(req)
 
-            // Assert — pages.update called with correct blocks
-            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+            // Assert — old page deleted, new page created with template blocks
+            expect(mockPayloadInstance.delete).toHaveBeenCalledWith(
+                expect.objectContaining({ collection: 'pages', id: 201 })
+            )
+            const pageCreateCall = mockPayloadInstance.create.mock.calls.find(
                 (c: any[]) => c[0].collection === 'pages'
             )
-            expect(pageUpdateCall).toBeDefined()
-            expect(pageUpdateCall[0].id).toBe(201)
-            expect(pageUpdateCall[0].data.layout).toEqual(DEFAULT_TEMPLATE.defaultBlocks)
+            expect(pageCreateCall).toBeDefined()
+            // Layout is sanitized (variants resolved, unknown blocks filtered)
+            // Just verify blocks are present with correct blockTypes
+            const layout = pageCreateCall[0].data.layout as Record<string, unknown>[]
+            expect(layout.length).toBeGreaterThan(0)
+            expect(layout[0].blockType).toBe('hero')
         })
 
         it('skips homepage layout update when site has no homepage', async () => {
@@ -416,32 +432,34 @@ describe('POST /api/ai/apply-template', () => {
             expect(templateUpdateCall[0].data.usageCount).toBe(6) // 5 + 1
         })
 
-        it('does NOT create any new sites or pages when applying to existing site', async () => {
+        it('creates new pages from template when applying to existing site (multi-page)', async () => {
             // Arrange
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
             // Act
             await POST(req)
 
-            // Assert — no create calls should happen
-            expect(mockPayloadInstance.create).not.toHaveBeenCalled()
+            // Assert — creates pages (delete old + create new is the new flow)
+            const pageCreateCalls = mockPayloadInstance.create.mock.calls.filter(
+                (c: any[]) => c[0].collection === 'pages'
+            )
+            expect(pageCreateCalls.length).toBeGreaterThanOrEqual(1)
         })
 
-        it('looks up homepage by site+isHomepage query (not just any page)', async () => {
+        it('finds all existing pages by site ID for deletion', async () => {
             // Arrange
             const req = makeRequest({ templateId: 'tpl-modern', siteId: '101' })
 
             // Act
             await POST(req)
 
-            // Assert — verify the find() query shape for pages
+            // Assert — verify the find() query shape for pages (all pages, not just homepage)
             const pageFindCall = mockPayloadInstance.find.mock.calls.find(
                 (c: any[]) => c[0].collection === 'pages'
             )
             expect(pageFindCall).toBeDefined()
             expect(pageFindCall[0].where).toMatchObject({
                 site: { equals: 101 },
-                isHomepage: { equals: true },
             })
         })
     })
@@ -519,12 +537,12 @@ describe('POST /api/ai/apply-template', () => {
             // Act
             await POST(req)
 
-            // Assert — page layout updated with empty array (not undefined/null)
-            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+            // Assert — page created with empty array layout (not undefined/null)
+            const pageCreateCall = mockPayloadInstance.create.mock.calls.find(
                 (c: any[]) => c[0].collection === 'pages'
             )
-            expect(pageUpdateCall).toBeDefined()
-            expect(pageUpdateCall[0].data.layout).toEqual([])
+            expect(pageCreateCall).toBeDefined()
+            expect(pageCreateCall[0].data.layout).toEqual([])
         })
 
         it('passes siteId as Number when calling payload.findByID and payload.update for sites', async () => {
@@ -570,12 +588,12 @@ describe('POST /api/ai/apply-template', () => {
             // Act
             await POST(req)
 
-            // Assert — page layout must be [] not null
-            const pageUpdateCall = mockPayloadInstance.update.mock.calls.find(
+            // Assert — page created with [] layout, not null
+            const pageCreateCall = mockPayloadInstance.create.mock.calls.find(
                 (c: any[]) => c[0].collection === 'pages'
             )
-            expect(pageUpdateCall).toBeDefined()
-            expect(pageUpdateCall[0].data.layout).toEqual([])
+            expect(pageCreateCall).toBeDefined()
+            expect(pageCreateCall[0].data.layout).toEqual([])
         })
 
         // ── TC-F07.041: null defaultTheme ─────────────────────────────────────

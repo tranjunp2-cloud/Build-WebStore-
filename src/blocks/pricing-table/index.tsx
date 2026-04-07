@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import type { BlockProps } from '../types'
 import type { PricingTableConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfig>) {
     const { variant = 'columns', headline, subheadline, billingToggle = 'monthly', plans = [] } = block
@@ -11,7 +13,7 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
     const isHorizontal = variant === 'horizontal'
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-12">
                     {headline && <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline}</h2>}
@@ -25,7 +27,7 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                         type="button"
                         onClick={() => setBilling(billing === 'monthly' ? 'yearly' : 'monthly')}
                         className="relative w-14 h-7 rounded-full transition-colors duration-200"
-                        style={{ backgroundColor: billing === 'yearly' ? theme.primaryColor : `rgba(var(--brand-primary-rgb), 0.251)` }}
+                        style={{ backgroundColor: billing === 'yearly' ? CSS_VARS.primary : `rgba(var(--brand-primary-rgb), 0.251)` }}
                         aria-label="Toggle billing period"
                     >
                         <span
@@ -47,7 +49,7 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                                 <div
                                     key={i}
                                     className={`flex flex-col md:flex-row items-start md:items-center gap-6 p-8 rounded-2xl border transition-shadow duration-200 ${plan.popular ? 'shadow-lg' : ''}`}
-                                    style={{ borderColor: plan.popular ? theme.primaryColor : `rgba(var(--brand-primary-rgb), 0.125)` }}
+                                    style={{ borderColor: plan.popular ? CSS_VARS.primary : `rgba(var(--brand-primary-rgb), 0.125)` }}
                                 >
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2">
@@ -84,7 +86,7 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                             <div
                                 key={i}
                                 className={`relative p-8 rounded-2xl border transition-all duration-200 ${plan.popular ? 'shadow-xl scale-105 z-10' : 'hover:shadow-md'}`}
-                                style={{ borderColor: plan.popular ? theme.primaryColor : `rgba(var(--brand-primary-rgb), 0.125)` }}
+                                style={{ borderColor: plan.popular ? CSS_VARS.primary : `rgba(var(--brand-primary-rgb), 0.125)` }}
                             >
                                 {plan.popular && (
                                     <div className="absolute -top-4 left-1/2 -translate-x-1/2">
@@ -116,6 +118,6 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                     })}
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

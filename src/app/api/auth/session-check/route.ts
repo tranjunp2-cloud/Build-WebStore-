@@ -1,26 +1,34 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser, getCurrentTenantId } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function GET() {
     try {
         const user = await getCurrentUser();
-        const tenantId = await getCurrentTenantId();
-
-        if (!user || !tenantId) {
-            return NextResponse.json({ action: 'force_logout', reason: 'Unauthenticated or Missing Tenant' });
+        if (!user) {
+            return NextResponse.json({ action: 'force_logout', reason: 'Unauthenticated' });
         }
 
-        // Check if the user still belongs to the active tenant
-        const isStillInTenant = user.tenants?.some((t: { tenant: string | { id: string } }) => {
+        // Extract tenant from user directly — avoid 2nd getCurrentUser() call
+        const tenants = user.tenants as Array<{ tenant: string | { id: string } }> | undefined;
+        const firstTenant = tenants?.[0]?.tenant;
+        const activeTenantId = typeof firstTenant === 'string' ? firstTenant : firstTenant?.id;
+
+        if (!activeTenantId) {
+            return NextResponse.json({ action: 'force_logout', reason: 'Missing Tenant' });
+        }
+
+        const isStillInTenant = tenants?.some((t) => {
             const tId = typeof t.tenant === 'object' ? t.tenant?.id : t.tenant;
-            return tId === tenantId;
+            return tId === activeTenantId;
         });
 
         if (!isStillInTenant) {
             return NextResponse.json({ action: 'force_logout', reason: 'Removed from workspace' });
         }
 
-        return NextResponse.json({ ok: true });
+        const response = NextResponse.json({ ok: true });
+        response.headers.set('Cache-Control', 'private, max-age=30');
+        return response;
     } catch (error) {
         console.error('[Session Check Error]:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

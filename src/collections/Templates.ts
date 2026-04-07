@@ -11,6 +11,10 @@ export const TEMPLATE_CATEGORY_OPTIONS = [
     { label: '💪 Gym / Fitness / Yoga', value: 'fitness' },
     { label: '🎨 Portfolio / Freelancer / Agency', value: 'creative' },
     { label: '🏢 Business / Corporate', value: 'business' },
+    { label: '🍜 F&B / Cafe / Bakery', value: 'fnb' },
+    { label: '🎉 Events / Wedding', value: 'events' },
+    { label: '📝 Blog / Media / Magazine', value: 'blog' },
+    { label: '✈️ Travel / Tourism', value: 'travel' },
 ]
 
 export const Templates: CollectionConfig = {
@@ -78,8 +82,21 @@ export const Templates: CollectionConfig = {
             name: 'defaultBlocks',
             type: 'json',
             admin: {
-                description: 'Default page blocks configuration (JSON) applied when using this template',
+                description: 'Default homepage blocks (JSON). Kept for backward compat — prefer templatePages.',
             },
+        },
+        {
+            name: 'templatePages',
+            type: 'array',
+            admin: {
+                description: 'Multi-page template structure. Professional=3 pages, Premium=5 pages.',
+            },
+            fields: [
+                { name: 'title', type: 'text', required: true },
+                { name: 'slug', type: 'text', required: true },
+                { name: 'isHomepage', type: 'checkbox', defaultValue: false },
+                { name: 'layout', type: 'json' },
+            ],
         },
         {
             name: 'sortOrder',

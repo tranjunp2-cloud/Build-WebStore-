@@ -6,7 +6,7 @@ import { startOfDay, subDays } from 'date-fns'
 // Force dynamic — requires auth context + getPayload() at runtime
 export const dynamic = 'force-dynamic'
 
-import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
@@ -24,8 +24,13 @@ interface Props {
 
 export default async function DashboardPage({ searchParams }: Props) {
     const user = await getCurrentUser()
-    const tenantId = await getCurrentTenantId()
     const payload = await getPayload({ config })
+
+    // Extract tenantId from user directly — avoid 2nd getCurrentUser() call
+    const typedUserForTenant = user as PlatformUser | null
+    const userTenants = typedUserForTenant?.tenants as Array<{ tenant: string | { id: string } }> | undefined
+    const firstUserTenant = userTenants?.[0]?.tenant
+    const tenantId = typeof firstUserTenant === 'string' ? firstUserTenant : firstUserTenant?.id || null
 
     // Using Next.js 15 asynchronous searchParams
     const resolvedParams = await searchParams
