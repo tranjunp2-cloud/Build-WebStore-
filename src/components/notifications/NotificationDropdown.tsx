@@ -10,7 +10,7 @@ import type { NotificationsResponse, NotificationItem as NotificationItemType } 
 import { Loader2 } from 'lucide-react'
 
 export function NotificationDropdown() {
-  const { isDropdownOpen, setDropdownOpen, setUnreadCount, decrementUnreadCount, incrementUnreadCount } = useNotificationStore()
+  const { isDropdownOpen, setDropdownOpen, setUnreadCount, decrementUnreadCount, incrementUnreadCount, resetUnread } = useNotificationStore()
   const { t } = useI18n()
   const router = useRouter()
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -113,6 +113,46 @@ export function NotificationDropdown() {
     }
   }, [decrementUnreadCount, incrementUnreadCount, router, setDropdownOpen])
 
+  const handleMarkAll = useCallback(() => {
+    if (!data || data.unreadCount === 0) return
+
+    // Save snapshot for rollback
+    const snapshot = {
+      unreadCount: data.unreadCount,
+      items: data.items.map((item) => ({ ...item })),
+    }
+
+    // Optimistic: mark all as read
+    setData((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        unreadCount: 0,
+        items: prev.items.map((item) => ({ ...item, isRead: true })),
+      }
+    })
+    resetUnread()
+    markingReadRef.current.clear()
+
+    // API call with rollback on failure
+    fetch('/api/notifications/mark-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mark_all: true }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('mark-all failed')
+      })
+      .catch(() => {
+        // Rollback to snapshot
+        setData((prev) => {
+          if (!prev) return prev
+          return { ...prev, unreadCount: snapshot.unreadCount, items: snapshot.items }
+        })
+        setUnreadCount(snapshot.unreadCount)
+      })
+  }, [data, resetUnread, setUnreadCount])
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -138,7 +178,11 @@ export function NotificationDropdown() {
     >
       <div className="flex items-center justify-between border-b border-white/10 px-4 sm:px-5 pt-3 pb-3 sm:pt-4">
         <h3 className="text-[16px] sm:text-[18px] font-bold text-white leading-relaxed">{t.notifications.title}</h3>
-        <button className="text-[14px] font-medium text-blue-500 hover:text-blue-400 transition-colors">
+        <button
+          onClick={handleMarkAll}
+          disabled={!data || data.unreadCount === 0}
+          className="text-[14px] font-medium text-blue-500 hover:text-blue-400 transition-colors disabled:text-white/20 disabled:cursor-not-allowed"
+        >
           {t.notifications.markAllRead}
         </button>
       </div>
