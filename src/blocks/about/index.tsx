@@ -5,29 +5,20 @@ import type { AboutConfig, TimelineItem } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import { motion } from 'framer-motion'
 import { getAboutImage } from '@/lib/images/industry-images'
-
-function SectionLabel({ children, color }: { children: string; color: string }) {
-    return (
-        <span
-            className="inline-block text-xs font-semibold uppercase tracking-widest px-3 py-1 rounded-full mb-4"
-            style={{ color, background: `rgba(var(--brand-primary-rgb), 0.1)` }}
-        >
-            {children}
-        </span>
-    )
-}
+import { SectionLabel } from '../shared/decorative'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 function SimpleVariant({ block }: { block: AboutConfig }) {
     const { headline, sectionLabel, body } = block
     return (
-        <AnimatedSection className="py-16 md:py-24" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6 max-w-3xl text-center">
-                {sectionLabel && <SectionLabel color="var(--brand-primary)">{sectionLabel}</SectionLabel>}
-                <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: 'var(--font-heading)' }}>
+                {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
+                <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: CSS_VARS.fontHeading }}>
                     {headline}
                 </h2>
                 {body && (
-                    <p className="text-lg leading-relaxed" style={{ color: 'var(--muted)' }}>
+                    <p className="text-lg leading-relaxed" style={{ color: CSS_VARS.muted }}>
                         {body}
                     </p>
                 )}
@@ -43,7 +34,7 @@ function SplitVariant({ block, category }: { block: AboutConfig; category: strin
     const isImageLeft = layout === 'image-left'
 
     return (
-        <AnimatedSection className="py-16 md:py-24 relative overflow-hidden" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-24 relative overflow-hidden" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center">
                     {isImageLeft && (
@@ -57,7 +48,7 @@ function SplitVariant({ block, category }: { block: AboutConfig; category: strin
                                 src={imageUrl}
                                 alt={imageAlt}
                                 className="w-full h-auto object-cover max-h-[450px]"
-                                style={{ borderRadius: 'var(--radius-lg)' }}
+                                style={{ borderRadius: CSS_VARS.radiusLg }}
                                 loading="lazy"
                             />
                         </motion.div>
@@ -69,12 +60,12 @@ function SplitVariant({ block, category }: { block: AboutConfig; category: strin
                         viewport={{ once: true }}
                         transition={{ duration: 0.6, delay: 0.1 }}
                     >
-                        {sectionLabel && <SectionLabel color="var(--brand-primary)">{sectionLabel}</SectionLabel>}
-                        <h2 className="text-3xl md:text-4xl font-bold mb-6 leading-tight" style={{ fontFamily: 'var(--font-heading)' }}>
+                        {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
+                        <h2 className="text-3xl md:text-4xl font-bold mb-6 leading-tight" style={{ fontFamily: CSS_VARS.fontHeading }}>
                             {headline}
                         </h2>
                         {body && (
-                            <p className="text-lg leading-relaxed" style={{ color: 'var(--muted)' }}>
+                            <p className="text-lg leading-relaxed" style={{ color: CSS_VARS.muted }}>
                                 {body}
                             </p>
                         )}
@@ -91,7 +82,7 @@ function SplitVariant({ block, category }: { block: AboutConfig; category: strin
                                 src={imageUrl}
                                 alt={imageAlt}
                                 className="w-full h-auto object-cover max-h-[450px]"
-                                style={{ borderRadius: 'var(--radius-lg)' }}
+                                style={{ borderRadius: CSS_VARS.radiusLg }}
                                 loading="lazy"
                             />
                         </motion.div>
@@ -111,14 +102,14 @@ function StoryVariant({ block }: { block: AboutConfig }) {
     }
 
     return (
-        <AnimatedSection className="py-16 md:py-24" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6 max-w-3xl">
                 <div className="text-center mb-12">
-                    {sectionLabel && <SectionLabel color="var(--brand-primary)">{sectionLabel}</SectionLabel>}
-                    <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: 'var(--font-heading)' }}>
+                    {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
+                    <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: CSS_VARS.fontHeading }}>
                         {headline}
                     </h2>
-                    {body && <p className="text-lg" style={{ color: 'var(--muted)' }}>{body}</p>}
+                    {body && <p className="text-lg" style={{ color: CSS_VARS.muted }}>{body}</p>}
                 </div>
 
                 <ol className="relative" aria-label="Company timeline">
@@ -150,7 +141,7 @@ function TimelineEntry({ item, index }: { item: TimelineItem; index: number; isL
                     {isEven ? (
                         <TimelineContent item={item} />
                     ) : (
-                        <span className="text-sm font-bold" style={{ color: 'var(--brand-primary)', fontFamily: 'var(--font-heading)' }}>
+                        <span className="text-sm font-bold" style={{ color: CSS_VARS.primary, fontFamily: CSS_VARS.fontHeading }}>
                             {item.icon && <span className="mr-1">{item.icon}</span>}
                             {item.year}
                         </span>
@@ -161,14 +152,14 @@ function TimelineEntry({ item, index }: { item: TimelineItem; index: number; isL
                 <div
                     className="relative z-10 w-3 h-3 rounded-full flex-shrink-0 ring-4 ring-[var(--background)]"
                     style={{
-                        background: 'var(--brand-primary)',
+                        background: CSS_VARS.primary,
                     }}
                     aria-hidden="true"
                 />
 
                 <div className={`hidden md:block md:w-1/2 ${isEven ? 'pl-8 order-2' : 'text-right pr-8'}`}>
                     {isEven ? (
-                        <span className="text-sm font-bold" style={{ color: 'var(--brand-primary)', fontFamily: 'var(--font-heading)' }}>
+                        <span className="text-sm font-bold" style={{ color: CSS_VARS.primary, fontFamily: CSS_VARS.fontHeading }}>
                             {item.icon && <span className="mr-1">{item.icon}</span>}
                             {item.year}
                         </span>
@@ -179,7 +170,7 @@ function TimelineEntry({ item, index }: { item: TimelineItem; index: number; isL
 
                 {/* Mobile: always left-aligned */}
                 <div className="md:hidden pl-4">
-                    <span className="text-sm font-bold block mb-1" style={{ color: 'var(--brand-primary)', fontFamily: 'var(--font-heading)' }}>
+                    <span className="text-sm font-bold block mb-1" style={{ color: CSS_VARS.primary, fontFamily: CSS_VARS.fontHeading }}>
                         {item.icon && <span className="mr-1">{item.icon}</span>}
                         {item.year}
                     </span>
@@ -193,11 +184,11 @@ function TimelineEntry({ item, index }: { item: TimelineItem; index: number; isL
 function TimelineContent({ item }: { item: TimelineItem }) {
     return (
         <div>
-            <h3 className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)', color: 'var(--text)' }}>
+            <h3 className="font-bold text-lg" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
                 {item.title}
             </h3>
             {item.description && (
-                <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
+                <p className="text-sm mt-1" style={{ color: CSS_VARS.muted }}>
                     {item.description}
                 </p>
             )}

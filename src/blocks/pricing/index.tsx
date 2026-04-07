@@ -253,6 +253,126 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
         )
     }
 
+    // ── table variant ────────────────────────────────────────────────────
+    if (variant === 'table') {
+        // Collect all unique feature texts across plans
+        const allFeatureTexts = Array.from(new Set(
+            plans.flatMap(p => p.features.map(f => typeof f === 'string' ? f : f.text))
+        ))
+        const planHasFeature = (plan: typeof plans[number], featureText: string) =>
+            plan.features.some(f => (typeof f === 'string' ? f : f.text) === featureText)
+
+        return (
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+                <div className="container mx-auto px-6 relative z-10">
+                    <SectionHeader headline={headline} subheadline={subheadline} />
+                    <div className="overflow-x-auto max-w-5xl mx-auto">
+                        <div className="min-w-[600px]">
+                            {/* Header row — plan names + prices */}
+                            <div
+                                className="grid items-end gap-px mb-px"
+                                style={{ gridTemplateColumns: `minmax(180px, 1.5fr) repeat(${plans.length}, 1fr)` }}
+                            >
+                                {/* Corner cell */}
+                                <div className="p-4" />
+                                {plans.map((plan, i) => (
+                                    <div
+                                        key={i}
+                                        className="p-5 text-center rounded-t-xl"
+                                        style={{
+                                            background: plan.highlighted
+                                                ? 'var(--brand-primary)'
+                                                : 'rgba(var(--brand-primary-rgb), 0.06)',
+                                            color: plan.highlighted ? '#fff' : 'inherit',
+                                        }}
+                                    >
+                                        {plan.highlighted && (
+                                            <span className="inline-block text-[10px] font-bold uppercase tracking-widest mb-2 px-2 py-0.5 rounded-full bg-white/20">
+                                                Popular
+                                            </span>
+                                        )}
+                                        <h3 className="text-lg font-bold font-heading">{plan.name}</h3>
+                                        <div className="mt-1">
+                                            <span className="text-2xl font-bold">{plan.price}</span>
+                                            {plan.period && (
+                                                <span className={`text-xs ${plan.highlighted ? 'opacity-70' : 'opacity-50'}`}>/{plan.period}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Feature rows */}
+                            {allFeatureTexts.map((featureText, fi) => (
+                                <div
+                                    key={fi}
+                                    className="grid items-center gap-px"
+                                    style={{
+                                        gridTemplateColumns: `minmax(180px, 1.5fr) repeat(${plans.length}, 1fr)`,
+                                        borderTop: '1px solid rgba(var(--brand-primary-rgb), 0.06)',
+                                    }}
+                                >
+                                    <div className="p-4 text-sm opacity-80">{featureText}</div>
+                                    {plans.map((plan, pi) => (
+                                        <div
+                                            key={pi}
+                                            className="p-4 text-center"
+                                            style={{
+                                                background: plan.highlighted
+                                                    ? 'rgba(var(--brand-primary-rgb), 0.04)'
+                                                    : 'transparent',
+                                            }}
+                                        >
+                                            {planHasFeature(plan, featureText) ? (
+                                                <span className="text-lg" style={{ color: 'var(--brand-primary)' }}>&#10003;</span>
+                                            ) : (
+                                                <span className="opacity-20">&times;</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+
+                            {/* CTA row */}
+                            <div
+                                className="grid items-center gap-px mt-px"
+                                style={{
+                                    gridTemplateColumns: `minmax(180px, 1.5fr) repeat(${plans.length}, 1fr)`,
+                                    borderTop: '1px solid rgba(var(--brand-primary-rgb), 0.06)',
+                                }}
+                            >
+                                <div className="p-4" />
+                                {plans.map((plan, i) => (
+                                    <div
+                                        key={i}
+                                        className="p-5 text-center rounded-b-xl"
+                                        style={{
+                                            background: plan.highlighted
+                                                ? 'rgba(var(--brand-primary-rgb), 0.04)'
+                                                : 'transparent',
+                                        }}
+                                    >
+                                        <a
+                                            href={plan.ctaUrl}
+                                            className={`inline-block px-6 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 hover:opacity-90 ${plan.highlighted ? 'text-white' : ''}`}
+                                            style={plan.highlighted
+                                                ? { background: 'var(--brand-primary)' }
+                                                : { border: '1px solid var(--brand-primary)', color: 'var(--brand-primary)' }
+                                            }
+                                        >
+                                            {plan.ctaLabel}
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </AnimatedSection>
+        )
+    }
+
     // ── minimal variant ───────────────────────────────────────────────────
     if (variant === 'minimal') {
         return <PricingMinimal block={block} theme={theme} />

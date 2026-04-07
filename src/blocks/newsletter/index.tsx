@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useId, useRef, useState } from 'react'
 import { AnimatedSection } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { NewsletterConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 type SubmitState = 'idle' | 'loading' | 'success' | 'error'
 
@@ -68,7 +69,7 @@ function EmailForm({
 
     if (state === 'success') {
         return (
-            <div className="flex items-center justify-center gap-2 py-3 px-4" style={{ color: 'var(--brand-primary)' }}>
+            <div className="flex items-center justify-center gap-2 py-3 px-4" style={{ color: CSS_VARS.primary }}>
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                     <path d="M16.667 5L7.5 14.167 3.333 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -92,9 +93,9 @@ function EmailForm({
                     className="w-full px-4 py-3 bg-transparent border focus:outline-none focus:ring-2 transition-colors"
                     style={{
                         borderColor: error ? '#ef4444' : 'rgba(var(--brand-primary-rgb), 0.3)',
-                        borderRadius: 'var(--radius-md)',
-                        color: 'var(--text)',
-                        outlineColor: 'var(--brand-primary)',
+                        borderRadius: CSS_VARS.radiusMd,
+                        color: CSS_VARS.text,
+                        outlineColor: CSS_VARS.primary,
                     }}
                     aria-describedby={error ? errorId : undefined}
                 />
@@ -109,8 +110,8 @@ function EmailForm({
                 disabled={state === 'loading'}
                 className="px-6 py-3 font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 flex-shrink-0 flex items-center justify-center gap-2"
                 style={{
-                    background: 'var(--brand-primary)',
-                    borderRadius: 'var(--radius-md)',
+                    background: CSS_VARS.primary,
+                    borderRadius: CSS_VARS.radiusMd,
                 }}
             >
                 {state === 'loading' && (
@@ -128,14 +129,14 @@ function EmailForm({
 function InlineVariant({ block, siteId }: { block: NewsletterConfig; siteId?: string }) {
     const { headline, subheadline, buttonLabel = 'Subscribe', placeholder = 'your@email.com' } = block
     return (
-        <AnimatedSection className="py-12 md:py-16" style={{ color: 'var(--text)', background: 'var(--surface)' }}>
+        <AnimatedSection className="py-12 md:py-16" style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
             <div className="container mx-auto px-6">
                 <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-12 max-w-4xl mx-auto">
                     <div className="flex-1 text-center lg:text-left">
-                        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
                             {headline || 'Stay Updated'}
                         </h2>
-                        {subheadline && <p style={{ color: 'var(--muted)' }}>{subheadline}</p>}
+                        {subheadline && <p style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
                     </div>
                     <div className="flex-1 w-full max-w-md">
                         <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="row" />
@@ -149,21 +150,21 @@ function InlineVariant({ block, siteId }: { block: NewsletterConfig; siteId?: st
 function PopupVariant({ block, siteId }: { block: NewsletterConfig; siteId?: string }) {
     const { headline, subheadline, buttonLabel = 'Subscribe', placeholder = 'your@email.com' } = block
     return (
-        <AnimatedSection className="py-16 md:py-20" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-20" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6">
                 <div
                     className="max-w-md mx-auto text-center p-8 md:p-10"
                     style={{
-                        background: 'var(--surface)',
-                        borderRadius: 'var(--radius-lg)',
-                        boxShadow: 'var(--shadow-md)',
+                        background: CSS_VARS.surface,
+                        borderRadius: CSS_VARS.radiusLg,
+                        boxShadow: CSS_VARS.shadowMd,
                         border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
                     }}
                 >
-                    <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ fontFamily: 'var(--font-heading)' }}>
+                    <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading }}>
                         {headline || 'Stay Updated'}
                     </h2>
-                    {subheadline && <p className="mb-6" style={{ color: 'var(--muted)' }}>{subheadline}</p>}
+                    {subheadline && <p className="mb-6" style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
                     <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="stack" />
                 </div>
             </div>
@@ -184,7 +185,7 @@ function BannerVariant({ block, siteId }: { block: NewsletterConfig; siteId?: st
             <div className="container mx-auto px-6">
                 <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-12 max-w-4xl mx-auto">
                     <div className="flex-1 text-center lg:text-left">
-                        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
                             {headline || 'Stay Updated'}
                         </h2>
                         {subheadline && <p className="opacity-85">{subheadline}</p>}

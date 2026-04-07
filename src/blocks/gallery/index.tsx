@@ -27,7 +27,64 @@ export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
         return <JustifiedGallery headline={headline} images={images} theme={theme} />
     }
 
-    // ── Default: grid / masonry / carousel (existing) ─────────────────────
+    // ── Masonry variant ────────────────────────────────────────────────────
+    if (variant === 'masonry') {
+        return <MasonryGallery headline={headline} images={images} theme={theme} />
+    }
+
+    // ── Carousel variant ─────────────────────────────────────────────────
+    if (variant === 'carousel') {
+        return <CarouselGallery headline={headline} images={images} theme={theme} />
+    }
+
+    // ── Default: grid ────────────────────────────────────────────────────
+    return (
+        <AnimatedSection className="py-24">
+            <div className="container mx-auto px-6">
+                {headline && (
+                    <div className="text-center mb-14">
+                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
+                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                    </div>
+                )}
+                <StaggerGrid className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {images.map((item, i) => (
+                        <StaggerItem key={i} className="group">
+                            {item.image?.url ? (
+                                <div className="relative overflow-hidden rounded-2xl aspect-square">
+                                    <img
+                                        src={item.image.url}
+                                        alt={item.caption || item.image.alt || ''}
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                    />
+                                    {item.caption && (
+                                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                            <p className="text-white text-sm font-medium">{item.caption}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div
+                                    className="aspect-square rounded-2xl flex items-center justify-center"
+                                    style={{
+                                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
+                                        border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
+                                    }}
+                                >
+                                    <span className="text-2xl opacity-20">📷</span>
+                                </div>
+                            )}
+                        </StaggerItem>
+                    ))}
+                </StaggerGrid>
+            </div>
+        </AnimatedSection>
+    )
+}
+
+// ── Masonry Gallery ─────────────────────────────────────────────────────────
+
+function MasonryGallery({ headline, images, theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
     return (
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
@@ -55,9 +112,9 @@ export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
                                 </div>
                             ) : (
                                 <div
-                                    className="aspect-square rounded-2xl flex items-center justify-center"
+                                    className="aspect-video rounded-2xl flex items-center justify-center"
                                     style={{
-                                        background: `linear-gradient(135deg, var(--brand-primary)${(10 + i * 3).toString(16).padStart(2, '0')}, rgba(var(--brand-primary-rgb), 0.02))`,
+                                        background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
                                         border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
                                     }}
                                 >
@@ -67,6 +124,134 @@ export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
                         </StaggerItem>
                     ))}
                 </StaggerGrid>
+            </div>
+        </AnimatedSection>
+    )
+}
+
+// ── Carousel Gallery ────────────────────────────────────────────────────────
+
+function CarouselGallery({ headline, images, theme }: { headline?: string; images: GalleryConfig['images']; theme: { primaryColor: string } }) {
+    const [currentIndex, setCurrentIndex] = useState(0)
+    const [isAutoPlaying, setIsAutoPlaying] = useState(true)
+    const totalImages = images.length
+
+    // Auto-scroll every 4 seconds
+    useEffect(() => {
+        if (!isAutoPlaying || totalImages <= 1) return
+        const timer = setInterval(() => {
+            setCurrentIndex(prev => (prev + 1) % totalImages)
+        }, 4000)
+        return () => clearInterval(timer)
+    }, [isAutoPlaying, totalImages])
+
+    const handlePrev = useCallback(() => {
+        setIsAutoPlaying(false)
+        setCurrentIndex(prev => (prev - 1 + totalImages) % totalImages)
+    }, [totalImages])
+
+    const handleNext = useCallback(() => {
+        setIsAutoPlaying(false)
+        setCurrentIndex(prev => (prev + 1) % totalImages)
+    }, [totalImages])
+
+    const handleDot = useCallback((index: number) => {
+        setIsAutoPlaying(false)
+        setCurrentIndex(index)
+    }, [])
+
+    return (
+        <AnimatedSection className="py-24">
+            <div className="container mx-auto px-6">
+                {headline && (
+                    <div className="text-center mb-14">
+                        <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
+                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                    </div>
+                )}
+
+                <div className="relative max-w-6xl mx-auto">
+                    {/* Carousel track */}
+                    <div className="overflow-hidden rounded-2xl">
+                        <motion.div
+                            className="flex"
+                            animate={{ x: `-${currentIndex * 100}%` }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                        >
+                            {images.map((item, i) => (
+                                <div
+                                    key={i}
+                                    className="w-full flex-shrink-0 md:w-1/2 lg:w-1/3 px-2"
+                                >
+                                    {item.image?.url ? (
+                                        <div className="relative overflow-hidden rounded-2xl aspect-[4/3] group">
+                                            <img
+                                                src={item.image.url}
+                                                alt={item.caption || item.image.alt || ''}
+                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                            />
+                                            {item.caption && (
+                                                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                    <p className="text-white text-sm font-medium">{item.caption}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div
+                                            className="aspect-[4/3] rounded-2xl flex items-center justify-center"
+                                            style={{
+                                                background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.06), rgba(var(--brand-primary-rgb), 0.02))`,
+                                                border: `1px solid rgba(var(--brand-primary-rgb), 0.063)`,
+                                            }}
+                                        >
+                                            <span className="text-2xl opacity-20">📷</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </motion.div>
+                    </div>
+
+                    {/* Prev/Next arrows */}
+                    {totalImages > 1 && (
+                        <>
+                            <button
+                                onClick={handlePrev}
+                                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white transition-colors z-10"
+                                aria-label="Previous image"
+                            >
+                                <ChevronLeft size={20} className="text-gray-700" />
+                            </button>
+                            <button
+                                onClick={handleNext}
+                                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white transition-colors z-10"
+                                aria-label="Next image"
+                            >
+                                <ChevronRight size={20} className="text-gray-700" />
+                            </button>
+                        </>
+                    )}
+
+                    {/* Dot indicators */}
+                    {totalImages > 1 && (
+                        <div className="flex justify-center gap-2 mt-6">
+                            {images.map((_, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => handleDot(i)}
+                                    className="w-2.5 h-2.5 rounded-full transition-all duration-300"
+                                    style={{
+                                        background: i === currentIndex
+                                            ? 'var(--brand-primary)'
+                                            : 'rgba(var(--brand-primary-rgb), 0.2)',
+                                        transform: i === currentIndex ? 'scale(1.3)' : 'scale(1)',
+                                    }}
+                                    aria-label={`Go to image ${i + 1}`}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </AnimatedSection>
     )

@@ -3,13 +3,14 @@
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { TeamConfig, TeamMember } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 function InitialsAvatar({ name }: { name: string }) {
     const initial = name.charAt(0).toUpperCase()
     return (
         <div
             className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl font-bold text-white"
-            style={{ background: 'var(--brand-primary)' }}
+            style={{ background: CSS_VARS.primary }}
             aria-hidden="true"
         >
             {initial}
@@ -43,7 +44,7 @@ function SocialLinks({ socials }: { socials: TeamMember['socials'] }) {
                     rel="noopener noreferrer"
                     className="text-xs px-3 py-1 rounded-full transition-colors"
                     style={{
-                        color: 'var(--brand-primary)',
+                        color: CSS_VARS.primary,
                         background: 'rgba(var(--brand-primary-rgb), 0.1)',
                     }}
                     aria-label={`Visit ${s.platform}`}
@@ -59,17 +60,17 @@ function SectionHeader({ headline, subheadline }: { headline?: string; subheadli
     if (!headline) return null
     return (
         <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-3" style={{ fontFamily: 'var(--font-heading)', color: 'var(--text)' }}>
+            <h2 className="text-3xl md:text-4xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
                 {headline}
             </h2>
-            {subheadline && <p className="max-w-2xl mx-auto" style={{ color: 'var(--muted)' }}>{subheadline}</p>}
+            {subheadline && <p className="max-w-2xl mx-auto" style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
         </div>
     )
 }
 
 function GridVariant({ headline, subheadline, members }: { headline?: string; subheadline?: string; members: TeamMember[] }) {
     return (
-        <AnimatedSection className="py-16 md:py-24" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6">
                 <SectionHeader headline={headline} subheadline={subheadline} />
                 <StaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -78,19 +79,19 @@ function GridVariant({ headline, subheadline, members }: { headline?: string; su
                             <HoverCard
                                 className="text-center p-6 transition-shadow"
                                 style={{
-                                    background: 'var(--surface)',
-                                    borderRadius: 'var(--radius-lg)',
-                                    boxShadow: 'var(--shadow-sm)',
+                                    background: CSS_VARS.surface,
+                                    borderRadius: CSS_VARS.radiusLg,
+                                    boxShadow: CSS_VARS.shadowSm,
                                     border: '1px solid rgba(var(--brand-primary-rgb), 0.08)',
                                 }}
                             >
                                 <article aria-label={`${m.name}, ${m.role}`}>
                                     <MemberAvatar member={m} />
-                                    <h3 className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)', color: 'var(--text)' }}>
+                                    <h3 className="font-bold text-lg" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
                                         {m.name}
                                     </h3>
-                                    <p className="text-sm mb-2" style={{ color: 'var(--brand-primary)' }}>{m.role}</p>
-                                    {m.bio && <p className="text-sm line-clamp-3" style={{ color: 'var(--muted)' }}>{m.bio}</p>}
+                                    <p className="text-sm mb-2" style={{ color: CSS_VARS.primary }}>{m.role}</p>
+                                    {m.bio && <p className="text-sm line-clamp-3" style={{ color: CSS_VARS.muted }}>{m.bio}</p>}
                                     <SocialLinks socials={m.socials} />
                                 </article>
                             </HoverCard>
@@ -104,7 +105,7 @@ function GridVariant({ headline, subheadline, members }: { headline?: string; su
 
 function ListVariant({ headline, subheadline, members }: { headline?: string; subheadline?: string; members: TeamMember[] }) {
     return (
-        <AnimatedSection className="py-16 md:py-24" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6 max-w-4xl">
                 <SectionHeader headline={headline} subheadline={subheadline} />
                 <StaggerGrid className="flex flex-col gap-4">
@@ -113,9 +114,9 @@ function ListVariant({ headline, subheadline, members }: { headline?: string; su
                             key={i}
                             className="flex flex-col sm:flex-row items-center sm:items-start gap-4 p-5 transition-shadow hover:shadow-md"
                             style={{
-                                background: 'var(--surface)',
-                                borderRadius: 'var(--radius-lg)',
-                                boxShadow: 'var(--shadow-sm)',
+                                background: CSS_VARS.surface,
+                                borderRadius: CSS_VARS.radiusLg,
+                                boxShadow: CSS_VARS.shadowSm,
                                 border: '1px solid rgba(var(--brand-primary-rgb), 0.08)',
                             }}
                         >
@@ -124,11 +125,11 @@ function ListVariant({ headline, subheadline, members }: { headline?: string; su
                                     <MemberAvatar member={m} />
                                 </div>
                                 <div className="flex-1 text-center sm:text-left">
-                                    <h3 className="font-bold text-lg" style={{ fontFamily: 'var(--font-heading)', color: 'var(--text)' }}>
+                                    <h3 className="font-bold text-lg" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
                                         {m.name}
                                     </h3>
-                                    <p className="text-sm mb-1" style={{ color: 'var(--brand-primary)' }}>{m.role}</p>
-                                    {m.bio && <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>{m.bio}</p>}
+                                    <p className="text-sm mb-1" style={{ color: CSS_VARS.primary }}>{m.role}</p>
+                                    {m.bio && <p className="text-sm mt-1" style={{ color: CSS_VARS.muted }}>{m.bio}</p>}
                                     <SocialLinks socials={m.socials} />
                                 </div>
                             </article>

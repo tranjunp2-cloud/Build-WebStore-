@@ -4,6 +4,7 @@ import type { BlockProps } from '../types'
 import type { CTAConfig } from './config'
 import { AnimatedSection } from '../shared/animations'
 import { motion, useReducedMotion } from 'framer-motion'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 function CTAButton({ label, url, style, variant }: { label: string; url: string; style: 'primary' | 'outline'; variant: string }) {
     const shouldReduce = useReducedMotion()
@@ -11,9 +12,9 @@ function CTAButton({ label, url, style, variant }: { label: string; url: string;
 
     const buttonStyle = isPrimary
         ? variant === 'banner'
-            ? { background: '#ffffff', color: 'var(--brand-primary)', borderRadius: 'var(--radius-md)' }
-            : { background: 'var(--brand-primary)', color: '#ffffff', borderRadius: 'var(--radius-md)', boxShadow: '0 4px 20px rgba(var(--brand-primary-rgb), 0.25)' }
-        : { border: '2px solid rgba(var(--brand-primary-rgb), 0.3)', color: 'var(--brand-primary)', background: 'transparent', borderRadius: 'var(--radius-md)' }
+            ? { background: '#ffffff', color: CSS_VARS.primary, borderRadius: CSS_VARS.radiusMd }
+            : { background: CSS_VARS.primary, color: '#ffffff', borderRadius: CSS_VARS.radiusMd, boxShadow: '0 4px 20px rgba(var(--brand-primary-rgb), 0.25)' }
+        : { border: '2px solid rgba(var(--brand-primary-rgb), 0.3)', color: CSS_VARS.primary, background: 'transparent', borderRadius: CSS_VARS.radiusMd }
 
     if (shouldReduce) {
         return (
@@ -48,7 +49,7 @@ function BannerVariant({ block }: { block: CTAConfig }) {
             }}
         >
             <div className="container mx-auto px-6 text-center max-w-3xl">
-                <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight" style={{ fontFamily: 'var(--font-heading)' }}>
+                <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight" style={{ fontFamily: CSS_VARS.fontHeading }}>
                     {headline}
                 </h2>
                 {subheadline && (
@@ -63,14 +64,14 @@ function BannerVariant({ block }: { block: CTAConfig }) {
 function InlineVariant({ block }: { block: CTAConfig }) {
     const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary' } = block
     return (
-        <AnimatedSection className="py-12 md:py-16" style={{ color: 'var(--text)', background: 'var(--surface)' }}>
+        <AnimatedSection className="py-12 md:py-16" style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
             <div className="container mx-auto px-6">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6 max-w-4xl mx-auto">
                     <div className="flex-1 text-center md:text-left">
-                        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+                        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
                             {headline}
                         </h2>
-                        {subheadline && <p style={{ color: 'var(--muted)' }}>{subheadline}</p>}
+                        {subheadline && <p style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
                     </div>
                     <div className="flex-shrink-0">
                         <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="inline" />
@@ -84,22 +85,22 @@ function InlineVariant({ block }: { block: CTAConfig }) {
 function FloatingVariant({ block }: { block: CTAConfig }) {
     const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary' } = block
     return (
-        <AnimatedSection className="py-16 md:py-20" style={{ color: 'var(--text)', background: 'var(--background)' }}>
+        <AnimatedSection className="py-16 md:py-20" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6">
                 <div
                     className="max-w-xl mx-auto text-center p-10 md:p-12"
                     style={{
-                        background: 'var(--surface)',
-                        borderRadius: 'var(--radius-lg)',
-                        boxShadow: 'var(--shadow-lg)',
+                        background: CSS_VARS.surface,
+                        borderRadius: CSS_VARS.radiusLg,
+                        boxShadow: CSS_VARS.shadowLg,
                         border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
                     }}
                 >
-                    <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ fontFamily: 'var(--font-heading)' }}>
+                    <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading }}>
                         {headline}
                     </h2>
                     {subheadline && (
-                        <p className="mb-8" style={{ color: 'var(--muted)' }}>{subheadline}</p>
+                        <p className="mb-8" style={{ color: CSS_VARS.muted }}>{subheadline}</p>
                     )}
                     <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="floating" />
                 </div>
