@@ -5,7 +5,8 @@ import { filterNavigationLinksByVisibility } from '@/lib/navigation'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { GoogleFontsLoader } from './GoogleFontsLoader'
 import { generatePageSchemas } from '@/lib/seo/json-ld'
-import { HeadingProvider, getBlockHeadingLevel } from '@/lib/seo/heading-context'
+import { HeadingProvider } from '@/lib/seo/heading-context'
+import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
@@ -39,9 +40,10 @@ export type SiteRendererProps = {
         [key: string]: unknown
     }
     pages?: NavPage[]
+    isEditor?: boolean
 }
 
-export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [], isEditor = false }: SiteRendererProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
         secondaryColor: site.theme?.secondaryColor,
@@ -123,15 +125,30 @@ export function SiteRenderer({ site, page, pages = [] }: SiteRendererProps) {
                     }
                     : block
 
-                const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes)
-
-                return (
+                const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
+                
+                const blockContent = (
                     <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
                         <HeadingProvider level={headingLevel}>
                             <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
                         </HeadingProvider>
                     </BlockErrorBoundary>
                 )
+
+                if (isEditor) {
+                    return (
+                        <div 
+                            key={`${block.blockType}-${index}`}
+                            data-block-index={index}
+                            data-block-type={block.blockType}
+                            className="group/block relative w-full"
+                        >
+                            {blockContent}
+                        </div>
+                    )
+                }
+
+                return blockContent
             })}
         </>
     )

@@ -121,7 +121,7 @@ export function EditorToolbar({
                 <div className="flex items-center gap-1.5">
                     <Button variant="ghost" size="icon" asChild className="h-8 w-8 rounded-lg text-slate-300 hover:bg-white/[0.06] hover:text-white">
                         <a
-                            href={currentPageId ? `/api/preview/${siteId}?pageId=${currentPageId}` : `/api/preview/${siteId}`}
+                            href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Preview"
@@ -154,6 +154,7 @@ export function EditorToolbar({
                             </>
                         )}
                     </Button>
+
                 </div>
             </header>
         )
@@ -259,7 +260,7 @@ export function EditorToolbar({
 
                 <Button variant="ghost" size="sm" asChild className="h-8 rounded-lg border border-white/[0.08] px-3 text-[11px] font-medium text-slate-300 hover:bg-white/[0.06] hover:text-white">
                     <a
-                        href={currentPageId ? `/api/preview/${siteId}?pageId=${currentPageId}` : `/api/preview/${siteId}`}
+                        href={currentPageId ? `/preview/${siteId}?pageId=${currentPageId}` : `/preview/${siteId}`}
                         target="_blank"
                         rel="noopener noreferrer"
                     >
