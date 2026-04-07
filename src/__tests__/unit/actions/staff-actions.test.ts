@@ -83,6 +83,79 @@ describe('inviteStaffAction [TC-F19.23]', () => {
     })
 })
 
+// ─── normalizeTenants helper ─────────────────────────────────────────
+// Inline replica for unit testing (the real function is not exported)
+function normalizeTenants(tenants: Array<{ tenant: string | { id: string }; role: string; status?: string; permissions?: string[] }>) {
+    return tenants.map((t) => ({
+        tenant: (t.tenant && typeof t.tenant === 'object') ? t.tenant.id : t.tenant,
+        role: t.role,
+        status: t.status,
+        permissions: t.permissions || [],
+    }))
+}
+
+describe('normalizeTenants [TC-F19.28]', () => {
+    it('extracts ID from populated tenant objects', () => {
+        const populated = [
+            { tenant: { id: '1' } as any, role: 'admin', status: 'active', permissions: ['blog'] },
+            { tenant: { id: '2' } as any, role: 'owner', status: 'active', permissions: [] },
+        ]
+        const result = normalizeTenants(populated)
+        expect(result[0].tenant).toBe('1')
+        expect(result[1].tenant).toBe('2')
+    })
+
+    it('preserves string tenant IDs as-is', () => {
+        const plain = [
+            { tenant: '10', role: 'custom', status: 'pending', permissions: ['settings'] },
+        ]
+        const result = normalizeTenants(plain)
+        expect(result[0].tenant).toBe('10')
+        expect(result[0].permissions).toEqual(['settings'])
+    })
+
+    it('defaults undefined permissions to empty array', () => {
+        const noPerms = [
+            { tenant: '5', role: 'admin', status: 'active' },
+        ]
+        const result = normalizeTenants(noPerms)
+        expect(result[0].permissions).toEqual([])
+    })
+})
+
+describe('cross-tenant owner check [TC-F19.29]', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+        vi.mocked(getCurrentTenantId).mockResolvedValue('tenant-1')
+        mockCookieGet.mockReturnValue({ value: 'jwt-token' })
+    })
+
+    it('blocks inviting a user who is active owner of another workspace', async () => {
+        mockFetchResponse(false, { errors: [{ message: 'This user is an owner of another workspace and cannot be added as staff' }] })
+
+        const result = await inviteStaffAction({
+            email: 'owner-other-shop@test.com',
+            name: 'Owner',
+            role: 'admin',
+        })
+
+        expect(result.success).toBe(false)
+        expect(result.error).toBe('This user is an owner of another workspace and cannot be added as staff')
+    })
+
+    it('allows inviting a user who is NOT an owner elsewhere', async () => {
+        mockFetchResponse(true, {})
+
+        const result = await inviteStaffAction({
+            email: 'staff-other-shop@test.com',
+            name: 'Staff',
+            role: 'admin',
+        })
+
+        expect(result.success).toBe(true)
+    })
+})
+
 describe('updateStaff [TC-F19.20]', () => {
     beforeEach(() => {
         vi.clearAllMocks()

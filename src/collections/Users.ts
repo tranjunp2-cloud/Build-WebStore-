@@ -38,8 +38,8 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
 }
 
 /** Normalize populated tenant objects → extract relationship IDs for safe Payload updates */
-function normalizeTenants(tenants: any[]): any[] {
-    return tenants.map((t: any) => ({
+function normalizeTenants(tenants: TenantMembership[]): TenantMembership[] {
+    return tenants.map((t: TenantMembership) => ({
         tenant: (t.tenant && typeof t.tenant === 'object') ? t.tenant.id : t.tenant,
         role: t.role,
         status: t.status,
