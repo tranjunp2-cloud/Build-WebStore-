@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { BlockProps } from '../types'
 import type { AnnouncementBarConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 export function AnnouncementBarBlock({ block, theme }: BlockProps<AnnouncementBarConfig>) {
     const { message, linkText, linkUrl, dismissible = true, variant = 'gradient', backgroundColor } = block
@@ -11,7 +12,7 @@ export function AnnouncementBarBlock({ block, theme }: BlockProps<AnnouncementBa
     if (dismissed) return null
 
     const bgStyle = (() => {
-        const bg = backgroundColor || theme.primaryColor
+        const bg = backgroundColor || CSS_VARS.primary
         switch (variant) {
             case 'gradient':
                 return { background: `linear-gradient(135deg, ${bg}, ${bg}cc)` }

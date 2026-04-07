@@ -2,6 +2,7 @@
 
 import type { BlockProps } from '../types'
 import type { WhatsappButtonConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 const WhatsAppIcon = () => (
     <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">

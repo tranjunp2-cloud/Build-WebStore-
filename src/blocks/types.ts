@@ -143,7 +143,7 @@ export type ImageRef = {
 
 export const ImageRefSchema = z.object({
     url: z.string(),
-    alt: z.string().optional(),
-    width: z.number().optional(),
-    height: z.number().optional(),
+    alt: z.string().default(''),
+    width: z.number().default(800),
+    height: z.number().default(600),
 })

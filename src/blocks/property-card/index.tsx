@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { PropertyCardConfig, PropertyItem } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 function BedIcon() {
     return (
@@ -255,7 +257,7 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
     }
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-12">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
@@ -266,6 +268,6 @@ export function PropertyCardBlock({ block }: BlockProps<PropertyCardConfig>) {
                 {variant === 'list' && renderList()}
                 {variant === 'featured' && renderFeatured()}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

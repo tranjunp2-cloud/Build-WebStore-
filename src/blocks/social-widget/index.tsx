@@ -3,6 +3,7 @@
 import type { BlockProps } from '../types'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig, type SocialLinkItem, type SocialPlatform, type SocialWidgetConfig } from './config'
 import { mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 const PLATFORM_META: Record<SocialPlatform, { label: string; mark: string; accent: string }> = {
     facebook: { label: 'Facebook', mark: 'f', accent: '#2563eb' },
@@ -29,7 +30,7 @@ function getPlatformStyles(platform: SocialPlatform, primaryColor: string) {
     const accent = PLATFORM_META[platform].accent
 
     return {
-        background: `linear-gradient(135deg, ${accent}20, ${primaryColor}16)`,
+        background: `linear-gradient(135deg, ${accent}20, rgba(var(--brand-primary-rgb), 0.086))`,
         borderColor: `${accent}40`,
         color: accent,
     }
@@ -67,7 +68,7 @@ export function SocialWidgetBlock({ block, theme, site }: BlockProps<SocialWidge
                     {links.map(item => {
                         const platform = item.platform
                         const meta = PLATFORM_META[platform]
-                        const style = getPlatformStyles(platform, theme.primaryColor)
+                        const style = getPlatformStyles(platform, CSS_VARS.primary)
 
                         return (
                             <a

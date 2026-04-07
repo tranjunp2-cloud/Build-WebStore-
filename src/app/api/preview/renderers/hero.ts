@@ -12,7 +12,6 @@ export type RenderHeroBlock = Record<string, unknown> & {
   ctaButtons?: { label?: string; url?: string; style?: string }[];
   variant?: string;
   image?: { url?: string; alt?: string };
-  badge?: { text?: string; show?: boolean };
   alignment?: string;
   fullWidth?: boolean;
   showRating?: boolean;
@@ -23,7 +22,9 @@ export type RenderHeroBlock = Record<string, unknown> & {
 }
 
 let _category = 'business'
+let _heroImageIndex = 0
 export function setHeroCategory(cat: string) { _category = cat }
+export function setHeroImageIndex(idx: number) { _heroImageIndex = idx }
 
 export function renderHero(block: RenderHeroBlock, t: TemplateTheme, category?: string): string {
   if (category) _category = category
@@ -33,79 +34,38 @@ export function renderHero(block: RenderHeroBlock, t: TemplateTheme, category?: 
   const btn1 = ctas[0] ? `<a href="${ctas[0].url || '#'}" class="btn-primary">${ctas[0].label}</a>` : ''
   const btn2 = ctas[1] ? `<a href="${ctas[1].url || '#'}" class="btn-outline">${ctas[1].label}</a>` : ''
 
-  const styleToUse = block.variant || t.heroStyle
-
-  switch (styleToUse) {
-    case 'split': return heroSplit(h, sub, btn1, btn2, t, block)
-    case 'slider': return heroSlider(h, sub, btn1, btn2, t, block)
-    case 'video-bg': return heroVideoBg(h, sub, btn1, btn2, t, block)
-    case 'gradient-mockup': return heroGradientMockup(h, sub, btn1, btn2, t, block)
-    case 'minimal': return heroMinimal(h, sub, t, block)
-    case 'centered': return heroCentered(h, sub, btn1, btn2, t, block)
-    case 'fullscreen-search': return heroFullscreenSearch(h, sub, btn1, btn2, t, block)
-    case 'diagonal': return heroDiagonal(h, sub, btn1, btn2, t, block)
-    case 'masonry': return heroMasonry(h, sub, btn1, btn2, t, block)
-    case 'geometric': return heroGeometric(h, sub, btn1, btn2, t, block)
-    default: return heroCentered(h, sub, btn1, btn2, t, block)
+  switch (t.heroStyle) {
+    case 'split': return heroSplit(h, sub, btn1, btn2, t)
+    case 'slider': return heroSlider(h, sub, btn1, btn2, t)
+    case 'video-bg': return heroVideoBg(h, sub, btn1, btn2, t)
+    case 'gradient-mockup': return heroGradientMockup(h, sub, btn1, btn2, t)
+    case 'centered': return heroCentered(h, sub, btn1, btn2, t)
+    case 'fullscreen-search': return heroFullscreenSearch(h, sub, btn1, btn2, t)
+    case 'diagonal': return heroDiagonal(h, sub, btn1, btn2, t)
+    case 'masonry': return heroMasonry(h, sub, btn1, btn2, t)
+    case 'geometric': return heroGeometric(h, sub, btn1, btn2, t)
+    default: return heroCentered(h, sub, btn1, btn2, t)
   }
 }
 
-function heroMinimal(h: string, sub: string, t: TemplateTheme, block?: RenderHeroBlock) {
-  const ctas = block?.ctaButtons || []
-  let buttonsHtml = ''
-  if (ctas.length > 0) {
-    buttonsHtml = `<div class="fade-up fade-up-d3 flex flex-wrap gap-4 justify-center mt-8">
-      ${ctas.map(btn => btn.style === 'outline' 
-        ? `<a href="${btn.url || '#'}" class="px-6 py-3 rounded-lg font-semibold text-sm transition-all inline-block" style="border: 2px solid ${t.primary}50; color: ${t.primary};">${btn.label}</a>`
-        : `<a href="${btn.url || '#'}" class="px-6 py-3 rounded-lg font-semibold text-sm transition-all text-white inline-block" style="background: ${t.primary}; box-shadow: 0 4px 20px ${t.primary}30;">${btn.label}</a>`).join('')}
-    </div>`
-  }
-
-  return `<section class="relative py-32 flex items-center overflow-hidden">
-    <div class="container mx-auto px-6 text-center max-w-3xl relative z-10">
-      <h1 class="fade-up fade-up-d1 text-5xl md:text-6xl font-bold font-heading leading-tight mb-6">${h}</h1>
-      ${sub ? `<p class="fade-up fade-up-d2 text-lg opacity-60 mb-8 max-w-xl mx-auto">${sub}</p>` : ''}
-      ${buttonsHtml}
+function heroSplit(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
+  const img = getHeroImage(_category, _heroImageIndex)
+  return `<section style="min-height:100vh;display:grid;grid-template-columns:1fr 1fr;position:relative;overflow:hidden;">
+    <div style="display:flex;flex-direction:column;justify-content:center;padding:80px 60px 80px 80px;position:relative;z-index:2;">
+      <div class="fade-up" style="font-size:13px;font-weight:600;color:${t.primary};text-transform:uppercase;letter-spacing:2px;margin-bottom:20px;">✨ Welcome</div>
+      <h1 class="fade-up fade-up-d1" style="font-size:clamp(36px,4.5vw,56px);font-weight:800;line-height:1.08;margin-bottom:24px;">${h}</h1>
+      <p class="fade-up fade-up-d2" style="font-size:17px;color:${t.muted};line-height:1.7;margin-bottom:36px;max-width:480px;">${sub}</p>
+      <div class="fade-up fade-up-d3" style="display:flex;gap:14px;flex-wrap:wrap;">${btn1} ${btn2}</div>
+    </div>
+    <div style="position:relative;overflow:hidden;" class="hide-mobile">
+      <img src="${img}" alt="Hero" loading="eager" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;" />
+      <div style="position:absolute;inset:0;background:linear-gradient(90deg,${t.bg} 0%,transparent 30%);"></div>
     </div>
   </section>`
 }
 
-function heroSplit(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme, block?: RenderHeroBlock) {
-  const img = block?.image?.url || getHeroImage(_category, 0)
-  const badgeText = block?.badge?.text || ''
-  const badgeHtml = badgeText ? `<div class="fade-up inline-block mb-6 px-4 py-2 rounded-full text-sm font-semibold" style="color:${t.primary};background:${t.primary}15;">${badgeText}</div>` : ''
-  
-  const ctas = block?.ctaButtons || []
-  let buttonsHtml = ''
-  if (ctas.length > 0) {
-    buttonsHtml = `<div class="fade-up fade-up-d3 flex flex-wrap gap-4 mt-10">
-      ${ctas.map(btn => btn.style === 'outline' 
-        ? `<a href="${btn.url || '#'}" class="px-8 py-4 rounded-xl font-semibold text-sm transition-all duration-300 inline-block" style="border: 2px solid ${t.primary}50; color: ${t.primary}; background: ${t.primary}08;">${btn.label}</a>`
-        : `<a href="${btn.url || '#'}" class="px-8 py-4 rounded-xl font-semibold text-sm transition-all duration-300 inline-block" style="background: linear-gradient(135deg, ${t.primary}, ${t.primary}cc); color: #fff; box-shadow: 0 8px 30px ${t.primary}35;">${btn.label}</a>`).join('')}
-    </div>`
-  }
-
-  return `<section class="relative min-h-[92vh] flex items-center overflow-hidden">
-    <div class="absolute inset-0 z-0 opacity-20 pointer-events-none" style="background-image: radial-gradient(${t.primary} 1.5px, transparent 1.5px); background-size: 24px 24px;"></div>
-    
-    <div class="container mx-auto px-6 relative z-10 py-24">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        <div>
-          ${badgeHtml}
-          <h1 class="fade-up fade-up-d1 text-5xl lg:text-6xl font-bold font-heading leading-[1.1] mb-6">${h}</h1>
-          ${sub ? `<p class="fade-up fade-up-d2 text-xl opacity-60 max-w-lg leading-relaxed">${sub}</p>` : ''}
-          ${buttonsHtml}
-        </div>
-        <div class="relative fade-up fade-up-d2 pt-10 lg:pt-0">
-          <img src="${img}" alt="Hero Image" class="w-full h-auto rounded-3xl shadow-2xl" />
-        </div>
-      </div>
-    </div>
-  </section>`
-}
-
-function heroSlider(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme, block?: RenderHeroBlock) {
-  const img = block?.image?.url || getHeroImage(_category, 0)
+function heroSlider(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:90vh;overflow:hidden;">
     <img src="${img}" alt="Hero Background" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
     <div style="position:absolute;inset:0;background:linear-gradient(135deg,${t.bg}e6 40%,${t.bg}80 100%);"></div>
@@ -125,8 +85,8 @@ function heroSlider(h: string, sub: string, btn1: string, btn2: string, t: Templ
   </section>`
 }
 
-function heroVideoBg(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme, block?: RenderHeroBlock) {
-  const img = block?.image?.url || getHeroImage(_category, 0)
+function heroVideoBg(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:85vh;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;">
     <img src="${img}" alt="Hero Background" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,${t.bg}cc,${t.bg}e6);"></div>
@@ -139,8 +99,8 @@ function heroVideoBg(h: string, sub: string, btn1: string, btn2: string, t: Temp
   </section>`
 }
 
-function heroGradientMockup(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme, block?: RenderHeroBlock) {
-  const img = block?.image?.url || getHeroImage(_category, 0)
+function heroGradientMockup(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:100vh;overflow:hidden;display:flex;align-items:center;">
     <div style="position:absolute;top:-200px;right:-150px;width:600px;height:600px;border-radius:50%;background:${t.primary};filter:blur(150px);opacity:.12;"></div>
     <div style="position:absolute;bottom:-200px;left:-150px;width:500px;height:500px;border-radius:50%;background:${t.accent};filter:blur(120px);opacity:.08;"></div>
@@ -165,41 +125,25 @@ function heroGradientMockup(h: string, sub: string, btn1: string, btn2: string, 
   </section>`
 }
 
-function heroCentered(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme, block?: RenderHeroBlock) {
-  const img = block?.image?.url || getHeroImage(_category, 0)
-  const badgeText = block?.badge?.text || ''
-  const badgeHtml = badgeText ? `<div class="fade-up mx-auto table mb-6 px-4 py-2 rounded-full text-sm font-semibold" style="color:${t.primary};background:${t.primary}15;">${badgeText}</div>` : ''
-  
-  const ctas = block?.ctaButtons || []
-  let buttonsHtml = ''
-  if (ctas.length > 0) {
-    buttonsHtml = `<div class="fade-up fade-up-d3 flex flex-wrap gap-4 justify-center mt-10">
-      ${ctas.map(btn => btn.style === 'outline' 
-        ? `<a href="${btn.url || '#'}" class="px-8 py-4 rounded-xl font-semibold text-sm transition-all duration-300 inline-block" style="border: 2px solid ${t.primary}50; color: ${t.primary}; background: ${t.primary}08;">${btn.label}</a>`
-        : `<a href="${btn.url || '#'}" class="px-8 py-4 rounded-xl font-semibold text-sm transition-all duration-300 inline-block" style="background: linear-gradient(135deg, ${t.primary}, ${t.primary}cc); color: #fff; box-shadow: 0 8px 30px ${t.primary}35;">${btn.label}</a>`).join('')}
-    </div>`
-  }
-
-  return `<section class="relative min-h-[92vh] flex items-center justify-center overflow-hidden">
-    <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 80% 50% at 50% -20%, ${t.primary}18 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 80% 80%, ${t.primary}10 0%, transparent 50%);"></div>
-    <div class="absolute inset-0 z-0 opacity-20 pointer-events-none" style="background-image: radial-gradient(${t.primary} 1.5px, transparent 1.5px); background-size: 24px 24px;"></div>
-    
-    <div class="container mx-auto px-6 relative z-10">
-      <div class="text-center max-w-4xl mx-auto py-24">
-        ${badgeHtml}
-        <h1 class="fade-up fade-up-d1 text-5xl md:text-7xl font-bold font-heading leading-[1.05] mb-6">${h}</h1>
-        ${sub ? `<p class="fade-up fade-up-d2 text-xl opacity-60 max-w-2xl mx-auto leading-relaxed">${sub}</p>` : ''}
-        ${buttonsHtml}
-        ${img ? `<div class="fade-up fade-up-d4 mt-16">
-          <img src="${img}" alt="Hero Image" class="w-full max-w-4xl mx-auto rounded-2xl shadow-2xl" />
-        </div>` : ''}
+function heroCentered(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
+  const img = getHeroImage(_category, _heroImageIndex)
+  const isDark = t.bg.startsWith('#0') || t.bg.startsWith('#1')
+  return `<section style="position:relative;min-height:85vh;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;">
+    <img src="${img}" alt="Hero Background" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.15;" />
+    <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 30%,${t.bg} 80%);"></div>
+    <div class="container" style="position:relative;z-index:2;max-width:800px;">
+      <div class="fade-up" style="display:inline-flex;padding:8px 20px;border-radius:100px;background:${isDark ? t.primary + '15' : t.primary + '10'};color:${t.primary};font-size:13px;font-weight:600;margin-bottom:24px;gap:8px;align-items:center;backdrop-filter:blur(10px);">
+        <span style="width:6px;height:6px;border-radius:50%;background:${t.primary};"></span> Trusted Choice
       </div>
+      <h1 class="fade-up fade-up-d1" style="font-size:clamp(36px,5vw,60px);font-weight:800;margin-bottom:20px;">${h}</h1>
+      <p class="fade-up fade-up-d2" style="font-size:18px;color:${t.muted};margin-bottom:40px;max-width:580px;margin-left:auto;margin-right:auto;">${sub}</p>
+      <div class="fade-up fade-up-d3" style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">${btn1} ${btn2}</div>
     </div>
   </section>`
 }
 
-function heroFullscreenSearch(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme, block?: RenderHeroBlock) {
-  const img = block?.image?.url || getHeroImage(_category, 0)
+function heroFullscreenSearch(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;">
     <img src="${img}" alt="Hero Background" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
     <div style="position:absolute;inset:0;background:linear-gradient(180deg,${t.bg}dd 0%,${t.bg}ee 100%);"></div>
@@ -220,8 +164,8 @@ function heroFullscreenSearch(h: string, sub: string, btn1: string, btn2: string
   </section>`
 }
 
-function heroDiagonal(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme, block?: RenderHeroBlock) {
-  const img = block?.image?.url || getHeroImage(_category, 0)
+function heroDiagonal(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:100vh;overflow:hidden;">
     <img src="${img}" alt="Hero Background" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" />
     <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,0,0,.7),rgba(0,0,0,.4));"></div>
@@ -243,8 +187,8 @@ function heroDiagonal(h: string, sub: string, btn1: string, btn2: string, t: Tem
   </section>`
 }
 
-function heroMasonry(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme, block?: RenderHeroBlock) {
-  const img = block?.image?.url || getHeroImage(_category, 0)
+function heroMasonry(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
+  const img = getHeroImage(_category, _heroImageIndex)
   const img2 = getHeroImage(_category, 1)
   const img3 = getHeroImage(_category, 2)
   return `<section style="min-height:90vh;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;">
@@ -269,8 +213,8 @@ function heroMasonry(h: string, sub: string, btn1: string, btn2: string, t: Temp
   </section>`
 }
 
-function heroGeometric(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme, block?: RenderHeroBlock) {
-  const img = block?.image?.url || getHeroImage(_category, 0)
+function heroGeometric(h: string, sub: string, btn1: string, btn2: string, t: TemplateTheme) {
+  const img = getHeroImage(_category, _heroImageIndex)
   return `<section style="position:relative;min-height:85vh;display:flex;align-items:center;overflow:hidden;">
     <div style="position:absolute;right:0;top:0;bottom:0;width:45%;overflow:hidden;" class="hide-mobile">
       <img src="${img}" alt="Hero" loading="eager" style="width:100%;height:100%;object-fit:cover;" />

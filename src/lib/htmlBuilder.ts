@@ -1,14 +1,13 @@
 import { renderNav, renderHero, renderSections, THEMES, baseCSS, getGoogleFontsLink, TemplateTheme } from '@/app/api/preview/renderers'
-import { setHeroCategory } from '@/app/api/preview/renderers/hero'
+import { setHeroCategory, setHeroImageIndex } from '@/app/api/preview/renderers/hero'
 import { setSectionCategory } from '@/app/api/preview/renderers/sections'
 
 export function buildFullHTML(
-    // Using any since block schemas are highly dynamic and unstructured
     blocks: any[],
-    // Theme may contain custom dynamic overrides from the dashboard
     theme?: TemplateTheme | any,
     category?: string,
-    meta?: { name?: string; description?: string; lang?: string }
+    meta?: { name?: string; description?: string; lang?: string },
+    heroImageIndex?: number,
 ): string {
     const cat = category || 'business'
     const defaultTheme = THEMES[cat] || THEMES.business
@@ -34,6 +33,7 @@ export function buildFullHTML(
 
     // Set category for image selection in renderers
     setHeroCategory(cat)
+    setHeroImageIndex(heroImageIndex ?? 0)
     setSectionCategory(cat)
 
     // Separate nav/hero from other sections for semantic HTML

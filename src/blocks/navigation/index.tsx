@@ -6,6 +6,7 @@ import type { NavigationConfig } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
 import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 // ── Shared Logo Component ────────────────────────────────────────────────────
 

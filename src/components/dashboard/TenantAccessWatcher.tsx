@@ -12,10 +12,10 @@ export function TenantAccessWatcher() {
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-        // Function to check session
-        const checkSession = async () => {
-            if (isEvicted) return; // Stop checking if already evicted
+        let debounceId: NodeJS.Timeout | null = null;
 
+        const checkSession = async () => {
+            if (isEvicted) return;
             try {
                 const res = await fetch('/api/auth/session-check', { cache: 'no-store' });
                 if (res.ok) {
@@ -29,16 +29,39 @@ export function TenantAccessWatcher() {
             }
         };
 
-        // Check every 15 seconds
-        intervalRef.current = setInterval(checkSession, 15000);
+        const startPolling = () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            intervalRef.current = setInterval(checkSession, 60_000);
+        };
 
-        // Also check when window regains focus
-        const handleFocus = () => checkSession();
+        // Poll every 60s (was 15s — tenant revocation is rare)
+        startPolling();
+
+        // Debounced focus handler — prevents burst requests on rapid tab switching
+        const handleFocus = () => {
+            if (document.visibilityState !== 'visible') return;
+            if (debounceId) clearTimeout(debounceId);
+            debounceId = setTimeout(checkSession, 2_000);
+        };
+
+        // Pause polling when tab hidden, resume when visible
+        const handleVisibility = () => {
+            if (document.visibilityState === 'hidden') {
+                if (intervalRef.current) clearInterval(intervalRef.current);
+            } else {
+                checkSession();
+                startPolling();
+            }
+        };
+
         window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibility);
 
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
+            if (debounceId) clearTimeout(debounceId);
             window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibility);
         };
     }, [isEvicted]);
 

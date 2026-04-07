@@ -7,6 +7,7 @@ import { AnimatedSection } from '../shared/animations'
 import { motion } from 'framer-motion'
 import { GradientBlob, DotGrid, SectionLabel } from '../shared/decorative'
 import { getHeroImage } from '@/lib/images/industry-images'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 // ── Shared CTA renderer ──────────────────────────────────────────────────────
 function CTAButtons({ buttons, variant = 'default' }: { buttons: HeroConfig['ctaButtons']; variant?: 'default' | 'glass' }) {
@@ -68,9 +69,9 @@ export function HeroBlock({ block, theme, site }: BlockProps<HeroConfig>) {
         return (
             <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
                 {/* Background decorations */}
-                <GradientBlob color={theme.primaryColor} className="top-[-10%] right-[-5%]" size={600} opacity={0.12} />
-                <GradientBlob color={theme.primaryColor} className="bottom-[-15%] left-[-8%]" size={500} opacity={0.08} />
-                <DotGrid color={theme.primaryColor} />
+                <GradientBlob color={CSS_VARS.primary} className="top-[-10%] right-[-5%]" size={600} opacity={0.12} />
+                <GradientBlob color={CSS_VARS.primary} className="bottom-[-15%] left-[-8%]" size={500} opacity={0.08} />
+                <DotGrid color={CSS_VARS.primary} />
 
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -82,7 +83,7 @@ export function HeroBlock({ block, theme, site }: BlockProps<HeroConfig>) {
                             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
                         >
                             {badge?.show && (
-                                <SectionLabel color={theme.primaryColor}>{badge.text}</SectionLabel>
+                                <SectionLabel color={CSS_VARS.primary}>{badge.text}</SectionLabel>
                             )}
                             <h1 className="text-5xl lg:text-6xl font-bold font-heading leading-[1.1] mb-6">
                                 {headline}
@@ -118,7 +119,7 @@ export function HeroBlock({ block, theme, site }: BlockProps<HeroConfig>) {
     if (variant === 'fullscreen') {
         return (
             <AnimatedSection className="relative py-32 flex items-center overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.06} />
+                <GradientBlob color={CSS_VARS.primary} className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" size={500} opacity={0.06} />
                 <div className="container mx-auto px-6 text-center max-w-3xl relative z-10">
                     <motion.h1
                         initial={{ opacity: 0, y: 20 }}
@@ -155,8 +156,8 @@ export function HeroBlock({ block, theme, site }: BlockProps<HeroConfig>) {
     if (variant === 'magazine') {
         return (
             <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="top-[-10%] left-[-5%]" size={500} opacity={0.08} />
-                <DotGrid color={theme.primaryColor} />
+                <GradientBlob color={CSS_VARS.primary} className="top-[-10%] left-[-5%]" size={500} opacity={0.08} />
+                <DotGrid color={CSS_VARS.primary} />
 
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-12 items-center">
@@ -188,7 +189,7 @@ export function HeroBlock({ block, theme, site }: BlockProps<HeroConfig>) {
                             className="md:col-span-2"
                         >
                             {badge?.show && (
-                                <SectionLabel color={theme.primaryColor}>{badge.text}</SectionLabel>
+                                <SectionLabel color={CSS_VARS.primary}>{badge.text}</SectionLabel>
                             )}
                             <h1 className="text-4xl lg:text-5xl font-bold font-heading leading-[1.1] mb-6">
                                 {headline}
@@ -522,7 +523,7 @@ export function HeroBlock({ block, theme, site }: BlockProps<HeroConfig>) {
             ctaButtons={ctaButtons}
             badge={badge}
             videoUrl={videoUrl}
-            primaryColor={theme.primaryColor}
+            primaryColor={CSS_VARS.primary}
         />
     }
 
@@ -538,9 +539,9 @@ export function HeroBlock({ block, theme, site }: BlockProps<HeroConfig>) {
                     radial-gradient(ellipse 60% 40% at 80% 80%, rgba(var(--brand-primary-rgb), 0.063) 0%, transparent 50%)
                 `,
             }} />
-            <DotGrid color={theme.primaryColor} />
-            <GradientBlob color={theme.primaryColor} className="top-[-20%] left-[10%]" size={600} opacity={0.1} />
-            <GradientBlob color={theme.primaryColor} className="bottom-[-10%] right-[5%]" size={400} opacity={0.08} />
+            <DotGrid color={CSS_VARS.primary} />
+            <GradientBlob color={CSS_VARS.primary} className="top-[-20%] left-[10%]" size={600} opacity={0.1} />
+            <GradientBlob color={CSS_VARS.primary} className="bottom-[-10%] right-[5%]" size={400} opacity={0.08} />
 
             <div className="container mx-auto px-6 relative z-10">
                 <div className="text-center max-w-4xl mx-auto">
@@ -551,7 +552,7 @@ export function HeroBlock({ block, theme, site }: BlockProps<HeroConfig>) {
                             viewport={{ once: true }}
                             transition={{ duration: 0.4 }}
                         >
-                            <SectionLabel color={theme.primaryColor}>{badge.text}</SectionLabel>
+                            <SectionLabel color={CSS_VARS.primary}>{badge.text}</SectionLabel>
                         </motion.div>
                     )}
 

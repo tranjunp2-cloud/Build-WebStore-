@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import type { BlockProps } from '../types'
 import type { AccordionConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function AccordionBlock({ block, theme }: BlockProps<AccordionConfig>) {
     const { headline, description, items = [], variant = 'bordered' } = block
@@ -43,7 +45,7 @@ export function AccordionBlock({ block, theme }: BlockProps<AccordionConfig>) {
     })()
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6 max-w-3xl">
                 {headline && (
                     <h2 className="text-4xl font-bold font-heading text-center mb-4">{headline}</h2>
@@ -90,6 +92,6 @@ export function AccordionBlock({ block, theme }: BlockProps<AccordionConfig>) {
                     })}
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
