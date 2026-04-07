@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { BlockProps } from '../types'
 import type { DownloadCTAConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 
 function DownloadIcon({ color }: { color: string }) {
@@ -76,9 +77,9 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
     )
 
     const action = unlocked ? (
-        <DownloadButton fileUrl={fileUrl} label={buttonLabel} pc={theme.primaryColor} />
+        <DownloadButton fileUrl={fileUrl} label={buttonLabel} pc={CSS_VARS.primary} />
     ) : (
-        <EmailGate onSubmit={() => setUnlocked(true)} pc={theme.primaryColor} label={buttonLabel} />
+        <EmailGate onSubmit={() => setUnlocked(true)} pc={CSS_VARS.primary} label={buttonLabel} />
     )
 
     if (variant === 'minimal') {
@@ -131,7 +132,7 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
                         className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6"
                         style={{ background: `rgba(var(--brand-primary-rgb), 0.082)` }}
                     >
-                        <DownloadIcon color={theme.primaryColor} />
+                        <DownloadIcon color={CSS_VARS.primary} />
                     </div>
                     <h2 className="text-2xl md:text-3xl font-bold font-heading mb-3">{headline}</h2>
                     {description && <p className="opacity-50 mb-6 max-w-sm mx-auto">{description}</p>}

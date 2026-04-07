@@ -393,6 +393,7 @@ export async function POST(req: NextRequest) {
                     slug: pageDefinition.slug,
                     site: site.id,
                     isHomepage: pageDefinition.isHomepage,
+                    _status: 'published',
                     layout: sanitizedLayout,
                     seo: pageDefinition.seo,
                 },

@@ -120,9 +120,9 @@ describe('[TC-S3-010] Theme presets — valid enum values', () => {
 })
 
 describe('[TC-S3-010] CATEGORY_PRESETS map', () => {
-  it('has 11 category entries', () => {
+  it('has 14 category entries', () => {
     // Assert
-    expect(Object.keys(CATEGORY_PRESETS)).toHaveLength(11)
+    expect(Object.keys(CATEGORY_PRESETS)).toHaveLength(14)
   })
 
   it('getCategoryPresets returns presets for valid category', () => {

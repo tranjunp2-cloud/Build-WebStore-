@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import type { BlockProps } from '../types'
 import type { BeforeAfterConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 
 export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>) {

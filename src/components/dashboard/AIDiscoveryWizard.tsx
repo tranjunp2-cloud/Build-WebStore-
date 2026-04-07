@@ -41,27 +41,18 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
   const stepData = WIZARD_STEPS[currentStep]
   const isLastStep = currentStep === WIZARD_STEPS.length - 1
 
-  const dismissWizard = async () => {
-    if (!userId) {
-      setIsOpen(false)
-      return
-    }
+  const dismissWizard = () => {
+    // Close immediately (optimistic) — don't block UI waiting for API
+    setIsOpen(false)
 
-    try {
-      const response = await fetch('/api/user/dismiss-wizard', {
+    // Persist to DB in background (fire-and-forget)
+    if (userId) {
+      fetch('/api/user/dismiss-wizard', {
         method: 'POST',
         credentials: 'include',
+      }).catch((error) => {
+        console.error('Failed to persist wizard dismiss state', error)
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to update status')
-      }
-
-      setIsOpen(false)
-    } catch (error) {
-      console.error('Failed to update wizard state', error)
-      // Still close the wizard on error — don't block the user
-      setIsOpen(false)
     }
   }
 

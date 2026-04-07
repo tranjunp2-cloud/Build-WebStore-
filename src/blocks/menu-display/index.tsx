@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { MenuDisplayConfig, MenuDisplayItem, DietaryTag } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 const DIETARY_ICONS: Record<DietaryTag, { label: string; icon: string }> = {
     halal: { label: 'Halal', icon: '\u2714\uFE0F' },
@@ -253,7 +255,7 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
     )
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-12">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
@@ -264,6 +266,6 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
                 {variant === 'photo-grid' && renderPhotoGrid()}
                 {variant === 'accordion' && renderAccordion()}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

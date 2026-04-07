@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 import type { BlockProps } from '../types'
 import type { CartWidgetConfig } from './config'
 import { useCartStore } from '@/store/cartStore'
+import { CSS_VARS } from '@/lib/theme/resolve'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 
 export function CartWidgetBlock({ block, theme, site }: BlockProps<CartWidgetConfig> & { site?: { slug?: string } }) {
@@ -30,8 +31,8 @@ export function CartWidgetBlock({ block, theme, site }: BlockProps<CartWidgetCon
                         onClick={openCart}
                         className="relative inline-flex items-center gap-3 rounded-2xl border px-4 py-3 font-medium text-white shadow-[0_16px_32px_rgba(2,6,23,0.22)] transition-transform duration-200 hover:-translate-y-0.5"
                         style={{
-                            background: `linear-gradient(135deg, ${theme.primaryColor}, ${theme.secondaryColor})`,
-                            borderColor: `${theme.primaryColor}55`,
+                            background: `linear-gradient(135deg, ${CSS_VARS.primary}, ${CSS_VARS.secondary})`,
+                            borderColor: `rgba(var(--brand-primary-rgb), 0.333)`,
                         }}
                     >
                         <ShoppingCart className="h-5 w-5" />

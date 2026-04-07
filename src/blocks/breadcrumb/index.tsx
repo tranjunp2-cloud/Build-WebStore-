@@ -2,12 +2,14 @@
 
 import type { BlockProps } from '../types'
 import type { BreadcrumbConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function BreadcrumbBlock({ block, theme }: BlockProps<BreadcrumbConfig>) {
     const { items = [], variant = 'simple' } = block
 
     return (
-        <section className="py-4">
+        <AnimatedSection className="py-4">
             <div className="container mx-auto px-6">
                 <nav aria-label="Breadcrumb">
                     <ol className="flex items-center flex-wrap gap-1 text-sm">
@@ -52,6 +54,6 @@ export function BreadcrumbBlock({ block, theme }: BlockProps<BreadcrumbConfig>) 
                     </ol>
                 </nav>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

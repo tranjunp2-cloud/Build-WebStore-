@@ -3,7 +3,8 @@
 import React from 'react'
 import type { BlockProps } from '../types'
 import type { BlogListConfig } from './config'
-import { StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import { SectionLabel, GradientBlob } from '../shared/decorative'
 
 const MOCK_POSTS = [
@@ -39,12 +40,12 @@ export function BlogListBlock({ block, theme }: BlockProps<BlogListConfig>) {
     const posts = MOCK_POSTS.slice(0, limit)
 
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="bottom-0 left-1/4" size={400} opacity={0.05} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="bottom-0 left-1/4" size={400} opacity={0.05} />
 
             <div className="container mx-auto px-6 relative z-10">
                 <div className="text-center max-w-2xl mx-auto mb-16">
-                    {block.sectionLabel && <SectionLabel color={theme.primaryColor}>{block.sectionLabel}</SectionLabel>}
+                    {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline}</h2>
                     {subheadline && <p className="opacity-60 text-lg">{subheadline}</p>}
                 </div>
@@ -64,7 +65,7 @@ export function BlogListBlock({ block, theme }: BlockProps<BlogListConfig>) {
                                     </div>
                                     <h3 className="text-2xl md:text-3xl font-heading font-bold mb-3 transition-colors"
                                         style={{ color: 'inherit' }}
-                                        onMouseEnter={(e) => { e.currentTarget.style.color = theme.primaryColor }}
+                                        onMouseEnter={(e) => { e.currentTarget.style.color = CSS_VARS.primary }}
                                         onMouseLeave={(e) => { e.currentTarget.style.color = 'inherit' }}>
                                         {post.title}
                                     </h3>
@@ -107,6 +108,6 @@ export function BlogListBlock({ block, theme }: BlockProps<BlogListConfig>) {
                     </StaggerGrid>
                 )}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

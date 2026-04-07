@@ -2,6 +2,8 @@
 
 import type { BlockProps } from '../types'
 import type { GalleryMasonryConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryConfig>) {
     const { variant = 'masonry', headline, images = [] } = block
@@ -16,7 +18,7 @@ export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryC
     const gridCols = variant === 'grid-4' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-14">
@@ -62,6 +64,6 @@ export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryC
                     </div>
                 )}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

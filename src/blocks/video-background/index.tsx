@@ -2,6 +2,8 @@
 
 import type { BlockProps } from '../types'
 import type { VideoBackgroundConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function VideoBackgroundBlock({ block, theme }: BlockProps<VideoBackgroundConfig>) {
     const {
@@ -57,7 +59,7 @@ export function VideoBackgroundBlock({ block, theme }: BlockProps<VideoBackgroun
 
     if (variant === 'contained') {
         return (
-            <section className="py-24">
+            <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     <div className="relative rounded-3xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
                         {videoEl}
@@ -65,16 +67,16 @@ export function VideoBackgroundBlock({ block, theme }: BlockProps<VideoBackgroun
                         {content}
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     // full (default)
     return (
-        <section className="relative overflow-hidden">
+        <AnimatedSection className="relative overflow-hidden">
             {videoEl}
             {overlay}
             {content}
-        </section>
+        </AnimatedSection>
     )
 }

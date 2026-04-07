@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import type { BlockProps } from '../types'
 import type { MenuFoodConfig, MenuItem } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
     const { headline, categories = [], variant = 'classic' } = block
@@ -82,7 +84,7 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
     const activeCategory = categories[activeTab]
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-12">
@@ -141,6 +143,6 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
                     </div>
                 )}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

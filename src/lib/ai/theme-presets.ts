@@ -112,6 +112,33 @@ export const FNB_PRESETS: ThemePreset[] = [
   { name: 'Night Lounge', primaryColor: '#be185d', secondaryColor: '#db2777', accentColor: '#fbbf24', fontPairingId: 'elegant-serif', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'dramatic' },
 ]
 
+// ── Events / Wedding ────────────────────────────────────────────────────────
+export const EVENTS_PRESETS: ThemePreset[] = [
+  { name: 'Elegant Blush', primaryColor: '#be185d', secondaryColor: '#ec4899', accentColor: '#fbbf24', fontPairingId: 'elegant-serif', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'subtle' },
+  { name: 'Royal Night', primaryColor: '#1e1b4b', secondaryColor: '#4338ca', accentColor: '#d4a574', fontPairingId: 'luxury-brand', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'dramatic' },
+  { name: 'Garden Party', primaryColor: '#166534', secondaryColor: '#22c55e', accentColor: '#f9a8d4', fontPairingId: 'artisan', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'pill', shadowPreset: 'subtle' },
+  { name: 'Modern Gala', primaryColor: '#0f172a', secondaryColor: '#334155', accentColor: '#f59e0b', fontPairingId: 'minimal-swiss', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium' },
+  { name: 'Rustic Charm', primaryColor: '#92400e', secondaryColor: '#b45309', accentColor: '#fef3c7', fontPairingId: 'warm-friendly', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'medium' },
+]
+
+// ── Blog / Media ────────────────────────────────────────────────────────────
+export const BLOG_PRESETS: ThemePreset[] = [
+  { name: 'Editorial White', primaryColor: '#0f172a', secondaryColor: '#334155', accentColor: '#dc2626', fontPairingId: 'editorial', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'sharp', shadowPreset: 'none' },
+  { name: 'Midnight Read', primaryColor: '#6366f1', secondaryColor: '#818cf8', accentColor: '#f59e0b', fontPairingId: 'retro-modern', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'rounded', shadowPreset: 'medium' },
+  { name: 'Fresh Ink', primaryColor: '#059669', secondaryColor: '#34d399', accentColor: '#f97316', fontPairingId: 'fresh-rounded', colorMode: 'light', spacingPreset: 'default', borderRadius: 'rounded', shadowPreset: 'subtle' },
+  { name: 'Bold Voice', primaryColor: '#dc2626', secondaryColor: '#f43f5e', accentColor: '#fbbf24', fontPairingId: 'bold-impact', colorMode: 'light', spacingPreset: 'compact', borderRadius: 'subtle', shadowPreset: 'medium' },
+  { name: 'Calm Journal', primaryColor: '#0d9488', secondaryColor: '#14b8a6', accentColor: '#d4a574', fontPairingId: 'humanist', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'subtle' },
+]
+
+// ── Travel / Tourism ────────────────────────────────────────────────────────
+export const TRAVEL_PRESETS: ThemePreset[] = [
+  { name: 'Tropical Escape', primaryColor: '#0891b2', secondaryColor: '#06b6d4', accentColor: '#f59e0b', fontPairingId: 'warm-friendly', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'subtle' },
+  { name: 'Explorer Dark', primaryColor: '#1e3a5f', secondaryColor: '#2563eb', accentColor: '#22d3ee', fontPairingId: 'geometric', colorMode: 'dark', spacingPreset: 'default', borderRadius: 'subtle', shadowPreset: 'medium' },
+  { name: 'Heritage Trail', primaryColor: '#92400e', secondaryColor: '#b45309', accentColor: '#fbbf24', fontPairingId: 'elegant-serif', colorMode: 'light', spacingPreset: 'relaxed', borderRadius: 'soft', shadowPreset: 'medium' },
+  { name: 'Backpacker Fresh', primaryColor: '#16a34a', secondaryColor: '#65a30d', accentColor: '#f97316', fontPairingId: 'startup-vibe', colorMode: 'light', spacingPreset: 'compact', borderRadius: 'rounded', shadowPreset: 'subtle' },
+  { name: 'Island Night', primaryColor: '#7c3aed', secondaryColor: '#a78bfa', accentColor: '#fbbf24', fontPairingId: 'creative-studio', colorMode: 'dark', spacingPreset: 'relaxed', borderRadius: 'rounded', shadowPreset: 'dramatic' },
+]
+
 // ── Category → Presets Map ──────────────────────────────────────────────────
 export const CATEGORY_PRESETS: Record<string, ThemePreset[]> = {
   restaurant: RESTAURANT_PRESETS,
@@ -125,6 +152,9 @@ export const CATEGORY_PRESETS: Record<string, ThemePreset[]> = {
   creative: CREATIVE_PRESETS,
   business: BUSINESS_PRESETS,
   fnb: FNB_PRESETS,
+  events: EVENTS_PRESETS,
+  blog: BLOG_PRESETS,
+  travel: TRAVEL_PRESETS,
 }
 
 export function getCategoryPresets(category: string): ThemePreset[] {

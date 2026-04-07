@@ -4,8 +4,9 @@ import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { PricingConfig } from './config'
-import { StaggerGrid, StaggerItem, HoverCard, staggerContainer, staggerItem } from '../shared/animations'
+import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard, staggerContainer, staggerItem } from '../shared/animations'
 import { GradientBlob } from '../shared/decorative'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
     const { headline, subheadline, plans = [], variant = 'cards' } = block
@@ -13,8 +14,8 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
     // ── horizontal variant ────────────────────────────────────────────────
     if (variant === 'horizontal') {
         return (
-            <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
                 <div className="container mx-auto px-6 relative z-10">
                     <SectionHeader headline={headline} subheadline={subheadline} />
                     <motion.div
@@ -82,7 +83,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                         ))}
                     </motion.div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
@@ -94,8 +95,8 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
     // ── tiered variant ────────────────────────────────────────────────────
     if (variant === 'tiered') {
         return (
-            <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
                 <div className="container mx-auto px-6 relative z-10">
                     <SectionHeader headline={headline} subheadline={subheadline} />
                     <motion.div
@@ -159,7 +160,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                         })}
                     </motion.div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
@@ -168,8 +169,8 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
         // Collect all unique features across plans
         const allFeatures = Array.from(new Set(plans.flatMap(p => p.features)))
         return (
-            <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
                 <div className="container mx-auto px-6 relative z-10">
                     <SectionHeader headline={headline} subheadline={subheadline} />
                     <div className="overflow-x-auto max-w-5xl mx-auto">
@@ -248,7 +249,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                         </table>
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
@@ -264,7 +265,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
 
     // ── Default: cards variant ────────────────────────────────────────────
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <SectionHeader headline={headline} subheadline={subheadline} />
                 <div className={`grid grid-cols-1 md:grid-cols-${Math.min(plans.length, 3)} gap-8 max-w-5xl mx-auto`}>
@@ -296,7 +297,7 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
                     ))}
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
 
@@ -327,8 +328,8 @@ function PricingToggle({ block, theme }: { block: BlockProps<PricingConfig>['blo
     }, [isYearly, yearlyDiscount])
 
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
             <div className="container mx-auto px-6 relative z-10">
                 <SectionHeader headline={headline} subheadline={subheadline} />
 
@@ -413,7 +414,7 @@ function PricingToggle({ block, theme }: { block: BlockProps<PricingConfig>['blo
                     ))}
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
 
@@ -423,8 +424,8 @@ function PricingMinimal({ block, theme }: { block: BlockProps<PricingConfig>['bl
     const [expandedPlan, setExpandedPlan] = useState<number | null>(null)
 
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
             <div className="container mx-auto px-6 relative z-10">
                 <SectionHeader headline={headline} subheadline={subheadline} />
                 <div className={`grid grid-cols-1 md:grid-cols-${Math.min(plans.length, 3)} gap-10 max-w-5xl mx-auto`}>
@@ -484,7 +485,7 @@ function PricingMinimal({ block, theme }: { block: BlockProps<PricingConfig>['bl
                     ))}
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
 
@@ -503,8 +504,8 @@ function PricingSlider({ block, theme }: { block: BlockProps<PricingConfig>['blo
     const plan = plans[currentIndex]
 
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="top-[10%] right-[-5%]" size={400} opacity={0.06} />
             <div className="container mx-auto px-6 relative z-10">
                 <SectionHeader headline={headline} subheadline={subheadline} />
 
@@ -600,6 +601,6 @@ function PricingSlider({ block, theme }: { block: BlockProps<PricingConfig>['blo
                     )}
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
