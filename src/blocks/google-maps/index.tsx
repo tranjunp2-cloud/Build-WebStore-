@@ -2,6 +2,8 @@
 
 import type { BlockProps } from '../types'
 import type { GoogleMapsConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function GoogleMapsBlock({ block, theme }: BlockProps<GoogleMapsConfig>) {
     const { variant = 'full-width', embedUrl, headline, address, height = 400 } = block
@@ -22,7 +24,7 @@ export function GoogleMapsBlock({ block, theme }: BlockProps<GoogleMapsConfig>) 
 
     if (variant === 'card') {
         return (
-            <section className="py-24">
+            <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     <div
                         className="max-w-4xl mx-auto rounded-2xl overflow-hidden border shadow-sm"
@@ -44,13 +46,13 @@ export function GoogleMapsBlock({ block, theme }: BlockProps<GoogleMapsConfig>) 
                         )}
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     // Full-width variant
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-10">
@@ -65,6 +67,6 @@ export function GoogleMapsBlock({ block, theme }: BlockProps<GoogleMapsConfig>) 
                     <p className="text-center text-sm opacity-70 mt-4">{address}</p>
                 )}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

@@ -4,6 +4,8 @@ import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { VideoShowcaseConfig, VideoItem } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 function PlayIcon({ size = 48 }: { size?: number }) {
     return (
@@ -212,7 +214,7 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
     )
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-12">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
@@ -223,6 +225,6 @@ export function VideoShowcaseBlock({ block }: BlockProps<VideoShowcaseConfig>) {
                 {variant === 'featured' && renderFeatured()}
                 {variant === 'fullwidth' && renderFullwidth()}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

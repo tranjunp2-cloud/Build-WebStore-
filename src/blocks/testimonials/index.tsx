@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { TestimonialsConfig, TestimonialItem } from './config'
-import { StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
+import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import { AvatarRing, GradientBlob } from '../shared/decorative'
 import { getTeamAvatar } from '@/lib/images/industry-images'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 export function TestimonialsBlock({ block, theme, site }: BlockProps<TestimonialsConfig>) {
     const { headline, testimonials = [] } = block
@@ -16,8 +17,8 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
     // ── masonry variant ───────────────────────────────────────────────────
     if (variant === 'masonry') {
         return (
-            <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'What Our Clients Say'}</h2>
@@ -47,7 +48,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                     &ldquo;{t.quote}&rdquo;
                                 </p>
                                 <div className="flex items-center gap-3">
-                                    <AvatarRing color={theme.primaryColor} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={40} />
+                                    <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={40} />
                                     <div>
                                         <p className="font-semibold text-sm">{t.name}</p>
                                         {(t.title || t.company) && (
@@ -59,7 +60,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                         ))}
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
@@ -81,8 +82,8 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
     // ── video-text variant ────────────────────────────────────────────────
     if (variant === 'video-text') {
         return (
-            <section className="py-24 relative overflow-hidden">
-                <GradientBlob color={theme.primaryColor} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
+            <AnimatedSection className="py-24 relative overflow-hidden">
+                <GradientBlob color={CSS_VARS.primary} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'What Our Clients Say'}</h2>
@@ -112,7 +113,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                                     </div>
                                                 </>
                                             ) : (
-                                                <AvatarRing color={theme.primaryColor} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={120} />
+                                                <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={120} />
                                             )}
                                         </div>
                                         {/* Text side */}
@@ -126,7 +127,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                                                 &ldquo;{t.quote}&rdquo;
                                             </p>
                                             <div className="flex items-center gap-3">
-                                                <AvatarRing color={theme.primaryColor} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={44} />
+                                                <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={44} />
                                                 <div>
                                                     <p className="font-semibold text-sm">{t.name}</p>
                                                     {(t.title || t.company) && (
@@ -141,14 +142,14 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                         })}
                     </StaggerGrid>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     // ── Default: cards variant ────────────────────────────────────────────
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
 
             <div className="container mx-auto px-6 relative z-10">
                 <div className="text-center max-w-2xl mx-auto mb-16">
@@ -190,7 +191,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
 
                                 {/* Author */}
                                 <div className="flex items-center gap-3 mt-auto">
-                                    <AvatarRing color={theme.primaryColor} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={44} />
+                                    <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, i)} name={t.name} size={44} />
                                     <div>
                                         <p className="font-semibold text-sm">{t.name}</p>
                                         {(t.title || t.company) && (
@@ -205,7 +206,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                     ))}
                 </StaggerGrid>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
 
@@ -228,8 +229,8 @@ function TestimonialsSpotlight({
     const sides = testimonials.filter((_, i) => i !== centerIdx)
 
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
             <div className="container mx-auto px-6 relative z-10">
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'What Our Clients Say'}</h2>
@@ -274,7 +275,7 @@ function TestimonialsSpotlight({
                             }}
                         >
                             <div className="flex justify-center mb-6">
-                                <AvatarRing color={theme.primaryColor} src={center.avatar?.url || getTeamAvatar(category, centerIdx)} name={center.name} size={72} />
+                                <AvatarRing color={CSS_VARS.primary} src={center.avatar?.url || getTeamAvatar(category, centerIdx)} name={center.name} size={72} />
                             </div>
                             <div className="flex justify-center gap-0.5 mb-4">
                                 {Array.from({ length: center.rating || 5 }).map((_, j) => (
@@ -329,7 +330,7 @@ function TestimonialsSpotlight({
                     </div>
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
 
@@ -363,8 +364,8 @@ function TestimonialsMinimalQuote({
     const t = testimonials[currentIndex]
 
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
             <div className="container mx-auto px-6 relative z-10">
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'What Our Clients Say'}</h2>
@@ -391,7 +392,7 @@ function TestimonialsMinimalQuote({
                                 &ldquo;{t.quote}&rdquo;
                             </p>
                             <div className="flex items-center justify-center gap-3">
-                                <AvatarRing color={theme.primaryColor} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={48} />
+                                <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={48} />
                                 <div className="text-left">
                                     <p className="font-bold">{t.name}</p>
                                     {(t.title || t.company) && (
@@ -420,7 +421,7 @@ function TestimonialsMinimalQuote({
                     )}
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }
 
@@ -442,8 +443,8 @@ function TestimonialsAvatarRow({
     const selected = testimonials[selectedIndex]
 
     return (
-        <section className="py-24 relative overflow-hidden">
-            <GradientBlob color={theme.primaryColor} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
+        <AnimatedSection className="py-24 relative overflow-hidden">
+            <GradientBlob color={CSS_VARS.primary} className="bottom-[0%] left-[-5%]" size={400} opacity={0.06} />
             <div className="container mx-auto px-6 relative z-10">
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline || 'What Our Clients Say'}</h2>
@@ -465,7 +466,7 @@ function TestimonialsAvatarRow({
                             aria-label={`View ${t.name}'s testimonial`}
                         >
                             <AvatarRing
-                                color={theme.primaryColor}
+                                color={CSS_VARS.primary}
                                 src={t.avatar?.url || getTeamAvatar(category, i)}
                                 name={t.name}
                                 size={56}
@@ -503,6 +504,6 @@ function TestimonialsAvatarRow({
                     </motion.div>
                 </AnimatePresence>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

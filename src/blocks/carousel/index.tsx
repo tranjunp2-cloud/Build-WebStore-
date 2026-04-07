@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { BlockProps } from '../types'
 import type { CarouselConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
     const { headline, items = [], variant = 'images', autoplay = true, interval = 5000 } = block
@@ -51,7 +53,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                     onClick={() => goTo(i)}
                     className="w-2.5 h-2.5 rounded-full transition-all duration-300"
                     style={{
-                        background: i === currentIndex ? theme.primaryColor : `rgba(var(--brand-primary-rgb), 0.188)`,
+                        background: i === currentIndex ? CSS_VARS.primary : `rgba(var(--brand-primary-rgb), 0.188)`,
                         transform: i === currentIndex ? 'scale(1.3)' : 'scale(1)',
                     }}
                     aria-label={`Go to slide ${i + 1}`}
@@ -63,7 +65,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
     // Images variant
     if (variant === 'images') {
         return (
-            <section className="py-24">
+            <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     {headline && (
                         <div className="text-center mb-12">
@@ -102,14 +104,14 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                     </div>
                     {total > 1 && <Dots />}
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     // Cards variant
     if (variant === 'cards') {
         return (
-            <section className="py-24">
+            <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     {headline && (
                         <div className="text-center mb-12">
@@ -152,13 +154,13 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                     </div>
                     {total > 1 && <Dots />}
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     // Testimonials variant
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-12">
@@ -205,6 +207,6 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                 </div>
                 {total > 1 && <Dots />}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

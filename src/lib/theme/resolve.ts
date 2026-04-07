@@ -140,28 +140,29 @@ function hexToRGB(hex: string): string {
 }
 
 export function generateThemeCSS(theme: ThemeConfig): string {
-    const spacing = SPACING_PRESETS[theme.spacingPreset]
-    const radius = RADIUS_PRESETS[theme.borderRadius]
-    const shadow = SHADOW_PRESETS[theme.shadowPreset]
+    try {
+        const spacing = SPACING_PRESETS[theme.spacingPreset] || SPACING_PRESETS.default
+        const radius = RADIUS_PRESETS[theme.borderRadius] || RADIUS_PRESETS.rounded
+        const shadow = SHADOW_PRESETS[theme.shadowPreset] || SHADOW_PRESETS.subtle
 
-    return `:root {
+        return `:root {
   /* Colors */
-  --brand-primary: ${theme.primaryColor};
-  --brand-secondary: ${theme.secondaryColor};
-  --brand-accent: ${theme.accentColor};
-  --surface: ${theme.surfaceColor};
-  --text: ${theme.textColor};
-  --muted: ${theme.mutedColor};
-  --background: ${theme.backgroundColor};
+  --brand-primary: ${theme.primaryColor || '#0ea5e9'};
+  --brand-secondary: ${theme.secondaryColor || '#d946ef'};
+  --brand-accent: ${theme.accentColor || '#f59e0b'};
+  --surface: ${theme.surfaceColor || '#f8f8f8'};
+  --text: ${theme.textColor || '#09090b'};
+  --muted: ${theme.mutedColor || '#71717a'};
+  --background: ${theme.backgroundColor || '#ffffff'};
 
   /* RGB variants for opacity */
-  --brand-primary-rgb: ${hexToRGB(theme.primaryColor)};
-  --brand-secondary-rgb: ${hexToRGB(theme.secondaryColor)};
-  --brand-accent-rgb: ${hexToRGB(theme.accentColor)};
+  --brand-primary-rgb: ${hexToRGB(theme.primaryColor || '#0ea5e9')};
+  --brand-secondary-rgb: ${hexToRGB(theme.secondaryColor || '#d946ef')};
+  --brand-accent-rgb: ${hexToRGB(theme.accentColor || '#f59e0b')};
 
   /* Typography */
-  --font-heading: '${theme.fontHeading}', sans-serif;
-  --font-body: '${theme.fontBody}', sans-serif;
+  --font-heading: '${theme.fontHeading || 'Outfit'}', sans-serif;
+  --font-body: '${theme.fontBody || 'Inter'}', sans-serif;
 
   /* Spacing */
   --space-xs: ${spacing.xs};
@@ -181,4 +182,54 @@ export function generateThemeCSS(theme: ThemeConfig): string {
   --shadow-md: ${shadow.md};
   --shadow-lg: ${shadow.lg};
 }`
+    } catch {
+        // Fallback CSS — prevents blank page on corrupted theme data
+        return `:root {
+  --brand-primary: #0ea5e9; --brand-secondary: #d946ef; --brand-accent: #f59e0b;
+  --surface: #f8f8f8; --text: #09090b; --muted: #71717a; --background: #ffffff;
+  --brand-primary-rgb: 14, 165, 233; --brand-secondary-rgb: 217, 70, 239; --brand-accent-rgb: 245, 158, 11;
+  --font-heading: 'Outfit', sans-serif; --font-body: 'Inter', sans-serif;
+  --space-xs: 0.25rem; --space-sm: 0.5rem; --space-md: 1rem; --space-lg: 1.5rem;
+  --space-xl: 2.5rem; --space-2xl: 4rem; --section-padding: 5rem;
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 16px; --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05); --shadow-md: 0 2px 8px rgba(0,0,0,0.08); --shadow-lg: 0 4px 16px rgba(0,0,0,0.1);
+}`
+    }
 }
+
+// ── CSS Var Constants (for blocks to import) ───────────────────────────────
+// Use these instead of raw strings to prevent typos (Scenario #25)
+
+export const CSS_VARS = {
+    // Colors
+    primary: 'var(--brand-primary, #0ea5e9)',
+    secondary: 'var(--brand-secondary, #d946ef)',
+    accent: 'var(--brand-accent, #f59e0b)',
+    surface: 'var(--surface, #f8f8f8)',
+    text: 'var(--text, #09090b)',
+    muted: 'var(--muted, #71717a)',
+    background: 'var(--background, #ffffff)',
+    // RGB (for opacity)
+    primaryRgb: 'var(--brand-primary-rgb, 14, 165, 233)',
+    secondaryRgb: 'var(--brand-secondary-rgb, 217, 70, 239)',
+    accentRgb: 'var(--brand-accent-rgb, 245, 158, 11)',
+    // Typography
+    fontHeading: "var(--font-heading, 'Outfit', sans-serif)",
+    fontBody: "var(--font-body, 'Inter', sans-serif)",
+    // Spacing
+    spaceXs: 'var(--space-xs, 0.25rem)',
+    spaceSm: 'var(--space-sm, 0.5rem)',
+    spaceMd: 'var(--space-md, 1rem)',
+    spaceLg: 'var(--space-lg, 1.5rem)',
+    spaceXl: 'var(--space-xl, 2.5rem)',
+    space2xl: 'var(--space-2xl, 4rem)',
+    sectionPadding: 'var(--section-padding, 5rem)',
+    // Shape
+    radiusSm: 'var(--radius-sm, 4px)',
+    radiusMd: 'var(--radius-md, 8px)',
+    radiusLg: 'var(--radius-lg, 16px)',
+    radiusFull: 'var(--radius-full, 9999px)',
+    shadowSm: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+    shadowMd: 'var(--shadow-md, 0 2px 8px rgba(0,0,0,0.08))',
+    shadowLg: 'var(--shadow-lg, 0 4px 16px rgba(0,0,0,0.1))',
+} as const

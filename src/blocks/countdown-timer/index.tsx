@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import type { BlockProps } from '../types'
 import type { CountdownTimerConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 
 function calcTimeLeft(target: string) {

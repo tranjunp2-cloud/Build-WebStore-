@@ -1,10 +1,12 @@
 import type { BlockProps } from '../types'
 import type { LogoCloudConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function LogoCloudBlock({ block, theme }: BlockProps<LogoCloudConfig>) {
     const { headline, logos = [] } = block
     return (
-        <section className="py-16">
+        <AnimatedSection className="py-16">
             <div className="container mx-auto px-6">
                 {headline && <p className="text-sm font-semibold uppercase tracking-widest text-center mb-8 opacity-50">{headline}</p>}
                 <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
@@ -13,6 +15,6 @@ export function LogoCloudBlock({ block, theme }: BlockProps<LogoCloudConfig>) {
                     ))}
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

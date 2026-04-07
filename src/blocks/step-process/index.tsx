@@ -2,13 +2,15 @@
 
 import type { BlockProps } from '../types'
 import type { StepProcessConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 export function StepProcessBlock({ block, theme }: BlockProps<StepProcessConfig>) {
     const { headline, subheadline, steps = [], variant = 'vertical' } = block
 
     if (variant === 'horizontal') {
         return (
-            <section className="py-24">
+            <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     <div className="text-center max-w-2xl mx-auto mb-16">
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
@@ -34,13 +36,13 @@ export function StepProcessBlock({ block, theme }: BlockProps<StepProcessConfig>
                         ))}
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     if (variant === 'alternating') {
         return (
-            <section className="py-24">
+            <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     <div className="text-center max-w-2xl mx-auto mb-16">
                         <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
@@ -75,13 +77,13 @@ export function StepProcessBlock({ block, theme }: BlockProps<StepProcessConfig>
                         })}
                     </div>
                 </div>
-            </section>
+            </AnimatedSection>
         )
     }
 
     // Default: vertical
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
@@ -111,6 +113,6 @@ export function StepProcessBlock({ block, theme }: BlockProps<StepProcessConfig>
                     ))}
                 </div>
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

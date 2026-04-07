@@ -180,7 +180,7 @@ describe('AIDiscoveryWizard', () => {
         // Assert: Fetch was called but caught by component's error handler
         await waitFor(() => {
             expect(global.fetch).toHaveBeenCalled()
-            expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to update wizard state', expect.any(Error))
+            expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to persist wizard dismiss state', expect.any(Error))
         })
         
         consoleErrorSpy.mockRestore()

@@ -20,6 +20,7 @@ vi.mock('@/app/api/preview/renderers', () => ({
 }))
 vi.mock('@/app/api/preview/renderers/hero', () => ({
     setHeroCategory: vi.fn(),
+    setHeroImageIndex: vi.fn(),
 }))
 vi.mock('@/app/api/preview/renderers/sections', () => ({
     setSectionCategory: vi.fn(),

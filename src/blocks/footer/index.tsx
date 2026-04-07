@@ -5,6 +5,7 @@ import type { FooterConfig } from './config'
 import { GradientLine } from '../shared/decorative'
 import { mergeFooterSocialsWithSite } from '@/lib/site-settings'
 import { Facebook, Instagram, Twitter, Linkedin, Youtube, Globe } from 'lucide-react'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
     facebook: Facebook,
@@ -35,7 +36,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
     if (variant === 'centered-stack') {
         return (
             <footer className="py-16 relative">
-                <GradientLine from={theme.primaryColor} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
+                <GradientLine from={CSS_VARS.primary} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
                 <div className="container mx-auto px-6 text-center">
                     {/* Logo */}
                     <div className="font-bold text-2xl font-heading mb-4">
@@ -209,7 +210,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                     background: `linear-gradient(to bottom, transparent, rgba(0,0,0,0.08))`,
                 }}
             >
-                <GradientLine from={theme.primaryColor} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
+                <GradientLine from={CSS_VARS.primary} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
                 <div className="container mx-auto px-6">
                     <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-10">
                         {/* Logo + tagline */}
@@ -285,7 +286,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
     return (
         <footer className="pt-20 pb-8 relative">
             {/* Top gradient line */}
-            <GradientLine from={theme.primaryColor} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
+            <GradientLine from={CSS_VARS.primary} to={`rgba(var(--brand-primary-rgb), 0)`} className="absolute top-0 left-0" height={1} />
 
             <div className="container mx-auto px-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-16">
@@ -307,7 +308,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                         </div>
                         {tagline && <p className="opacity-40 text-sm leading-relaxed max-w-xs">{tagline}</p>}
 
-                        {/* Social icons placeholder */}
+                        {/* Social icons */}
                         {socialsArr.length > 0 && (
                             <div className="flex gap-3 mt-6">
                                 {socialsArr.map((social, i) => (

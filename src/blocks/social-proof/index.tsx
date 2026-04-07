@@ -2,6 +2,8 @@
 
 import type { BlockProps } from '../types'
 import type { SocialProofConfig, SocialProofReview } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
+import { AnimatedSection } from '../shared/animations'
 
 function StarRating({ rating, color }: { rating: number; color: string }) {
     return (
@@ -43,7 +45,7 @@ function Avatar({ src, name, color }: { src?: string; name: string; color: strin
 function ReviewCard({ review, color, variant }: { review: SocialProofReview; color: string; variant: string }) {
     if (variant === 'minimal') {
         return (
-            <div className="py-6 border-b last:border-b-0" style={{ borderColor: `${color}15` }}>
+            <div className="py-6 border-b last:border-b-0" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.082)` }}>
                 <StarRating rating={review.rating} color={color} />
                 <p className="mt-3 text-sm leading-relaxed opacity-80">{review.content}</p>
                 <div className="flex items-center gap-3 mt-4">
@@ -60,11 +62,11 @@ function ReviewCard({ review, color, variant }: { review: SocialProofReview; col
     return (
         <div
             className="p-6 rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200"
-            style={{ borderColor: `${color}20` }}
+            style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.125)` }}
         >
             <StarRating rating={review.rating} color={color} />
             <p className="mt-4 text-sm leading-relaxed opacity-80">{review.content}</p>
-            <div className="flex items-center gap-3 mt-6 pt-4 border-t" style={{ borderColor: `${color}10` }}>
+            <div className="flex items-center gap-3 mt-6 pt-4 border-t" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.063)` }}>
                 <Avatar src={review.avatar} name={review.author} color={color} />
                 <div>
                     <p className="text-sm font-semibold">{review.author}</p>
@@ -79,7 +81,7 @@ export function SocialProofBlock({ block, theme }: BlockProps<SocialProofConfig>
     const { variant = 'cards', headline, reviews = [] } = block
 
     return (
-        <section className="py-24">
+        <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-14">
@@ -90,17 +92,17 @@ export function SocialProofBlock({ block, theme }: BlockProps<SocialProofConfig>
                 {variant === 'minimal' ? (
                     <div className="max-w-2xl mx-auto">
                         {reviews.map((review, i) => (
-                            <ReviewCard key={i} review={review} color={theme.primaryColor} variant={variant} />
+                            <ReviewCard key={i} review={review} color={CSS_VARS.primary} variant={variant} />
                         ))}
                     </div>
                 ) : (
                     <div className={`grid grid-cols-1 md:grid-cols-2 ${variant === 'grid' ? 'lg:grid-cols-3' : 'lg:grid-cols-3'} gap-6 max-w-6xl mx-auto`}>
                         {reviews.map((review, i) => (
-                            <ReviewCard key={i} review={review} color={theme.primaryColor} variant={variant} />
+                            <ReviewCard key={i} review={review} color={CSS_VARS.primary} variant={variant} />
                         ))}
                     </div>
                 )}
             </div>
-        </section>
+        </AnimatedSection>
     )
 }

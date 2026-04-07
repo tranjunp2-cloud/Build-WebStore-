@@ -1,8 +1,8 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { SEED_TEMPLATES } from '@/lib/ai/seed-templates'
-import { composeTemplate } from '@/lib/ai/template-composer'
-import { TEMPLATE_DEFINITIONS } from '@/lib/ai/template-definitions'
+import { composeTemplate, composeFromBlueprint } from '@/lib/ai/template-composer'
+import { TEMPLATE_DEFINITIONS, TEMPLATE_PRESETS } from '@/lib/ai/template-definitions'
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/auth'
 
@@ -12,18 +12,133 @@ import { withAuth } from '@/lib/auth'
  *
  * Modes:
  *   - Default (no query): seeds the original 10 industry templates (legacy)
- *   - ?v2=true: seeds ~48 composed templates from template-definitions
+ *   - ?v2=true: seeds ~48 composed templates from template-definitions (legacy v2)
+ *   - ?v3=true: seeds 56 premium blueprint templates (NEW — Category DNA)
  *   - ?force=true: delete existing templates before seeding
  *   - ?dry=true: return composed seeds without writing to DB
  */
 export const POST = withAuth(async (_user, request) => {
     try {
+        // Only super-admin can seed in production; allow any auth user in dev
+        const isDev = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
+        if (!isDev && !_user?.roles?.includes('super-admin')) {
+            return NextResponse.json({
+                success: false,
+                error: { code: 'FORBIDDEN', message: 'Only super-admin can seed templates' },
+            }, { status: 403 })
+        }
+
         const url = new URL(request.url)
         const force = url.searchParams.get('force') === 'true'
         const v2 = url.searchParams.get('v2') === 'true'
+        const v3 = url.searchParams.get('v3') === 'true'
         const dry = url.searchParams.get('dry') === 'true'
 
-        // ── v2: Composed templates ──────────────────────────────────────
+        // ── v3: Blueprint-driven premium templates ─────────────────────
+        if (v3) {
+            if (TEMPLATE_PRESETS.length === 0) {
+                return NextResponse.json({
+                    success: false,
+                    error: { code: 'NO_PRESETS', message: 'TEMPLATE_PRESETS is empty. Phase 3 blueprints not yet populated.' },
+                }, { status: 400 })
+            }
+
+            const batchSize = 5
+            const seeds = TEMPLATE_PRESETS.map((preset) => composeFromBlueprint(preset))
+
+            if (dry) {
+                return NextResponse.json({
+                    success: true,
+                    data: {
+                        total: seeds.length,
+                        created: 0, skipped: 0, failed: 0, dry: true,
+                        templates: seeds.map((s) => ({
+                            name: s.name,
+                            category: s.category,
+                            personality: TEMPLATE_PRESETS.find(p => p.name === s.name)?.personality ?? 'unknown',
+                            isPremium: s.isPremium,
+                            pageCount: s.pages.length,
+                            blockCount: s.pages.reduce((acc, p) => acc + p.layout.length, 0),
+                        })),
+                    },
+                })
+            }
+
+            const payload = await getPayload({ config })
+
+            if (force) {
+                const existing = await payload.find({ collection: 'templates', limit: 200, overrideAccess: true })
+                for (const doc of existing.docs) {
+                    await payload.delete({ collection: 'templates', id: doc.id, overrideAccess: true })
+                }
+                console.log(`[Seed v3] Deleted ${existing.totalDocs} existing templates`)
+            }
+
+            // Check existing templates to skip duplicates
+            const existingTemplates = await payload.find({ collection: 'templates', limit: 200, overrideAccess: true })
+            const existingNames = new Set(existingTemplates.docs.map((d: any) => d.name))
+
+            const results: { status: 'fulfilled' | 'rejected'; value?: { name: string; category: string; personality: string; status: string }; reason?: string }[] = []
+            let skipped = 0
+
+            for (let i = 0; i < seeds.length; i += batchSize) {
+                const batch = seeds.slice(i, i + batchSize)
+                const batchResults = await Promise.allSettled(
+                    batch.map(async (seed, idx) => {
+                        const preset = TEMPLATE_PRESETS[i + idx]!
+                        // Skip if template with same name already exists
+                        if (existingNames.has(seed.name)) {
+                            skipped++
+                            return { name: seed.name, category: seed.category, personality: preset.personality, status: 'skipped' as const }
+                        }
+                        await payload.create({
+                            collection: 'templates',
+                            overrideAccess: true,
+                            data: {
+                                name: seed.name,
+                                description: seed.description,
+                                category: [seed.category],
+                                defaultTheme: seed.theme as Record<string, unknown>,
+                                defaultBlocks: seed.pages[0]?.layout ?? [],
+                                templatePages: seed.pages.map((page, pidx) => ({
+                                    title: page.title || (pidx === 0 ? 'Home' : `Page ${pidx + 1}`),
+                                    slug: page.slug || (pidx === 0 ? 'home' : `page-${pidx + 1}`),
+                                    isHomepage: pidx === 0,
+                                    layout: page.layout,
+                                })),
+                                tags: [seed.category, preset.personality, ...preset.tags].map(t => ({ tag: t })),
+                                sortOrder: 0,
+                                isPremium: true,
+                                isFeatured: false,
+                            },
+                        })
+                        return { name: seed.name, category: seed.category, personality: preset.personality, status: 'created' as const }
+                    })
+                )
+                for (const r of batchResults) {
+                    if (r.status === 'fulfilled') {
+                        results.push({ status: 'fulfilled', value: r.value })
+                    } else {
+                        results.push({ status: 'rejected', reason: String(r.reason) })
+                    }
+                }
+            }
+
+            const created = results.filter((r) => r.status === 'fulfilled' && r.value?.status === 'created').length
+            const failed = results.filter((r) => r.status === 'rejected').length
+            const failReasons = results.filter((r) => r.status === 'rejected').map((r) => r.reason).slice(0, 5)
+
+            return NextResponse.json({
+                success: true,
+                data: {
+                    total: TEMPLATE_PRESETS.length,
+                    created, skipped, failed, failReasons,
+                    templates: results.filter((r) => r.status === 'fulfilled' && r.value).map((r) => r.value),
+                },
+            })
+        }
+
+        // ── v2: Composed templates (legacy) ────────────────────────────
         if (v2) {
             const batchSize = 10
             const seeds = TEMPLATE_DEFINITIONS.map((def) => composeTemplate(def))
@@ -74,6 +189,12 @@ export const POST = withAuth(async (_user, request) => {
                                 category: seed.category,
                                 defaultTheme: seed.theme as Record<string, unknown>,
                                 defaultBlocks: seed.pages[0]?.layout ?? [],
+                                templatePages: seed.pages.map((page, idx) => ({
+                                    title: page.title || (idx === 0 ? 'Home' : `Page ${idx + 1}`),
+                                    slug: page.slug || (idx === 0 ? 'home' : `page-${idx + 1}`),
+                                    isHomepage: idx === 0,
+                                    layout: page.layout,
+                                })),
                                 tags: [seed.category, seed.tier],
                                 sortOrder: 0,
                                 isPremium: seed.isPremium,

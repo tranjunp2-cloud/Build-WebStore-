@@ -2,6 +2,7 @@
 
 import type { BlockProps } from '../types'
 import type { FeatureComparisonConfig } from './config'
+import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 
 function CheckIcon({ color }: { color: string }) {
@@ -37,7 +38,7 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
                                 className="rounded-2xl p-6 md:p-8"
                                 style={{
                                     background: product.highlighted ? `rgba(var(--brand-primary-rgb), 0.063)` : `rgba(var(--brand-primary-rgb), 0.024)`,
-                                    border: `1px solid ${product.highlighted ? theme.primaryColor : `rgba(var(--brand-primary-rgb), 0.125)`}`,
+                                    border: `1px solid ${product.highlighted ? CSS_VARS.primary : `rgba(var(--brand-primary-rgb), 0.125)`}`,
                                 }}
                             >
                                 <h3
@@ -51,7 +52,7 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
                                         const has = feature.values[pIdx] ?? false
                                         return (
                                             <li key={fIdx} className="flex items-center gap-3">
-                                                {has ? <CheckIcon color={theme.primaryColor} /> : <CrossIcon />}
+                                                {has ? <CheckIcon color={CSS_VARS.primary} /> : <CrossIcon />}
                                                 <span className={has ? '' : 'opacity-40 line-through'}>{feature.name}</span>
                                             </li>
                                         )
@@ -103,7 +104,7 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
                                                 style={product.highlighted ? { background: `rgba(var(--brand-primary-rgb), 0.024)` } : undefined}
                                             >
                                                 <span className="inline-flex justify-center">
-                                                    {has ? <CheckIcon color={theme.primaryColor} /> : <CrossIcon />}
+                                                    {has ? <CheckIcon color={CSS_VARS.primary} /> : <CrossIcon />}
                                                 </span>
                                             </td>
                                         )
