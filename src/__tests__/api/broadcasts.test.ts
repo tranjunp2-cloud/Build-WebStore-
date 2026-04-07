@@ -71,21 +71,20 @@ describe('[TC-F16.13] POST /api/admin/broadcasts', () => {
         )
     })
 
-    it('passes targetAudience to createBroadcastNotifications', async () => {
+    it('defaults targetAudience to "all" when not provided', async () => {
         // Arrange & Act
         await POST(createRequest({
             title: 'Promo',
-            message: 'New feature for paid users',
-            targetAudience: 'paid',
+            message: 'New feature for all users',
         }))
 
         // Assert
         expect(mockCreateBroadcast).toHaveBeenCalledWith(
-            expect.objectContaining({ targetAudience: 'paid' }),
+            expect.objectContaining({ targetAudience: 'all' }),
         )
     })
 
-    it('passes actionUrl when provided', async () => {
+    it('passes valid internal actionUrl', async () => {
         // Arrange & Act
         await POST(createRequest({
             title: 'Update',
@@ -97,6 +96,46 @@ describe('[TC-F16.13] POST /api/admin/broadcasts', () => {
         expect(mockCreateBroadcast).toHaveBeenCalledWith(
             expect.objectContaining({ actionUrl: '/changelog' }),
         )
+    })
+
+    it('passes valid https actionUrl', async () => {
+        // Arrange & Act
+        await POST(createRequest({
+            title: 'Update',
+            message: 'Check it out',
+            actionUrl: 'https://docs.example.com/release-notes',
+        }))
+
+        // Assert
+        expect(mockCreateBroadcast).toHaveBeenCalledWith(
+            expect.objectContaining({ actionUrl: 'https://docs.example.com/release-notes' }),
+        )
+    })
+
+    it('returns 400 for javascript: protocol actionUrl', async () => {
+        // Act
+        const res = await POST(createRequest({
+            title: 'Test',
+            message: 'Body',
+            actionUrl: 'javascript:alert(1)',
+        }))
+
+        // Assert
+        expect(res.status).toBe(400)
+        expect(mockCreateBroadcast).not.toHaveBeenCalled()
+    })
+
+    it('returns 400 for data: protocol actionUrl', async () => {
+        // Act
+        const res = await POST(createRequest({
+            title: 'Test',
+            message: 'Body',
+            actionUrl: 'data:text/html,<script>alert(1)</script>',
+        }))
+
+        // Assert
+        expect(res.status).toBe(400)
+        expect(mockCreateBroadcast).not.toHaveBeenCalled()
     })
 })
 
@@ -180,17 +219,29 @@ describe('[TC-F16.19] Broadcast API — Input validation & XSS', () => {
         )
     })
 
-    it('defaults targetAudience to "all" for invalid values', async () => {
+    it('returns 400 for unsupported targetAudience "paid"', async () => {
         // Act
-        await POST(createRequest({
+        const res = await POST(createRequest({
             title: 'Test',
             message: 'Body',
-            targetAudience: 'invalid_value',
+            targetAudience: 'paid',
         }))
 
         // Assert
-        expect(mockCreateBroadcast).toHaveBeenCalledWith(
-            expect.objectContaining({ targetAudience: 'all' }),
-        )
+        expect(res.status).toBe(400)
+        expect(mockCreateBroadcast).not.toHaveBeenCalled()
+    })
+
+    it('returns 400 for unsupported targetAudience "free"', async () => {
+        // Act
+        const res = await POST(createRequest({
+            title: 'Test',
+            message: 'Body',
+            targetAudience: 'free',
+        }))
+
+        // Assert
+        expect(res.status).toBe(400)
+        expect(mockCreateBroadcast).not.toHaveBeenCalled()
     })
 })

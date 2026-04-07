@@ -71,11 +71,23 @@ export const POST = withAuth(async (user, request) => {
             )
         }
 
-        const validAudiences: BroadcastTargetAudience[] = ['all', 'free', 'paid']
-        const audience: BroadcastTargetAudience =
-            targetAudience && validAudiences.includes(targetAudience as BroadcastTargetAudience)
-                ? (targetAudience as BroadcastTargetAudience)
-                : 'all'
+        // Only 'all' is supported until tenant subscription model (F15) is implemented
+        if (targetAudience && targetAudience !== 'all') {
+            return NextResponse.json(
+                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Only targetAudience "all" is currently supported. "free"/"paid" filtering requires F15 subscription model.' } },
+                { status: 400 },
+            )
+        }
+        const audience: BroadcastTargetAudience = 'all'
+
+        // Validate actionUrl — only allow internal paths or http(s) URLs
+        const trimmedActionUrl = actionUrl?.trim() || undefined
+        if (trimmedActionUrl && !isSafeActionUrl(trimmedActionUrl)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'VALIDATION_ERROR', message: 'actionUrl must be a relative path (/) or https:// URL' } },
+                { status: 400 },
+            )
+        }
 
         // Sanitize: strip any HTML tags from title/message to prevent stored XSS
         const sanitizedTitle = stripHtml(title.trim())
@@ -86,7 +98,7 @@ export const POST = withAuth(async (user, request) => {
         const result = await createBroadcastNotifications({
             title: sanitizedTitle,
             message: sanitizedMessage,
-            actionUrl: actionUrl?.trim() || undefined,
+            actionUrl: trimmedActionUrl,
             targetAudience: audience,
             payload,
         })
@@ -110,4 +122,24 @@ export const POST = withAuth(async (user, request) => {
  */
 function stripHtml(input: string): string {
     return input.replace(/<[^>]*>/g, '')
+}
+
+/**
+ * Validate actionUrl — only allow:
+ * - Internal paths starting with /
+ * - http:// or https:// URLs
+ * Blocks javascript:, data:, vbscript: and other dangerous protocols.
+ */
+function isSafeActionUrl(url: string): boolean {
+    // Internal relative path
+    if (url.startsWith('/') && !url.startsWith('//')) {
+        return true
+    }
+    // Absolute URL — only http(s)
+    try {
+        const parsed = new URL(url)
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch {
+        return false
+    }
 }
