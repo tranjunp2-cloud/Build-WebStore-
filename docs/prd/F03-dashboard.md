@@ -2,6 +2,7 @@
 > **Version:** 2.0 | **Updated:** 2026-03-17 | **Agent:** `project-planner`
 > **Priority:** P0 | **Sprint:** Wave 3 | **Size:** XL
 > **Depends on:** F02 Auth ✅, Published site exists
+> **Reference:** [Bản phân tích tính năng F03 (Larksuite)](https://primecommerce.sg.larksuite.com/docx/ZlD8dKg0booFp4xLsGMl9Z8Yg7b)
 
 ---
 
@@ -51,16 +52,16 @@ Sau khi login, user (chủ shop SME) cần thấy **tổng quan ngay lập tức
 ## 4. Scope
 
 ### In Scope
-- **Dashboard Overview:** Top 4 Metrics mặc định (Traffic, Leads, Engagement, Sales/Orders), Action Required list, và SEO Widget.
-- **Customization:** Cho phép user chọn khoảng thời gian (Today, 7d, 30d) và tùy chỉnh (thêm/ẩn/sắp xếp) các metrics hiển thị trên Dashboard.
+- **Dashboard Overview:** Top 4 Metrics mặc định (Traffic, Leads, Engagement, Sales/Orders), Action Required list, và SEO Widget. Cấp số liệu từ **Google Analytics Data API**.
+- **Customization:** Cho phép user chọn khoảng thời gian (Today, 7d, 30d) và tùy chỉnh (thêm/ẩn/sắp xếp) các metrics hiển thị. Trạng thái lọc được hỗ trợ bởi **Redis Cache** dự phòng lỗi Rate Limit.
 - **Analytics Details:** % change vs previous period, Daily bar chart, Top hạng mục hiệu suất cao (Pages, Products, Blogs) max 10 rows.
-- **SEO Health:** Overall score (0-100) and breakdown, Basic Keyword Tracker (max 5 keywords), AI "Fix All Issues ✨" với SSE streaming progress, Auto meta tag generation khi publish (title, description), Sitemap generation, JSON-LD Schema.
+- **SEO Health:** Overall score (0-100) and breakdown, Keyword Tracker từ **Google Search Console API**, AI "Fix All Issues ✨" với SSE streaming (ứng dụng Prompt Batching và Context Limit 150 ký tự), Auto meta tag generation (chuẩn SEO 60/160 chars), Sitemap, JSON-LD Schema.
+- **Connectivity:** Xác thực OAuth Google, quản lý Tenant Token, và Auto-Verification (Xác minh miền tự động trên GSC khi thay đổi Custom Domain).
 
 ### Out of Scope
-- Real-time Analytics phức tạp (chỉ fetch batch).
+- Real-time Analytics phức tạp (chỉ fetch phân mảnh).
 - Custom event tracking ngoài các metrics được định nghĩa sẵn.
-- Google Search Console integration (Wave 7+).
-- Keyword rank tracking, Backlink analysis.
+- Keyword rank tracking sâu quá 5 keywords mặc định. Backlink analysis.
 
 ---
 
@@ -97,11 +98,14 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 | FR-06 | **Analytics:** 4 stat cards + % change so với kỳ trước | US-F03-02 | P0 | |
 | FR-07 | **Analytics:** Daily bar chart with hover tooltip & Period selector (Today, 7d, 30d) | US-F03-02 | P0 | |
 | FR-08 | **Analytics:** Danh sách Top (Pages, Products, Blogs) chia tab/list (max 10 rows) | US-F03-02 | P0 | Nguồn từ F12 tracking |
-| FR-09 | **SEO:** Overall SEO score (0-100) + 4 category breakdown | US-F03-03 | P0 | |
-| FR-10 | **SEO:** Basic Keyword Tracker (add/remove max 5 keywords, view rank & trend) | US-F03-06 | P1 | Third-party fetch hoặc scrape cơ bản |
-| FR-11 | **SEO:** "Fix All Issues ✨" → SSE streaming progress per issue | US-F03-05 | P0 | < 15s |
-| FR-12 | **SEO:** Fix All batch undoable (1 Ctrl+Z reverts all) | US-F03-05 | P0 | |
-| FR-13 | **SEO:** Auto-generate meta title (≤60) & description (≤160) on first publish | US-F03-04 | P0 | |
+| FR-09 | **SEO:** Overall SEO score (0-100) + 3 category breakdown theo trọng số: Meta Tags (40%), Nội dung (35%), Kỹ thuật (25%). Dashboard hiển thị điểm từng hạng mục dạng thanh tiến trình hoặc con số để người dùng biết cần cải thiện phần nào. | US-F03-03 | P0 | |
+| FR-10 | **SEO:** Basic Keyword Tracker (add/remove max 5 keywords, rank & trend) | US-F03-06 | P1 | Sprint 1: chỉ nhập từ khoá thủ công (manual input). Tích hợp Google Search Console API sẽ triển khai ở sprint sau. |
+| FR-11 | **SEO:** "Fix All Issues ✨" → SSE streaming. Tối ưu context (chỉ truyền 150 ký tự đầu tiên), Batch process. | US-F03-05 | P0 | < 15s, Token cost optimization. MVP: dùng Promise.all xử lý song song (đủ cho 5-10 trang, ~3-5 giây). SSE streaming sẽ nâng cấp sau khi cần hỗ trợ >10 trang. |
+| FR-12 | **SEO:** Fix All batch undoable (1 Ctrl+Z reverts all qua DB Transaction) | US-F03-05 | P0 | |
+| FR-13 | **SEO:** AI Generated Meta: strict limit (Title 50-60, Desc 150-160 + CTA, Alt Localization) | US-F03-04 | P0 | Chuẩn SEO hiển thị. AI Generate sử dụng trackedKeywords từ cài đặt site để kết hợp từ khoá mục tiêu vào meta một cách tự nhiên (không nhồi nhét). Áp dụng cho cả Fix All lẫn Auto-generate khi publish. |
+| FR-19 | **Connectivity:** Xác thực OAuth Google, lưu trữ Token ở cấp Tenant | US-F03-08 | P0 | |
+| FR-20 | **Connectivity:** Webhook Auto-Verification GSC khi đổi Custom Domain | US-F03-08 | P0 | Google Verification API |
+| FR-21 | **Error:** Cơ chế Fallback (Redis Cache) khi dính Rate Limit, Empty State nếu báo 401 | US-F03-08 | P0 | |
 | FR-14 | **Shared:** Empty state khi chưa có site/data | US-F03-01 | P0 | |
 | FR-15 | **Shared:** Loading skeleton components có shimmer | US-F03-01 | P0 | Không spinner |
 | FR-16 | **[Mobile]** Layout Dashboard hiển thị 4 stat cards thành lưới 2x2. | US-F03-07 | P0 | Không hiển thị 4x1 (scroll mỏi tay) |
@@ -117,6 +121,7 @@ SO THAT tôi nắm bắt được tình hình kinh doanh và tăng trưởng tra
 - **BR-03:** Auto-generated SEO meta là overridable (user can edit manually), nhưng limits length được enforced.
 - **BR-04:** Fix All Issues trong SEO thực thi dưới 15s và là một single batch cho mục đích Undo/Redo.
 - **BR-05:** MY market: Nếu locale='ms', target BM keywords; format address/JSON-LD theo MY.
+- **BR-06:** Khi AI sinh meta (lúc publish hoặc Fix All), nếu trường đang trống → tự động điền. Nếu trường đã có nội dung thủ công → AI đề xuất bản chỉnh sửa và hiển thị so sánh (bản cũ vs bản mới). Chỉ ghi đè khi người dùng đồng ý.
 
 ---
 
@@ -314,6 +319,30 @@ THEN  hệ thống tự động query hạng của website theo từng keyword
   AND cập nhật kết quả mới nhất vào database
 ```
 
+### AC-15: AI Meta sinh ra có chứa từ khoá mục tiêu
+
+> 📌 Source: Plan SEO Optimization Sprint 1 — Công việc 2
+
+```gherkin
+GIVEN người dùng đã nhập từ khoá theo dõi (VD: "bakery KL", "bánh sinh nhật")
+WHEN  nhấn "Fix All Issues" hoặc "✨ Tự động tối ưu SEO" trên bất kỳ trang nào
+THEN  meta title và meta description sinh ra có chứa từ khoá mục tiêu một cách tự nhiên
+  AND không nhồi nhét keyword (keyword density ≤ 2%)
+  AND khi không có từ khoá theo dõi, AI hoạt động giống hệt hiện tại
+```
+
+### AC-16: AI đề xuất chỉnh sửa meta đã có sẵn
+
+> 📌 Source: Plan SEO Optimization Sprint 1 — BR-06
+
+```gherkin
+GIVEN một trang đã có meta title/description do người dùng nhập thủ công
+WHEN  AI sinh meta mới (qua Fix All hoặc Auto-generate khi publish)
+THEN  hiển thị so sánh bản cũ vs bản mới
+  AND người dùng có thể chọn "Giữ bản cũ" hoặc "Áp dụng bản mới"
+  AND chỉ ghi đè khi người dùng đồng ý
+```
+
 ### AC-14: Trải Nghiệm Dashboard trên Mobile (Responsive UI)
 > 📌 Source: [US-F03-07](../stories/F03-dashboard-stories.md)
 
@@ -353,6 +382,26 @@ POST /api/seo/analyze                      → Trigger SEO scan
 POST /api/seo/fix                          → AI fix (SSE stream)
 ```
 
+### 13.3 Hướng dẫn Tích hợp Google OAuth 2.0 (Dành cho Development)
+
+Để hệ thống Backend có toàn quyền giao tiếp OAuth 2.0 từ Google, quá trình phát triển chia làm 3 giai đoạn:
+
+**Giai đoạn 1: Khởi tạo trên Google Cloud Console**
+1. Tạo Project trên GCP (VD: `Ech-Prime-Web-CMS`).
+2. Bật (Enable) 3 API cốt lõi: `Google Analytics Data API`, `Google Search Console API`, `Google Site Verification API`.
+3. Cấu hình **OAuth Consent Screen** khai báo rõ các Scopes xin cấp quyền và khai báo Test Users.
+4. Đăng ký thông tin **OAuth Client ID** (Web Application), lấy `CLIENT_ID`, `CLIENT_SECRET` và chốt cứng đường **Authorized redirect URIs** (VD: `https://<domain_cms>/api/google/callback`).
+
+**Giai đoạn 2: Hạ tầng Database & Backend**
+1. Quản lý Secret vào `.env`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`. Tuyệt đối không hard-code.
+2. Thiết kế DB Schema: Mở rộng Collection `Tenants`, thêm các fields: `google_access_token`, `google_refresh_token`, `token_expiry_date`.
+3. Tích hợp thư viện: Sử dụng gói `googleapis` NPM chuẩn.
+
+**Giai đoạn 3: Viết Code luồng Authentication**
+1. **Route Sinh Link (`/api/google/auth`):** Tạo URL chèn CLIENT_ID và Scopes, ném User redirect sang cửa sổ Google.
+2. **Route Callback Hứng Dữ Liệu (`/api/google/callback`):** Nhận mã `Code` từ Google trả về, dùng lệnh server-to-server đổi ra `Access_Token` và `Refresh_Token`, tiến hành lưu xuống DB cho Tenant đó.
+3. **Middleware Token Auto-Renew:** Bọc quanh các Request. Nếu check `Date.now() > token_expiry_date` thì lôi `Refresh_Token` gọi sang API Google lấy Session quyền giới hạn mới, rồi mới thực hiện fetch dữ liệu (Đảm bảo Token xoay vòng kín không làm mất Data).
+
 ---
 
 ## 14. Dependencies
@@ -361,7 +410,9 @@ POST /api/seo/fix                          → AI fix (SSE stream)
 |-----------|--------|---------------|
 | F02 Auth | ✅ Done | |
 | F10 Orders | ⬜ Pending | Cần có API đếm số Pending Orders |
-| OpenAI API | ✅ Setup | Phục vụ SEO Fix All |
+| OpenAI API | ✅ Setup | Phục vụ Auto SEO & Fix All Streaming (Sử dụng SSE) |
+| Google Analytics API | ⬜ Pending | Phục vụ Overview & Analytics Detail |
+| Google Search Console | ⬜ Pending | Phục vụ SEO Rank & Domain Validation |
 
 ---
 
