@@ -37,6 +37,16 @@ const sendWelcomeEmailHook: CollectionAfterChangeHook = async ({ doc, operation 
     return doc
 }
 
+/** Normalize populated tenant objects → extract relationship IDs for safe Payload updates */
+function normalizeTenants(tenants: any[]): any[] {
+    return tenants.map((t: any) => ({
+        tenant: (t.tenant && typeof t.tenant === 'object') ? t.tenant.id : t.tenant,
+        role: t.role,
+        status: t.status,
+        permissions: t.permissions || [],
+    }))
+}
+
 async function injectUser(req: any) {
     if (req.user) return;
     const authHeader = (typeof req.headers.get === 'function')
@@ -234,14 +244,23 @@ export const Users: CollectionConfig = {
                             return Response.json({ errors: [{ message: 'User is already a member of this workspace' }] }, { status: 400 })
                         }
 
+                        // Check cross-tenant: block if user is an active owner of another workspace
+                        const isOwnerElsewhere = targetUser.tenants?.find((t: any) =>
+                            t.role === 'owner' && t.status === 'active'
+                        )
+                        if (isOwnerElsewhere) {
+                            return Response.json({ errors: [{ message: 'This user is an owner of another workspace and cannot be added as staff' }] }, { status: 400 })
+                        }
+
                         // Add to tenant
+                        const normalizedExisting = normalizeTenants(targetUser.tenants || [])
                         await req.payload.update({
                             collection: 'users',
                             id: targetUser.id,
                             data: {
                                 tenants: [
-                                    ...(targetUser.tenants || []),
-                                    { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? permissions : undefined }
+                                    ...normalizedExisting,
+                                    { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? (permissions || []) : [] }
                                 ]
                             }
                         })
@@ -258,7 +277,7 @@ export const Users: CollectionConfig = {
                                 password: tempPassword,
                                 roles: ['tenant-owner'], // Default platform role
                                 tenants: [
-                                    { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? permissions : undefined }
+                                    { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? (permissions || []) : [] }
                                 ]
                             }
                         })
@@ -348,13 +367,13 @@ export const Users: CollectionConfig = {
                 }
 
                 // Remove the tenant from the user's tenants array
-                const updatedTenants = [...(targetUser.tenants || [])]
-                updatedTenants.splice(targetTenantIndex, 1)
+                const normalizedTenants = normalizeTenants(targetUser.tenants || [])
+                normalizedTenants.splice(targetTenantIndex, 1)
 
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
-                    data: { tenants: updatedTenants }
+                    data: { tenants: normalizedTenants }
                 })
 
                 return Response.json({ message: 'User removed from workspace successfully' })
@@ -420,16 +439,16 @@ export const Users: CollectionConfig = {
                     }
                 }
 
-                const updatedTenants = [...(targetUser.tenants || [])]
-                updatedTenants[targetTenantIndex].role = role as any
-                updatedTenants[targetTenantIndex].permissions = role === 'custom' ? permissions : undefined
+                const normalizedTenants = normalizeTenants(targetUser.tenants || [])
+                normalizedTenants[targetTenantIndex].role = role
+                normalizedTenants[targetTenantIndex].permissions = role === 'custom' ? (permissions || []) : []
 
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
                     data: {
-                        firstName: name, // Overwrite name along with access rights
-                        tenants: updatedTenants
+                        firstName: name,
+                        tenants: normalizedTenants
                     }
                 })
 
@@ -486,13 +505,13 @@ export const Users: CollectionConfig = {
                     }
                 }
 
-                const updatedTenants = [...(targetUser.tenants || [])]
-                updatedTenants[targetTenantIndex].status = status as any
+                const normalizedTenants = normalizeTenants(targetUser.tenants || [])
+                normalizedTenants[targetTenantIndex].status = status
 
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
-                    data: { tenants: updatedTenants }
+                    data: { tenants: normalizedTenants }
                 })
 
                 return Response.json({ message: 'User status updated successfully' })
@@ -577,10 +596,10 @@ export const Users: CollectionConfig = {
                             }
                         }
 
-                        const updatedTenants = [...(targetUser.tenants || [])]
-                        updatedTenants.splice(targetTenantIndex, 1)
+                        const normalizedTenants = normalizeTenants(targetUser.tenants || [])
+                        normalizedTenants.splice(targetTenantIndex, 1)
 
-                        await req.payload.update({ collection: 'users', id: userId, data: { tenants: updatedTenants } })
+                        await req.payload.update({ collection: 'users', id: userId, data: { tenants: normalizedTenants } })
                         removedCount++;
                     } catch (e) {
                         errorCount++;
