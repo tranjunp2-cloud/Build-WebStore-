@@ -1,0 +1,57 @@
+# ECH Prime Web v2 — CODEOWNERS
+# ================================
+# Auto-assign reviewers based on changed files.
+# GitHub auto-requests review from code owners when PR touches matching paths.
+#
+# Rules:
+#   - No catch-all (*) — only explicit paths get reviewers
+#   - Max 2 reviewers per path (1 primary + 1 secondary)
+#   - Junior devs assigned manually when needed for mentoring
+#
+# Team:
+#   @tinnt-prime      — SA / Tech Lead
+#   @haynoikonike     — PM
+#   @dangduy310       — BA (Assistant PM)
+#   @thuuya           — BA
+#   @levietducprime   — FE Dev (Lead)
+#   @hptruong         — FE Dev (Senior)
+#   @Duylinh03        — FE Dev (assign manually)
+#   @Mr-LeeB          — BE Dev (Lead)
+#   @tgiangk1         — BE Dev (Senior)
+#   @nntanh585        — BE Dev (assign manually)
+#   @aryhibye         — QA
+#   @tranjunp2-cloud  — UI/UX Designer
+#
+# Format: <path-pattern> @github-username [@github-username ...]
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# ── Frontend — FE Lead + Senior FE ───────────────────
+/src/app/                       @levietducprime @hptruong
+/src/components/                @levietducprime @hptruong
+/src/blocks/                    @levietducprime
+/src/store/                     @levietducprime
+/tailwind.config.js             @levietducprime
+
+# ── Backend — BE Lead + Senior BE ────────────────────
+/src/collections/               @Mr-LeeB @tgiangk1
+/src/lib/                       @Mr-LeeB @levietducprime
+/src/app/api/                   @Mr-LeeB @tgiangk1
+/src/payload.config.ts          @Mr-LeeB
+
+# ── Infrastructure — Tech Lead ───────────────────────
+/.github/                       @tinnt-prime
+/Dockerfile*                    @tinnt-prime
+/docker-compose*.yml            @tinnt-prime
+/scripts/                       @tinnt-prime
+/package.json                   @tinnt-prime
+/tsconfig.json                  @tinnt-prime
+/.env.example                   @tinnt-prime
+
+# ── Documentation & Specs ────────────────────────────
+/docs/prd/                      @haynoikonike @dangduy310
+/docs/stories/                  @haynoikonike @dangduy310
+/docs/design/                   @tranjunp2-cloud
+/docs/qa/                       @aryhibye
+/docs/architecture/             @tinnt-prime
+/SPEC.md                        @haynoikonike
+/CLAUDE.md                      @tinnt-prime

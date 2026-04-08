@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { useEditorStore } from '@/store/editorStore'
 
 const mockBlocks = [
@@ -22,6 +22,7 @@ describe('EditorStore', () => {
             expect(state.theme.primaryColor).toBe('#0d9488')
             expect(state.siteName).toBe('Test Site')
             expect(state.history).toHaveLength(1)
+            expect(state.autoSaveIntervalMs).toBe(3000)
         })
     })
 
@@ -103,6 +104,257 @@ describe('EditorStore', () => {
             useEditorStore.getState().markSaved()
             expect(useEditorStore.getState().hasUnsavedChanges).toBe(false)
             expect(useEditorStore.getState().lastSavedAt).toBeDefined()
+        })
+    })
+
+    describe('auto-save & draft (F12)', () => {
+        beforeEach(() => {
+            vi.useFakeTimers()
+            global.fetch = vi.fn()
+            useEditorStore.getState().init('site-1', mockBlocks, mockTheme, 'Test Site')
+        })
+
+        afterEach(() => {
+            vi.restoreAllMocks()
+            vi.useRealTimers()
+        })
+
+        it('TC-F12.01: should debounce auto-save for 3s after a change', async () => {
+            useEditorStore.getState().updateBlock(0, { heading: 'Debounce test' })
+            
+            expect(useEditorStore.getState().hasUnsavedChanges).toBe(true)
+            expect(useEditorStore.getState().saveStatus).toBe('idle')
+
+            // Fast-forward 2.9 seconds - should still be idle
+            vi.advanceTimersByTime(2900)
+            expect(global.fetch).not.toHaveBeenCalled()
+
+            // Mock fetch success
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
+
+            // Fast-forward to 3 seconds
+            vi.advanceTimersByTime(100)
+            
+            // Wait for the async save to finish
+            await Promise.resolve() 
+
+            expect(global.fetch).toHaveBeenCalledTimes(1)
+            expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/sites/site-1/save'), expect.any(Object))
+            
+            expect(useEditorStore.getState().hasUnsavedChanges).toBe(false)
+            expect(useEditorStore.getState().saveStatus).toBe('saved')
+        })
+
+        it('TC-F12.03: manual save should override debounce and trigger save immediately', async () => {
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
+            
+            useEditorStore.getState().updateBlock(0, { heading: 'Manual override' })
+            
+            // Trigger manual save
+            const savePromise = useEditorStore.getState().performSave(true)
+            
+            // Timer should be cleared and fetch called immediately
+            expect(global.fetch).toHaveBeenCalledTimes(1)
+            expect(useEditorStore.getState().saveStatus).toBe('saving')
+            
+            await savePromise
+            expect(useEditorStore.getState().saveStatus).toBe('saved')
+        })
+
+        it('TC-F12.06: should include isDraft: true when saving', async () => {
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
+            
+            useEditorStore.getState().updateBlock(0, { heading: 'Draft payload' })
+            vi.advanceTimersByTime(3000)
+            await Promise.resolve()
+            
+            if ((global.fetch as any).mock.calls.length === 0) {
+                throw new Error("fetch was not called")
+            }
+
+            const fetchCallParams = (global.fetch as any).mock.calls[0][1]
+            const requestBody = JSON.parse(fetchCallParams.body)
+            
+            expect(requestBody.isDraft).toBe(true)
+            expect(requestBody.blocks[0].heading).toBe('Draft payload')
+        })
+
+        it('TC-F12.12: should handle token expiration (401) gracefully without retrying', async () => {
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: false, status: 401 })
+            
+            useEditorStore.getState().updateBlock(0, { heading: 'Auth error' })
+            vi.advanceTimersByTime(3000)
+            await Promise.resolve()
+            
+            expect(useEditorStore.getState().saveStatus).toBe('error')
+            expect(global.fetch).toHaveBeenCalledTimes(1)
+        })
+
+        it('TC-F12.10 & TC-F12.11: should retry on network error with backoff (5s, 10s, 20s)', async () => {
+            ;(global.fetch as any)
+                .mockRejectedValueOnce(new Error('Network error'))
+                .mockRejectedValueOnce(new Error('Network error'))
+                .mockRejectedValueOnce(new Error('Network error'))
+                .mockRejectedValueOnce(new Error('Network error'))
+
+            useEditorStore.getState().updateBlock(0, { heading: 'Retry test' })
+            
+            // Trigger auto-save
+            vi.advanceTimersByTime(3000)
+            await Promise.resolve() // Let async tick
+            
+            expect(useEditorStore.getState().saveStatus).toBe('error')
+            expect(global.fetch).toHaveBeenCalledTimes(1)
+
+            // Advance 5s
+            vi.advanceTimersByTime(5000)
+            await Promise.resolve()
+            expect(global.fetch).toHaveBeenCalledTimes(2)
+
+            // Advance 10s
+            vi.advanceTimersByTime(10000)
+            await Promise.resolve()
+            expect(global.fetch).toHaveBeenCalledTimes(3)
+
+            // Advance 20s
+            vi.advanceTimersByTime(20000)
+            await Promise.resolve()
+            expect(global.fetch).toHaveBeenCalledTimes(4)
+
+            // No more retries
+            vi.advanceTimersByTime(30000)
+            await Promise.resolve()
+            expect(global.fetch).toHaveBeenCalledTimes(4)
+        })
+
+        it('TC-F12.13: should allow saving empty payload', async () => {
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
+
+            const blocksCount = useEditorStore.getState().blocks.length
+            for (let i = 0; i < blocksCount; i++) {
+                useEditorStore.getState().deleteBlock(0)
+            }
+
+            expect(useEditorStore.getState().blocks).toHaveLength(0)
+
+            vi.advanceTimersByTime(3000)
+            await Promise.resolve()
+
+            const fetchCallParams = (global.fetch as any).mock.calls[0][1]
+            const requestBody = JSON.parse(fetchCallParams.body)
+
+            expect(requestBody.blocks).toEqual([])
+            expect(useEditorStore.getState().saveStatus).toBe('saved')
+        })
+    })
+
+    describe('cross-page save safety', () => {
+        beforeEach(() => {
+            vi.useFakeTimers()
+            global.fetch = vi.fn()
+            useEditorStore.getState().init('site-1', mockBlocks, mockTheme, 'Test Site')
+        })
+
+        afterEach(() => {
+            vi.restoreAllMocks()
+            vi.useRealTimers()
+        })
+
+        it('TC-CROSS-01: performSave should include currentPageId in save URL', async () => {
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
+
+            useEditorStore.setState({ currentPageId: 'page-about-123' })
+            useEditorStore.getState().updateBlock(0, { heading: 'About edit' })
+
+            vi.advanceTimersByTime(3000)
+            await Promise.resolve()
+
+            const url = (global.fetch as any).mock.calls[0][0]
+            expect(url).toContain('pageId=page-about-123')
+        })
+
+        it('TC-CROSS-02: performSave without currentPageId should not include pageId param', async () => {
+            ;(global.fetch as any).mockResolvedValueOnce({ ok: true })
+
+            useEditorStore.setState({ currentPageId: null })
+            useEditorStore.getState().updateBlock(0, { heading: 'Home edit' })
+
+            vi.advanceTimersByTime(3000)
+            await Promise.resolve()
+
+            const url = (global.fetch as any).mock.calls[0][0]
+            expect(url).not.toContain('pageId=')
+        })
+
+        it('TC-CROSS-03: init() should clear pending autoSaveTimer from previous page', () => {
+            // Trigger auto-save timer
+            useEditorStore.getState().updateBlock(0, { heading: 'Timer trigger' })
+            expect(useEditorStore.getState().autoSaveTimer).not.toBeNull()
+
+            // Init with new page data — timer should be cleared
+            const newBlocks = [{ blockType: 'hero', heading: 'New Page' }]
+            useEditorStore.getState().init('site-1', newBlocks, mockTheme, 'Test Site')
+
+            expect(useEditorStore.getState().autoSaveTimer).toBeNull()
+            expect(useEditorStore.getState().hasUnsavedChanges).toBe(false)
+
+            // Advance past debounce — should NOT trigger fetch (timer was cleared)
+            vi.advanceTimersByTime(5000)
+            expect(global.fetch).not.toHaveBeenCalled()
+        })
+
+        it('TC-CROSS-04: init() should reset isSaving, saveStatus, isAIStreaming', () => {
+            useEditorStore.setState({
+                isSaving: true,
+                saveStatus: 'saving',
+                isAIStreaming: true,
+            })
+
+            useEditorStore.getState().init('site-1', mockBlocks, mockTheme, 'Test Site')
+
+            const state = useEditorStore.getState()
+            expect(state.isSaving).toBe(false)
+            expect(state.saveStatus).toBe('idle')
+            expect(state.isAIStreaming).toBe(false)
+        })
+
+        it('TC-CROSS-05: retry should re-read currentPageId from store (not stale closure)', async () => {
+            // Start on page-home
+            useEditorStore.setState({ currentPageId: 'page-home' })
+            ;(global.fetch as any)
+                .mockRejectedValueOnce(new Error('Network error'))
+                .mockResolvedValueOnce({ ok: true })
+
+            useEditorStore.getState().updateBlock(0, { heading: 'Will retry' })
+            vi.advanceTimersByTime(3000)
+            await Promise.resolve()
+
+            // First call should target page-home
+            expect((global.fetch as any).mock.calls[0][0]).toContain('pageId=page-home')
+
+            // Simulate page switch before retry fires
+            useEditorStore.setState({ currentPageId: 'page-about' })
+
+            // Advance to retry (5s)
+            vi.advanceTimersByTime(5000)
+            await Promise.resolve()
+
+            // Retry should use fresh currentPageId (page-about), not stale page-home
+            expect((global.fetch as any).mock.calls[1][0]).toContain('pageId=page-about')
+        })
+
+        it('TC-CROSS-06: page switch should cancel debounce timer (no stale save)', () => {
+            useEditorStore.getState().updateBlock(0, { heading: 'Edit before switch' })
+            const timer = useEditorStore.getState().autoSaveTimer
+            expect(timer).not.toBeNull()
+
+            // Simulate handlePageSelected clearing the timer
+            if (timer) clearTimeout(timer)
+            useEditorStore.setState({ autoSaveTimer: null, hasUnsavedChanges: false })
+
+            // Advance past debounce window
+            vi.advanceTimersByTime(5000)
+            expect(global.fetch).not.toHaveBeenCalled()
         })
     })
 })

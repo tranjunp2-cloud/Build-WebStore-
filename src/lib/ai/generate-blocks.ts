@@ -26,6 +26,7 @@ type GenerationResult = {
     siteType: BusinessIntent['type']
     blocks: GeneratedBlock[]
     seo: { title: string; description: string }
+    language?: 'en' | 'ms' | 'vi'
     theme: {
         primaryColor: string
         secondaryColor: string
@@ -302,4 +303,4 @@ export function generateBlocks(prompt: string): GenerationResult {
     }
 }
 
-export type { GenerationResult, BusinessIntent }
+export type { GenerationResult, BusinessIntent, GeneratedBlock }

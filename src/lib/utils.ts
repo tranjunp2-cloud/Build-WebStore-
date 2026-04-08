@@ -36,3 +36,13 @@ export function formatStorage(bytes: number): string {
     if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`
     return `${(bytes / 1073741824).toFixed(1)} GB`
 }
+
+/**
+ * Format price by currency (MYR, SGD, USD).
+ * Used by storefront, dashboard, email templates.
+ */
+export function formatPrice(price: number, currency: string): string {
+    if (currency === 'MYR') return `RM ${price.toFixed(2)}`
+    if (currency === 'SGD') return `S$${price.toFixed(2)}`
+    return `$${price.toFixed(2)}`
+}

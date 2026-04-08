@@ -1,75 +1,155 @@
 import { blockRegistry } from '@/blocks/registry'
 import { BlockErrorBoundary } from '@/blocks/ErrorBoundary'
 import type { ThemeConfig } from '@/blocks/types'
+import { filterNavigationLinksByVisibility } from '@/lib/navigation'
+import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
+import { GoogleFontsLoader } from './GoogleFontsLoader'
+import { generatePageSchemas } from '@/lib/seo/json-ld'
+import { HeadingProvider } from '@/lib/seo/heading-context'
+import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
-type SiteRendererProps = {
-    site: any
-    page: any
+export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
+
+export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null };
+
+export type SiteRendererProps = {
+    site: {
+        theme?: {
+            primaryColor?: string
+            secondaryColor?: string
+            accentColor?: string
+            surfaceColor?: string
+            textColor?: string
+            mutedColor?: string
+            fontPairingId?: string | null
+            fontHeading?: string
+            fontBody?: string
+            spacingPreset?: 'compact' | 'default' | 'relaxed'
+            borderRadius?: 'sharp' | 'subtle' | 'rounded' | 'soft' | 'pill'
+            shadowPreset?: 'none' | 'subtle' | 'medium' | 'dramatic'
+            colorMode?: 'dark' | 'light'
+            backgroundColor?: string
+            [key: string]: unknown
+        }
+        [key: string]: unknown
+    }
+    page: {
+        layout?: unknown[]
+        [key: string]: unknown
+    }
+    pages?: NavPage[]
+    isEditor?: boolean
 }
 
-export function SiteRenderer({ site, page }: SiteRendererProps) {
-    const theme: ThemeConfig = {
-        primaryColor: site.theme?.primaryColor || '#0ea5e9',
-        secondaryColor: site.theme?.secondaryColor || '#d946ef',
-        backgroundColor: site.theme?.backgroundColor || '#09090b',
-        fontHeading: site.theme?.fontHeading || 'Outfit',
-        fontBody: site.theme?.fontBody || 'Inter',
-        colorMode: site.theme?.colorMode || 'dark',
-    }
+export function SiteRenderer({ site, page, pages = [], isEditor = false }: SiteRendererProps) {
+    const theme: ThemeConfig = resolveTheme({
+        primaryColor: site.theme?.primaryColor,
+        secondaryColor: site.theme?.secondaryColor,
+        accentColor: site.theme?.accentColor,
+        surfaceColor: site.theme?.surfaceColor,
+        textColor: site.theme?.textColor,
+        mutedColor: site.theme?.mutedColor,
+        fontPairingId: site.theme?.fontPairingId,
+        fontHeading: site.theme?.fontHeading,
+        fontBody: site.theme?.fontBody,
+        spacingPreset: site.theme?.spacingPreset,
+        borderRadius: site.theme?.borderRadius,
+        shadowPreset: site.theme?.shadowPreset,
+        colorMode: site.theme?.colorMode,
+        backgroundColor: site.theme?.backgroundColor,
+    })
 
-    const blocks: any[] = page.layout || []
+    const themeCSS = generateThemeCSS(theme)
+
+    type PreviewBlock = { blockType: string; links?: NavLinkItem[]; [key: string]: unknown }
+    const blocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
+
+    // JSON-LD schemas — auto-detect from blocks present
+    const isHomepage = blocks.some(b => b.blockType === 'hero') && blocks[0]?.blockType === 'navigation'
+    const jsonLdSchemas = generatePageSchemas({ blocks, site, page, isHomepage })
+
+    // Heading hierarchy — compute levels for all blocks
+    const allBlockTypes = blocks.map(b => b.blockType).filter(Boolean)
 
     return (
-        <html lang="en">
-            <head>
-                <meta charSet="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <link rel="preconnect" href="https://fonts.googleapis.com" />
-                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-                <link
-                    href={`https://fonts.googleapis.com/css2?family=${theme.fontHeading.replace(/ /g, '+')}:wght@400;600;700;900&family=${theme.fontBody.replace(/ /g, '+')}:wght@400;500;600&display=swap`}
-                    rel="stylesheet"
-                />
-                <style>{`
-          :root {
-            --brand-primary: ${theme.primaryColor};
-            --brand-secondary: ${theme.secondaryColor};
-            --font-heading: '${theme.fontHeading}', sans-serif;
-            --font-body: '${theme.fontBody}', sans-serif;
-          }
+        <>
+            <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
+            <style>{`
+          ${themeCSS}
           * { box-sizing: border-box; margin: 0; padding: 0; }
           html { scroll-behavior: smooth; }
           body {
             font-family: var(--font-body);
-            background: ${theme.colorMode === 'dark' ? '#09090b' : '#ffffff'};
-            color: ${theme.colorMode === 'dark' ? '#fafafa' : '#09090b'};
+            background: var(--background);
+            color: var(--text);
           }
           h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); }
           .container { max-width: 1200px; margin: 0 auto; }
           img { max-width: 100%; height: auto; }
           a { color: inherit; text-decoration: none; }
+          /* Print — show all content, no animations */
+          @media print {
+            * { opacity: 1 !important; transform: none !important; animation: none !important; }
+          }
         `}</style>
-            </head>
-            <body>
-                {blocks.map((block, index) => {
-                    if (!block.blockType) return null
 
-                    const BlockComponent = blockRegistry.getComponent(block.blockType)
-                    if (!BlockComponent) {
-                        // Unknown block type — skip silently (AC-6)
-                        return null
+            {/* No-JS fallback — Framer Motion initial="hidden" sets opacity:0 */}
+            <noscript>
+                <style>{`[style*="opacity: 0"], [style*="opacity:0"] { opacity: 1 !important; transform: none !important; }`}</style>
+            </noscript>
+
+            {/* JSON-LD Structured Data */}
+            {jsonLdSchemas.map((schema, i) => (
+                <script
+                    key={`jsonld-${i}`}
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+                />
+            ))}
+
+            {blocks.map((block, index) => {
+                if (!block.blockType) return null
+
+                const BlockComponent = blockRegistry.getComponent(block.blockType)
+                if (!BlockComponent) {
+                    // Unknown block type — skip silently (AC-6)
+                    return null
+                }
+
+                const normalizedBlock = block.blockType === 'navigation'
+                    ? {
+                        ...block,
+                        links: filterNavigationLinksByVisibility(block.links, pages),
                     }
+                    : block
 
+                const headingLevel = getBlockHeadingLevel(block.blockType, allBlockTypes, index)
+                
+                const blockContent = (
+                    <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
+                        <HeadingProvider level={headingLevel}>
+                            <BlockComponent block={normalizedBlock} theme={theme} site={site} page={page} />
+                        </HeadingProvider>
+                    </BlockErrorBoundary>
+                )
+
+                if (isEditor) {
                     return (
-                        <BlockErrorBoundary key={`${block.blockType}-${index}`} blockType={block.blockType}>
-                            <BlockComponent block={block} theme={theme} />
-                        </BlockErrorBoundary>
+                        <div 
+                            key={`${block.blockType}-${index}`}
+                            data-block-index={index}
+                            data-block-type={block.blockType}
+                            className="group/block relative w-full"
+                        >
+                            {blockContent}
+                        </div>
                     )
-                })}
-            </body>
-        </html>
+                }
+
+                return blockContent
+            })}
+        </>
     )
 }
-

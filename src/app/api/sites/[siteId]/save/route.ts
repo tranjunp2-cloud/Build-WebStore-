@@ -1,62 +1,138 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
+import { saveSiteSchema } from '@/lib/validations/sites'
+import { parseRequest } from '@/lib/validations/helpers'
+import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 
 /**
  * PATCH /api/sites/[siteId]/save
  * Saves updated blocks (layout) and/or theme for a site.
- * Body: { blocks?: any[], theme?: any }
+ * Body: { blocks?: unknown[], theme?: unknown }
  */
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ siteId: string }> }
 ) {
     try {
-        const payload = await getPayload({ config })
-        const { user } = await payload.auth({ headers: req.headers })
+        // Authenticate — handles both Payload JWT and custom Jose JWT (from verify-otp)
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
-        const { siteId } = await params
-        const body = await req.json()
-        const { blocks, theme } = body
+        const payload = await getPayload({ config })
 
-        // Update theme on site if provided
-        if (theme) {
+        const { siteId } = await params
+
+        // Verify site exists and check ownership (tenant isolation)
+        const existingSite = await payload.findByID({ collection: 'sites', id: siteId })
+        if (!existingSite) {
+            return NextResponse.json({ error: 'Site not found' }, { status: 404 })
+        }
+        type TenantRef = string | number | { id: string | number } | null | undefined
+        const resolveTenantId = (t: TenantRef): string | null =>
+            t == null ? null : String(typeof t === 'object' ? t.id : t)
+        const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
+        const siteTenantId = resolveTenantId(existingSite.tenant as TenantRef)
+        if (!siteTenantId || !userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+
+        const pageId = req.nextUrl.searchParams.get('pageId')
+        const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
+        if (errorResponse) return errorResponse
+        const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
+        const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
+
+        type SiteUpdateData = Partial<{
+            theme: unknown;
+            name: unknown;
+            locale: "en" | "ms";
+            shippingConfig: unknown;
+            headerBlock: unknown;
+            footerBlock: unknown;
+            contactInfo: unknown;
+            socialLinks: unknown;
+            branding: unknown;
+            seo: unknown;
+        }>;
+        const siteUpdateData: SiteUpdateData = {}
+        if (theme) siteUpdateData.theme = theme
+        if (siteName) siteUpdateData.name = siteName
+        if (locale) siteUpdateData.locale = locale
+        if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
+        if (headerBlock !== undefined) siteUpdateData.headerBlock = headerBlock
+        if (footerBlock !== undefined) siteUpdateData.footerBlock = footerBlock
+        if (contactInfo) siteUpdateData.contactInfo = contactInfo
+        if (socialLinks) siteUpdateData.socialLinks = socialLinks
+        if (branding) siteUpdateData.branding = branding
+        if (seo) siteUpdateData.seo = seo
+
+        if (Object.keys(siteUpdateData).length > 0) {
             await payload.update({
                 collection: 'sites',
                 id: siteId,
-                data: { theme },
+                data: siteUpdateData,
             })
         }
 
-        // Update blocks on homepage if provided
-        if (blocks) {
+        // Update blocks on the selected page if provided
+        if (normalizedBlocks) {
             const numericSiteId = Number(siteId)
-            let pagesResult = await payload.find({
-                collection: 'pages',
-                where: {
-                    site: { equals: numericSiteId },
-                    isHomepage: { equals: true },
-                },
-                limit: 1,
-            })
+            type PageDoc = NonNullable<Awaited<ReturnType<typeof payload.findByID>>>
+            let page: PageDoc | null = null
 
-            if (pagesResult.docs.length === 0) {
-                pagesResult = await payload.find({
-                    collection: 'pages',
-                    where: { site: { equals: numericSiteId } },
-                    limit: 1,
-                })
+            if (pageId) {
+                if (!/^\d+$/.test(pageId)) {
+                    return NextResponse.json({ error: 'Invalid pageId' }, { status: 400 })
+                }
+                let requestedPage: PageDoc | null = null
+                try {
+                    requestedPage = await payload.findByID({
+                        collection: 'pages',
+                        id: pageId,
+                    })
+                } catch {
+                    // Page not found — fall through to homepage
+                }
+                const requestedPageSiteId =
+                    typeof requestedPage?.site === 'object' ? requestedPage.site?.id : requestedPage?.site
+
+                if (requestedPage && Number(requestedPageSiteId) === numericSiteId) {
+                    page = requestedPage
+                }
             }
 
-            const page = pagesResult.docs[0]
+            if (!page) {
+                let pagesResult = await payload.find({
+                    collection: 'pages',
+                    where: {
+                        site: { equals: numericSiteId },
+                        isHomepage: { equals: true },
+                    },
+                    limit: 1,
+                })
+
+                if (pagesResult.docs.length === 0) {
+                    pagesResult = await payload.find({
+                        collection: 'pages',
+                        where: { site: { equals: numericSiteId } },
+                        limit: 1,
+                    })
+                }
+
+                page = pagesResult.docs[0]
+            }
+
             if (page) {
                 await payload.update({
                     collection: 'pages',
                     id: page.id,
-                    data: { layout: blocks },
+                    data: { layout: normalizedBlocks },
+                    draft: isDraft ?? false,
                 })
             }
         }
@@ -66,10 +142,15 @@ export async function PATCH(
             message: 'Saved successfully',
         })
 
-    } catch (error: any) {
-        console.error('[Save Error]', error)
+    } catch (error: unknown) {
+        const errMsg = error instanceof Error ? error.message : String(error)
+        const errName = error instanceof Error ? error.name : 'Unknown'
+        console.error('[Save Error]', errName + ':', errMsg)
+        if (error && typeof error === 'object' && 'data' in error) {
+            console.error('[Save Error] Validation data:', JSON.stringify((error as Record<string, unknown>).data, null, 2))
+        }
         return NextResponse.json(
-            { error: error?.message || 'Save failed' },
+            { error: 'Save failed: ' + errMsg },
             { status: 500 },
         )
     }

@@ -10,15 +10,36 @@ if (typeof globalThis.File === 'undefined') {
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['undici'],
+  serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify'],
+  eslint: {
+    // CI runs lint separately — skip during build to save ~1 min
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    // CI runs typecheck separately — skip during build to save ~30s
+    ignoreBuildErrors: true,
+  },
   experimental: {
     reactCompiler: false,
+  },
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
   },
   images: {
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'http',
+        hostname: 'minio',
       },
     ],
   },

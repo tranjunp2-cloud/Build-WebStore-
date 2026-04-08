@@ -1,9 +1,15 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
+import { getCurrentUser } from '@/lib/auth'
 import config from '@payload-config'
 import type { Metadata } from 'next'
-import { SiteRenderer } from '@/components/site-renderer/SiteRenderer'
+import { SiteRenderer, type NavPage } from '@/components/site-renderer/SiteRenderer'
+import type { SiteData } from '@/blocks/types'
+import type { PageData } from '@/store/editorStore'
+
+// Force dynamic — uses getPayload() + SiteRenderer (jsdom chain) at runtime
+export const dynamic = 'force-dynamic'
 
 type Props = {
     params: Promise<{ slug: string; path?: string[] }>
@@ -11,32 +17,62 @@ type Props = {
 }
 
 async function getTenantAndPage(slug: string, pagePath: string) {
+    const reqHeaders = await headers()
     const payload = await getPayload({ config })
+    const user = await getCurrentUser()
 
-    // Find tenant by subdomain slug
-    const tenantsResult = await payload.find({
-        collection: 'tenants',
-        where: { slug: { equals: slug } },
-        limit: 1,
-    })
+    let tenant;
 
-    const tenant = tenantsResult.docs[0]
+    /* REQ-F19: Resolve custom domain route */
+    if (slug === 'custom') {
+        const hostname = reqHeaders.get('x-tenant-hostname')
+        if (!hostname) return null
+        
+        const tenantsResult = await payload.find({
+            collection: 'tenants',
+            where: { 'customDomains.domain': { equals: hostname } },
+            limit: 1,
+        })
+        tenant = tenantsResult.docs[0]
+    } else {
+        // Find tenant by subdomain slug
+        const tenantsResult = await payload.find({
+            collection: 'tenants',
+            where: { slug: { equals: slug } },
+            limit: 1,
+        })
+        tenant = tenantsResult.docs[0]
+    }
+
     if (!tenant) return null
 
     // Find the site for this tenant
     const sitesResult = await payload.find({
         collection: 'sites',
-        where: {
-            and: [
-                { tenant: { equals: tenant.id } },
-                { status: { equals: 'published' } },
-            ],
-        },
+        where: { tenant: { equals: tenant.id } },
         limit: 1,
     })
 
     const site = sitesResult.docs[0]
     if (!site) return null
+
+    // Require authentication to view draft sites
+    if (site.status === 'draft') {
+        if (!user) {
+            return null // Visitor hits 404 for draft site (AC-2)
+        }
+
+        interface TenantRef {
+            tenant: string | number | { id: string | number }
+        }
+        const tenantIds = user.tenants?.map((t: TenantRef) =>
+            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+        ) ?? []
+
+        if (!tenantIds.includes(String(tenant.id))) {
+            return null // Visitor hits 404 for draft site (AC-2)
+        }
+    }
 
     // Find the page
     const pagesResult = await payload.find({
@@ -53,7 +89,16 @@ async function getTenantAndPage(slug: string, pagePath: string) {
 
     const page = pagesResult.docs[0]
 
-    return { tenant, site, page }
+    const navigationPages = await payload.find({
+        collection: 'pages',
+        where: {
+            site: { equals: site.id },
+        },
+        limit: 100,
+        sort: 'createdAt',
+    })
+
+    return { tenant, site, page, pages: navigationPages.docs }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -61,7 +106,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const pagePath = (path ?? []).join('/')
     const data = await getTenantAndPage(slug, pagePath)
 
-    if (!data) return { title: 'Not Found' }
+    if (!data) return { title: 'Not Found', robots: { index: false, follow: false } }
 
     const { site, page } = data
     const title = page?.seo?.title || site.seo?.metaTitle || site.name
@@ -84,16 +129,22 @@ export default async function TenantSitePage({ params }: Props) {
     const pagePath = (path ?? []).join('/')
     const data = await getTenantAndPage(slug, pagePath)
 
-    if (!data || !data.page) {
+    if (!data) {
         notFound()
     }
 
-    const { site, page } = data
+
+    if (!data.page) {
+        notFound()
+    }
+
+    const { site, page, pages } = data
 
     return (
         <SiteRenderer
-            site={site as any}
-            page={page as any}
+            site={site as unknown as SiteData}
+            page={page as unknown as PageData}
+            pages={pages as unknown as NavPage[]}
         />
     )
 }

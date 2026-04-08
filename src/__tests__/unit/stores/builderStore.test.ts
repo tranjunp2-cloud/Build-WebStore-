@@ -3,10 +3,9 @@ import { useBuilderStore } from '@/store/builderStore'
 
 const mockBusinessInfo = {
     businessName: 'Bella Bakery',
+    shortDescription: 'A friendly neighborhood bakery since 2010',
     industry: 'Food & Beverage',
     products: 'Cakes, Cookies, Bread',
-    targetAudience: 'Young professionals',
-    style: 'Modern, clean',
 }
 
 describe('BuilderStore', () => {
@@ -31,12 +30,9 @@ describe('BuilderStore', () => {
             expect(state.step).toBe('chat')
         })
 
-        it('should add welcome message with business name', () => {
+        it('should clear messages when setting business info', () => {
             useBuilderStore.getState().setBusinessInfo(mockBusinessInfo)
-            const messages = useBuilderStore.getState().messages
-            expect(messages).toHaveLength(1)
-            expect(messages[0].role).toBe('assistant')
-            expect(messages[0].content).toContain('Bella Bakery')
+            expect(useBuilderStore.getState().messages).toHaveLength(0)
         })
     })
 
@@ -62,6 +58,48 @@ describe('BuilderStore', () => {
         })
     })
 
+    describe('generation metadata', () => {
+        it('should store progress, theme, site id and site name', () => {
+            useBuilderStore.getState().setProgress({
+                step: 'generate',
+                label: 'Generating layout',
+                progress: 55,
+            })
+            useBuilderStore.getState().setTheme({
+                primaryColor: '#111827',
+                secondaryColor: '#f59e0b',
+                fontHeading: 'Inter',
+                fontBody: 'Inter',
+                colorMode: 'light',
+            })
+            useBuilderStore.getState().setSiteId('site-123')
+            useBuilderStore.getState().setSiteName('Bella Bakery')
+
+            const state = useBuilderStore.getState()
+            expect(state.progress).toEqual({
+                step: 'generate',
+                label: 'Generating layout',
+                progress: 55,
+            })
+            expect(state.theme?.primaryColor).toBe('#111827')
+            expect(state.siteId).toBe('site-123')
+            expect(state.siteName).toBe('Bella Bakery')
+        })
+
+        it('should replace the current blocks list when setBlocks is called', () => {
+            useBuilderStore.getState().addBlock({ blockType: 'hero', heading: 'Welcome' })
+            useBuilderStore.getState().setBlocks([
+                { _id: 'features-1', blockType: 'features' },
+                { _id: 'contact-1', blockType: 'contact' },
+            ])
+
+            expect(useBuilderStore.getState().blocks).toEqual([
+                { _id: 'features-1', blockType: 'features' },
+                { _id: 'contact-1', blockType: 'contact' },
+            ])
+        })
+    })
+
     describe('addBlock', () => {
         it('should add blocks to the list', () => {
             useBuilderStore.getState().addBlock({ blockType: 'hero', heading: 'Welcome' })
@@ -79,6 +117,19 @@ describe('BuilderStore', () => {
             })
             const state = useBuilderStore.getState()
             expect(state.error?.code).toBe('AI_TIMEOUT')
+            expect(state.status).toBe('error')
+        })
+
+        it('should clear the error when null is provided while keeping error status behavior explicit', () => {
+            useBuilderStore.getState().setError({
+                code: 'AI_TIMEOUT',
+                message: 'Generation failed',
+                retryable: true,
+            })
+            useBuilderStore.getState().setError(null)
+
+            const state = useBuilderStore.getState()
+            expect(state.error).toBeNull()
             expect(state.status).toBe('error')
         })
     })

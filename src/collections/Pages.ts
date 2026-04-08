@@ -1,5 +1,5 @@
-import type { CollectionConfig } from 'payload'
-
+import type { Block, CollectionConfig, CollectionAfterChangeHook } from 'payload'
+import { queueSEOAutoGeneration } from '../lib/ai/seo-queue'
 // Block definitions — each block is a section of a page
 const HeroBlock = {
     slug: 'hero',
@@ -17,7 +17,7 @@ const HeroBlock = {
                 { label: 'Video Background', value: 'video' },
             ],
         },
-        { name: 'headline', type: 'text', required: true },
+        { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
         {
             name: 'ctaButtons',
@@ -39,7 +39,7 @@ const HeroBlock = {
         },
         { name: 'image', type: 'upload', relationTo: 'media' },
         { name: 'backgroundImage', type: 'upload', relationTo: 'media' },
-        { name: 'videoUrl', type: 'text', admin: { condition: (_, s) => s?.variant === 'video' } },
+        { name: 'videoUrl', type: 'text', admin: { condition: (_: unknown, s: Record<string, unknown>) => s?.variant === 'video' } },
         {
             name: 'badge',
             type: 'group',
@@ -105,14 +105,14 @@ const AboutBlock = {
             ],
         },
         { name: 'sectionLabel', type: 'text', defaultValue: 'About Us' },
-        { name: 'headline', type: 'text', required: true },
+        { name: 'headline', type: 'text' },
         { name: 'body', type: 'richText' },
         { name: 'image', type: 'upload', relationTo: 'media' },
         {
             name: 'stats',
             type: 'array',
             maxRows: 4,
-            admin: { condition: (_, s) => s?.layout === 'cards' },
+            admin: { condition: (_: unknown, s: Record<string, unknown>) => s?.layout === 'cards' },
             fields: [
                 { name: 'value', type: 'text', required: true },
                 { name: 'label', type: 'text', required: true },
@@ -188,12 +188,67 @@ const FooterBlock = {
     ],
 }
 
+const SocialWidgetBlock = {
+    slug: 'socialWidget',
+    labels: { singular: 'Social Widget', plural: 'Social Widgets' },
+    fields: [
+        {
+            name: 'variant',
+            type: 'select',
+            defaultValue: 'floating',
+            options: [
+                { label: 'Floating', value: 'floating' },
+                { label: 'Inline', value: 'inline' },
+            ],
+        },
+        { name: 'headline', type: 'text' },
+        {
+            name: 'links',
+            type: 'array',
+            fields: [
+                {
+                    name: 'platform',
+                    type: 'select',
+                    required: true,
+                    options: [
+                        { label: 'Facebook', value: 'facebook' },
+                        { label: 'WhatsApp', value: 'whatsapp' },
+                        { label: 'Instagram', value: 'instagram' },
+                        { label: 'LinkedIn', value: 'linkedin' },
+                        { label: 'YouTube', value: 'youtube' },
+                    ],
+                },
+                { name: 'url', type: 'text' },
+                { name: 'enabled', type: 'checkbox', defaultValue: true },
+            ],
+        },
+    ],
+}
+
+const CartWidgetBlock = {
+    slug: 'cartWidget',
+    labels: { singular: 'Cart Widget', plural: 'Cart Widgets' },
+    fields: [
+        {
+            name: 'variant',
+            type: 'select',
+            defaultValue: 'floating',
+            options: [
+                { label: 'Floating', value: 'floating' },
+                { label: 'Inline', value: 'inline' },
+            ],
+        },
+        { name: 'label', type: 'text', defaultValue: 'Cart' },
+        { name: 'showLabel', type: 'checkbox', defaultValue: false },
+    ],
+}
+
 const FeaturesBlock = {
     slug: 'features',
     labels: { singular: 'Features Section', plural: 'Features Sections' },
     fields: [
         { name: 'sectionLabel', type: 'text' },
-        { name: 'headline', type: 'text', required: true },
+        { name: 'headline', type: 'text' },
         { name: 'subheadline', type: 'textarea' },
         {
             name: 'layout',
@@ -270,15 +325,118 @@ const GalleryBlock = {
             name: 'images',
             type: 'array',
             fields: [
-                { name: 'image', type: 'upload', relationTo: 'media', required: true },
+                { name: 'image', type: 'upload', relationTo: 'media', required: false },
                 { name: 'caption', type: 'text' },
             ],
         },
     ],
 }
 
+
+const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation }) => {
+    const isPublishingUpdate = operation === 'update' && doc._status === 'published' && previousDoc?._status !== 'published'
+    const isPublishingCreate = operation === 'create' && doc._status === 'published'
+
+    // Wait until it becomes published and seo title is empty
+    if ((isPublishingUpdate || isPublishingCreate) && !doc.seo?.title) {
+        // Collect text content for context (very basic extraction)
+        let textContext = ''
+        if (Array.isArray(doc.layout)) {
+            const texts = doc.layout.map((block: Record<string, unknown>) => block.headline || block.sectionLabel || '').filter(Boolean)
+            textContext = texts.join('. ')
+        }
+        
+        // Trigger background generation
+        queueSEOAutoGeneration('pages', doc.id, typeof doc.site === 'object' ? doc.site.id : doc.site, doc.title, textContext)
+    }
+}
+
+const StatsBlock = {
+    slug: 'stats',
+    labels: { singular: 'Stats Section', plural: 'Stats Sections' },
+    fields: [
+        { name: 'headline', type: 'text' },
+        {
+            name: 'stats',
+            type: 'array',
+            required: true,
+            fields: [
+                { name: 'value', type: 'text', required: true },
+                { name: 'label', type: 'text', required: true },
+            ],
+        },
+    ],
+}
+
+const PricingBlock = {
+    slug: 'pricing',
+    labels: { singular: 'Pricing Section', plural: 'Pricing Sections' },
+    fields: [
+        { name: 'headline', type: 'text' },
+        { name: 'subheadline', type: 'textarea' },
+        {
+            name: 'plans',
+            type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'price', type: 'text', required: true },
+                { name: 'description', type: 'textarea' },
+                {
+                    name: 'features',
+                    type: 'array',
+                    fields: [
+                        { name: 'text', type: 'text', required: true },
+                        { name: 'included', type: 'checkbox', defaultValue: true },
+                    ],
+                },
+                { name: 'isPopular', type: 'checkbox', defaultValue: false },
+                { name: 'ctaLabel', type: 'text', defaultValue: 'Get Started' },
+                { name: 'ctaUrl', type: 'text' },
+            ],
+        },
+    ],
+}
+
+const FAQBlock = {
+    slug: 'faq',
+    labels: { singular: 'FAQ Section', plural: 'FAQ Sections' },
+    fields: [
+        { name: 'headline', type: 'text', defaultValue: 'Frequently Asked Questions' },
+        {
+            name: 'faqs',
+            type: 'array',
+            fields: [
+                { name: 'question', type: 'text', required: true },
+                { name: 'answer', type: 'textarea', required: true },
+            ],
+        },
+    ],
+}
+
+const TeamBlock = {
+    slug: 'team',
+    labels: { singular: 'Team Section', plural: 'Team Sections' },
+    fields: [
+        { name: 'headline', type: 'text', defaultValue: 'Meet Our Team' },
+        {
+            name: 'members',
+            type: 'array',
+            fields: [
+                { name: 'name', type: 'text', required: true },
+                { name: 'role', type: 'text' },
+                { name: 'bio', type: 'textarea' },
+                { name: 'image', type: 'upload', relationTo: 'media' },
+            ],
+        },
+    ],
+
+}
+
 export const Pages: CollectionConfig = {
     slug: 'pages',
+    hooks: {
+        afterChange: [afterChangeHook],
+    },
     admin: {
         useAsTitle: 'title',
         description: 'Pages belong to a site and contain ordered blocks.',
@@ -334,7 +492,13 @@ export const Pages: CollectionConfig = {
                 ContactBlock,
                 GalleryBlock,
                 FooterBlock,
-            ],
+                StatsBlock,
+                PricingBlock,
+                FAQBlock,
+                TeamBlock,
+                SocialWidgetBlock,
+                CartWidgetBlock,
+            ] as Block[],
         },
         {
             name: 'seo',
@@ -349,6 +513,22 @@ export const Pages: CollectionConfig = {
         {
             name: 'publishedAt',
             type: 'date',
+        },
+        {
+            name: 'isVisible',
+            type: 'checkbox',
+            defaultValue: true,
+            admin: {
+                description: 'Show this page on live site and in navigation.',
+            },
+        },
+        {
+            name: 'deletedAt',
+            type: 'date',
+            admin: {
+                position: 'sidebar',
+                description: 'Soft delete timestamp. If set, the page is considered deleted.',
+            },
         },
     ],
     timestamps: true,
