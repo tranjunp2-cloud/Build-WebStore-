@@ -117,7 +117,7 @@ describe('Publish and Save Flows (TC-F05)', () => {
         ;(global.fetch as any).mockImplementation((url: string | URL) => {
             const urlStr = url.toString()
             if (urlStr.includes('/publish')) {
-                return Promise.resolve({ ok: true })
+                return Promise.resolve({ ok: true, json: async () => ({ data: { url: 'https://coffee-shop.primeweb.app', domain: 'coffee-shop.primeweb.app' } }) })
             }
             if (urlStr.includes('/save')) {
                 return Promise.resolve({ ok: true })
