@@ -1759,7 +1759,7 @@ async function main() {
     }
     console.log('[db-setup] Phase 1: Starting server with NODE_ENV=development...');
 
-    const devEnv = { ...process.env, NODE_ENV: 'development' };
+    const devEnv = { ...process.env, NODE_ENV: 'development', PAYLOAD_PUSH_SCHEMA: 'true' };
     const devServer = spawnServer(devEnv);
 
     // Payload pushDevSchema runs during DB connect (on server start).
