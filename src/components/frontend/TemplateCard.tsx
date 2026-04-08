@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Star, Crown, Eye, Loader2, Sparkles } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
@@ -37,10 +37,24 @@ export function TemplateCard({
     const primaryColor = template.defaultTheme?.primaryColor || '#3B82F6'
     const secondaryColor = template.defaultTheme?.secondaryColor || '#8B5CF6'
     const [isLoaded, setIsLoaded] = useState(false)
+    const [isVisible, setIsVisible] = useState(false)
+    const cardRef = useRef<HTMLDivElement>(null)
     const isThisApplying = isApplying === template.id
 
+    // Only load iframe when card is visible in viewport
+    useEffect(() => {
+        const el = cardRef.current
+        if (!el) return
+        const observer = new IntersectionObserver(
+            ([entry]) => { if (entry.isIntersecting) { setIsVisible(true); observer.disconnect() } },
+            { rootMargin: '200px' },
+        )
+        observer.observe(el)
+        return () => observer.disconnect()
+    }, [])
+
     return (
-        <div className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-all duration-500 hover:border-white/[0.12] hover:bg-white/[0.04] hover:shadow-2xl hover:shadow-blue-500/[0.06] hover:-translate-y-1">
+        <div ref={cardRef} className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] transition-all duration-500 hover:border-white/[0.12] hover:bg-white/[0.04] hover:shadow-2xl hover:shadow-blue-500/[0.06] hover:-translate-y-1">
             {/* Live preview thumbnail via iframe */}
             <div className="relative h-64 overflow-hidden bg-[#08080c]">
                 {/* Skeleton/Placeholder */}
@@ -51,17 +65,18 @@ export function TemplateCard({
                     </div>
                 )}
 
-                <iframe
-                    src={`/api/templates/preview?id=${template.id}`}
-                    onLoad={() => setIsLoaded(true)}
-                    className={cn(
-                        "w-[1200px] h-[900px] border-0 pointer-events-none origin-top-left transition-opacity duration-700",
-                        isLoaded ? "opacity-100" : "opacity-0"
-                    )}
-                    style={{ transform: 'scale(0.32)', transformOrigin: 'top left' }}
-                    title={template.name}
-                    loading="lazy"
-                />
+                {isVisible && (
+                    <iframe
+                        src={`/api/templates/preview?id=${template.id}`}
+                        onLoad={() => setIsLoaded(true)}
+                        className={cn(
+                            "w-[1200px] h-[900px] border-0 pointer-events-none origin-top-left transition-opacity duration-700",
+                            isLoaded ? "opacity-100" : "opacity-0"
+                        )}
+                        style={{ transform: 'scale(0.32)', transformOrigin: 'top left' }}
+                        title={template.name}
+                    />
+                )}
 
                 {/* Bottom fade */}
                 <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0a0a12] to-transparent pointer-events-none" />
