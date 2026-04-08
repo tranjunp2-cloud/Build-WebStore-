@@ -17,6 +17,7 @@ import type { ThemeConfig } from '@/blocks/types'
 import { GoogleFontsLoader } from '@/components/site-renderer/GoogleFontsLoader'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
 import { getGenerationError, formatErrorMessage } from '@/lib/generation-errors'
+import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 
 export interface AIBuilderPageClientProps {
     /** Server-resolved current user ID — used to detect cross-user localStorage contamination */
@@ -76,8 +77,12 @@ function LivePreview({
 }) {
     if (!theme || blocks.length === 0) return null
 
+    const resolved = resolveTheme(theme)
+    const themeCSS = generateThemeCSS(resolved)
+
     return (
         <>
+        <style dangerouslySetInnerHTML={{ __html: themeCSS }} />
         <GoogleFontsLoader fontBody={theme.fontBody} fontHeading={theme.fontHeading} />
         <Reorder.Group
             axis="y"
@@ -85,8 +90,8 @@ function LivePreview({
             onReorder={(newOrder) => onReorder?.(newOrder)}
             style={{
                 fontFamily: `'${theme.fontBody}', sans-serif`,
-                background: theme.colorMode === 'dark' ? '#09090b' : '#ffffff',
-                color: theme.colorMode === 'dark' ? '#fafafa' : '#09090b',
+                background: resolved.backgroundColor,
+                color: resolved.textColor,
             }}
             values={blocks}
         >
