@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
 import { assertStaging } from '@/lib/env'
@@ -42,7 +43,7 @@ async function clearCollection(
  * for the current user. User account (email, password) is preserved.
  * User is expected to redirect to /onboarding after reset.
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
     try {
         // Double guard: server-side staging check
         assertStaging()
@@ -56,10 +57,9 @@ export async function POST(request: NextRequest) {
     try {
         const payload = await getPayload({ config })
 
-        // Auth check
-        const authHeader = request.headers.get('cookie')
-        const tokenMatch = authHeader?.match(/payload-token=([^;]+)/)
-        const token = tokenMatch?.[1]
+        // Auth check — same pattern as getCurrentUser()
+        const cookieStore = await cookies()
+        const token = cookieStore.get('payload-token')?.value
 
         if (!token) {
             return NextResponse.json(
