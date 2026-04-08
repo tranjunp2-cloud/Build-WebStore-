@@ -597,86 +597,94 @@ export const Users: CollectionConfig = {
             path: '/send-otp',
             method: 'post',
             handler: async (req) => {
-                const body = await req.json?.() ?? {}
-                const { email } = body as { email?: string }
+                try {
+                    const body = await req.json?.() ?? {}
+                    const { email } = body as { email?: string }
 
-                if (!email) {
-                    return Response.json(
-                        { errors: [{ message: 'Email is required' }] },
-                        { status: 400 },
-                    )
-                }
-
-                // Find user by email
-                const result = await req.payload.find({
-                    collection: 'users',
-                    where: { email: { equals: email } },
-                    limit: 1,
-                    overrideAccess: true, // Required to read protected fields like otpHash
-                })
-
-                if (!result.docs.length) {
-                    // Don't reveal whether email exists — return generic success
-                    return Response.json({ message: 'If the email exists, an OTP has been sent.' })
-                }
-
-                const user = result.docs[0]
-                const userName = user.firstName || user.email?.split('@')[0] || 'there'
-
-                // Check rate limiting: max 1 OTP per 60 seconds
-                if (user.otpExpiresAt) {
-                    const lastExpiry = new Date(user.otpExpiresAt)
-                    const cooldownEnd = new Date(lastExpiry.getTime() - (4 * 60 * 1000)) // 5 min TTL - 4 min = sent 1 min ago
-                    if (Date.now() < cooldownEnd.getTime()) {
+                    if (!email) {
                         return Response.json(
-                            { errors: [{ message: 'Please wait before requesting a new code.' }] },
-                            { status: 429 },
+                            { errors: [{ message: 'Email is required' }] },
+                            { status: 400 },
                         )
                     }
-                }
 
-                // Dev/E2E bypass: use magic code instead of generating real OTP
-                const testOtpCode = process.env.E2E_TEST_OTP_CODE
-                const isDev = process.env.NODE_ENV === 'development'
-                const testEmail = process.env.TEST_EMAIL
-                const useDevBypass = isDev && !!testOtpCode
-                const useE2EBypass = !!(testOtpCode && testEmail && email === testEmail)
-
-                const otp = (useDevBypass || useE2EBypass) ? testOtpCode! : generateOTP()
-                const otpHash = hashOTP(otp)
-                const otpExpiry = getOTPExpiry()
-
-                // Store hashed OTP in database
-                await req.payload.update({
-                    collection: 'users',
-                    id: user.id,
-                    data: {
-                        otpHash,
-                        otpExpiresAt: otpExpiry.toISOString(),
-                        otpAttempts: 0,
-                    },
-                })
-
-                // Mask email for logging
-                const [local, domain] = email.split('@')
-                const safeLocal = local.length <= 2 ? '*'.repeat(local.length) : local.slice(0, 2) + '***'
-                const maskedEmail = `${safeLocal}@${domain}`
-
-                if (useDevBypass || useE2EBypass) {
-                    // Dev/E2E: log the bypass code, skip sending email
-                    console.log(`[DEV OTP] ════════════════════════════════════`)
-                    console.log(`[DEV OTP] Email: ${maskedEmail}`)
-                    console.log(`[DEV OTP] Code:  ${otp}`)
-                    console.log(`[DEV OTP] ════════════════════════════════════`)
-                } else {
-                    // Production: send real email, never log code
-                    const { subject, html } = otpVerificationEmail({ userName, otpCode: otp })
-                    req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
-                        console.error(`[Users] Failed to send OTP email to ${email}:`, err)
+                    // Find user by email
+                    const result = await req.payload.find({
+                        collection: 'users',
+                        where: { email: { equals: email } },
+                        limit: 1,
+                        overrideAccess: true, // Required to read protected fields like otpHash
                     })
-                    console.log(`[OTP] Code dispatched for ${maskedEmail}`)
+
+                    if (!result.docs.length) {
+                        // Don't reveal whether email exists — return generic success
+                        return Response.json({ message: 'If the email exists, an OTP has been sent.' })
+                    }
+
+                    const user = result.docs[0]
+                    const userName = user.firstName || user.email?.split('@')[0] || 'there'
+
+                    // Check rate limiting: max 1 OTP per 60 seconds
+                    if (user.otpExpiresAt) {
+                        const lastExpiry = new Date(user.otpExpiresAt)
+                        const cooldownEnd = new Date(lastExpiry.getTime() - (4 * 60 * 1000)) // 5 min TTL - 4 min = sent 1 min ago
+                        if (Date.now() < cooldownEnd.getTime()) {
+                            return Response.json(
+                                { errors: [{ message: 'Please wait before requesting a new code.' }] },
+                                { status: 429 },
+                            )
+                        }
+                    }
+
+                    // Dev/E2E bypass: use magic code instead of generating real OTP
+                    const testOtpCode = process.env.E2E_TEST_OTP_CODE
+                    const isDev = process.env.NODE_ENV === 'development'
+                    const testEmail = process.env.TEST_EMAIL
+                    const useDevBypass = isDev && !!testOtpCode
+                    const useE2EBypass = !!(testOtpCode && testEmail && email === testEmail)
+
+                    const otp = (useDevBypass || useE2EBypass) ? testOtpCode! : generateOTP()
+                    const otpHash = hashOTP(otp)
+                    const otpExpiry = getOTPExpiry()
+
+                    // Store hashed OTP in database
+                    await req.payload.update({
+                        collection: 'users',
+                        id: user.id,
+                        data: {
+                            otpHash,
+                            otpExpiresAt: otpExpiry.toISOString(),
+                            otpAttempts: 0,
+                        },
+                    })
+
+                    // Mask email for logging
+                    const [local, domain] = email.split('@')
+                    const safeLocal = local.length <= 2 ? '*'.repeat(local.length) : local.slice(0, 2) + '***'
+                    const maskedEmail = `${safeLocal}@${domain}`
+
+                    if (useDevBypass || useE2EBypass) {
+                        // Dev/E2E: log the bypass code, skip sending email
+                        console.log(`[DEV OTP] ════════════════════════════════════`)
+                        console.log(`[DEV OTP] Email: ${maskedEmail}`)
+                        console.log(`[DEV OTP] Code:  ${otp}`)
+                        console.log(`[DEV OTP] ════════════════════════════════════`)
+                    } else {
+                        // Production: send real email, never log code
+                        const { subject, html } = otpVerificationEmail({ userName, otpCode: otp })
+                        req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
+                            console.error(`[Users] Failed to send OTP email to ${email}:`, err)
+                        })
+                        console.log(`[OTP] Code dispatched for ${maskedEmail}`)
+                    }
+                    return Response.json({ message: 'If the email exists, an OTP has been sent.' })
+                } catch (error: unknown) {
+                    console.error('[Users] send-otp error:', error)
+                    return Response.json(
+                        { errors: [{ message: 'Failed to send verification code. Please try again.' }] },
+                        { status: 500 },
+                    )
                 }
-                return Response.json({ message: 'If the email exists, an OTP has been sent.' })
             },
         },
         {

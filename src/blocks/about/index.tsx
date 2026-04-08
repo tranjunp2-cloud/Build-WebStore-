@@ -8,8 +8,28 @@ import { getAboutImage } from '@/lib/images/industry-images'
 import { SectionLabel } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 
+/** Extract plain text from richText JSON or return string as-is */
+function toPlainText(value: unknown): string {
+    if (!value) return ''
+    if (typeof value === 'string') {
+        // May be a JSON string from DB — try parse
+        if (value.startsWith('{')) {
+            try { return toPlainText(JSON.parse(value)) } catch { return value }
+        }
+        return value
+    }
+    if (typeof value === 'object' && value !== null) {
+        const obj = value as Record<string, unknown>
+        if (obj.text && typeof obj.text === 'string') return obj.text
+        if (Array.isArray(obj.children)) return (obj.children as unknown[]).map(toPlainText).join('')
+        if (obj.root) return toPlainText(obj.root)
+    }
+    return String(value)
+}
+
 function SimpleVariant({ block }: { block: AboutConfig }) {
-    const { headline, sectionLabel, body } = block
+    const { headline, sectionLabel } = block
+    const body = toPlainText(block.body)
     return (
         <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6 max-w-3xl text-center">
@@ -28,7 +48,8 @@ function SimpleVariant({ block }: { block: AboutConfig }) {
 }
 
 function SplitVariant({ block, category }: { block: AboutConfig; category: string }) {
-    const { headline, sectionLabel, body, layout = 'image-right' } = block
+    const { headline, sectionLabel, layout = 'image-right' } = block
+    const body = toPlainText(block.body)
     const imageUrl = block.image?.url || getAboutImage(category)
     const imageAlt = block.image?.alt || headline
     const isImageLeft = layout === 'image-left'
@@ -94,7 +115,8 @@ function SplitVariant({ block, category }: { block: AboutConfig; category: strin
 }
 
 function StoryVariant({ block }: { block: AboutConfig }) {
-    const { headline, sectionLabel, body, timelineItems } = block
+    const { headline, sectionLabel, timelineItems } = block
+    const body = toPlainText(block.body)
 
     // Fallback: if no timelineItems, render simple
     if (!timelineItems?.length) {
