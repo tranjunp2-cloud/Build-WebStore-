@@ -45,14 +45,40 @@ export const POST = withAuth(async (user, req) => {
             return NextResponse.json({ error: 'Template not found' }, { status: 404 })
         }
 
-        // Get tenant from user object (same pattern as generate-site)
-        const userWithTenants = user as { id: number | string; tenants?: Array<{ tenant: unknown }> }
+        // Get tenant from user — auto-create if missing (same as generate-site)
+        const userWithTenants = user as { id: number | string; firstName?: string; name?: string; tenants?: Array<{ tenant: unknown }> }
         let tenantId = userWithTenants.tenants?.[0]?.tenant
         if (typeof tenantId === 'object' && tenantId !== null) {
             tenantId = (tenantId as Record<string, unknown>).id
         }
         if (!tenantId) {
-            return NextResponse.json({ error: 'Tenant not found' }, { status: 400 })
+            // Auto-create tenant for users without one (new users, post-reset)
+            const fallbackSlug = `store-${user.id}`
+            const existing = await payload.find({
+                collection: 'tenants',
+                where: { slug: { equals: fallbackSlug } },
+                limit: 1,
+            })
+            if (existing.docs.length > 0) {
+                tenantId = existing.docs[0].id
+                await payload.update({
+                    collection: 'users',
+                    id: user.id,
+                    data: { tenants: [{ tenant: tenantId, role: 'owner' }] } as Record<string, unknown>,
+                })
+            } else {
+                const firstName = userWithTenants.firstName || userWithTenants.name || 'My'
+                const newTenant = await payload.create({
+                    collection: 'tenants',
+                    data: { name: `${firstName}'s Store`, slug: fallbackSlug },
+                })
+                tenantId = newTenant.id
+                await payload.update({
+                    collection: 'users',
+                    id: user.id,
+                    data: { tenants: [{ tenant: tenantId, role: 'owner' }] } as Record<string, unknown>,
+                })
+            }
         }
 
         const blocks = (template.defaultBlocks as Record<string, unknown>[]) || []
