@@ -1347,6 +1347,17 @@ const MIGRATIONS = [
     sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_position varchar;`,
   },
   // ── F05: Unique constraint for page slug per site ──
+  // Dedupe existing rows before creating unique index (keep newest, soft-delete older duplicates)
+  {
+    name: 'pages.dedupe_site_slug',
+    sql: `UPDATE pages SET deleted_at = NOW()
+      WHERE deleted_at IS NULL
+        AND id NOT IN (
+          SELECT DISTINCT ON (site_id, slug) id
+          FROM pages WHERE deleted_at IS NULL
+          ORDER BY site_id, slug, updated_at DESC
+        );`,
+  },
   {
     name: 'pages.site_slug_unique',
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS pages_site_slug_uniq ON pages (site_id, slug) WHERE deleted_at IS NULL;`,

@@ -133,7 +133,8 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         let normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`
         if (normalizedSlug === '//') normalizedSlug = '/'
 
-        // Optimistic check: page count limit (soft guard — not atomic but sufficient for UX)
+        // Soft guard: page count limit. Not atomic under concurrent writes, but acceptable —
+        // worst case is 101 pages instead of 100 (harmless). Hard enforcement would need a DB trigger.
         const { totalDocs: pageCount } = await payload.find({
             collection: 'pages',
             where: { site: { equals: siteId } },
