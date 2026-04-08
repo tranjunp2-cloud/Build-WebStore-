@@ -69,6 +69,7 @@ describe('POST /api/sites/[siteId]/pages [TC-F05.02]', () => {
     it('creates page with valid data', async () => {
         mockFind
             .mockResolvedValueOnce({ docs: [{ id: 'site-1', tenant: 'tenant-1' }] }) // auth
+            .mockResolvedValueOnce({ totalDocs: 3 }) // page count check
             .mockResolvedValueOnce({ docs: [] }) // no duplicate slug
         mockCreate.mockResolvedValue({
             id: 'p-new', title: 'Contact', slug: '/contact',
@@ -88,6 +89,7 @@ describe('POST /api/sites/[siteId]/pages [TC-F05.02]', () => {
     it('returns 409 for duplicate slug', async () => {
         mockFind
             .mockResolvedValueOnce({ docs: [{ id: 'site-1', tenant: 'tenant-1' }] })
+            .mockResolvedValueOnce({ totalDocs: 3 }) // page count check
             .mockResolvedValueOnce({ docs: [{ id: 'existing' }] }) // duplicate
 
         const req = { json: () => Promise.resolve({ title: 'About', slug: 'about' }) } as unknown as Request
