@@ -173,6 +173,19 @@ async function handleCheckoutCompleted(
             console.error('[Stripe Webhook] Failed to send confirmation email:', emailErr)
             // Don't fail the webhook — email is non-critical
         }
+
+        // Fire-and-forget: ORDER_NEW notification for merchant (Stripe flow)
+        import('@/lib/notifications/notify-tenant-owners')
+            .then(({ notifyTenantOwners }) => {
+                const tenantId = typeof (order as any).tenant === 'object' ? (order as any).tenant.id : (order as any).tenant
+                return notifyTenantOwners(payload, tenantId, {
+                    type: 'ORDER_NEW',
+                    title: `New Order #${(order as any).orderNumber} - ${(order as any).currency || 'MYR'} ${((order as any).total ?? 0).toFixed(2)}`,
+                    message: `Order placed by ${(order as any).customerName}`,
+                    actionUrl: '/orders',
+                })
+            })
+            .catch((err) => console.error('[Notification] ORDER_NEW (Stripe) hook failed', err))
     } catch (err: any) {
         console.error(`[Stripe Webhook] Failed to update order ${orderId}:`, err.message)
     }
@@ -219,6 +232,19 @@ async function handlePaymentFailed(
     })
 
     console.log(`[Stripe Webhook] Order ${order.id} marked as payment_failed`)
+
+    // Fire-and-forget: notify merchant of failed payment
+    import('@/lib/notifications/notify-tenant-owners')
+        .then(({ notifyTenantOwners }) => {
+            const tenantId = typeof order.tenant === 'object' ? (order as any).tenant.id : order.tenant
+            return notifyTenantOwners(payload, tenantId, {
+                type: 'SYSTEM_ALERT',
+                title: `Payment Failed - Order #${(order as any).orderNumber}`,
+                message: `Payment for order #${(order as any).orderNumber} has failed. Customer may retry.`,
+                actionUrl: '/orders',
+            })
+        })
+        .catch((err) => console.error('[Notification] PAYMENT_FAILED hook failed', err))
 }
 
 async function handleSubscriptionUpdated(
