@@ -125,18 +125,21 @@ export async function POST() {
             results.sites = (results.sites || 0) + await clearCollection(
                 payload, 'sites', { tenant: { equals: tenantId } },
             )
-
-            // Step 7: Delete tenant record
-            await payload.delete({ collection: 'tenants', id: tenantId })
-            results.tenants = (results.tenants || 0) + 1
         }
 
-        // Step 8: Clear user.tenants array
+        // Step 7: Clear user.tenants array BEFORE deleting tenant records
+        // (users_tenants.tenant_id has NOT NULL constraint — must detach first)
         await payload.update({
             collection: 'users',
             id: userWithTenants.id,
             data: { tenants: [] } as Record<string, unknown>,
         })
+
+        // Step 8: Delete tenant records (now safe — no FK reference from users_tenants)
+        for (const tenantId of tenantIds) {
+            await payload.delete({ collection: 'tenants', id: tenantId })
+            results.tenants = (results.tenants || 0) + 1
+        }
 
         console.log(`[Account Reset] Complete for user ${userWithTenants.id}:`, results)
 
