@@ -1346,6 +1346,11 @@ const MIGRATIONS = [
     name: '_pages_v.version_position',
     sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_position varchar;`,
   },
+  // ── F05: Unique constraint for page slug per site ──
+  {
+    name: 'pages.site_slug_unique',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS pages_site_slug_uniq ON pages (site_id, slug) WHERE deleted_at IS NULL;`,
+  },
   // ── F01: Fix about body from richText (jsonb) to textarea (varchar) ──
   {
     name: 'pages_blocks_about.body_to_varchar',

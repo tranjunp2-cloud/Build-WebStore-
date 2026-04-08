@@ -133,32 +133,34 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         let normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`
         if (normalizedSlug === '//') normalizedSlug = '/'
 
-        // Atomic: check limits + create inside transaction to prevent race conditions
-        const newPage = await payload.db.drizzle.transaction(async () => {
-            const { totalDocs: pageCount } = await payload.find({
-                collection: 'pages',
-                where: { site: { equals: siteId } },
-                limit: 0,
-            })
-            if (pageCount >= MAX_PAGES_PER_SITE) {
-                throw new Error(`LIMIT:Maximum ${MAX_PAGES_PER_SITE} pages per site reached`)
-            }
+        // Optimistic check: page count limit (soft guard — not atomic but sufficient for UX)
+        const { totalDocs: pageCount } = await payload.find({
+            collection: 'pages',
+            where: { site: { equals: siteId } },
+            limit: 0,
+        })
+        if (pageCount >= MAX_PAGES_PER_SITE) {
+            return new NextResponse(`Maximum ${MAX_PAGES_PER_SITE} pages per site reached`, { status: 400 })
+        }
 
-            const { docs: existing } = await payload.find({
-                collection: 'pages',
-                where: {
-                    and: [
-                        { site: { equals: siteId } },
-                        { slug: { equals: normalizedSlug } },
-                    ],
-                },
-                limit: 1,
-            })
-            if (existing.length > 0) {
-                throw new Error('CONFLICT:Page slug already exists in this site')
-            }
+        // Optimistic check: slug uniqueness (DB constraint is the real guard)
+        const { docs: existing } = await payload.find({
+            collection: 'pages',
+            where: {
+                and: [
+                    { site: { equals: siteId } },
+                    { slug: { equals: normalizedSlug } },
+                ],
+            },
+            limit: 1,
+        })
+        if (existing.length > 0) {
+            return new NextResponse('Page slug already exists in this site', { status: 409 })
+        }
 
-            return payload.create({
+        let newPage: Record<string, unknown>
+        try {
+            newPage = await payload.create({
                 collection: 'pages',
                 data: {
                     title,
@@ -169,18 +171,13 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                     _status: 'draft',
                 },
             })
-        }).catch((err: Error) => {
-            if (err.message.startsWith('LIMIT:')) {
-                return { error: err.message.slice(6), status: 400 } as const
-            }
-            if (err.message.startsWith('CONFLICT:')) {
-                return { error: err.message.slice(9), status: 409 } as const
+        } catch (err: unknown) {
+            // Handle DB unique constraint violation (concurrent slug creation)
+            const message = err instanceof Error ? err.message : String(err)
+            if (message.includes('unique') || message.includes('duplicate')) {
+                return new NextResponse('Page slug already exists in this site', { status: 409 })
             }
             throw err
-        })
-
-        if ('error' in newPage) {
-            return new NextResponse(newPage.error, { status: newPage.status })
         }
 
         return NextResponse.json({
@@ -191,8 +188,8 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                 status: newPage._status || 'draft',
                 isHomepage: Boolean(newPage.isHomepage),
                 isVisible: newPage.isVisible ?? true,
-                seoTitle: newPage.seo?.title ?? null,
-                seoDescription: newPage.seo?.description ?? null,
+                seoTitle: (newPage.seo as Record<string, unknown> | undefined)?.title ?? null,
+                seoDescription: (newPage.seo as Record<string, unknown> | undefined)?.description ?? null,
                 updatedAt: newPage.updatedAt,
             }
         })
