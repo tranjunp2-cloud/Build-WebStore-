@@ -1439,7 +1439,13 @@
         "ariaDefault": "Pemberitahuan",
         "tagSystem": "Sistem",
         "tagAnnouncement": "Pengumuman",
-        "broadcastTitle": "Pemberitahuan Sistem"
+        "broadcastTitle": "Pemberitahuan Sistem",
+        "toast": {
+            "newNotification": "Pemberitahuan baharu",
+            "newCount": "{count} pemberitahuan baharu",
+            "justNow": "Baru sahaja",
+            "dismiss": "Tutup"
+        }
     },
     "Staff": {
         "title": "Pengurusan Kakitangan",

@@ -31,7 +31,8 @@ export async function GET(request: Request): Promise<Response> {
         tenants?: Array<{ tenant: string | { id: string } }>
     }
     const firstTenant = userWithTenants.tenants?.[0]?.tenant
-    const tenantId = typeof firstTenant === 'object' ? firstTenant?.id : (firstTenant ?? null)
+    const rawTenantId = typeof firstTenant === 'object' ? firstTenant?.id : (firstTenant ?? null)
+    const tenantId = rawTenantId ? String(rawTenantId) : null
 
     const encoder = new TextEncoder()
 
@@ -68,9 +69,11 @@ export async function GET(request: Request): Promise<Response> {
                 }
 
                 // Dedicated pg connection for LISTEN (cannot share pool connection)
+                // Skip SSL for local/Docker environments (localhost, 127.0.0.1, Docker service names)
+                const isLocal = /localhost|127\.0\.0\.1|postgres:|db:/.test(connStr) || connStr.includes('sslmode=disable')
                 pgClient = new Client({
                     connectionString: connStr.replace(/[?&]sslmode=[^&]+/g, '').replace(/\?&/, '?').replace(/\?$/, ''),
-                    ssl: connStr.includes('localhost') ? undefined : { rejectUnauthorized: false },
+                    ssl: isLocal ? false : { rejectUnauthorized: false },
                 })
                 await pgClient.connect()
                 await pgClient.query('LISTEN notification_channel')
