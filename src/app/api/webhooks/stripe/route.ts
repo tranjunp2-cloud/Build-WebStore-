@@ -20,7 +20,7 @@ interface OrderDoc {
     total: number
     subtotal: number
     tax: number
-    items: Array<{ product: any; productName: string; quantity: number; unitPrice: number }>
+    items: Array<{ product: string | number | { id: string | number }; productName: string; quantity: number; unitPrice: number }>
     shippingAddress: Record<string, unknown>
 }
 

@@ -10,11 +10,14 @@ export const PushSubscriptions: CollectionConfig = {
   hooks: {
     beforeChange: [
       async ({ data, req, operation }) => {
-        // Force user and tenant from session to prevent spoofing via direct API
-        if (operation === 'create' && req.user) {
+        if (!data || operation !== 'create' || !req.user) return data
+        try {
           data.user = req.user.id
-          const firstTenant = (req.user as any).tenants?.[0]?.tenant
+          const userWithTenants = req.user as { tenants?: Array<{ tenant: string | number | { id: string | number } }> }
+          const firstTenant = userWithTenants.tenants?.[0]?.tenant
           data.tenant = typeof firstTenant === 'object' ? firstTenant?.id : firstTenant
+        } catch (err) {
+          console.error('[PushSubscriptions] beforeChange failed', err)
         }
         return data
       },
