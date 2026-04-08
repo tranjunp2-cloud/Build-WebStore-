@@ -1284,16 +1284,32 @@ const MIGRATIONS = [
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_accent_color varchar;`,
   },
   {
+    name: 'sites.accent_color',
+    sql: `SELECT 1;`,
+  },
+  {
     name: 'sites.theme_surface_color',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_surface_color varchar;`,
+  },
+  {
+    name: 'sites.surface_color',
+    sql: `SELECT 1;`,
   },
   {
     name: 'sites.theme_text_color',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_text_color varchar;`,
   },
   {
+    name: 'sites.text_color',
+    sql: `SELECT 1;`,
+  },
+  {
     name: 'sites.theme_muted_color',
     sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_muted_color varchar;`,
+  },
+  {
+    name: 'sites.muted_color',
+    sql: `SELECT 1;`,
   },
   {
     name: 'sites.theme_spacing_preset',
@@ -1303,11 +1319,32 @@ const MIGRATIONS = [
     ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_spacing_preset enum_sites_theme_spacing_preset DEFAULT 'default';`,
   },
   {
+    name: 'sites.spacing_preset',
+    sql: `SELECT 1;`,
+  },
+  {
     name: 'sites.theme_shadow_preset',
     sql: `DO $$ BEGIN
       CREATE TYPE enum_sites_theme_shadow_preset AS ENUM ('none', 'subtle', 'medium', 'dramatic');
     EXCEPTION WHEN duplicate_object THEN NULL; END $$;
     ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_shadow_preset enum_sites_theme_shadow_preset DEFAULT 'subtle';`,
+  },
+  {
+    name: 'sites.shadow_preset',
+    sql: `SELECT 1;`,
+  },
+  // ── F01: _pages_v version columns for new block fields (CI check requirement) ──
+  {
+    name: '_pages_v.version_variant',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_variant varchar;`,
+  },
+  {
+    name: '_pages_v.version_cta_style',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_cta_style varchar;`,
+  },
+  {
+    name: '_pages_v.version_position',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_position varchar;`,
   },
   // ── F01: Fix about body from richText (jsonb) to textarea (varchar) ──
   {

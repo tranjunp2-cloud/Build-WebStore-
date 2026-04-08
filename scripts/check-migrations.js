@@ -89,7 +89,18 @@ function getMigrationColumns() {
   const regex = /ALTER TABLE\s+(\w+)\s+ADD COLUMN IF NOT EXISTS\s+(\w+)/gi
   let match
   while ((match = regex.exec(content)) !== null) {
-    columns.add(`${match[1]}.${match[2]}`)
+    const table = match[1]
+    const col = match[2]
+    columns.add(`${table}.${col}`)
+    // Also register without group prefix (e.g., theme_accent_color → accent_color)
+    // so that Payload group fields are found by their unprefixed name
+    if (col.includes('_')) {
+      const parts = col.split('_')
+      if (parts.length >= 3) {
+        const withoutPrefix = parts.slice(1).join('_')
+        columns.add(`${table}.${withoutPrefix}`)
+      }
+    }
   }
 
   return columns
@@ -99,8 +110,8 @@ function getMigrationTables() {
   const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')
   const tables = new Set()
 
-  // Match CREATE TABLE IF NOT EXISTS "xxx" or xxx
-  const regex = /CREATE TABLE IF NOT EXISTS\s+"?(\w+)"?/gi
+  // Match CREATE TABLE IF NOT EXISTS "xxx" or xxx (supports hyphens in quoted names)
+  const regex = /CREATE TABLE IF NOT EXISTS\s+"?([\w-]+)"?/gi
   let match
   while ((match = regex.exec(content)) !== null) {
     tables.add(match[1])
@@ -234,8 +245,10 @@ function checkNewBlocks() {
   const missing = []
 
   for (const slug of newSlugs) {
-    const liveTable = `pages_blocks_${slug}`
-    const versionTable = `_pages_v_blocks_${slug}`
+    // Payload Drizzle converts kebab-case slugs to snake_case table names
+    const snakeSlug = slug.replace(/-/g, '_')
+    const liveTable = `pages_blocks_${snakeSlug}`
+    const versionTable = `_pages_v_blocks_${snakeSlug}`
 
     if (!tables.has(liveTable)) {
       missing.push({ slug, table: liveTable, type: 'live' })
