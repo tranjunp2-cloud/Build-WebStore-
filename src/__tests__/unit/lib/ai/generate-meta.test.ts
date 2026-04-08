@@ -14,9 +14,9 @@ vi.mock('@/lib/ai/config', () => ({
 
 import { generateAutoSEOMeta } from '@/lib/ai/generate-meta'
 
-// ─── TC-F08.13: SEO auto-generation ──────────────────────────────────
+// ─── TC-F08-03-01: SEO auto-generation ──────────────────────────────────
 
-describe('generateAutoSEOMeta — fallback (no API key) [TC-F08.13]', () => {
+describe('generateAutoSEOMeta — fallback (no API key) [TC-F08-03-01]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         delete process.env.OPENAI_API_KEY
@@ -62,7 +62,7 @@ describe('generateAutoSEOMeta — fallback (no API key) [TC-F08.13]', () => {
     })
 })
 
-describe('generateAutoSEOMeta — fallback format checks [TC-F08.13]', () => {
+describe('generateAutoSEOMeta — fallback format checks [TC-F08-03-01]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         delete process.env.OPENAI_API_KEY

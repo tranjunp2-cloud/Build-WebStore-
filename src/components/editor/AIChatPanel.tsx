@@ -2,11 +2,17 @@
 
 
 import React, { memo, useEffect, useRef, useState } from 'react'
+import DOMPurify from 'isomorphic-dompurify'
 import { RotateCcw, Send, WandSparkles } from 'lucide-react'
 import { AddSectionPromptChips } from './AddSectionPromptChips'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData, ThemeData } from '@/types/editor'
+
+/** Strip all HTML tags from content — defense-in-depth against XSS in AI responses */
+function sanitizeContent(content: string): string {
+    return DOMPurify.sanitize(content, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+}
 
 type ChatMessage = {
     id: string
@@ -88,13 +94,15 @@ function AIChatPanelInner({
 
     const updateAssistantMessage = (messageId: string, next: Partial<ChatMessage>) => {
         setMessages(prev =>
-            prev.map(message => (message.id === messageId ? { ...message, ...next } : message)),
+            prev.map(message => (message.id === messageId
+                ? { ...message, ...next, content: next.content ? sanitizeContent(next.content) : message.content }
+                : message)),
         )
     }
 
     const handleAIError = (messageId: string, message: string) => {
         updateAssistantMessage(messageId, {
-            content: `❌ ${message}`,
+            content: `❌ ${sanitizeContent(message)}`,
             isStreaming: false,
             undoable: false,
         })
@@ -250,15 +258,15 @@ function AIChatPanelInner({
                     role="log"
                     aria-label="AI chat messages"
                 >
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         {messages.map(msg => {
                             if (msg.role === 'user') {
                                 return (
                                     <div key={msg.id} className="flex justify-end">
-                                        <div className="w-fit max-w-[160px] rounded-2xl bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-4 pt-3 pb-3 text-white">
-                                            <p className="whitespace-pre-wrap text-sm leading-[22.75px]">{msg.content}</p>
+                                        <div className="w-fit max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] px-4 py-3 text-white shadow-lg shadow-blue-500/10">
+                                            <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
                                             {msg.createdAt ? (
-                                                <p className="mt-2 text-xs text-white/60">{msg.createdAt}</p>
+                                                <p className="mt-1.5 text-right text-[10px] text-white/50">{msg.createdAt}</p>
                                             ) : null}
                                         </div>
                                     </div>
@@ -268,14 +276,14 @@ function AIChatPanelInner({
                             if (msg.isStreaming) {
                                 return (
                                     <div key={msg.id} className="flex">
-                                        <div className="rounded-2xl border border-[rgba(59,130,246,0.04)] bg-[#1E293B] px-4 py-[13px] text-slate-400">
-                                            <div className="flex items-center gap-2">
+                                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] px-4 py-3">
+                                            <div className="flex items-center gap-2.5">
                                                 <div className="flex gap-1">
-                                                    <span className="h-2 w-2 rounded-full bg-[#2DD4BF]" />
-                                                    <span className="h-2 w-2 rounded-full bg-[#2DD4BF]" />
-                                                    <span className="h-2 w-2 rounded-full bg-[#2DD4BF]" />
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:0ms]" />
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:150ms]" />
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:300ms]" />
                                                 </div>
-                                                <span className="text-xs leading-4">{msg.content || 'AI is drafting...'}</span>
+                                                <span className="text-[13px] leading-relaxed text-slate-300">{msg.content || 'AI is thinking...'}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -285,21 +293,21 @@ function AIChatPanelInner({
                             if (msg.undoable) {
                                 return (
                                     <div key={msg.id} className="flex">
-                                        <div className="w-[295px] rounded-2xl border border-[rgba(59,130,246,0.04)] bg-[#1E293B] px-4 py-3 text-[#F8FAFC]">
-                                            <p className="whitespace-pre-wrap text-sm leading-[22.75px]">{msg.content}</p>
-                                            <div className="mt-4 border-t border-white/10 pt-3">
+                                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] px-4 py-3 text-[#F8FAFC]">
+                                            <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
+                                            <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2.5">
                                                 <button
                                                     type="button"
                                                     onClick={onUndoLastAction}
-                                                    className="inline-flex items-center gap-2 text-xs font-medium text-[#2DD4BF] transition-colors hover:text-[#5EEAD4]"
+                                                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#2DD4BF] transition-all hover:bg-[#2DD4BF]/10 hover:text-[#5EEAD4]"
                                                 >
-                                                    <RotateCcw className="h-3.5 w-3.5" />
-                                                    Undo this step
+                                                    <RotateCcw className="h-3 w-3" />
+                                                    Undo
                                                 </button>
+                                                {msg.createdAt ? (
+                                                    <span className="text-[10px] text-white/40">{msg.createdAt}</span>
+                                                ) : null}
                                             </div>
-                                            {msg.createdAt ? (
-                                                <p className="mt-2 text-xs text-white/60">{msg.createdAt}</p>
-                                            ) : null}
                                         </div>
                                     </div>
                                 )
@@ -308,12 +316,12 @@ function AIChatPanelInner({
                             return (
                                 <div key={msg.id} className="flex">
                                     <div className={cn(
-                                        'rounded-2xl border border-[rgba(59,130,246,0.04)] bg-[#1E293B] text-[#F8FAFC]',
-                                        compact ? 'max-w-[260px] px-4 py-3.5' : 'w-[255px] px-[17px] py-[13px]',
+                                        'rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] text-[#F8FAFC]',
+                                        compact ? 'max-w-[85%] px-4 py-3' : 'max-w-[85%] px-4 py-3',
                                     )}>
-                                        <p className="whitespace-pre-wrap text-sm leading-[22.75px]">{msg.content}</p>
+                                        <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
                                         {msg.createdAt ? (
-                                            <p className="mt-2 text-xs text-white/60">{msg.createdAt}</p>
+                                            <p className="mt-1.5 text-[10px] text-white/40">{msg.createdAt}</p>
                                         ) : null}
                                     </div>
                                 </div>
@@ -324,45 +332,41 @@ function AIChatPanelInner({
                     </div>
                 </div>
 
-                <div className={cn('border-t border-[rgba(59,130,246,0.07)] bg-[rgba(11,17,32,0.5)]', compact ? 'px-4 pb-4 pt-4' : 'px-4 pb-4 pt-4')}>
-                    <div className={cn('mb-3 flex gap-2', compact ? 'overflow-x-auto pb-1' : 'items-center justify-between')}>
+                <div className={cn('border-t border-white/[0.06] bg-[#0B1120]/80 backdrop-blur-sm', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-3')}>
+                    <div className={cn('mb-2.5 flex gap-1.5', compact ? 'overflow-x-auto pb-1 scrollbar-none' : 'flex-wrap')}>
                         <button
                             type="button"
                             onClick={() => setInput('Change web color to mint green')}
-                            className={cn(
-                                'rounded-full border border-[rgba(59,130,246,0.04)] bg-[#1E293B] px-[13px] py-[7px] text-xs font-medium text-slate-400 transition-colors hover:bg-white/10',
-                                compact && 'shrink-0 border-white/[0.04] bg-[#1E293B] text-slate-400',
-                            )}
+                            className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-slate-300 transition-all hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-white"
                         >
-                            {compact ? '💡 Change website color' : 'Change web color'}
+                            Change color
                         </button>
                         <AddSectionPromptChips
                             compact={compact}
                             desktopMinimal={!compact}
-                            desktopLabelOverride="➕ Add section"
+                            desktopLabelOverride="+ Add section"
                             onPromptSelect={prompt => setInput(prompt)}
                         />
                     </div>
 
                     <div className={cn(
-                        'relative mt-3 h-[66px] rounded-2xl border border-[rgba(59,130,246,0.04)] bg-[#1E293B] pl-4 pr-12 py-3 transition-colors focus-within:border-cyan-500/40',
-                        compact && 'h-auto border-white/[0.04] bg-[#1E293B] px-4 py-3.5',
+                        'group relative rounded-xl border border-white/[0.08] bg-[#1E293B]/80 pl-4 pr-12 py-3 transition-all focus-within:border-cyan-400/40 focus-within:bg-[#1E293B] focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.1)]',
+                        compact && 'px-4 py-3',
                     )}>
                         <textarea
-                                value={input}
-                                onChange={e => setInput(e.target.value)}
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
                             onKeyDown={e => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault()
                                     void handleSendChat()
                                 }
                             }}
-                            placeholder={compact ? "Enter command... (e.g., 'Change website color')" : "Enter command... (For example: 'Change..."}
+                            placeholder="Tell AI what to change..."
                             aria-label="Chat message"
-                            className={cn(
-                                'mt-[1px] h-[40px] w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-5 text-white placeholder:text-slate-500 shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0',
-                                compact && 'min-h-[38px] max-h-none text-[14px] leading-6 text-slate-200 placeholder:text-slate-500',
-                            )}
+                            rows={1}
+                            className="w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[13px] leading-relaxed text-white placeholder:text-slate-500 shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                            style={{ minHeight: '24px', maxHeight: '120px' }}
                             disabled={isProcessing}
                         />
                         <button
@@ -370,21 +374,25 @@ function AIChatPanelInner({
                             onClick={() => void handleSendChat()}
                             disabled={!input.trim() || isProcessing}
                             className={cn(
-                                'absolute right-3.5 top-1/2 inline-flex -translate-y-1/2 items-center justify-center transition-all',
-                                (!input.trim() || isProcessing)
-                                    ? 'cursor-not-allowed bg-slate-700/50 text-slate-500'
-                                    : 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white hover:opacity-90',
-                                compact ? 'h-9 w-9 rounded-[14px]' : 'h-8 w-8 rounded-[12px]',
+                                'absolute bottom-2.5 right-3 inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all',
+                                input.trim() && !isProcessing
+                                    ? 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30'
+                                    : 'bg-white/[0.06] text-slate-500',
+                                isProcessing && 'cursor-not-allowed',
                             )}
                         >
-                            <Send className="h-4 w-4" />
+                            <Send className="h-3.5 w-3.5" />
                         </button>
                     </div>
 
-                    <p className="mt-3 flex items-center gap-1.5 text-[12px] text-slate-400">
-                        <WandSparkles className="h-3 w-3" />
-                        Press Enter to send, Shift+Enter to go to the next line
-                    </p>
+                    <div className="mt-2 flex items-center justify-between px-0.5">
+                        <p className="flex items-center gap-1 text-[11px] text-slate-500">
+                            <kbd className="rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 font-mono text-[10px]">Enter</kbd>
+                            <span>send</span>
+                            <kbd className="ml-1 rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 font-mono text-[10px]">Shift+Enter</kbd>
+                            <span>new line</span>
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

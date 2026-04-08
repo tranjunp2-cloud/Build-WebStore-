@@ -6,18 +6,17 @@ import { startOfDay, subDays } from 'date-fns'
 // Force dynamic — requires auth context + getPayload() at runtime
 export const dynamic = 'force-dynamic'
 
-import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
-import { DashboardActionList } from '@/components/dashboard/DashboardActionList'
 import { SEOHealthWidget } from '@/components/dashboard/SEOHealthWidget'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
-import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
 import { DashboardSiteGrid } from '@/components/dashboard/DashboardSiteGrid'
 import { AISmartInsights } from '@/components/dashboard/AISmartInsights'
+import { DashboardOnboarding } from '@/components/dashboard/DashboardOnboarding'
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -25,9 +24,14 @@ interface Props {
 
 export default async function DashboardPage({ searchParams }: Props) {
     const user = await getCurrentUser()
-    const tenantId = await getCurrentTenantId()
     const payload = await getPayload({ config })
-    
+
+    // Extract tenantId from user directly — avoid 2nd getCurrentUser() call
+    const typedUserForTenant = user as PlatformUser | null
+    const userTenants = typedUserForTenant?.tenants as Array<{ tenant: string | { id: string } }> | undefined
+    const firstUserTenant = userTenants?.[0]?.tenant
+    const tenantId = typeof firstUserTenant === 'string' ? firstUserTenant : firstUserTenant?.id || null
+
     // Using Next.js 15 asynchronous searchParams
     const resolvedParams = await searchParams
     const period = typeof resolvedParams.period === 'string' ? resolvedParams.period : '7d'
@@ -37,25 +41,22 @@ export default async function DashboardPage({ searchParams }: Props) {
 
     let totalSites = 0
     let recentSites: any[] = []
+    let hasPublishedSite = false
     if (tenantId) {
-        const sitesResult = await payload.find({ 
-            collection: 'sites', 
-            where: { tenant: { equals: tenantId } }, 
+        const sitesResult = await payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: tenantId } },
             sort: '-updatedAt',
-            limit: 6 
+            limit: 6
         })
         totalSites = sitesResult.totalDocs
         recentSites = sitesResult.docs
+        hasPublishedSite = recentSites.some((s: any) => s.status === 'published')
     }
 
-    if (totalSites === 0) {
-        return (
-            <div className="space-y-8">
-                <DashboardGreeting userName={userName} />
-                <DashboardEmptyState />
-            </div>
-        )
-    }
+    // Detect onboarding state
+    const hasWebsite = totalSites > 0
+    const isOnboarding = !hasWebsite || !hasPublishedSite
 
     const now = new Date()
     let startDate = subDays(startOfDay(now), 7)
@@ -75,94 +76,87 @@ export default async function DashboardPage({ searchParams }: Props) {
     let prevViews = 0
     let leads = 0
     let engagement = 0
-    let revenue = 0
-    let pendingOrdersCount = 0
-    let pendingOrders: any[] = []
     let dashboardPreferences: string[] | undefined = undefined
 
     if (tenantId) {
         const tenantResult: any = await payload.findByID({ collection: 'tenants', id: tenantId })
         dashboardPreferences = tenantResult?.settings?.dashboardPreferences
 
-        const [viewsRes, prevViewsRes, leadsRes, engagementRes, ordersRes, pendingOrdersRes] = await Promise.all([
-            payload.count({ 
-                collection: 'analytics', 
+        const [viewsRes, prevViewsRes, leadsRes, engagementRes] = await Promise.all([
+            payload.count({
+                collection: 'analytics',
                 where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'pageview' } }
             }),
-            payload.count({ 
-                collection: 'analytics', 
+            payload.count({
+                collection: 'analytics',
                 where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevStartDate.toISOString(), less_than: startDate.toISOString() }, event: { equals: 'pageview' } }
             }),
-            payload.count({ 
-                collection: 'analytics', 
+            payload.count({
+                collection: 'analytics',
                 where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'click' } }
             }),
-            payload.count({ 
-                collection: 'analytics', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { in: ['add_to_cart', 'checkout'] } }
+            payload.count({
+                collection: 'analytics',
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { not_equals: 'pageview' } }
             }),
-            payload.find({ 
-                collection: 'orders', 
-                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, status: { in: ['paid', 'completed'] } }, 
-                limit: 2000 
-            }),
-            payload.find({ 
-                collection: 'orders', 
-                where: { tenant: { equals: tenantId }, status: { equals: 'pending' } }, 
-                sort: '-createdAt', 
-                limit: 5 
-            })
         ])
 
         views = viewsRes.totalDocs
         prevViews = prevViewsRes.totalDocs
         leads = leadsRes.totalDocs
         engagement = engagementRes.totalDocs
-
-        ordersRes.docs.forEach((doc: any) => {
-            if (doc.total) revenue += doc.total
-        })
-
-        pendingOrdersCount = pendingOrdersRes.totalDocs
-        pendingOrders = pendingOrdersRes.docs
     }
+
+    const hasAnalyticsData = views > 0 || leads > 0 || engagement > 0
 
     return (
         <Suspense fallback={<DashboardSkeleton />}>
             <div className="space-y-8">
-                {/* Header: Greeting + Period Selector */}
+                {/* Header: Greeting + Controls */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <DashboardGreeting userName={userName} />
-                    <div className="flex items-center gap-4">
-                        <PeriodSelector />
-                        <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
-                    </div>
+                    {hasAnalyticsData && (
+                        <div className="flex items-center gap-4">
+                            <PeriodSelector />
+                            <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+                        </div>
+                    )}
                 </div>
 
-                {/* AI Insights & Alerts */}
-                <AISmartInsights views={views} prevViews={prevViews} />
+                {/* Onboarding: Quick Actions + Setup Checklist */}
+                {isOnboarding && (
+                    <DashboardOnboarding
+                        hasWebsite={hasWebsite}
+                        hasPublishedSite={hasPublishedSite}
+                        hasProducts={false}
+                        hasPaymentSetup={false}
+                    />
+                )}
 
-                {/* Stats Cards */}
-                <DashboardStats 
-                    views={views}
-                    leads={leads}
-                    engagement={engagement}
-                    revenue={revenue}
-                    pendingOrdersCount={pendingOrdersCount}
-                    currency="MYR"
-                    preferences={dashboardPreferences}
-                />
-
-                {/* Main Content Grid */}
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                    <DashboardActionList pendingOrders={pendingOrders} />
-                    <SEOHealthWidget score={68} />
-                </div>
-
-                {/* Recent Sites */}
-                <div className="mt-8">
+                {/* My Websites — always show if user has sites */}
+                {hasWebsite && (
                     <DashboardSiteGrid sites={recentSites} />
-                </div>
+                )}
+
+                {/* Analytics — only show when there's actual data */}
+                {hasAnalyticsData && (
+                    <>
+                        <AISmartInsights views={views} prevViews={prevViews} />
+                        <DashboardStats
+                            views={views}
+                            leads={leads}
+                            engagement={engagement}
+                            preferences={dashboardPreferences}
+                        />
+                    </>
+                )}
+
+                {/* SEO Health — only show when site exists */}
+                {hasWebsite && (
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        <SEOHealthWidget score={68} />
+                    </div>
+                )}
             </div>
         </Suspense>
     )

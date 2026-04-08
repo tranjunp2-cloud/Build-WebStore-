@@ -1,5 +1,5 @@
 # Kiểm Thử Chi Tiết: F01 — AI Website Builder
-> **Phiên bản:** 7.0 (118-Case Comprehensive Coverage) | **Cập nhật:** 2026-04-02 | **Thực hiện:** QA Team
+> **Phiên bản:** 8.0 (130-Case Comprehensive Coverage) | **Cập nhật:** 2026-04-03 | **Thực hiện:** QA Team
 > **Nguồn tham chiếu:** PRD v2.1 (`F01-ai-builder.md`), User Stories 10 US / 26 ACs (`F01-ai-builder-stories.md`), Figma Design (Desktop + Mobile)
 > **Nhánh làm việc:** `qa/F01-testcase-update`
 
@@ -15,7 +15,7 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 - 9 Business Rules (BR-01 → BR-09)
 - Responsive Design: Desktop (1920×1080) + Mobile (375px)
 
-**Tổng số kịch bản:** **117 test cases** (Positive + Negative + Edge + Mobile + Recovery + Race Condition)
+**Tổng số kịch bản:** **130 test cases** (Positive + Negative + Edge + Mobile + Recovery + Race Condition)
 
 ---
 
@@ -27,7 +27,7 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | Trình duyệt | Chrome (v110+), Firefox (v105+), Safari |
 | Thiết bị | Desktop (1920×1080), Mobile (iPhone 14 Pro — 375px) |
 | Dữ liệu kiểm thử | Input XSS/SQLi vectors, network throttling, SLA metrics `<60s` |
-| URL | `https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app` |
+| URL |https://web-cms-v2.dev.ecommercehub.my/
 
 ---
 
@@ -92,6 +92,20 @@ Bộ kiểm thử này đảm bảo chất lượng toàn diện cho tính năng
 | TC-F01.79 | AC-1 (01) | Flow | **[Recovery]** Hủy (Abort) quá trình generate giữa chừng | **1.** Nhấn Generate, chờ SSE stream chạy ~30%.<br>**2.** Nhấn nút Hủy (X) hoặc navigate sang trang khác. | SSE stream bị đóng. Dữ liệu nháp (nếu có) được lưu dưới dạng Draft incomplete. Form dữ liệu gốc được giữ nguyên khi quay lại. | High | [ ] |
 | TC-F01.80 | FR-08 | Race | **[Race]** Double-click nút "Tạo Website" (Anti-spam) | **1.** Điền form hợp lệ.<br>**2.** Click nhanh 2 lần liên tiếp vào nút "Continue — AI will create your website →". | Nút chuyển sang trạng thái Disabled + Loading ngay sau click đầu tiên. Chỉ gửi 1 API request duy nhất. Không tạo 2 site trùng lặp. | Blocker | [ ] |
 | TC-F01.81 | AC-4 (01) | Edge | **[Edge]** Draft hết hạn 24 giờ — hiển thị thông báo | **1.** Tạo draft, không hoàn thành. Đợi >24 giờ (hoặc set createdAt cũ trong DB).<br>**2.** Truy cập lại `/builder/new`. | Hệ thống không load draft cũ. Hiển thị form trống mới hoàn toàn. Không báo lỗi crash. | Medium | [ ] |
+| | | | **--- [Issue #246] Comprehensive QA Expert: 13 TCs bổ sung ---** | | | | |
+| TC-F01.99 | AC-3 (01) | UI | **[UI State]** Toggle Desktop ↔ Mobile trong Full-screen Preview | **1.** Sau generate → mở Full-screen view.<br>**2.** Click toggle Desktop/Mobile lần lượt. | Preview chuyển đúng viewport (1920px ↔ 375px). Content responsive, layout không vỡ. Không thể edit ở cả 2 mode. Toggle active state highlight đúng. | High | [ ] |
+| TC-F01.100 | AC-3 (01) | Flow | **[Flow]** "Tinh chỉnh" redirect đúng Editor với Draft data | **1.** Generate xong → click "Tinh chỉnh".<br>**2.** Kiểm tra URL và data trong Editor. | Redirect đúng `/editor/:siteId`. Toàn bộ 4 trang + navigation + content AI tạo load đầy đủ. Draft status hiện trong Editor. | Blocker | [ ] |
+| TC-F01.101 | AC-3 (01) | Flow | **[Flow]** "Publish ngay" deploy live subdomain | **1.** Generate xong → click "Publish ngay".<br>**2.** Truy cập `{slug}.primeweb.app`. | Site deploy < 30s. Subdomain accessible. 4 trang + navigation hoạt động. Content hiển thị đúng. | Blocker | [ ] |
+| TC-F01.102 | AC-4 (01) | State | **[Recovery]** Close tab → reopen giữ draft | **1.** Đang generate ~50% → đóng tab hoàn toàn.<br>**2.** Mở lại `/builder/new`. | Draft recoverable từ DB. Form không yêu cầu nhập lại. Tiếp tục từ bước đã dừng hoặc hiện draft đã generate. | High | [ ] |
+| TC-F01.103 | AC-6 (01) | Func | **[Validation]** Homepage chứa Banner + Image Carousel + tổng quan | **1.** Generate xong → mở Homepage trong preview.<br>**2.** Kiểm tra các block. | Homepage có: Hero Banner (ảnh AI/stock), Image Carousel nổi bật, và đoạn tổng quan business dựa trên input. Không thiếu block nào. | Blocker | [ ] |
+| TC-F01.104 | AC-6 (01) | Func | **[Validation]** About Us chứa Vision + Mission | **1.** Navigate đến trang About Us.<br>**2.** Kiểm tra nội dung. | Trang About Us có: đoạn About company, Vision (tầm nhìn), Mission (sứ mệnh). Nội dung phù hợp với business info đã nhập. | High | [ ] |
+| TC-F01.105 | AC-6 (01) | Func | **[Validation]** Products & Services liệt kê đúng mặt hàng | **1.** Navigate đến trang Products.<br>**2.** Kiểm tra nội dung. | Trang liệt kê các mặt hàng/dịch vụ đã nhập trong form (VD: "Phở bò, phở gà"). Layout tối ưu cho ngành nghề. Không có nội dung trống. | High | [ ] |
+| TC-F01.106 | AC-6 (01) | Func | **[Validation]** Contact Us chứa đủ thông tin liên hệ | **1.** Navigate đến trang Contact.<br>**2.** Kiểm tra các field. | Trang Contact có: Địa chỉ, số điện thoại, email, contact form. Dữ liệu lấy từ input hoặc AI generate hợp lý. | High | [ ] |
+| TC-F01.107 | AC-7 (01) | Theme | **[Validation]** Màu sắc + Font phù hợp ngành F&B | **1.** Tạo website ngành F&B.<br>**2.** Inspect CSS: primary color, font-family. | Tone màu ấm (đỏ/cam/vàng). Font thân thiện (sans-serif). Không dùng tone lạnh (xanh tech). Background/hero phù hợp food imagery. | High | [ ] |
+| TC-F01.108 | AC-7 (01) | Theme | **[Validation]** Màu sắc + Font phù hợp ngành Thời trang | **1.** Tạo website ngành Fashion/Retail.<br>**2.** Inspect CSS. | Tone hiện đại (đen/trắng/gold hoặc trendy). Font thanh lịch. Layout image-heavy, product grid nổi bật. | High | [ ] |
+| TC-F01.109 | AC-1 (01) | UI | **[UI State]** Progress steps realtime: "Đang tạo Banner... About Us..." | **1.** Nhấn "Tạo Website".<br>**2.** Quan sát progress messages. | Progress cập nhật tuần tự: "Đang tạo Banner..." → "About Us..." → "Products..." → "Contact...". Mỗi step hiện ít nhất 2 giây. Không bị skip. | High | [ ] |
+| TC-F01.110 | AC-1 (01) | Perf | **[Performance]** AI stream first token < 2 giây | **1.** Nhấn "Tạo Website" với tiếng Việt + BM.<br>**2.** Đo thời gian từ click → SSE first event. | SSE stream bắt đầu trong < 2 giây. Preview bắt đầu render. Không có blank wait > 2s. | Blocker | [ ] |
+| TC-F01.111 | AC-7 (01) | Edge | **[Edge]** Ngành nghề không rõ ràng → AI chọn layout mặc định | **1.** Nhập ngành: "Kinh doanh tổng hợp" hoặc mô tả mơ hồ.<br>**2.** Generate website. | AI detect không rõ category → dùng generic layout mặc định. Website vẫn có đủ 4 trang + navigation. Không crash. | Medium | [ ] |
 
 ---
 
@@ -273,4 +287,4 @@ _Mô tả kịch bản kiểm thử dựa trên hành vi tổng thể của ch�
 | **8. E2E UAT** | [ ] Chưa chạy | Full flow từ đăng nhập → publish → verify live |
 | **9. Mobile Responsive** | [ ] 0/17 TC đã chạy | US-F01-09 + US-F01-10 + landscape + back button |
 
-> **Khuyến nghị Release:** Bộ kiểm thử bao gồm **117 kịch bản** phủ 100% các Acceptance Criteria, Functional Requirements, và Business Rules, bổ sung đầy đủ Negative/Edge/Race/Recovery theo chuẩn Comprehensive QA Expert. Cần đạt tỷ lệ **≥ 95% PASS** ở nhóm Blocker/High trước khi chuyển lên Production.
+> **Khuyến nghị Release:** Bộ kiểm thử bao gồm **130 kịch bản** phủ 100% các Acceptance Criteria (bao gồm Issue #246 US-F01-01), Functional Requirements, và Business Rules, bổ sung đầy đủ Negative/Edge/Race/Recovery theo chuẩn Comprehensive QA Expert. Cần đạt tỷ lệ **≥ 95% PASS** ở nhóm Blocker/High trước khi chuyển lên Production.

@@ -49,12 +49,8 @@ export async function PATCH(
             )
         }
 
-        if (existing.status === 'published') {
-            return NextResponse.json(
-                { success: false, error: { code: 'ALREADY_PUBLISHED', message: 'Site is already published' } },
-                { status: 409 }
-            )
-        }
+        // Re-publish is allowed — user may have edited content after initial publish.
+        // Just update publishedAt timestamp to mark the latest version.
 
         // Publish the site
         const site = await payload.update({
@@ -78,7 +74,8 @@ export async function PATCH(
             tenantSlug = ((fullSite.tenant as Record<string, unknown>).slug as string) || 'site'
         }
 
-        const domainUrl = `${tenantSlug}.primeweb.app`
+        const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
+        const domainUrl = `${tenantSlug}.${platformDomain}`
 
         return NextResponse.json({
             success: true,

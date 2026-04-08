@@ -149,9 +149,9 @@ describe('F19 Staff Management (StaffDirectoryClient & StaffDrawer)', () => {
             // Select Custom role
             fireEvent.click(screen.getByText('Custom Features'));
 
-            // The exact hardcoded labels in StaffDrawer
-            const productFeature = screen.getByText('Products & Inventory');
-            fireEvent.click(productFeature);
+            // The exact hardcoded labels in StaffDrawer (products & orders are hidden)
+            const blogFeature = screen.getByText('Blog Management');
+            fireEvent.click(blogFeature);
 
             // Click Send Invite
             fireEvent.click(screen.getByRole('button', { name: /Send Invite/i }));
@@ -161,7 +161,7 @@ describe('F19 Staff Management (StaffDirectoryClient & StaffDrawer)', () => {
                     email: 'newuser@test.com',
                     name: 'newuser',
                     role: 'custom',
-                    permissions: ['products']
+                    permissions: ['blog']
                 });
                 expect(toast.success).toHaveBeenCalledWith('Invitation sent successfully!');
                 expect(onCloseMock).toHaveBeenCalled();

@@ -66,13 +66,22 @@ const textToLexical = (text: string) => {
     };
 }
 
+export function sanitizeXSS(text: string) {
+    if (!text) return text;
+    let safe = text.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '');
+    return safe.replace(/<[^>]*>?/gm, '').trim();
+}
+
 export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | number | null, categoryId: string | number | null, defaultVariantName: string = 'Default') {
     const hasVariants = Boolean(prod.variants?.length)
     const baseSlug = prod.slug || slugify(prod.name)
     const finalSlug = baseSlug + '-' + Math.random().toString(36).substring(2, 7)
 
-    let variantConfigs: { name: string; options: { value: string }[] }[] | undefined = prod.variantConfigs;
-    if (hasVariants && (!variantConfigs || variantConfigs.length === 0)) {
+    // Force generation of variantConfigs from variant names to guarantee 100% option mapping accuracy
+    // and correctly capture merged multi-tier options. We ignore AI's variantConfigs because they often
+    // mismatch when tiers are clamped/merged.
+    let variantConfigs: { name: string; options: { value: string }[] }[] | undefined = [];
+    if (hasVariants) {
         const splitVariants = prod.variants!.map(v => (v.name || defaultVariantName).split(' - '));
         const numTiers = Math.max(...splitVariants.map(v => v.length));
         const validNumTiers = Math.min(numTiers, 2); // DB schema limits to 2 tiers
@@ -82,8 +91,7 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
                 name: i === 0 ? 'Color' : 'Size',
                 options: Array.from(
                     new Set(splitVariants.map(v => {
-                        // Merge excess splits into the last tier if AI provided too many
-                        if (i === 1 && v.length > 2) return v.slice(1).join(' - ').trim();
+                        // Drop excess splits if AI provided too many
                         return (v[i] || '').trim();
                     }).filter(val => val !== ''))
                 ).map(val => ({ value: val }))
@@ -91,31 +99,50 @@ export function buildSavePayload(prod: ParsedProduct, cartonMediaId: string | nu
         }
     }
 
+    // Defensive clamping on variant names to prevent > 1 hyphen if user didn't correct it
+    let safeVariants = prod.variants;
+    if (hasVariants && safeVariants) {
+        safeVariants = safeVariants.map(v => {
+            const rawName = v.name || defaultVariantName;
+            const parts = rawName.split(' - ');
+            if (parts.length > 2) {
+                 // Truncate to maximum 2 tiers
+                 return { ...v, name: `${parts[0].trim()} - ${parts[1].trim()}` }
+            }
+            return { ...v, name: rawName.trim() };
+        });
+    }
+
+    let safeName = sanitizeXSS(prod.name).trim() || 'Product';
+    if (safeName.length < 3) {
+        safeName = safeName + ' (Bulk)';
+    }
+
     return {
-        name: prod.name,
+        name: safeName,
         slug: finalSlug,
         price: prod.price,
-        compareAtPrice: prod.compareAtPrice || null,
+        compareAtPrice: (prod.compareAtPrice && Number(prod.compareAtPrice) > Number(prod.price)) ? Number(prod.compareAtPrice) : null,
         description: prod.description ? textToLexical(prod.description) : undefined,
         status: 'draft',
         hasVariants,
         variantConfigs,
         category: categoryId ? [categoryId] : undefined,
-        images: cartonMediaId ? [{ image: cartonMediaId, alt: prod.name }] : [],
+        images: cartonMediaId ? [{ image: cartonMediaId, alt: sanitizeXSS(prod.name) }] : [],
         seo: {
-            title: prod.seoTitle || '',
-            description: prod.seoDescription || ''
+            title: sanitizeXSS(prod.seoTitle || ''),
+            description: sanitizeXSS(prod.seoDescription || '')
         },
         dimensions: {
-            length: prod.length || 0,
-            width: prod.width || 0,
-            height: prod.height || 0
+            length: Number(prod.length) || 0,
+            width: Number(prod.width) || 0,
+            height: Number(prod.height) || 0
         },
-        variants: hasVariants ? prod.variants!.map(v => ({
-            name: v.name || defaultVariantName,
-            price: v.price || prod.price,
-            stock: v.stock || 0,
-            sku: v.sku || ''
+        variants: hasVariants ? safeVariants!.map(v => ({
+            name: sanitizeXSS(v.name || defaultVariantName),
+            price: Number(v.price || prod.price) || 0,
+            stock: Number(v.stock ?? 0),
+            sku: sanitizeXSS(v.sku || '')
         })) : undefined,
         inventory: hasVariants ? 0 : 10, // Top-level stock is mapped to `inventory` in schema
         weight: prod.weight || 1, // Fallback for F14 dimension requirements
@@ -155,12 +182,28 @@ export function BulkCreateModal({ onClose, onSuccess, initialPrompt = '' }: Bulk
             if (!res.ok) throw new Error(data.error || 'parseError')
 
             if (data.products && Array.isArray(data.products)) {
-                const initProducts = data.products.map((p: ParsedProduct) => ({
-                    ...p,
-                    _id: Math.random().toString(36).substring(2, 11),
-                    selected: true,
-                    category: p.category || '',
-                }))
+                const initProducts = data.products.map((p: ParsedProduct) => {
+                    let cleanedVariants = p.variants;
+                    if (cleanedVariants && cleanedVariants.length > 0) {
+                        const uniqueMap = new Map<string, NonNullable<ParsedProduct['variants']>[number]>();
+                        cleanedVariants.forEach(v => {
+                            const rawName = v.name || 'Default';
+                            const parts = rawName.split(' - ');
+                            const truncatedName = parts.slice(0, 2).map(s => s.trim()).join(' - ');
+                            if (!uniqueMap.has(truncatedName)) {
+                                uniqueMap.set(truncatedName, { ...v, name: truncatedName });
+                            }
+                        });
+                        cleanedVariants = Array.from(uniqueMap.values());
+                    }
+                    return {
+                        ...p,
+                        variants: cleanedVariants,
+                        _id: Math.random().toString(36).substring(2, 11),
+                        selected: true,
+                        category: p.category || '',
+                    };
+                });
                 setProducts(initProducts)
             } else {
                 toast.error(t.dashboard?.products?.bulkCreate?.parseInvalidData || 'Invalid products format received from AI')

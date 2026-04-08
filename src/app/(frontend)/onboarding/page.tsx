@@ -14,13 +14,14 @@ export default async function OnboardingPage() {
         redirect('/login')
     }
 
-    let shouldRedirect = false
-    try {
-        const tenantIds = (user.tenants || [])
-            .map(t => t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant)
-            .filter(Boolean) as string[]
+    // Extract tenantIds from user directly — no extra getCurrentUser call needed
+    const tenantIds = (user.tenants || [])
+        .map((t: { tenant: string | { id: string } }) => typeof t.tenant === 'object' ? t.tenant?.id : t.tenant)
+        .filter(Boolean) as string[]
 
-        if (tenantIds.length > 0) {
+    let shouldRedirect = false
+    if (tenantIds.length > 0) {
+        try {
             const payload = await getPayload({ config })
             const sites = await payload.find({
                 collection: 'sites',
@@ -28,11 +29,11 @@ export default async function OnboardingPage() {
                 limit: 1,
             })
             shouldRedirect = sites.docs.length > 0
+        } catch (error) {
+            console.error('[Onboarding] Failed to check user sites:', error)
         }
-    } catch (error) {
-        console.error('[Onboarding] Failed to check user sites:', error)
     }
-    
+
     if (shouldRedirect) {
         redirect('/dashboard')
     }

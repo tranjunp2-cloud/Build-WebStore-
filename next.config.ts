@@ -22,6 +22,11 @@ const nextConfig: NextConfig = {
   experimental: {
     reactCompiler: false,
   },
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+  },
   images: {
     remotePatterns: [
       {

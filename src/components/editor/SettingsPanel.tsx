@@ -157,24 +157,24 @@ function SettingsPanelInner({
     const siteSeo = site?.seo || {}
     const siteBranding = site?.branding || {}
 
-    const globalAccordionButtonCls = 'flex w-full items-center justify-between rounded-t-[14px] border border-[#25324A] bg-[#1A2437] px-3 py-3 text-left'
-    const globalAccordionBodyCls = 'rounded-b-[14px] border border-t-0 border-[#25324A] bg-[#131D2E] px-4 py-4'
+    const globalAccordionButtonCls = 'flex w-full items-center justify-between rounded-t-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]'
+    const globalAccordionBodyCls = 'rounded-b-xl border border-t-0 border-white/[0.08] bg-[#0F172A] px-4 py-4'
 
     const renderGlobalAccordion = (
         id: keyof typeof openGlobalSections,
         title: string,
         content: React.ReactNode,
     ) => (
-        <div className="rounded-[14px]">
+        <div className="rounded-xl">
             <button
                 type="button"
                 onClick={() => setOpenGlobalSections(prev => ({ ...prev, [id]: !prev[id] }))}
                 className={cn(
                     globalAccordionButtonCls,
-                    openGlobalSections[id] ? 'rounded-b-none' : 'rounded-b-[14px]',
+                    openGlobalSections[id] ? 'rounded-b-none' : 'rounded-b-xl',
                 )}
             >
-                <span className="text-[15px] font-medium text-white">{openGlobalSections[id] ? '▼' : '▶'} {title}</span>
+                <span className="text-[13px] font-medium text-slate-200">{title}</span>
                 <ChevronDown
                     className={cn(
                         'h-4 w-4 text-slate-500 transition-transform',
@@ -198,7 +198,7 @@ function SettingsPanelInner({
             {renderGlobalAccordion('brand', 'Brand Identity', (
                 <div className="space-y-4">
                     <div>
-                        <label className="text-[12px] font-medium text-[#A5B4CF]">Business Name</label>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Business Name</label>
                         <Input
                             defaultValue={siteName || site?.name || ''}
                             key={`business-name-${siteName || site?.name || ''}`}
@@ -209,7 +209,7 @@ function SettingsPanelInner({
                         />
                     </div>
                     <div>
-                        <label className="text-[12px] font-medium text-[#A5B4CF]">Upload Logo</label>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Upload Logo</label>
                         <div className="mt-2">
                             <LogoEditor
                                 currentLogo={(siteBranding.logo as string) || ((headerBlock as Record<string, unknown>)?.logo as string) || null}
@@ -230,7 +230,7 @@ function SettingsPanelInner({
             {renderGlobalAccordion('contact', 'Contact Info', (
                 <div className="space-y-4">
                     <div>
-                        <label className="text-[12px] font-medium text-[#A5B4CF]">Phone</label>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Phone</label>
                         <Input
                             defaultValue={siteContactInfo.phone || ''}
                             key={`contact-phone-${siteContactInfo.phone || ''}`}
@@ -241,7 +241,7 @@ function SettingsPanelInner({
                         />
                     </div>
                     <div>
-                        <label className="text-[12px] font-medium text-[#A5B4CF]">Email</label>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Email</label>
                         <Input
                             type="email"
                             defaultValue={siteContactInfo.email || ''}
@@ -259,7 +259,7 @@ function SettingsPanelInner({
                         />
                     </div>
                     <div>
-                        <label className="text-[12px] font-medium text-[#A5B4CF]">Address</label>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Address</label>
                         <Textarea
                             defaultValue={siteContactInfo.address || ''}
                             key={`contact-address-${siteContactInfo.address || ''}`}
@@ -342,7 +342,8 @@ function SettingsPanelInner({
     const seoSlugValue = seoSlugInput
     const isHomepage = activePage?.isHomepage || activePage?.slug === 'home' || activePage?.slug === '/' || activePage?.slug === ''
     const normalizedPreviewPath = isHomepage ? '' : seoSlugValue.replace(/^\//, '')
-    const previewDomain = (site?.domain || `${(siteName || site?.name || 'site').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}.primeweb.app`).replace(/^https?:\/\//, '')
+    const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
+    const previewDomain = (site?.domain || `${(siteName || site?.name || 'site').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}.${platformDomain}`).replace(/^https?:\/\//, '')
     const metaTitleWarning = seoTitleValue.length > 60 ? 'Title may be truncated on Google Search.' : null
     const metaDescriptionWarning = seoDescriptionValue.length > 160 ? 'Description may be truncated on Google Search.' : null
 
@@ -805,7 +806,7 @@ function SettingsPanelInner({
                     <div className={sectionCls}>
                         <label className="text-xs font-medium uppercase text-gray-500">CTA Buttons</label>
                         {((block.ctaButtons || []) as CtaButton[]).map((btn, i) => (
-                            <div key={`cta-${i}`} className="mt-3 rounded-lg bg-white/5 p-3 space-y-2">
+                            <div key={`cta-${btn.label}-${btn.url}-${i}`} className="mt-3 rounded-lg bg-white/5 p-3 space-y-2">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] text-gray-500">Button {i + 1}</span>
                                     <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
@@ -861,7 +862,7 @@ function SettingsPanelInner({
                     <div className={sectionCls}>
                         <label className="text-xs font-medium uppercase text-gray-500">Features ({((block.features || []) as FeatureItem[]).length})</label>
                         {((block.features || []) as FeatureItem[]).map((feat, i) => (
-                            <div key={`feat-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
+                            <div key={`feat-${feat.title}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] text-gray-500">{feat.icon || '✦'} Feature {i + 1}</span>
                                     <button onClick={() => removeArrayItem('features', i)} aria-label={`Remove feature ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
@@ -890,7 +891,7 @@ function SettingsPanelInner({
                     <div className={sectionCls}>
                         <label className="text-xs font-medium uppercase text-gray-500">Testimonials ({((block.testimonials || []) as TestimonialItem[]).length})</label>
                         {((block.testimonials || []) as TestimonialItem[]).map((item, i) => (
-                            <div key={`test-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
+                            <div key={`test-${item.name}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] text-gray-500">Review {i + 1}</span>
                                     <button onClick={() => removeArrayItem('testimonials', i)} aria-label={`Remove testimonial ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
@@ -919,7 +920,7 @@ function SettingsPanelInner({
                     <div className={sectionCls}>
                         <label className="text-xs font-medium uppercase text-gray-500">Footer Columns ({((block.columns || []) as FooterColumn[]).length})</label>
                         {((block.columns || []) as FooterColumn[]).map((col, i) => (
-                            <div key={`col-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
+                            <div key={`col-${(col as FooterColumn).title}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] text-gray-500">Column {i + 1}</span>
                                     <button onClick={() => removeArrayItem('columns', i)} aria-label={`Remove column ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>

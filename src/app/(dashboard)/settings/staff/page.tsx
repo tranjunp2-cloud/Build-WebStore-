@@ -1,12 +1,25 @@
 import React from 'react';
-import { getCurrentTenantId } from '@/lib/auth';
+import { getCurrentTenantId, getCurrentUser } from '@/lib/auth';
 import { StaffDirectoryClient } from './StaffDirectoryClient';
 import { getPayloadHMR } from '@payloadcms/next/utilities';
 import configPromise from '@payload-config';
+import { redirect } from 'next/navigation';
 
 export default async function StaffPage() {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) return null;
+    
+    const user = await getCurrentUser();
+    if (!user) return null;
+
+    const currentTenantInfo = user.tenants?.find((t: { tenant: string | { id: string }, role?: string }) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId);
+    const currentUserRole = currentTenantInfo?.role || 'viewer';
+    const currentUserId = String(user.id);
+
+    // BA Rule: Only Owner has access to staff management
+    if (currentUserRole !== 'owner') {
+        redirect('/settings');
+    }
 
     const payload = await getPayloadHMR({ config: configPromise });
     const usersRes = await payload.find({
@@ -14,22 +27,12 @@ export default async function StaffPage() {
         where: {
             'tenants.tenant': { equals: tenantId }
         },
+        sort: '-createdAt',
         limit: 100
     });
 
-    // Determine the current user's role to see if they can remove others
-    // We don't have direct req.user here efficiently inside page.tsx without reading cookies
-    // Usually, we let the client side or actions handle granular auth since Payload endpoints handle security
-    // But we need the current user ID to not let them remove themselves
-    const { cookies } = await import('next/headers');
-    // Instead of parsing token manually here, we'll let the user's browser provide it if needed, or pass the full list.
-    // Actually `getCurrentTenantId` doesn't give us the user ID directly.
-    // We can fetch via Payload using token if needed, but simple way is to pass `me` info:
-    
-    // We can get the user from payload REST or just let the Action handle the "Cannot remove yourself" check.
-
     const staffMembers = usersRes.docs.map(u => {
-        const tenantInfo = u.tenants?.find((t: any) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId);
+        const tenantInfo = u.tenants?.find((t: { tenant: string | { id: string }, role?: string }) => (typeof t.tenant === 'object' ? t.tenant.id : t.tenant) === tenantId);
         return {
             id: String(u.id),
             email: u.email,
@@ -39,7 +42,8 @@ export default async function StaffPage() {
             role: tenantInfo?.role || 'viewer',
             status: tenantInfo?.status || 'active',
             permissions: tenantInfo?.permissions || [],
-            lastLoginAt: u.lastLoginAt
+            lastLoginAt: u.lastLoginAt,
+            createdAt: u.createdAt
         };
     });
 
@@ -47,6 +51,8 @@ export default async function StaffPage() {
         <StaffDirectoryClient
             tenantId={tenantId}
             initialStaff={staffMembers}
+            currentUserId={currentUserId}
+            currentUserRole={currentUserRole}
         />
     );
 }

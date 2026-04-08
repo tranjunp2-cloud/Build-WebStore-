@@ -127,7 +127,7 @@ SO THAT tôi tinh chỉnh nội dung mà không cần biết code
 | FR-24 | Widget Cart: Tích hợp nút giỏ hàng, mở xem giỏ, ấn Mua → sang Checkout | US-F05-11 | P0 | |
 | FR-25 | Logo Scaling & AI Favicon: Upload Logo → tự resize/adapt theo chuẩn (VD: max-height 60px). AI tự xử lý extract ra Favicon (file .ico/png nhỏ). | US-F05-07 | P1 | |
 | FR-26 | Global Settings Panel (Right Sidebar): Khi không focus block nào, hiển thị Cấu hình Toàn cục. Chứa mục Nhận diện (Tên cửa hàng, Logo), Liên hệ (SDT, Email, Trụ sở), Mạng xã hội, và Cấu hình SEO cơ bản (Title, Description). | US-F05-12 | P0 | Data bound |
-| FR-27 | Page-Level SEO & AI Content: Trong Page Manager hoặc Settings, cho phép tùy chỉnh Meta Title, Description, Slug cho từng trang. Bổ sung nút "✨ Tự động Tối ưu SEO" để AI đọc các text blocks trên canvas và tự sinh metadata phù hợp. | US-F05-13 | P1 | Content-aware AI |
+| FR-27 | Page-Level SEO & AI Content: Trong Page Manager hoặc Settings, cho phép tùy chỉnh Meta Title, Description, Slug cho từng trang. Bổ sung nút "✨ Tự động Tối ưu SEO" để AI đọc các text blocks trên canvas, kết hợp với trackedKeywords từ cài đặt site, và tự sinh metadata phù hợp chứa từ khoá mục tiêu một cách tự nhiên. | US-F05-13 | P1 | Content-aware AI + Keyword-aware. Nếu trường meta đã có nội dung thủ công → AI đề xuất bản chỉnh sửa, hiển thị so sánh, chỉ ghi đè khi người dùng đồng ý. |
 | FR-28 | Template Gallery Integration: Entry point để mở Template Gallery modal, hỗ trợ AI Search và Smart Swap. | US-F07-04 | P0 | Integrated with F07 |
 | FR-29 | **[Mobile]** Layout Editor trên mobile từ bỏ Split-Screen, thay bằng `Live Preview` làm background chiếm toàn màn hình, và `AI Chat` trở thành nút nổi (FAB) góc phải dưới màn hình. | US-F05-14 | P0 | Tiết kiệm diện tích |
 | FR-30 | **[Mobile]** Hủy tính năng Drag & Drop component blocks trên viewport mobile. Thay bằng nút `[+] Tap to Add` chèn thẳng vào đầu/cuối trang. | US-F05-14 | P0 | Tránh xung đột cuộn mượt |
@@ -302,6 +302,19 @@ GIVEN user click vào external link hoặc nút Checkout bên trong Editor Previ
 WHEN  bấm vào nút chức năng đó
 THEN  ngăn chặn hành vi Redirect (Prevent default) để tránh làm mất trạng thái phiên làm việc hiện tại
   AND hệ thống hiển thị Toast báo: "Navigation is disabled inside the Editor."
+```
+
+### AC-8: AI SEO Generate sử dụng từ khoá mục tiêu
+
+> 📌 Source: Plan SEO Optimization Sprint 1 — Công việc 2
+
+```gherkin
+GIVEN người dùng đang ở Page-level SEO Settings
+  AND site đã có trackedKeywords (VD: "bakery KL", "bánh sinh nhật")
+WHEN  click nút "✨ Tự động Tối ưu SEO"
+THEN  AI phân tích text content trên trang VÀ kết hợp trackedKeywords
+  AND meta title/description sinh ra chứa từ khoá mục tiêu tự nhiên
+  AND hiển thị preview so sánh nếu trường đã có nội dung cũ
 ```
 
 ---

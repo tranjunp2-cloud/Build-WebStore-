@@ -84,15 +84,23 @@ export async function addCustomDomain(rawDomain: string) {
                 
                 if (doResponse.ok) {
                     const appData = await doResponse.json();
-                    const appSpec = appData.app.spec;
                     
-                    // Add the new domain to existing domains in DO spec
-                    const existingDomains = appSpec.domains || [];
-                    if (!existingDomains.some((d: DoAppSpecDomain) => d.domain === domain)) {
-                        const newDomains = [...existingDomains, { domain, type: 'ALIAS' }];
+                    // Technical Note: DO's 'app.spec.domains' holds the static configuration target.
+                    // We must inspect the top-level 'app.domains' array (live state outside the spec) 
+                    // to accurately track real-time SSL provisioning and deployment phases.
+                    const liveDomains = appData.app.domains || [];
+                    const appSpec = appData.app.spec || {}; // Bản config
+                    const specDomains = appSpec.domains || [];
+                    
+                    // Nếu domain chưa thực sự tồn tại trên DO Live Domains và cũng chưa có trong Spec pending
+                    const isLive = liveDomains.some((d: DoAppLiveDomain) => d.spec?.domain === domain);
+                    const isInSpec = specDomains.some((d: DoAppSpecDomain) => d.domain === domain);
+                    
+                    if (!isLive && !isInSpec) {
+                        const newDomains = [...specDomains, { domain, type: 'ALIAS' }];
                         
-                        // Update the app with the new domain
-                        await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
+                        // Update the app spec
+                        const putResponse = await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
                             method: 'PUT',
                             headers: {
                                 'Authorization': `Bearer ${DO_API_TOKEN}`,
@@ -105,11 +113,18 @@ export async function addCustomDomain(rawDomain: string) {
                                 }
                             })
                         });
+                        
+                        if (!putResponse.ok) {
+                            console.error('DO API Error (PUT Add Domain):', await putResponse.text());
+                            revalidatePath('/settings/domains');
+                            return { success: true, warning: 'Domain saved, but failed to register with hosting provider. Verification may be delayed — please try verifying later or contact support.' };
+                        }
                     }
                 }
             } catch (doError) {
                 console.error('DO API Error (Add Domain):', doError);
-                // We still returned success because it's in our DB, but background DO task failed.
+                revalidatePath('/settings/domains');
+                return { success: true, warning: 'Domain saved, but failed to register with hosting provider. Verification may be delayed — please try verifying later or contact support.' };
             }
         }
 
@@ -129,6 +144,13 @@ export async function removeCustomDomain(domain: string) {
     const payload = await getPayloadHMR({ config: configPromise });
     try {
         const current = await getTenantDomains(payload, tenantId);
+
+        // Block removing the current primary domain (TC-F19.14 QA)
+        const target = current.find(d => d.domain === domain);
+        if (target?.isPrimary) {
+            return { success: false, error: 'Cannot remove the primary domain. Please set another domain as primary first.' };
+        }
+
         const updated = current.filter(d => d.domain !== domain);
         await payload.update({
             collection: 'tenants',
@@ -156,7 +178,7 @@ export async function removeCustomDomain(domain: string) {
                     // Filter out the domain from DO spec
                     const newDomains = (appSpec.domains || []).filter((d: DoAppSpecDomain) => d.domain !== domain);
                     
-                    await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
+                    const putResponse = await fetch(`${DO_API_URL}/${DO_APP_ID}`, {
                         method: 'PUT',
                         headers: {
                             'Authorization': `Bearer ${DO_API_TOKEN}`,
@@ -169,9 +191,17 @@ export async function removeCustomDomain(domain: string) {
                             }
                         })
                     });
+                    
+                    if (!putResponse.ok) {
+                        console.error('DO API Error (PUT Remove Domain):', await putResponse.text());
+                        revalidatePath('/settings/domains');
+                        return { success: true, warning: 'Domain removed from your store, but failed to sync with hosting provider. The domain may still route temporarily — please contact support if it persists.' };
+                    }
                 }
             } catch (doError) {
                 console.error('DO API Error (Remove Domain):', doError);
+                revalidatePath('/settings/domains');
+                return { success: true, warning: 'Domain removed from your store, but failed to sync with hosting provider. The domain may still route temporarily — please contact support if it persists.' };
             }
         }
 
@@ -196,9 +226,11 @@ export async function verifyCustomDomain(domain: string) {
     let errorMessage = 'Verification failed. DNS records not found. Propagation may take up to 48 hours.';
 
     if (!serverIp) {
-        // ── DEV MODE: SERVER_IP not set → simulate (80% success) ──
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        isSuccess = Math.random() > 0.2;
+        // SERVER_IP is required for DNS verification — block if not configured
+        return {
+            success: false,
+            error: 'Domain verification is not available. Server configuration is missing (SERVER_IP). Please contact support.',
+        };
     } else {
         // ── PRODUCTION: Real DNS lookup & DO SSL Check ──
         try {
@@ -225,20 +257,32 @@ export async function verifyCustomDomain(domain: string) {
                     
                     if (doResponse.ok) {
                         const appData = await doResponse.json();
-                        // Find this domain in live_state or spec
+                        
+                        // Domain status live tracking
                         const domainsStatuses = appData.app.domains || [];
                         const domainStatus = domainsStatuses.find((d: DoAppLiveDomain) => d.spec?.domain === domain);
                         
-                        // Only succeed if domain exists in DO AND phase is ACTIVE.
-                        // If it's undefined, it means DO doesn't track it (maybe Add failed).
-                        isSuccess = !!domainStatus && domainStatus.phase === 'ACTIVE'; 
-                        
-                        if (!isSuccess) {
-                            errorMessage = 'SSL Provisioning is still in progress or domain registration is syncing. Please wait up to 48 hours.';
+                        if (!domainStatus) {
+                            // If undefined, it means DO hasn't started tracking it in live state (Deployment is pending)
+                            isSuccess = false;
+                            errorMessage = 'Domain registration is syncing with DigitalOcean. Please wait a few minutes and try again.';
+                        } else {
+                            const phase = domainStatus.phase?.toUpperCase();
+                            if (phase === 'ACTIVE') {
+                                isSuccess = true;
+                            } else if (phase === 'ERROR') {
+                                isSuccess = false;
+                                errorMessage = 'Domain SSL configuration failed on DigitalOcean. Please check your DNS records, or try removing and re-adding the domain.';
+                            } else {
+                                // PENDING, CONFIGURING, etc.
+                                isSuccess = false;
+                                errorMessage = `SSL Provisioning is currently ${phase || 'in progress'}. Please wait up to 48 hours.`;
+                            }
                         }
                     } else {
-                        // If DO API fails, fall back to just DNS success
-                        isSuccess = true;
+                        // DO API failed — cannot confirm SSL provisioning (REQ-F19-04)
+                        isSuccess = false;
+                        errorMessage = 'DNS records are correct, but SSL status could not be confirmed. Please try again in a few minutes.';
                     }
                 } else {
                     // No API Token? Just trust the DNS check.

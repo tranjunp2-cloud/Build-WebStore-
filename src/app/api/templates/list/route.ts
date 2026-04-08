@@ -1,17 +1,17 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { NextResponse } from 'next/server'
-import { withAuth } from '@/lib/auth'
 
 /**
  * GET /api/templates/list
- * Custom endpoint to list templates (workaround for Payload REST API undici bug).
+ * Public endpoint to list templates (no auth required — templates collection has read: () => true).
+ * Workaround for Payload REST API undici bug.
  */
-export const GET = withAuth(async (_user, req) => {
+export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url)
         const limit = parseInt(searchParams.get('limit') || '50', 10)
-        const sort = searchParams.get('sort') || 'sortOrder'
+        const sort = searchParams.get('sort') || '-createdAt'
 
         const payload = await getPayload({ config })
         const result = await payload.find({
@@ -21,12 +21,8 @@ export const GET = withAuth(async (_user, req) => {
         })
 
         return NextResponse.json(result)
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Templates list error:', error)
-        return NextResponse.json({
-            docs: [],
-            totalDocs: 0,
-            error: 'Failed to load templates',
-        }, { status: 500 })
+        return NextResponse.json({ docs: [], totalDocs: 0 }, { status: 500 })
     }
-})
+}

@@ -22,6 +22,26 @@ vi.mock('@/lib/ai/seed-templates', () => ({
     ]
 }))
 
+// Mock template-definitions (v3 blueprint imports)
+vi.mock('@/lib/ai/template-definitions', () => ({
+    TEMPLATE_DEFINITIONS: [
+        { category: 'restaurant', businessIndex: 0, variant: 'starter', themePreset: {} }
+    ],
+    TEMPLATE_PRESETS: [],
+}))
+
+// Mock template-composer (v3 blueprint composer)
+vi.mock('@/lib/ai/template-composer', () => ({
+    composeTemplate: vi.fn().mockReturnValue({
+        name: 'Mock Composed', description: '', category: 'restaurant', tier: 'starter',
+        isPremium: false, theme: {}, pages: [{ title: 'Home', slug: 'home', layout: [] }],
+    }),
+    composeFromBlueprint: vi.fn().mockReturnValue({
+        name: 'Mock Blueprint', description: '', category: 'restaurant', tier: 'premium',
+        isPremium: true, theme: {}, pages: [{ title: 'Home', slug: 'home', layout: [] }],
+    }),
+}))
+
 // Trạng thái của Fake DB để có thể test Seed Force Delete
 let mockTemplateDB: any[] = []
 

@@ -15,6 +15,7 @@ interface PageManagerPanelProps {
     onPageSelected: (pageId: string) => void
     onPageCreated?: (pageId: string) => void
     onPagesChanged?: () => void
+    onEditPage?: (pageId: string) => void
 }
 
 function slugifyPageTitle(title: string) {
@@ -55,6 +56,7 @@ export function PageManagerPanel({
     onPageSelected,
     onPageCreated,
     onPagesChanged,
+    onEditPage,
 }: PageManagerPanelProps) {
     const pages = useEditorStore(state => state.pages)
     const addPageToState = useEditorStore(state => state.addPageToState)
@@ -297,12 +299,15 @@ export function PageManagerPanel({
                                 <div
                                     key={page.id}
                                     className={cn(
-                                        'rounded-xl border border-[rgba(59,130,246,0.04)] bg-[#1E293B] px-[13px] pb-3 pt-[13px] transition-colors',
+                                        'relative rounded-xl border px-[13px] pb-3 pt-[13px] transition-all',
                                         isCurrent
-                                            ? 'border-cyan-500/45 bg-[#22314A]'
-                                            : 'hover:border-cyan-500/20',
+                                            ? 'border-cyan-400/50 bg-cyan-500/10 shadow-[0_0_0_1px_rgba(34,211,238,0.15),0_4px_12px_rgba(34,211,238,0.08)]'
+                                            : 'border-white/[0.06] bg-[#1E293B] hover:border-white/[0.12]',
                                     )}
                                 >
+                                    {isCurrent && (
+                                        <div className="absolute -left-px top-3 bottom-3 w-[3px] rounded-r-full bg-gradient-to-b from-[#3B82F6] to-[#2DD4BF]" />
+                                    )}
                                     <button
                                         type="button"
                                         onClick={() => onPageSelected(page.id)}
@@ -320,24 +325,44 @@ export function PageManagerPanel({
                                                             Trang chủ
                                                         </span>
                                                     ) : null}
-                                                    <span className={cn('inline-flex items-center gap-1 rounded-[4px] px-2 py-[3px] text-[12px] font-semibold leading-4', statusBadge.className)}>
-                                                        {statusBadge.dotClassName ? (
-                                                            <span className={cn('h-1.5 w-1.5 rounded-full', statusBadge.dotClassName)} />
-                                                        ) : null}
-                                                        {statusBadge.label}
-                                                    </span>
+                                                    {isCurrent ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-[4px] border border-cyan-400/30 bg-cyan-500/15 px-2 py-[3px] text-[11px] font-semibold leading-4 text-cyan-300">
+                                                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
+                                                            Editing
+                                                        </span>
+                                                    ) : (
+                                                        <span className={cn('inline-flex items-center gap-1 rounded-[4px] px-2 py-[3px] text-[12px] font-semibold leading-4', statusBadge.className)}>
+                                                            {statusBadge.dotClassName ? (
+                                                                <span className={cn('h-1.5 w-1.5 rounded-full', statusBadge.dotClassName)} />
+                                                            ) : null}
+                                                            {statusBadge.label}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <div className="mt-1 flex items-center gap-2 truncate text-xs leading-4 text-[#94A3B8]">
-                                                    <span>{getPagePath(page)}</span>
-                                                    <span className="text-[#475569]">•</span>
-                                                    <span>{page.blockCount || 0} blocks</span>
-                                                    <span className="text-[#475569]">•</span>
-                                                    <span>{new Date(page.updatedAt).toLocaleDateString()}</span>
+                                                <div className="mt-1 flex items-center gap-2 text-xs leading-4 text-[#94A3B8]">
+                                                    <span className="truncate">{getPagePath(page)}</span>
+                                                    {page.updatedAt && (
+                                                        <>
+                                                            <span className="text-[#475569]">·</span>
+                                                            <span className="shrink-0">{new Date(page.updatedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
 
                                         </div>
                                     </button>
+
+                                    {isCurrent && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onEditPage?.(page.id)}
+                                            className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                            Edit with AI Chat
+                                        </button>
+                                    )}
 
                                     <div className="mt-2 flex h-8 items-center gap-2">
                                         <button
@@ -454,7 +479,7 @@ export function PageManagerPanel({
                                     ?
                                 </p>
                                 <p className="text-[14px] leading-5 text-[#94A3B8]">
-                                    This action cannot be undone.
+                                    Bạn có thể hoàn tác trong vài giây sau khi xóa.
                                 </p>
                             </div>
 

@@ -182,12 +182,17 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     autoSaveTimer: null,
 
     init: (siteId, blocks, theme, siteName, headerBlock = null, footerBlock = null) => {
+        // Clear any pending auto-save timer from previous page to prevent cross-page save
+        const { autoSaveTimer } = get()
+        if (autoSaveTimer) clearTimeout(autoSaveTimer)
+
         const fallbackHeader = blocks.find(b => b.blockType === 'navigation')
         const fallbackFooter = blocks.find(b => b.blockType === 'footer')
 
         const effectiveHeader = headerBlock || (fallbackHeader ? JSON.parse(JSON.stringify(fallbackHeader)) : { blockType: 'navigation', links: [] })
         const effectiveFooter = footerBlock || (fallbackFooter ? JSON.parse(JSON.stringify(fallbackFooter)) : { blockType: 'footer' })
 
+        // Keep blocks as-is (including nav/footer) for preview iframe index consistency
         const snapshot = createSnapshot(blocks, theme, effectiveHeader, effectiveFooter, 'Initial state', 'manual')
         set({
             siteId,
@@ -200,6 +205,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             historyIndex: 0,
             hasUnsavedChanges: false,
             lastSavedAt: null,
+            autoSaveTimer: null,
+            isSaving: false,
+            saveStatus: 'idle',
+            isAIStreaming: false,
         })
     },
 
@@ -425,9 +434,15 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
         const RETRY_DELAYS = [5000, 10000, 20000]
 
         const attemptSave = async (retryCount = 0): Promise<boolean> => {
-            const { blocks, theme } = get()
+            // Re-read currentPageId from store each attempt to prevent stale closure
+            // after page switch (blocks/theme already re-read below)
+            const { blocks, theme, currentPageId: pageIdNow } = get()
             try {
-                const res = await fetch(`/api/sites/${siteId}/save`, {
+                const saveUrl = new URL(`/api/sites/${siteId}/save`, window.location.origin)
+                if (pageIdNow) {
+                    saveUrl.searchParams.set('pageId', pageIdNow)
+                }
+                const res = await fetch(saveUrl.toString(), {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ blocks, theme, isDraft: true }),

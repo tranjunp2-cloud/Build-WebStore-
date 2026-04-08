@@ -20,6 +20,8 @@ interface PreviewFrameProps {
     onInlineEditApplied?: (content: string, blockIndex: number) => void
     onReorderBlocks?: (fromIndex: number, toIndex: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
+    onPageNavigate?: (pageId: string) => void
+    disableDragDrop?: boolean
 }
 
 type HoverRect = {
@@ -44,7 +46,7 @@ type BlockLayoutRect = HoverRect & {
 
 type DragState = {
     sourceIndex: number
-    sourceRect: HoverRect
+    sourceRect: HoverRect & { blockType?: string }
     pointerOffsetY: number
     currentY: number
 }
@@ -184,14 +186,28 @@ function PreviewFrameInner({
     onInlineEditApplied,
     onReorderBlocks,
     onBlockDrop,
+    onPageNavigate,
+    disableDragDrop = false,
 }: PreviewFrameProps) {
     const { blocks, updateBlock, performSave } = useEditorStore()
+    const blocksRef = useRef(blocks)
+    useEffect(() => { blocksRef.current = blocks }, [blocks])
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
     const [blockHover, setBlockHover] = useState<BlockLayoutRect | null>(null)
     const [blockLayouts, setBlockLayouts] = useState<BlockLayoutRect[]>([])
-    const [dragState, setDragState] = useState<DragState | null>(null)
+    const [dragState, setDragStateRaw] = useState<DragState | null>(null)
     const [dropIndex, setDropIndex] = useState<number | null>(null)
-    const [isEditing, setIsEditing] = useState(false)
+    const [isEditing, setIsEditingState] = useState(false)
+    const isEditingRef = useRef(false)
+    const dragStateRef = useRef<DragState | null>(null)
+    const setIsEditing = useCallback((val: boolean) => { isEditingRef.current = val; setIsEditingState(val) }, [])
+    const setDragState = useCallback((val: DragState | null | ((prev: DragState | null) => DragState | null)) => {
+        setDragStateRaw(prev => {
+            const next = typeof val === 'function' ? val(prev) : val
+            dragStateRef.current = next
+            return next
+        })
+    }, [])
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [textEditingData, setTextEditingData] = useState<{ rect: HoverRect; blockIndex: number } | null>(null)
     const [imageClickData, setImageClickData] = useState<{ rect: HoverRect; src: string; blockIndex: number; blockType: string } | null>(null)
@@ -294,41 +310,48 @@ function PreviewFrameInner({
             }
         }
 
+        frameElement?.contentWindow?.postMessage(
+            { type: 'DRAG_BLOCK_END' },
+            window.location.origin,
+        )
         setDragState(null)
         setDropIndex(null)
         dragPointerClientYRef.current = null
-    }, [onReorderBlocks])
+    }, [onReorderBlocks, frameElement])
 
     useEffect(() => {
         const handleMessage = (e: MessageEvent) => {
+            // Security: only accept messages from own origin or sandboxed iframe ('null')
+            if (e.origin !== window.location.origin && e.origin !== 'null') return
+
             if (e.data?.type === 'BLOCK_HOVERED') {
-                if (isEditing || dragState) return
+                if (isEditingRef.current || dragStateRef.current) return
                 cancelPendingHoverClear()
 
                 const nextData = e.data as Omit<HoveredElementData, 'fieldPath'> & { rect: HoverRect | null }
-                const block = blocks[nextData.blockIndex]
-                const fieldPath = block ? findStringFieldPath(block, nextData.text, nextData.text) : null
+                const block = blocksRef.current[nextData.blockIndex]
+                const fieldPath = block ? findStringFieldPath(block, nextData.text) : null
 
                 setHoverData({
                     ...nextData,
                     fieldPath,
                 })
             } else if (e.data?.type === 'BLOCK_CONTAINER_HOVERED') {
-                if (isEditing || dragState) return
+                if (isEditingRef.current || dragStateRef.current) return
                 setBlockHover(e.data.layout as BlockLayoutRect)
             } else if (e.data?.type === 'BLOCK_LAYOUT') {
                 setBlockLayouts((e.data.layouts || []) as BlockLayoutRect[])
             } else if (e.data?.type === 'BLOCK_MOUSEOUT') {
-                if (!isEditing && !dragState && !isHoveringControlsRef.current) {
+                if (!isEditingRef.current && !dragStateRef.current && !isHoveringControlsRef.current) {
                     cancelPendingHoverClear()
                     clearHoverTimerRef.current = window.setTimeout(() => {
                         setHoverData(null)
                         setBlockHover(null)
                         clearHoverTimerRef.current = null
-                    }, 180)
+                    }, 120)
                 }
             } else if (e.data?.type === 'PREVIEW_POINTER_DOWN') {
-                if (isEditing) {
+                if (isEditingRef.current) {
                     setIsEditing(false)
                 }
             } else if (e.data?.type === 'BLOCK_CONTAINER_CLICKED') {
@@ -355,15 +378,13 @@ function PreviewFrameInner({
                 }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
                 const { searchKey, oldHtml, newHtml, blockIndex } = e.data
-                console.log('[PreviewFrame] TEXT_EDITED Event:', { searchKey, oldHtml, newHtml, blockIndex })
                 if (oldHtml !== newHtml && newHtml !== undefined) {
-                    const block = blocks[blockIndex]
+                    const currentBlocks = blocksRef.current
+                    const block = currentBlocks[blockIndex]
                     const fieldPath = block ? findStringFieldPathTwoPass(block, searchKey, oldHtml) : null
-                    console.log('[PreviewFrame] Found fieldPath:', fieldPath)
                     if (fieldPath && block) {
                         const currentValue = getValueAtPath(block as Record<string, unknown>, fieldPath)
                         let nextValue = newHtml
-                        console.log('[PreviewFrame] currentValue:', currentValue, 'type:', typeof currentValue)
                         if (typeof currentValue === 'string') {
                             const temp = document.createElement('textarea')
                             temp.innerHTML = oldHtml
@@ -377,44 +398,31 @@ function PreviewFrameInner({
 
                             if (currentValue.includes(oldHtml)) {
                                 nextValue = currentValue.replace(oldHtml, newHtml)
-                                console.log('[PreviewFrame] Replaced using exact oldHtml')
                             } else if (currentValue.includes(decodedOldHtml)) {
                                 nextValue = currentValue.replace(decodedOldHtml, newHtml)
-                                console.log('[PreviewFrame] Replaced using decodedOldHtml')
                             } else if (currentValue.includes(searchKey)) {
                                 nextValue = currentValue.replace(searchKey, newHtml)
-                                console.log('[PreviewFrame] Replaced using exact searchKey')
                             } else {
                                 const flexOld = createFlexibleRegex(oldHtml)
                                 if (flexOld.test(currentValue)) {
                                     nextValue = currentValue.replace(flexOld, newHtml)
-                                    console.log('[PreviewFrame] Replaced using flexible oldHtml')
                                 } else {
                                     const flexDecoded = createFlexibleRegex(decodedOldHtml)
                                     if (flexDecoded.test(currentValue)) {
                                         nextValue = currentValue.replace(flexDecoded, newHtml)
-                                        console.log('[PreviewFrame] Replaced using flexible decodedOldHtml')
                                     } else {
                                         const flexKey = createFlexibleRegex(searchKey)
                                         if (flexKey.test(currentValue)) {
                                             nextValue = currentValue.replace(flexKey, newHtml)
-                                            console.log('[PreviewFrame] Replaced using flexible searchKey')
                                         } else if (searchKey && Math.abs(currentValue.replace(/<[^>]*>/g, '').length - searchKey.length) < 15) {
                                             nextValue = newHtml
-                                            console.log('[PreviewFrame] Replaced entirely as fallback')
-                                        } else {
-                                            console.log('[PreviewFrame] COULD NOT FIND pattern in currentValue!')
                                         }
                                     }
                                 }
                             }
-
-                            // Intentionally removed regex sanitization here because route.ts now handles un-nesting explicitly,
-                            // and preserving the nested tag structure is required to keep structural parents (data-field-path) intact.
-
                         }
-                        
-                        const clone = JSON.parse(JSON.stringify(blocks))
+
+                        const clone = JSON.parse(JSON.stringify(currentBlocks))
                         const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, nextValue)
                         updateBlock(blockIndex, nextBlock)
                     }
@@ -440,6 +448,8 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'EDITOR_BLOCK_DROP') {
                 const { index, blockData } = e.data.payload
                 onBlockDrop?.(index, blockData)
+            } else if (e.data?.type === 'PAGE_NAVIGATE') {
+                onPageNavigate?.(String(e.data.pageId))
             }
         }
         window.addEventListener('message', handleMessage)
@@ -447,7 +457,8 @@ function PreviewFrameInner({
             cancelPendingHoverClear()
             window.removeEventListener('message', handleMessage)
         }
-    }, [blocks, cancelPendingHoverClear, dragState, isEditing, onBlockDrop, onBlockSelect])
+    // Stable deps only — blocks/dragState/isEditing accessed via refs to prevent listener churn
+    }, [cancelPendingHoverClear, onBlockDrop, onBlockSelect, onPageNavigate, setIsEditing, updateBlock])
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -499,7 +510,7 @@ function PreviewFrameInner({
             type: 'EXEC_COMMAND',
             command,
             value
-        }, '*')
+        }, window.location.origin)
     }, [frameElement])
 
     const handleImageReplace = useCallback(async (file: File) => {
@@ -746,7 +757,7 @@ function PreviewFrameInner({
         )
     }
 
-    const previewUrl = new URL(`/api/preview/${siteId}`, 'http://localhost')
+    const previewUrl = new URL(`/preview/${siteId}`, 'http://localhost')
     previewUrl.searchParams.set('v', String(iframeKey))
     if (pageId) {
         previewUrl.searchParams.set('pageId', pageId)
@@ -822,17 +833,18 @@ function PreviewFrameInner({
                         const activeLayout = blockHover || (selectedBlock !== null
                             ? editableLayouts.find(layout => layout.blockIndex === selectedBlock) || null
                             : null)
-                        if (!activeLayout || !overlayOffset || dragState || ['navigation', 'footer'].includes(activeLayout.blockType)) {
+                        if (!activeLayout || !overlayOffset || dragState || disableDragDrop || ['navigation', 'footer'].includes(activeLayout.blockType)) {
                             return null
                         }
 
                         return (
                         <button
                             type="button"
-                            className="absolute inline-flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-400/20 bg-[#0F172A]/95 text-cyan-300 shadow-lg transition-colors hover:bg-[#162136] hover:text-cyan-200"
+                            title="Drag to reorder section"
+                            className="group/drag absolute inline-flex items-center gap-2 rounded-full border border-white/20 bg-white px-3 py-2 text-slate-700 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)] active:scale-95 cursor-grab active:cursor-grabbing"
                             style={{
                                 top: overlayOffset.top + activeLayout.top + 10,
-                                left: overlayOffset.left + activeLayout.left - 20,
+                                left: overlayOffset.left + activeLayout.left - 24,
                                 zIndex: 45,
                             }}
                             onMouseEnter={() => {
@@ -857,7 +869,7 @@ function PreviewFrameInner({
                                 setIsEditing(false)
                                 setDragState({
                                     sourceIndex: activeLayout.blockIndex,
-                                    sourceRect: activeLayout,
+                                    sourceRect: { ...activeLayout, blockType: activeLayout.blockType },
                                     pointerOffsetY:
                                         event.clientY - frameRect.top - activeLayout.top,
                                     currentY: activeLayout.top,
@@ -867,10 +879,15 @@ function PreviewFrameInner({
                                         layout => layout.blockIndex === activeLayout.blockIndex,
                                     ),
                                 )
+                                frameElement?.contentWindow?.postMessage(
+                                    { type: 'DRAG_BLOCK_START', blockIndex: activeLayout.blockIndex },
+                                    window.location.origin,
+                                )
                                 syncDragPosition(event.clientY, activeLayout.blockIndex)
                             }}
                         >
-                            <GripVertical className="h-4 w-4" />
+                            <GripVertical className="h-4 w-4 text-slate-400 group-hover/drag:text-slate-600" />
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 group-hover/drag:text-slate-700">Drag</span>
                         </button>
                         )
                     })()}
@@ -880,20 +897,26 @@ function PreviewFrameInner({
             <AnimatePresence>
             {dragState && overlayOffset ? (
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.98 }}
+                    initial={{ opacity: 0, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.15 }}
-                    className="pointer-events-none absolute rounded-xl border border-cyan-400/40 bg-cyan-400/10 shadow-[0_24px_64px_rgba(45,212,191,0.15)]"
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={{ duration: 0.12 }}
+                    className="pointer-events-none absolute rounded-xl border-2 border-blue-500/60 bg-blue-500/10 shadow-[0_24px_64px_rgba(59,130,246,0.25)]"
                     style={{
                         top: overlayOffset.top + dragState.currentY - dragState.pointerOffsetY,
                         left: overlayOffset.left + dragState.sourceRect.left,
                         width: dragState.sourceRect.width,
-                        height: dragState.sourceRect.height,
+                        height: Math.min(dragState.sourceRect.height, 120),
                         zIndex: 60,
                     }}
                 >
-                    <div className="absolute inset-0 rounded-xl border border-dashed border-cyan-300/60" />
+                    <div className="absolute inset-0 rounded-xl border border-dashed border-blue-400/40" />
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 rounded-lg bg-blue-600/90 px-3 py-1.5 shadow-lg">
+                        <GripVertical className="h-3.5 w-3.5 text-white/80" />
+                        <span className="text-xs font-semibold text-white capitalize">
+                            {dragState.sourceRect.blockType?.replace(/-/g, ' ') || 'Block'}
+                        </span>
+                    </div>
                 </motion.div>
             ) : null}
             </AnimatePresence>
@@ -972,6 +995,7 @@ function PreviewFrameInner({
                                 blockType={hoverData.blockType}
                                 currentText={hoverData.text}
                                 isSubmitting={isSubmitting}
+                                isMobile={viewport === 'mobile'}
                                 onClose={() => setIsEditing(false)}
                                 onSubmit={handleInlineRewrite}
                             />

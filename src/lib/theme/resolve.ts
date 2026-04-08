@@ -1,0 +1,235 @@
+import type { ThemeConfig } from '@/blocks/types'
+import { getFontPairing } from '@/lib/fonts/pairings'
+
+// ── Hex Color Manipulation Helpers ──────────────────────────────────────────
+
+const HEX_REGEX = /^#[0-9A-Fa-f]{6}$/
+
+function isValidHex(hex: string): boolean {
+    return HEX_REGEX.test(hex)
+}
+
+export function hexToHSL(hex: string): { h: number; s: number; l: number } {
+    if (!isValidHex(hex)) return { h: 0, s: 0, l: 50 }
+
+    const r = parseInt(hex.slice(1, 3), 16) / 255
+    const g = parseInt(hex.slice(3, 5), 16) / 255
+    const b = parseInt(hex.slice(5, 7), 16) / 255
+
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    const l = (max + min) / 2
+
+    if (max === min) return { h: 0, s: 0, l: l * 100 }
+
+    const d = max - min
+    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+
+    let h = 0
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+    else if (max === g) h = ((b - r) / d + 2) / 6
+    else h = ((r - g) / d + 4) / 6
+
+    return { h: h * 360, s: s * 100, l: l * 100 }
+}
+
+export function hslToHex(h: number, s: number, l: number): string {
+    h = ((h % 360) + 360) % 360
+    s = Math.max(0, Math.min(100, s)) / 100
+    l = Math.max(0, Math.min(100, l)) / 100
+
+    const a = s * Math.min(l, 1 - l)
+    const f = (n: number) => {
+        const k = (n + h / 30) % 12
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
+        return Math.round(255 * Math.max(0, Math.min(1, color)))
+            .toString(16)
+            .padStart(2, '0')
+    }
+    return `#${f(0)}${f(8)}${f(4)}`
+}
+
+export function lightenHex(hex: string, percent: number): string {
+    if (!isValidHex(hex)) return hex
+    const hsl = hexToHSL(hex)
+    const newL = Math.min(100, hsl.l + percent)
+    return hslToHex(hsl.h, hsl.s, newL)
+}
+
+// ── Spacing Presets ─────────────────────────────────────────────────────────
+
+export const SPACING_PRESETS = {
+    compact: { xs: '0.125rem', sm: '0.25rem', md: '0.5rem', lg: '1rem', xl: '1.5rem', '2xl': '2.5rem', section: '3rem' },
+    default: { xs: '0.25rem', sm: '0.5rem', md: '1rem', lg: '1.5rem', xl: '2.5rem', '2xl': '4rem', section: '5rem' },
+    relaxed: { xs: '0.375rem', sm: '0.75rem', md: '1.5rem', lg: '2rem', xl: '3.5rem', '2xl': '6rem', section: '7rem' },
+} as const
+
+// ── Border Radius Presets ───────────────────────────────────────────────────
+
+export const RADIUS_PRESETS = {
+    sharp: { sm: '0', md: '0', lg: '0', full: '0' },
+    subtle: { sm: '2px', md: '4px', lg: '8px', full: '9999px' },
+    rounded: { sm: '4px', md: '8px', lg: '16px', full: '9999px' },
+    soft: { sm: '8px', md: '16px', lg: '24px', full: '9999px' },
+    pill: { sm: '9999px', md: '9999px', lg: '9999px', full: '9999px' },
+} as const
+
+// ── Shadow Presets ──────────────────────────────────────────────────────────
+
+export const SHADOW_PRESETS = {
+    none: { sm: 'none', md: 'none', lg: 'none' },
+    subtle: { sm: '0 1px 2px rgba(0,0,0,0.05)', md: '0 2px 8px rgba(0,0,0,0.08)', lg: '0 4px 16px rgba(0,0,0,0.1)' },
+    medium: { sm: '0 1px 3px rgba(0,0,0,0.1)', md: '0 4px 12px rgba(0,0,0,0.15)', lg: '0 8px 30px rgba(0,0,0,0.2)' },
+    dramatic: { sm: '0 2px 4px rgba(0,0,0,0.15)', md: '0 8px 24px rgba(0,0,0,0.2)', lg: '0 16px 48px rgba(0,0,0,0.3)' },
+} as const
+
+// ── Font Resolution Helpers ─────────────────────────────────────────────────
+
+function resolveHeadingFont(pairingId: string | null | undefined): string {
+    if (!pairingId) return 'Outfit'
+    const pairing = getFontPairing(pairingId)
+    return pairing?.headingFont || 'Outfit'
+}
+
+function resolveBodyFont(pairingId: string | null | undefined): string {
+    if (!pairingId) return 'Inter'
+    const pairing = getFontPairing(pairingId)
+    return pairing?.bodyFont || 'Inter'
+}
+
+// ── Theme Resolver ──────────────────────────────────────────────────────────
+// Resolves a partial theme (from DB with missing fields) into a full ThemeConfig.
+// Backward compatible: existing sites with only primaryColor + secondaryColor work identically.
+
+export function resolveTheme(
+    partial: Partial<ThemeConfig> & { primaryColor?: string; colorMode?: 'light' | 'dark' },
+): ThemeConfig {
+    const colorMode = partial.colorMode || 'dark'
+    const isDark = colorMode === 'dark'
+    const primaryColor = partial.primaryColor || '#0ea5e9'
+
+    return {
+        primaryColor,
+        secondaryColor: partial.secondaryColor || '#d946ef',
+        accentColor: partial.accentColor || lightenHex(primaryColor, 15),
+        surfaceColor: partial.surfaceColor || (isDark ? '#111111' : '#f8f8f8'),
+        textColor: partial.textColor || (isDark ? '#fafafa' : '#09090b'),
+        mutedColor: partial.mutedColor || (isDark ? '#a1a1aa' : '#71717a'),
+
+        fontPairingId: partial.fontPairingId ?? null,
+        fontHeading: partial.fontHeading || resolveHeadingFont(partial.fontPairingId),
+        fontBody: partial.fontBody || resolveBodyFont(partial.fontPairingId),
+
+        spacingPreset: partial.spacingPreset || 'default',
+        borderRadius: partial.borderRadius || 'rounded',
+        shadowPreset: partial.shadowPreset || 'subtle',
+
+        colorMode,
+        backgroundColor: partial.backgroundColor || (isDark ? '#09090b' : '#ffffff'),
+    }
+}
+
+// ── CSS Custom Properties Generator ─────────────────────────────────────────
+
+function hexToRGB(hex: string): string {
+    if (!isValidHex(hex)) return '0, 0, 0'
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    return `${r}, ${g}, ${b}`
+}
+
+export function generateThemeCSS(theme: ThemeConfig): string {
+    try {
+        const spacing = SPACING_PRESETS[theme.spacingPreset] || SPACING_PRESETS.default
+        const radius = RADIUS_PRESETS[theme.borderRadius] || RADIUS_PRESETS.rounded
+        const shadow = SHADOW_PRESETS[theme.shadowPreset] || SHADOW_PRESETS.subtle
+
+        return `:root {
+  /* Colors */
+  --brand-primary: ${theme.primaryColor || '#0ea5e9'};
+  --brand-secondary: ${theme.secondaryColor || '#d946ef'};
+  --brand-accent: ${theme.accentColor || '#f59e0b'};
+  --surface: ${theme.surfaceColor || '#f8f8f8'};
+  --text: ${theme.textColor || '#09090b'};
+  --muted: ${theme.mutedColor || '#71717a'};
+  --background: ${theme.backgroundColor || '#ffffff'};
+
+  /* RGB variants for opacity */
+  --brand-primary-rgb: ${hexToRGB(theme.primaryColor || '#0ea5e9')};
+  --brand-secondary-rgb: ${hexToRGB(theme.secondaryColor || '#d946ef')};
+  --brand-accent-rgb: ${hexToRGB(theme.accentColor || '#f59e0b')};
+
+  /* Typography */
+  --font-heading: '${theme.fontHeading || 'Outfit'}', sans-serif;
+  --font-body: '${theme.fontBody || 'Inter'}', sans-serif;
+
+  /* Spacing */
+  --space-xs: ${spacing.xs};
+  --space-sm: ${spacing.sm};
+  --space-md: ${spacing.md};
+  --space-lg: ${spacing.lg};
+  --space-xl: ${spacing.xl};
+  --space-2xl: ${spacing['2xl']};
+  --section-padding: ${spacing.section};
+
+  /* Shape */
+  --radius-sm: ${radius.sm};
+  --radius-md: ${radius.md};
+  --radius-lg: ${radius.lg};
+  --radius-full: ${radius.full};
+  --shadow-sm: ${shadow.sm};
+  --shadow-md: ${shadow.md};
+  --shadow-lg: ${shadow.lg};
+}`
+    } catch {
+        // Fallback CSS — prevents blank page on corrupted theme data
+        return `:root {
+  --brand-primary: #0ea5e9; --brand-secondary: #d946ef; --brand-accent: #f59e0b;
+  --surface: #f8f8f8; --text: #09090b; --muted: #71717a; --background: #ffffff;
+  --brand-primary-rgb: 14, 165, 233; --brand-secondary-rgb: 217, 70, 239; --brand-accent-rgb: 245, 158, 11;
+  --font-heading: 'Outfit', sans-serif; --font-body: 'Inter', sans-serif;
+  --space-xs: 0.25rem; --space-sm: 0.5rem; --space-md: 1rem; --space-lg: 1.5rem;
+  --space-xl: 2.5rem; --space-2xl: 4rem; --section-padding: 5rem;
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 16px; --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05); --shadow-md: 0 2px 8px rgba(0,0,0,0.08); --shadow-lg: 0 4px 16px rgba(0,0,0,0.1);
+}`
+    }
+}
+
+// ── CSS Var Constants (for blocks to import) ───────────────────────────────
+// Use these instead of raw strings to prevent typos (Scenario #25)
+
+export const CSS_VARS = {
+    // Colors
+    primary: 'var(--brand-primary, #0ea5e9)',
+    secondary: 'var(--brand-secondary, #d946ef)',
+    accent: 'var(--brand-accent, #f59e0b)',
+    surface: 'var(--surface, #f8f8f8)',
+    text: 'var(--text, #09090b)',
+    muted: 'var(--muted, #71717a)',
+    background: 'var(--background, #ffffff)',
+    // RGB (for opacity)
+    primaryRgb: 'var(--brand-primary-rgb, 14, 165, 233)',
+    secondaryRgb: 'var(--brand-secondary-rgb, 217, 70, 239)',
+    accentRgb: 'var(--brand-accent-rgb, 245, 158, 11)',
+    // Typography
+    fontHeading: "var(--font-heading, 'Outfit', sans-serif)",
+    fontBody: "var(--font-body, 'Inter', sans-serif)",
+    // Spacing
+    spaceXs: 'var(--space-xs, 0.25rem)',
+    spaceSm: 'var(--space-sm, 0.5rem)',
+    spaceMd: 'var(--space-md, 1rem)',
+    spaceLg: 'var(--space-lg, 1.5rem)',
+    spaceXl: 'var(--space-xl, 2.5rem)',
+    space2xl: 'var(--space-2xl, 4rem)',
+    sectionPadding: 'var(--section-padding, 5rem)',
+    // Shape
+    radiusSm: 'var(--radius-sm, 4px)',
+    radiusMd: 'var(--radius-md, 8px)',
+    radiusLg: 'var(--radius-lg, 16px)',
+    radiusFull: 'var(--radius-full, 9999px)',
+    shadowSm: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+    shadowMd: 'var(--shadow-md, 0 2px 8px rgba(0,0,0,0.08))',
+    shadowLg: 'var(--shadow-lg, 0 4px 16px rgba(0,0,0,0.1))',
+} as const

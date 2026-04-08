@@ -28,10 +28,12 @@ describe('ProductImageFallback Component', () => {
     })
 })
 
-import { productFormSchema } from '../../../components/dashboard/product-form/schema'
+import { getProductFormSchema } from '../../../components/dashboard/product-form/schema'
 
 describe('Products CRUD Form Zod Validation Logic', () => {
     
+    const productFormSchema = getProductFormSchema({});
+
     // Helper to generate a valid base object so we can test specific field failures
     const getValidBaseData = () => ({
         name: 'Valid Product Name',
@@ -61,7 +63,7 @@ describe('Products CRUD Form Zod Validation Logic', () => {
         }
     })
 
-    it('returns error when price or inventory is negative (TC-F08.03c)', () => {
+    it('returns error when price or inventory is negative (TC-F08-01-05)', () => {
         const result = productFormSchema.safeParse({ ...getValidBaseData(), basePrice: -5, baseInventory: -1 })
         expect(result.success).toBe(false)
         if (!result.success) {
@@ -75,7 +77,12 @@ describe('Products CRUD Form Zod Validation Logic', () => {
         expect(result.success).toBe(true)
     })
 
-    it('returns error when category is omitted (TC-F08.03e)', () => {
+    it('passes validation when price is 0 (TC-F08-01-20 - Gift bypass)', () => {
+        const result = productFormSchema.safeParse({ ...getValidBaseData(), basePrice: 0 })
+        expect(result.success).toBe(true)
+    })
+
+    it('returns error when category is omitted (TC-F08-01-01e)', () => {
         const result = productFormSchema.safeParse({ ...getValidBaseData(), categoryIds: [] })
         expect(result.success).toBe(false)
         if (!result.success) {
@@ -83,7 +90,7 @@ describe('Products CRUD Form Zod Validation Logic', () => {
         }
     })
 
-    it('returns error when compare at price is less than regular price (TC-F08.08c)', () => {
+    it('returns error when compare at price is less than regular price (TC-F08-01-17)', () => {
         const result = productFormSchema.safeParse({ ...getValidBaseData(), basePrice: 50, compareAtPrice: 30 })
         expect(result.success).toBe(false)
         if (!result.success) {
@@ -91,7 +98,7 @@ describe('Products CRUD Form Zod Validation Logic', () => {
         }
     })
 
-    it('returns error when weight is zero or negative (TC-F08.03d)', () => {
+    it('returns error when weight is zero or negative (TC-F08-01-01d)', () => {
         const resZero = productFormSchema.safeParse({ ...getValidBaseData(), shippingWeight: 0 })
         expect(resZero.success).toBe(false)
         
@@ -103,7 +110,7 @@ describe('Products CRUD Form Zod Validation Logic', () => {
         }
     })
 
-    it('returns error when uploading > 5 images (TC-F08.03g)', () => {
+    it('returns error when uploading > 5 images (TC-F08-01-14)', () => {
         const tooManyImages = new Array(6).fill({ id: 'img', url: 'http' })
         const result = productFormSchema.safeParse({ ...getValidBaseData(), images: tooManyImages })
         expect(result.success).toBe(false)

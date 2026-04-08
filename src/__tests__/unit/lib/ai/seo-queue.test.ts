@@ -15,9 +15,9 @@ vi.mock('@/lib/ai/generate-meta', () => ({
 
 import { queueSEOAutoGeneration } from '@/lib/ai/seo-queue'
 
-// ─── TC-F08.13: SEO auto-generation queue ─────────────────────────────
+// ─── TC-F08-03-01: SEO auto-generation queue ─────────────────────────────
 
-describe('queueSEOAutoGeneration [TC-F08.13]', () => {
+describe('queueSEOAutoGeneration [TC-F08-03-01]', () => {
     beforeEach(() => {
         vi.clearAllMocks()
     })

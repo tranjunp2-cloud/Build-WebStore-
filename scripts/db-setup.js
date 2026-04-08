@@ -518,6 +518,9 @@ const MIGRATIONS = [
   { name: 'sites_seo_tracked_keywords.current_rank', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS current_rank numeric;` },
   { name: 'sites_seo_tracked_keywords.previous_rank', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS previous_rank numeric;` },
   { name: 'sites_seo_tracked_keywords.last_checked_at', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS last_checked_at timestamptz;` },
+  // templates
+  { name: 'templates.sort_order', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS sort_order numeric DEFAULT 0;` },
+  { name: 'templates.usage_count', sql: `ALTER TABLE templates ADD COLUMN IF NOT EXISTS usage_count numeric DEFAULT 0;` },
   // templates_tags
   { name: 'templates_tags.tag', sql: `ALTER TABLE templates_tags ADD COLUMN IF NOT EXISTS tag varchar;` },
   // ── Templates: Tags array table ──
@@ -530,6 +533,37 @@ const MIGRATIONS = [
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       tag varchar
     );`,
+  },
+  // ── Templates: Multi-page array sub-table (F31) ──
+  {
+    name: 'templates_template_pages.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS templates_template_pages (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar NOT NULL,
+      slug varchar NOT NULL,
+      is_homepage boolean DEFAULT false,
+      layout jsonb
+    );`,
+  },
+  // ── Templates: Add new category enum values (F31: fnb, events, blog, travel) ──
+  {
+    name: 'templates_category.add_fnb',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'fnb'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'templates_category.add_events',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'events'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'templates_category.add_blog',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'blog'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'templates_category.add_travel',
+    sql: `DO $$ BEGIN ALTER TYPE enum_templates_category ADD VALUE IF NOT EXISTS 'travel'; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
   },
   // ── Pages: Block tables (Payload blocks field → separate table per block type) ──
   // Each block has metadata + block-specific field columns (per Codex P1 review)
@@ -1228,6 +1262,231 @@ const MIGRATIONS = [
     name: 'payload_locked_documents_rels.categories_id',
     sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS categories_id integer;`,
   },
+  {
+    name: 'payload_locked_documents_rels.notifications_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS notifications_id integer;`,
+  },
+  {
+    name: 'payload_locked_documents_rels.subscribers_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS subscribers_id integer;`,
+  },
+  {
+    name: 'payload_preferences_rels.notifications_id',
+    sql: `ALTER TABLE payload_preferences_rels ADD COLUMN IF NOT EXISTS notifications_id integer;`,
+  },
+  {
+    name: 'payload_preferences_rels.subscribers_id',
+    sql: `ALTER TABLE payload_preferences_rels ADD COLUMN IF NOT EXISTS subscribers_id integer;`,
+  },
+  // ── F01: Add missing theme fields to sites table ──
+  {
+    name: 'sites.theme_accent_color',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_accent_color varchar;`,
+  },
+  {
+    name: 'sites.accent_color',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_accent_color varchar;`,
+  },
+  {
+    name: 'sites.theme_surface_color',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_surface_color varchar;`,
+  },
+  {
+    name: 'sites.surface_color',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_surface_color varchar;`,
+  },
+  {
+    name: 'sites.theme_text_color',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_text_color varchar;`,
+  },
+  {
+    name: 'sites.text_color',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_text_color varchar;`,
+  },
+  {
+    name: 'sites.theme_muted_color',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_muted_color varchar;`,
+  },
+  {
+    name: 'sites.muted_color',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_muted_color varchar;`,
+  },
+  {
+    name: 'sites.theme_spacing_preset',
+    sql: `DO $$ BEGIN
+      CREATE TYPE enum_sites_theme_spacing_preset AS ENUM ('compact', 'default', 'relaxed');
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_spacing_preset enum_sites_theme_spacing_preset DEFAULT 'default';`,
+  },
+  {
+    name: 'sites.spacing_preset',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_spacing_preset enum_sites_theme_spacing_preset DEFAULT 'default';`,
+  },
+  {
+    name: 'sites.theme_shadow_preset',
+    sql: `DO $$ BEGIN
+      CREATE TYPE enum_sites_theme_shadow_preset AS ENUM ('none', 'subtle', 'medium', 'dramatic');
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_shadow_preset enum_sites_theme_shadow_preset DEFAULT 'subtle';`,
+  },
+  {
+    name: 'sites.shadow_preset',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_shadow_preset enum_sites_theme_shadow_preset DEFAULT 'subtle';`,
+  },
+  // ── F01: _pages_v version columns for new block fields (CI check requirement) ──
+  {
+    name: '_pages_v.version_variant',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_variant varchar;`,
+  },
+  {
+    name: '_pages_v.version_cta_style',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_cta_style varchar;`,
+  },
+  {
+    name: '_pages_v.version_position',
+    sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_position varchar;`,
+  },
+  // ── F05: Unique constraint for page slug per site ──
+  // Dedupe existing rows before creating unique index (keep newest, soft-delete older duplicates)
+  {
+    name: 'pages.dedupe_site_slug',
+    sql: `UPDATE pages SET deleted_at = NOW()
+      WHERE deleted_at IS NULL
+        AND id NOT IN (
+          SELECT DISTINCT ON (site_id, slug) id
+          FROM pages WHERE deleted_at IS NULL
+          ORDER BY site_id, slug, updated_at DESC NULLS LAST, created_at DESC, id DESC
+        );`,
+  },
+  {
+    name: 'pages.site_slug_unique',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS pages_site_slug_uniq ON pages (site_id, slug) WHERE deleted_at IS NULL;`,
+  },
+  // ── F01: Fix about body from richText (jsonb) to textarea (varchar) ──
+  {
+    name: 'pages_blocks_about.body_to_varchar',
+    sql: `ALTER TABLE pages_blocks_about ALTER COLUMN body TYPE varchar USING body::varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_about.body_to_varchar',
+    sql: `ALTER TABLE _pages_v_blocks_about ALTER COLUMN body TYPE varchar USING body::varchar;`,
+  },
+  // ── F01: Add missing enum values to existing block variant/layout types ──
+  {
+    name: 'enum_pages_blocks_hero_variant.new_values',
+    sql: `DO $$ BEGIN
+      ALTER TYPE enum_pages_blocks_hero_variant ADD VALUE IF NOT EXISTS 'magazine';
+      ALTER TYPE enum_pages_blocks_hero_variant ADD VALUE IF NOT EXISTS 'minimal';
+      ALTER TYPE enum_pages_blocks_hero_variant ADD VALUE IF NOT EXISTS 'cards-overlay';
+      ALTER TYPE enum_pages_blocks_hero_variant ADD VALUE IF NOT EXISTS 'gradient';
+      ALTER TYPE enum_pages_blocks_hero_variant ADD VALUE IF NOT EXISTS 'parallax';
+      ALTER TYPE enum_pages_blocks_hero_variant ADD VALUE IF NOT EXISTS 'slideshow';
+      ALTER TYPE enum_pages_blocks_hero_variant ADD VALUE IF NOT EXISTS 'split-video';
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'enum_pages_blocks_testimonials_variant.new_values',
+    sql: `DO $$ BEGIN
+      ALTER TYPE enum_pages_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'cards';
+      ALTER TYPE enum_pages_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'simple';
+      ALTER TYPE enum_pages_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'spotlight';
+      ALTER TYPE enum_pages_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'minimal-quote';
+      ALTER TYPE enum_pages_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'avatar-row';
+      ALTER TYPE enum_pages_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'video-text';
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'enum_pages_blocks_gallery_layout.new_values',
+    sql: `DO $$ BEGIN
+      ALTER TYPE enum_pages_blocks_gallery_layout ADD VALUE IF NOT EXISTS 'filmstrip';
+      ALTER TYPE enum_pages_blocks_gallery_layout ADD VALUE IF NOT EXISTS 'justified';
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'enum_pages_blocks_features_layout.new_values',
+    sql: `DO $$ BEGIN
+      ALTER TYPE enum_pages_blocks_features_layout ADD VALUE IF NOT EXISTS 'grid-4';
+      ALTER TYPE enum_pages_blocks_features_layout ADD VALUE IF NOT EXISTS 'list';
+      ALTER TYPE enum_pages_blocks_features_layout ADD VALUE IF NOT EXISTS 'icon-top';
+      ALTER TYPE enum_pages_blocks_features_layout ADD VALUE IF NOT EXISTS 'icon-left';
+      ALTER TYPE enum_pages_blocks_features_layout ADD VALUE IF NOT EXISTS 'zigzag';
+      ALTER TYPE enum_pages_blocks_features_layout ADD VALUE IF NOT EXISTS 'carousel';
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'enum__pages_v_blocks_hero_variant.new_values',
+    sql: `DO $$ BEGIN
+      ALTER TYPE enum__pages_v_blocks_hero_variant ADD VALUE IF NOT EXISTS 'magazine';
+      ALTER TYPE enum__pages_v_blocks_hero_variant ADD VALUE IF NOT EXISTS 'minimal';
+      ALTER TYPE enum__pages_v_blocks_hero_variant ADD VALUE IF NOT EXISTS 'cards-overlay';
+      ALTER TYPE enum__pages_v_blocks_hero_variant ADD VALUE IF NOT EXISTS 'gradient';
+      ALTER TYPE enum__pages_v_blocks_hero_variant ADD VALUE IF NOT EXISTS 'parallax';
+      ALTER TYPE enum__pages_v_blocks_hero_variant ADD VALUE IF NOT EXISTS 'slideshow';
+      ALTER TYPE enum__pages_v_blocks_hero_variant ADD VALUE IF NOT EXISTS 'split-video';
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'enum__pages_v_blocks_testimonials_variant.new_values',
+    sql: `DO $$ BEGIN
+      ALTER TYPE enum__pages_v_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'cards';
+      ALTER TYPE enum__pages_v_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'simple';
+      ALTER TYPE enum__pages_v_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'spotlight';
+      ALTER TYPE enum__pages_v_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'minimal-quote';
+      ALTER TYPE enum__pages_v_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'avatar-row';
+      ALTER TYPE enum__pages_v_blocks_testimonials_variant ADD VALUE IF NOT EXISTS 'video-text';
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'enum__pages_v_blocks_gallery_layout.new_values',
+    sql: `DO $$ BEGIN
+      ALTER TYPE enum__pages_v_blocks_gallery_layout ADD VALUE IF NOT EXISTS 'filmstrip';
+      ALTER TYPE enum__pages_v_blocks_gallery_layout ADD VALUE IF NOT EXISTS 'justified';
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  {
+    name: 'enum__pages_v_blocks_features_layout.new_values',
+    sql: `DO $$ BEGIN
+      ALTER TYPE enum__pages_v_blocks_features_layout ADD VALUE IF NOT EXISTS 'grid-4';
+      ALTER TYPE enum__pages_v_blocks_features_layout ADD VALUE IF NOT EXISTS 'list';
+      ALTER TYPE enum__pages_v_blocks_features_layout ADD VALUE IF NOT EXISTS 'icon-top';
+      ALTER TYPE enum__pages_v_blocks_features_layout ADD VALUE IF NOT EXISTS 'icon-left';
+      ALTER TYPE enum__pages_v_blocks_features_layout ADD VALUE IF NOT EXISTS 'zigzag';
+      ALTER TYPE enum__pages_v_blocks_features_layout ADD VALUE IF NOT EXISTS 'carousel';
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+  },
+  // ── F01: Add variant column to blocks that only had layout/style ──
+  {
+    name: 'pages_blocks_navigation.variant',
+    sql: `ALTER TABLE pages_blocks_navigation ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_about.variant',
+    sql: `ALTER TABLE pages_blocks_about ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_features.variant',
+    sql: `ALTER TABLE pages_blocks_features ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_gallery.variant',
+    sql: `ALTER TABLE pages_blocks_gallery ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_navigation.variant',
+    sql: `ALTER TABLE _pages_v_blocks_navigation ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_about.variant',
+    sql: `ALTER TABLE _pages_v_blocks_about ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_features.variant',
+    sql: `ALTER TABLE _pages_v_blocks_features ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_gallery.variant',
+    sql: `ALTER TABLE _pages_v_blocks_gallery ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
   // ── Tenants: Payment Methods ──
   {
     name: 'tenants.payments_payment_cod',
@@ -1330,6 +1589,673 @@ const MIGRATIONS = [
       show_label boolean
     );`,
   },
+  // ── F01: Additional AI-generated block tables ──────────────────────
+  // pages_blocks_* tables (varchar id, _parent_id integer, _order, _uuid, _path)
+  {
+    name: 'pages_blocks_cta.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_cta" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      cta_label varchar, cta_url varchar, cta_style varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_newsletter.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_newsletter" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      button_label varchar, placeholder varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_video.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_video" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      video_url varchar, poster_image_id integer
+    );`,
+  },
+  {
+    name: 'pages_blocks_logo_cloud.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_logo_cloud" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_logo_cloud_logos.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_logo_cloud_logos" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, logo_id integer
+    );`,
+  },
+  {
+    name: 'pages_blocks_blog_list.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_blog_list" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar, "limit" integer DEFAULT 6
+    );`,
+  },
+  {
+    name: 'pages_blocks_products_grid.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_products_grid" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar, "limit" integer DEFAULT 6, category varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_products_featured.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_products_featured" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_custom_html.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_custom_html" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      html text
+    );`,
+  },
+  {
+    name: 'pages_blocks_service_cards.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_service_cards" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_service_cards_services.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_service_cards_services" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar, description varchar, icon varchar, price varchar, price_unit varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_carousel.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_carousel" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, autoplay boolean DEFAULT true, "interval" integer DEFAULT 5000
+    );`,
+  },
+  {
+    name: 'pages_blocks_carousel_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_carousel_items" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      image_id integer, title varchar, description varchar, link_url varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_step_process.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_step_process" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_step_process_steps.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_step_process_steps" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar, description varchar, icon varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_divider.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_divider" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, height integer DEFAULT 1, color varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_announcement_bar.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_announcement_bar" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, message varchar, link_text varchar, link_url varchar,
+      dismissible boolean DEFAULT true, background_color varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_whatsapp_button.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_whatsapp_button" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, phone_number varchar, message varchar, label varchar, "position" varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_google_maps.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_google_maps" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, embed_url varchar, address varchar, height integer DEFAULT 400
+    );`,
+  },
+  {
+    name: 'pages_blocks_accordion.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_accordion" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, description varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_accordion_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_accordion_items" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar, content varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_countdown_timer.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_countdown_timer" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, target_date timestamptz,
+      expired_message varchar, show_days boolean DEFAULT true,
+      show_hours boolean DEFAULT true, show_minutes boolean DEFAULT true, show_seconds boolean DEFAULT true
+    );`,
+  },
+  {
+    name: 'pages_blocks_social_proof.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_social_proof" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_social_proof_reviews.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_social_proof_reviews" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      author varchar, role varchar, content varchar, rating numeric, avatar_id integer
+    );`,
+  },
+  {
+    name: 'pages_blocks_breadcrumb.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_breadcrumb" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_breadcrumb_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_breadcrumb_items" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      label varchar, url varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_client_logos.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_client_logos" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_client_logos_logos.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_client_logos_logos" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      image_id integer, alt varchar, link_url varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_menu_food.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_menu_food" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_menu_food_categories.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_menu_food_categories" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_menu_food_categories_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_menu_food_categories_items" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      name varchar, description varchar, price varchar, currency varchar, tag varchar, image_id integer
+    );`,
+  },
+  {
+    name: 'pages_blocks_portfolio_grid.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_portfolio_grid" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: 'pages_blocks_portfolio_grid_projects.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "pages_blocks_portfolio_grid_projects" (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0, _parent_id varchar NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar, description varchar, image_id integer, category varchar, link_url varchar
+    );`,
+  },
+  // ── _pages_v (version tables) for new AI blocks ──
+  // id: serial (integer auto-increment), _path: text NOT NULL
+  {
+    name: '_pages_v_blocks_cta.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_cta" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      cta_label varchar, cta_url varchar, cta_style varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_newsletter.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_newsletter" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      button_label varchar, placeholder varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_video.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_video" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar,
+      video_url varchar, poster_image_id integer
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_logo_cloud.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_logo_cloud" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_logo_cloud_logos.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_logo_cloud_logos" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, name varchar, logo_id integer
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_blog_list.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_blog_list" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar, "limit" integer
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_products_grid.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_products_grid" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar, "limit" integer, category varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_products_featured.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_products_featured" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_custom_html.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_custom_html" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar, html text
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_service_cards.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_service_cards" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_service_cards_services.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_service_cards_services" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, title varchar, description varchar, icon varchar, price varchar, price_unit varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_carousel.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_carousel" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, autoplay boolean, "interval" integer
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_carousel_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_carousel_items" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, image_id integer, title varchar, description varchar, link_url varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_step_process.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_step_process" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_step_process_steps.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_step_process_steps" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, title varchar, description varchar, icon varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_divider.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_divider" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, height integer, color varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_announcement_bar.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_announcement_bar" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, message varchar, link_text varchar, link_url varchar,
+      dismissible boolean, background_color varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_whatsapp_button.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_whatsapp_button" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, phone_number varchar, message varchar, label varchar, "position" varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_google_maps.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_google_maps" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, embed_url varchar, address varchar, height integer
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_accordion.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_accordion" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, description varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_accordion_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_accordion_items" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, title varchar, content varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_countdown_timer.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_countdown_timer" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, target_date timestamptz,
+      expired_message varchar, show_days boolean, show_hours boolean, show_minutes boolean, show_seconds boolean
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_social_proof.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_social_proof" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_social_proof_reviews.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_social_proof_reviews" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, author varchar, role varchar, content varchar, rating numeric, avatar_id integer
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_breadcrumb.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_breadcrumb" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar, variant varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_breadcrumb_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_breadcrumb_items" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, label varchar, url varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_client_logos.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_client_logos" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_client_logos_logos.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_client_logos_logos" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, image_id integer, alt varchar, link_url varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_menu_food.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_menu_food" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_menu_food_categories.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_menu_food_categories" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, name varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_menu_food_categories_items.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_menu_food_categories_items" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, name varchar, description varchar, price varchar, currency varchar, tag varchar, image_id integer
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_portfolio_grid.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_portfolio_grid" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _path text NOT NULL, _uuid varchar, block_name varchar,
+      variant varchar, headline varchar, subheadline varchar
+    );`,
+  },
+  {
+    name: '_pages_v_blocks_portfolio_grid_projects.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS "_pages_v_blocks_portfolio_grid_projects" (
+      id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
+      _uuid varchar, title varchar, description varchar, image_id integer, category varchar, link_url varchar
+    );`,
+  },
+  // ── F16: Notifications table ─────────────────────────────────────
+  {
+    name: 'notifications.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS notifications (
+      id serial PRIMARY KEY,
+      tenant_id integer NOT NULL,
+      user_id integer NOT NULL,
+      type varchar NOT NULL,
+      title varchar NOT NULL,
+      message text,
+      action_url varchar,
+      is_read boolean DEFAULT false,
+      created_at timestamptz DEFAULT now() NOT NULL,
+      expires_at timestamptz
+    );`,
+  },
+  {
+    name: 'notifications.tenant_user_idx',
+    sql: `CREATE INDEX IF NOT EXISTS notifications_tenant_user_idx ON notifications (tenant_id, user_id);`,
+  },
+  {
+    name: 'notifications.is_read_idx',
+    sql: `CREATE INDEX IF NOT EXISTS notifications_is_read_idx ON notifications (is_read);`,
+  },
+  {
+    name: 'notifications.created_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS notifications_created_at_idx ON notifications (created_at DESC);`,
+  },
+  // pg LISTEN/NOTIFY trigger — SSE realtime bridge
+  {
+    name: 'notifications.notify_fn',
+    sql: `CREATE OR REPLACE FUNCTION notify_new_notification()
+      RETURNS trigger AS $$
+      BEGIN
+        PERFORM pg_notify(
+          'notification_channel',
+          json_build_object(
+            'userId', NEW.user_id,
+            'tenantId', NEW.tenant_id,
+            'id', NEW.id
+          )::text
+        );
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;`,
+  },
+  {
+    name: 'notifications.notify_trigger',
+    sql: `CREATE OR REPLACE TRIGGER after_notification_insert
+      AFTER INSERT ON notifications
+      FOR EACH ROW EXECUTE FUNCTION notify_new_notification();`,
+  },
+  // ── Templates — multi-page array sub-table ──
+  {
+    name: 'templates_template_pages.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS templates_template_pages (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      title varchar NOT NULL,
+      slug varchar NOT NULL,
+      is_homepage boolean DEFAULT false,
+      layout jsonb
+    );`,
+  },
+  // ── Subscribers (newsletter email collection) ──
+  {
+    name: 'subscribers.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS subscribers (
+      id serial PRIMARY KEY,
+      email varchar NOT NULL,
+      site_id integer NOT NULL,
+      source varchar DEFAULT 'newsletter',
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'subscribers.email_site_unique',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS subscribers_email_site_uniq ON subscribers (email, site_id);`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -1354,7 +2280,7 @@ const COLLECTION_SLUGS = [
   'tenants', 'users', 'sites', 'pages', 'media',
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
-  'seo_meta_jobs',
+  'seo_meta_jobs', 'notifications', 'subscribers',
 ];
 
 /**
@@ -1556,6 +2482,79 @@ function spawnServer(env) {
   return spawn('node', ['server.js'], { stdio: 'inherit', env });
 }
 
+/**
+ * Auto-seed v3 templates (56 premium blueprints).
+ * Uses the running dev server's seed API endpoint.
+ * Re-seeds if count < 56 (old templates or partial seed).
+ */
+async function autoSeedTemplates() {
+  const pool = createPool();
+  if (!pool) return;
+
+  const EXPECTED_COUNT = 56;
+
+  try {
+    const result = await pool.query('SELECT COUNT(*)::int AS cnt FROM templates');
+    const count = result.rows[0]?.cnt || 0;
+
+    if (count >= EXPECTED_COUNT) {
+      console.log(`[db-setup] 📦 Templates: ${count} exist (>= ${EXPECTED_COUNT}) — skipping auto-seed`);
+      await pool.end();
+      return;
+    }
+
+    console.log(`[db-setup] 📦 Templates: ${count} found (expected ${EXPECTED_COUNT}) — re-seeding v3 templates...`);
+    await pool.end();
+
+    // Call seed API on the running dev server (force=true to replace old templates)
+    const http = require('http');
+    const seedResult = await new Promise((resolve) => {
+      const postData = '';
+      const req = http.request({
+        hostname: 'localhost',
+        port: 3000,
+        path: `/api/templates/seed?v3=true&force=${count > 0 ? 'true' : 'false'}`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': 0,
+          'x-db-setup-key': process.env.PAYLOAD_SECRET || '',
+        },
+        timeout: 120000,
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            resolve(json);
+          } catch {
+            resolve({ success: false, error: 'Invalid JSON response' });
+          }
+        });
+      });
+      req.on('error', (err) => {
+        resolve({ success: false, error: err.message });
+      });
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ success: false, error: 'Seed request timed out (60s)' });
+      });
+      req.end(postData);
+    });
+
+    if (seedResult.success && seedResult.data) {
+      console.log(`[db-setup] ✅ Auto-seeded ${seedResult.data.created || 0} templates (${seedResult.data.failed || 0} failed)`);
+    } else {
+      console.warn(`[db-setup] ⚠️ Template auto-seed failed: ${seedResult.error || 'unknown error'}`);
+      console.warn('[db-setup]    Run POST /api/templates/seed?v3=true&force=true manually after deploy');
+    }
+  } catch (err) {
+    console.warn(`[db-setup] ⚠️ Template auto-seed check failed: ${err.message}`);
+    try { await pool.end(); } catch { /* ignore */ }
+  }
+}
+
 async function main() {
   console.log('[db-setup] NODE_ENV:', process.env.NODE_ENV);
 
@@ -1570,7 +2569,7 @@ async function main() {
     }
     console.log('[db-setup] Phase 1: Starting server with NODE_ENV=development...');
 
-    const devEnv = { ...process.env, NODE_ENV: 'development' };
+    const devEnv = { ...process.env, NODE_ENV: 'development', PAYLOAD_PUSH_SCHEMA: 'true' };
     const devServer = spawnServer(devEnv);
 
     // Payload pushDevSchema runs during DB connect (on server start).
@@ -1609,6 +2608,9 @@ async function main() {
     }
 
     if (schemaReady) {
+      // ── Auto-seed templates if empty ──
+      await autoSeedTemplates();
+
       // ── Phase 2: Restart with NODE_ENV=production ──
       console.log('[db-setup] Phase 2: Restarting server with NODE_ENV=production...');
       devServer.kill('SIGTERM');

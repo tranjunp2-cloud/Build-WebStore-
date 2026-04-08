@@ -3,6 +3,7 @@
 import type { BlockProps } from '../types'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig, type SocialLinkItem, type SocialPlatform, type SocialWidgetConfig } from './config'
 import { mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
+import { CSS_VARS } from '@/lib/theme/resolve'
 
 const PLATFORM_META: Record<SocialPlatform, { label: string; mark: string; accent: string }> = {
     facebook: { label: 'Facebook', mark: 'f', accent: '#2563eb' },
@@ -29,7 +30,7 @@ function getPlatformStyles(platform: SocialPlatform, primaryColor: string) {
     const accent = PLATFORM_META[platform].accent
 
     return {
-        background: `linear-gradient(135deg, ${accent}20, ${primaryColor}16)`,
+        background: `linear-gradient(135deg, ${accent}20, rgba(var(--brand-primary-rgb), 0.086))`,
         borderColor: `${accent}40`,
         color: accent,
     }
@@ -51,24 +52,56 @@ function PlatformBadge({ platform }: { platform: SocialPlatform }) {
 export function SocialWidgetBlock({ block, theme, site }: BlockProps<SocialWidgetConfig>) {
     const normalizedBlock = normalizeSocialWidgetConfig(mergeSocialWidgetLinksWithSite(block, site?.socialLinks))
     let links = normalizedBlock.links.filter((item: SocialLinkItem) => item.enabled !== false)
-    const isFloating = block.variant !== 'inline'
-
     if (links.length === 0) {
         links = getDefaultSocialWidgetLinks().filter(item => item.enabled !== false)
     }
 
+    // ── Inline variant ───────────────────────────────────────────────────
+    if (block.variant === 'inline') {
+        return (
+            <section className="py-10">
+                <div className="container mx-auto px-6">
+                    {normalizedBlock.headline ? (
+                        <p className="mb-3 text-sm font-medium text-slate-400">{normalizedBlock.headline}</p>
+                    ) : null}
+                    <div className="flex flex-wrap gap-3">
+                        {links.map(item => {
+                            const platform = item.platform
+                            const meta = PLATFORM_META[platform]
+                            const style = getPlatformStyles(platform, CSS_VARS.primary)
+                            return (
+                                <a
+                                    key={platform}
+                                    href={normalizeUrl(platform, item.url)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    aria-label={meta.label}
+                                    className="group flex items-center gap-3 rounded-2xl border px-3 py-2 shadow-[0_14px_32px_rgba(15,23,42,0.12)] transition-transform duration-200 hover:-translate-y-0.5"
+                                    style={style}
+                                >
+                                    <PlatformBadge platform={platform} />
+                                    <span className="text-sm font-medium text-white/85">{meta.label}</span>
+                                </a>
+                            )
+                        })}
+                    </div>
+                </div>
+            </section>
+        )
+    }
+
+    // ── Default: floating variant ────────────────────────────────────────
     return (
-        <section className={isFloating ? 'fixed bottom-6 right-6 z-40' : 'py-10'}>
-            <div className={isFloating ? 'flex flex-col items-end gap-3' : 'container mx-auto px-6'}>
+        <section className="fixed bottom-6 right-6 z-40">
+            <div className="flex flex-col items-end gap-3">
                 {normalizedBlock.headline ? (
                     <p className="mb-1 text-sm font-medium text-slate-400">{normalizedBlock.headline}</p>
                 ) : null}
-                <div className={`flex ${isFloating ? 'flex-col' : 'flex-wrap'} gap-3`}>
+                <div className="flex flex-col gap-3">
                     {links.map(item => {
                         const platform = item.platform
                         const meta = PLATFORM_META[platform]
-                        const style = getPlatformStyles(platform, theme.primaryColor)
-
+                        const style = getPlatformStyles(platform, CSS_VARS.primary)
                         return (
                             <a
                                 key={platform}
@@ -76,16 +109,11 @@ export function SocialWidgetBlock({ block, theme, site }: BlockProps<SocialWidge
                                 target="_blank"
                                 rel="noreferrer"
                                 aria-label={meta.label}
-                                className={isFloating
-                                    ? 'group flex items-center gap-3 rounded-2xl border px-3 py-2 shadow-[0_14px_32px_rgba(15,23,42,0.18)] backdrop-blur-sm transition-transform duration-200 hover:-translate-y-0.5'
-                                    : 'group flex items-center gap-3 rounded-2xl border px-3 py-2 shadow-[0_14px_32px_rgba(15,23,42,0.12)] transition-transform duration-200 hover:-translate-y-0.5'
-                                }
+                                className="group flex items-center gap-3 rounded-2xl border px-3 py-2 shadow-[0_14px_32px_rgba(15,23,42,0.18)] backdrop-blur-sm transition-transform duration-200 hover:-translate-y-0.5"
                                 style={style}
                             >
                                 <PlatformBadge platform={platform} />
-                                <span className={isFloating ? 'hidden text-sm font-medium text-white/85 group-hover:block' : 'text-sm font-medium text-white/85'}>
-                                    {meta.label}
-                                </span>
+                                <span className="hidden text-sm font-medium text-white/85 group-hover:block">{meta.label}</span>
                             </a>
                         )
                     })}
