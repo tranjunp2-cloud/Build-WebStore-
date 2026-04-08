@@ -1436,7 +1436,10 @@
         "viewAll": "Lihat semua pemberitahuan",
         "close": "Tutup pemberitahuan",
         "ariaUnread": "{count} pemberitahuan belum dibaca",
-        "ariaDefault": "Pemberitahuan"
+        "ariaDefault": "Pemberitahuan",
+        "tagSystem": "Sistem",
+        "tagAnnouncement": "Pengumuman",
+        "broadcastTitle": "Pemberitahuan Sistem"
     },
     "Staff": {
         "title": "Pengurusan Kakitangan",

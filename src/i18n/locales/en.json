@@ -1436,7 +1436,10 @@
         "viewAll": "View all notifications",
         "close": "Close notifications",
         "ariaUnread": "{count} unread notifications",
-        "ariaDefault": "Notifications"
+        "ariaDefault": "Notifications",
+        "tagSystem": "System",
+        "tagAnnouncement": "Announcement",
+        "broadcastTitle": "System Notification"
     },
     "Staff": {
         "title": "Staff Management",
