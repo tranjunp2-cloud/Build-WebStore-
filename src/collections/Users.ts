@@ -664,11 +664,8 @@ export const Users: CollectionConfig = {
                     const maskedEmail = `${safeLocal}@${domain}`
 
                     if (useDevBypass || useE2EBypass) {
-                        // Dev/E2E: log the bypass code, skip sending email
-                        console.log(`[DEV OTP] ════════════════════════════════════`)
-                        console.log(`[DEV OTP] Email: ${maskedEmail}`)
-                        console.log(`[DEV OTP] Code:  ${otp}`)
-                        console.log(`[DEV OTP] ════════════════════════════════════`)
+                        // Dev/E2E: log metadata only, never log OTP code
+                        console.log(`[DEV OTP] Bypass code sent for ${maskedEmail}`)
                     } else {
                         // Production: send real email, never log code
                         const { subject, html } = otpVerificationEmail({ userName, otpCode: otp })
