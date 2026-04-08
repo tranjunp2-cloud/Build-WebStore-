@@ -4,7 +4,7 @@ import config from '@payload-config'
 import { assertStaging } from '@/lib/env'
 import { getCurrentUser } from '@/lib/auth'
 
-type CollectionSlug = 'analytics' | 'orders' | 'subscriptions' | 'products' | 'pages' | 'sites' | 'tenants' | 'users'
+type CollectionSlug = 'analytics' | 'orders' | 'subscriptions' | 'products' | 'pages' | 'sites'
 
 interface ClearResult {
     [collection: string]: number
@@ -39,9 +39,11 @@ async function clearCollection(
 /**
  * POST /api/account/reset
  *
- * Staging-only endpoint. Cascade-deletes all tenant data and tenant records
- * for the current user. User account (email, password) is preserved.
- * User is expected to redirect to /onboarding after reset.
+ * Staging-only endpoint. Resets user account to "new user" state:
+ * - Deletes all data (sites, pages, products, orders, analytics, subscriptions)
+ * - KEEPS tenant (reset counters only) — same as `pnpm db:reset`
+ * - Resets user flags (has_seen_ai_wizard, otp)
+ * - User redirects to /onboarding after reset
  */
 export async function POST() {
     try {
@@ -57,7 +59,7 @@ export async function POST() {
     try {
         const payload = await getPayload({ config })
 
-        // Auth check — reuse proven getCurrentUser()
+        // Auth check
         const user = await getCurrentUser()
 
         if (!user) {
@@ -68,7 +70,7 @@ export async function POST() {
         }
 
         const userWithTenants = user as unknown as {
-            id: string
+            id: string | number
             tenants?: Array<{ tenant: string | { id: string } }>
         }
 
@@ -125,21 +127,29 @@ export async function POST() {
             results.sites = (results.sites || 0) + await clearCollection(
                 payload, 'sites', { tenant: { equals: tenantId } },
             )
+
+            // Step 7: Reset tenant counters (KEEP tenant, don't delete)
+            await payload.update({
+                collection: 'tenants',
+                id: tenantId,
+                data: {
+                    onboardingCompleted: false,
+                    settings: { storageUsed: 0 },
+                } as Record<string, unknown>,
+            })
         }
 
-        // Step 7: Clear user.tenants array BEFORE deleting tenant records
-        // (users_tenants.tenant_id has NOT NULL constraint — must detach first)
+        // Step 8: Reset user flags (same as pnpm db:reset)
         await payload.update({
             collection: 'users',
             id: userWithTenants.id,
-            data: { tenants: [] } as Record<string, unknown>,
+            data: {
+                has_seen_ai_wizard: false,
+                otpHash: null,
+                otpExpiresAt: null,
+                otpAttempts: 0,
+            } as Record<string, unknown>,
         })
-
-        // Step 8: Delete tenant records (now safe — no FK reference from users_tenants)
-        for (const tenantId of tenantIds) {
-            await payload.delete({ collection: 'tenants', id: tenantId })
-            results.tenants = (results.tenants || 0) + 1
-        }
 
         console.log(`[Account Reset] Complete for user ${userWithTenants.id}:`, results)
 
