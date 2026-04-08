@@ -299,6 +299,15 @@ export function PreviewScripts() {
                 document.execCommand(e.data.command, false, e.data.value)
                 currentEditingEl?.focus()
             }
+            if (e.data?.type === 'DRAG_BLOCK_START') {
+                const el = document.querySelector(`[data-block-index="${e.data.blockIndex}"]`) as HTMLElement
+                if (el) el.style.opacity = '0.3'
+            }
+            if (e.data?.type === 'DRAG_BLOCK_END') {
+                document.querySelectorAll('[data-block-index]').forEach((el) => {
+                    ;(el as HTMLElement).style.opacity = ''
+                })
+            }
         }
 
         document.addEventListener('mouseover', onMouseOver)

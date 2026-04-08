@@ -55,6 +55,30 @@ const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, op
     }
 }
 
+export const LOW_STOCK_THRESHOLD = 10
+
+export const lowStockHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
+    if (operation !== 'update') return doc
+    const prevInventory = previousDoc?.inventory ?? 0
+    const currInventory = doc.inventory ?? 0
+
+    // Only notify when crossing threshold downward (anti-spam)
+    if (prevInventory >= LOW_STOCK_THRESHOLD && currInventory < LOW_STOCK_THRESHOLD && currInventory >= 0) {
+        import('@/lib/notifications/notify-tenant-owners')
+            .then(({ notifyTenantOwners }) => {
+                const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+                return notifyTenantOwners(req.payload, tenantId, {
+                    type: 'PRODUCT_LOW_STOCK',
+                    title: 'Low Stock Alert',
+                    message: `${doc.name} is running low (${currInventory} units left)`,
+                    actionUrl: '/products',
+                })
+            })
+            .catch((err) => console.error('[Notification] PRODUCT_LOW_STOCK hook failed', err))
+    }
+    return doc
+}
+
 // Auto-inject tenant and site from logged-in user if not provided by client
 const beforeChangeHook: CollectionBeforeChangeHook = async ({ data, req, operation }) => {
     if (operation === 'create' && req.user) {
@@ -90,7 +114,7 @@ export const Products: CollectionConfig = {
     slug: 'products',
     hooks: {
         beforeChange: [beforeChangeHook],
-        afterChange: [afterChangeHook],
+        afterChange: [afterChangeHook, lowStockHook],
     },
     admin: {
         useAsTitle: 'name',

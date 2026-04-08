@@ -6,6 +6,7 @@ import { CMSLayoutClient } from './_components/CMSLayoutClient'
 import { AIDiscoveryWizard } from '@/components/dashboard/AIDiscoveryWizard'
 import { NotificationProvider } from '@/providers/NotificationProvider'
 import { ToastContainer } from '@/components/notifications/ToastContainer'
+import { PushOptInPrompt } from '@/components/notifications/PushOptInPrompt'
 
 export default async function DashboardLayout({
     children,
@@ -35,6 +36,7 @@ export default async function DashboardLayout({
                     <>
                         <NotificationProvider />
                         <ToastContainer />
+                        <PushOptInPrompt />
                     </>
                 )}
                 {/* Only evaluate and render if the user hasn't seen the wizard yet */}

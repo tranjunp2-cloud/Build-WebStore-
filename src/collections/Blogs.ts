@@ -2,6 +2,27 @@ import type { CollectionConfig, Where } from 'payload'
 
 export const Blogs: CollectionConfig = {
     slug: 'blogs',
+    hooks: {
+        afterChange: [
+            async ({ doc, previousDoc, operation, req }) => {
+                const isPublishing = doc.status === 'published' && previousDoc?.status !== 'published'
+                if (!isPublishing) return doc
+                // Fire-and-forget: notify tenant owners of published blog
+                import('@/lib/notifications/notify-tenant-owners')
+                    .then(({ notifyTenantOwners }) => {
+                        const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+                        return notifyTenantOwners(req.payload, tenantId, {
+                            type: 'BLOG_PUBLISHED',
+                            title: 'Blog Published',
+                            message: `${doc.title} has been published`,
+                            actionUrl: '/blogs',
+                        })
+                    })
+                    .catch((err) => console.error('[Notification] BLOG_PUBLISHED hook failed', err))
+                return doc
+            },
+        ],
+    },
     admin: {
         useAsTitle: 'title',
         description: 'Blog posts belong to a site and can be published to the storefront.',

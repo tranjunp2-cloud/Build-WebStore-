@@ -27,10 +27,13 @@ function normalizeInstructionValue(nextValue: string, previousValue: string): st
     return nextValue
 }
 
+const MAX_INSTRUCTION_LENGTH = 300
+
 interface InlineEditPopoverProps {
     blockType: string
     currentText: string
     isSubmitting: boolean
+    isMobile?: boolean
     onClose: () => void
     onSubmit: (instruction: string) => Promise<void> | void
 }
@@ -39,6 +42,7 @@ export function InlineEditPopover({
     blockType,
     currentText,
     isSubmitting,
+    isMobile = false,
     onClose,
     onSubmit,
 }: InlineEditPopoverProps) {
@@ -66,7 +70,10 @@ export function InlineEditPopover({
     }
 
     return (
-        <div className="w-[360px] rounded-2xl border border-cyan-500/30 bg-[#0F172A] p-4 shadow-2xl shadow-black/40">
+        <div className={isMobile
+            ? "fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-cyan-500/30 bg-[#0F172A] p-4 shadow-2xl shadow-black/40"
+            : "w-[360px] rounded-2xl border border-cyan-500/30 bg-[#0F172A] p-4 shadow-2xl shadow-black/40"
+        }>
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">
@@ -100,8 +107,9 @@ export function InlineEditPopover({
                     ref={inputRef}
                     value={instruction}
                     onChange={event =>
-                        setInstruction(prev => normalizeInstructionValue(event.target.value, prev))
+                        setInstruction(prev => normalizeInstructionValue(event.target.value.slice(0, MAX_INSTRUCTION_LENGTH), prev))
                     }
+                    maxLength={MAX_INSTRUCTION_LENGTH}
                     autoComplete="off"
                     autoCorrect="off"
                     autoCapitalize="off"
@@ -115,6 +123,9 @@ export function InlineEditPopover({
                     placeholder="For example: Make this more concise and premium."
                     className="mt-2 min-h-[100px] w-full resize-none rounded-xl border border-white/10 bg-[#111827] px-3 py-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-cyan-500/40"
                 />
+                <div className="mt-1 text-right text-[11px] text-gray-500">
+                    {instruction.length}/{MAX_INSTRUCTION_LENGTH}
+                </div>
             </div>
 
             <div className="mt-4 flex items-center justify-end gap-2">
