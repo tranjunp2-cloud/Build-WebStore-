@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
 import { assertStaging } from '@/lib/env'
+import { getCurrentUser } from '@/lib/auth'
 
 type CollectionSlug = 'analytics' | 'orders' | 'subscriptions' | 'products' | 'pages' | 'sites' | 'tenants' | 'users'
 
@@ -57,20 +57,8 @@ export async function POST() {
     try {
         const payload = await getPayload({ config })
 
-        // Auth check — same pattern as getCurrentUser()
-        const cookieStore = await cookies()
-        const token = cookieStore.get('payload-token')?.value
-
-        if (!token) {
-            return NextResponse.json(
-                { success: false, error: { code: 'AUTH_REQUIRED', message: 'Login required' } },
-                { status: 401 },
-            )
-        }
-
-        const { user } = await payload.auth({
-            headers: new Headers({ Authorization: `JWT ${token}` }),
-        })
+        // Auth check — reuse proven getCurrentUser()
+        const user = await getCurrentUser()
 
         if (!user) {
             return NextResponse.json(
