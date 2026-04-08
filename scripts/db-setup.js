@@ -1271,12 +1271,20 @@ const MIGRATIONS = [
     sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS subscribers_id integer;`,
   },
   {
+    name: 'payload_locked_documents_rels.push_subscriptions_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS push_subscriptions_id integer;`,
+  },
+  {
     name: 'payload_preferences_rels.notifications_id',
     sql: `ALTER TABLE payload_preferences_rels ADD COLUMN IF NOT EXISTS notifications_id integer;`,
   },
   {
     name: 'payload_preferences_rels.subscribers_id',
     sql: `ALTER TABLE payload_preferences_rels ADD COLUMN IF NOT EXISTS subscribers_id integer;`,
+  },
+  {
+    name: 'payload_preferences_rels.push_subscriptions_id',
+    sql: `ALTER TABLE payload_preferences_rels ADD COLUMN IF NOT EXISTS push_subscriptions_id integer;`,
   },
   // ── F01: Add missing theme fields to sites table ──
   {
@@ -2225,6 +2233,30 @@ const MIGRATIONS = [
     sql: `CREATE OR REPLACE TRIGGER after_notification_insert
       AFTER INSERT ON notifications
       FOR EACH ROW EXECUTE FUNCTION notify_new_notification();`,
+  },
+  // ── F16-07: Push Subscriptions table ──────────────────────────────────────
+  {
+    name: 'push_subscriptions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id serial PRIMARY KEY,
+      user_id integer NOT NULL,
+      tenant_id integer NOT NULL,
+      endpoint text NOT NULL,
+      p256dh text NOT NULL,
+      auth text NOT NULL,
+      is_active boolean DEFAULT true NOT NULL,
+      user_agent text,
+      created_at timestamptz DEFAULT now() NOT NULL,
+      updated_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'push_subscriptions.user_endpoint_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_user_endpoint_idx ON push_subscriptions (user_id, endpoint);`,
+  },
+  {
+    name: 'push_subscriptions.user_tenant_active_idx',
+    sql: `CREATE INDEX IF NOT EXISTS push_subscriptions_user_tenant_active_idx ON push_subscriptions (user_id, tenant_id) WHERE is_active = true;`,
   },
   // ── Templates — multi-page array sub-table ──
   {

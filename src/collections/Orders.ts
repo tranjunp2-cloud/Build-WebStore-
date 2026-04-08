@@ -21,6 +21,28 @@ export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
 
 export const Orders: CollectionConfig = {
     slug: 'orders',
+    hooks: {
+        afterChange: [
+            async ({ doc, operation, req }) => {
+                if (operation !== 'create') return doc
+                // Skip Stripe orders — they're notified via webhook after payment confirms
+                if (doc.stripeSessionId) return doc
+                // Fire-and-forget: notify tenant owners of new order (COD/QR Banking)
+                import('@/lib/notifications/notify-tenant-owners')
+                    .then(({ notifyTenantOwners }) => {
+                        const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+                        return notifyTenantOwners(req.payload, tenantId, {
+                            type: 'ORDER_NEW',
+                            title: `New Order #${doc.orderNumber} - ${doc.currency || 'MYR'} ${(doc.total ?? 0).toFixed(2)}`,
+                            message: `Order placed by ${doc.customerName}`,
+                            actionUrl: '/orders',
+                        })
+                    })
+                    .catch((err) => console.error('[Notification] ORDER_NEW hook failed', err))
+                return doc
+            },
+        ],
+    },
     admin: {
         useAsTitle: 'orderNumber',
         description: 'Customer orders from the storefront.',

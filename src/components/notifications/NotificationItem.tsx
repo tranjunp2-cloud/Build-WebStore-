@@ -1,7 +1,7 @@
 'use client'
 
 import { formatDistanceToNow } from 'date-fns'
-import { ShoppingCart, Megaphone, CircleAlert, FileText, ShoppingBag, type LucideIcon } from 'lucide-react'
+import { ShoppingCart, Megaphone, CircleAlert, FileText, type LucideIcon } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { NotificationItem as NotificationItemType } from '@/types/notification'
 
@@ -26,9 +26,6 @@ export function NotificationItem({ notification, onClick }: Props) {
   } else if (type === 'BLOG_PUBLISHED') {
     Icon = FileText
     iconBgClass = 'bg-white/10 text-white'
-  } else if (type as string === 'ABANDONED_CART') {
-    Icon = ShoppingBag
-    iconBgClass = 'bg-[#A855F7]/10 text-[#C084FC]' // From image, abandoned cart uses purple
   }
 
   return (
