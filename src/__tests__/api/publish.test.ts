@@ -69,6 +69,7 @@ describe('[TC-F01-publish] PATCH /api/sites/[siteId]/publish', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        vi.stubEnv('NEXT_PUBLIC_PLATFORM_DOMAIN', 'primeweb.app')
         mockAuthUser = {
             id: 'user-1',
             email: 'owner@example.com',
