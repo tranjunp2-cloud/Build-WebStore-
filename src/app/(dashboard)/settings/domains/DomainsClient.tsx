@@ -249,28 +249,26 @@ export function DomainsClient({
 
             <div className="space-y-[16px]">
                 {/* Banner — Figma 30872:1455, height: 102px, padding: 25px 25px 1px */}
-                <div className="flex flex-row items-center justify-between py-[25px] px-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60" style={{ minHeight: '102px' }}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px] py-[25px] px-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60" style={{ minHeight: '102px' }}>
                     {/* Text — Figma layout_T77324: column, gap 4px — self-center to prevent stretch */}
                     <div className="self-center">
                         <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.556em] font-['Inter']">Add a Domain to your store</h2>
                         <p className="mt-[4px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.429em] font-['Inter']">Connect your custom domain to make your store accessible</p>
                     </div>
-                    {/* Buttons — Figma layout_04AXA2: row, center, gap 24px */}
-                    <div className="flex flex-row items-center gap-[24px] shrink-0">
-                        {/* Ghost — Figma layout_AVBJW5: padding 12px 68px, hug height */}
+                    {/* Buttons — stack on mobile, row on desktop */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-[12px] sm:gap-[24px] shrink-0">
                         <button
                             type="button"
                             onClick={() => setIsSelectPrimaryOpen(true)}
-                            className="hidden sm:flex items-center justify-center py-[12px] px-[68px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors whitespace-nowrap font-['Inter']"
+                            className="flex items-center justify-center py-[12px] px-[24px] sm:px-[68px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[14px] sm:text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors whitespace-nowrap font-['Inter']"
                         >
                             Select primary domain
                         </button>
-                        {/* Gradient — Figma layout_2HUKSP: w~236, h 48 */}
                         <button
                             type="button"
                             onClick={() => setIsAddModalOpen(true)}
                             style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
-                            className="flex items-center justify-center gap-2 h-[48px] px-6 rounded-[16px] text-white text-[16px] font-semibold shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
+                            className="flex items-center justify-center gap-2 h-[48px] px-6 rounded-[16px] text-white text-[14px] sm:text-[16px] font-semibold shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
                         >
                             <Plus className="h-5 w-5" />
                             <span>Add Custom Domain</span>
@@ -407,8 +405,8 @@ export function DomainsClient({
                                         )}
                                     </div>
                                 </div>
-                                {/* Only Remove button — no Set as Primary here */}
-                                <div className="hidden sm:flex items-center gap-3 pb-[25px]">
+                                {/* Remove button — visible on all screen sizes */}
+                                <div className="flex items-center gap-3 pb-[25px]">
                                     <button
                                         type="button"
                                         onClick={() => setRemovingDomain(domain)}

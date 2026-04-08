@@ -116,12 +116,13 @@ export async function addCustomDomain(rawDomain: string) {
                         
                         if (!putResponse.ok) {
                             console.error('DO API Error (PUT Add Domain):', await putResponse.text());
+                            revalidatePath('/settings/domains');
+                            return { success: true, warning: 'Domain saved, but failed to register with hosting provider. Verification may be delayed — please try verifying later or contact support.' };
                         }
                     }
                 }
             } catch (doError) {
                 console.error('DO API Error (Add Domain):', doError);
-                // Domain saved in DB but DO sync failed — inform user so they can retry
                 revalidatePath('/settings/domains');
                 return { success: true, warning: 'Domain saved, but failed to register with hosting provider. Verification may be delayed — please try verifying later or contact support.' };
             }
@@ -193,11 +194,12 @@ export async function removeCustomDomain(domain: string) {
                     
                     if (!putResponse.ok) {
                         console.error('DO API Error (PUT Remove Domain):', await putResponse.text());
+                        revalidatePath('/settings/domains');
+                        return { success: true, warning: 'Domain removed from your store, but failed to sync with hosting provider. The domain may still route temporarily — please contact support if it persists.' };
                     }
                 }
             } catch (doError) {
                 console.error('DO API Error (Remove Domain):', doError);
-                // Domain removed from DB but DO sync failed — warn user
                 revalidatePath('/settings/domains');
                 return { success: true, warning: 'Domain removed from your store, but failed to sync with hosting provider. The domain may still route temporarily — please contact support if it persists.' };
             }
