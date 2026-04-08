@@ -7,25 +7,7 @@ import { motion } from 'framer-motion'
 import { getAboutImage } from '@/lib/images/industry-images'
 import { SectionLabel } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
-
-/** Extract plain text from richText JSON or return string as-is */
-function toPlainText(value: unknown): string {
-    if (!value) return ''
-    if (typeof value === 'string') {
-        // May be a JSON string from DB — try parse
-        if (value.startsWith('{')) {
-            try { return toPlainText(JSON.parse(value)) } catch { return value }
-        }
-        return value
-    }
-    if (typeof value === 'object' && value !== null) {
-        const obj = value as Record<string, unknown>
-        if (obj.text && typeof obj.text === 'string') return obj.text
-        if (Array.isArray(obj.children)) return (obj.children as unknown[]).map(toPlainText).join('')
-        if (obj.root) return toPlainText(obj.root)
-    }
-    return String(value)
-}
+import { toPlainText } from '@/lib/utils/to-plain-text'
 
 function SimpleVariant({ block }: { block: AboutConfig }) {
     const { headline, sectionLabel } = block

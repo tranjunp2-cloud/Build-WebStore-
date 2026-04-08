@@ -1285,7 +1285,7 @@ const MIGRATIONS = [
   },
   {
     name: 'sites.accent_color',
-    sql: `SELECT 1;`,
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_accent_color varchar;`,
   },
   {
     name: 'sites.theme_surface_color',
@@ -1293,7 +1293,7 @@ const MIGRATIONS = [
   },
   {
     name: 'sites.surface_color',
-    sql: `SELECT 1;`,
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_surface_color varchar;`,
   },
   {
     name: 'sites.theme_text_color',
@@ -1301,7 +1301,7 @@ const MIGRATIONS = [
   },
   {
     name: 'sites.text_color',
-    sql: `SELECT 1;`,
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_text_color varchar;`,
   },
   {
     name: 'sites.theme_muted_color',
@@ -1309,7 +1309,7 @@ const MIGRATIONS = [
   },
   {
     name: 'sites.muted_color',
-    sql: `SELECT 1;`,
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_muted_color varchar;`,
   },
   {
     name: 'sites.theme_spacing_preset',
@@ -1320,7 +1320,7 @@ const MIGRATIONS = [
   },
   {
     name: 'sites.spacing_preset',
-    sql: `SELECT 1;`,
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_spacing_preset enum_sites_theme_spacing_preset DEFAULT 'default';`,
   },
   {
     name: 'sites.theme_shadow_preset',
@@ -1331,7 +1331,7 @@ const MIGRATIONS = [
   },
   {
     name: 'sites.shadow_preset',
-    sql: `SELECT 1;`,
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS theme_shadow_preset enum_sites_theme_shadow_preset DEFAULT 'subtle';`,
   },
   // ── F01: _pages_v version columns for new block fields (CI check requirement) ──
   {

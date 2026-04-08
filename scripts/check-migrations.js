@@ -81,6 +81,9 @@ function getNewFieldsFromDiff() {
   return newFields
 }
 
+// Known Payload group field prefixes — only strip these when matching migrations
+const KNOWN_GROUP_PREFIXES = ['theme', 'seo', 'payments', 'badge', 'ai_generation_metadata']
+
 function getMigrationColumns() {
   const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')
   const columns = new Set()
@@ -92,13 +95,12 @@ function getMigrationColumns() {
     const table = match[1]
     const col = match[2]
     columns.add(`${table}.${col}`)
-    // Also register without group prefix (e.g., theme_accent_color → accent_color)
-    // so that Payload group fields are found by their unprefixed name
-    if (col.includes('_')) {
-      const parts = col.split('_')
-      if (parts.length >= 3) {
-        const withoutPrefix = parts.slice(1).join('_')
+    // Also register without known group prefix (e.g., theme_accent_color → accent_color)
+    for (const prefix of KNOWN_GROUP_PREFIXES) {
+      if (col.startsWith(`${prefix}_`)) {
+        const withoutPrefix = col.slice(prefix.length + 1)
         columns.add(`${table}.${withoutPrefix}`)
+        break
       }
     }
   }
