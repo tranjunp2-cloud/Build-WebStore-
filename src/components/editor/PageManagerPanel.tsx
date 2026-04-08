@@ -338,8 +338,14 @@ export function PageManagerPanel({
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="mt-1 truncate text-xs leading-4 text-[#94A3B8]">
-                                                    {getPagePath(page)}
+                                                <div className="mt-1 flex items-center gap-2 text-xs leading-4 text-[#94A3B8]">
+                                                    <span className="truncate">{getPagePath(page)}</span>
+                                                    {page.updatedAt && (
+                                                        <>
+                                                            <span className="text-[#475569]">·</span>
+                                                            <span className="shrink-0">{new Date(page.updatedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}</span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -472,7 +478,7 @@ export function PageManagerPanel({
                                     ?
                                 </p>
                                 <p className="text-[14px] leading-5 text-[#94A3B8]">
-                                    This action cannot be undone.
+                                    Bạn có thể hoàn tác trong vài giây sau khi xóa.
                                 </p>
                             </div>
 
