@@ -5,6 +5,20 @@ import React from 'react'
 import { NotificationItem } from '@/components/notifications/NotificationItem'
 import type { NotificationItem as NotificationItemType } from '@/types/notification'
 
+// Mock i18n
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: {
+            notifications: {
+                tagSystem: 'System',
+                tagAnnouncement: 'Announcement',
+                broadcastTitle: 'System Notification',
+            },
+        },
+        locale: 'en',
+    }),
+}))
+
 // ── TC-F16.04, TC-F16.06: NotificationItem rendering + a11y ─────────────
 
 const makeNotification = (overrides: Partial<NotificationItemType> = {}): NotificationItemType => ({

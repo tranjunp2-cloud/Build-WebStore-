@@ -1,5 +1,8 @@
+'use client'
+
 import { formatDistanceToNow } from 'date-fns'
 import { ShoppingCart, Megaphone, CircleAlert, FileText, ShoppingBag, type LucideIcon } from 'lucide-react'
+import { useI18n } from '@/i18n'
 import type { NotificationItem as NotificationItemType } from '@/types/notification'
 
 interface Props {
@@ -9,6 +12,7 @@ interface Props {
 
 export function NotificationItem({ notification, onClick }: Props) {
   const { type, title, message, isRead, createdAt } = notification
+  const { t } = useI18n()
 
   let Icon: LucideIcon = ShoppingCart
   let iconBgClass = 'bg-[#00BC7D]/10 text-[#00BC7D]'
@@ -43,9 +47,16 @@ export function NotificationItem({ notification, onClick }: Props) {
       </div>
       
       <div className="flex-1 flex flex-col pt-[2px] pr-[10px]">
-        <h4 className={`text-[14px] leading-[20px] mb-1 ${!isRead ? 'font-semibold text-white' : 'font-normal text-[#CBD5E1]'}`}>
-          {title}
-        </h4>
+        <div className="flex items-center gap-[6px] mb-1">
+          <h4 className={`text-[14px] leading-[20px] ${!isRead ? 'font-semibold text-white' : 'font-normal text-[#CBD5E1]'}`}>
+            {title}
+          </h4>
+          {type === 'SYSTEM_ALERT' && (
+            <span className="inline-flex items-center rounded-full bg-[#7C3AED]/15 px-[6px] py-[1px] text-[10px] font-medium leading-[14px] text-[#A78BFA] whitespace-nowrap">
+              {t.notifications.tagSystem}
+            </span>
+          )}
+        </div>
         <p className="text-[12px] font-medium leading-[16px] text-[#94A3B8]">
           {message}
         </p>
