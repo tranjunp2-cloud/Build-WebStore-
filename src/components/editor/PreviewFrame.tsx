@@ -893,6 +893,7 @@ function PreviewFrameInner({
                                 blockType={hoverData.blockType}
                                 currentText={hoverData.text}
                                 isSubmitting={isSubmitting}
+                                isMobile={viewport === 'mobile'}
                                 onClose={() => setIsEditing(false)}
                                 onSubmit={handleInlineRewrite}
                             />
