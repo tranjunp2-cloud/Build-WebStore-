@@ -174,14 +174,14 @@ export function NotificationDropdown() {
   return (
     <div 
       ref={dropdownRef}
-      className="fixed sm:absolute top-[72px] sm:top-14 left-1/2 sm:left-auto -translate-x-1/2 sm:translate-x-0 sm:right-0 w-[calc(100vw-32px)] sm:w-[380px] max-w-[340px] sm:max-w-none rounded-[16px] bg-[#1E293B] border border-white/10 shadow-2xl flex flex-col z-[100] overflow-hidden"
+      className="fixed sm:absolute top-[60px] sm:top-14 left-1/2 sm:left-auto -translate-x-1/2 sm:translate-x-0 sm:right-0 w-[calc(100vw-32px)] sm:w-[380px] max-w-[340px] sm:max-w-none rounded-[16px] bg-[#1E293B] border border-white/10 shadow-2xl flex flex-col z-[100] overflow-hidden"
     >
       <div className="flex items-center justify-between border-b border-white/10 px-4 sm:px-5 pt-3 pb-3 sm:pt-4">
         <h3 className="text-[16px] sm:text-[18px] font-bold text-white leading-relaxed">{t.notifications.title}</h3>
         <button
           onClick={handleMarkAll}
           disabled={!data || data.unreadCount === 0}
-          className="text-[14px] font-medium text-blue-500 hover:text-blue-400 transition-colors disabled:text-white/20 disabled:cursor-not-allowed"
+          className="text-[12px] sm:text-[14px] font-medium text-blue-500 hover:text-blue-400 transition-colors disabled:text-white/20 disabled:cursor-not-allowed"
         >
           {t.notifications.markAllRead}
         </button>
