@@ -1355,7 +1355,7 @@ const MIGRATIONS = [
         AND id NOT IN (
           SELECT DISTINCT ON (site_id, slug) id
           FROM pages WHERE deleted_at IS NULL
-          ORDER BY site_id, slug, updated_at DESC
+          ORDER BY site_id, slug, updated_at DESC NULLS LAST, created_at DESC, id DESC
         );`,
   },
   {
