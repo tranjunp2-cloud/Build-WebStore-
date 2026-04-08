@@ -81,6 +81,9 @@ function getNewFieldsFromDiff() {
   return newFields
 }
 
+// Known Payload group field prefixes — only strip these when matching migrations
+const KNOWN_GROUP_PREFIXES = ['theme', 'seo', 'payments', 'badge', 'ai_generation_metadata']
+
 function getMigrationColumns() {
   const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')
   const columns = new Set()
@@ -89,7 +92,17 @@ function getMigrationColumns() {
   const regex = /ALTER TABLE\s+(\w+)\s+ADD COLUMN IF NOT EXISTS\s+(\w+)/gi
   let match
   while ((match = regex.exec(content)) !== null) {
-    columns.add(`${match[1]}.${match[2]}`)
+    const table = match[1]
+    const col = match[2]
+    columns.add(`${table}.${col}`)
+    // Also register without known group prefix (e.g., theme_accent_color → accent_color)
+    for (const prefix of KNOWN_GROUP_PREFIXES) {
+      if (col.startsWith(`${prefix}_`)) {
+        const withoutPrefix = col.slice(prefix.length + 1)
+        columns.add(`${table}.${withoutPrefix}`)
+        break
+      }
+    }
   }
 
   return columns
@@ -99,8 +112,8 @@ function getMigrationTables() {
   const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')
   const tables = new Set()
 
-  // Match CREATE TABLE IF NOT EXISTS "xxx" or xxx
-  const regex = /CREATE TABLE IF NOT EXISTS\s+"?(\w+)"?/gi
+  // Match CREATE TABLE IF NOT EXISTS "xxx" or xxx (supports hyphens in quoted names)
+  const regex = /CREATE TABLE IF NOT EXISTS\s+"?([\w-]+)"?/gi
   let match
   while ((match = regex.exec(content)) !== null) {
     tables.add(match[1])
@@ -234,8 +247,10 @@ function checkNewBlocks() {
   const missing = []
 
   for (const slug of newSlugs) {
-    const liveTable = `pages_blocks_${slug}`
-    const versionTable = `_pages_v_blocks_${slug}`
+    // Payload Drizzle converts kebab-case slugs to snake_case table names
+    const snakeSlug = slug.replace(/-/g, '_')
+    const liveTable = `pages_blocks_${snakeSlug}`
+    const versionTable = `_pages_v_blocks_${snakeSlug}`
 
     if (!tables.has(liveTable)) {
       missing.push({ slug, table: liveTable, type: 'live' })

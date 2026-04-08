@@ -7,9 +7,11 @@ import { motion } from 'framer-motion'
 import { getAboutImage } from '@/lib/images/industry-images'
 import { SectionLabel } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { toPlainText } from '@/lib/utils/to-plain-text'
 
 function SimpleVariant({ block }: { block: AboutConfig }) {
-    const { headline, sectionLabel, body } = block
+    const { headline, sectionLabel } = block
+    const body = toPlainText(block.body)
     return (
         <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6 max-w-3xl text-center">
@@ -28,7 +30,8 @@ function SimpleVariant({ block }: { block: AboutConfig }) {
 }
 
 function SplitVariant({ block, category }: { block: AboutConfig; category: string }) {
-    const { headline, sectionLabel, body, layout = 'image-right' } = block
+    const { headline, sectionLabel, layout = 'image-right' } = block
+    const body = toPlainText(block.body)
     const imageUrl = block.image?.url || getAboutImage(category)
     const imageAlt = block.image?.alt || headline
     const isImageLeft = layout === 'image-left'
@@ -94,7 +97,8 @@ function SplitVariant({ block, category }: { block: AboutConfig; category: strin
 }
 
 function StoryVariant({ block }: { block: AboutConfig }) {
-    const { headline, sectionLabel, body, timelineItems } = block
+    const { headline, sectionLabel, timelineItems } = block
+    const body = toPlainText(block.body)
 
     // Fallback: if no timelineItems, render simple
     if (!timelineItems?.length) {
