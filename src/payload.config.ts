@@ -31,14 +31,14 @@ const require = createRequire(import.meta.url)
 
 /** Trả về connection string (bỏ sslmode để tránh parse ghi đè pool.ssl). */
 function getDatabaseConnectionString(): string {
-  const raw = process.env.DATABASE_URI || 'postgresql://localhost/primeweb'
+  const raw = process.env.DATABASE_URI || process.env.DATABASE_URL || 'postgresql://localhost/primeweb'
   const withoutSslmode = raw.replace(/[?&]sslmode=[^&]+/g, '').replace(/\?&/, '?').replace(/\?$/, '')
   return withoutSslmode || raw
 }
 
 /** Có phải DB từ xa (cần SSL, có thể self-signed) không. */
 function isRemoteDatabase(): boolean {
-  const raw = process.env.DATABASE_URI || ''
+  const raw = process.env.DATABASE_URI || process.env.DATABASE_URL || ''
   return (
     raw.length > 0 &&
     !raw.includes('localhost') &&

@@ -41,7 +41,8 @@ describe('F19 Domain Management (DomainsClient)', () => {
     it('[TC-F19.01] Renders active and pending domains in the directory', () => {
         render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={mockDomains} />);
         
-        expect(screen.getByText('mywebstore.ech-prime-web-v2-staging-pzdwc.ondigitalocean.app')).toBeInTheDocument();
+        const platform = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'ech-prime-web-v2-staging-pzdwc.ondigitalocean.app';
+        expect(screen.getByText(`mywebstore.${platform}`)).toBeInTheDocument();
         expect(screen.getAllByText('store.custom.com').length).toBeGreaterThan(0);
         expect(screen.getByText('pending.custom.com')).toBeInTheDocument();
         expect(screen.getByText('Pending Verification')).toBeInTheDocument();
@@ -175,8 +176,8 @@ describe('F19 Domain Management (DomainsClient)', () => {
     it('[TC-F19.10] Protects default platform subdomain from removal', () => {
         render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={[]} />);
         
-        //  The default platform domain mywebstore.ech-prime-web-v2-staging-pzdwc.ondigitalocean.app should render
-        expect(screen.getByText('mywebstore.ech-prime-web-v2-staging-pzdwc.ondigitalocean.app')).toBeInTheDocument();
+        const platform = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'ech-prime-web-v2-staging-pzdwc.ondigitalocean.app';
+        expect(screen.getByText(`mywebstore.${platform}`)).toBeInTheDocument();
 
         // There shouldn't be a generic Remove Domain button for it.
         const removeBtns = screen.queryAllByRole('button', { name: /Remove/i });
@@ -209,6 +210,15 @@ describe('F19 Domain Management (DomainsClient)', () => {
         
         const removeBtn = screen.getByRole('button', { name: 'Remove Domain' });
         fireEvent.click(removeBtn);
+
+        // Confirmation modal should appear
+        await waitFor(() => {
+            expect(screen.getByText(/Are you sure you want to remove/i)).toBeInTheDocument();
+        });
+
+        // Click confirm button in modal (second "Remove Domain" button)
+        const confirmBtns = screen.getAllByRole('button', { name: 'Remove Domain' });
+        fireEvent.click(confirmBtns[confirmBtns.length - 1]);
 
         await waitFor(() => {
             expect(actions.removeCustomDomain).toHaveBeenCalledWith('store.active.com');
