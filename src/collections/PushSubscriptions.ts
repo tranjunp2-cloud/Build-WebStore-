@@ -7,6 +7,19 @@ import type { CollectionConfig, AccessResult } from 'payload'
  */
 export const PushSubscriptions: CollectionConfig = {
   slug: 'push-subscriptions',
+  hooks: {
+    beforeChange: [
+      async ({ data, req, operation }) => {
+        // Force user and tenant from session to prevent spoofing via direct API
+        if (operation === 'create' && req.user) {
+          data.user = req.user.id
+          const firstTenant = (req.user as any).tenants?.[0]?.tenant
+          data.tenant = typeof firstTenant === 'object' ? firstTenant?.id : firstTenant
+        }
+        return data
+      },
+    ],
+  },
   admin: {
     useAsTitle: 'endpoint',
     description: 'Web Push notification subscriptions.',

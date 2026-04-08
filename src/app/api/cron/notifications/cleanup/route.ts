@@ -12,9 +12,9 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: Request) {
     const authHeader = request.headers.get('authorization')
-    const CRON_SECRET = process.env.CRON_SECRET || 'dev-cron-secret'
+    const CRON_SECRET = process.env.CRON_SECRET
 
-    if (authHeader !== `Bearer ${CRON_SECRET}` && process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' && (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`)) {
         return new NextResponse('Unauthorized', { status: 401 })
     }
 

@@ -9,6 +9,21 @@ import { sendEmail } from '@/lib/email/send'
 import { orderConfirmationEmail } from '@/lib/email/templates/order-confirmation'
 import type { PaymentWebhookEvent } from '@/lib/payment/types'
 
+/** Minimal shape of an order document for webhook notification logic. */
+interface OrderDoc {
+    id: number | string
+    tenant: number | string | { id: number | string }
+    orderNumber: string
+    customerName: string
+    customerEmail: string
+    currency: string
+    total: number
+    subtotal: number
+    tax: number
+    items: Array<{ product: any; productName: string; quantity: number; unitPrice: number }>
+    shippingAddress: Record<string, unknown>
+}
+
 /**
  * POST /api/webhooks/stripe
  *
@@ -136,10 +151,12 @@ async function handleCheckoutCompleted(
             collection: 'orders',
             id: orderId,
             depth: 1,
-        })
+        }) as unknown as OrderDoc | null
 
-        if (order?.items) {
-            for (const item of order.items as any[]) {
+        if (!order) return
+
+        if (order.items) {
+            for (const item of order.items) {
                 const productId = typeof item.product === 'object' ? item.product.id : item.product
                 await decrementStock(payload, productId, item.quantity)
             }
@@ -148,27 +165,27 @@ async function handleCheckoutCompleted(
         // Send order confirmation email
         try {
             const emailData = orderConfirmationEmail({
-                orderNumber: (order as any).orderNumber,
-                customerName: (order as any).customerName,
-                items: ((order as any).items || []).map((item: any) => ({
+                orderNumber: order.orderNumber,
+                customerName: order.customerName,
+                items: (order.items || []).map((item) => ({
                     productName: item.productName,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                 })),
-                subtotal: (order as any).subtotal,
-                tax: (order as any).tax || 0,
-                total: (order as any).total,
-                currency: (order as any).currency || 'MYR',
-                shippingAddress: (order as any).shippingAddress,
+                subtotal: order.subtotal,
+                tax: order.tax || 0,
+                total: order.total,
+                currency: order.currency || 'MYR',
+                shippingAddress: order.shippingAddress,
             })
 
             await sendEmail({
-                to: (order as any).customerEmail,
+                to: order.customerEmail,
                 subject: emailData.subject,
                 html: emailData.html,
             })
 
-            console.log(`[Stripe Webhook] Confirmation email sent to ${(order as any).customerEmail}`)
+            console.log(`[Stripe Webhook] Confirmation email sent to ${order.customerEmail}`)
         } catch (emailErr) {
             console.error('[Stripe Webhook] Failed to send confirmation email:', emailErr)
             // Don't fail the webhook — email is non-critical
@@ -177,11 +194,11 @@ async function handleCheckoutCompleted(
         // Fire-and-forget: ORDER_NEW notification for merchant (Stripe flow)
         import('@/lib/notifications/notify-tenant-owners')
             .then(({ notifyTenantOwners }) => {
-                const tenantId = typeof (order as any).tenant === 'object' ? (order as any).tenant.id : (order as any).tenant
+                const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
                 return notifyTenantOwners(payload, tenantId, {
                     type: 'ORDER_NEW',
-                    title: `New Order #${(order as any).orderNumber} - ${(order as any).currency || 'MYR'} ${((order as any).total ?? 0).toFixed(2)}`,
-                    message: `Order placed by ${(order as any).customerName}`,
+                    title: `New Order #${order.orderNumber} - ${order.currency || 'MYR'} ${(order.total ?? 0).toFixed(2)}`,
+                    message: `Order placed by ${order.customerName}`,
                     actionUrl: '/orders',
                 })
             })
@@ -219,7 +236,7 @@ async function handlePaymentFailed(
         return
     }
 
-    const order = orders.docs[0]
+    const order = orders.docs[0] as unknown as OrderDoc
 
     // Save the PaymentIntent ID for future reference
     await payload.update({
@@ -236,11 +253,11 @@ async function handlePaymentFailed(
     // Fire-and-forget: notify merchant of failed payment
     import('@/lib/notifications/notify-tenant-owners')
         .then(({ notifyTenantOwners }) => {
-            const tenantId = typeof order.tenant === 'object' ? (order as any).tenant.id : order.tenant
+            const tenantId = typeof order.tenant === 'object' ? order.tenant.id : order.tenant
             return notifyTenantOwners(payload, tenantId, {
                 type: 'SYSTEM_ALERT',
-                title: `Payment Failed - Order #${(order as any).orderNumber}`,
-                message: `Payment for order #${(order as any).orderNumber} has failed. Customer may retry.`,
+                title: `Payment Failed - Order #${order.orderNumber}`,
+                message: `Payment for order #${order.orderNumber} has failed. Customer may retry.`,
                 actionUrl: '/orders',
             })
         })
