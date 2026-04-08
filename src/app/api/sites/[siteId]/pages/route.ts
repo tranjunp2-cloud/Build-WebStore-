@@ -130,45 +130,58 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             return new NextResponse('Title is required', { status: 400 })
         }
 
-        // Check max pages limit
-        const { totalDocs: pageCount } = await payload.find({
-            collection: 'pages',
-            where: { site: { equals: siteId } },
-            limit: 0,
-        })
-        if (pageCount >= MAX_PAGES_PER_SITE) {
-            return new NextResponse(`Maximum ${MAX_PAGES_PER_SITE} pages per site reached`, { status: 400 })
-        }
-
         let normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`
         if (normalizedSlug === '//') normalizedSlug = '/'
 
-        const existingPages = await payload.find({
-            collection: 'pages',
-            where: {
-                and: [
-                    { site: { equals: siteId } },
-                    { slug: { equals: normalizedSlug } }
-                ]
-            },
-            limit: 1
+        // Atomic: check limits + create inside transaction to prevent race conditions
+        const newPage = await payload.db.drizzle.transaction(async () => {
+            const { totalDocs: pageCount } = await payload.find({
+                collection: 'pages',
+                where: { site: { equals: siteId } },
+                limit: 0,
+            })
+            if (pageCount >= MAX_PAGES_PER_SITE) {
+                throw new Error(`LIMIT:Maximum ${MAX_PAGES_PER_SITE} pages per site reached`)
+            }
+
+            const { docs: existing } = await payload.find({
+                collection: 'pages',
+                where: {
+                    and: [
+                        { site: { equals: siteId } },
+                        { slug: { equals: normalizedSlug } },
+                    ],
+                },
+                limit: 1,
+            })
+            if (existing.length > 0) {
+                throw new Error('CONFLICT:Page slug already exists in this site')
+            }
+
+            return payload.create({
+                collection: 'pages',
+                data: {
+                    title,
+                    slug: normalizedSlug,
+                    site: siteId,
+                    isVisible: true,
+                    layout: [],
+                    _status: 'draft',
+                },
+            })
+        }).catch((err: Error) => {
+            if (err.message.startsWith('LIMIT:')) {
+                return { error: err.message.slice(6), status: 400 } as const
+            }
+            if (err.message.startsWith('CONFLICT:')) {
+                return { error: err.message.slice(9), status: 409 } as const
+            }
+            throw err
         })
 
-        if (existingPages.docs.length > 0) {
-            return new NextResponse('Page slug already exists in this site', { status: 409 })
+        if ('error' in newPage) {
+            return new NextResponse(newPage.error, { status: newPage.status })
         }
-
-        const newPage = await payload.create({
-            collection: 'pages',
-            data: {
-                title,
-                slug: normalizedSlug,
-                site: siteId,
-                isVisible: true,
-                layout: [],
-                _status: 'draft',
-            },
-        })
 
         return NextResponse.json({
             page: {
