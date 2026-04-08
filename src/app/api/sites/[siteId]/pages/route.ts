@@ -7,8 +7,14 @@ import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { z } from 'zod'
 
+const MAX_PAGES_PER_SITE = 100
+
+function stripHtml(input: string): string {
+    return input.replace(/<[^>]*>/g, '')
+}
+
 const newPageSchema = z.object({
-    title: z.string().min(1, 'Title is required'),
+    title: z.string().min(1, 'Title is required').max(100, 'Title must be 100 characters or less'),
     slug: z.string().regex(/^[a-z0-9-\/]+$/, 'Slug must be kebab-case or valid path').min(1, 'Slug is required'),
 })
 type RouteContext = { params: Promise<{ siteId: string }> }
@@ -117,7 +123,22 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const { data, errorResponse } = await parseRequest(request, newPageSchema)
         if (errorResponse) return errorResponse
 
-        const { title, slug } = data!
+        const { title: rawTitle, slug } = data!
+        const title = stripHtml(rawTitle.trim())
+
+        if (!title) {
+            return new NextResponse('Title is required', { status: 400 })
+        }
+
+        // Check max pages limit
+        const { totalDocs: pageCount } = await payload.find({
+            collection: 'pages',
+            where: { site: { equals: siteId } },
+            limit: 0,
+        })
+        if (pageCount >= MAX_PAGES_PER_SITE) {
+            return new NextResponse(`Maximum ${MAX_PAGES_PER_SITE} pages per site reached`, { status: 400 })
+        }
 
         let normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`
         if (normalizedSlug === '//') normalizedSlug = '/'
