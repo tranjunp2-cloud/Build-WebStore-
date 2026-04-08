@@ -557,14 +557,19 @@ export default function EditorPage() {
             setIsUnpublishModalOpen(false)
             
             if (!currentlyPublished) {
-                const domainUrl = `${siteName ? siteName.toLowerCase().replace(/\s+/g, '-') : 'site'}.primeweb.app` 
-                toast.success('🎉 Website đã live!', { 
-                    description: `Domain: ${domainUrl}`,
-                    action: {
-                        label: 'View',
-                        onClick: () => window.open(`http://${domainUrl}`, '_blank')
-                    }
-                })
+                const data = await res.json()
+                const siteUrl = data?.data?.url || data?.data?.domain
+                if (siteUrl) {
+                    toast.success('🎉 Website đã live!', {
+                        description: `Domain: ${siteUrl.replace(/^https?:\/\//, '')}`,
+                        action: {
+                            label: 'View',
+                            onClick: () => window.open(siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`, '_blank')
+                        }
+                    })
+                } else {
+                    toast.success('🎉 Website đã live!')
+                }
             } else {
                 toast.success('Đã đưa website về trạng thái bảo trì.')
             }

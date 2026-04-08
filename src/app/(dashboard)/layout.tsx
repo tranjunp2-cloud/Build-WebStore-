@@ -4,6 +4,8 @@ import { getCurrentUser } from '@/lib/auth'
 import type { PlatformUser } from '@/types/user'
 import { CMSLayoutClient } from './_components/CMSLayoutClient'
 import { AIDiscoveryWizard } from '@/components/dashboard/AIDiscoveryWizard'
+import { NotificationProvider } from '@/providers/NotificationProvider'
+import { ToastContainer } from '@/components/notifications/ToastContainer'
 
 export default async function DashboardLayout({
     children,
@@ -29,6 +31,12 @@ export default async function DashboardLayout({
                 <CMSLayoutClient userName={userName} userInitial={userInitial} userEmail={userEmail} currentUserRole={currentUserRole}>
                     {children}
                 </CMSLayoutClient>
+                {typedUser && (
+                    <>
+                        <NotificationProvider />
+                        <ToastContainer />
+                    </>
+                )}
                 {/* Only evaluate and render if the user hasn't seen the wizard yet */}
                 {!typedUser?.has_seen_ai_wizard && (
                     <AIDiscoveryWizard userId={typedUser?.id} />

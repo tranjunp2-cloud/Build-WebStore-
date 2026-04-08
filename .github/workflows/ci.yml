@@ -319,6 +319,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ── Sync env vars to DO before deploying ─────────────────────────────
+      # Auto-syncs ALL GitHub Secrets → DO App env vars.
+      # To add a new secret: just run "gh secret set KEY" — auto-synced on next deploy.
+      # CI-only secrets (webhooks, test creds) are excluded by the script.
+      # ⚠️ DO NOT REMOVE — removed in eff47c5 by accident, caused staging 500.
+      - name: Sync env vars → DO App (staging)
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+        run: python3 .github/scripts/sync-do-envs.py ech-prime-web-v2-staging
+
       - name: Deploy to DigitalOcean App Platform
         id: deploy
         uses: digitalocean/app_action/deploy@v2
@@ -366,6 +377,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # ⚠️ DO NOT REMOVE — syncs GitHub Secrets → DO production env vars.
+      - name: Sync env vars → DO App (production)
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+        run: python3 .github/scripts/sync-do-envs.py ech-prime-web-v2
 
       - name: Deploy to DigitalOcean App Platform
         id: deploy
