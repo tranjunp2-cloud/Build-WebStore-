@@ -74,7 +74,8 @@ export async function PATCH(
             tenantSlug = ((fullSite.tenant as Record<string, unknown>).slug as string) || 'site'
         }
 
-        const domainUrl = `${tenantSlug}.primeweb.app`
+        const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
+        const domainUrl = `${tenantSlug}.${platformDomain}`
 
         return NextResponse.json({
             success: true,
