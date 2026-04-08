@@ -1439,7 +1439,13 @@
         "ariaDefault": "Notifications",
         "tagSystem": "System",
         "tagAnnouncement": "Announcement",
-        "broadcastTitle": "System Notification"
+        "broadcastTitle": "System Notification",
+        "toast": {
+            "newNotification": "New notification",
+            "newCount": "{count} new notifications",
+            "justNow": "Just now",
+            "dismiss": "Dismiss"
+        }
     },
     "Staff": {
         "title": "Staff Management",
