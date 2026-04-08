@@ -143,6 +143,7 @@ export function DomainsClient({
     const [domains, setDomains] = useState<DomainEntry[]>(customDomains);
     const [verifyErrors, setVerifyErrors] = useState<Record<string, string>>({});
     const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null);
+    const [removingDomain, setRemovingDomain] = useState<string | null>(null);
 
     const handleAddDomain = () => {
         const domainValue = newDomainInput.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -158,7 +159,11 @@ export function DomainsClient({
                 setIsAddModalOpen(false);
                 setNewDomainInput('');
                 setDomains(prev => [...prev, { domain: domainValue, status: 'pending' }]);
-                toast.success('Domain added successfully! Please configure DNS.');
+                if (res.warning) {
+                    toast.warning(res.warning);
+                } else {
+                    toast.success('Domain added successfully! Please configure DNS.');
+                }
             } else {
                 toast.error(res.error || 'Failed to add domain');
             }
@@ -180,12 +185,19 @@ export function DomainsClient({
         });
     };
 
-    const handleRemove = (domain: string) => {
+    const handleRemoveConfirm = () => {
+        if (!removingDomain) return;
+        const domain = removingDomain;
         startTransition(async () => {
             const res = await removeCustomDomain(domain);
+            setRemovingDomain(null);
             if (res.success) {
                 setDomains(prev => prev.filter(d => d.domain !== domain));
-                toast.success('Custom domain removed.');
+                if (res.warning) {
+                    toast.warning(res.warning);
+                } else {
+                    toast.success('Custom domain removed.');
+                }
             } else {
                 toast.error(res.error || 'Failed to remove domain');
             }
@@ -366,7 +378,7 @@ export function DomainsClient({
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => handleRemove(domain)}
+                                        onClick={() => setRemovingDomain(domain)}
                                         disabled={isPending}
                                         className="w-full sm:w-[112px] flex items-center justify-center h-[50px] rounded-[16px] border border-[rgba(251,44,54,0.3)] bg-transparent text-[#FF6467] hover:bg-[rgba(251,44,54,0.08)] text-[16px] font-semibold font-['Inter'] transition-colors disabled:opacity-50"
                                     >
@@ -399,7 +411,7 @@ export function DomainsClient({
                                 <div className="hidden sm:flex items-center gap-3 pb-[25px]">
                                     <button
                                         type="button"
-                                        onClick={() => handleRemove(domain)}
+                                        onClick={() => setRemovingDomain(domain)}
                                         disabled={isPending || isPrimary === true}
                                         className="flex items-center justify-center h-[44px] px-[16px] rounded-[12px] border border-[#FB2C36]/30 bg-transparent text-[#FF6467] hover:bg-[#FB2C36]/10 text-[14px] font-semibold transition-colors font-['Inter'] disabled:opacity-50"
                                         title={isPrimary ? 'Cannot remove the primary domain' : 'Remove domain'}
@@ -475,6 +487,40 @@ export function DomainsClient({
                     onClose={() => setIsSelectPrimaryOpen(false)}
                     onSave={handleSavePrimary}
                 />
+            )}
+
+            {/* ── Remove Domain Confirmation Modal (TC-F19.14 QA) ─────────── */}
+            {removingDomain && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0B1120]/80 p-4 animate-in fade-in duration-200">
+                    <div className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] bg-[#1E293B] border border-white/[0.08] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200">
+                        <div className="flex flex-col">
+                            <div className="m-0 p-0 text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter']">
+                                Remove domain
+                            </div>
+                            <div className="m-0 p-0 mt-[8px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter']">
+                                Are you sure you want to remove <span className="font-semibold text-[#F8FAFC]">{removingDomain}</span>? This will revoke the SSL certificate and the domain will no longer route to your store.
+                            </div>
+                        </div>
+                        <div className="mt-[24px] flex items-center gap-[12px]">
+                            <button
+                                type="button"
+                                onClick={() => setRemovingDomain(null)}
+                                className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors font-['Inter']"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleRemoveConfirm}
+                                disabled={isPending}
+                                className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] border border-[#FB2C36]/30 bg-[#FB2C36]/10 text-[#FF6467] text-[16px] font-semibold leading-[1.5em] hover:bg-[#FB2C36]/20 transition-colors font-['Inter'] disabled:opacity-50"
+                            >
+                                {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
+                                Remove Domain
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

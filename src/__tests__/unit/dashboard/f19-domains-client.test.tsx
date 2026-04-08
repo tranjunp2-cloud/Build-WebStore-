@@ -211,6 +211,15 @@ describe('F19 Domain Management (DomainsClient)', () => {
         const removeBtn = screen.getByRole('button', { name: 'Remove Domain' });
         fireEvent.click(removeBtn);
 
+        // Confirmation modal should appear
+        await waitFor(() => {
+            expect(screen.getByText(/Are you sure you want to remove/i)).toBeInTheDocument();
+        });
+
+        // Click confirm button in modal (second "Remove Domain" button)
+        const confirmBtns = screen.getAllByRole('button', { name: 'Remove Domain' });
+        fireEvent.click(confirmBtns[confirmBtns.length - 1]);
+
         await waitFor(() => {
             expect(actions.removeCustomDomain).toHaveBeenCalledWith('store.active.com');
             expect(toast.success).toHaveBeenCalledWith('Custom domain removed.');

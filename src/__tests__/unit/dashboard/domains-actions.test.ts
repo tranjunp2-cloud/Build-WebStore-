@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { addCustomDomain, verifyCustomDomain, removeCustomDomain } from '@/app/(dashboard)/settings/domains/actions';
+import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain } from '@/app/(dashboard)/settings/domains/actions';
 import * as dns from 'dns';
 
 // ── MOCKS AT TOP OF FILE (Rule #5) ──
@@ -127,9 +127,63 @@ describe('Domains Server Actions', () => {
             const putCall = mockFetch.mock.calls[1];
             expect(putCall[1].body).toContain('"domains":[]');
         });
+
+        it('TC-F19.02b: blocks removing a domain that is the current primary', async () => {
+            mockFindByID.mockResolvedValueOnce({
+                id: 'tenant-123',
+                customDomains: [{ domain: 'primary.com', status: 'active', isPrimary: true }],
+            });
+
+            const res = await removeCustomDomain('primary.com');
+            expect(res.success).toBe(false);
+            expect(res.error).toMatch(/primary domain/i);
+            expect(mockUpdate).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('setPrimaryDomain', () => {
+        it('TC-F19.04a: blocks setting a pending domain as primary', async () => {
+            mockFindByID.mockResolvedValueOnce({
+                id: 'tenant-123',
+                customDomains: [{ domain: 'pending.com', status: 'pending' }],
+            });
+
+            const res = await setPrimaryDomain('pending.com');
+            expect(res.success).toBe(false);
+            expect(res.error).toMatch(/verified/i);
+        });
+
+        it('TC-F19.04b: sets an active domain as primary successfully', async () => {
+            mockFindByID.mockResolvedValueOnce({
+                id: 'tenant-123',
+                customDomains: [
+                    { domain: 'old.com', status: 'active', isPrimary: true },
+                    { domain: 'new.com', status: 'active', isPrimary: false },
+                ],
+            });
+
+            const res = await setPrimaryDomain('new.com');
+            expect(res.success).toBe(true);
+            expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+                data: {
+                    customDomains: [
+                        { domain: 'old.com', status: 'active', isPrimary: false },
+                        { domain: 'new.com', status: 'active', isPrimary: true },
+                    ],
+                },
+            }));
+        });
     });
 
     describe('verifyCustomDomain', () => {
+        it('TC-F19.03f: returns config error when SERVER_IP env is not set', async () => {
+            vi.stubEnv('SERVER_IP', '');
+
+            const res = await verifyCustomDomain('any-domain.com');
+            expect(res.success).toBe(false);
+            expect(res.error).toMatch(/Server configuration is missing/i);
+        });
+
         it('TC-F19.03a: returns DNS mismatch error if IPs do not match server', async () => {
             const mockedDnsResolve4 = vi.mocked(dns.promises.resolve4);
             mockedDnsResolve4.mockResolvedValueOnce(['1.1.1.1']); // Not the standard server IP
@@ -174,15 +228,16 @@ describe('Domains Server Actions', () => {
             expect(res.error).toMatch(/Domain SSL configuration failed on DigitalOcean/i);
         });
 
-        it('TC-F19.03c: falls back to success if DO API fetch fails (500 internal)', async () => {
+        it('TC-F19.03c: returns error if DO API fetch fails (500 internal) — cannot confirm SSL (REQ-F19-04)', async () => {
             const mockedDnsResolve4 = vi.mocked(dns.promises.resolve4);
             mockedDnsResolve4.mockResolvedValueOnce(['162.159.140.98']); // Valid IP
 
             mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
 
             const res = await verifyCustomDomain('check-me.com');
-            expect(res.success).toBe(true); // Fallback behavior
-            expect(mockUpdate).toHaveBeenCalled();
+            expect(res.success).toBe(false);
+            expect(res.error).toMatch(/SSL status could not be confirmed/i);
+            expect(mockUpdate).not.toHaveBeenCalled();
         });
 
         it('TC-F19.03d: succeeds perfectly when DNS is correct and DO phase is ACTIVE', async () => {

@@ -121,7 +121,9 @@ export async function addCustomDomain(rawDomain: string) {
                 }
             } catch (doError) {
                 console.error('DO API Error (Add Domain):', doError);
-                // We still returned success because it's in our DB, but background DO task failed.
+                // Domain saved in DB but DO sync failed — inform user so they can retry
+                revalidatePath('/settings/domains');
+                return { success: true, warning: 'Domain saved, but failed to register with hosting provider. Verification may be delayed — please try verifying later or contact support.' };
             }
         }
 
@@ -141,6 +143,13 @@ export async function removeCustomDomain(domain: string) {
     const payload = await getPayloadHMR({ config: configPromise });
     try {
         const current = await getTenantDomains(payload, tenantId);
+
+        // Block removing the current primary domain (TC-F19.14 QA)
+        const target = current.find(d => d.domain === domain);
+        if (target?.isPrimary) {
+            return { success: false, error: 'Cannot remove the primary domain. Please set another domain as primary first.' };
+        }
+
         const updated = current.filter(d => d.domain !== domain);
         await payload.update({
             collection: 'tenants',
@@ -188,6 +197,9 @@ export async function removeCustomDomain(domain: string) {
                 }
             } catch (doError) {
                 console.error('DO API Error (Remove Domain):', doError);
+                // Domain removed from DB but DO sync failed — warn user
+                revalidatePath('/settings/domains');
+                return { success: true, warning: 'Domain removed from your store, but failed to sync with hosting provider. The domain may still route temporarily — please contact support if it persists.' };
             }
         }
 
@@ -212,9 +224,11 @@ export async function verifyCustomDomain(domain: string) {
     let errorMessage = 'Verification failed. DNS records not found. Propagation may take up to 48 hours.';
 
     if (!serverIp) {
-        // ── DEV MODE: SERVER_IP not set → simulate (80% success) ──
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        isSuccess = Math.random() > 0.2;
+        // SERVER_IP is required for DNS verification — block if not configured
+        return {
+            success: false,
+            error: 'Domain verification is not available. Server configuration is missing (SERVER_IP). Please contact support.',
+        };
     } else {
         // ── PRODUCTION: Real DNS lookup & DO SSL Check ──
         try {
@@ -264,8 +278,9 @@ export async function verifyCustomDomain(domain: string) {
                             }
                         }
                     } else {
-                        // If DO API fails, fall back to just DNS success to avoid blocking
-                        isSuccess = true;
+                        // DO API failed — cannot confirm SSL provisioning (REQ-F19-04)
+                        isSuccess = false;
+                        errorMessage = 'DNS records are correct, but SSL status could not be confirmed. Please try again in a few minutes.';
                     }
                 } else {
                     // No API Token? Just trust the DNS check.
