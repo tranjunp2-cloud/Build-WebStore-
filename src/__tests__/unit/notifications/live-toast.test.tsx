@@ -19,7 +19,7 @@ class MockEventSource {
     })
     removeEventListener = vi.fn()
     static notificationListeners: Function[] = []
-    static dispatchNotification(data: any) {
+    static dispatchNotification(data: { id: string }) {
         MockEventSource.notificationListeners.forEach(cb => cb({ data: JSON.stringify(data) }))
     }
     static reset() { MockEventSource.notificationListeners = [] }
@@ -27,7 +27,7 @@ class MockEventSource {
 
 vi.stubGlobal('EventSource', MockEventSource)
 
-function setupFetchMock(resolvesWith: any) {
+function setupFetchMock(resolvesWith: { unreadCount?: number; items?: Array<{ id: string; title: string; type?: string; message?: string }> }) {
     global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(resolvesWith),

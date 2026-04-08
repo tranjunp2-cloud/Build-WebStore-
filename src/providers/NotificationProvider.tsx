@@ -67,8 +67,8 @@ export function NotificationProvider() {
                             return
                         }
                     }
-                } catch {
-                    // Fallback to generic toast below
+                } catch (err) {
+                    console.warn('Failed to fetch notification', err)
                 }
                 emitToast({
                     id: events[0],
@@ -100,8 +100,8 @@ export function NotificationProvider() {
                     buffer.push(String(data.id ?? Date.now()))
                     if (debounceTimer) clearTimeout(debounceTimer)
                     debounceTimer = setTimeout(() => processBuffer(), DEBOUNCE_MS)
-                } catch {
-                    // Malformed event — ignore
+                } catch (err) {
+                    console.warn('Malformed notification event', err)
                 }
             })
 
