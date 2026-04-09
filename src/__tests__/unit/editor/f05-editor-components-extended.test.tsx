@@ -26,7 +26,13 @@ vi.mock('next/font/google', () => ({
 // ── Mock i18n ────────────────────────────────────────────────────────────
 vi.mock('@/i18n', () => ({
     useI18n: () => ({
-        t: { dashboard: { overview: {} }, editor: { unpublish: { title: 'Unpublish', confirm: 'Confirm', cancel: 'Cancel', description: 'Are you sure?' } } },
+        t: {
+            dashboard: { overview: {} },
+            editor: {
+                unpublish: { title: 'Unpublish', confirm: 'Confirm', cancel: 'Cancel', description: 'Are you sure?' },
+                unpublishModal: { title: 'Unpublish Site', warningTitle: 'Warning', warningDesc: 'Site will go offline', ownerAccessTitle: 'Owner access', ownerAccessDesc: 'Only you can see', cancel: 'Cancel', confirm: 'Confirm Unpublish', processing: 'Processing...' },
+            },
+        },
         locale: 'en',
     }),
     I18nProvider: ({ children }: any) => children,
@@ -140,8 +146,7 @@ describe('UnpublishModal', () => {
                 isPublishing={false}
             />
         )
-        expect(screen.getByText(/Xác nhận tạm ẩn website/)).toBeTruthy()
-        expect(screen.getByText(/Maintenance Mode/i)).toBeTruthy()
+        expect(screen.getAllByText(/Unpublish Site/).length).toBeGreaterThan(0)
     })
 
     it('does not render when closed', () => {
@@ -166,7 +171,7 @@ describe('UnpublishModal', () => {
                 isPublishing={false}
             />
         )
-        fireEvent.click(screen.getByText('Bật chế độ Tạm ẩn'))
+        fireEvent.click(screen.getByText('Confirm Unpublish'))
         expect(onUnpublish).toHaveBeenCalledOnce()
     })
 
@@ -179,7 +184,7 @@ describe('UnpublishModal', () => {
                 isPublishing={true}
             />
         )
-        expect(screen.getByText('Đang xử lý...')).toBeTruthy()
+        expect(screen.getByText('Processing...')).toBeTruthy()
     })
 })
 
