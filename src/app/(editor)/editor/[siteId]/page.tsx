@@ -114,6 +114,7 @@ export default function EditorPage() {
     const duplicateBlock = useEditorStore(state => state.duplicateBlock)
     const reorderBlocks = useEditorStore(state => state.reorderBlocks)
     const updateTheme = useEditorStore(state => state.updateTheme)
+    const updateSiteName = useEditorStore(state => state.updateSiteName)
     const headerBlock = useEditorStore(state => state.headerBlock)
     const footerBlock = useEditorStore(state => state.footerBlock)
     const updateHeaderBlock = useEditorStore(state => state.updateHeaderBlock)
@@ -259,6 +260,7 @@ export default function EditorPage() {
                     theme: currentTheme,
                     headerBlock: snapshot.headerBlock,
                     footerBlock: snapshot.footerBlock,
+                    isDraft: true,
                 }),
             })
 
@@ -339,6 +341,10 @@ export default function EditorPage() {
     const handleSiteSettingsChange = useCallback(async (changes: Partial<SiteData>) => {
         if (!siteId) return
 
+        if (changes.name) {
+            updateSiteName(changes.name)
+        }
+
         setSite(prev => {
             if (!prev) return prev
 
@@ -396,7 +402,7 @@ export default function EditorPage() {
             console.error('Failed to update site settings', error)
             toast.error('Failed to update site settings', { description: 'Please try again later.' })
         }
-    }, [currentPageId, siteId])
+    }, [currentPageId, siteId, updateSiteName])
 
     const handleDeleteBlock = useCallback((index: number) => {
         deleteBlock(index)
@@ -845,6 +851,8 @@ export default function EditorPage() {
                                     id: `inline-${Date.now()}`,
                                     content,
                                 })
+                                void handleSave({ showToast: false, refreshPreview: true })
+                                setIframeKey(key => key + 1)
                             }}
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}

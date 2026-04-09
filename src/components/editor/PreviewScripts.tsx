@@ -131,64 +131,142 @@ export function PreviewScripts() {
             }
         }
 
-        const onPointerDown = () => {
+        const onPointerDown = (e: PointerEvent) => {
             window.parent.postMessage({ type: 'PREVIEW_POINTER_DOWN' }, parentOrigin)
+            // If clicking outside the current editing element, finish editing
+            if (currentEditingEl && e.target !== currentEditingEl && !currentEditingEl.contains(e.target as Node)) {
+                cleanUpEditing()
+            }
         }
 
         let currentEditingEl: HTMLElement | null = null
         let originalText = ''
+        let originalHtml = ''
+        let originalTag = ''
+
+        const HEADING_TAGS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6']
+
+        /**
+         * Build clean HTML from the current editing element.
+         * Only checks explicit tags in innerHTML — heading and inline formatting
+         * are completely independent.
+         */
+        const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+        const buildCleanHtml = (el: HTMLElement): string => {
+            const text = el.innerText?.trim() || ''
+            if (!text) return ''
+
+            const rawHtml = el.innerHTML
+            const isBold = /<b\b|<strong\b/i.test(rawHtml)
+            const isItalic = /<i\b|<em\b/i.test(rawHtml)
+            const isUnderline = /<u\b/i.test(rawHtml)
+
+            let html = escapeHtml(text)
+            if (isUnderline) html = `<u>${html}</u>`
+            if (isItalic) html = `<i>${html}</i>`
+            if (isBold) html = `<b>${html}</b>`
+
+            if (HEADING_TAGS.includes(el.tagName)) {
+                html = `<${el.tagName.toLowerCase()}>${html}</${el.tagName.toLowerCase()}>`
+            }
+
+            return html
+        }
 
         const cleanUpEditing = () => {
             if (!currentEditingEl) return
+            // Build clean HTML BEFORE removing contenteditable (queryCommandState needs it)
+            const cleanHtml = buildCleanHtml(currentEditingEl)
             currentEditingEl.removeAttribute('contenteditable')
-            const newText = currentEditingEl.innerText?.trim()
+            const searchKey = originalText
             const blockIndex = parseInt(currentEditingEl.closest('[data-block-index]')?.getAttribute('data-block-index') || '-1', 10)
-            
+
+            // Reconstruct oldHtml to match field value (including heading wrapper if original was heading)
+            const oldHtmlFull = HEADING_TAGS.includes(originalTag)
+                ? `<${originalTag.toLowerCase()}>${originalHtml}</${originalTag.toLowerCase()}>`
+                : originalHtml
+
             window.parent.postMessage({
                 type: 'TEXT_EDITED',
                 blockIndex,
-                oldText: originalText,
-                newText: newText
+                searchKey,
+                oldHtml: oldHtmlFull,
+                newHtml: cleanHtml,
             }, parentOrigin)
-            
+
             currentEditingEl = null
             window.parent.postMessage({ type: 'TEXT_EDITING_STOPPED' }, parentOrigin)
         }
 
-        const onDblClick = (e: MouseEvent) => {
-            const target = e.target as HTMLElement
+        const onTextClick = (e: MouseEvent) => {
+            let target = e.target as HTMLElement
             const blockContainer = target.closest('[data-block-index]')
-            
+
             if (!blockContainer) return
             const blockType = blockContainer.getAttribute('data-block-type')
             if (blockType && excludedBlockTypes.includes(blockType)) return
 
-            if (validTags.includes(target.tagName) && target.children.length <= 1) {
-                e.preventDefault()
-                e.stopPropagation()
-                
-                if (currentEditingEl && currentEditingEl !== target) {
-                    cleanUpEditing()
-                }
-                
-                currentEditingEl = target
-                currentEditingEl.setAttribute('contenteditable', 'true')
-                currentEditingEl.focus()
-                originalText = currentEditingEl.innerText?.trim() || ''
+            // Walk up from click target to find nearest valid editable element
+            // (click may land on <b>, <i>, <u> inside a valid element)
+            // Stop before reaching block container or its direct structural children
+            while (target && target !== blockContainer && target.parentElement !== blockContainer) {
+                if (validTags.includes(target.tagName)) break
+                target = target.parentElement!
+            }
+            if (!target || target === blockContainer || !validTags.includes(target.tagName)) return
+            // Don't edit elements with many block-level children (sections, not text)
+            const blockChildren = Array.from(target.children).filter(c =>
+                ['DIV', 'SECTION', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'UL', 'OL'].includes(c.tagName)
+            )
+            if (blockChildren.length > 1) return
 
-                const rect = target.getBoundingClientRect()
-                window.parent.postMessage({
-                    type: 'TEXT_EDITING_STARTED',
-                    rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-                    blockIndex: parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10)
-                }, parentOrigin)
+            // Skip if already editing this element
+            if (currentEditingEl === target) return
+
+            if (currentEditingEl && currentEditingEl !== target) {
+                cleanUpEditing()
+            }
+
+            currentEditingEl = target
+            currentEditingEl.setAttribute('contenteditable', 'true')
+            currentEditingEl.focus()
+            originalText = currentEditingEl.innerText?.trim() || ''
+            originalHtml = currentEditingEl.innerHTML?.trim() || ''
+            originalTag = currentEditingEl.tagName
+
+            const rect = target.getBoundingClientRect()
+            window.parent.postMessage({
+                type: 'TEXT_EDITING_STARTED',
+                rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+                blockIndex: parseInt(blockContainer.getAttribute('data-block-index') || '-1', 10)
+            }, parentOrigin)
+        }
+
+        // Track whether parent toolbar is being used — skip blur cleanup if so
+        let toolbarActive = false
+        let blurCleanupTimer: number | null = null
+
+        const cancelBlurCleanup = () => {
+            if (blurCleanupTimer !== null) {
+                clearTimeout(blurCleanupTimer)
+                blurCleanupTimer = null
             }
         }
 
         const onBlur = (e: FocusEvent) => {
-            if (currentEditingEl === e.target) {
-                cleanUpEditing()
+            if (currentEditingEl !== e.target) return
+            // relatedTarget is null when focus moves to parent frame (toolbar)
+            // relatedTarget is set when focus moves within the iframe
+            if (e.relatedTarget === null) {
+                // Focus moved to parent frame (toolbar, dropdown, or elsewhere).
+                // Do NOT cleanup here — parent will send STOP_TEXT_EDITING if user
+                // clicked outside toolbar. This avoids racing with select dropdown.
+                toolbarActive = true
+                return
             }
+            // Focus moved within iframe — cleanup immediately
+            cleanUpEditing()
         }
 
         const onKeyDown = (e: KeyboardEvent) => {
@@ -291,13 +369,129 @@ export function PreviewScripts() {
             }
         }
 
+        // Save/restore selection across cross-frame focus changes
+        let savedRange: Range | null = null
+
+        const saveSelection = () => {
+            const sel = window.getSelection()
+            if (sel && sel.rangeCount > 0) {
+                savedRange = sel.getRangeAt(0).cloneRange()
+            }
+        }
+
+        const restoreSelection = () => {
+            if (!savedRange) return
+            const sel = window.getSelection()
+            if (sel) {
+                sel.removeAllRanges()
+                sel.addRange(savedRange)
+            }
+        }
+
+        const postSelectionState = () => {
+            const html = currentEditingEl?.innerHTML || ''
+            window.parent.postMessage({
+                type: 'SELECTION_STATE',
+                state: {
+                    bold: /<b\b|<strong\b/i.test(html),
+                    italic: /<i\b|<em\b/i.test(html),
+                    underline: /<u\b/i.test(html),
+                    formatBlock: currentEditingEl?.tagName || 'P',
+                }
+            }, parentOrigin)
+        }
+
+        // Save selection when iframe loses focus (user clicked toolbar in parent)
+        const onWindowBlur = () => { saveSelection() }
+        window.addEventListener('blur', onWindowBlur)
+
+        // Track selection changes for toolbar active state
+        const onSelectionChange = () => {
+            if (currentEditingEl) postSelectionState()
+        }
+        document.addEventListener('selectionchange', onSelectionChange)
+
         const onMessage = (e: MessageEvent) => {
             const allowedOrigin = window.location.origin
             if (e.origin !== allowedOrigin) return
-            
+
             if (e.data?.type === 'EXEC_COMMAND') {
-                document.execCommand(e.data.command, false, e.data.value)
-                currentEditingEl?.focus()
+                toolbarActive = false
+                cancelBlurCleanup()
+                if (!currentEditingEl) return
+
+                currentEditingEl.focus()
+                restoreSelection()
+
+                const cmd = e.data.command as string
+                const val = e.data.value as string | undefined
+
+                // ── formatBlock: change element tag only, preserve inline formatting ──
+                const ALLOWED_FORMAT_TAGS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P']
+                if (cmd === 'formatBlock' && val && ALLOWED_FORMAT_TAGS.includes(val.toUpperCase())) {
+                    const newTag = val.toUpperCase()
+                    if (currentEditingEl.tagName !== newTag) {
+                        const newEl = document.createElement(newTag)
+                        newEl.innerHTML = currentEditingEl.innerHTML
+                        // Only copy safe attributes (class, style) — skip event handlers
+                        const safeAttrs = ['class', 'style']
+                        for (const attr of safeAttrs) {
+                            const v = currentEditingEl.getAttribute(attr)
+                            if (v) newEl.setAttribute(attr, v)
+                        }
+                        newEl.setAttribute('contenteditable', 'true')
+                        currentEditingEl.replaceWith(newEl)
+                        currentEditingEl = newEl
+                        newEl.focus()
+                        const range = document.createRange()
+                        range.selectNodeContents(newEl)
+                        const sel = window.getSelection()
+                        sel?.removeAllRanges()
+                        sel?.addRange(range)
+                        saveSelection()
+                    }
+
+                // ── bold/italic/underline: toggle by rebuilding innerHTML from scratch ──
+                } else if (['bold', 'italic', 'underline'].includes(cmd)) {
+                    const rawHtml = currentEditingEl.innerHTML
+                    const text = currentEditingEl.innerText?.trim() || ''
+
+                    // Read current state from DOM
+                    let hasBold = /<b\b|<strong\b/i.test(rawHtml)
+                    let hasItalic = /<i\b|<em\b/i.test(rawHtml)
+                    let hasUnderline = /<u\b/i.test(rawHtml)
+
+                    // Toggle the requested format
+                    if (cmd === 'bold') hasBold = !hasBold
+                    if (cmd === 'italic') hasItalic = !hasItalic
+                    if (cmd === 'underline') hasUnderline = !hasUnderline
+
+                    // Rebuild clean HTML
+                    let newHtml = text
+                    if (hasUnderline) newHtml = `<u>${newHtml}</u>`
+                    if (hasItalic) newHtml = `<i>${newHtml}</i>`
+                    if (hasBold) newHtml = `<b>${newHtml}</b>`
+
+                    currentEditingEl.innerHTML = newHtml
+
+                    const range = document.createRange()
+                    range.selectNodeContents(currentEditingEl)
+                    const sel = window.getSelection()
+                    sel?.removeAllRanges()
+                    sel?.addRange(range)
+                    saveSelection()
+
+                // ── other commands (alignment, etc.): use execCommand ──
+                } else {
+                    document.execCommand(cmd, false, val)
+                }
+                // Re-save selection + update toolbar state
+                saveSelection()
+                postSelectionState()
+            }
+            if (e.data?.type === 'STOP_TEXT_EDITING') {
+                toolbarActive = false
+                cleanUpEditing()
             }
             if (e.data?.type === 'DRAG_BLOCK_START') {
                 const el = document.querySelector(`[data-block-index="${e.data.blockIndex}"]`) as HTMLElement
@@ -313,7 +507,7 @@ export function PreviewScripts() {
         document.addEventListener('mouseover', onMouseOver)
         document.addEventListener('mouseout', onMouseOut)
         document.addEventListener('pointerdown', onPointerDown)
-        document.addEventListener('dblclick', onDblClick)
+        document.addEventListener('click', onTextClick)
         document.addEventListener('blur', onBlur, true) // capture phase
         document.addEventListener('keydown', onKeyDown)
         document.addEventListener('click', onClick)
@@ -393,7 +587,7 @@ export function PreviewScripts() {
             document.removeEventListener('mouseover', onMouseOver)
             document.removeEventListener('mouseout', onMouseOut)
             document.removeEventListener('pointerdown', onPointerDown)
-            document.removeEventListener('dblclick', onDblClick)
+            document.removeEventListener('click', onTextClick)
             document.removeEventListener('blur', onBlur, true)
             document.removeEventListener('keydown', onKeyDown)
             document.removeEventListener('click', onClick)
@@ -401,6 +595,8 @@ export function PreviewScripts() {
             document.removeEventListener('dragleave', onDragLeave)
             document.removeEventListener('drop', onDrop)
             window.removeEventListener('message', onMessage)
+            window.removeEventListener('blur', onWindowBlur)
+            document.removeEventListener('selectionchange', onSelectionChange)
             window.removeEventListener('load', postLayouts)
             window.removeEventListener('resize', postLayouts)
             window.removeEventListener('scroll', postLayouts)

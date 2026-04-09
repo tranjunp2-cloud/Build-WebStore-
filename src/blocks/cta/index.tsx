@@ -5,6 +5,7 @@ import type { CTAConfig } from './config'
 import { AnimatedSection } from '../shared/animations'
 import { motion, useReducedMotion } from 'framer-motion'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../shared/RichText'
 
 function CTAButton({ label, url, style, variant }: { label: string; url: string; style: 'primary' | 'outline'; variant: string }) {
     const shouldReduce = useReducedMotion()
@@ -19,7 +20,7 @@ function CTAButton({ label, url, style, variant }: { label: string; url: string;
     if (shouldReduce) {
         return (
             <a href={url} rel="noopener noreferrer" className="inline-block px-8 py-3.5 font-semibold text-sm transition-colors hover:opacity-90" style={buttonStyle}>
-                {label}
+                <RichText text={label} as="span" />
             </a>
         )
     }

@@ -72,6 +72,7 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
             isVisible?: boolean | null
             seo?: { title?: string; description?: string }
             updatedAt: string
+            layout?: unknown[]
         }
 
         const formattedPages = (pages as unknown as PageDoc[]).map((p: PageDoc) => ({
@@ -84,6 +85,7 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
             seoTitle: p.seo?.title ?? null,
             seoDescription: p.seo?.description ?? null,
             updatedAt: p.updatedAt,
+            blockCount: Array.isArray(p.layout) ? p.layout.length : 0,
         }))
 
         return NextResponse.json({ pages: formattedPages })

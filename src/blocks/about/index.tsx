@@ -8,6 +8,7 @@ import { getAboutImage } from '@/lib/images/industry-images'
 import { SectionLabel } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { toPlainText } from '@/lib/utils/to-plain-text'
+import { RichText } from '../shared/RichText'
 
 function SimpleVariant({ block }: { block: AboutConfig }) {
     const { headline, sectionLabel } = block
@@ -17,11 +18,11 @@ function SimpleVariant({ block }: { block: AboutConfig }) {
             <div className="container mx-auto px-6 max-w-3xl text-center">
                 {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
                 <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                    {headline}
+                    <RichText text={headline} as="span" />
                 </h2>
                 {body && (
                     <p className="text-lg leading-relaxed" style={{ color: CSS_VARS.muted }}>
-                        {body}
+                        <RichText text={body} as="span" />
                     </p>
                 )}
             </div>
@@ -65,11 +66,11 @@ function SplitVariant({ block, category }: { block: AboutConfig; category: strin
                     >
                         {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
                         <h2 className="text-3xl md:text-4xl font-bold mb-6 leading-tight" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                            {headline}
+                            <RichText text={headline} as="span" />
                         </h2>
                         {body && (
                             <p className="text-lg leading-relaxed" style={{ color: CSS_VARS.muted }}>
-                                {body}
+                                <RichText text={body} as="span" />
                             </p>
                         )}
                     </motion.div>

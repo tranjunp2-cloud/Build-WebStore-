@@ -35,6 +35,7 @@ export type PageData = {
     error?: string | null
     deletedAt?: string | null
     updatedAt: string
+    blockCount?: number
 }
 
 type EditorState = {
@@ -93,6 +94,7 @@ type EditorActions = {
 
     // Theme
     updateTheme: (changes: ThemeState, label?: string) => void
+    updateSiteName: (name: string) => void
 
     // Header/Footer (F-05-07)
     updateHeaderBlock: (changes: BlockPatch) => void
@@ -321,6 +323,10 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             historyIndex: newHistory.length - 1,
         })
         get().handleContentChange()
+    },
+
+    updateSiteName: (name: string) => {
+        set({ siteName: name })
     },
 
     // ── AI Batch (F-11) ─────────────────────────────────────────────────
