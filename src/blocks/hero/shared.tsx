@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import type { HeroConfig } from './config'
+import { RichText } from '../shared/RichText'
 
 // ── Shared CTA renderer ──────────────────────────────────────────────────────
 export function CTAButtons({ buttons, variant = 'default' }: { buttons: HeroConfig['ctaButtons']; variant?: 'default' | 'glass' }) {
@@ -43,7 +44,7 @@ export function CTAButtons({ buttons, variant = 'default' }: { buttons: HeroConf
                                 boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)`,
                             }}
                 >
-                    {btn.label}
+                    <RichText text={btn.label} as="span" />
                 </motion.a>
             ))}
         </div>
