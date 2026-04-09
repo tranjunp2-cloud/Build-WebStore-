@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPayloadHMR } from '@payloadcms/next/utilities'
+import { getPayload } from 'payload'
 import configPromise from '@payload-config'
 
 /**
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const payload = await getPayloadHMR({ config: configPromise })
+        const payload = await getPayload({ config: configPromise })
 
         // Find the tenant that has this custom domain
         const result = await payload.find({
