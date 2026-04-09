@@ -8,9 +8,11 @@ import {
 
 interface RichTextToolbarProps {
     onCommand: (command: string, value?: string) => void
+    activeState?: Record<string, unknown>
 }
 
-export function RichTextToolbar({ onCommand }: RichTextToolbarProps) {
+export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbarProps) {
+    const isActive = (cmd: string) => Boolean(activeState[cmd])
     return (
         <div className="flex items-center gap-1 bg-white border border-gray-200 shadow-xl rounded-lg p-1.5 pointer-events-auto">
             <select 
@@ -27,22 +29,22 @@ export function RichTextToolbar({ onCommand }: RichTextToolbarProps) {
 
             <div className="w-px h-6 bg-gray-200 mx-1" />
 
-            <button 
-                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            <button
+                className={`p-1.5 rounded transition-colors ${isActive('bold') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('bold') }}
                 title="Bold"
             >
                 <Bold className="w-4 h-4" />
             </button>
-            <button 
-                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            <button
+                className={`p-1.5 rounded transition-colors ${isActive('italic') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('italic') }}
                 title="Italic"
             >
                 <Italic className="w-4 h-4" />
             </button>
-            <button 
-                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            <button
+                className={`p-1.5 rounded transition-colors ${isActive('underline') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('underline') }}
                 title="Underline"
             >

@@ -330,7 +330,7 @@ function PreviewFrameInner({
 
                 const nextData = e.data as Omit<HoveredElementData, 'fieldPath'> & { rect: HoverRect | null }
                 const block = blocksRef.current[nextData.blockIndex]
-                const fieldPath = block ? findStringFieldPath(block, nextData.text) : null
+                const fieldPath = block ? findStringFieldPath(block, nextData.text, nextData.text) : null
 
                 setHoverData({
                     ...nextData,
