@@ -42,11 +42,12 @@ const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/r
  * - primeweb.app      → Marketing / dashboard pages
  */
 export async function middleware(req: NextRequest) {
-    const { pathname, hostname } = req.nextUrl
+    const { pathname } = req.nextUrl
     const url = req.nextUrl.clone()
 
-    // DEBUG: log hostname + PLATFORM_DOMAIN (remove after subdomain fix verified)
-    console.log(`[MW] hostname=${hostname} PLATFORM_DOMAIN=${PLATFORM_DOMAIN} path=${pathname}`)
+    // Docker sets HOSTNAME=0.0.0.0 → req.nextUrl.hostname is "0.0.0.0" not the real host.
+    // Read the Host header instead (set by DO load balancer / Cloudflare).
+    const hostname = req.headers.get('host')?.split(':')[0] || req.nextUrl.hostname
 
     // Allow Next.js internals and static files
     if (
