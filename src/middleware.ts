@@ -118,10 +118,13 @@ export async function middleware(req: NextRequest) {
     }
 
     // ── Custom domain: hostname không phải platform, không phải admin, không phải DO app URL ──
+    // SERVER_DOMAIN = web-cms-v2.dev.ecommercehub.my (dashboard/API domain, different from PLATFORM_DOMAIN)
+    const SERVER_DOMAIN = (process.env.NEXT_PUBLIC_SERVER_URL || '').replace(/^https?:\/\//, '').split(':')[0]
     const isDoInternalHost =
         hostname === PLATFORM_DOMAIN ||
         hostname === `www.${PLATFORM_DOMAIN}` ||
         hostname === ADMIN_DOMAIN ||
+        hostname === SERVER_DOMAIN ||
         hostname === '0.0.0.0' ||
         hostname.includes('localhost') ||
         hostname.includes('127.0.0.1') ||
