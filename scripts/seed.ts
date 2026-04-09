@@ -85,14 +85,16 @@ async function seed() {
   }
 
   // 4. Tạo categories (3 cấp) — phải tạo trước products vì product.category required
+  type CategoryLite = { id: number; slug: string }
+
   const existingCategories = await payload.find({
     collection: 'categories',
     where: { site: { equals: site.id as number } },
   })
 
-  let bajuKurungCat: any
-  let tudungCat: any
-  let sneakerCat: any
+  let bajuKurungCat: CategoryLite | null = null
+  let tudungCat: CategoryLite | null = null
+  let sneakerCat: CategoryLite | null = null
 
   if (existingCategories.totalDocs === 0) {
     const fesyenWanita = await payload.create({
@@ -108,12 +110,12 @@ async function seed() {
     bajuKurungCat = await payload.create({
       collection: 'categories',
       data: { name: 'Baju Kurung', slug: 'baju-kurung', parent: pakaian.id as number, site: site.id as number, tenant: tenant.id as number },
-    })
+    }) as unknown as CategoryLite
 
     tudungCat = await payload.create({
       collection: 'categories',
       data: { name: 'Tudung', slug: 'tudung', parent: pakaian.id as number, site: site.id as number, tenant: tenant.id as number },
-    })
+    }) as unknown as CategoryLite
 
     const kasut = await payload.create({
       collection: 'categories',
@@ -123,7 +125,7 @@ async function seed() {
     sneakerCat = await payload.create({
       collection: 'categories',
       data: { name: 'Sneaker Wanita', slug: 'sneaker-wanita', parent: kasut.id as number, site: site.id as number, tenant: tenant.id as number },
-    })
+    }) as unknown as CategoryLite
 
     const makanan = await payload.create({
       collection: 'categories',
@@ -143,21 +145,24 @@ async function seed() {
     console.log('  ✓ Created hierarchical categories (up to 3 levels)')
   } else {
     console.log(`  ✓ Categories already exist (${existingCategories.totalDocs})`)
-    // Find existing categories for product assignment
     const allCats = await payload.find({ collection: 'categories', where: { site: { equals: site.id as number } }, limit: 100 })
-    bajuKurungCat = allCats.docs.find((c: any) => c.slug === 'baju-kurung')
-    tudungCat = allCats.docs.find((c: any) => c.slug === 'tudung')
-    sneakerCat = allCats.docs.find((c: any) => c.slug === 'sneaker-wanita')
+    bajuKurungCat = (allCats.docs.find((c) => c.slug === 'baju-kurung') as unknown as CategoryLite) ?? null
+    tudungCat = (allCats.docs.find((c) => c.slug === 'tudung') as unknown as CategoryLite) ?? null
+    sneakerCat = (allCats.docs.find((c) => c.slug === 'sneaker-wanita') as unknown as CategoryLite) ?? null
   }
 
   // 5. Tạo 5 products (với category)
-  const defaultCatId = (bajuKurungCat?.id || tudungCat?.id || sneakerCat?.id) as number
+  const defaultCatId = bajuKurungCat?.id ?? tudungCat?.id ?? sneakerCat?.id
+  if (!defaultCatId) {
+    throw new Error('No category found — cannot seed products without at least one category')
+  }
+
   const productList = [
-    { name: 'Baju Kurung Pink', price: 189, inventory: 50, slug: 'baju-kurung-pink', category: [bajuKurungCat?.id as number || defaultCatId] },
-    { name: 'Tudung Bawal Basic', price: 35, inventory: 100, slug: 'tudung-bawal-basic', category: [tudungCat?.id as number || defaultCatId] },
-    { name: 'Telekung Premium', price: 250, inventory: 30, slug: 'telekung-premium', category: [bajuKurungCat?.id as number || defaultCatId] },
-    { name: 'Beg Tangan Kulit', price: 120, inventory: 40, slug: 'beg-tangan-kulit', category: [bajuKurungCat?.id as number || defaultCatId] },
-    { name: 'Kasut Perempuan', price: 89, inventory: 60, slug: 'kasut-perempuan', category: [sneakerCat?.id as number || defaultCatId] },
+    { name: 'Baju Kurung Pink', price: 189, inventory: 50, slug: 'baju-kurung-pink', category: [bajuKurungCat?.id ?? defaultCatId] },
+    { name: 'Tudung Bawal Basic', price: 35, inventory: 100, slug: 'tudung-bawal-basic', category: [tudungCat?.id ?? defaultCatId] },
+    { name: 'Telekung Premium', price: 250, inventory: 30, slug: 'telekung-premium', category: [bajuKurungCat?.id ?? defaultCatId] },
+    { name: 'Beg Tangan Kulit', price: 120, inventory: 40, slug: 'beg-tangan-kulit', category: [bajuKurungCat?.id ?? defaultCatId] },
+    { name: 'Kasut Perempuan', price: 89, inventory: 60, slug: 'kasut-perempuan', category: [sneakerCat?.id ?? defaultCatId] },
   ]
 
   const existingProducts = await payload.find({
