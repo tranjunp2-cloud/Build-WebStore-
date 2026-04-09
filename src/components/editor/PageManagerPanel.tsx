@@ -237,6 +237,7 @@ export function PageManagerPanel({
                     <form onSubmit={handleCreatePage} className="rounded-2xl border border-white/10 bg-white/5 p-3">
                         <Input
                             autoFocus
+                            required
                             value={newPageTitle}
                             onChange={e => setNewPageTitle(e.target.value)}
                             placeholder="Tên trang (VD: Khuyến mãi)"
