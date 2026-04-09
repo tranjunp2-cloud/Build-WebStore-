@@ -14,9 +14,14 @@ interface RichTextToolbarProps {
 export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbarProps) {
     const isActive = (cmd: string) => Boolean(activeState[cmd])
     return (
-        <div className="flex items-center gap-1 bg-white border border-gray-200 shadow-xl rounded-lg p-1.5 pointer-events-auto">
-            <select 
-                defaultValue="p" 
+        <div
+            data-wysiwyg-toolbar
+            className="flex items-center gap-1 bg-white border border-gray-200 shadow-xl rounded-lg p-1.5 pointer-events-auto"
+            onMouseDown={(e) => e.preventDefault()}
+        >
+            <select
+                defaultValue="p"
+                onMouseDown={(e) => e.stopPropagation()}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onCommand('formatBlock', e.target.value)}
                 className="w-[110px] h-8 text-xs border-0 bg-transparent hover:bg-gray-100 focus:ring-0 cursor-pointer outline-none"
             >

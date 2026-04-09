@@ -291,13 +291,63 @@ export function PreviewScripts() {
             }
         }
 
+        // Save/restore selection across cross-frame focus changes
+        let savedRange: Range | null = null
+
+        const saveSelection = () => {
+            const sel = window.getSelection()
+            if (sel && sel.rangeCount > 0) {
+                savedRange = sel.getRangeAt(0).cloneRange()
+            }
+        }
+
+        const restoreSelection = () => {
+            if (!savedRange) return
+            const sel = window.getSelection()
+            if (sel) {
+                sel.removeAllRanges()
+                sel.addRange(savedRange)
+            }
+        }
+
+        const postSelectionState = () => {
+            window.parent.postMessage({
+                type: 'SELECTION_STATE',
+                state: {
+                    bold: document.queryCommandState('bold'),
+                    italic: document.queryCommandState('italic'),
+                    underline: document.queryCommandState('underline'),
+                }
+            }, parentOrigin)
+        }
+
+        // Save selection when iframe loses focus (user clicked toolbar in parent)
+        const onWindowBlur = () => { saveSelection() }
+        window.addEventListener('blur', onWindowBlur)
+
+        // Track selection changes for toolbar active state
+        const onSelectionChange = () => {
+            if (currentEditingEl) postSelectionState()
+        }
+        document.addEventListener('selectionchange', onSelectionChange)
+
         const onMessage = (e: MessageEvent) => {
             const allowedOrigin = window.location.origin
             if (e.origin !== allowedOrigin) return
-            
+
             if (e.data?.type === 'EXEC_COMMAND') {
+                // Restore selection that was lost when user clicked parent toolbar
+                if (currentEditingEl) {
+                    currentEditingEl.focus()
+                    restoreSelection()
+                }
                 document.execCommand(e.data.command, false, e.data.value)
-                currentEditingEl?.focus()
+                // Re-save selection + update toolbar state
+                saveSelection()
+                postSelectionState()
+            }
+            if (e.data?.type === 'STOP_TEXT_EDITING') {
+                cleanUpEditing()
             }
             if (e.data?.type === 'DRAG_BLOCK_START') {
                 const el = document.querySelector(`[data-block-index="${e.data.blockIndex}"]`) as HTMLElement
@@ -401,6 +451,8 @@ export function PreviewScripts() {
             document.removeEventListener('dragleave', onDragLeave)
             document.removeEventListener('drop', onDrop)
             window.removeEventListener('message', onMessage)
+            window.removeEventListener('blur', onWindowBlur)
+            document.removeEventListener('selectionchange', onSelectionChange)
             window.removeEventListener('load', postLayouts)
             window.removeEventListener('resize', postLayouts)
             window.removeEventListener('scroll', postLayouts)
