@@ -59,14 +59,6 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next()
     }
 
-    // ── Redirect DO internal URL → custom domain ───────────────────────
-    // Exclude /api/ and /admin paths (DO health checks use internal URL)
-    if (hostname.includes('ondigitalocean.app') && !pathname.startsWith('/api/') && !pathname.startsWith('/admin')) {
-        const customDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
-        const redirectUrl = `https://${customDomain}${pathname}${req.nextUrl.search}`
-        return NextResponse.redirect(redirectUrl, { status: 301 })
-    }
-
     // ── API and admin routes: pass through ─────────────────────────────
     // IMPORTANT: This MUST be checked BEFORE admin domain rewrite.
     // When ADMIN_DOMAIN equals SERVER_DOMAIN (e.g. web-cms-v2.dev.ecommercehub.my),
@@ -144,20 +136,18 @@ export async function middleware(req: NextRequest) {
         return response
     }
 
-    // ── Custom domain: hostname không phải platform, không phải admin, không phải DO app URL ──
-    // SERVER_DOMAIN = web-cms-v2.dev.ecommercehub.my (dashboard/API domain, different from PLATFORM_DOMAIN)
+    // ── Custom domain: hostname không phải platform/admin/local ──
     const SERVER_DOMAIN = (process.env.NEXT_PUBLIC_SERVER_URL || '').replace(/^https?:\/\//, '').split(':')[0]
-    const isDoInternalHost =
+    const isPlatformHost =
         hostname === PLATFORM_DOMAIN ||
         hostname === `www.${PLATFORM_DOMAIN}` ||
         hostname === ADMIN_DOMAIN ||
         hostname === SERVER_DOMAIN ||
-        hostname === '0.0.0.0' ||
         hostname.includes('localhost') ||
         hostname.includes('127.0.0.1') ||
-        hostname.includes('ondigitalocean.app') // DO internal app URL – không phải custom domain
+        hostname.endsWith('.vercel.app')
 
-    if (!isDoInternalHost) {
+    if (!isPlatformHost) {
         // REQ-F19-06: 301 redirect non-primary custom domains → primary domain
         try {
             const internalOrigin = req.nextUrl.origin

@@ -7,7 +7,7 @@ import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDoma
 
 // Đọc từ env vars — deploy production chỉ cần set các biến này, không sửa code
 const DNS_A_RECORD = process.env.NEXT_PUBLIC_SERVER_IP ?? '162.159.140.98';
-const DNS_CNAME = process.env.NEXT_PUBLIC_CNAME_TARGET ?? process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'ech-prime-web-v2-staging-pzdwc.ondigitalocean.app';
+const DNS_CNAME = process.env.NEXT_PUBLIC_CNAME_TARGET ?? process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'cname.vercel-dns.com';
 
 type DomainEntry = { domain: string; status: string; isPrimary?: boolean | null };
 

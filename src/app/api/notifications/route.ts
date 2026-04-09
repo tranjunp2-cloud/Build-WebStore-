@@ -7,9 +7,10 @@ import type { NotificationsResponse } from '@/types/notification'
 export const dynamic = 'force-dynamic'
 
 /**
- * GET /api/notifications?limit=20&offset=0
+ * GET /api/notifications?limit=20&offset=0&since=ISO8601
  *
  * Returns paginated notifications for the authenticated user within their tenant.
+ * Optional `since` param filters to notifications created after the given timestamp.
  * Always scoped to the current user (user_id + tenant_id) for data isolation.
  */
 export const GET = withAuth(async (user, request) => {
@@ -18,6 +19,7 @@ export const GET = withAuth(async (user, request) => {
         const url = new URL(request.url)
         const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50)
         const offset = parseInt(url.searchParams.get('offset') || '0')
+        const since = url.searchParams.get('since')
 
         // Resolve tenant ID for this user
         const userWithTenants = user as unknown as {
@@ -30,6 +32,14 @@ export const GET = withAuth(async (user, request) => {
             return NextResponse.json<NotificationsResponse>({ unreadCount: 0, items: [] })
         }
 
+        // Build where filter
+        const sinceFilter = since ? (() => {
+            const sinceDate = new Date(since)
+            const now = new Date()
+            const effectiveSince = sinceDate > now ? new Date(now.getTime() - 60_000) : sinceDate
+            return { createdAt: { greater_than: effectiveSince.toISOString() } }
+        })() : null
+
         // Fetch notifications (Payload access control enforces user scoping)
         const result = await payload.find({
             collection: 'notifications',
@@ -37,6 +47,7 @@ export const GET = withAuth(async (user, request) => {
                 and: [
                     { user: { equals: user.id } },
                     { tenant: { equals: tenantId } },
+                    ...(sinceFilter ? [sinceFilter] : []),
                 ],
             },
             sort: '-createdAt',

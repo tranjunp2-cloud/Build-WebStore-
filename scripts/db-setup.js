@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * DB Setup Script — runs as Docker CMD on DO App Platform.
+ * DB Setup Script — runs as Docker CMD (DO) or Vercel build step.
  *
- * Problem: Payload CMS's `push: true` only creates tables when
- * `process.env.NODE_ENV !== 'production'` (checked at runtime in
- * node_modules/@payloadcms/db-postgres/dist/connect.js line 109).
+ * Modes:
+ * - `--migrate-only`: Run SQL migrations then exit (for Vercel build).
+ * - Default: Full Docker mode — pushDevSchema + start server (for DO/Docker).
  *
- * Solution:
+ * Docker mode:
  * 1. Check if database has tables
  * 2. If empty → start server.js with NODE_ENV=development (triggers pushDevSchema)
  * 3. Poll DB until tables are created (pushDevSchema done)
@@ -2646,7 +2646,40 @@ async function autoSeedTemplates() {
 }
 
 async function main() {
+  const MIGRATE_ONLY = process.argv.includes('--migrate-only');
   console.log('[db-setup] NODE_ENV:', process.env.NODE_ENV);
+  if (MIGRATE_ONLY) console.log('[db-setup] Mode: --migrate-only (Vercel build)');
+
+  // --migrate-only: Run SQL migrations then exit (no server spawn)
+  if (MIGRATE_ONLY) {
+    const pool = createPool();
+    if (!pool) {
+      console.error('[db-setup] ❌ No DATABASE_URI found');
+      process.exit(1);
+    }
+    try {
+      const info = await pool.query('SELECT current_database(), current_user');
+      const row = info.rows[0];
+      console.log(`[db-setup] Connected: db=${row.current_database}, user=${row.current_user}`);
+
+      const tableCount = await getTableCount(pool);
+      console.log(`[db-setup] Tables in public schema: ${tableCount}`);
+
+      if (tableCount > 0) {
+        await runMigrations(pool);
+        await syncPayloadRelsTables(pool);
+        await runBootstrapSeed(pool);
+      }
+
+      await pool.end();
+      console.log('[db-setup] ✅ Migrations complete, exiting for Vercel build');
+      process.exit(0);
+    } catch (e) {
+      console.error('[db-setup] ❌ Migration failed:', e.message);
+      await pool.end().catch(() => {});
+      process.exit(1);
+    }
+  }
 
   const { needsPush, tableCount } = await checkDB();
 

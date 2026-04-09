@@ -2,8 +2,9 @@ import { getCurrentUser } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
-// Keep SSE connections open — prevent Next.js from closing the response
-export const maxDuration = 300
+// DEPRECATED: SSE stream replaced by polling (Vercel migration).
+// Kept for backward compat with cached clients. Will be removed in Phase 5.
+export const maxDuration = 60
 
 /**
  * GET /api/notifications/stream
