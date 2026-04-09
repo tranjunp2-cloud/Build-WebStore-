@@ -1,5 +1,22 @@
 import type { CollectionConfig } from 'payload'
 
+export const TEMPLATE_CATEGORY_OPTIONS = [
+    { label: '🍽️ Restaurant / Cafe / F&B', value: 'restaurant' },
+    { label: '🛍️ Shop / Fashion / E-commerce', value: 'ecommerce' },
+    { label: '💄 Beauty / Spa / Wellness', value: 'beauty' },
+    { label: '💻 Tech / IT / SaaS', value: 'tech' },
+    { label: '🏥 Health / Dental / Clinic', value: 'health' },
+    { label: '📚 Education / Training', value: 'education' },
+    { label: '🏠 Real Estate / Property', value: 'realestate' },
+    { label: '💪 Gym / Fitness / Yoga', value: 'fitness' },
+    { label: '🎨 Portfolio / Freelancer / Agency', value: 'creative' },
+    { label: '🏢 Business / Corporate', value: 'business' },
+    { label: '🍜 F&B / Cafe / Bakery', value: 'fnb' },
+    { label: '🎉 Events / Wedding', value: 'events' },
+    { label: '📝 Blog / Media / Magazine', value: 'blog' },
+    { label: '✈️ Travel / Tourism', value: 'travel' },
+]
+
 export const Templates: CollectionConfig = {
     slug: 'templates',
     admin: {
@@ -20,18 +37,7 @@ export const Templates: CollectionConfig = {
             type: 'select',
             required: true,
             hasMany: true,
-            options: [
-                { label: '🍽️ Restaurant / Cafe / F&B', value: 'restaurant' },
-                { label: '🛍️ Shop / Fashion / E-commerce', value: 'ecommerce' },
-                { label: '💄 Beauty / Spa / Wellness', value: 'beauty' },
-                { label: '💻 Tech / IT / SaaS', value: 'tech' },
-                { label: '🏥 Health / Dental / Clinic', value: 'health' },
-                { label: '📚 Education / Training', value: 'education' },
-                { label: '🏠 Real Estate / Property', value: 'realestate' },
-                { label: '💪 Gym / Fitness / Yoga', value: 'fitness' },
-                { label: '🎨 Portfolio / Freelancer / Agency', value: 'creative' },
-                { label: '🏢 Business / Corporate', value: 'business' },
-            ],
+            options: TEMPLATE_CATEGORY_OPTIONS,
         },
         {
             name: 'thumbnail',
@@ -76,8 +82,21 @@ export const Templates: CollectionConfig = {
             name: 'defaultBlocks',
             type: 'json',
             admin: {
-                description: 'Default page blocks configuration (JSON) applied when using this template',
+                description: 'Default homepage blocks (JSON). Kept for backward compat — prefer templatePages.',
             },
+        },
+        {
+            name: 'templatePages',
+            type: 'array',
+            admin: {
+                description: 'Multi-page template structure. Professional=3 pages, Premium=5 pages.',
+            },
+            fields: [
+                { name: 'title', type: 'text', required: true },
+                { name: 'slug', type: 'text', required: true },
+                { name: 'isHomepage', type: 'checkbox', defaultValue: false },
+                { name: 'layout', type: 'json' },
+            ],
         },
         {
             name: 'sortOrder',

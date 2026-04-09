@@ -1,119 +1,162 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
-import { Plus, Sparkles } from 'lucide-react'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { startOfDay, subDays } from 'date-fns'
 
-import { getCurrentUser, getCurrentTenantId } from '@/lib/auth'
-import { formatRelativeTime, formatStorage } from '@/lib/utils'
+// Force dynamic — requires auth context + getPayload() at runtime
+export const dynamic = 'force-dynamic'
+
+import { getCurrentUser } from '@/lib/auth'
+import type { PlatformUser } from '@/types/user'
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 import { DashboardStats } from '@/components/dashboard/DashboardStats'
-import { DashboardSiteGrid } from '@/components/dashboard/DashboardSiteGrid'
-import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
-import { DashboardBanner } from '@/components/dashboard/DashboardBanner'
+import { SEOHealthWidget } from '@/components/dashboard/SEOHealthWidget'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
+import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
+import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
+import { DashboardSiteGrid } from '@/components/dashboard/DashboardSiteGrid'
+import { AISmartInsights } from '@/components/dashboard/AISmartInsights'
+import { DashboardOnboarding } from '@/components/dashboard/DashboardOnboarding'
 
-// ─── Dashboard Page (Server Component — Real Data) ─────────────────────
-export default async function DashboardPage() {
+interface Props {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+export default async function DashboardPage({ searchParams }: Props) {
     const user = await getCurrentUser()
-    const tenantId = await getCurrentTenantId()
     const payload = await getPayload({ config })
 
-    // Get real user name
-    const userName = (user as any)?.firstName || (user as any)?.email?.split('@')[0] || 'User'
+    // Extract tenantId from user directly — avoid 2nd getCurrentUser() call
+    const typedUserForTenant = user as PlatformUser | null
+    const userTenants = typedUserForTenant?.tenants as Array<{ tenant: string | { id: string } }> | undefined
+    const firstUserTenant = userTenants?.[0]?.tenant
+    const tenantId = typeof firstUserTenant === 'string' ? firstUserTenant : firstUserTenant?.id || null
 
-    // Fetch real sites from DB
-    let sites: Array<{ id: string; name: string; slug: string; isPublished: boolean; updatedAt: string }> = []
+    // Using Next.js 15 asynchronous searchParams
+    const resolvedParams = await searchParams
+    const period = typeof resolvedParams.period === 'string' ? resolvedParams.period : '7d'
+
+    const typedUser = user as PlatformUser | null
+    const userName = typedUser?.firstName || typedUser?.email?.split('@')[0] || 'User'
+
     let totalSites = 0
-
+    let recentSites: any[] = []
+    let hasPublishedSite = false
     if (tenantId) {
         const sitesResult = await payload.find({
             collection: 'sites',
             where: { tenant: { equals: tenantId } },
             sort: '-updatedAt',
-            limit: 20,
+            limit: 6
         })
         totalSites = sitesResult.totalDocs
-        sites = sitesResult.docs.map((doc: any) => ({
-            id: doc.id,
-            name: doc.name || 'Untitled Site',
-            slug: doc.domain || doc.id,
-            isPublished: doc.status === 'published',
-            updatedAt: doc.updatedAt ? formatRelativeTime(doc.updatedAt) : 'Just created',
-        }))
+        recentSites = sitesResult.docs
+        hasPublishedSite = recentSites.some((s: any) => s.status === 'published')
     }
 
-    // Fetch real tenant data for stats
-    let storageUsed = 0
-    let storageLimit = 500 // MB default
+    // Detect onboarding state
+    const hasWebsite = totalSites > 0
+    const isOnboarding = !hasWebsite || !hasPublishedSite
+
+    const now = new Date()
+    let startDate = subDays(startOfDay(now), 7)
+    let daysDiff = 7
+    if (period === 'today') {
+        startDate = startOfDay(now)
+        daysDiff = 1
+    }
+    if (period === '30d') {
+        startDate = subDays(startOfDay(now), 30)
+        daysDiff = 30
+    }
+
+    const prevStartDate = subDays(startDate, daysDiff)
+
+    let views = 0
+    let prevViews = 0
+    let leads = 0
+    let engagement = 0
+    let dashboardPreferences: string[] | undefined = undefined
+
     if (tenantId) {
-        try {
-            const tenant = await payload.findByID({ collection: 'tenants', id: tenantId })
-            storageUsed = (tenant as any)?.settings?.storageUsed || 0
-            storageLimit = ((tenant as any)?.settings?.storageLimitBytes || 524288000) / (1024 * 1024) // bytes → MB
-        } catch {
-            // tenant not found — use defaults
-        }
+        const tenantResult: any = await payload.findByID({ collection: 'tenants', id: tenantId })
+        dashboardPreferences = tenantResult?.settings?.dashboardPreferences
+
+        const [viewsRes, prevViewsRes, leadsRes, engagementRes] = await Promise.all([
+            payload.count({
+                collection: 'analytics',
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'pageview' } }
+            }),
+            payload.count({
+                collection: 'analytics',
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevStartDate.toISOString(), less_than: startDate.toISOString() }, event: { equals: 'pageview' } }
+            }),
+            payload.count({
+                collection: 'analytics',
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'click' } }
+            }),
+            payload.count({
+                collection: 'analytics',
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { not_equals: 'pageview' } }
+            }),
+        ])
+
+        views = viewsRes.totalDocs
+        prevViews = prevViewsRes.totalDocs
+        leads = leadsRes.totalDocs
+        engagement = engagementRes.totalDocs
     }
 
-    const publishedCount = sites.filter((s) => s.isPublished).length
-
-    const stats = {
-        totalSites,
-        storageUsed: Math.round((storageUsed / (1024 * 1024)) * 10) / 10, // bytes → MB
-        storageLimit: Math.round(storageLimit),
-        publishedCount,
-    }
-
-    const hasSites = sites.length > 0
-    const unpublishedSite = sites.find((s) => !s.isPublished)
+    const hasAnalyticsData = views > 0 || leads > 0 || engagement > 0
 
     return (
         <Suspense fallback={<DashboardSkeleton />}>
             <div className="space-y-8">
-                {/* Header: Greeting + Create CTA */}
-                <div className="flex items-center justify-between">
+                {/* Header: Greeting + Controls */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <DashboardGreeting userName={userName} />
-                    <Link
-                        href="/onboarding"
-                        className="hidden sm:inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-purple-500 transition-all hover:scale-105"
-                    >
-                        <Plus className="h-4 w-4" />
-                        Create New Website
-                        <Sparkles className="h-3.5 w-3.5" />
-                    </Link>
+                    {hasAnalyticsData && (
+                        <div className="flex items-center gap-4">
+                            <PeriodSelector />
+                            <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+                        </div>
+                    )}
                 </div>
 
-                {/* Unpublished Banner */}
-                {unpublishedSite && (
-                    <DashboardBanner
-                        siteId={unpublishedSite.id}
-                        siteName={unpublishedSite.name}
+                {/* Onboarding: Quick Actions + Setup Checklist */}
+                {isOnboarding && (
+                    <DashboardOnboarding
+                        hasWebsite={hasWebsite}
+                        hasPublishedSite={hasPublishedSite}
+                        hasProducts={false}
+                        hasPaymentSetup={false}
                     />
                 )}
 
-                {hasSites ? (
-                    <>
-                        {/* Stats Cards */}
-                        <DashboardStats {...stats} />
-
-                        {/* Site Grid */}
-                        <DashboardSiteGrid sites={sites} />
-                    </>
-                ) : (
-                    /* Empty State */
-                    <DashboardEmptyState />
+                {/* My Websites — always show if user has sites */}
+                {hasWebsite && (
+                    <DashboardSiteGrid sites={recentSites} />
                 )}
 
-                {/* Mobile Create Button */}
-                <div className="fixed bottom-6 right-6 sm:hidden">
-                    <Link
-                        href="/onboarding"
-                        className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-500/25 hover:scale-110 transition-all"
-                    >
-                        <Plus className="h-6 w-6 text-white" />
-                    </Link>
-                </div>
+                {/* Analytics — only show when there's actual data */}
+                {hasAnalyticsData && (
+                    <>
+                        <AISmartInsights views={views} prevViews={prevViews} />
+                        <DashboardStats
+                            views={views}
+                            leads={leads}
+                            engagement={engagement}
+                            preferences={dashboardPreferences}
+                        />
+                    </>
+                )}
+
+                {/* SEO Health — only show when site exists */}
+                {hasWebsite && (
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        <SEOHealthWidget score={68} />
+                    </div>
+                )}
             </div>
         </Suspense>
     )

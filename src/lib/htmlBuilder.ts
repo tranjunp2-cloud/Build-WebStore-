@@ -99,7 +99,6 @@ export function buildFullHTML(
     ${mainHtml}
   </main>
   ${footerHtml}
-
 </body>
 </html>`
 }

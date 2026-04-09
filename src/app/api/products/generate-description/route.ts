@@ -1,5 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { generateDescriptionSchema } from '@/lib/validations/products'
+import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 /**
  * POST /api/products/generate-description
@@ -8,16 +12,21 @@ import OpenAI from 'openai'
  * Body: { name, category?, features? }
  * Response: { description, shortDescription, seoTitle, seoDescription }
  */
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (user, request) => {
     try {
-        const { name, category, features } = await request.json()
-
-        if (!name) {
+        // Rate Limit: 20 AI tasks per hour
+        const rateLimit = checkRateLimit(String(user.id), 20)
+        if (!rateLimit.allowed) {
             return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'Product name is required' } },
-                { status: 422 }
+                { error: 'Rate limit exceeded. Try again later.' },
+                { status: 429 }
             )
         }
+
+        const { data, errorResponse } = await parseRequest(request, generateDescriptionSchema)
+        if (errorResponse) return errorResponse
+
+        const { name, category, features } = data!
 
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
@@ -35,8 +44,9 @@ export async function POST(request: NextRequest) {
                     role: 'system',
                     content: `You are a professional e-commerce copywriter for Malaysian businesses. Generate compelling product copy. Output JSON only:
 {
-  "description": "2-3 paragraph rich description (HTML with <p>, <strong>, <ul> tags allowed)",
-  "shortDescription": "One-liner for product cards (max 150 chars)",
+  "descriptionEN": "2-3 paragraph rich description in English",
+  "descriptionBM": "2-3 paragraph rich description in Bahasa Melayu",
+  "shortDescription": "One-liner for product cards in English (max 150 chars)",
   "seoTitle": "SEO meta title (max 60 chars)",
   "seoDescription": "SEO meta description (max 155 chars)"
 }`,
@@ -57,8 +67,8 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
         console.error('[Product AI Description Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Description generation failed' } },
             { status: 500 }
         )
     }
-}
+})

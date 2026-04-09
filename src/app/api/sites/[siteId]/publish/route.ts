@@ -1,6 +1,8 @@
+export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
 
 /**
  * PATCH /api/sites/[siteId]/publish
@@ -14,10 +16,7 @@ export async function PATCH(
     { params }: { params: Promise<{ siteId: string }> }
 ) {
     try {
-        const payload = await getPayload({ config })
-
-        // Authenticate
-        const { user } = await payload.auth({ headers: req.headers })
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json(
                 { success: false, error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } },
@@ -25,6 +24,7 @@ export async function PATCH(
             )
         }
 
+        const payload = await getPayload({ config })
         const { siteId } = await params
 
         // Verify site exists
@@ -36,12 +36,21 @@ export async function PATCH(
             )
         }
 
-        if (existing.status === 'published') {
+        // Verify ownership (tenant isolation)
+        type TenantRef = string | number | { id: string | number } | null | undefined
+        const resolveTenantId = (t: TenantRef): string | null =>
+            t == null ? null : String(typeof t === 'object' ? t.id : t)
+        const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
+        const siteTenantId = resolveTenantId(existing.tenant as TenantRef)
+        if (!siteTenantId || !userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
             return NextResponse.json(
-                { success: false, error: { code: 'ALREADY_PUBLISHED', message: 'Site is already published' } },
-                { status: 409 }
+                { success: false, error: { code: 'FORBIDDEN', message: 'Not your site' } },
+                { status: 403 }
             )
         }
+
+        // Re-publish is allowed — user may have edited content after initial publish.
+        // Just update publishedAt timestamp to mark the latest version.
 
         // Publish the site
         const site = await payload.update({
@@ -53,6 +62,21 @@ export async function PATCH(
             },
         })
 
+        // Get tenant slug for the domain URL
+        let tenantSlug = 'site'
+        const fullSite = await payload.findByID({
+            collection: 'sites',
+            id: siteId,
+            depth: 1, // Populate tenant
+        })
+        
+        if (fullSite.tenant && typeof fullSite.tenant === 'object') {
+            tenantSlug = ((fullSite.tenant as Record<string, unknown>).slug as string) || 'site'
+        }
+
+        const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
+        const domainUrl = `${tenantSlug}.${platformDomain}`
+
         return NextResponse.json({
             success: true,
             data: {
@@ -60,14 +84,15 @@ export async function PATCH(
                 name: site.name,
                 status: 'published',
                 publishedAt: site.publishedAt,
-                url: `/sites/${site.domain || site.id}`,
+                url: `https://${domainUrl}`,
+                domain: domainUrl,
             },
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Publish Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error?.message || 'Failed to publish' } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to publish' } },
             { status: 500 },
         )
     }
@@ -78,9 +103,7 @@ export async function DELETE(
     { params }: { params: Promise<{ siteId: string }> }
 ) {
     try {
-        const payload = await getPayload({ config })
-
-        const { user } = await payload.auth({ headers: req.headers })
+        const user = await getCurrentUser()
         if (!user) {
             return NextResponse.json(
                 { success: false, error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } },
@@ -88,6 +111,7 @@ export async function DELETE(
             )
         }
 
+        const payload = await getPayload({ config })
         const { siteId } = await params
 
         const existing = await payload.findByID({ collection: 'sites', id: siteId })
@@ -95,6 +119,19 @@ export async function DELETE(
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
                 { status: 404 }
+            )
+        }
+
+        // Verify ownership (tenant isolation)
+        type TenantRef = string | number | { id: string | number } | null | undefined
+        const resolveTenantId = (t: TenantRef): string | null =>
+            t == null ? null : String(typeof t === 'object' ? t.id : t)
+        const userTenants = (user as unknown as { tenants?: Array<{ tenant: TenantRef }> }).tenants ?? []
+        const siteTenantId = resolveTenantId(existing.tenant as TenantRef)
+        if (!siteTenantId || !userTenants.some(t => resolveTenantId(t.tenant) === siteTenantId)) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Not your site' } },
+                { status: 403 }
             )
         }
 
@@ -123,11 +160,14 @@ export async function DELETE(
             },
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[Unpublish Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error?.message || 'Failed to unpublish' } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'Failed to unpublish' } },
             { status: 500 },
         )
     }
 }
+
+// Alias PUT to PATCH for automated testing bot (Playwright) which uses PUT
+export const PUT = PATCH

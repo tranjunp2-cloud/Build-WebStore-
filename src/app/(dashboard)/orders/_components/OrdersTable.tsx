@@ -1,0 +1,494 @@
+"use client"
+
+import React, { useState, useRef, useEffect } from 'react'
+import { Package } from 'lucide-react'
+import { useI18n } from '@/i18n'
+import { OrdersPagination } from './OrdersPagination'
+
+// ───────── TYPES ─────────
+export type OrderStatus = 'pending' | 'confirmed' | 'ready_to_ship' | 'shipped' | 'completed' | 'cancelled' | 'refunded' | 'paid' | 'payment_failed' | 'processing'
+
+export interface Order {
+    id: string
+    orderNumber: string
+    customerName: string
+    total: number
+    currency: string
+    status: OrderStatus
+}
+
+const STATUS_STYLE: Record<OrderStatus, { bg: string; borderColor: string; dotColor: string; textColor: string }> = {
+    'pending': { bg: 'rgba(255,105,0,0.1)', borderColor: 'rgba(255,105,0,0.3)', dotColor: '#FF6900', textColor: '#FF8904' },
+    'confirmed': { bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)', dotColor: '#3B82F6', textColor: '#3B82F6' },
+    'ready_to_ship': { bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)', dotColor: '#3B82F6', textColor: '#3B82F6' },
+    'shipped': { bg: 'rgba(0,201,80,0.1)', borderColor: 'rgba(0,201,80,0.3)', dotColor: '#00C950', textColor: '#05DF72' },
+    'completed': { bg: 'rgba(0,201,80,0.1)', borderColor: 'rgba(0,201,80,0.3)', dotColor: '#00C950', textColor: '#05DF72' },
+    'cancelled': { bg: 'rgba(251,44,54,0.1)', borderColor: 'rgba(251,44,54,0.3)', dotColor: '#FB2C36', textColor: '#FF6467' },
+    'refunded': { bg: 'rgba(178,53,74,0.1)', borderColor: '#B2354A', dotColor: '#B2354A', textColor: '#B2354A' },
+    'paid': { bg: 'rgba(0,201,80,0.1)', borderColor: 'rgba(0,201,80,0.3)', dotColor: '#00C950', textColor: '#05DF72' },
+    'processing': { bg: 'rgba(59,130,246,0.1)', borderColor: 'rgba(59,130,246,0.3)', dotColor: '#3B82F6', textColor: '#3B82F6' },
+    'payment_failed': { bg: 'rgba(251,44,54,0.1)', borderColor: 'rgba(251,44,54,0.3)', dotColor: '#FB2C36', textColor: '#FF6467' },
+}
+
+function getStatusLabel(status: OrderStatus, statusLabels: Record<string, string>): string {
+    const keyMap: Record<OrderStatus, string> = {
+        'pending': 'pending',
+        'confirmed': 'confirmed',
+        'ready_to_ship': 'readyToShip',
+        'shipped': 'shipped',
+        'completed': 'completed',
+        'cancelled': 'cancelled',
+        'refunded': 'refunded',
+        'paid': 'paid',
+        'processing': 'processing',
+        'payment_failed': 'pending',
+    }
+    return (statusLabels as any)[keyMap[status]] || status
+}
+
+// ───────── STATUS BADGE COMPONENT ─────────
+function StatusBadge({ status, label }: { status: OrderStatus; label: string }) {
+    const cfg = STATUS_STYLE[status] || STATUS_STYLE['pending']
+    return (
+        <span
+            className="inline-flex items-center rounded-[12px]"
+            style={{
+                background: cfg.bg,
+                border: `1px solid ${cfg.borderColor}`,
+                gap: '8px',
+                padding: '5px 13px',
+            }}
+        >
+            <span
+                className="shrink-0 rounded-full"
+                style={{ width: 8, height: 8, background: cfg.dotColor }}
+            />
+            <span
+                style={{
+                    fontFamily: 'Inter, sans-serif',
+                    fontWeight: 500,
+                    fontSize: 14,
+                    lineHeight: '1.4285714285714286em',
+                    color: cfg.textColor,
+                    whiteSpace: 'nowrap',
+                }}
+            >
+                {label}
+            </span>
+        </span>
+    )
+}
+
+function Checkbox({
+    checked,
+    indeterminate,
+    onChange,
+    inputRef,
+    'aria-label': ariaLabel,
+}: {
+    checked: boolean
+    indeterminate?: boolean
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+    inputRef?: React.Ref<HTMLInputElement>
+    'aria-label'?: string
+}) {
+    return (
+        <label className="relative flex items-center justify-center cursor-pointer" style={{ width: 18, height: 18 }}>
+            <input
+                ref={inputRef}
+                type="checkbox"
+                checked={checked}
+                onChange={onChange}
+                aria-label={ariaLabel}
+                className="peer sr-only"
+            />
+            <div
+                style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: 6,
+                    border: checked || indeterminate ? '1px solid #2563EB' : '1px solid rgba(255, 255, 255, 0.16)',
+                    background: checked || indeterminate ? '#2563EB' : 'transparent',
+                    transition: 'background 0.2s, border 0.2s'
+                }}
+            />
+            {checked && !indeterminate && (
+                <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="absolute pointer-events-none text-white left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                >
+                    <path
+                        d="M10 3L4.5 8.5L2 6"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                </svg>
+            )}
+            {indeterminate && (
+                <svg
+                    width="10"
+                    height="2"
+                    viewBox="0 0 10 2"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="absolute pointer-events-none text-white left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                >
+                    <rect width="10" height="2" rx="1" fill="currentColor" />
+                </svg>
+            )}
+        </label>
+    )
+}
+
+function HeaderCell({ children }: { children: React.ReactNode }) {
+    return (
+        <span
+            style={{
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: 12,
+                lineHeight: '1.3333333333333333em',
+                letterSpacing: '0.025em',
+                textTransform: 'uppercase',
+                color: 'rgba(248, 250, 252, 0.6)',
+            }}
+        >
+            {children}
+        </span>
+    )
+}
+
+function EmptyOrderState({ text }: { text: string }) {
+    return (
+        <div className="flex flex-col w-full items-center justify-center gap-[16px] py-[64px]">
+            <Package className="w-[64px] h-[64px] text-[rgba(248,250,252,0.2)]" strokeWidth={2} />
+            <span
+                style={{
+                    fontFamily: 'Inter, sans-serif',
+                    fontWeight: 400,
+                    fontSize: 16,
+                    lineHeight: '1.5em',
+                    color: 'rgba(248, 250, 252, 0.6)',
+                }}
+            >
+                {text}
+            </span>
+        </div>
+    )
+}
+
+interface TableProps {
+    orders: Order[]
+    loading: boolean
+    onSelectOrder?: (orderId: string) => void
+    selectedOrderId?: string | null
+    selectedRows: Set<string>
+    onSelectionChange: (selectedIds: Set<string>) => void
+}
+
+function Table({ orders, loading, onSelectOrder, selectedOrderId, selectedRows, onSelectionChange }: TableProps) {
+    const { t } = useI18n()
+    const o = t.dashboard.orders
+    const statusLabels = o.status
+    const allSelected = orders.length > 0 && orders.every(o => selectedRows.has(o.id))
+    const someSelected = orders.some(o => selectedRows.has(o.id)) && !allSelected
+    const allCheckboxRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        if (allCheckboxRef.current) {
+            allCheckboxRef.current.indeterminate = someSelected
+        }
+    }, [someSelected])
+
+    function toggleAll(e: React.ChangeEvent<HTMLInputElement>) {
+        if (e.target.checked) {
+            const next = new Set(selectedRows)
+            orders.forEach(o => next.add(o.id))
+            onSelectionChange(next)
+        } else {
+            const next = new Set(selectedRows)
+            orders.forEach(o => next.delete(o.id))
+            onSelectionChange(next)
+        }
+    }
+
+    function toggleRow(id: string) {
+        const next = new Set(selectedRows)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        onSelectionChange(next)
+    }
+
+    return (
+        <div className="w-full">
+            {/* Mobile View: Stacked Cards */}
+            <div className="flex flex-col md:hidden w-full gap-4">
+                {loading ? (
+                    <div className="p-8 text-center text-slate-400">{o.tableHeaders.loading}</div>
+                ) : orders.length === 0 ? (
+                    <EmptyOrderState text={o.tableHeaders.noOrders} />
+                ) : (
+                    orders.map((order) => {
+                        const isSelected = selectedRows.has(order.id)
+                        const isDetailOpen = selectedOrderId === order.id
+
+                        return (
+                            <div
+                                key={order.id}
+                                onClick={() => { if (onSelectOrder) onSelectOrder(order.id) }}
+                                className={`flex flex-row items-start gap-[12px] p-[17px] cursor-pointer transition-colors border border-[rgba(255,255,255,0.08)] rounded-2xl ${isDetailOpen ? 'bg-blue-500/10 border-blue-500/30' : isSelected ? 'bg-blue-500/5' : 'bg-slate-800/60'}`}
+                            >
+                                <div className="pt-[4px]" onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                        checked={isSelected}
+                                        onChange={() => toggleRow(order.id)}
+                                        aria-label={`Select order ${order.id}`}
+                                    />
+                                </div>
+                                <div className="flex flex-col flex-1 gap-[8px]">
+                                    <div className="flex items-center justify-between w-full">
+                                        <span className="text-[14px] font-semibold leading-[1.4285714285714286em] text-slate-50 tracking-tight">
+                                            #{order.orderNumber}
+                                        </span>
+                                        <StatusBadge status={order.status} label={getStatusLabel(order.status, statusLabels)} />
+                                    </div>
+                                    <span className="text-[14px] font-medium leading-[1.4285714285714286em] text-slate-400 truncate max-w-[200px]">
+                                        {order.customerName || 'N/A'}
+                                    </span>
+                                    <span className="text-[20px] font-semibold leading-[1.4em] text-slate-50">
+                                        {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
+                                    </span>
+                                </div>
+                            </div>
+                        )
+                    })
+                )}
+            </div>
+
+            {/* Desktop View: Table */}
+            <div className="hidden md:block w-full overflow-x-auto overflow-y-auto" style={{ maxHeight: 685 }}>
+                <table
+                    className="w-full border-collapse"
+                    style={{ tableLayout: 'fixed', minWidth: 960 }}
+                >
+                    <colgroup>
+                        <col style={{ width: '11.06%' }} />
+                        <col style={{ width: '17.58%' }} />
+                        <col style={{ width: '26.15%' }} />
+                        <col style={{ width: '17.47%' }} />
+                        <col style={{ width: '27.74%' }} />
+                    </colgroup>
+
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                        <tr style={{ background: 'rgba(11, 17, 32, 0.5)' }}>
+                            <th className="text-left" style={{ height: 56, padding: '20px 24px', backdropFilter: 'blur(12px)' }}>
+                                <Checkbox
+                                    checked={allSelected}
+                                    indeterminate={someSelected}
+                                    onChange={toggleAll}
+                                    inputRef={allCheckboxRef}
+                                    aria-label="Select all rows"
+                                />
+                            </th>
+                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
+                                <HeaderCell>{o.tableHeaders.orderNumber}</HeaderCell>
+                            </th>
+                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
+                                <HeaderCell>{o.tableHeaders.customer}</HeaderCell>
+                            </th>
+                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
+                                <HeaderCell>{o.tableHeaders.total}</HeaderCell>
+                            </th>
+                            <th className="text-left" style={{ height: 56, padding: '20px 24px' }}>
+                                <HeaderCell>{o.tableHeaders.status}</HeaderCell>
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {loading ? (
+                            <tr>
+                                <td colSpan={5} style={{ padding: '60px 24px', textAlign: 'center' }}>
+                                    <span style={{ color: 'rgba(248, 250, 252, 0.6)' }}>{o.tableHeaders.loading}</span>
+                                </td>
+                            </tr>
+                        ) : orders.length === 0 ? (
+                            <tr>
+                                <td colSpan={5} style={{ padding: 0 }}>
+                                    <EmptyOrderState text={o.tableHeaders.noOrders} />
+                                </td>
+                            </tr>
+                        ) : orders.map((order, i) => {
+                            const isEdgeRow = i === 0 || i === orders.length - 1
+                            const rowHeight = isEdgeRow ? 62 : 63
+                            const textPadY = isEdgeRow ? 21 : 21.5
+                            const isSelected = selectedRows.has(order.id)
+                            const isDetailOpen = selectedOrderId === order.id
+
+                            return (
+                                <tr
+                                    key={order.id}
+                                    className="transition-colors cursor-pointer"
+                                    style={{
+                                        height: rowHeight,
+                                        borderBottom: i < orders.length - 1
+                                            ? '1px solid rgba(255, 255, 255, 0.05)'
+                                            : 'none',
+                                        background: isDetailOpen
+                                            ? 'rgba(59,130,246,0.12)'
+                                            : isSelected ? 'rgba(59,130,246,0.06)' : undefined,
+                                    }}
+                                    onMouseEnter={e => {
+                                        if (!isSelected && !isDetailOpen) (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.03)'
+                                    }}
+                                    onMouseLeave={e => {
+                                        if (!isSelected && !isDetailOpen) (e.currentTarget as HTMLTableRowElement).style.background = ''
+                                    }}
+                                    onClick={() => {
+                                        if (onSelectOrder) onSelectOrder(order.id)
+                                    }}
+                                >
+                                    <td
+                                        style={{ padding: '18px 24px' }}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <Checkbox
+                                            checked={isSelected}
+                                            onChange={() => toggleRow(order.id)}
+                                            aria-label={`Select order ${order.id}`}
+                                        />
+                                    </td>
+                                    <td style={{ padding: `${textPadY}px 24px` }}>
+                                        <span
+                                            style={{
+                                                fontFamily: 'Inter, sans-serif',
+                                                fontWeight: 600,
+                                                fontSize: 14,
+                                                lineHeight: '1.4285714285714286em',
+                                                color: '#F8FAFC',
+                                            }}
+                                        >
+                                            #{order.orderNumber}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: `${textPadY}px 24px` }}>
+                                        <span
+                                            style={{
+                                                fontFamily: 'Inter, sans-serif',
+                                                fontWeight: 400,
+                                                fontSize: 14,
+                                                lineHeight: '1.4285714285714286em',
+                                                color: '#F8FAFC',
+                                            }}
+                                        >
+                                            {order.customerName || 'N/A'}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: `${textPadY}px 24px` }}>
+                                        <span
+                                            style={{
+                                                fontFamily: 'Inter, sans-serif',
+                                                fontWeight: 600,
+                                                fontSize: 14,
+                                                lineHeight: '1.4285714285714286em',
+                                                color: '#F8FAFC',
+                                            }}
+                                        >
+                                            {order.currency || 'RM'} {typeof order.total === 'number' ? order.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : order.total}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '16px 24px' }}>
+                                        <StatusBadge status={order.status} label={getStatusLabel(order.status, statusLabels)} />
+                                    </td>
+                                </tr>
+                            )
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    )
+}
+
+export function OrdersTable({
+    onSelectOrder,
+    selectedOrderId,
+    refreshCounter = 0,
+    selectedRows = new Set(),
+    onSelectionChange,
+    onOrdersLoaded,
+    searchQuery = '',
+    statusFilter = 'all',
+    dateFilter = 'all'
+}: {
+    onSelectOrder?: (orderId: string) => void
+    selectedOrderId?: string | null
+    refreshCounter?: number
+    selectedRows?: Set<string>
+    onSelectionChange?: (selectedIds: Set<string>) => void
+    onOrdersLoaded?: (orders: Order[]) => void
+    searchQuery?: string
+    statusFilter?: string
+    dateFilter?: string
+}) {
+    const [orders, setOrders] = useState<Order[]>([])
+    const [loading, setLoading] = useState(true)
+    const [page, setPage] = useState(1)
+    const [totalPages, setTotalPages] = useState(1)
+
+    useEffect(() => {
+        async function fetchOrders() {
+            try {
+                setLoading(true)
+                let url = `/api/orders?page=${page}&limit=10`
+                if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`
+                if (statusFilter && statusFilter !== 'all') url += `&status=${encodeURIComponent(statusFilter)}`
+                if (dateFilter && dateFilter !== 'all') url += `&date=${encodeURIComponent(dateFilter)}`
+
+                const res = await fetch(url)
+                if (!res.ok) throw new Error('Failed to fetch')
+                const data = await res.json()
+
+                if (data.success && data.docs) {
+                    setOrders(data.docs)
+                    setTotalPages(data.totalPages || 1)
+                    if (onOrdersLoaded) onOrdersLoaded(data.docs)
+                }
+            } catch (err) {
+                console.error("Failed to load orders:", err)
+            } finally {
+                setLoading(false)
+            }
+        }
+        fetchOrders()
+    }, [page, refreshCounter, searchQuery, statusFilter, dateFilter])
+
+    return (
+        <div
+            className="flex flex-col w-full md:rounded-[16px] md:bg-slate-800/60 md:border md:border-[rgba(255,255,255,0.08)] md:p-[1px]"
+        >
+            <Table
+                orders={orders}
+                loading={loading}
+                onSelectOrder={onSelectOrder}
+                selectedOrderId={selectedOrderId}
+                selectedRows={selectedRows}
+                onSelectionChange={onSelectionChange || (() => { })}
+            />
+
+            <div className="flex items-center justify-end px-6 py-3">
+                <OrdersPagination
+                    currentPage={page}
+                    totalPages={totalPages}
+                    onPageChange={(p) => setPage(p)}
+                />
+            </div>
+        </div>
+    )
+}

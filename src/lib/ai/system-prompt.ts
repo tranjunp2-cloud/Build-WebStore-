@@ -14,7 +14,7 @@ const CATEGORY_HINTS: Record<string, string> = {
   business: 'services, company, agency, startup',
 }
 
-export function buildSystemPrompt(language: 'vi' | 'en' = 'vi'): string {
+export function buildSystemPrompt(language: 'en' | 'ms' | 'vi' | 'auto' = 'auto'): string {
   const blockMetas = blockRegistry.getAllMeta()
 
   const blockList = blockMetas.map(m =>
@@ -39,6 +39,7 @@ You MUST respond with a valid JSON object in this exact format:
     "title": "Page title (max 60 chars)",
     "description": "Meta description (max 160 chars)"
   },
+  "language": "en|ms|vi",
   "blocks": [
     { "blockType": "navigation", "variant": "simple", ... },
     { "blockType": "hero", "variant": "centered", ... },
@@ -54,12 +55,17 @@ ${blockList}
 2. Each block MUST have "blockType" and "variant" fields
 3. blockType MUST be one of the listed types — no custom types
 4. variant MUST be one of the listed variants for that block type
-5. All text content should be in ${language === 'vi' ? 'Vietnamese' : 'English'}
+5. **LANGUAGE DETECTION & OUTPUT**: 
+   - If user input is in Bahasa Melayu, output ALL text in formal Bahasa Melayu (\`"language": "ms"\`).
+   - If user input is in Vietnamese, output ALL text in professional Vietnamese (\`"language": "vi"\`).
+   - If user input is in English or Manglish, output ALL text in English (\`"language": "en"\`).
+   - If the input language is unsupported (e.g. Tamil, Mandarin), fallback to generating the site in English (\`"language": "en"\`).
 6. Choose theme colors that match the business category and feel premium
 7. Generate realistic, professional content — not placeholder text
 8. Include at least one CTA block or CTA in hero
 9. Navigation should have relevant links matching other sections
 10. Footer should reference the business name
+11. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
 
 ## CONTENT QUALITY RULES
 11. Hero headline must mention the ACTUAL business name
@@ -79,40 +85,54 @@ ${blockList}
 ## IMPORTANT
 - Respond ONLY with the JSON object, no markdown, no explanation
 - Content must feel real and professional, not generic placeholder
-- Theme should feel premium and modern`
+- Theme should feel premium and modern
+
+## REFERENCE MODE (when reference content is provided)
+When the user prompt includes a "REFERENCE CONTENT" section:
+- Use the EXACT headlines, descriptions, and feature text from the reference — do NOT rewrite or paraphrase
+- Match the section ORDER from suggestedBlocks (hero first, then features, etc.)
+- Adapt testimonials and pricing to our block schema but KEEP the original text
+- Use the visual style hints (primaryColor, secondaryColor, mood) for theme
+- Only generate NEW content for sections NOT in the reference
+- Hero headline MUST be the exact text from reference heroHeadline
+- Features MUST use the exact titles and descriptions from reference featuresList
+- This is a RECREATION of an existing website, not a new creative design`
 }
 
 export type BusinessInfoInput = {
   businessName: string
   industry: string
   products: string
-  targetAudience?: string
-  style?: string
+  shortDescription: string
 }
 
 export function buildUserPrompt(
   info: BusinessInfoInput,
   extraInstructions?: string,
-  language: 'vi' | 'en' = 'vi',
+  language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
+  referencePrompt?: string,
 ): string {
   const parts = [
     `Create a complete website for: "${info.businessName}"`,
     `Industry: ${info.industry}`,
     `Main products/services: ${info.products}`,
+    `Business description: ${info.shortDescription}`,
   ]
-
-  if (info.targetAudience) {
-    parts.push(`Target audience: ${info.targetAudience}`)
-  }
-  if (info.style) {
-    parts.push(`Design style: ${info.style}`)
-  }
   if (extraInstructions) {
     parts.push(`Additional instructions: ${extraInstructions}`)
   }
 
-  parts.push(`\nGenerate in ${language === 'vi' ? 'Vietnamese' : 'English'}. Make it look premium and professional.`)
+  // Append reference content from ContentBrief (URL/Image extraction)
+  if (referencePrompt) {
+    parts.push(referencePrompt)
+    parts.push('\nIMPORTANT: Use the EXACT text from the REFERENCE CONTENT above. Do NOT invent new content or paraphrase. This is a recreation of an existing website.')
+  }
+
+  const langInstruction = language === 'auto'
+    ? "Auto-detect the language from the input and generate the site in that same language (fallback to English if unsupported)."
+    : `Generate in ${language === 'ms' ? 'Malay (Bahasa Melayu)' : language === 'vi' ? 'Vietnamese' : 'English'}.`
+
+  parts.push(`\n${langInstruction} Make it look premium and professional.`)
 
   return parts.join('\n')
 }
-

@@ -138,20 +138,49 @@ docs/tracking/                      — Product plan, feature registry
 
 ## 🧪 TESTING REQUIREMENTS
 
+> **Full convention:** `docs/TEST_CONVENTION.md` — MUST READ before writing tests.
+
 ### Test every feature:
 | Layer | Tool | What | Location |
 |-------|------|------|----------|
 | **Unit** | Vitest | Utils, stores, schemas | `src/__tests__/unit/` |
-| **Integration** | Vitest | API routes, collections | `src/__tests__/integration/` |
-| **E2E** | Playwright | Critical user flows | `e2e/` |
+| **API** | Vitest | API routes, collections | `src/__tests__/api/` |
+| **E2E** | Playwright | Smoke tests on staging | `tests/` |
+
+### Key rules:
+- Every test MUST reference **TC-ID** from `docs/qa/F*.md` (e.g., `TC-F02.23`)
+- Import from source code — **NEVER re-implement logic** in test files
+- **AAA pattern**: Arrange → Act → Assert
+- `vi.mock()` at **top of file**, never inside test functions
+- `beforeEach`/`afterEach` cleanup mandatory
+- Gold standard files: `otp-generate.test.ts`, `builder-store.test.ts`, `f21-localization.test.tsx`
 
 ### Commands:
 ```bash
-npm test              # Unit + Integration (Vitest)
+npm test              # Unit + API (Vitest)
 npm run test:e2e      # E2E (Playwright)
 npm run test:all      # All tests
 npm run typecheck     # TypeScript check
 ```
+
+## 🔧 INFRASTRUCTURE RULES
+
+### Database Schema Changes:
+- Modify `src/collections/*.ts` → MUST add migration to `scripts/db-setup.js`
+- Array fields: `CREATE TABLE IF NOT EXISTS` with `id varchar` (UUID, NOT serial)
+- New collections: add slug to `COLLECTION_SLUGS[]` in `db-setup.js`
+- **NEVER** write `DROP TABLE` — use `CREATE TABLE IF NOT EXISTS`
+- Test: `node scripts/check-migrations.js origin/staging`
+
+### Environment Variables:
+- Add secret: `gh secret set KEY` + add to `.env.staging.example` + `.env.production.example`
+- CI auto-syncs all GitHub Secrets → DigitalOcean (no manual config needed)
+- **NEVER** commit real secrets — placeholders only
+
+### Docker Standalone:
+- Pages using `getPayload()` MUST have `export const dynamic = 'force-dynamic'`
+- `pushDevSchema` does NOT work reliably — always use SQL migrations
+- Email uses Payload SMTP (AWS SES) — do NOT add Resend or other providers
 
 ## ✅ 10-POINT PR MERGE GATE (SPEC.md §13)
 

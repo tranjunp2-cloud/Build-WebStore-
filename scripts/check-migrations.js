@@ -1,12 +1,26 @@
 #!/usr/bin/env node
 /**
- * CI Check: When a PR adds new fields to Payload collections,
+ * CI Check: When a PR adds new fields or block types to Payload collections,
  * ensure matching migrations exist in db-setup.js.
  *
  * How it works:
  * 1. Get git diff of collection files vs base branch (staging)
  * 2. Find NEW field definitions (added lines with `name: 'xxx'`)
  * 3. Check if db-setup.js MIGRATIONS array has matching ALTER TABLE
+ *
+ * BLOCK RULE (Pages.ts):
+ * When a new block slug is added to Pages.ts, BOTH tables must exist in migrations:
+ *   - pages_blocks_{slug}      (live data table)
+ *   - _pages_v_blocks_{slug}   (draft/versioning table — Payload editor uses this)
+ * Forgetting _pages_v_blocks_* causes the editor to show "0 blocks" with
+ * "relation does not exist" DB errors.
+ *
+ * VERSION COLUMN RULE (Pages.ts top-level fields):
+ * When a new top-level field is added to the Pages collection (not inside blocks),
+ * a matching `version_*` column must exist in `_pages_v` table:
+ *   - pages.isVisible → _pages_v.version_is_visible
+ *   - pages.deletedAt → _pages_v.version_deleted_at
+ * Forgetting this causes Payload draft queries to crash with 42703 (column does not exist).
  *
  * Usage: node scripts/check-migrations.js [base-branch]
  * Default base branch: staging
@@ -21,12 +35,24 @@ const path = require('path')
 const BASE_BRANCH = process.argv[2] || 'origin/staging'
 const DB_SETUP_PATH = path.join(__dirname, 'db-setup.js')
 
-// Tables we track migrations for
+// Tables we track migrations for — ALL collections with DB tables
 const TRACKED_COLLECTIONS = {
   'Tenants.ts': 'tenants',
+  'Users.ts': 'users',
   'Sites.ts': 'sites',
+  'Pages.ts': 'pages',
+  'Media.ts': 'media',
+  'Templates.ts': 'templates',
+  'Subscriptions.ts': 'subscriptions',
+  'Subscribers.ts': 'subscribers',
   'Products.ts': 'products',
   'Orders.ts': 'orders',
+  'Analytics.ts': 'analytics',
+  'SEOMetaJobs.ts': 'seo_meta_jobs',
+  'Blogs.ts': 'blogs',
+  'BlogCategories.ts': 'blog_categories',
+  'Categories.ts': 'categories',
+  'Notifications.ts': 'notifications',
 }
 
 function toSnakeCase(str) {
@@ -59,13 +85,32 @@ function getNewFieldsFromDiff() {
           file: filename,
         })
       }
-    } catch {
-      // File doesn't exist or no diff — skip
+    } catch (err) {
+      console.error(`[migration-check] Warning: could not diff ${filePath}:`, err.message)
     }
+  }
+
+  // Also check: if a NEW collection file has timestamps: true,
+  // the CREATE TABLE must include updated_at + created_at columns
+  for (const [filename, tableName] of Object.entries(TRACKED_COLLECTIONS)) {
+    const filePath = `src/collections/${filename}`
+    try {
+      const diff = execSync(
+        `git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" | grep "timestamps" || true`,
+        { encoding: 'utf8' }
+      ).trim()
+      if (diff && diff.includes('timestamps') && diff.includes('true')) {
+        newFields.push({ field: 'updated_at', snake: 'updated_at', table: tableName, file: filename })
+        newFields.push({ field: 'created_at', snake: 'created_at', table: tableName, file: filename })
+      }
+    } catch { /* ignore */ }
   }
 
   return newFields
 }
+
+// Known Payload group field prefixes — only strip these when matching migrations
+const KNOWN_GROUP_PREFIXES = ['theme', 'seo', 'payments', 'badge', 'ai_generation_metadata']
 
 function getMigrationColumns() {
   const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')
@@ -75,45 +120,262 @@ function getMigrationColumns() {
   const regex = /ALTER TABLE\s+(\w+)\s+ADD COLUMN IF NOT EXISTS\s+(\w+)/gi
   let match
   while ((match = regex.exec(content)) !== null) {
-    columns.add(`${match[1]}.${match[2]}`)
+    const table = match[1]
+    const col = match[2]
+    columns.add(`${table}.${col}`)
+    // Also register without known group prefix (e.g., theme_accent_color → accent_color)
+    for (const prefix of KNOWN_GROUP_PREFIXES) {
+      if (col.startsWith(`${prefix}_`)) {
+        const withoutPrefix = col.slice(prefix.length + 1)
+        columns.add(`${table}.${withoutPrefix}`)
+        break
+      }
+    }
   }
 
   return columns
 }
 
+function getMigrationTables() {
+  const content = fs.readFileSync(DB_SETUP_PATH, 'utf8')
+  const tables = new Set()
+
+  // Match CREATE TABLE IF NOT EXISTS "xxx" or xxx (supports hyphens in quoted names)
+  const regex = /CREATE TABLE IF NOT EXISTS\s+"?([\w-]+)"?/gi
+  let match
+  while ((match = regex.exec(content)) !== null) {
+    tables.add(match[1])
+  }
+
+  return tables
+}
+
+function getNewBlockSlugsFromDiff() {
+  const slugs = []
+  const filePath = 'src/collections/Pages.ts'
+
+  try {
+    const diff = execSync(
+      `git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" || true`,
+      { encoding: 'utf8' }
+    ).trim()
+
+    if (!diff) return slugs
+
+    // Detect new block slug definitions: +    slug: 'hero',
+    const regex = /^\+.*slug:\s*['"]([a-zA-Z0-9_-]+)['"]/gm
+    let match
+    while ((match = regex.exec(diff)) !== null) {
+      const slug = match[1]
+      // Skip 'pages' (the collection slug itself, not a block)
+      if (slug !== 'pages') {
+        slugs.push(slug)
+      }
+    }
+  } catch (err) {
+    console.error(`[migration-check] Warning: could not diff ${filePath}:`, err.message)
+  }
+
+  return slugs
+}
+
+/**
+ * Check 3: New top-level fields added to Pages collection need `_pages_v.version_*` migrations.
+ *
+ * When Payload CMS runs versioning/drafts, it queries `_pages_v` for every
+ * column that exists in `pages`. If a new top-level field is added to the
+ * Pages collection WITHOUT a corresponding `_pages_v.version_*` column,
+ * the editor shows "0 blocks" and logs 42703 (column does not exist).
+ *
+ * This check detects new fields at the Pages collection level (12-space indent
+ * in Pages.ts) and verifies `ALTER TABLE _pages_v ADD COLUMN version_* ...`
+ * exists in db-setup.js.
+ *
+ * Skips:
+ * - Fields Payload auto-manages: title, slug, site, isHomepage, layout, seo, timestamps
+ * - Field types handled differently by Payload: group (flattened columns),
+ *   array (separate table), blocks (separate table), relationship/upload (FK column)
+ *   — these do NOT create a simple version_* column in _pages_v.
+ */
+const PAGES_AUTO_COLUMNS = new Set([
+  'title', 'slug', 'site', 'isHomepage', 'layout',
+  'seo', 'publishedAt', 'updatedAt', 'createdAt',
+])
+
+// Field types that do NOT produce a simple version_* column in _pages_v.
+// group → Payload flattens sub-fields directly (version_group_field)
+// array/blocks → separate _pages_v_{field} or _pages_v_blocks_{slug} tables
+// relationship/upload → version_{field}_id FK column (Payload auto-manages)
+const SKIP_FIELD_TYPES = new Set(['group', 'array', 'blocks', 'relationship', 'upload'])
+
+function checkPagesVersionColumns() {
+  const filePath = 'src/collections/Pages.ts'
+  const missing = []
+
+  let diff
+  try {
+    diff = execSync(
+      `git diff ${BASE_BRANCH} -- ${filePath}`,
+      { encoding: 'utf8' }
+    ).trim()
+  } catch (err) {
+    console.error(`[migration-check] Warning: could not diff ${filePath}:`, err.message)
+    return missing
+  }
+
+  if (!diff) return missing
+
+  // Collection-level fields in Pages.ts have exactly 12 spaces of indentation.
+  // Block-level fields have 16+ spaces. This distinguishes the two.
+  // Pattern: +            name: 'fieldName'  (12 spaces)
+  // Collect all collection-level field matches first so we know each field's
+  // exact text boundary (from its name: to the next name: at the same indent).
+  const collectionFieldRegex = /^\+            name:\s*['"]([a-zA-Z0-9_]+)['"]/gm
+  const fieldMatches = []
+  let m
+  while ((m = collectionFieldRegex.exec(diff)) !== null) {
+    fieldMatches.push({ name: m[1], index: m.index })
+  }
+
+  const columns = getMigrationColumns()
+  const seen = new Set()
+
+  for (let i = 0; i < fieldMatches.length; i++) {
+    const { name: fieldName, index: startIdx } = fieldMatches[i]
+    const endIdx = i + 1 < fieldMatches.length ? fieldMatches[i + 1].index : diff.length
+    const fieldBlock = diff.slice(startIdx, endIdx)
+
+    if (seen.has(fieldName)) continue
+    seen.add(fieldName)
+
+    // Skip fields that Payload auto-manages in _pages_v or handles specially
+    if (PAGES_AUTO_COLUMNS.has(fieldName)) continue
+
+    // Skip field types that do not produce a simple version_* column.
+    // Parse type: from the field's own block (between this name: and the next one),
+    // so we never accidentally read a sibling field's type.
+    const typeMatch = fieldBlock.match(/type:\s*['"]([a-zA-Z]+)['"]/)
+    if (typeMatch && SKIP_FIELD_TYPES.has(typeMatch[1])) continue
+
+    const snake = toSnakeCase(fieldName)
+    const versionCol = `version_${snake}`
+    if (!columns.has(`_pages_v.${versionCol}`)) {
+      missing.push({ field: fieldName, snake, versionCol })
+    }
+  }
+
+  return missing
+}
+
+function checkNewBlocks() {
+  const newSlugs = getNewBlockSlugsFromDiff()
+  if (newSlugs.length === 0) return []
+
+  const tables = getMigrationTables()
+  const missing = []
+
+  for (const slug of newSlugs) {
+    // Payload Drizzle converts kebab-case slugs to snake_case table names
+    const snakeSlug = slug.replace(/-/g, '_')
+    const liveTable = `pages_blocks_${snakeSlug}`
+    const versionTable = `_pages_v_blocks_${snakeSlug}`
+
+    if (!tables.has(liveTable)) {
+      missing.push({ slug, table: liveTable, type: 'live' })
+    }
+    if (!tables.has(versionTable)) {
+      missing.push({ slug, table: versionTable, type: 'version' })
+    }
+  }
+
+  return missing
+}
+
 function main() {
   console.log(`[migration-check] Comparing against ${BASE_BRANCH}...`)
 
+  let hasErrors = false
+
+  // ── Check 1: New block types in Pages.ts ────────────────────────────
+  const missingBlockTables = checkNewBlocks()
+  if (missingBlockTables.length > 0) {
+    hasErrors = true
+    const slugsAffected = [...new Set(missingBlockTables.map(m => m.slug))]
+    console.error(`\n❌ New block slug(s) detected in Pages.ts: ${slugsAffected.join(', ')}`)
+    console.error('   Both tables MUST exist in db-setup.js MIGRATIONS:\n')
+    for (const m of missingBlockTables) {
+      console.error(`   Missing: "${m.table}"`)
+      if (m.type === 'live') {
+        console.error(`   → Add to db-setup.js:`)
+        console.error(`     { name: '${m.table}.create_table', sql: \`CREATE TABLE IF NOT EXISTS "${m.table}" (`)
+        console.error(`       id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,`)
+        console.error(`       _order integer NOT NULL, _parent_id integer NOT NULL,`)
+        console.error(`       _path varchar NOT NULL DEFAULT 'layout', _uuid varchar, block_name varchar,`)
+        console.error(`       /* add block-specific columns here */`)
+        console.error(`     );\` },`)
+      } else {
+        console.error(`   → Add to db-setup.js (MUST pair with pages_blocks_${m.slug}):`)
+        console.error(`     { name: '${m.table}.create_table', sql: \`CREATE TABLE IF NOT EXISTS "${m.table}" (`)
+        console.error(`       id serial PRIMARY KEY,`)
+        console.error(`       _order integer NOT NULL, _parent_id integer NOT NULL,`)
+        console.error(`       _path text NOT NULL, _uuid varchar, block_name varchar,`)
+        console.error(`       /* same block-specific columns as pages_blocks_${m.slug} */`)
+        console.error(`     );\` },`)
+      }
+      console.error()
+    }
+    console.error('💡 RULE: Every new Pages block needs BOTH tables:')
+    console.error('   pages_blocks_{slug}    — live data (id varchar, _path varchar)')
+    console.error('   _pages_v_blocks_{slug} — drafts/editor (id serial, _path text)\n')
+  }
+
+  // ── Check 2: New Pages.ts top-level fields need _pages_v version columns ──
+  const missingVersionCols = checkPagesVersionColumns()
+  if (missingVersionCols.length > 0) {
+    hasErrors = true
+    console.error(`\n❌ New Pages collection field(s) detected without _pages_v version column migrations:\n`)
+    for (const v of missingVersionCols) {
+      console.error(`   Missing: _pages_v.${v.versionCol}  (from field "${v.field}")`)
+      console.error(`   → Add to scripts/db-setup.js MIGRATIONS:`)
+      console.error(`     { name: '_pages_v.${v.versionCol}',`)
+      console.error(`       sql: \`ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS ${v.versionCol} varchar;\` },`)
+      console.error()
+    }
+    console.error('💡 RULE: Every new top-level Pages field needs a _pages_v version column.')
+    console.error('   Without it, Payload draft queries (editor) will crash with 42703.')
+    console.error('   Adjust the column type (boolean/timestamptz/jsonb/integer) as needed.\n')
+  }
+
+  // ── Check 3: New fields in tracked collections ───────────────────────
   const newFields = getNewFieldsFromDiff()
 
-  if (newFields.length === 0) {
-    console.log('[migration-check] ✅ No new collection fields detected')
-    process.exit(0)
+  if (newFields.length > 0) {
+    console.log(`[migration-check] Found ${newFields.length} new field(s) in PR:`)
+    for (const f of newFields) {
+      console.log(`   ${f.table}.${f.snake} (${f.field} in ${f.file})`)
+    }
+
+    const migrations = getMigrationColumns()
+    const missingFields = newFields.filter(f => !migrations.has(`${f.table}.${f.snake}`))
+
+    if (missingFields.length > 0) {
+      hasErrors = true
+      console.error(`\n❌ ${missingFields.length} new field(s) WITHOUT migrations:\n`)
+      for (const f of missingFields) {
+        console.error(`   ${f.table}.${f.snake} (added in ${f.file})`)
+        console.error(`   → Add to scripts/db-setup.js MIGRATIONS:`)
+        console.error(`     { name: '${f.table}.${f.snake}', sql: 'ALTER TABLE ${f.table} ADD COLUMN IF NOT EXISTS ${f.snake} varchar;' }\n`)
+      }
+      console.error('💡 Tip: Add the migration entries above to scripts/db-setup.js MIGRATIONS array.')
+      console.error('   This ensures the column exists on staging/production before your code queries it.\n')
+    } else {
+      console.log('[migration-check] ✅ All new fields have matching migrations')
+    }
+  } else if (missingBlockTables.length === 0 && missingVersionCols.length === 0) {
+    console.log('[migration-check] ✅ No new collection fields or block types detected')
   }
 
-  console.log(`[migration-check] Found ${newFields.length} new field(s) in PR:`)
-  for (const f of newFields) {
-    console.log(`   ${f.table}.${f.snake} (${f.field} in ${f.file})`)
-  }
-
-  const migrations = getMigrationColumns()
-  const missing = newFields.filter(f => !migrations.has(`${f.table}.${f.snake}`))
-
-  if (missing.length === 0) {
-    console.log('[migration-check] ✅ All new fields have matching migrations')
-    process.exit(0)
-  }
-
-  console.error(`\n❌ ${missing.length} new field(s) WITHOUT migrations:\n`)
-  for (const f of missing) {
-    console.error(`   ${f.table}.${f.snake} (added in ${f.file})`)
-    console.error(`   → Add to scripts/db-setup.js MIGRATIONS:`)
-    console.error(`     { name: '${f.table}.${f.snake}', sql: 'ALTER TABLE ${f.table} ADD COLUMN IF NOT EXISTS ${f.snake} varchar;' }\n`)
-  }
-
-  console.error('💡 Tip: Add the migration entries above to scripts/db-setup.js MIGRATIONS array.')
-  console.error('   This ensures the column exists on staging/production before your code queries it.\n')
-  process.exit(1)
+  process.exit(hasErrors ? 1 : 0)
 }
 
 main()

@@ -17,6 +17,9 @@ build/
 .env.production
 .env.staging
 
+## Bot config (personality controlled by PM/Lead only)
+.bot-config.json
+
 ## IDE
 .idea/
 .vscode/
@@ -34,6 +37,26 @@ public/media/*
 ## Payload generated
 src/payload-types.ts
 
+## TypeScript build cache
+*.tsbuildinfo
+
 ## Logs
 *.log
 npm-debug.log*
+docs/qa/qa-automation/target/
+docs/qa/qa-automation/auth-state.json
+
+## Test and AI Agent data
+test-results/
+.agents/
+.agent/
+_agents/
+_agent/
+
+## Worktrees
+.worktrees/
+.gitnexus
+
+# Playwright auth state
+e2e/.auth/
+coverage/

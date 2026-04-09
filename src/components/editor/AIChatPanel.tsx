@@ -1,0 +1,402 @@
+'use client'
+
+
+import React, { memo, useEffect, useRef, useState } from 'react'
+import DOMPurify from 'isomorphic-dompurify'
+import { RotateCcw, Send, WandSparkles } from 'lucide-react'
+import { AddSectionPromptChips } from './AddSectionPromptChips'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import type { AIAction, BlockData, ThemeData } from '@/types/editor'
+
+/** Strip all HTML tags from content — defense-in-depth against XSS in AI responses */
+function sanitizeContent(content: string): string {
+    return DOMPurify.sanitize(content, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+}
+
+type ChatMessage = {
+    id: string
+    role: 'user' | 'assistant'
+    content: string
+    createdAt?: string
+    undoable?: boolean
+    isStreaming?: boolean
+}
+
+interface AIChatPanelProps {
+    blocks: BlockData[]
+    selectedBlock: number | null
+    onAIAction: (action: AIAction) => Promise<void> | void
+    onUndoLastAction: () => void
+    siteName: string
+    theme: ThemeData | undefined
+    externalActivity?: {
+        id: string
+        content: string
+    } | null
+    compact?: boolean
+}
+
+function formatChatTime(date = new Date()) {
+    return date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+    })
+}
+
+function AIChatPanelInner({
+    blocks,
+    selectedBlock,
+    onAIAction,
+    onUndoLastAction,
+    siteName,
+    theme,
+    externalActivity,
+    compact = false,
+}: AIChatPanelProps) {
+
+    const [input, setInput] = useState('')
+    const [isProcessing, setIsProcessing] = useState(false)
+    const [messages, setMessages] = useState<ChatMessage[]>([
+        {
+            id: 'welcome',
+            role: 'assistant',
+            content: 'Hello! What would you like to edit?',
+            createdAt: formatChatTime(),
+        },
+    ])
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, [messages])
+
+    useEffect(() => {
+        if (!externalActivity) return
+
+        setMessages(prev => {
+            if (prev.some(message => message.id === externalActivity.id)) {
+                return prev
+            }
+
+            return [
+                ...prev,
+                {
+                    id: externalActivity.id,
+                    role: 'assistant',
+                    content: externalActivity.content,
+                    createdAt: formatChatTime(),
+                    undoable: true,
+                },
+            ]
+        })
+    }, [externalActivity])
+
+    const updateAssistantMessage = (messageId: string, next: Partial<ChatMessage>) => {
+        setMessages(prev =>
+            prev.map(message => (message.id === messageId
+                ? { ...message, ...next, content: next.content ? sanitizeContent(next.content) : message.content }
+                : message)),
+        )
+    }
+
+    const handleAIError = (messageId: string, message: string) => {
+        updateAssistantMessage(messageId, {
+            content: `❌ ${sanitizeContent(message)}`,
+            isStreaming: false,
+            undoable: false,
+        })
+    }
+
+    const readSSEStream = async (response: Response, messageId: string) => {
+        if (!response.body) {
+            throw new Error('Empty stream body')
+        }
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        const flushChunk = async (chunk: string) => {
+            const rawEvent = chunk.trim()
+            if (!rawEvent) return
+
+            let eventName = 'message'
+            const dataLines: string[] = []
+
+            for (const line of rawEvent.split('\n')) {
+                if (line.startsWith('event:')) {
+                    eventName = line.slice(6).trim()
+                    continue
+                }
+
+                if (line.startsWith('data:')) {
+                    dataLines.push(line.slice(5).trim())
+                }
+            }
+
+            if (dataLines.length === 0) return
+
+            const payload = JSON.parse(dataLines.join('\n'))
+
+            if (eventName === 'status') {
+                updateAssistantMessage(messageId, { content: payload.message || 'AI is drafting...' })
+                return
+            }
+
+            if (eventName === 'action') {
+                await onAIAction(payload as AIAction)
+                return
+            }
+
+            if (eventName === 'done') {
+                updateAssistantMessage(messageId, {
+                    content: payload.message || 'Applied changes to website.',
+                    isStreaming: false,
+                    undoable: true,
+                })
+                return
+            }
+
+            if (eventName === 'error') {
+                handleAIError(messageId, payload.error || 'AI editing failed')
+            }
+        }
+
+        while (true) {
+            const { done, value } = await reader.read()
+            buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+
+            const chunks = buffer.split('\n\n')
+            buffer = chunks.pop() || ''
+
+            for (const chunk of chunks) {
+                await flushChunk(chunk)
+            }
+
+            if (done) {
+                if (buffer.trim()) {
+                    await flushChunk(buffer)
+                }
+                break
+            }
+        }
+    }
+
+    const handleSendChat = async () => {
+        if (!input.trim() || isProcessing) return
+
+        const userMsg = input.trim()
+        const assistantMessageId = `${Date.now()}-assistant`
+
+        setInput('')
+        setMessages(prev => [
+            ...prev,
+            { id: Date.now().toString(), role: 'user', content: userMsg, createdAt: formatChatTime() },
+            {
+                id: assistantMessageId,
+                role: 'assistant',
+                content: 'AI is drafting...',
+                createdAt: formatChatTime(),
+                isStreaming: true,
+            },
+        ])
+        setIsProcessing(true)
+
+        try {
+            const currentBlock = selectedBlock !== null ? (blocks[selectedBlock] || null) : null
+            const res = await fetch('/api/ai/edit-block?stream=true', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    instruction: userMsg,
+                    block: currentBlock,
+                    blockIndex: selectedBlock ?? undefined,
+                    allBlocks: blocks,
+                    theme,
+                    siteName,
+                }),
+            })
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                handleAIError(assistantMessageId, data.error || 'Failed to edit website')
+                return
+            }
+
+            const isStream = res.headers.get('content-type')?.includes('text/event-stream')
+
+            if (isStream) {
+                await readSSEStream(res, assistantMessageId)
+                return
+            }
+
+            const data = await res.json()
+            await onAIAction(data as AIAction)
+            updateAssistantMessage(assistantMessageId, {
+                content: data.message || 'Applied changes to website.',
+                isStreaming: false,
+                undoable: true,
+            })
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Unknown error'
+            handleAIError(assistantMessageId, message)
+        } finally {
+            setIsProcessing(false)
+        }
+    }
+
+    return (
+        <div className="flex h-full flex-col bg-[#0F172A]">
+            <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
+                <div
+                    className={cn(
+                        'flex-1 overflow-y-auto',
+                        compact ? 'px-4 pb-5 pt-6' : 'px-4 pb-4 pt-6',
+                    )}
+                    role="log"
+                    aria-label="AI chat messages"
+                >
+                    <div className="space-y-3">
+                        {messages.map(msg => {
+                            if (msg.role === 'user') {
+                                return (
+                                    <div key={msg.id} className="flex justify-end">
+                                        <div className="w-fit max-w-[85%] rounded-2xl rounded-br-md bg-gradient-to-br from-[#3B82F6] to-[#2DD4BF] px-4 py-3 text-white shadow-lg shadow-blue-500/10">
+                                            <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
+                                            {msg.createdAt ? (
+                                                <p className="mt-1.5 text-right text-[10px] text-white/50">{msg.createdAt}</p>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                )
+                            }
+
+                            if (msg.isStreaming) {
+                                return (
+                                    <div key={msg.id} className="flex">
+                                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] px-4 py-3">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="flex gap-1">
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:0ms]" />
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:150ms]" />
+                                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#2DD4BF] [animation-delay:300ms]" />
+                                                </div>
+                                                <span className="text-[13px] leading-relaxed text-slate-300">{msg.content || 'AI is thinking...'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            }
+
+                            if (msg.undoable) {
+                                return (
+                                    <div key={msg.id} className="flex">
+                                        <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] px-4 py-3 text-[#F8FAFC]">
+                                            <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
+                                            <div className="mt-3 flex items-center justify-between border-t border-white/[0.06] pt-2.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={onUndoLastAction}
+                                                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#2DD4BF] transition-all hover:bg-[#2DD4BF]/10 hover:text-[#5EEAD4]"
+                                                >
+                                                    <RotateCcw className="h-3 w-3" />
+                                                    Undo
+                                                </button>
+                                                {msg.createdAt ? (
+                                                    <span className="text-[10px] text-white/40">{msg.createdAt}</span>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            }
+
+                            return (
+                                <div key={msg.id} className="flex">
+                                    <div className={cn(
+                                        'rounded-2xl rounded-bl-md border border-white/[0.06] bg-[#1E293B] text-[#F8FAFC]',
+                                        compact ? 'max-w-[85%] px-4 py-3' : 'max-w-[85%] px-4 py-3',
+                                    )}>
+                                        <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{msg.content}</p>
+                                        {msg.createdAt ? (
+                                            <p className="mt-1.5 text-[10px] text-white/40">{msg.createdAt}</p>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            )
+                        })}
+
+                        <div ref={messagesEndRef} />
+                    </div>
+                </div>
+
+                <div className={cn('border-t border-white/[0.06] bg-[#0B1120]/80 backdrop-blur-sm', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-3')}>
+                    <div className={cn('mb-2.5 flex gap-1.5', compact ? 'overflow-x-auto pb-1 scrollbar-none' : 'flex-wrap')}>
+                        <button
+                            type="button"
+                            onClick={() => setInput('Change web color to mint green')}
+                            className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-slate-300 transition-all hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-white"
+                        >
+                            Change color
+                        </button>
+                        <AddSectionPromptChips
+                            compact={compact}
+                            desktopMinimal={!compact}
+                            desktopLabelOverride="+ Add section"
+                            onPromptSelect={prompt => setInput(prompt)}
+                        />
+                    </div>
+
+                    <div className={cn(
+                        'group relative rounded-xl border border-white/[0.08] bg-[#1E293B]/80 pl-4 pr-12 py-3 transition-all focus-within:border-cyan-400/40 focus-within:bg-[#1E293B] focus-within:shadow-[0_0_0_1px_rgba(34,211,238,0.1)]',
+                        compact && 'px-4 py-3',
+                    )}>
+                        <textarea
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault()
+                                    void handleSendChat()
+                                }
+                            }}
+                            placeholder="Tell AI what to change..."
+                            aria-label="Chat message"
+                            rows={1}
+                            className="w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[13px] leading-relaxed text-white placeholder:text-slate-500 shadow-none outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+                            style={{ minHeight: '24px', maxHeight: '120px' }}
+                            disabled={isProcessing}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => void handleSendChat()}
+                            disabled={!input.trim() || isProcessing}
+                            className={cn(
+                                'absolute bottom-2.5 right-3 inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all',
+                                input.trim() && !isProcessing
+                                    ? 'bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30'
+                                    : 'bg-white/[0.06] text-slate-500',
+                                isProcessing && 'cursor-not-allowed',
+                            )}
+                        >
+                            <Send className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between px-0.5">
+                        <p className="flex items-center gap-1 text-[11px] text-slate-500">
+                            <kbd className="rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 font-mono text-[10px]">Enter</kbd>
+                            <span>send</span>
+                            <kbd className="ml-1 rounded border border-white/10 bg-white/[0.04] px-1 py-0.5 font-mono text-[10px]">Shift+Enter</kbd>
+                            <span>new line</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export const AIChatPanel = memo(AIChatPanelInner)

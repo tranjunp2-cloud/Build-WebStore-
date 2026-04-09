@@ -1,0 +1,151 @@
+# DigitalOcean App Platform — App Spec (Staging)
+# Docs: https://docs.digitalocean.com/products/app-platform/reference/app-spec/
+#
+# ⚠️  Env vars loại SECRET phải được set thủ công trong DO Dashboard:
+#     App → Settings → Environment Variables → Edit → điền giá trị thật.
+#     KHÔNG commit actual values vào file này.
+
+name: ech-prime-web-v2-staging
+
+region: sgp1
+
+services:
+  - name: web
+    dockerfile_path: Dockerfile
+    source_dir: /
+    http_port: 3000
+
+    instance_count: 1
+    instance_size_slug: professional-xs
+
+    github:
+      repo: primeproduction/ech-prime-web-v2
+      branch: staging
+      deploy_on_push: false
+
+    health_check:
+      http_path: /api/health
+      initial_delay_seconds: 10
+      timeout_seconds: 5
+
+    envs:
+      # ── Runtime ──────────────────────────────────────────────────────────
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_ENV
+        value: staging
+
+      # ── E2E Testing (staging only — NOT in production app.yaml) ─────────
+      - key: E2E_TEST_OTP_CODE
+        type: SECRET
+      - key: TEST_EMAIL
+        type: SECRET
+      - key: TEST_PASSWORD
+        type: SECRET
+
+      # ── Database ─────────────────────────────────────────────────────────
+      - key: DATABASE_URI
+        value: ${db.DATABASE_URL}
+
+      # ── Payload CMS ──────────────────────────────────────────────────────
+      - key: PAYLOAD_SECRET
+        type: SECRET
+
+      # ── Next.js ──────────────────────────────────────────────────────────
+      - key: NEXT_PUBLIC_SERVER_URL
+        value: https://web-v2.dev.ecommercehub.my
+      - key: NEXT_PUBLIC_PLATFORM_DOMAIN
+        value: web-v2.dev.ecommercehub.my
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://web-v2.dev.ecommercehub.my
+      - key: NEXT_PUBLIC_ADMIN_DOMAIN
+        value: web-cms-v2.dev.ecommercehub.my
+
+      # ── Stripe ───────────────────────────────────────────────────────────
+      - key: STRIPE_SECRET_KEY
+        type: SECRET
+      - key: STRIPE_WEBHOOK_SECRET
+        type: SECRET
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        type: SECRET
+
+      # ── OpenAI ───────────────────────────────────────────────────────────
+      - key: OPENAI_API_KEY
+        type: SECRET
+
+      # ── S3 / Storage ─────────────────────────────────────────────────────
+      - key: S3_ENDPOINT
+        type: SECRET
+      - key: S3_BUCKET
+        value: primeweb-media
+      - key: S3_ACCESS_KEY_ID
+        type: SECRET
+      - key: S3_SECRET_ACCESS_KEY
+        type: SECRET
+      - key: S3_REGION
+        value: ap-southeast-1
+
+      # ── Lark Bot ─────────────────────────────────────────────────────────
+      - key: LARK_APP_ID
+        type: SECRET
+      - key: LARK_APP_SECRET
+        type: SECRET
+      - key: LARK_ENCRYPT_KEY
+        type: SECRET
+      - key: LARK_VERIFICATION_TOKEN
+        type: SECRET
+      - key: LARK_BOT_OPEN_ID
+        type: SECRET
+
+      # ── GitHub API ────────────────────────────────────────────────────────
+      - key: GITHUB_TOKEN
+        type: SECRET
+      - key: GITHUB_REPO
+        value: primeproduction/ech-prime-web-v2
+
+      # ── Domain Verification (Custom Domains) ────────────────────────────
+      - key: DO_API_TOKEN
+        type: SECRET
+      - key: DO_APP_ID
+        type: SECRET
+      - key: SERVER_IP
+        type: SECRET
+
+      # ── ECH Distribution API ─────────────────────────────────────────────
+      - key: ECH_DISTRIBUTION_API_URL
+        type: SECRET
+      - key: ECH_DISTRIBUTION_API_KEY
+        type: SECRET
+
+      # ── Email (SMTP AWS SES) ──────────────────────────────────────────────
+      - key: MAIL_DRIVER
+        value: smtp
+      - key: MAIL_HOST
+        value: email-smtp.ap-southeast-1.amazonaws.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USERNAME
+        type: SECRET
+      - key: MAIL_PASSWORD
+        type: SECRET
+      - key: MAIL_ENCRYPTION
+        value: tls
+      - key: MAIL_FROM_NAME
+        value: Web Store
+      - key: MAIL_FROM_ADDRESS
+        value: no-reply-web-dev@admin.ecommercehub.unifi.com.my
+
+domains:
+  - domain: web-v2.dev.ecommercehub.my
+    type: PRIMARY
+  - domain: web-cms-v2.dev.ecommercehub.my
+    type: ALIAS
+  - domain: "*.web-v2.dev.ecommercehub.my"
+    type: ALIAS
+
+databases:
+  - name: db
+    engine: PG
+    version: "16"
+    size: db-s-dev-database
+    num_nodes: 1

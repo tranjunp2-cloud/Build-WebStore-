@@ -1,217 +1,624 @@
 'use client'
 
-import { useState } from 'react'
-import { Sparkles, ArrowRight, Building2, ShoppingBag, Briefcase } from 'lucide-react'
+import type { FormEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { BuilderField } from '@/components/builder/fields/BuilderField'
+import { BuilderOptionCard } from '@/components/builder/fields/BuilderOptionCard'
+import { BuilderOptionGrid } from '@/components/builder/fields/BuilderOptionGrid'
+import { BuilderSubmitButton } from '@/components/builder/fields/BuilderSubmitButton'
+import { BuilderTextInput } from '@/components/builder/fields/BuilderTextInput'
+import { BuilderTextarea } from '@/components/builder/fields/BuilderTextarea'
+import { BuilderPromoCard } from '@/components/builder/onboarding/BuilderPromoCard'
+import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
+import { useI18n } from '@/i18n'
 
-const INDUSTRY_OPTIONS = [
-    { value: 'restaurant', label: '🍽️ Restaurant / Cafe / F&B', icon: '🍽️' },
-    { value: 'ecommerce', label: '🛍️ Shop / Fashion / E-commerce', icon: '🛍️' },
-    { value: 'beauty', label: '💄 Beauty / Spa / Wellness', icon: '💄' },
-    { value: 'tech', label: '💻 Tech / IT / SaaS', icon: '💻' },
-    { value: 'health', label: '🏥 Health / Dental / Clinic', icon: '🏥' },
-    { value: 'education', label: '📚 Education / Training', icon: '📚' },
-    { value: 'realestate', label: '🏠 Real Estate / Property', icon: '🏠' },
-    { value: 'fitness', label: '💪 Gym / Fitness / Yoga', icon: '💪' },
-    { value: 'creative', label: '🎨 Portfolio / Freelancer / Agency', icon: '🎨' },
-    { value: 'other', label: '🏢 Other', icon: '🏢' },
-]
+type IndustryOption = {
+    value: string
+    label: string
+    icon?: string
+}
 
-const STYLE_OPTIONS = [
-    { value: 'modern', label: 'Modern & Clean' },
-    { value: 'classic', label: 'Classic & Elegant' },
-    { value: 'bold', label: 'Bold & Vibrant' },
-    { value: 'minimal', label: 'Minimal & Simple' },
-]
+type ExtractionResult = {
+    businessName: string
+    industry: string
+    shortDescription: string
+    products: string
+    referenceContent?: Record<string, unknown>
+    suggestedTheme?: {
+        primaryColor?: string
+        secondaryColor?: string
+        siteType?: string
+        mood?: string
+    }
+    suggestedBlocks?: string[]
+    detectedLanguage: string
+    confidence: 'high' | 'medium' | 'low'
+}
 
-export default function BusinessInfoForm() {
-    const setBusinessInfo = useBuilderStore(s => s.setBusinessInfo)
+const BUILDER_TEXTAREA_BADGE_URL = '/assets/builder/builder-textarea-badge.svg'
+const BUILDER_TEXTAREA_HINT_ICON_URL = '/assets/builder/builder-hint-icon.svg'
 
-    const [form, setForm] = useState({
-        businessName: '',
-        industry: '',
-        products: '',
-        targetAudience: '',
-        style: 'modern',
-    })
+interface BusinessInfoFormProps {
+    onSubmit?: (info: BusinessInfo) => void
+    onRetry?: (info: BusinessInfo) => void
+    errorMessage?: string | null
+    isGenerating?: boolean
+    initialValues?: Partial<BusinessInfo> | null
+}
+
+const DEFAULT_FORM: BusinessInfo = {
+    businessName: '',
+    shortDescription: '',
+    industry: '',
+    products: '',
+    language: 'auto',
+}
+
+export default function BusinessInfoForm({
+    onSubmit,
+    onRetry,
+    errorMessage,
+    isGenerating,
+    initialValues,
+}: BusinessInfoFormProps) {
+    const setBusinessInfo = useBuilderStore((s) => s.setBusinessInfo)
+    const setBusinessInfoDraft = useBuilderStore((s) => s.setBusinessInfoDraft)
+    const setContentBrief = useBuilderStore((s) => s.setContentBrief)
+    const { t } = useI18n()
+
+    const [form, setForm] = useState<BusinessInfo>({ ...DEFAULT_FORM, ...initialValues })
     const [errors, setErrors] = useState<Record<string, string>>({})
+    const [industryOptions, setIndustryOptions] = useState<IndustryOption[]>([])
+    const [isLoadingIndustries, setIsLoadingIndustries] = useState(true)
+
+    // URL extraction state
+    const [inputMode, setInputMode] = useState<'manual' | 'url'>('manual')
+    const [urlValue, setUrlValue] = useState('')
+    const [urlExtracting, setUrlExtracting] = useState(false)
+    const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null)
+    const [extractionError, setExtractionError] = useState<string | null>(null)
+    const abortControllerRef = useRef<AbortController | null>(null)
+
+    const isFormReady =
+        form.businessName.trim().length >= 3 &&
+        form.industry.trim().length > 0 &&
+        form.shortDescription.trim().length >= 3 &&
+        form.products.trim().length >= 3
+
+    useEffect(() => {
+        let isMounted = true
+
+        async function fetchIndustryOptions() {
+            try {
+                const response = await fetch('/api/data/industries', {
+                    credentials: 'include',
+                })
+
+                if (!response.ok) {
+                    throw new Error('Failed to load industries')
+                }
+
+                const data = await response.json()
+                if (!isMounted) return
+
+                setIndustryOptions(Array.isArray(data.docs) ? data.docs : [])
+            } catch (error) {
+                console.error('Failed to fetch industry options:', error)
+                if (!isMounted) return
+                setIndustryOptions([])
+            } finally {
+                if (isMounted) {
+                    setIsLoadingIndustries(false)
+                }
+            }
+        }
+
+        fetchIndustryOptions()
+
+        return () => {
+            isMounted = false
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!initialValues) return
+
+        setForm({
+            ...DEFAULT_FORM,
+            ...initialValues,
+        })
+    }, [
+        initialValues?.businessName,
+        initialValues?.shortDescription,
+        initialValues?.industry,
+        initialValues?.products,
+        initialValues?.language,
+    ])
 
     const validate = (): boolean => {
-        const e: Record<string, string> = {}
-        if (!form.businessName.trim()) e.businessName = 'Please enter your business name'
-        if (!form.industry) e.industry = 'Please select an industry'
-        if (!form.products.trim()) e.products = 'Please describe your products / services'
-        setErrors(e)
-        return Object.keys(e).length === 0
+        const nextErrors: Record<string, string> = {}
+
+        if (form.businessName.trim().length < 3) nextErrors.businessName = t.onboarding.form.errors.businessName
+        if (!form.industry) nextErrors.industry = t.onboarding.form.errors.industry
+        if (form.shortDescription.trim().length < 3) nextErrors.shortDescription = t.onboarding.form.errors.shortDescription
+        if (form.products.trim().length < 3) nextErrors.products = t.onboarding.form.errors.products
+
+        setErrors(nextErrors)
+        return Object.keys(nextErrors).length === 0
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = (e: FormEvent) => {
         e.preventDefault()
-        if (!validate()) return
-        setBusinessInfo(form as BusinessInfo)
+        submitForm()
     }
+
+    const submitForm = () => {
+        if (!validate() || isGenerating) return
+
+        const payload: BusinessInfo = {
+            ...form,
+            ...(extractionResult ? { businessUrl: urlValue, source: 'url' as const } : { source: 'form' as const }),
+        }
+
+        if (onSubmit) {
+            onSubmit(payload)
+            return
+        }
+
+        setBusinessInfo(payload)
+    }
+
+    // ── URL Extraction ───────────────────────────────────────────────────
+
+    const isValidUrl = (value: string): boolean => {
+        try {
+            const url = new URL(value)
+            return ['http:', 'https:'].includes(url.protocol)
+        } catch {
+            return false
+        }
+    }
+
+    const handleUrlExtract = async () => {
+        if (!isValidUrl(urlValue) || urlExtracting) return
+
+        setUrlExtracting(true)
+        setExtractionError(null)
+        setExtractionResult(null)
+
+        abortControllerRef.current = new AbortController()
+
+        try {
+            const res = await fetch('/api/ai/extract-from-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ url: urlValue }),
+                signal: abortControllerRef.current.signal,
+            })
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                const code = data.code || ''
+                let message = data.error || t.onboarding.form.errorGeneric
+
+                // Map error codes to i18n messages
+                if (code === 'RATE_LIMITED') message = t.onboarding.form.errorRateLimit
+                else if (code === 'URL_BLOCKED') message = t.onboarding.form.errorBlocked
+                else if (code === 'CONTENT_UNSAFE') message = t.onboarding.form.errorUnsafe
+                else if (code === 'SCRAPE_FAILED') {
+                    if (data.error?.includes('timed out')) message = t.onboarding.form.errorTimeout
+                    else if (data.error?.includes('non-HTML')) message = t.onboarding.form.errorInvalid
+                    else message = t.onboarding.form.errorTimeout
+                }
+
+                setExtractionError(message)
+                return
+            }
+
+            const data = await res.json()
+            const result = data.data as ExtractionResult
+
+            setExtractionResult(result)
+
+            // Store ContentBrief in Zustand for generator to use
+            setContentBrief({
+                businessInfo: {
+                    businessName: result.businessName || '',
+                    industry: result.industry || '',
+                    shortDescription: result.shortDescription || '',
+                    products: result.products || '',
+                },
+                referenceContent: result.referenceContent || {},
+                visualStyle: {
+                    primaryColor: result.suggestedTheme?.primaryColor,
+                    secondaryColor: result.suggestedTheme?.secondaryColor,
+                    mood: result.suggestedTheme?.mood,
+                },
+                suggestedBlocks: result.suggestedBlocks,
+                source: 'url',
+                sourceUrl: urlValue,
+                language: result.detectedLanguage || 'en',
+                confidence: result.confidence,
+            })
+
+            // Build payload from extraction result
+            const extractedInfo: BusinessInfo = {
+                businessName: result.businessName || '',
+                industry: result.industry || '',
+                shortDescription: result.shortDescription || '',
+                products: result.products || '',
+                language: result.detectedLanguage === 'ms' ? 'ms' : result.detectedLanguage === 'vi' ? 'vi' : 'auto',
+                businessUrl: urlValue,
+                source: 'url',
+            }
+
+            // If all required fields extracted → generate immediately (skip review)
+            const canAutoGenerate =
+                extractedInfo.businessName.trim().length >= 3 &&
+                extractedInfo.industry.trim().length > 0 &&
+                extractedInfo.shortDescription.trim().length >= 3 &&
+                extractedInfo.products.trim().length >= 3
+
+            if (canAutoGenerate) {
+                // Direct generation — no review step needed
+                if (onSubmit) {
+                    onSubmit(extractedInfo)
+                } else {
+                    setBusinessInfo(extractedInfo)
+                }
+                return
+            }
+
+            // Fallback: not enough data → show form for user to fill gaps
+            const partialData = {
+                businessName: result.businessName || '',
+                industry: result.industry || '',
+                shortDescription: result.shortDescription || '',
+                products: result.products || '',
+            }
+            setForm((current) => ({
+                ...current,
+                ...partialData,
+            }))
+            // Persist to Zustand store so data survives HMR/re-renders
+            setBusinessInfoDraft(partialData)
+            setInputMode('manual')
+            setErrors({})
+
+        } catch (err: unknown) {
+            if (err instanceof Error && err.name === 'AbortError') return
+            toast.error(t.onboarding.form.errorGeneric)
+        } finally {
+            setUrlExtracting(false)
+            abortControllerRef.current = null
+        }
+    }
+
+    const handleSwitchToManual = () => {
+        setInputMode('manual')
+        setExtractionError(null)
+        if (urlExtracting && abortControllerRef.current) {
+            abortControllerRef.current.abort()
+            setUrlExtracting(false)
+        }
+    }
+
+    // ── Confidence Badge ─────────────────────────────────────────────────
+
+    const confidenceBadge = extractionResult ? (
+        <div
+            className={`rounded-2xl border px-4 py-3 text-sm ${
+                extractionResult.confidence === 'high'
+                    ? 'border-[rgba(34,197,94,0.3)] bg-[rgba(34,197,94,0.1)] text-[#86efac]'
+                    : extractionResult.confidence === 'medium'
+                      ? 'border-[rgba(234,179,8,0.3)] bg-[rgba(234,179,8,0.1)] text-[#fde047]'
+                      : 'border-[rgba(248,113,113,0.3)] bg-[rgba(248,113,113,0.1)] text-[#fca5a5]'
+            }`}
+            role="status"
+            aria-live="polite"
+        >
+            <div className="flex items-center justify-between">
+                <span className="font-semibold">
+                    {extractionResult.confidence === 'high'
+                        ? `✅ ${t.onboarding.form.confidenceHigh}`
+                        : extractionResult.confidence === 'medium'
+                          ? `⚠️ ${t.onboarding.form.confidenceMedium}`
+                          : `⚠️ ${t.onboarding.form.confidenceLow}`}
+                </span>
+                <div className="flex gap-1">
+                    {[0, 1, 2, 3].map((i) => (
+                        <div
+                            key={i}
+                            className={`size-2 rounded-full ${
+                                i < (extractionResult.confidence === 'high' ? 3 : extractionResult.confidence === 'medium' ? 2 : 1)
+                                    ? extractionResult.confidence === 'high'
+                                        ? 'bg-green-400'
+                                        : extractionResult.confidence === 'medium'
+                                          ? 'bg-yellow-400'
+                                          : 'bg-red-400'
+                                    : 'bg-white/20'
+                            }`}
+                        />
+                    ))}
+                </div>
+            </div>
+            {extractionResult.confidence === 'low' && (
+                <p className="mt-1 text-xs opacity-80">{t.onboarding.form.warningLow}</p>
+            )}
+            {extractionResult.confidence === 'medium' && (
+                <p className="mt-1 text-xs opacity-80">{t.onboarding.form.warningMedium}</p>
+            )}
+        </div>
+    ) : null
+
+    // ── Render ───────────────────────────────────────────────────────────
+
+    const toggleTabs = (
+        <div className="mb-6 flex border-b border-white/10" role="tablist" aria-label="Input method selection">
+            <button
+                role="tab"
+                aria-selected={inputMode === 'manual'}
+                aria-controls="panel-manual"
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                    inputMode === 'manual'
+                        ? 'border-b-2 border-blue-500 bg-blue-500/15 text-blue-400 font-semibold'
+                        : 'border-b-2 border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-300'
+                }`}
+                disabled={urlExtracting}
+                onClick={() => handleSwitchToManual()}
+                type="button"
+            >
+                ✏️ {t.onboarding.form.tabManual}
+            </button>
+            <button
+                role="tab"
+                aria-selected={inputMode === 'url'}
+                aria-controls="panel-url"
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                    inputMode === 'url'
+                        ? 'border-b-2 border-blue-500 bg-blue-500/15 text-blue-400 font-semibold'
+                        : 'border-b-2 border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-300'
+                }`}
+                disabled={urlExtracting}
+                onClick={() => {
+                    setInputMode('url')
+                    setExtractionError(null)
+                }}
+                type="button"
+            >
+                🔗 {t.onboarding.form.tabUrl}
+            </button>
+        </div>
+    )
+
+    const urlInputSection = (
+        <div id="panel-url" role="tabpanel" aria-labelledby="tab-url">
+            <BuilderField icon="🔗" label={t.onboarding.form.urlLabel} required>
+                <div className="flex gap-3">
+                    <div className="flex-1">
+                        <BuilderTextInput
+                            invalid={false}
+                            onChange={(e) => setUrlValue(e.target.value)}
+                            placeholder={t.onboarding.form.urlPlaceholder}
+                            type="url"
+                            value={urlValue}
+                            disabled={urlExtracting}
+                            aria-label="Website URL"
+                        />
+                    </div>
+                    <button
+                        className="flex h-[44px] min-w-[120px] items-center justify-center gap-2 rounded-xl bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] px-5 text-sm font-semibold text-white transition-all duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!isValidUrl(urlValue) || urlExtracting}
+                        onClick={handleUrlExtract}
+                        type="button"
+                        aria-label={urlExtracting ? t.onboarding.form.extracting : t.onboarding.form.extractButton}
+                        aria-busy={urlExtracting}
+                    >
+                        {urlExtracting ? (
+                            <>
+                                <span className="size-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                                <span>{t.onboarding.form.extracting}</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>{t.onboarding.form.extractButton}</span>
+                                <span>→</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+                <p className="mt-2 text-xs text-slate-400">{t.onboarding.form.urlHint}</p>
+            </BuilderField>
+
+            {/* Loading skeleton */}
+            {urlExtracting && (
+                <div className="mt-6 space-y-4">
+                    <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 px-4 py-3">
+                        <div className="flex items-center gap-2 text-sm text-blue-400">
+                            <span className="size-4 animate-spin rounded-full border-2 border-blue-400/20 border-t-blue-400" />
+                            <span>{t.onboarding.form.analyzingWebsite}</span>
+                        </div>
+                    </div>
+                    {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="space-y-2">
+                            <div className="h-4 w-24 animate-pulse rounded bg-white/10" />
+                            <div className="h-11 animate-pulse rounded-xl bg-white/5" />
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Error */}
+            {extractionError && !urlExtracting && (
+                <div className="mt-6 rounded-2xl border border-[rgba(248,113,113,0.35)] bg-[rgba(127,29,29,0.18)] px-4 py-3 text-sm text-[#fecaca]" role="alert">
+                    <p>{extractionError}</p>
+                    <button
+                        className="mt-3 text-sm font-semibold text-white transition-colors hover:text-[#bfdbfe]"
+                        onClick={handleSwitchToManual}
+                        type="button"
+                    >
+                        {t.onboarding.form.tryManual} →
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+
+    const formFields = (
+        <div id="panel-manual" role="tabpanel" aria-labelledby="tab-manual">
+            <form onSubmit={handleSubmit}>
+                <div className="flex flex-col gap-6">
+                    {errorMessage ? (
+                        <div className="rounded-2xl border border-[rgba(248,113,113,0.35)] bg-[rgba(127,29,29,0.18)] px-4 py-3 text-sm text-[#fecaca]">
+                            <p>{errorMessage}</p>
+                            {onRetry ? (
+                                <button
+                                    className="mt-3 text-sm font-semibold text-white transition-colors hover:text-[#bfdbfe]"
+                                    onClick={() => onRetry(form)}
+                                    type="button"
+                                >
+                                    {t.onboarding.form.retryWithCurrent}
+                                </button>
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {confidenceBadge}
+
+                    <BuilderField
+                        error={errors.businessName}
+                        icon="📝"
+                        label={t.onboarding.form.businessName}
+                        required
+                    >
+                        <BuilderTextInput
+                            invalid={!!errors.businessName}
+                            onChange={(e) => setForm((current) => ({ ...current, businessName: e.target.value }))}
+                            placeholder={t.onboarding.form.businessNamePlaceholder}
+                            type="text"
+                            value={form.businessName}
+                        />
+                    </BuilderField>
+
+                    <BuilderField
+                        error={errors.industry}
+                        icon="🏢"
+                        label={t.onboarding.form.industry}
+                        required
+                    >
+                        <BuilderOptionGrid>
+                            {industryOptions.map((option) => (
+                                <BuilderOptionCard
+                                    icon={option.icon}
+                                    key={option.value}
+                                    label={option.label}
+                                    onClick={() => setForm((current) => ({ ...current, industry: option.value }))}
+                                    selected={form.industry === option.value}
+                                />
+                            ))}
+                        </BuilderOptionGrid>
+                        {isLoadingIndustries ? (
+                            <p className="text-xs text-[#94a3b8]">{t.onboarding.form.loadingIndustries}</p>
+                        ) : null}
+                    </BuilderField>
+
+                    <BuilderField
+                        hint={(
+                            <div className="flex items-center gap-2">
+                                <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
+                                <span>{t.onboarding.form.productsHint}</span>
+                            </div>
+                        )}
+                        error={errors.products}
+                        icon="📦"
+                        label={t.onboarding.form.products}
+                        required
+                    >
+                        <BuilderTextarea
+                            adornment={(
+                                <div className="flex size-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
+                                    <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
+                                </div>
+                            )}
+                            invalid={!!errors.products}
+                            onChange={(e) => setForm((current) => ({ ...current, products: e.target.value }))}
+                            placeholder={t.onboarding.form.productsPlaceholder}
+                            rows={3}
+                            value={form.products}
+                        />
+                    </BuilderField>
+
+                    <BuilderField
+                        hint={(
+                            <div className="flex items-center gap-2">
+                                <img alt="" className="size-3" src={BUILDER_TEXTAREA_HINT_ICON_URL} />
+                                <span>{t.onboarding.form.shortDescriptionHint}</span>
+                            </div>
+                        )}
+                        error={errors.shortDescription}
+                        icon="📝"
+                        label={t.onboarding.form.shortDescription}
+                        required
+                    >
+                        <BuilderTextarea
+                            adornment={(
+                                <div className="flex size-6 items-center justify-center rounded-full bg-[rgba(59,130,246,0.1)]">
+                                    <img alt="" className="size-3" src={BUILDER_TEXTAREA_BADGE_URL} />
+                                </div>
+                            )}
+                            invalid={!!errors.shortDescription}
+                            onChange={(e) => setForm((current) => ({ ...current, shortDescription: e.target.value }))}
+                            placeholder={t.onboarding.form.shortDescriptionPlaceholder}
+                            rows={3}
+                            value={form.shortDescription}
+                        />
+                    </BuilderField>
+                </div>
+            </form>
+        </div>
+    )
+
+    const leftBody = (
+        <>
+            {toggleTabs}
+            {inputMode === 'url' ? urlInputSection : formFields}
+        </>
+    )
+
+    const leftFooter = (
+        <BuilderSubmitButton
+            disabled={inputMode === 'url' ? false : !isFormReady || isGenerating}
+            loading={isGenerating}
+            onClick={inputMode === 'url' ? undefined : submitForm}
+            type="button"
+        >
+            {t.onboarding.form.generateButton}
+        </BuilderSubmitButton>
+    )
+
+    const rightPane = (
+        <BuilderPromoCard
+            description={t.onboarding.form.promoDescription}
+            steps={[
+                { id: 1, label: t.onboarding.form.promoStep1, active: true },
+                { id: 2, label: t.onboarding.form.promoStep2 },
+                { id: 3, label: t.onboarding.form.promoStep3 },
+            ]}
+            title={t.onboarding.form.promoTitle}
+        />
+    )
 
     return (
-        <div className="flex h-screen bg-[#0B1120]">
-            {/* Left side — Form */}
-            <div className="flex flex-1 items-center justify-center p-6">
-                <div className="w-full max-w-lg space-y-8">
-                    {/* Header */}
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-blue-600">
-                                <Sparkles className="h-5 w-5 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-white">Create Website with AI</h1>
-                                <p className="text-xs text-gray-500">Step 1/3 — Business Information</p>
-                            </div>
-                        </div>
-                        <p className="text-sm text-gray-400">
-                            Provide basic information so AI can create the perfect website for you.
-                        </p>
-                    </div>
-
-                    {/* Form */}
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* Business Name */}
-                        <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
-                                <Building2 className="h-3.5 w-3.5 text-gray-500" />
-                                Business Name <span className="text-red-400">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={form.businessName}
-                                onChange={e => setForm(f => ({ ...f, businessName: e.target.value }))}
-                                placeholder="VD: The Coffee House, Beauty Spa Hana..."
-                                className={`w-full rounded-xl border bg-[#1E293B] px-4 py-3 text-sm text-white placeholder-gray-600 outline-none transition-colors
-                                    ${errors.businessName ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-blue-500/50'}`}
-                            />
-                            {errors.businessName && <p className="text-xs text-red-400">{errors.businessName}</p>}
-                        </div>
-
-                        {/* Industry */}
-                        <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
-                                <Briefcase className="h-3.5 w-3.5 text-gray-500" />
-                                Industry <span className="text-red-400">*</span>
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {INDUSTRY_OPTIONS.map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        type="button"
-                                        onClick={() => {
-                                            setForm(f => ({ ...f, industry: opt.value }))
-                                            setErrors(e => ({ ...e, industry: '' }))
-                                        }}
-                                        className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-xs font-medium transition-all
-                                            ${form.industry === opt.value
-                                                ? 'border-blue-500 bg-blue-500/10 text-blue-300'
-                                                : 'border-white/10 bg-[#1E293B] text-gray-400 hover:border-white/20 hover:text-gray-300'
-                                            }`}
-                                    >
-                                        <span>{opt.icon}</span>
-                                        <span className="truncate">{opt.label.split(' ').slice(1).join(' ')}</span>
-                                    </button>
-                                ))}
-                            </div>
-                            {errors.industry && <p className="text-xs text-red-400">{errors.industry}</p>}
-                        </div>
-
-                        {/* Products / Services */}
-                        <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
-                                <ShoppingBag className="h-3.5 w-3.5 text-gray-500" />
-                                Products / Services <span className="text-red-400">*</span>
-                            </label>
-                            <textarea
-                                value={form.products}
-                                onChange={e => setForm(f => ({ ...f, products: e.target.value }))}
-                                placeholder="e.g. Specialty coffee, bubble tea, handmade pastries, co-working space..."
-                                rows={3}
-                                className={`w-full rounded-xl border bg-[#1E293B] px-4 py-3 text-sm text-white placeholder-gray-600 outline-none transition-colors resize-none
-                                    ${errors.products ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-blue-500/50'}`}
-                            />
-                            {errors.products && <p className="text-xs text-red-400">{errors.products}</p>}
-                        </div>
-
-                        {/* Target Audience (optional) */}
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-300">
-                                Target Audience <span className="text-gray-600">(optional)</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={form.targetAudience}
-                                onChange={e => setForm(f => ({ ...f, targetAudience: e.target.value }))}
-                                placeholder="e.g. Young adults 18-35, office workers, families..."
-                                className="w-full rounded-xl border border-white/10 bg-[#1E293B] px-4 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-blue-500/50 transition-colors"
-                            />
-                        </div>
-
-                        {/* Style */}
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gray-300">Style</label>
-                            <div className="flex gap-2">
-                                {STYLE_OPTIONS.map(opt => (
-                                    <button
-                                        key={opt.value}
-                                        type="button"
-                                        onClick={() => setForm(f => ({ ...f, style: opt.value }))}
-                                        className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-all
-                                            ${form.style === opt.value
-                                                ? 'border-purple-500 bg-purple-500/10 text-purple-300'
-                                                : 'border-white/10 bg-[#1E293B] text-gray-400 hover:border-white/20'
-                                            }`}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Submit */}
-                        <button
-                            type="submit"
-                            className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:shadow-blue-500/40 hover:brightness-110"
-                        >
-                            Continue — AI will create your website
-                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                        </button>
-                    </form>
-                </div>
-            </div>
-
-            {/* Right side — Visual */}
-            <div className="hidden lg:flex flex-1 items-center justify-center bg-gradient-to-br from-[#0F172A] to-[#1E1B4B] border-l border-white/5">
-                <div className="text-center space-y-6 max-w-sm">
-                    <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/20">
-                        <Sparkles className="h-12 w-12 text-purple-400" />
-                    </div>
-                    <div className="space-y-2">
-                        <h2 className="text-lg font-bold text-white">AI Website Builder</h2>
-                        <p className="text-sm text-gray-400 leading-relaxed">
-                            Just 3 simple steps, AI will create a professional website in minutes.
-                        </p>
-                    </div>
-                    <div className="space-y-3 text-left">
-                        <div className="flex items-center gap-3 rounded-lg bg-white/5 px-4 py-3">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">1</div>
-                            <span className="text-sm text-gray-300">Enter business information</span>
-                        </div>
-                        <div className="flex items-center gap-3 rounded-lg bg-white/5 px-4 py-3 opacity-50">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-xs font-bold text-gray-400">2</div>
-                            <span className="text-sm text-gray-500">AI creates content & design</span>
-                        </div>
-                        <div className="flex items-center gap-3 rounded-lg bg-white/5 px-4 py-3 opacity-50">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-xs font-bold text-gray-400">3</div>
-                            <span className="text-sm text-gray-500">Preview & Publish</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <BuilderStepScreen
+            description={t.onboarding.step1Description}
+            leftBody={leftBody}
+            leftFooter={inputMode === 'manual' ? leftFooter : undefined}
+            right={rightPane}
+            subtitle={t.onboarding.step1Subtitle}
+            title={t.onboarding.step1Title}
+        />
     )
 }

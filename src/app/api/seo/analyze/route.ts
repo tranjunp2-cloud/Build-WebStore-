@@ -1,7 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-
+import { seoAnalyzeSchema } from '@/lib/validations/seo'
+import { parseRequest } from '@/lib/validations/helpers'
+import { withAuth } from '@/lib/auth'
 /**
  * POST /api/seo/analyze
  * Analyses all pages of a site and returns an SEO score with issues.
@@ -96,15 +98,12 @@ function analysePage(page: any, siteSEO: any): PageAnalysis {
     }
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (_user, request) => {
     try {
-        const { siteId } = await request.json()
-        if (!siteId) {
-            return NextResponse.json(
-                { success: false, error: { code: 'VALIDATION_ERROR', message: 'siteId is required' } },
-                { status: 422 }
-            )
-        }
+        const { data, errorResponse } = await parseRequest(request, seoAnalyzeSchema)
+        if (errorResponse) return errorResponse
+        
+        const { siteId } = data!
 
         const payload = await getPayload({ config })
 
@@ -114,6 +113,19 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 { success: false, error: { code: 'NOT_FOUND', message: 'Site not found' } },
                 { status: 404 }
+            )
+        }
+
+        // IDOR Protection: local API bypasses access control, so we must manually check tenant ownership
+        const userTenantIds = _user.tenants?.map((t: any) =>
+            t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant
+        ).map(String) || []
+        const siteTenantId = site.tenant && typeof site.tenant === 'object' ? site.tenant.id : site.tenant
+
+        if (!_user.roles?.includes('super-admin') && !userTenantIds.includes(String(siteTenantId))) {
+            return NextResponse.json(
+                { success: false, error: { code: 'FORBIDDEN', message: 'Forbidden' } },
+                { status: 403 }
             )
         }
 
@@ -152,8 +164,8 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
         console.error('[SEO Analyze Error]', error)
         return NextResponse.json(
-            { success: false, error: { code: 'INTERNAL_ERROR', message: error.message } },
+            { success: false, error: { code: 'INTERNAL_ERROR', message: 'SEO analysis failed' } },
             { status: 500 }
         )
     }
-}
+})

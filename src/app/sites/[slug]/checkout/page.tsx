@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useCartStore } from '@/store/cartStore'
-import { ArrowLeft, CheckCircle, Loader2, ShoppingBag } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Loader2, ShoppingBag, Upload, X, CreditCard, Banknote, QrCode, AlertCircle } from 'lucide-react'
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -34,13 +33,21 @@ const MY_STATES = [
     'Putrajaya', 'Sabah', 'Sarawak', 'Selangor', 'Terengganu',
 ]
 
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/jpg']
+const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
+
 export default function CheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
     const [slug, setSlug] = useState('')
     const [siteId, setSiteId] = useState('')
     const { items, subtotal, clearCart } = useCartStore()
-    const router = useRouter()
 
     const [form, setForm] = useState<CheckoutForm>(initialForm)
+    const [paymentMethod, setPaymentMethod] = useState<'cod' | 'qr_banking'>('cod')
+    const [proofFile, setProofFile] = useState<File | null>(null)
+    const [proofPreview, setProofPreview] = useState<string | null>(null)
+    const [proofError, setProofError] = useState<string | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
     const [isPlacing, setIsPlacing] = useState(false)
     const [orderResult, setOrderResult] = useState<any>(null)
     const [error, setError] = useState<string | null>(null)
@@ -49,16 +56,23 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         params.then(p => setSlug(p.slug))
     }, [params])
 
-    // Get siteId from slug
+    // Get siteId from slug (slug = tenant slug)
     useEffect(() => {
         if (!slug) return
         async function fetchSite() {
             try {
-                const res = await fetch(`/api/sites?where[tenant.slug][equals]=${slug}&limit=1`)
-                if (res.ok) {
-                    const data = await res.json()
-                    if (data.docs?.[0]) setSiteId(String(data.docs[0].id))
-                }
+                // Step 1: Find tenant by slug
+                const tenantRes = await fetch(`/api/tenants?where[slug][equals]=${slug}&limit=1`)
+                if (!tenantRes.ok) return
+                const tenantData = await tenantRes.json()
+                const tenant = tenantData.docs?.[0]
+                if (!tenant) return
+
+                // Step 2: Find site belonging to this tenant
+                const siteRes = await fetch(`/api/sites?where[tenant][equals]=${tenant.id}&limit=1`)
+                if (!siteRes.ok) return
+                const siteData = await siteRes.json()
+                if (siteData.docs?.[0]) setSiteId(String(siteData.docs[0].id))
             } catch { }
         }
         fetchSite()
@@ -66,76 +80,136 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
     const currency = items[0]?.currency || 'MYR'
     const sub = subtotal()
+    const shippingFee = sub > 0 ? 10 : 0 // Flat RM10 shipping
     const tax = Math.round(sub * 0.06 * 100) / 100
-    const total = sub + tax
+    const total = sub + shippingFee + tax
 
     const updateField = (field: keyof CheckoutForm, value: string) => {
         setForm(prev => ({ ...prev, [field]: value }))
     }
 
+    // Payment proof upload handler
+    const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        setProofError(null)
+
+        if (!file) return
+
+        if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+            setProofError('Only JPG / PNG images are accepted')
+            setProofFile(null)
+            setProofPreview(null)
+            return
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+            setProofError('File size must be under 2MB')
+            setProofFile(null)
+            setProofPreview(null)
+            return
+        }
+
+        setProofFile(file)
+        const reader = new FileReader()
+        reader.onloadend = () => setProofPreview(reader.result as string)
+        reader.readAsDataURL(file)
+    }
+
+    const removeProof = () => {
+        setProofFile(null)
+        setProofPreview(null)
+        setProofError(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+
+    // Can place order?
+    const canPlaceOrder =
+        form.name.trim() && form.email.trim() &&
+        items.length > 0 &&
+        (paymentMethod === 'cod' || (paymentMethod === 'qr_banking' && proofFile))
+
     const handlePlaceOrder = async () => {
-        if (!form.name || !form.email) {
-            setError('Name and email are required')
-            return
-        }
-        if (items.length === 0) {
-            setError('Cart is empty')
-            return
-        }
+        if (!canPlaceOrder) return
 
         setIsPlacing(true)
         setError(null)
 
         try {
-            const res = await fetch('/api/orders/create', {
+            // Step 1: Upload proof image if QR Banking
+            let paymentProofImageId: string | undefined
+            if (paymentMethod === 'qr_banking' && proofFile) {
+                const formData = new FormData()
+                formData.append('file', proofFile)
+                formData.append('alt', `Payment proof - ${form.name}`)
+
+                const uploadRes = await fetch('/api/media', {
+                    method: 'POST',
+                    body: formData,
+                })
+                if (!uploadRes.ok) {
+                    throw new Error('Failed to upload payment proof')
+                }
+                const uploadData = await uploadRes.json()
+                paymentProofImageId = uploadData.doc?.id
+            }
+
+            // Step 2: Create order
+            const payload: Record<string, unknown> = {
+                siteId,
+                items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+                customer: {
+                    name: form.name,
+                    email: form.email,
+                    phone: form.phone,
+                    address: {
+                        line1: form.line1,
+                        line2: form.line2,
+                        city: form.city,
+                        state: form.state,
+                        postcode: form.postcode,
+                        country: 'Malaysia',
+                    },
+                },
+                paymentMethod,
+            }
+
+            if (paymentProofImageId) {
+                payload.paymentProofImage = paymentProofImageId
+            }
+
+            const res = await fetch('/api/orders/checkout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    siteId,
-                    items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
-                    customer: {
-                        name: form.name,
-                        email: form.email,
-                        phone: form.phone,
-                        address: {
-                            line1: form.line1,
-                            line2: form.line2,
-                            city: form.city,
-                            state: form.state,
-                            postcode: form.postcode,
-                            country: 'Malaysia',
-                        },
-                    },
-                }),
+                body: JSON.stringify(payload),
             })
 
-            if (res.ok) {
-                const data = await res.json()
-                if (data.success) {
-                    setOrderResult(data.data)
-                    clearCart()
-                }
+            const data = await res.json()
+
+            if (res.ok && data.success) {
+                setOrderResult(data.data)
+                clearCart()
             } else {
-                const data = await res.json()
+                // AC-2: Cart preserved on error
                 setError(data.error?.message || 'Failed to place order')
             }
-        } catch (err: any) {
-            setError(err.message || 'Network error')
+        } catch (err: unknown) {
+            // AC-2: Cart preserved on error
+            setError(err instanceof Error ? err.message : 'Network error. Please try again.')
         } finally {
             setIsPlacing(false)
         }
     }
 
-    // Order Success
+    // ─── Order Success ─────────────────────────────────────────
     if (orderResult) {
         return (
             <div style={{
                 fontFamily: 'Inter, sans-serif', minHeight: '100vh',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: '#fafafa',
+                background: '#fafafa', padding: '24px',
             }}>
                 <div style={{
-                    textAlign: 'center', maxWidth: '480px', padding: '48px',
+                    textAlign: 'center', maxWidth: '480px', width: '100%', padding: '48px 32px',
                     background: 'white', borderRadius: '24px', boxShadow: '0 4px 24px rgba(0,0,0,0.05)',
                 }}>
                     <div style={{
@@ -155,9 +229,12 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                         <p style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 12px', letterSpacing: '1px' }}>
                             {orderResult.orderNumber}
                         </p>
-                        <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>Total Paid</p>
+                        <p style={{ fontSize: '13px', color: '#999', margin: '0 0 4px' }}>Total</p>
                         <p style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
                             {formatPrice(orderResult.total, orderResult.currency)}
+                        </p>
+                        <p style={{ fontSize: '13px', color: '#999', margin: '12px 0 0' }}>
+                            Payment: {orderResult.paymentMethod === 'cod' ? 'Cash on Delivery' : 'QR Banking'}
                         </p>
                     </div>
                     <p style={{ fontSize: '13px', color: '#999' }}>
@@ -176,12 +253,13 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         )
     }
 
-    // Empty cart
+    // ─── Empty Cart ────────────────────────────────────────────
     if (items.length === 0 && !isPlacing) {
         return (
             <div style={{
                 fontFamily: 'Inter, sans-serif', minHeight: '100vh',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '24px',
             }}>
                 <div style={{ textAlign: 'center' }}>
                     <ShoppingBag size={48} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
@@ -195,16 +273,17 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         )
     }
 
-    const inputStyle = {
+    // ─── Shared Styles ─────────────────────────────────────────
+    const inputStyle: React.CSSProperties = {
         width: '100%', padding: '12px 16px', borderRadius: '10px',
         border: '1px solid #e5e7eb', fontSize: '14px', outline: 'none',
-        boxSizing: 'border-box' as const,
+        boxSizing: 'border-box',
     }
 
     return (
         <div style={{ fontFamily: 'Inter, sans-serif', minHeight: '100vh', background: '#fafafa' }}>
             {/* Nav */}
-            <nav style={{ padding: '16px 32px', borderBottom: '1px solid #eee', background: 'white' }}>
+            <nav style={{ padding: '16px 24px', borderBottom: '1px solid #eee', background: 'white' }}>
                 <Link href={`/sites/${slug}/products`} style={{
                     display: 'flex', alignItems: 'center', gap: '8px',
                     color: '#666', textDecoration: 'none', fontSize: '14px',
@@ -213,26 +292,28 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                 </Link>
             </nav>
 
-            <div style={{
-                display: 'grid', gridTemplateColumns: '1fr 400px',
-                gap: '48px', maxWidth: '1100px', margin: '0 auto',
-                padding: '40px 32px',
+            <div className="checkout-layout" style={{
+                display: 'grid', gap: '32px', maxWidth: '1100px', margin: '0 auto',
+                padding: '32px 24px',
             }}>
-                {/* Form */}
-                <div>
+                {/* ─── Left: Form ──────────────────────────────────── */}
+                <div style={{ minWidth: 0 }}>
                     <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 32px' }}>Checkout</h1>
 
+                    {/* Error Banner */}
                     {error && (
                         <div style={{
-                            background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px',
-                            padding: '12px 16px', fontSize: '13px', color: '#dc2626', marginBottom: '24px',
+                            background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px',
+                            padding: '14px 16px', fontSize: '13px', color: '#dc2626', marginBottom: '24px',
+                            display: 'flex', alignItems: 'center', gap: '10px',
                         }}>
-                            {error}
+                            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                            <span>{error}</span>
                         </div>
                     )}
 
                     {/* Contact */}
-                    <div style={{ marginBottom: '32px' }}>
+                    <section style={{ marginBottom: '32px' }}>
                         <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px' }}>Contact Information</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <input placeholder="Full Name *" value={form.name}
@@ -242,17 +323,17 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                             <input placeholder="Phone (e.g. +60 12-345 6789)" value={form.phone}
                                 onChange={e => updateField('phone', e.target.value)} style={inputStyle} />
                         </div>
-                    </div>
+                    </section>
 
                     {/* Shipping */}
-                    <div style={{ marginBottom: '32px' }}>
+                    <section style={{ marginBottom: '32px' }}>
                         <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px' }}>Shipping Address</h2>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <input placeholder="Address Line 1" value={form.line1}
                                 onChange={e => updateField('line1', e.target.value)} style={inputStyle} />
                             <input placeholder="Address Line 2 (optional)" value={form.line2}
                                 onChange={e => updateField('line2', e.target.value)} style={inputStyle} />
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div className="checkout-grid-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <input placeholder="City" value={form.city}
                                     onChange={e => updateField('city', e.target.value)} style={inputStyle} />
                                 <select value={form.state}
@@ -266,15 +347,155 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                                 onChange={e => updateField('postcode', e.target.value)}
                                 style={{ ...inputStyle, maxWidth: '200px' }} />
                         </div>
-                    </div>
+                    </section>
 
-                    {/* Place Order */}
-                    <button onClick={handlePlaceOrder} disabled={isPlacing}
+                    {/* ─── Payment Method ───────────────────────── */}
+                    <section style={{ marginBottom: '32px' }}>
+                        <h2 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 16px' }}>Payment Method</h2>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {/* COD Option */}
+                            <label
+                                onClick={() => setPaymentMethod('cod')}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '14px',
+                                    padding: '16px 20px', borderRadius: '12px', cursor: 'pointer',
+                                    border: `2px solid ${paymentMethod === 'cod' ? '#111' : '#e5e7eb'}`,
+                                    background: paymentMethod === 'cod' ? '#f8fafc' : 'white',
+                                    transition: 'all 0.15s',
+                                }}>
+                                <div style={{
+                                    width: '20px', height: '20px', borderRadius: '50%',
+                                    border: `2px solid ${paymentMethod === 'cod' ? '#111' : '#ccc'}`,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                }}>
+                                    {paymentMethod === 'cod' && <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#111' }} />}
+                                </div>
+                                <Banknote size={20} color="#666" />
+                                <div>
+                                    <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>Cash on Delivery (COD)</p>
+                                    <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>Pay when you receive your order</p>
+                                </div>
+                            </label>
+
+                            {/* QR Banking Option */}
+                            <label
+                                onClick={() => setPaymentMethod('qr_banking')}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '14px',
+                                    padding: '16px 20px', borderRadius: '12px', cursor: 'pointer',
+                                    border: `2px solid ${paymentMethod === 'qr_banking' ? '#111' : '#e5e7eb'}`,
+                                    background: paymentMethod === 'qr_banking' ? '#f8fafc' : 'white',
+                                    transition: 'all 0.15s',
+                                }}>
+                                <div style={{
+                                    width: '20px', height: '20px', borderRadius: '50%',
+                                    border: `2px solid ${paymentMethod === 'qr_banking' ? '#111' : '#ccc'}`,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                }}>
+                                    {paymentMethod === 'qr_banking' && <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#111' }} />}
+                                </div>
+                                <QrCode size={20} color="#666" />
+                                <div>
+                                    <p style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>QR Banking / DuitNow</p>
+                                    <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>Scan QR code and upload payment proof</p>
+                                </div>
+                            </label>
+                        </div>
+
+                        {/* QR Banking Details */}
+                        {paymentMethod === 'qr_banking' && (
+                            <div style={{
+                                marginTop: '20px', padding: '24px', borderRadius: '16px',
+                                background: 'white', border: '1px solid #e5e7eb',
+                            }}>
+                                {/* Merchant QR Code */}
+                                <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                                    <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 16px' }}>
+                                        Scan to pay via DuitNow QR
+                                    </p>
+                                    <div style={{
+                                        width: '200px', height: '200px', margin: '0 auto',
+                                        borderRadius: '16px', background: '#f8fafc',
+                                        border: '2px dashed #d1d5db',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        flexDirection: 'column', gap: '8px',
+                                    }}>
+                                        <QrCode size={48} color="#9ca3af" />
+                                        <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>Merchant QR Code</p>
+                                    </div>
+                                    <p style={{ fontSize: '12px', color: '#999', margin: '12px 0 0' }}>
+                                        Amount: <strong>{formatPrice(total, currency)}</strong>
+                                    </p>
+                                </div>
+
+                                {/* Upload Proof */}
+                                <div>
+                                    <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 12px' }}>
+                                        Upload Payment Proof <span style={{ color: '#ef4444' }}>*</span>
+                                    </p>
+
+                                    {proofPreview ? (
+                                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={proofPreview} alt="Payment proof"
+                                                style={{
+                                                    maxWidth: '100%', maxHeight: '200px', borderRadius: '12px',
+                                                    border: '1px solid #e5e7eb',
+                                                }} />
+                                            <button onClick={removeProof}
+                                                style={{
+                                                    position: 'absolute', top: '-8px', right: '-8px',
+                                                    width: '24px', height: '24px', borderRadius: '50%',
+                                                    background: '#ef4444', color: 'white', border: 'none',
+                                                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                }}>
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            onClick={() => fileInputRef.current?.click()}
+                                            style={{
+                                                padding: '32px', borderRadius: '12px', textAlign: 'center',
+                                                border: '2px dashed #d1d5db', cursor: 'pointer',
+                                                background: '#fafafa', transition: 'border-color 0.15s',
+                                            }}
+                                            onMouseEnter={e => (e.currentTarget.style.borderColor = '#9ca3af')}
+                                            onMouseLeave={e => (e.currentTarget.style.borderColor = '#d1d5db')}
+                                        >
+                                            <Upload size={24} color="#9ca3af" style={{ margin: '0 auto 8px' }} />
+                                            <p style={{ fontSize: '13px', color: '#666', margin: '0 0 4px' }}>
+                                                Click to upload receipt / screenshot
+                                            </p>
+                                            <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>
+                                                JPG or PNG, max 2MB
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <input ref={fileInputRef} type="file" accept="image/jpeg,image/png"
+                                        onChange={handleProofUpload} style={{ display: 'none' }} />
+
+                                    {proofError && (
+                                        <p style={{ fontSize: '12px', color: '#ef4444', margin: '8px 0 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <AlertCircle size={14} /> {proofError}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Place Order Button */}
+                    <button onClick={handlePlaceOrder}
+                        disabled={isPlacing || !canPlaceOrder}
                         style={{
-                            width: '100%', padding: '16px', background: '#111', color: 'white',
-                            borderRadius: '12px', border: 'none', fontSize: '16px', fontWeight: 600,
-                            cursor: isPlacing ? 'wait' : 'pointer', opacity: isPlacing ? 0.7 : 1,
+                            width: '100%', padding: '16px', background: canPlaceOrder ? '#111' : '#d1d5db',
+                            color: 'white', borderRadius: '12px', border: 'none', fontSize: '16px', fontWeight: 600,
+                            cursor: canPlaceOrder ? 'pointer' : 'not-allowed',
+                            opacity: isPlacing ? 0.7 : 1,
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                            transition: 'all 0.15s',
                         }}>
                         {isPlacing ? (
                             <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Placing Order...</>
@@ -282,10 +503,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                             <>Place Order — {formatPrice(total, currency)}</>
                         )}
                     </button>
+
+                    {paymentMethod === 'qr_banking' && !proofFile && (
+                        <p style={{ fontSize: '12px', color: '#f59e0b', textAlign: 'center', margin: '8px 0 0' }}>
+                            Please upload payment proof to proceed
+                        </p>
+                    )}
                 </div>
 
-                {/* Order Summary Sidebar */}
-                <div style={{
+                {/* ─── Right: Order Summary ─────────────────────── */}
+                <div className="checkout-summary" style={{
                     background: 'white', borderRadius: '16px', padding: '24px',
                     border: '1px solid #eee', height: 'fit-content', position: 'sticky', top: '24px',
                 }}>
@@ -293,12 +520,36 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
                         {items.map(item => (
-                            <div key={item.productId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                                <div>
-                                    <span>{item.name}</span>
-                                    <span style={{ color: '#999' }}> × {item.quantity}</span>
+                            <div key={item.productId} style={{
+                                display: 'flex', gap: '12px', alignItems: 'center',
+                            }}>
+                                {/* Thumbnail */}
+                                <div style={{
+                                    width: '48px', height: '48px', borderRadius: '8px',
+                                    background: '#f8f8f8', flexShrink: 0, overflow: 'hidden',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>
+                                    {item.imageUrl ? (
+                                        <>
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={item.imageUrl} alt={item.name}
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        </>
+                                    ) : (
+                                        <span style={{ fontSize: '16px', opacity: 0.2 }}>📦</span>
+                                    )}
                                 </div>
-                                <span style={{ fontWeight: 600 }}>{formatPrice(item.price * item.quantity, item.currency)}</span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <p style={{ fontSize: '13px', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {item.name}
+                                    </p>
+                                    <p style={{ fontSize: '12px', color: '#999', margin: '2px 0 0' }}>
+                                        Qty: {item.quantity}
+                                    </p>
+                                </div>
+                                <span style={{ fontSize: '14px', fontWeight: 600, flexShrink: 0 }}>
+                                    {formatPrice(item.price * item.quantity, item.currency)}
+                                </span>
                             </div>
                         ))}
                     </div>
@@ -307,6 +558,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
                             <span style={{ color: '#666' }}>Subtotal</span>
                             <span>{formatPrice(sub, currency)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
+                            <span style={{ color: '#666' }}>Shipping</span>
+                            <span>{shippingFee > 0 ? formatPrice(shippingFee, currency) : 'Free'}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '8px' }}>
                             <span style={{ color: '#666' }}>SST (6%)</span>
@@ -322,6 +577,28 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                     </div>
                 </div>
             </div>
+
+            {/* ─── Responsive CSS ──────────────────────────────── */}
+            <style>{`
+                .checkout-layout {
+                    grid-template-columns: 1fr 380px;
+                }
+                @media (max-width: 768px) {
+                    .checkout-layout {
+                        grid-template-columns: 1fr !important;
+                    }
+                    .checkout-summary {
+                        position: static !important;
+                        order: -1;
+                    }
+                    .checkout-grid-2col {
+                        grid-template-columns: 1fr !important;
+                    }
+                }
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     )
 }

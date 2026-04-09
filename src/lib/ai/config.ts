@@ -27,6 +27,7 @@ export function selectModel(task: AITask): AIModel {
         case 'seo-generation':
         case 'content-rewrite':
         case 'product-description':
+        case 'url-extraction':
             return 'gpt-4o-mini'
         default:
             return 'gpt-4o-mini'
@@ -40,6 +41,7 @@ export type AITask =
     | 'seo-generation'
     | 'content-rewrite'
     | 'product-description'
+    | 'url-extraction'
 
 // ─── Rate Limiting ──────────────────────────────────────────────────────
 export type SubscriptionPlan = 'free' | 'starter' | 'pro' | 'business'
@@ -55,6 +57,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 3,         // per day
         'content-rewrite': 5,        // per day
         'product-description': 5,    // per day
+        'url-extraction': 10,        // per day
     },
     starter: {
         'site-generation': 5,        // per month
@@ -63,6 +66,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 10,        // per day
         'content-rewrite': 20,       // per day
         'product-description': 20,   // per day
+        'url-extraction': 30,        // per day
     },
     pro: {
         'site-generation': 20,       // per month
@@ -71,6 +75,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 50,        // per day
         'content-rewrite': 100,      // per day
         'product-description': 100,  // per day
+        'url-extraction': 100,       // per day
     },
     business: {
         'site-generation': 999999,   // unlimited
@@ -79,6 +84,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'seo-generation': 999999,
         'content-rewrite': 999999,
         'product-description': 999999,
+        'url-extraction': 999999,
     },
 }
 
@@ -142,4 +148,5 @@ export const ESTIMATED_COSTS: Record<AITask, number> = {
     'seo-generation': 0.0004,     // GPT-4o-mini, ~800 in + 400 out
     'content-rewrite': 0.0003,    // GPT-4o-mini, ~600 in + 300 out
     'product-description': 0.0003,
+    'url-extraction': 0.001,         // GPT-4o-mini, ~2.3K in + 500 out
 }

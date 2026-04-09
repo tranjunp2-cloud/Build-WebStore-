@@ -18,4 +18,5 @@ export async function register() {
         // @ts-ignore — minimal FormData polyfill for Node 18
         globalThis.FormData = class FormData { }
     }
+
 }
