@@ -377,53 +377,17 @@ function PreviewFrameInner({
                     performSave(true) // Trigger immediate auto save when focusing out
                 }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
-                const { searchKey, oldHtml, newHtml, blockIndex } = e.data
-                if (oldHtml !== newHtml && newHtml !== undefined) {
+                const { searchKey, newHtml, blockIndex } = e.data
+                if (newHtml !== undefined) {
                     const currentBlocks = blocksRef.current
                     const block = currentBlocks[blockIndex]
-                    const fieldPath = block ? findStringFieldPathTwoPass(block, searchKey, oldHtml) : null
+                    // Find the field using plain text searchKey
+                    const fieldPath = block ? findStringFieldPathTwoPass(block, searchKey, searchKey) : null
                     if (fieldPath && block) {
-                        const currentValue = getValueAtPath(block as Record<string, unknown>, fieldPath)
-                        let nextValue = newHtml
-                        if (typeof currentValue === 'string') {
-                            const temp = document.createElement('textarea')
-                            temp.innerHTML = oldHtml
-                            const decodedOldHtml = temp.value
-
-                            const createFlexibleRegex = (str: string) => {
-                                const escaped = str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                                const flexibleSpace = escaped.replace(/(?:\\s| )+/g, '\\s+')
-                                return new RegExp(flexibleSpace, 'i')
-                            }
-
-                            if (currentValue.includes(oldHtml)) {
-                                nextValue = currentValue.replace(oldHtml, newHtml)
-                            } else if (currentValue.includes(decodedOldHtml)) {
-                                nextValue = currentValue.replace(decodedOldHtml, newHtml)
-                            } else if (currentValue.includes(searchKey)) {
-                                nextValue = currentValue.replace(searchKey, newHtml)
-                            } else {
-                                const flexOld = createFlexibleRegex(oldHtml)
-                                if (flexOld.test(currentValue)) {
-                                    nextValue = currentValue.replace(flexOld, newHtml)
-                                } else {
-                                    const flexDecoded = createFlexibleRegex(decodedOldHtml)
-                                    if (flexDecoded.test(currentValue)) {
-                                        nextValue = currentValue.replace(flexDecoded, newHtml)
-                                    } else {
-                                        const flexKey = createFlexibleRegex(searchKey)
-                                        if (flexKey.test(currentValue)) {
-                                            nextValue = currentValue.replace(flexKey, newHtml)
-                                        } else if (searchKey && Math.abs(currentValue.replace(/<[^>]*>/g, '').length - searchKey.length) < 15) {
-                                            nextValue = newHtml
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
+                        // Direct set — always replace entire field value with clean HTML
+                        // This prevents nesting accumulation from partial find-and-replace
                         const clone = JSON.parse(JSON.stringify(currentBlocks))
-                        const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, nextValue)
+                        const nextBlock = updateValueAtPath(clone[blockIndex] as Record<string, unknown>, fieldPath, newHtml)
                         updateBlock(blockIndex, nextBlock)
                     }
                 }
@@ -476,6 +440,8 @@ function PreviewFrameInner({
             
             setIsEditing(false)
             setTextEditingData(null) // Clean up WYSIWYG if clicking outside
+            // Tell iframe to stop editing too
+            frameElement?.contentWindow?.postMessage({ type: 'STOP_TEXT_EDITING' }, window.location.origin)
         }
 
         document.addEventListener('keydown', handleKeyDown)

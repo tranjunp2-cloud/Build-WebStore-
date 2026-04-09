@@ -11,8 +11,16 @@ interface RichTextToolbarProps {
     activeState?: Record<string, unknown>
 }
 
+const TAG_LABELS: Record<string, string> = {
+    H1: 'Heading 1', H2: 'Heading 2', H3: 'Heading 3', H4: 'Heading 4',
+    P: 'Paragraph', SPAN: 'Paragraph', DIV: 'Paragraph',
+}
+
 export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbarProps) {
     const isActive = (cmd: string) => Boolean(activeState[cmd])
+    const currentTag = String(activeState.formatBlock || 'P').toUpperCase()
+    const currentValue = ['H1', 'H2', 'H3', 'H4'].includes(currentTag) ? currentTag : 'P'
+
     return (
         <div
             data-wysiwyg-toolbar
@@ -20,7 +28,7 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
             onMouseDown={(e) => e.preventDefault()}
         >
             <select
-                defaultValue="p"
+                value={currentValue}
                 onMouseDown={(e) => e.stopPropagation()}
                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onCommand('formatBlock', e.target.value)}
                 className="w-[110px] h-8 text-xs border-0 bg-transparent hover:bg-gray-100 focus:ring-0 cursor-pointer outline-none"
