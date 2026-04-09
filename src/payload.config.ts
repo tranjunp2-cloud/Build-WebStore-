@@ -48,11 +48,21 @@ function isRemoteDatabase(): boolean {
   )
 }
 
-/** Schema push is expensive in dev Docker and can block auth/API requests.
- * Enable it explicitly only when you intend to sync schema changes.
+/** Schema push: auto-enable for local dev, explicit for Docker/staging.
+ * - Local dev (NODE_ENV=development): always push (dev needs latest schema)
+ * - Docker/staging: only when PAYLOAD_PUSH_SCHEMA=true (db-setup controls this)
+ * - Production: never push
+ *
+ * History: commit 5934144 disabled auto-push to fix 45s timeout in dev Docker.
+ * But this broke local dev — fields added to collections didn't create columns.
+ * Fix: auto-push for local dev, explicit for Docker (db-setup sets the env var).
  */
 function shouldPushSchema(): boolean {
-  return process.env.PAYLOAD_PUSH_SCHEMA === 'true'
+  if (process.env.PAYLOAD_PUSH_SCHEMA === 'true') return true
+  // Auto-push for local dev (not Docker — Docker sets HOSTNAME=0.0.0.0)
+  const isDev = process.env.NODE_ENV === 'development'
+  const isDocker = process.env.HOSTNAME === '0.0.0.0'
+  return isDev && !isDocker
 }
 
 
