@@ -21,8 +21,8 @@ RUN mkdir -p public
 # Build-time env vars — NEXT_PUBLIC_* are baked by webpack at build time.
 # These CANNOT be overridden at runtime, so they must be set here for staging.
 # PAYLOAD_SECRET is NOT needed at build time — injected by DO App Platform at runtime.
-ENV NEXT_PUBLIC_SERVER_URL=https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
-ENV NEXT_PUBLIC_PLATFORM_DOMAIN=ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
+ENV NEXT_PUBLIC_SERVER_URL=https://web-cms-v2.dev.ecommercehub.my
+ENV NEXT_PUBLIC_PLATFORM_DOMAIN=web-v2.dev.ecommercehub.my
 ENV NEXT_TELEMETRY_DISABLED=1
 # Polyfill for Next.js build (File/Blob); package.json build script also sets NODE_OPTIONS
 ENV NODE_OPTIONS="--require ./node-polyfill.js"
@@ -37,8 +37,8 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 # Runtime env — NEXT_PUBLIC_* are baked at build time but also needed at runtime
 # for Payload serverURL resolution. PAYLOAD_SECRET is injected by DO App Platform.
-ENV NEXT_PUBLIC_SERVER_URL=https://ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
-ENV NEXT_PUBLIC_PLATFORM_DOMAIN=ech-prime-web-v2-staging-pzdwc.ondigitalocean.app
+ENV NEXT_PUBLIC_SERVER_URL=https://web-cms-v2.dev.ecommercehub.my
+ENV NEXT_PUBLIC_PLATFORM_DOMAIN=web-v2.dev.ecommercehub.my
 
 # Security: non-root user
 RUN addgroup --system --gid 1001 nodejs && \
