@@ -71,3 +71,21 @@ body:
         - "⚪ Cosmetic — UI/text sai nhưng không ảnh hưởng chức năng"
     validations:
       required: true
+
+  - type: input
+    id: start-date
+    attributes:
+      label: "Start Date"
+      description: "Ngày bắt đầu fix (YYYY-MM-DD)"
+      placeholder: "2026-04-09"
+    validations:
+      required: false
+
+  - type: input
+    id: end-date
+    attributes:
+      label: "End Date"
+      description: "Ngày kết thúc / Deadline (YYYY-MM-DD)"
+      placeholder: "2026-04-16"
+    validations:
+      required: false
