@@ -174,7 +174,7 @@ export function NotificationDropdown() {
   return (
     <div 
       ref={dropdownRef}
-      className="fixed sm:absolute top-[60px] sm:top-14 left-1/2 sm:left-auto -translate-x-1/2 sm:translate-x-0 sm:right-0 w-[calc(100vw-32px)] sm:w-[380px] max-w-[340px] sm:max-w-none rounded-[16px] bg-[#1E293B] border border-white/10 shadow-2xl flex flex-col z-[100] overflow-hidden"
+      className="fixed sm:absolute top-[60px] sm:top-14 left-1/2 sm:left-auto -translate-x-1/2 sm:translate-x-0 sm:right-0 w-[calc(100vw-32px)] sm:w-[380px] max-w-[340px] sm:max-w-none max-h-[calc(100dvh-76px)] sm:max-h-none rounded-[16px] bg-[#1E293B] border border-white/10 shadow-2xl flex flex-col z-[100] overflow-hidden"
     >
       <div className="flex items-center justify-between border-b border-white/10 px-4 sm:px-5 pt-3 pb-3 sm:pt-4">
         <h3 className="text-[16px] sm:text-[18px] font-bold text-white leading-relaxed">{t.notifications.title}</h3>
@@ -187,7 +187,7 @@ export function NotificationDropdown() {
         </button>
       </div>
 
-      <div className={`flex-1 ${isExpanded ? 'max-h-[460px] overflow-y-auto custom-scrollbar' : 'max-h-[368px] overflow-hidden'} bg-[#1E293B] transition-all duration-300`}>
+      <div className={`flex-1 min-h-0 ${isExpanded ? 'max-h-[460px] overflow-y-auto custom-scrollbar' : 'max-h-[368px] overflow-hidden'} bg-[#1E293B] transition-all duration-300`}>
         {isLoading && (
             <div className="flex items-center justify-center py-10 bg-[#1E293B]">
                 <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
