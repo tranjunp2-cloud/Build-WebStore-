@@ -1,6 +1,11 @@
 import { AppShell } from '@/components/AppShell'
 import { I18nProvider } from '@/i18n'
 
+// force-dynamic prevents ISR cache from serving stale marketing page
+// when subdomain requests hit middleware rewrite → /sites/{slug}
+// Without this, Next.js serves cached "/" for ALL hostnames including subdomains
+export const dynamic = 'force-dynamic'
+
 export default function FrontendLayout({ children }: { children: React.ReactNode }) {
     return (
         <AppShell>
