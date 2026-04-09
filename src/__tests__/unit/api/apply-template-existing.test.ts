@@ -292,7 +292,7 @@ describe('POST /api/ai/apply-template', () => {
             expect(body.error).toMatch(/template not found/i)
         })
 
-        it('returns 400 when user has no associated tenant', async () => {
+        it('auto-creates tenant when user has no associated tenant', async () => {
             // Arrange — user.tenants is empty (no tenant assigned)
             mockUser = { id: 'user-42', email: 'owner@example.com', tenants: [] }
             const req = makeRequest({ templateId: 'tpl-modern' })
@@ -301,9 +301,9 @@ describe('POST /api/ai/apply-template', () => {
             const res = await POST(req)
             const body = await res.json()
 
-            // Assert
-            expect(res.status).toBe(400)
-            expect(body.error).toMatch(/tenant not found/i)
+            // Assert — should succeed by auto-creating tenant (same as generate-site)
+            expect(res.status).toBe(200)
+            expect(body.success).toBe(true)
         })
 
         it('uses default theme values when template has no defaultTheme', async () => {

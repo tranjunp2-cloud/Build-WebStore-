@@ -50,6 +50,25 @@ export const Notifications: CollectionConfig = {
         },
         delete: ({ req }) => Boolean(req.user?.roles?.includes('super-admin')),
     },
+    hooks: {
+        afterChange: [
+            async ({ doc, operation, req }) => {
+                if (operation !== 'create') return doc
+                // Fire-and-forget push notification — never block the response
+                import('@/lib/notifications/send-push')
+                    .then(({ sendPushToUser }) =>
+                        sendPushToUser(doc.user, doc.tenant, {
+                            title: doc.title,
+                            body: doc.message || undefined,
+                            tag: doc.type,
+                            actionUrl: doc.actionUrl || undefined,
+                        }, req.payload),
+                    )
+                    .catch((err) => console.error('[Push] Hook failed', err))
+                return doc
+            },
+        ],
+    },
     fields: [
         {
             name: 'tenant',

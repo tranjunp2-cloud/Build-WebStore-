@@ -11,6 +11,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 import { blockRegistry } from '@/blocks/registry'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
+import { resolveTheme } from '@/lib/theme/resolve'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -246,6 +247,9 @@ export async function POST(req: NextRequest) {
 
         let site: Record<string, unknown>
 
+        // Resolve complete theme before saving (prevents color mismatch between builder preview and editor)
+        const resolvedTheme = resolveTheme(result.theme)
+
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
             site = await payload.update({
@@ -256,13 +260,7 @@ export async function POST(req: NextRequest) {
                     status: 'draft',
                     siteType: result.siteType,
                     locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
-                    theme: {
-                        primaryColor: result.theme.primaryColor,
-                        secondaryColor: result.theme.secondaryColor,
-                        fontHeading: result.theme.fontHeading,
-                        fontBody: result.theme.fontBody,
-                        colorMode: result.theme.colorMode,
-                    },
+                    theme: resolvedTheme,
                     seo: {
                         metaTitle: result.seo.title,
                         metaDescription: result.seo.description,
@@ -294,13 +292,7 @@ export async function POST(req: NextRequest) {
                     status: 'draft',
                     siteType: result.siteType,
                     locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
-                    theme: {
-                        primaryColor: result.theme.primaryColor,
-                        secondaryColor: result.theme.secondaryColor,
-                        fontHeading: result.theme.fontHeading,
-                        fontBody: result.theme.fontBody,
-                        colorMode: result.theme.colorMode,
-                    },
+                    theme: resolvedTheme,
                     seo: {
                         metaTitle: result.seo.title,
                         metaDescription: result.seo.description,

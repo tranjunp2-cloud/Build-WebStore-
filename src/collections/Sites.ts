@@ -166,6 +166,43 @@ export const Sites: CollectionConfig = {
                         { label: 'Dark', value: 'dark' },
                     ],
                 },
+                {
+                    name: 'accentColor',
+                    type: 'text',
+                },
+                {
+                    name: 'surfaceColor',
+                    type: 'text',
+                },
+                {
+                    name: 'textColor',
+                    type: 'text',
+                },
+                {
+                    name: 'mutedColor',
+                    type: 'text',
+                },
+                {
+                    name: 'spacingPreset',
+                    type: 'select',
+                    defaultValue: 'default',
+                    options: [
+                        { label: 'Compact', value: 'compact' },
+                        { label: 'Default', value: 'default' },
+                        { label: 'Relaxed', value: 'relaxed' },
+                    ],
+                },
+                {
+                    name: 'shadowPreset',
+                    type: 'select',
+                    defaultValue: 'subtle',
+                    options: [
+                        { label: 'None', value: 'none' },
+                        { label: 'Subtle', value: 'subtle' },
+                        { label: 'Medium', value: 'medium' },
+                        { label: 'Dramatic', value: 'dramatic' },
+                    ],
+                },
             ],
         },
         {

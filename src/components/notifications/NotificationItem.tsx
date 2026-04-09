@@ -1,7 +1,7 @@
 'use client'
 
 import { formatDistanceToNow } from 'date-fns'
-import { ShoppingCart, Megaphone, CircleAlert, FileText, ShoppingBag, type LucideIcon } from 'lucide-react'
+import { ShoppingCart, Megaphone, CircleAlert, FileText, type LucideIcon } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { NotificationItem as NotificationItemType } from '@/types/notification'
 
@@ -26,9 +26,6 @@ export function NotificationItem({ notification, onClick }: Props) {
   } else if (type === 'BLOG_PUBLISHED') {
     Icon = FileText
     iconBgClass = 'bg-white/10 text-white'
-  } else if (type as string === 'ABANDONED_CART') {
-    Icon = ShoppingBag
-    iconBgClass = 'bg-[#A855F7]/10 text-[#C084FC]' // From image, abandoned cart uses purple
   }
 
   return (
@@ -37,9 +34,9 @@ export function NotificationItem({ notification, onClick }: Props) {
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(notification) } }}
-      className={`relative flex items-start gap-[10px] sm:gap-[12px] px-[8px] py-[12px] sm:px-[20px] sm:py-[16px] transition-colors hover:bg-white/5 cursor-pointer border-b border-t-0 border-r-0 border-white/5 last:border-b-0 bg-transparent`}>
+      className={`relative flex items-start gap-[10px] sm:gap-[12px] px-[8px] py-[12px] sm:px-[20px] sm:py-[16px] min-h-[44px] transition-colors hover:bg-white/5 cursor-pointer border-b border-t-0 border-r-0 border-white/5 last:border-b-0 ${!isRead ? 'border-l-2 border-l-[#3B82F6] bg-white/[0.02]' : 'border-l-2 border-l-transparent bg-transparent'}`}>
       {!isRead && (
-        <div className="absolute left-[2px] sm:left-[6px] top-[29px] sm:top-[33px] h-[6px] w-[6px] rounded-full bg-[#3B82F6]" />
+        <div className="absolute left-[2px] sm:left-[6px] top-[29px] sm:top-[33px] h-[8px] w-[8px] rounded-full bg-[#3B82F6]" />
       )}
       
       <div className={`flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-2xl ${iconBgClass}`}>
@@ -48,7 +45,7 @@ export function NotificationItem({ notification, onClick }: Props) {
       
       <div className="flex-1 flex flex-col pt-[2px] pr-[10px]">
         <div className="flex items-center gap-[6px] mb-1">
-          <h4 className={`text-[14px] leading-[20px] ${!isRead ? 'font-semibold text-white' : 'font-normal text-[#CBD5E1]'}`}>
+          <h4 className={`text-[12px] sm:text-[14px] leading-[20px] ${!isRead ? 'font-semibold text-white' : 'font-normal text-[#CBD5E1]'}`}>
             {title}
           </h4>
           {type === 'SYSTEM_ALERT' && (

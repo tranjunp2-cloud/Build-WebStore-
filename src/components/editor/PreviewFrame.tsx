@@ -46,7 +46,7 @@ type BlockLayoutRect = HoverRect & {
 
 type DragState = {
     sourceIndex: number
-    sourceRect: HoverRect
+    sourceRect: HoverRect & { blockType?: string }
     pointerOffsetY: number
     currentY: number
 }
@@ -271,10 +271,14 @@ function PreviewFrameInner({
             }
         }
 
+        frameElement?.contentWindow?.postMessage(
+            { type: 'DRAG_BLOCK_END' },
+            window.location.origin,
+        )
         setDragState(null)
         setDropIndex(null)
         dragPointerClientYRef.current = null
-    }, [onReorderBlocks])
+    }, [onReorderBlocks, frameElement])
 
     useEffect(() => {
         const handleMessage = (e: MessageEvent) => {
@@ -763,7 +767,7 @@ function PreviewFrameInner({
                                 setIsEditing(false)
                                 setDragState({
                                     sourceIndex: activeLayout.blockIndex,
-                                    sourceRect: activeLayout,
+                                    sourceRect: { ...activeLayout, blockType: activeLayout.blockType },
                                     pointerOffsetY:
                                         event.clientY - frameRect.top - activeLayout.top,
                                     currentY: activeLayout.top,
@@ -772,6 +776,10 @@ function PreviewFrameInner({
                                     editableLayouts.findIndex(
                                         layout => layout.blockIndex === activeLayout.blockIndex,
                                     ),
+                                )
+                                frameElement?.contentWindow?.postMessage(
+                                    { type: 'DRAG_BLOCK_START', blockIndex: activeLayout.blockIndex },
+                                    window.location.origin,
                                 )
                                 syncDragPosition(event.clientY, activeLayout.blockIndex)
                             }}
@@ -787,20 +795,26 @@ function PreviewFrameInner({
             <AnimatePresence>
             {dragState && overlayOffset ? (
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.98 }}
+                    initial={{ opacity: 0, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.15 }}
-                    className="pointer-events-none absolute rounded-xl border border-cyan-400/40 bg-cyan-400/10 shadow-[0_24px_64px_rgba(45,212,191,0.15)]"
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    transition={{ duration: 0.12 }}
+                    className="pointer-events-none absolute rounded-xl border-2 border-blue-500/60 bg-blue-500/10 shadow-[0_24px_64px_rgba(59,130,246,0.25)]"
                     style={{
                         top: overlayOffset.top + dragState.currentY - dragState.pointerOffsetY,
                         left: overlayOffset.left + dragState.sourceRect.left,
                         width: dragState.sourceRect.width,
-                        height: dragState.sourceRect.height,
+                        height: Math.min(dragState.sourceRect.height, 120),
                         zIndex: 60,
                     }}
                 >
-                    <div className="absolute inset-0 rounded-xl border border-dashed border-cyan-300/60" />
+                    <div className="absolute inset-0 rounded-xl border border-dashed border-blue-400/40" />
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 rounded-lg bg-blue-600/90 px-3 py-1.5 shadow-lg">
+                        <GripVertical className="h-3.5 w-3.5 text-white/80" />
+                        <span className="text-xs font-semibold text-white capitalize">
+                            {dragState.sourceRect.blockType?.replace(/-/g, ' ') || 'Block'}
+                        </span>
+                    </div>
                 </motion.div>
             ) : null}
             </AnimatePresence>
@@ -879,6 +893,7 @@ function PreviewFrameInner({
                                 blockType={hoverData.blockType}
                                 currentText={hoverData.text}
                                 isSubmitting={isSubmitting}
+                                isMobile={viewport === 'mobile'}
                                 onClose={() => setIsEditing(false)}
                                 onSubmit={handleInlineRewrite}
                             />
