@@ -32,10 +32,11 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
         const numericSiteId = Number(siteId)
         const pageId = new URL(req.url).searchParams.get('pageId')
 
-        // Fetch site
+        // Fetch site (depth: 1 to populate tenant for siteUrl computation)
         const site = await payload.findByID({
             collection: 'sites',
             id: siteId,
+            depth: 1,
         })
 
         if (!site) {
@@ -120,6 +121,10 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 headerBlock: site.headerBlock || null,
                 footerBlock: site.footerBlock || null,
                 shippingConfig: site.shippingConfig || {},
+                publishedAt: site.publishedAt || null,
+                tenantSlug: (typeof site.tenant === 'object' && site.tenant !== null)
+                    ? (site.tenant as Record<string, unknown>).slug as string || null
+                    : null,
             },
             page: page ? {
                 id: page.id,

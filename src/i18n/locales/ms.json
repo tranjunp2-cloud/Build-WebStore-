@@ -1522,5 +1522,57 @@
             "updated": "Pengguna ditandakan sebagai {status}",
             "resent": "E-mel jemputan berjaya dihantar semula"
         }
+    },
+    "editor": {
+        "toolbar": {
+            "publish": "Terbitkan",
+            "publishing": "Menerbitkan",
+            "published": "Diterbitkan",
+            "viewLive": "Lihat Laman",
+            "update": "Kemas kini",
+            "updating": "Mengemaskini...",
+            "preview": "Pratonton",
+            "live": "Aktif",
+            "draft": "Draf"
+        },
+        "publishModal": {
+            "title": "Sedia untuk Terbitkan?",
+            "homepageReady": "Halaman utama telah ditetapkan",
+            "homepageReadyDesc": "Halaman utama anda sudah sedia",
+            "unsavedChanges": "Perubahan belum disimpan",
+            "unsavedChangesDesc": "Kami akan menyimpan perubahan terkini sebelum menerbitkan.",
+            "seoNeeded": "Pengoptimuman SEO diperlukan",
+            "seoSet": "Metadata SEO telah ditetapkan",
+            "seoSetDesc": "Semua halaman mempunyai tajuk dan penerangan meta.",
+            "cancel": "Batal",
+            "publishNow": "Terbitkan Sekarang"
+        },
+        "unpublishModal": {
+            "title": "Nyahterbit Laman Web",
+            "warningTitle": "Pelanggan tidak dapat mengakses",
+            "warningDesc": "Laman web anda akan memaparkan halaman \"Sedang Penyelenggaraan\" kepada semua pelawat.",
+            "ownerAccessTitle": "Anda masih boleh mengedit",
+            "ownerAccessDesc": "Pratonton dan edit melalui Editor seperti biasa. Terbitkan semula bila-bila masa.",
+            "cancel": "Batal",
+            "confirm": "Aktifkan Mod Penyelenggaraan",
+            "processing": "Memproses..."
+        },
+        "viewLiveMenu": {
+            "openWebsite": "Buka Laman Web",
+            "copyLink": "Salin Pautan",
+            "unpublish": "Nyahterbit"
+        },
+        "toast": {
+            "publishSuccess": "Laman web telah aktif!",
+            "publishSuccessDomain": "Domain: {domain}",
+            "unpublishSuccess": "Laman web kini dalam mod penyelenggaraan.",
+            "linkCopied": "Pautan disalin!",
+            "publishFailed": "Gagal menerbitkan",
+            "updateSuccess": "Laman web dikemaskini!"
+        },
+        "maintenance": {
+            "banner": "Laman web dalam Mod Penyelenggaraan. Pelanggan akan melihat halaman penyelenggaraan.",
+            "republish": "Terbitkan Semula"
+        }
     }
 }

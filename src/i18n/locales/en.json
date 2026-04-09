@@ -1522,5 +1522,57 @@
             "updated": "User marked as {status}",
             "resent": "Invitation email resent successfully"
         }
+    },
+    "editor": {
+        "toolbar": {
+            "publish": "Publish",
+            "publishing": "Publishing",
+            "published": "Published",
+            "viewLive": "View Live",
+            "update": "Update",
+            "updating": "Updating...",
+            "preview": "Preview",
+            "live": "Live",
+            "draft": "Draft"
+        },
+        "publishModal": {
+            "title": "Ready to Publish?",
+            "homepageReady": "Homepage is set",
+            "homepageReadyDesc": "Your Home page is ready",
+            "unsavedChanges": "Unsaved changes detected",
+            "unsavedChangesDesc": "We will save your latest edits before publishing.",
+            "seoNeeded": "SEO optimization needed",
+            "seoSet": "SEO metadata is set",
+            "seoSetDesc": "All pages have meta title and description.",
+            "cancel": "Cancel",
+            "publishNow": "Publish Now"
+        },
+        "unpublishModal": {
+            "title": "Unpublish Website",
+            "warningTitle": "Customers will not be able to access",
+            "warningDesc": "Your website will show a \"Under Maintenance\" page to all visitors.",
+            "ownerAccessTitle": "You can still edit",
+            "ownerAccessDesc": "Preview and edit via the Editor as normal. Re-publish anytime.",
+            "cancel": "Cancel",
+            "confirm": "Enable Maintenance Mode",
+            "processing": "Processing..."
+        },
+        "viewLiveMenu": {
+            "openWebsite": "Open Website",
+            "copyLink": "Copy Link",
+            "unpublish": "Unpublish"
+        },
+        "toast": {
+            "publishSuccess": "Website is live!",
+            "publishSuccessDomain": "Domain: {domain}",
+            "unpublishSuccess": "Website is now in maintenance mode.",
+            "linkCopied": "Link copied!",
+            "publishFailed": "Publish failed",
+            "updateSuccess": "Website updated!"
+        },
+        "maintenance": {
+            "banner": "Website is in Maintenance Mode. Customers will see a maintenance page.",
+            "republish": "Re-publish"
+        }
     }
 }
