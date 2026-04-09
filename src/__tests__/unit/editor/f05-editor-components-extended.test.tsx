@@ -18,12 +18,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import React from 'react'
 
+// ── Mock next/font/google (not available in test env) ────────────────────
+vi.mock('next/font/google', () => ({
+    Inter: () => ({ className: 'inter', variable: '--font-inter', style: { fontFamily: 'Inter' } }),
+}))
+
 // ── Mock i18n ────────────────────────────────────────────────────────────
 vi.mock('@/i18n', () => ({
     useI18n: () => ({
-        t: { dashboard: { overview: {} } },
+        t: { dashboard: { overview: {} }, editor: { unpublish: { title: 'Unpublish', confirm: 'Confirm', cancel: 'Cancel', description: 'Are you sure?' } } },
         locale: 'en',
     }),
+    I18nProvider: ({ children }: any) => children,
 }))
 
 // ── Mock date-fns ────────────────────────────────────────────────────────

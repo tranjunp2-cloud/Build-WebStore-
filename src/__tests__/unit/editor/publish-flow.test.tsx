@@ -21,6 +21,38 @@ vi.mock('next/font/google', () => ({
     }),
 }))
 
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: {
+            editor: {
+                publish: {},
+                save: {},
+                unpublish: { title: 'Unpublish', confirm: 'Confirm', cancel: 'Cancel', description: 'desc' },
+                toast: {
+                    publishSuccess: 'Website đã live!',
+                    publishSuccessDomain: 'Live at {domain}',
+                    publishFailed: 'Publish thất bại',
+                    saveSuccess: 'Đã lưu thành công!',
+                    saveFailed: 'Lưu thất bại',
+                    unpublishSuccess: 'Đã gỡ website',
+                    unpublishFailed: 'Gỡ website thất bại',
+                    versionConflict: 'Version conflict',
+                },
+            },
+            dashboard: { overview: {} },
+        },
+        locale: 'en',
+        ti: (template: string, vars: Record<string, string>) => {
+            let result = template
+            for (const [key, val] of Object.entries(vars)) {
+                result = result.replace(`{${key}}`, val)
+            }
+            return result
+        },
+    }),
+    I18nProvider: ({ children }: any) => children,
+}))
+
 // Mock out heavy child components so we can focus on EditorPage's publish/save flows
 vi.mock('@/components/editor/PreviewFrame', () => ({ PreviewFrame: () => <div data-testid="preview-frame" /> }))
 vi.mock('@/components/editor/EditorSidebar', () => ({ 
@@ -33,6 +65,23 @@ vi.mock('@/components/editor/EditorToolbar', () => ({
             <button data-testid="publish-btn" onClick={onPublish}>Publish</button>
         </div>
     ) 
+}))
+vi.mock('@/components/editor/PrePublishModal', () => ({
+    PrePublishModal: ({ isOpen, onPublish }: any) => isOpen ? (
+        <div data-testid="pre-publish-modal">
+            <button onClick={onPublish}>Publish now</button>
+        </div>
+    ) : null,
+}))
+vi.mock('@/components/editor/UnpublishModal', () => ({
+    UnpublishModal: ({ isOpen, onConfirm }: any) => isOpen ? (
+        <div data-testid="unpublish-modal">
+            <button onClick={onConfirm}>Confirm unpublish</button>
+        </div>
+    ) : null,
+}))
+vi.mock('@/components/editor/EditorTemplateModal', () => ({
+    EditorTemplateModal: () => null,
 }))
 vi.mock('@/components/editor/PageManagerPanel', () => ({ PageManagerPanel: () => <div /> }))
 vi.mock('@/components/editor/SettingsPanel', () => ({ SettingsPanel: () => <div /> }))
@@ -141,7 +190,7 @@ describe('Publish and Save Flows (TC-F05)', () => {
             expect(global.fetch).toHaveBeenCalledWith('/api/sites/test-site-id/publish', expect.objectContaining({
                 method: 'PATCH'
             }))
-            expect(toast.success).toHaveBeenCalledWith('🎉 Website đã live!', expect.any(Object))
+            expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Website đã live!'), expect.any(Object))
         })
         
         // After publish success, Publish button replaced by View Live dropdown
