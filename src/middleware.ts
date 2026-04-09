@@ -45,6 +45,9 @@ export async function middleware(req: NextRequest) {
     const { pathname, hostname } = req.nextUrl
     const url = req.nextUrl.clone()
 
+    // DEBUG: log hostname + PLATFORM_DOMAIN (remove after subdomain fix verified)
+    console.log(`[MW] hostname=${hostname} PLATFORM_DOMAIN=${PLATFORM_DOMAIN} path=${pathname}`)
+
     // Allow Next.js internals and static files
     if (
         pathname.startsWith('/_next') ||
