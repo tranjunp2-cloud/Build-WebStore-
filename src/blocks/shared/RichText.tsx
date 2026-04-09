@@ -24,14 +24,16 @@ export function RichText({ text, as: Tag = 'span', className, style }: RichTextP
 
     if (hasInlineFormatting(text)) {
         const sanitized = sanitizeInlineHtml(text)
-        // Only unwrap heading when parent tag is NOT already block-level (prevents <h2><h4>...</h4></h2>)
         const parentIsBlock = typeof Tag === 'string' && BLOCK_LEVEL_TAGS.has(Tag.toLowerCase())
-        if (!parentIsBlock) {
-            const heading = extractHeadingWrapper(sanitized)
-            if (heading) {
-                const HeadingTag = heading.tag as React.ElementType
-                return <HeadingTag className={className} style={style} dangerouslySetInnerHTML={{ __html: heading.content }} />
+        const heading = extractHeadingWrapper(sanitized)
+        if (heading) {
+            if (parentIsBlock) {
+                // Parent is block-level — strip heading wrapper, render only inner content
+                return <Tag className={className} style={style} dangerouslySetInnerHTML={{ __html: heading.content }} />
             }
+            // Parent is inline (span) — unwrap and use heading tag
+            const HeadingTag = heading.tag as React.ElementType
+            return <HeadingTag className={className} style={style} dangerouslySetInnerHTML={{ __html: heading.content }} />
         }
         return <Tag className={className} style={style} dangerouslySetInnerHTML={{ __html: sanitized }} />
     }
