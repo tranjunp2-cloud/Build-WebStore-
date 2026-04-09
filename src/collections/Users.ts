@@ -648,9 +648,12 @@ export const Users: CollectionConfig = {
                     const otpExpiry = getOTPExpiry()
 
                     // Store hashed OTP in database
+                    // overrideAccess bypasses field validation — staff users may have
+                    // permissions=[] which fails Payload validation on non-custom roles
                     await req.payload.update({
                         collection: 'users',
                         id: user.id,
+                        overrideAccess: true,
                         data: {
                             otpHash,
                             otpExpiresAt: otpExpiry.toISOString(),
@@ -770,6 +773,7 @@ export const Users: CollectionConfig = {
                         await req.payload.update({
                             collection: 'users',
                             id: user.id,
+                            overrideAccess: true,
                             data: { otpAttempts: attempts + 1 },
                         })
                         return Response.json(
@@ -790,6 +794,7 @@ export const Users: CollectionConfig = {
                 await req.payload.update({
                     collection: 'users',
                     id: user.id,
+                    overrideAccess: true,
                     data: {
                         otpHash: '',
                         otpExpiresAt: null,
