@@ -53,11 +53,13 @@ services:
 
       # ── Next.js ──────────────────────────────────────────────────────────
       - key: NEXT_PUBLIC_SERVER_URL
-        value: ${APP_URL}
+        value: https://web-v2.dev.ecommercehub.my
       - key: NEXT_PUBLIC_PLATFORM_DOMAIN
-        value: ${APP_DOMAIN}
+        value: web-v2.dev.ecommercehub.my
       - key: NEXT_PUBLIC_APP_URL
-        value: ${APP_URL}
+        value: https://web-v2.dev.ecommercehub.my
+      - key: NEXT_PUBLIC_ADMIN_DOMAIN
+        value: web-cms-v2.dev.ecommercehub.my
 
       # ── Stripe ───────────────────────────────────────────────────────────
       - key: STRIPE_SECRET_KEY
@@ -101,6 +103,14 @@ services:
       - key: GITHUB_REPO
         value: primeproduction/ech-prime-web-v2
 
+      # ── Domain Verification (Custom Domains) ────────────────────────────
+      - key: DO_API_TOKEN
+        type: SECRET
+      - key: DO_APP_ID
+        type: SECRET
+      - key: SERVER_IP
+        type: SECRET
+
       # ── ECH Distribution API ─────────────────────────────────────────────
       - key: ECH_DISTRIBUTION_API_URL
         type: SECRET
@@ -124,6 +134,14 @@ services:
         value: Web Store
       - key: MAIL_FROM_ADDRESS
         value: no-reply-web-dev@admin.ecommercehub.unifi.com.my
+
+domains:
+  - domain: web-v2.dev.ecommercehub.my
+    type: PRIMARY
+  - domain: web-cms-v2.dev.ecommercehub.my
+    type: ALIAS
+  - domain: "*.web-v2.dev.ecommercehub.my"
+    type: ALIAS
 
 databases:
   - name: db

@@ -55,6 +55,14 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next()
     }
 
+    // ── Redirect DO internal URL → custom domain ───────────────────────
+    // Exclude /api/ and /admin paths (DO health checks use internal URL)
+    if (hostname.includes('ondigitalocean.app') && !pathname.startsWith('/api/') && !pathname.startsWith('/admin')) {
+        const customDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+        const redirectUrl = `https://${customDomain}${pathname}${req.nextUrl.search}`
+        return NextResponse.redirect(redirectUrl, { status: 301 })
+    }
+
     // ── Admin domain: web-cms-v2.dev.ecommercehub.my (explicit or fallback to admin.PLATFORM_DOMAIN) ──
     const ADMIN_DOMAIN = process.env.NEXT_PUBLIC_ADMIN_DOMAIN || `admin.${PLATFORM_DOMAIN}`
     if (hostname === ADMIN_DOMAIN) {
