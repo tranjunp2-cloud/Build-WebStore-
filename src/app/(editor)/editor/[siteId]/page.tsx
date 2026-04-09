@@ -14,6 +14,7 @@ import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
 import { useEditorStore } from '@/store/editorStore'
 import type { AIAction } from '@/types/editor'
+import { useI18n } from '@/i18n'
 import { PrePublishModal } from '@/components/editor/PrePublishModal'
 import { UnpublishModal } from '@/components/editor/UnpublishModal'
 import { EditorTemplateModal } from '@/components/editor/EditorTemplateModal'
@@ -50,6 +51,8 @@ type SiteData = {
         metaDescription?: string
         ogImage?: string | number | null
     }
+    publishedAt?: string | null
+    tenantSlug?: string | null
 }
 
 type LoadedPageData = {
@@ -72,6 +75,7 @@ export default function EditorPage() {
     const siteId = params?.siteId as string
     const selectedPageId = searchParams.get('pageId')
 
+    const { t, ti } = useI18n()
     const [selectedBlock, setSelectedBlock] = useState<number | null>(null)
     const [site, setSite] = useState<SiteData | null>(null)
     const [page, setPage] = useState<LoadedPageData | null>(null)
@@ -127,6 +131,14 @@ export default function EditorPage() {
         [blocks, selectedBlock],
     )
     const isPublished = site?.status === 'published'
+    const wasPublished = !isPublished && !!site?.publishedAt
+    const siteUrl = useMemo(() => {
+        const slug = site?.tenantSlug
+        if (!slug) return null
+        const domain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+        return `https://${slug}.${domain}`
+    }, [site?.tenantSlug])
+
     const lastSavedLabel = useMemo(() => {
         if (!lastSavedAt) return null
         return new Date(lastSavedAt).toLocaleTimeString([], {
@@ -566,24 +578,24 @@ export default function EditorPage() {
                 const data = await res.json()
                 const siteUrl = data?.data?.url || data?.data?.domain
                 if (siteUrl) {
-                    toast.success('🎉 Website đã live!', {
-                        description: `Domain: ${siteUrl.replace(/^https?:\/\//, '')}`,
+                    toast.success(`🎉 ${t.editor.toast.publishSuccess}`, {
+                        description: ti(t.editor.toast.publishSuccessDomain, { domain: siteUrl.replace(/^https?:\/\//, '') }),
                         action: {
                             label: 'View',
                             onClick: () => window.open(siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`, '_blank')
                         }
                     })
                 } else {
-                    toast.success('🎉 Website đã live!')
+                    toast.success(`🎉 ${t.editor.toast.publishSuccess}`)
                 }
             } else {
-                toast.success('Đã đưa website về trạng thái bảo trì.')
+                toast.success(t.editor.toast.unpublishSuccess)
             }
 
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Publish failed'
-            toast.error('Publish failed', { description: message })
+            toast.error(t.editor.toast.publishFailed, { description: message })
         } finally {
             setIsPublishing(false)
         }
@@ -728,7 +740,18 @@ export default function EditorPage() {
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onSave={() => void handleSave()}
-                onPublish={() => isPublished ? setIsUnpublishModalOpen(true) : setIsPublishModalOpen(true)}
+                onPublish={() => setIsPublishModalOpen(true)}
+                onRepublish={handlePublish}
+                onUnpublish={() => setIsUnpublishModalOpen(true)}
+                onViewLive={() => siteUrl && window.open(siteUrl, '_blank')}
+                onCopyLink={() => {
+                    if (siteUrl) {
+                        navigator.clipboard.writeText(siteUrl)
+                        toast.success(t.editor.toast.linkCopied, { description: siteUrl })
+                    }
+                }}
+                siteUrl={siteUrl}
+                wasPublished={wasPublished}
                 onViewportChange={setViewport}
             />
 

@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/auth'
 import config from '@payload-config'
 import type { Metadata } from 'next'
 import { SiteRenderer, type NavPage } from '@/components/site-renderer/SiteRenderer'
+import { MaintenancePage } from '@/components/site-renderer/MaintenancePage'
 import type { SiteData } from '@/blocks/types'
 import type { PageData } from '@/store/editorStore'
 
@@ -58,19 +59,20 @@ async function getTenantAndPage(slug: string, pagePath: string) {
 
     // Require authentication to view draft sites
     if (site.status === 'draft') {
-        if (!user) {
-            return null // Visitor hits 404 for draft site (AC-2)
-        }
-
         interface TenantRef {
             tenant: string | number | { id: string | number }
         }
-        const tenantIds = user.tenants?.map((t: TenantRef) =>
-            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
-        ) ?? []
 
-        if (!tenantIds.includes(String(tenant.id))) {
-            return null // Visitor hits 404 for draft site (AC-2)
+        const isOwner = !!user && (user.tenants?.map((t: TenantRef) =>
+            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+        ) ?? []).includes(String(tenant.id))
+
+        if (!isOwner) {
+            // AC-3: Was published → maintenance mode (503); never published → 404
+            if (site.publishedAt) {
+                return { tenant, site, page: null, pages: [], maintenance: true }
+            }
+            return null // Never published → 404
         }
     }
 
@@ -107,6 +109,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const data = await getTenantAndPage(slug, pagePath)
 
     if (!data) return { title: 'Not Found', robots: { index: false, follow: false } }
+    if ('maintenance' in data && data.maintenance) {
+        return { title: 'Maintenance', robots: { index: false, follow: false } }
+    }
 
     const { site, page } = data
     const title = page?.seo?.title || site.seo?.metaTitle || site.name
@@ -133,6 +138,10 @@ export default async function TenantSitePage({ params }: Props) {
         notFound()
     }
 
+    // AC-3: Maintenance mode — was published, now draft
+    if ('maintenance' in data && data.maintenance) {
+        return <MaintenancePage siteName={data.site?.name as string} />
+    }
 
     if (!data.page) {
         notFound()
