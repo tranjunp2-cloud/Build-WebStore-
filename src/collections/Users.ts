@@ -663,18 +663,23 @@ export const Users: CollectionConfig = {
                     const safeLocal = local.length <= 2 ? '*'.repeat(local.length) : local.slice(0, 2) + '***'
                     const maskedEmail = `${safeLocal}@${domain}`
 
+                    let emailSent = true
+
                     if (useDevBypass || useE2EBypass) {
                         // Dev/E2E: log metadata only, never log OTP code
                         console.log(`[DEV OTP] Bypass code sent for ${maskedEmail}`)
                     } else {
-                        // Production: send real email, never log code
+                        // Production: await real email send so we can report failures
                         const { subject, html } = otpVerificationEmail({ userName, otpCode: otp })
-                        req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
-                            console.error(`[Users] Failed to send OTP email to ${email}:`, err)
-                        })
-                        console.log(`[OTP] Code dispatched for ${maskedEmail}`)
+                        try {
+                            await req.payload.sendEmail({ to: email, subject, html })
+                            console.log(`[OTP] Code dispatched for ${maskedEmail}`)
+                        } catch (err: unknown) {
+                            emailSent = false
+                            console.error(`[OTP] Email send FAILED for ${maskedEmail}:`, err instanceof Error ? err.message : err)
+                        }
                     }
-                    return Response.json({ message: 'If the email exists, an OTP has been sent.' })
+                    return Response.json({ message: 'If the email exists, an OTP has been sent.', emailSent })
                 } catch (error: unknown) {
                     console.error('[Users] send-otp error:', error)
                     return Response.json(

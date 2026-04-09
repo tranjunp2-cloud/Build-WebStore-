@@ -35,12 +35,24 @@ const path = require('path')
 const BASE_BRANCH = process.argv[2] || 'origin/staging'
 const DB_SETUP_PATH = path.join(__dirname, 'db-setup.js')
 
-// Tables we track migrations for
+// Tables we track migrations for — ALL collections with DB tables
 const TRACKED_COLLECTIONS = {
   'Tenants.ts': 'tenants',
+  'Users.ts': 'users',
   'Sites.ts': 'sites',
+  'Pages.ts': 'pages',
+  'Media.ts': 'media',
+  'Templates.ts': 'templates',
+  'Subscriptions.ts': 'subscriptions',
+  'Subscribers.ts': 'subscribers',
   'Products.ts': 'products',
   'Orders.ts': 'orders',
+  'Analytics.ts': 'analytics',
+  'SEOMetaJobs.ts': 'seo_meta_jobs',
+  'Blogs.ts': 'blogs',
+  'BlogCategories.ts': 'blog_categories',
+  'Categories.ts': 'categories',
+  'Notifications.ts': 'notifications',
 }
 
 function toSnakeCase(str) {
@@ -76,6 +88,22 @@ function getNewFieldsFromDiff() {
     } catch (err) {
       console.error(`[migration-check] Warning: could not diff ${filePath}:`, err.message)
     }
+  }
+
+  // Also check: if a NEW collection file has timestamps: true,
+  // the CREATE TABLE must include updated_at + created_at columns
+  for (const [filename, tableName] of Object.entries(TRACKED_COLLECTIONS)) {
+    const filePath = `src/collections/${filename}`
+    try {
+      const diff = execSync(
+        `git diff ${BASE_BRANCH} -- ${filePath} | grep "^+" | grep "timestamps" || true`,
+        { encoding: 'utf8' }
+      ).trim()
+      if (diff && diff.includes('timestamps') && diff.includes('true')) {
+        newFields.push({ field: 'updated_at', snake: 'updated_at', table: tableName, file: filename })
+        newFields.push({ field: 'created_at', snake: 'created_at', table: tableName, file: filename })
+      }
+    } catch { /* ignore */ }
   }
 
   return newFields

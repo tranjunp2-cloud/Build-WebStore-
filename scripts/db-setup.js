@@ -2210,6 +2210,10 @@ const MIGRATIONS = [
     name: 'notifications.created_at_idx',
     sql: `CREATE INDEX IF NOT EXISTS notifications_created_at_idx ON notifications (created_at DESC);`,
   },
+  {
+    name: 'notifications.updated_at',
+    sql: `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();`,
+  },
   // pg LISTEN/NOTIFY trigger — SSE realtime bridge
   {
     name: 'notifications.notify_fn',
