@@ -1,17 +1,20 @@
 /**
  * Render inline-formatted text (from WYSIWYG editor).
  * Allows safe formatting tags + heading tags for block-level changes.
- * Strips all other HTML to prevent XSS.
+ * STRIPS ALL ATTRIBUTES to prevent XSS via event handlers.
  */
 
-const ALLOWED_TAGS = ['b', 'i', 'u', 'strong', 'em', 'br', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+const ALLOWED_TAGS = new Set(['b', 'i', 'u', 'strong', 'em', 'br', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
 
 export function sanitizeInlineHtml(html: string): string {
     if (!html || !html.includes('<')) return html
-    // Strip all tags except allowed formatting + heading tags
+    // Strip all tags except allowed ones, and REMOVE ALL ATTRIBUTES from allowed tags
     return html.replace(/<\/?([a-z][a-z0-9]*)\b[^>]*>/gi, (match, tag) => {
-        if (ALLOWED_TAGS.includes(tag.toLowerCase())) return match
-        return ''
+        const t = tag.toLowerCase()
+        if (!ALLOWED_TAGS.has(t)) return ''
+        // Return clean tag without any attributes (prevents event handler injection)
+        if (match.startsWith('</')) return `</${t}>`
+        return `<${t}>`
     })
 }
 

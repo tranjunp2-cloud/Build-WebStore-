@@ -151,6 +151,8 @@ export function PreviewScripts() {
          * Only checks explicit tags in innerHTML — heading and inline formatting
          * are completely independent.
          */
+        const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
         const buildCleanHtml = (el: HTMLElement): string => {
             const text = el.innerText?.trim() || ''
             if (!text) return ''
@@ -160,7 +162,7 @@ export function PreviewScripts() {
             const isItalic = /<i\b|<em\b/i.test(rawHtml)
             const isUnderline = /<u\b/i.test(rawHtml)
 
-            let html = text
+            let html = escapeHtml(text)
             if (isUnderline) html = `<u>${html}</u>`
             if (isItalic) html = `<i>${html}</i>`
             if (isBold) html = `<b>${html}</b>`
@@ -425,13 +427,17 @@ export function PreviewScripts() {
                 const val = e.data.value as string | undefined
 
                 // ── formatBlock: change element tag only, preserve inline formatting ──
-                if (cmd === 'formatBlock' && val) {
+                const ALLOWED_FORMAT_TAGS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P']
+                if (cmd === 'formatBlock' && val && ALLOWED_FORMAT_TAGS.includes(val.toUpperCase())) {
                     const newTag = val.toUpperCase()
                     if (currentEditingEl.tagName !== newTag) {
                         const newEl = document.createElement(newTag)
                         newEl.innerHTML = currentEditingEl.innerHTML
-                        for (const attr of Array.from(currentEditingEl.attributes)) {
-                            newEl.setAttribute(attr.name, attr.value)
+                        // Only copy safe attributes (class, style) — skip event handlers
+                        const safeAttrs = ['class', 'style']
+                        for (const attr of safeAttrs) {
+                            const v = currentEditingEl.getAttribute(attr)
+                            if (v) newEl.setAttribute(attr, v)
                         }
                         newEl.setAttribute('contenteditable', 'true')
                         currentEditingEl.replaceWith(newEl)

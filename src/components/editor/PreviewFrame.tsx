@@ -398,7 +398,7 @@ function PreviewFrameInner({
                                            activeEl?.closest('[data-wysiwyg-toolbar]')
                     if (!isToolbarClicked) {
                         const iframe = document.querySelector('iframe') as HTMLIFrameElement
-                        iframe?.contentWindow?.postMessage({ type: 'STOP_TEXT_EDITING' }, '*')
+                        iframe?.contentWindow?.postMessage({ type: 'STOP_TEXT_EDITING' }, window.location.origin)
                         setTextEditingData(null)
                         setWysiwygState({})
                     }
