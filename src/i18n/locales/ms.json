@@ -1316,23 +1316,19 @@
         },
         "overview": {
             "title": "Pusat Bantuan",
-            "subtitle": "Ketahui cara menggunakan sistem pengurusan kedai dalam talian anda.",
+            "subtitle": "Ketahui cara menggunakan sistem pengurusan laman web anda.",
             "welcomeTitle": "👋 Selamat datang ke EchPrime!",
-            "welcomeDesc": "EchPrime CMS membantu anda menguruskan keseluruhan kedai dalam talian anda — daripada mencipta laman web, menguruskan produk, memproses pesanan hingga menganalisis hasil. Berikut adalah gambaran keseluruhan ciri utama.",
+            "welcomeDesc": "EchPrime membantu anda membina dan mengurus laman web profesional anda — daripada mencipta laman web dengan AI, menulis artikel blog dioptimumkan SEO hingga menjejak trafik dan penglibatan. Berikut adalah gambaran keseluruhan ciri utama.",
             "featuresTitle": "🚀 Ciri Utama",
             "features": {
                 "dashboardTitle": "Papan Pemuka",
-                "dashboardDesc": "Lihat gambaran masa nyata tentang hasil, pesanan, dan pelawat.",
+                "dashboardDesc": "Lihat gambaran masa nyata tentang trafik laman web, petunjuk, dan penglibatan.",
                 "aiBuilderTitle": "Pembina Laman Web AI",
-                "aiBuilderDesc": "Cipta laman web jualan profesional dalam hanya 5 minit dengan AI.",
-                "productsTitle": "Produk",
-                "productsDesc": "Uruskan produk, harga RM, inventori, Lencana Halal, dan imej produk.",
-                "ordersTitle": "Pesanan",
-                "ordersDesc": "Proses pesanan COD, Pindahan Bank, DuitNow. Cetak invois dengan satu klik.",
+                "aiBuilderDesc": "Cipta laman web profesional dalam hanya 5 minit dengan AI.",
                 "blogTitle": "Blog",
                 "blogDesc": "Tulis artikel blog mesra SEO untuk menarik lebih ramai pelanggan.",
-                "settingsTitle": "Tetapan Kedai",
-                "settingsDesc": "Konfigurasikan domain, pembayaran, dan jemput staf pentadbir."
+                "settingsTitle": "Tetapan",
+                "settingsDesc": "Konfigurasikan domain dan jemput staf pentadbir."
             },
             "needHelpTitle": "📞 Perlukan lebih bantuan?",
             "needHelpDesc": "Jika anda tidak menjumpai jawapan, hubungi pasukan sokongan kami melalui WhatsApp atau e-mel "
@@ -1347,47 +1343,12 @@
                 "fullResolution": "Tangkapan skrin resolusi penuh"
             },
             "data": {
-                "products": {
-                    "label": "Produk",
-                    "steps": [
-                        {
-                            "title": "Akses Menu Produk",
-                            "desc": "Dari Bar Sisi kiri, klik pada <strong>\"📦 Produk\"</strong> untuk membuka senarai produk semasa anda.",
-                            "imgTitle": "Paparan Senarai Produk"
-                        },
-                        {
-                            "title": "Cipta Produk Baru",
-                            "desc": "Klik butang <strong>[+ Tambah Produk]</strong> di bahagian atas kanan. Isi borang:<ul class=\"text-[#9CA3AF] mb-4 mt-1 ml-5 text-[14px] leading-[24px] list-disc marker:text-[#9CA3AF]\"><li>Nama produk, harga RM, penerangan terperinci</li><li>Muat naik imej produk (WebP dicadangkan, ≤ 5MB/imej)</li><li>Aktifkan Lencana Halal jika produk mempunyai pensijilan JAKIM</li><li>Tetapkan inventori dan berat penghantaran</li></ul>",
-                            "imgTitle": "Borang Cipta Produk"
-                        },
-                        {
-                            "title": "Urus Imej Produk",
-                            "desc": "Seret dan lepas atau klik <strong>Semak Imbas Fail</strong> untuk memuat naik pelbagai imej. Seret dan lepas untuk susun semula. Imej pertama akan menjadi imej utama di Storefront.",
-                            "imgTitle": "Pengurus Galeri Imej"
-                        }
-                    ]
-                },
-                "orders": {
-                    "label": "Pesanan",
-                    "steps": [
-                        {
-                            "title": "Lihat Senarai Pesanan",
-                            "desc": "Pergi ke <strong>\"🛒 Pesanan\"</strong> untuk melihat semua pesanan. Gunakan penapis Status untuk mencari pesanan yang perlu diproses.",
-                            "imgTitle": "Senarai Pesanan"
-                        },
-                        {
-                            "title": "Proses Pesanan",
-                            "desc": "Klik pada pesanan untuk lihat butiran. Kemas kini status: <strong>Disahkan → Dihantar → Diterima</strong>. Masukkan kod penjejakan J&T/Pos Laju.",
-                            "imgTitle": "Butiran Pesanan"
-                        }
-                    ]
-                },
                 "dashboard": {
                     "label": "Papan Pemuka",
                     "steps": [
                         {
                             "title": "Gambaran Keseluruhan Papan Pemuka",
-                            "desc": "Papan pemuka memaparkan metrik utama: jumlah hasil, bilangan pesanan, pelawat, dan Tindakan Pantas.",
+                            "desc": "Papan pemuka memaparkan metrik utama: trafik laman web, petunjuk, penglibatan, dan skor kesihatan SEO.",
                             "imgTitle": "Gambaran Keseluruhan"
                         }
                     ]
@@ -1419,23 +1380,34 @@
             "emptyTitle": "Tiada jawapan dijumpai",
             "emptyDesc": "Cuba kata kunci lain atau hubungi sokongan melalui WhatsApp.",
             "categories": {
-                "productsTitle": "🛍️ Pengurusan Produk",
-                "qAddProduct": "Bagaimana cara menambah produk baru?",
-                "aAddProduct": "Pergi ke menu <strong>Produk</strong> → klik <strong>[+ Tambah Produk]</strong> di bahagian atas kanan. Isi nama, harga RM, penerangan, muat naik imej produk (maksimum 10, dicadangkan format WebP). Klik <strong>Simpan</strong>.",
-                "qMultipleImages": "Bagaimana memuat naik pelbagai imej?",
-                "aMultipleImages": "Seret dan lepas imej ke kawasan muat naik, atau gunakan <strong>Semak Imbas Fail</strong>. Maksimum 10 imej, ≤ 5MB setiap satu. Format: JPG, PNG, WebP.",
-                "qHalal": "Di manakah Lencana Halal dipaparkan?",
-                "aHalal": "Lencana Halal (JAKIM) dipaparkan pada <strong>Kad Produk</strong> dan <strong>Halaman Perincian Produk</strong> di kedai. Aktifkannya dalam borang produk → bahagian <strong>Pensijilan Halal</strong>.",
-                "ordersTitle": "🛒 Pengurusan Pesanan",
-                "qCod": "Bagaimana pesanan COD diproses?",
-                "aCod": "Pesanan COD akan mempunyai status <strong>Menunggu Pembayaran</strong> sehingga penghantar mengesahkan kutipan. Anda boleh mengemas kini status secara manual dalam perincian pesanan → <strong>Tandakan sebagai Dibayar</strong>.",
-                "qInvoice": "Bagaimana mencetak slip pembungkusan / invois?",
-                "aInvoice": "Pergi ke <strong>Pesanan</strong> → pilih pesanan → klik <strong>Cetak Invois</strong> atau <strong>Cetak Slip Pembungkusan</strong>. Sistem akan menjana PDF untuk dicetak.",
-                "paymentsTitle": "💳 Pembayaran",
-                "qFpx": "Apakah kaedah pembayaran yang disokong?",
-                "aFpx": "EchPrime menyokong: <strong>FPX</strong> (perbankan dalam talian Malaysia), <strong>Kad Kredit/Debit</strong> (Visa, Mastercard), <strong>DuitNow QR</strong>, <strong>COD</strong> (Tunai Semasa Penghantaran), dan <strong>Pemindahan Bank</strong> manual.",
-                "qSst": "Adakah SST 6% dikira secara automatik?",
-                "aSst": "Ya, apabila anda mengaktifkan <strong>SST</strong> dalam <strong>Tetapan Kedai → Konfigurasi Cukai</strong>, sistem mengira 6% SST secara automatik dan memaparkannya dengan jelas kepada pembeli."
+                "dashboardTitle": "📊 Papan Pemuka",
+                "qDashboardMetrics": "Apakah metrik yang dipaparkan di Papan Pemuka?",
+                "aDashboardMetrics": "Papan Pemuka memaparkan tiga metrik utama: <strong>Trafik / Paparan</strong> (jumlah lawatan halaman), <strong>Petunjuk / Klik</strong> (klik pautan dan interaksi), dan <strong>Penglibatan</strong> (aktiviti pengguna bukan paparan halaman). Gunakan pemilih tempoh untuk melihat data untuk Hari Ini, 7 hari, atau 30 hari.",
+                "qDashboardCustomize": "Bagaimana menyesuaikan susun atur Papan Pemuka?",
+                "aDashboardCustomize": "Klik butang <strong>Sesuaikan</strong> di bahagian atas kanan Papan Pemuka. Modal akan muncul di mana anda boleh seret-dan-lepas untuk menyusun semula kad metrik, dan togol ikon mata untuk menunjukkan atau menyembunyikan metrik tertentu.",
+                "qDashboardSeo": "Apakah Widget Kesihatan SEO?",
+                "aDashboardSeo": "<strong>Widget Kesihatan SEO</strong> memaparkan skor SEO laman web anda daripada 100. Ia menunjukkan amaran seperti tajuk meta yang hilang atau imej yang tidak dioptimumkan. Klik <strong>\"AI Baiki Semua Isu\"</strong> untuk membenarkan AI mengoptimumkan SEO laman web anda secara automatik.",
+                "builderTitle": "🤖 Pembina Laman Web AI",
+                "qBuilderCreate": "Bagaimana mencipta laman web dengan AI?",
+                "aBuilderCreate": "Klik <strong>\"Bina dengan AI\"</strong> di Papan Pemuka atau pergi ke <strong>Pembina → Baru</strong>. Masukkan nama perniagaan anda, pilih industri, nyatakan produk/perkhidmatan anda, kemudian klik <strong>\"Teruskan — AI akan mencipta laman web anda\"</strong>. AI akan menjana laman web lengkap dalam kira-kira 30-60 saat.",
+                "qBuilderEdit": "Bolehkah saya mengedit laman web yang dijana AI?",
+                "aBuilderEdit": "Ya! Selepas AI menjana laman web anda, anda boleh menyesuaikannya sepenuhnya menggunakan <strong>Editor Visual</strong>. Edit teks, tukar imej, susun semula bahagian, laraskan warna dan fon — semuanya dengan antara muka seret-dan-lepas.",
+                "qBuilderMobile": "Adakah laman web yang dijana AI responsif untuk mudah alih?",
+                "aBuilderMobile": "Ya, semua laman web yang dijana AI adalah responsif sepenuhnya. Anda boleh pratonton paparan <strong>Desktop</strong> dan <strong>Mudah Alih</strong> menggunakan butang togol di halaman Pratonton Laman Web. Susun atur menyesuaikan secara automatik kepada semua saiz skrin.",
+                "blogTitle": "📝 Blog",
+                "qBlogCreate": "Bagaimana mencipta artikel blog baru?",
+                "aBlogCreate": "Pergi ke <strong>\"📝 Blog\"</strong> di bar sisi → klik <strong>[+ Artikel Baru]</strong>. Masukkan tajuk, tulis kandungan menggunakan Editor Teks Kaya, muat naik lakaran kecil utama, tetapkan kategori dan tarikh terbit, kemudian klik <strong>Terbit</strong> atau <strong>Simpan Draf</strong>.",
+                "qBlogAi": "Bagaimana Pembantu AI Blog berfungsi?",
+                "aBlogAi": "Klik butang <strong>\"Pembantu AI\"</strong> (ungu) di bahagian atas kanan editor blog. Masukkan topik anda, pilih nada suara (Profesional, Mesra, atau Memujuk), kemudian klik <strong>\"Jana Idea Blog\"</strong>. AI akan menjana tajuk, rangka kandungan, dan meta SEO untuk anda.",
+                "qBlogSeo": "Bagaimana mengoptimumkan artikel blog untuk SEO?",
+                "aBlogSeo": "Dalam editor blog, tatal ke bahagian <strong>\"Pengoptimuman Carian (SEO)\"</strong> di bar sisi kanan. Isi <strong>Tajuk Meta</strong> (maksimum 60 aksara) dan <strong>Penerangan Meta</strong> (maksimum 160 aksara). Anda juga boleh klik <strong>\"Jana melalui AI\"</strong> untuk menjana tag meta yang dioptimumkan secara automatik.",
+                "settingsTitle": "⚙️ Tetapan",
+                "qSettingsDomain": "Bagaimana menyambungkan domain tersuai?",
+                "aSettingsDomain": "Pergi ke <strong>\"⚙️ Tetapan → Domain\"</strong>. Klik <strong>\"+ Tambah Domain Tersuai\"</strong>, masukkan nama domain anda (cth., abccompany.com). Kemudian konfigurasi rekod DNS di pendaftar domain anda dan klik <strong>\"Sahkan Sambungan\"</strong>.",
+                "qSettingsDns": "Bagaimana mengkonfigurasi rekod DNS?",
+                "aSettingsDns": "Selepas menambah domain anda, sistem menunjukkan rekod DNS yang diperlukan:<ul><li><strong>A Record</strong> — Halakan domain anda ke alamat IP statik yang ditunjukkan (cth., 162.159.140.98)</li><li><strong>CNAME Record</strong> — Halakan ke <strong>web-v2.dev.ecommercehub.my</strong></li></ul>Penyebaran DNS biasanya mengambil masa 15 minit hingga 48 jam bergantung pada pendaftar anda.",
+                "qSettingsStaff": "Bagaimana menjemput staf pentadbir?",
+                "aSettingsStaff": "Pergi ke <strong>\"⚙️ Tetapan → Staf\"</strong>. Klik <strong>\"Jemput Staf\"</strong>, masukkan alamat e-mel mereka, dan pilih peranan (Penonton atau Akses Penuh). Mereka akan menerima jemputan e-mel untuk menyertai ruang kerja anda."
             }
         }
     },

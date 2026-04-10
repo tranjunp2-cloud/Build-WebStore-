@@ -17,16 +17,6 @@ export default function GuidelinePage() {
       desc: t.help.overview.features.aiBuilderDesc
     },
     {
-      emoji: '📦',
-      title: t.help.overview.features.productsTitle,
-      desc: t.help.overview.features.productsDesc
-    },
-    {
-      emoji: '🛒',
-      title: t.help.overview.features.ordersTitle,
-      desc: t.help.overview.features.ordersDesc
-    },
-    {
       emoji: '📝',
       title: t.help.overview.features.blogTitle,
       desc: t.help.overview.features.blogDesc

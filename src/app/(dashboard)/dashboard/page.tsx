@@ -128,8 +128,6 @@ export default async function DashboardPage({ searchParams }: Props) {
                     <DashboardOnboarding
                         hasWebsite={hasWebsite}
                         hasPublishedSite={hasPublishedSite}
-                        hasProducts={false}
-                        hasPaymentSetup={false}
                     />
                 )}
 
