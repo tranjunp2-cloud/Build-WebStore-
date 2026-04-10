@@ -1,86 +1,209 @@
-# Design System - PrimeWeb F05 (Standardized & Dev-Ready)
+# 🎨 Prime AI Builder — Design System
 
-> [!IMPORTANT]
-> This is the single source of truth for the F05 AI Editor project. All UI/UX implementations must align with these technical tokens and visual principles.
+**Optimized for AI-powered website builder interfaces and modern SaaS dashboards.**
 
-## 1. Typography
-- **Primary Font Family:** `Inter`, sans-serif (Google Fonts)
-- **Scale:**
-  - `h1`: 32px / 2rem, Semi-bold
-  - `h2`: 24px / 1.5rem, Semi-bold
-  - `h3`: 18px / 1.125rem, Medium
-  - `base`: 16px / 1rem, Regular
-  - `small`: 14px / 0.875rem, Regular
-  - `xs`: 12px / 0.75rem, Regular
+> **Style Inspiration:** Vercel, Linear, Framer AI, Notion AI.
+> **Visual Style:** Clean, minimal, modern, neutral UI with soft shadows and rounded corners.
+> **Component Patterns:** shadcn/ui.
 
-## 2. Iconography
-- **Library:** `Lucide Icons` (Standard for shadcn/ui)
-- **Stroke Width:** 2px
-- **Default Size:** 20px (base), 16px (small)
+---
 
-## 3. Theme & Colors (Dark Mode Default)
-We use HSL color model for flexibility.
+## 🎨 1. Color System
 
-### Base Tokens (Dark Mode)
-```css
-:root {
-  /* Default to Dark Mode */
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
+### Global Themes
+| Token | Dark Mode (Default) | Light Mode |
+|-------|---------------------|------------|
+| **Background** | `#0B1120` | `#F8FAFC` |
+| **Surface** | `#161E2E` | `#FFFFFF` |
+| **Primary Blue** | `#3B82F6` | `#2563EB` |
+| **Primary Teal** | `#2DD4BF` | `#0D9488` |
 
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
+### Neutral Scale
+| Token | Dark Mode | Light Mode | Usage |
+|-------|-----------|------------|-------|
+| **100** | `#FFFFFF` | `#0F172A` | Primary Foreground / Text |
+| **400** | `#9CA3AF` | `#64748B` | Muted Text / Placeholder |
+| **700** | `#374151` | `#CBD5E1` | Secondary Border |
+| **800** | `#1F2937` | `#E2E8F0` | Base Border / Secondary BG |
 
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
+### Semantic Status
+| Token | Dark Mode | Light Mode |
+|-------|-----------|------------|
+| **Success** | `#10B981` | `#059669` |
+| **Error** | `#EF4444` | `#DC2626` |
+| **Warning** | `#F59E0B` | `#D97706` |
+| **Info** | `#3B82F6` | `#2563EB` |
 
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
+### Semantic Tokens (Components)
+- **Button (Primary):**
+  - **Background:** `linear-gradient(90deg, var(--primary-blue) 0%, var(--primary-teal) 100%)`
+  - **Text:** `#FFFFFF` (Both modes)
+  - **Radius:** `8px`
+- **Button (Secondary):**
+  - **Background:** Dark `#1F2937` / Light `#F1F5F9`
+  - **Border:** Dark `#374151` / Light `#E2E8F0`
+  - **Text:** Dark `#FFFFFF` / Light `#0F172A`
+- **Input:**
+  - **Background:** Dark `#161E2E` / Light `#FFFFFF`
+  - **Border:** Dark `#1F2937` / Light `#E2E8F0`
+  - **Text:** Dark `#FFFFFF` / Light `#0F172A`
+  - **Placeholder:** Dark `#9CA3AF` / Light `#64748B`
+- **Card:**
+  - **Background:** Dark `#161E2E` / Light `#FFFFFF`
+  - **Border:** Dark `#1F2937` / Light `#E2E8F0`
+  - **Radius:** `12px`
 
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
+---
 
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
+## 🔤 2. Typography
 
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
+**Primary Font:** `Inter, sans-serif`
+**Font Weights:** Regular (`400`), Medium (`500`), Semibold (`600`), Bold (`700`)
 
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
+### Heading Scale
+| Token | Font Size | Line Height | Font Weight |
+|-------|-----------|-------------|-------------|
+| **Heading 1** | `44px` | `54px` | `700` (bold) |
+| **Heading 2** | `32px` | `40px` | `700` (bold) |
+| **Heading 3** | `24px` | `32px` | `700` (bold) |
+| **Heading 4** | `20px` | `26px` | `700` (bold) |
+| **Heading 5** | `16px` | `24px` | `700` (bold) |
 
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
-}
-```
+### Body & Subtitle Scale
+| Token | Font Size | Line Height | Font Weight |
+|-------|-----------|-------------|-------------|
+| **Subtitle 1** | `20px` | `24px` | `600` (semibold) |
+| **Subtitle 2** | `14px` | `22px` | `600` (semibold) |
+| **Body 1** | `16px` | `24px` | `400` (regular) |
+| **Body 2** | `14px` | `22px` | `400` (regular) |
 
-## 4. Layout Mechanics
-- **Z-Index Scale:**
-  - `base`: 0
-  - `dropdown`: 1000
-  - `sticky`: 1020
-  - `overlay`: 1030
-  - `modal`: 1040
-  - `popover`: 1050
-  - `toast`: 1060 (Highest)
+### Components & Extras
+| Token | Font Size | Line Height | Font Weight |
+|-------|-----------|-------------|-------------|
+| **Button** | `14px` | `18px` | `700` (bold) |
+| **Small 1** | `12px` | `16px` | `400` (regular) |
+| **Small 2** | `12px` | `16px` | `600` (semibold) |
 
-- **Animations:**
-  - `transition-fast`: 150ms ease-in-out
-  - `transition-normal`: 300ms ease-in-out
+---
 
-## 5. Component: F05 SettingsPanel
-A critical component for the AI Editor.
+## 📐 3. Layout Tokens & Shadows
 
-| Property | Value | CSS Variable / Utility |
-| :--- | :--- | :--- |
-| **Background** | #020817 (Dark) | `var(--background)` |
-| **Border Color** | #1e293b | `var(--border)` |
-| **Padding** | 16px (4rem) | `p-4` |
-| **Input Gap** | 12px | `gap-3` |
-| **Corner Radius** | 8px | `rounded-lg` |
+### Spacing Scale 
+| Token | Value | Base |
+|-------|-------|------|
+| **0** | `0px` | 0 |
+| **xs** | `4px` | 1 |
+| **sm** | `8px` | 2 |
+| **md** | `16px`| 4 |
+| **lg** | `24px`| 6 |
+| **xl** | `32px`| 8 |
+| **2xl**| `48px`| 12 |
+| **3xl**| `64px`| 16 |
 
-### Settings UI Elements
-- **Color Swatch:** 24x24px circle with 2px white ring when active.
-- **Alignment Toggle:** Segmented button group (Lucide icons: AlignLeft, AlignCenter, AlignRight).
-- **Form Wrapper:** Vertical stack with label (xs, muted-foreground) and input field.
+### Sizing (Global Elements)
+- **icon-sm:** `16px`
+- **icon-md:** `24px`
+- **sidebar-width:** `260px`
+- **header-height:** `64px`
+- **container-max:** `1440px`
+
+### Semantic Layouts & Component Sizing
+- **gap-cards:** `{spacing.lg}` (`24px`)
+- **page-padding:** `{spacing.xl}` (`32px`)
+- **card-padding:** `{spacing.md}` (`16px`)
+- **section-margin:** `{spacing.2xl}` (`48px`)
+- **input-height:** `40px`
+- **button-height:** `40px`
+- **avatar-md:** `32px`
+
+### Border Radius
+- **sm:** `4px` (Tags, small inputs)
+- **md:** `8px` (Buttons, inputs)
+- **lg:** `12px` (Cards, panels)
+- **xl:** `16px` (Modals, featured blocks) *(Lưu ý: Bạn nhớ khai báo thêm xl vào hệ thống JSON ban đầu)*
+
+### Shadow Styles (Soft & Clean)
+*Lưu ý: Thay viền Drop Shadow thành Border hoặc nâng opacity 50-80% khi dùng ở Dark Mode để tạo độ nổi.*
+
+- **Card Shadow:** 
+  - **Light Mode:** `0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)` (Tailwind `shadow-sm`)
+  - **Dark Mode:** `0 1px 3px 0 rgb(0 0 0 / 0.5)`
+- **Panel Shadow:** 
+  - **Light Mode:** `0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)` (Tailwind `shadow-md`)
+  - **Dark Mode:** `0 4px 6px -1px rgb(0 0 0 / 0.6)`
+- **Floating/Popover Shadow:** 
+  - **Light Mode:** `0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)` (Tailwind `shadow-xl`)
+  - **Dark Mode:** `0 20px 25px -5px rgb(0 0 0 / 0.8)`
+
+---
+
+## 🧩 4. Component Library (Base)
+
+*Consistent with shadcn/ui patterns.*
+
+### Buttons
+- **Primary:** Dải màu Gradient (`linear-gradient` Blue sang Teal), chữ trắng. Dùng làm Action gọi sự chú ý lớn nhất.
+- **Secondary:** Nền `#1F2937` (Dark) / `#F1F5F9` (Light), và chữ tương ứng. Dùng cho các alternative action.
+- **Outline:** Không nền, viền xám mỏng. Dùng làm action phụ trợ/Cancel.
+- **Ghost:** Không viền, không nền. Dùng cho các list tác vụ hay Chat action cần tiết chế không gian.
+- **Icon Button:** Form vuông vức bo cong tiêu chuẩn, chứa icon Send, Edit, Delete...
+
+### Inputs
+- **Text Input:** Chiều cao 40px, góc bo `md` (`8px`), viền mỏng theo mode tông xám (`#E2E8F0` Light / `#1F2937` Dark). Focus chuyển vòng màu sang màu Primary (`#3B82F6`).
+- **Textarea:** Form tự động đa dòng như text input cho khung nhập Description.
+- **Chat Input:** Khung Input nâng cao chứa button Send bo góc nằm bên phải. Cực kì quan trọng cho Workflow AI.
+- **Disabled State:** Giảm Opacity xuống 50%, tắt khả năng tương tác, hiện trỏ chuột `cursor-not-allowed`.
+
+### Cards
+- **Standard Card:** Background phân mảnh (`#161E2E` cho Dark và Trắng `#FFFFFF` cho Light), sử dụng border viền rất mỏng 1px với form bo góc `lg` (`12px`).
+- **Builder Panel Card:** Elevated card nổi bậc hơn Standard card. Thường dùng trong Property Editing hoặc Container chứa Chat.
+
+### Badges
+- **Status Badge:** Filled or subtle background matching semantic colors.
+- **Draft Badge:** Neutral gray or subtle yellow.
+- **AI Badge:** Sparkle icon, gradient background or distinct primary color to denote AI action.
+
+### Progress
+- **Progress Bar:** Continuous smooth loading bar (Primary color).
+- **Step Progress:** Discrete steps (e.g., 1. Analyzing -> 2. Building -> 3. Done).
+
+### Skeleton (Loading States)
+- **Text Skeleton:** Rounded-full, varying widths.
+- **Block Skeleton:** Large rectangular blocks resembling layout structure.
+- **Page Skeleton:** Full page layout skeleton without spinner.
+
+### Toast Notifications
+- Floating at bottom-right or top-center.
+- **Success:** Green icon, success message.
+- **Error:** Red icon, error message, Retry button.
+- **Info:** Blue icon, informational message.
+
+---
+
+## 🤖 5. Builder-Specific Components
+
+*Specialized components for the AI AI Builder Workflow.*
+
+### 1. BuilderChatPanel
+- **Layout:** Fixed width or flex container on left/bottom.
+- **Features:** Scrollable message history, sticky chat input at bottom.
+
+### 2. BuilderPreviewPanel
+- **Layout:** Main right-side canvas. Light gray background.
+- **Features:** Holds the live website preview (iframe or scaled container).
+
+### 3. BuilderProgressSteps
+- **Layout:** Vertical list of checklist items inside the chat or overlay.
+- **States:** Pending (gray circle), Active (spinner/indigo circle), Done (green check).
+
+### 4. AIMessageBubble / UserMessageBubble
+- **User Bubble:** Right-aligned, primary muted background (or gray), standard text.
+- **AI Bubble:** Left-aligned, white background with very soft shadow, contains rich text, blocks, or suggestions.
+
+### 5. StreamingBlockPlaceholder
+- **Usage:** While AI is generating a specific block (e.g., Hero).
+- **UI:** A glowing or shimmering skeleton block integrated into the Preview Panel that transforms into the actual block when done.
+
+### 6. DraftBadge
+- **Usage:** Positioned top-right in the preview panel.
+- **UI:** `Badge variant="secondary"` indicating the site is continuously auto-saved.
