@@ -6,6 +6,7 @@ import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob } from '../../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../../shared/RichText'
 
 export function FullscreenHero({ block }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [] } = block
@@ -21,13 +22,13 @@ export function FullscreenHero({ block }: BlockProps<HeroConfig>) {
                     transition={{ duration: 0.6 }}
                     className="text-5xl md:text-6xl font-bold font-heading leading-tight mb-6"
                 >
-                    {headline}
+                    <RichText text={headline} as="span" />
                 </motion.h1>
-                {subheadline && <p className="text-lg opacity-60 mb-8 max-w-xl mx-auto">{subheadline}</p>}
+                {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-60 mb-8 max-w-xl mx-auto" />}
                 {ctaButtons.length > 0 && (
                     <div className="flex flex-wrap gap-4 justify-center">
                         {ctaButtons.map((btn, i) => (
-                            <motion.a key={i} href={btn.url}
+                            <motion.a key={i} href={btn?.url}
                                 whileHover={{ scale: 1.03 }}
                                 whileTap={{ scale: 0.98 }}
                                 className="px-6 py-3 rounded-lg font-semibold text-sm transition-all"

@@ -490,7 +490,7 @@ describe('normalizeAddSectionBlock — basic merge [TC-F05.13]', () => {
     })
 
     it('returns AI block unchanged when fallback cannot be created', () => {
-        const aiBlock = { blockType: 'hero', headline: 'Hello' }
+        const aiBlock = { blockType: 'unknown-block-xyz', headline: 'Hello' }
         const result = normalizeAddSectionBlock({ instruction: 'random stuff' }, aiBlock)
         expect(result).toEqual(aiBlock)
     })

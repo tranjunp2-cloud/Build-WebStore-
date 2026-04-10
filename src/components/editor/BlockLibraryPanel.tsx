@@ -178,7 +178,7 @@ export function BlockLibraryPanel({
                                                     <p className="truncate text-[11px] text-slate-500">{item.description}</p>
                                                 </div>
                                                 <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
-                                                    click to add
+                                                    click or drag
                                                 </span>
                                             </button>
                                         ))}

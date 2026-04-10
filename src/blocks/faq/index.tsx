@@ -6,15 +6,14 @@ import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { FAQConfig, FAQItem } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../shared/RichText'
 
 function SectionHeader({ headline, subheadline }: { headline?: string; subheadline?: string }) {
     if (!headline) return null
     return (
         <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
-                {headline}
-            </h2>
-            {subheadline && <p className="max-w-2xl mx-auto" style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
+            <RichText text={headline} as="h2" className="text-3xl md:text-4xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }} />
+            {subheadline && <RichText text={subheadline} as="p" className="max-w-2xl mx-auto" style={{ color: CSS_VARS.muted }} />}
         </div>
     )
 }

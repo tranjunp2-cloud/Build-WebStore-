@@ -5,6 +5,7 @@ import type { BlockProps } from '../types'
 import type { PortfolioGridConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 export function PortfolioGridBlock({ block, theme }: BlockProps<PortfolioGridConfig>) {
     const { headline, subheadline, projects = [], variant = 'grid' } = block
@@ -46,8 +47,8 @@ export function PortfolioGridBlock({ block, theme }: BlockProps<PortfolioGridCon
             <div className="container mx-auto px-6">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                    {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                 </div>
 
                 {/* Category filter */}

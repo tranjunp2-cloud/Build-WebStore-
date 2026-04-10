@@ -5,6 +5,7 @@ import type { BlockProps } from '../types'
 import type { CarouselConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
     const { headline, items = [], variant = 'images', autoplay = true, interval = 5000 } = block
@@ -69,7 +70,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                 <div className="container mx-auto px-6">
                     {headline && (
                         <div className="text-center mb-12">
-                            <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                            <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                         </div>
                     )}
                     <div className="relative overflow-hidden rounded-2xl">
@@ -115,7 +116,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
                 <div className="container mx-auto px-6">
                     {headline && (
                         <div className="text-center mb-12">
-                            <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                            <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                         </div>
                     )}
                     <div className="relative overflow-hidden">
@@ -164,7 +165,7 @@ export function CarouselBlock({ block, theme }: BlockProps<CarouselConfig>) {
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-12">
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                     </div>
                 )}
                 <div className="relative max-w-3xl mx-auto overflow-hidden">

@@ -5,6 +5,7 @@ import type { BlockProps } from '../types'
 import type { PricingTableConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfig>) {
     const { variant = 'columns', headline, subheadline, billingToggle = 'monthly', plans = [] } = block
@@ -16,8 +17,8 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    {headline && <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline}</h2>}
-                    {subheadline && <p className="text-lg opacity-70">{subheadline}</p>}
+                    {headline && <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />}
+                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-70" />}
                 </div>
 
                 {/* Billing Toggle */}
@@ -71,7 +72,7 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                                             <span className="text-sm opacity-60">/{billing === 'yearly' ? 'yr' : 'mo'}</span>
                                         </div>
                                         <a
-                                            href={plan.cta.url}
+                                            href={plan.cta?.url}
                                             className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-200 hover:opacity-90 whitespace-nowrap"
                                             style={plan.popular ? { backgroundColor: 'var(--brand-primary)', color: '#fff' } : { border: `2px solid var(--brand-primary)`, color: 'var(--brand-primary)' }}
                                         >
@@ -107,7 +108,7 @@ export function PricingTableBlock({ block, theme }: BlockProps<PricingTableConfi
                                     ))}
                                 </ul>
                                 <a
-                                    href={plan.cta.url}
+                                    href={plan.cta?.url}
                                     className={`block w-full py-3 rounded-xl font-semibold text-center transition-all duration-200 hover:opacity-90 ${plan.popular ? 'text-white' : 'border'}`}
                                     style={plan.popular ? { backgroundColor: 'var(--brand-primary)' } : { borderColor: 'var(--brand-primary)', color: 'var(--brand-primary)' }}
                                 >

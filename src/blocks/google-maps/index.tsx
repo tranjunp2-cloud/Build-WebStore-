@@ -4,6 +4,7 @@ import type { BlockProps } from '../types'
 import type { GoogleMapsConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 export function GoogleMapsBlock({ block, theme }: BlockProps<GoogleMapsConfig>) {
     const { variant = 'full-width', embedUrl, headline, address, height = 400 } = block
@@ -32,7 +33,7 @@ export function GoogleMapsBlock({ block, theme }: BlockProps<GoogleMapsConfig>) 
                     >
                         {headline && (
                             <div className="p-6 pb-0">
-                                <h2 className="text-2xl font-bold font-heading">{headline}</h2>
+                                <RichText text={headline} as="h2" className="text-2xl font-bold font-heading" />
                             </div>
                         )}
                         <div className="p-6">
@@ -56,7 +57,7 @@ export function GoogleMapsBlock({ block, theme }: BlockProps<GoogleMapsConfig>) 
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-10">
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
                         {address && <p className="text-lg opacity-70">{address}</p>}
                     </div>
                 )}

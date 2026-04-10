@@ -10,33 +10,49 @@ interface RichTextProps {
     style?: React.CSSProperties
 }
 
-// Block-level tags that should NOT have heading children (prevents invalid nesting)
-const BLOCK_LEVEL_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'])
+const HEADING_SIZES: Record<string, string> = {
+    h1: 'text-4xl md:text-6xl',
+    h2: 'text-3xl md:text-4xl',
+    h3: 'text-2xl md:text-3xl',
+    h4: 'text-xl md:text-2xl',
+    h5: 'text-lg md:text-xl',
+    h6: 'text-base md:text-lg',
+    p: 'text-base',
+}
 
-/**
- * Renders text that may contain inline formatting from WYSIWYG editor.
- * Detects heading wrappers (e.g., <h4>content</h4>) and renders with correct tag.
- * Avoids invalid nesting (e.g., <h2><h4>...</h4></h2>) by skipping heading unwrap
- * when parent is already a block-level element.
- */
+const SIZE_CLASS_REGEX = /\b(md:)?text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)\b/g
+
 export function RichText({ text, as: Tag = 'span', className, style }: RichTextProps) {
     if (!text) return null
 
-    if (hasInlineFormatting(text)) {
-        const sanitized = sanitizeInlineHtml(text)
-        const parentIsBlock = typeof Tag === 'string' && BLOCK_LEVEL_TAGS.has(Tag.toLowerCase())
-        const heading = extractHeadingWrapper(sanitized)
-        if (heading) {
-            if (parentIsBlock) {
-                // Parent is block-level — strip heading wrapper, render only inner content
-                return <Tag className={className} style={style} dangerouslySetInnerHTML={{ __html: heading.content }} />
-            }
-            // Parent is inline (span) — unwrap and use heading tag
-            const HeadingTag = heading.tag as React.ElementType
-            return <HeadingTag className={className} style={style} dangerouslySetInnerHTML={{ __html: heading.content }} />
-        }
-        return <Tag className={className} style={style} dangerouslySetInnerHTML={{ __html: sanitized }} />
+    if (!hasInlineFormatting(text)) {
+        if (Tag === 'span' && !className && !style) return <>{text}</>
+        return <Tag className={className} style={style}>{text}</Tag>
     }
 
-    return <Tag className={className} style={style}>{text}</Tag>
+    const sanitized = sanitizeInlineHtml(text)
+    const heading = extractHeadingWrapper(sanitized)
+
+    if (heading) {
+        const HeadingTag = heading.tag as React.ElementType
+        const defaultTag = typeof Tag === 'string' ? Tag : 'span'
+
+        let finalClassName = className || ''
+        if (heading.tag !== defaultTag && HEADING_SIZES[heading.tag]) {
+            finalClassName = finalClassName.replace(SIZE_CLASS_REGEX, '').trim()
+            finalClassName = `${finalClassName} ${HEADING_SIZES[heading.tag]}`.trim()
+        }
+
+        // Merge alignment style from heading wrapper
+        const mergedStyle = heading.style
+            ? { ...style, textAlign: heading.style as React.CSSProperties['textAlign'] }
+            : style
+
+        return <HeadingTag className={finalClassName} style={mergedStyle} dangerouslySetInnerHTML={{ __html: heading.content }} />
+    }
+
+    if (Tag === 'span' && !className && !style) {
+        return <span dangerouslySetInnerHTML={{ __html: sanitized }} />
+    }
+    return <Tag className={className} style={style} dangerouslySetInnerHTML={{ __html: sanitized }} />
 }

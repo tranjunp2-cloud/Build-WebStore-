@@ -13,7 +13,7 @@ export function CTAButtons({ buttons, variant = 'default' }: { buttons: HeroConf
             {buttons.map((btn, i) => (
                 <motion.a
                     key={i}
-                    href={btn.url}
+                    href={btn?.url}
                     whileHover={{ scale: 1.03, y: -2 }}
                     whileTap={{ scale: 0.98 }}
                     className="px-8 py-4 rounded-xl font-semibold text-sm transition-all duration-300"

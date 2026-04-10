@@ -50,11 +50,9 @@ function BannerVariant({ block }: { block: CTAConfig }) {
             }}
         >
             <div className="container mx-auto px-6 text-center max-w-3xl">
-                <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                    {headline}
-                </h2>
+                <RichText text={headline} as="h2" className="text-3xl md:text-4xl font-bold mb-4 leading-tight" style={{ fontFamily: CSS_VARS.fontHeading }} />
                 {subheadline && (
-                    <p className="text-lg opacity-85 mb-8 max-w-xl mx-auto">{subheadline}</p>
+                    <RichText text={subheadline} as="p" className="text-lg opacity-85 mb-8 max-w-xl mx-auto" />
                 )}
                 <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="banner" />
             </div>
@@ -69,10 +67,8 @@ function InlineVariant({ block }: { block: CTAConfig }) {
             <div className="container mx-auto px-6">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-6 max-w-4xl mx-auto">
                     <div className="flex-1 text-center md:text-left">
-                        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                            {headline}
-                        </h2>
-                        {subheadline && <p style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
+                        <RichText text={headline} as="h2" className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: CSS_VARS.fontHeading }} />
+                        {subheadline && <RichText text={subheadline} as="p" style={{ color: CSS_VARS.muted }} />}
                     </div>
                     <div className="flex-shrink-0">
                         <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="inline" />
@@ -97,11 +93,9 @@ function FloatingVariant({ block }: { block: CTAConfig }) {
                         border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
                     }}
                 >
-                    <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                        {headline}
-                    </h2>
+                    <RichText text={headline} as="h2" className="text-2xl md:text-3xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading }} />
                     {subheadline && (
-                        <p className="mb-8" style={{ color: CSS_VARS.muted }}>{subheadline}</p>
+                        <RichText text={subheadline} as="p" className="mb-8" style={{ color: CSS_VARS.muted }} />
                     )}
                     <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="floating" />
                 </div>

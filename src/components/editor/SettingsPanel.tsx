@@ -14,6 +14,12 @@ import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, Testimonial
 import type { PageData } from '@/store/editorStore'
 import { toast } from 'sonner'
 
+/** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
+function stripHtmlForDisplay(value: unknown): string {
+    if (!value || typeof value !== 'string') return ''
+    return value.replace(/<[^>]*>/g, '')
+}
+
 type SocialWidgetLink = {
     platform: 'facebook' | 'whatsapp' | 'instagram' | 'linkedin' | 'youtube'
     url: string
@@ -131,11 +137,19 @@ function SettingsPanelInner({
     onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate
 }: SettingsPanelProps) {
+    // Version key: changes when block data changes (from inline editing or AI) → forces input re-mount
+    const blockDataVersion = useMemo(() => {
+        if (!block) return ''
+        return `${block.headline || ''}-${block.subheadline || ''}-${block.body || ''}-${block.variant || ''}`
+    }, [block])
+    const bk = `${blockIndex}-${blockDataVersion.length}` // short block key for input keys
+
     const [activeTab, setActiveTab] = useState<SettingsTab>(block ? 'block' : 'global')
     const [openGlobalSections, setOpenGlobalSections] = useState({
         brand: true,
         contact: true,
         social: true,
+        theme: true,
     })
     const [isGeneratingSEO, setIsGeneratingSEO] = useState(false)
     const [seoSlugInput, setSeoSlugInput] = useState('')
@@ -192,6 +206,49 @@ function SettingsPanelInner({
 
     const editorInputClassName = 'mt-1.5'
     const editorTextareaClassName = 'mt-1.5 min-h-[96px]'
+
+    const renderThemeContent = () => theme ? (
+        <div className="space-y-3">
+            <div>
+                <label className="text-xs text-gray-400">Primary Color</label>
+                <div className="mt-1 flex items-center gap-2">
+                    <input type="color" value={(theme.primaryColor as string) || '#0ea5e9'}
+                        onChange={e => onThemeChange('primaryColor', e.target.value)}
+                        aria-label="Primary color picker"
+                        className="h-7 w-7 rounded border-0 cursor-pointer bg-transparent" />
+                    <input value={(theme.primaryColor as string) || '#0ea5e9'}
+                        onChange={e => onThemeChange('primaryColor', e.target.value)}
+                        className="flex-1 rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500/50" />
+                </div>
+            </div>
+            <div>
+                <label className="text-xs text-gray-400">Heading Font</label>
+                <select value={(theme.fontHeading as string) || 'Outfit'} onChange={e => onThemeChange('fontHeading', e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
+                    {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+            </div>
+            <div>
+                <label className="text-xs text-gray-400">Body Font</label>
+                <select value={(theme.fontBody as string) || 'Inter'} onChange={e => onThemeChange('fontBody', e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
+                    {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+            </div>
+            <div>
+                <label className="text-xs text-gray-400">Color Mode</label>
+                <div className="mt-1 flex gap-2">
+                    {(['dark', 'light'] as const).map(mode => (
+                        <button key={mode} onClick={() => onThemeChange('colorMode', mode)}
+                            className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors',
+                                theme.colorMode === mode ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10')}>
+                            {mode === 'dark' ? 'Dark' : 'Light'}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        </div>
+    ) : null
 
     const renderGlobalContent = () => (
         <div className="space-y-4">
@@ -292,6 +349,8 @@ function SettingsPanelInner({
                     />
                 </div>
             ))}
+
+            {renderGlobalAccordion('theme', 'Theme & Colors', renderThemeContent())}
         </div>
     )
 
@@ -671,7 +730,7 @@ function SettingsPanelInner({
                 {block.logoText !== undefined && (
                     <div>
                         <label className={labelCls}>Logo Text</label>
-                        <Input defaultValue={block.logoText as string} key={`logo-${currentBlockIndex}`}
+                        <Input defaultValue={stripHtmlForDisplay(block.logoText)} key={`logo-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'logoText', e.target.value)}
                             variant="editor"
                             className={editorInputClassName} />
@@ -681,7 +740,7 @@ function SettingsPanelInner({
                 {block.headline !== undefined && (
                     <div>
                         <label className={labelCls}>Headline</label>
-                        <Input defaultValue={block.headline as string} key={`hl-${currentBlockIndex}`}
+                        <Input defaultValue={stripHtmlForDisplay(block.headline)} key={`hl-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
                             variant="editor"
                             className={editorInputClassName} />
@@ -691,7 +750,7 @@ function SettingsPanelInner({
                 {block.subheadline !== undefined && (
                     <div>
                         <label className={labelCls}>Subheadline</label>
-                        <Textarea defaultValue={block.subheadline as string} rows={2} key={`sub-${currentBlockIndex}`}
+                        <Textarea defaultValue={stripHtmlForDisplay(block.subheadline)} rows={2} key={`sub-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subheadline', e.target.value)}
                             variant="editor"
                             className={editorTextareaClassName} />
@@ -701,7 +760,7 @@ function SettingsPanelInner({
                 {block.sectionLabel !== undefined && (
                     <div>
                         <label className={labelCls}>Section Label</label>
-                        <Input defaultValue={block.sectionLabel as string} key={`sl-${currentBlockIndex}`}
+                        <Input defaultValue={stripHtmlForDisplay(block.sectionLabel)} key={`sl-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'sectionLabel', e.target.value)}
                             variant="editor"
                             className={editorInputClassName} />
@@ -711,7 +770,7 @@ function SettingsPanelInner({
                 {block.body !== undefined && (
                     <div>
                         <label className={labelCls}>Body Text</label>
-                        <Textarea defaultValue={block.body as string} rows={4} key={`body-${currentBlockIndex}`}
+                        <Textarea defaultValue={stripHtmlForDisplay(block.body)} rows={4} key={`body-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'body', e.target.value)}
                             variant="editor"
                             className={editorTextareaClassName} />
@@ -721,7 +780,7 @@ function SettingsPanelInner({
                 {block.subtext !== undefined && (
                     <div>
                         <label className={labelCls}>Description</label>
-                        <Textarea defaultValue={block.subtext as string} rows={3} key={`subtext-${currentBlockIndex}`}
+                        <Textarea defaultValue={stripHtmlForDisplay(block.subtext)} rows={3} key={`subtext-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subtext', e.target.value)}
                             variant="editor"
                             className={editorTextareaClassName} />
@@ -731,7 +790,7 @@ function SettingsPanelInner({
                 {block.tagline !== undefined && (
                     <div>
                         <label className={labelCls}>Tagline</label>
-                        <Textarea defaultValue={block.tagline as string} rows={2} key={`tag-${currentBlockIndex}`}
+                        <Textarea defaultValue={stripHtmlForDisplay(block.tagline)} rows={2} key={`tag-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'tagline', e.target.value)}
                             variant="editor"
                             className={editorTextareaClassName} />
@@ -745,7 +804,7 @@ function SettingsPanelInner({
                         <div className="mt-3 space-y-3">
                             <div>
                                 <label className={labelCls}>Email</label>
-                                <Input type="email" defaultValue={(block.email as string) || ''} key={`email-${currentBlockIndex}`}
+                                <Input type="email" defaultValue={(block.email as string) || ''} key={`email-${bk}`}
                                     onBlur={(e: FieldBlurEvent) => {
                                         if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
                                             onBlockFieldChange(currentBlockIndex, 'email', e.target.value)
@@ -758,14 +817,14 @@ function SettingsPanelInner({
                             </div>
                             <div>
                                 <label className={labelCls}>Phone</label>
-                                <Input defaultValue={(block.phone as string) || ''} key={`phone-${currentBlockIndex}`}
+                                <Input defaultValue={(block.phone as string) || ''} key={`phone-${bk}`}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'phone', e.target.value)}
                                     variant="editor"
                                     className={editorInputClassName} placeholder="+84 xxx xxx xxx" />
                             </div>
                             <div>
                                 <label className={labelCls}>Address</label>
-                                <Textarea defaultValue={(block.address as string) || ''} rows={2} key={`addr-${currentBlockIndex}`}
+                                <Textarea defaultValue={(block.address as string) || ''} rows={2} key={`addr-${bk}`}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'address', e.target.value)}
                                     variant="editor"
                                     className={editorTextareaClassName} placeholder="123 Street, City" />
@@ -779,11 +838,11 @@ function SettingsPanelInner({
                     <div>
                         <label className={labelCls}>CTA Button</label>
                         <div className="mt-1.5 space-y-2">
-                            <Input defaultValue={(block.ctaLabel as string) || ''} key={`ctalbl-${currentBlockIndex}`}
+                            <Input defaultValue={stripHtmlForDisplay(block.ctaLabel)} key={`ctalbl-${bk}`}
                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaLabel', e.target.value)}
                                 variant="editor"
                                 className={editorInputClassName} placeholder="Button text" />
-                            <Input defaultValue={(block.ctaUrl as string) || ''} key={`ctaurl-${currentBlockIndex}`}
+                            <Input defaultValue={(block.ctaUrl as string) || ''} key={`ctaurl-${bk}`}
                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaUrl', e.target.value)}
                                 variant="editor"
                                 className={editorInputClassName} placeholder="Button URL" />
@@ -794,7 +853,7 @@ function SettingsPanelInner({
                 {block.copyrightText !== undefined && (
                     <div>
                         <label className={labelCls}>Copyright</label>
-                        <Input defaultValue={block.copyrightText as string} key={`copy-${currentBlockIndex}`}
+                        <Input defaultValue={block.copyrightText as string} key={`copy-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'copyrightText', e.target.value)}
                             variant="editor"
                             className={editorInputClassName} />
@@ -811,7 +870,7 @@ function SettingsPanelInner({
                                     <span className="text-[10px] text-gray-500">Button {i + 1}</span>
                                     <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
-                                <Input defaultValue={btn.label || ''} placeholder="Label"
+                                <Input defaultValue={stripHtmlForDisplay(btn.label)} placeholder="Label"
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'label', e.target.value)}
                                     variant="editor"
                                     className={editorInputClassName} />
@@ -844,7 +903,7 @@ function SettingsPanelInner({
                         {!!block.ctaButton && (
                             <div className="mt-3">
                                 <label className={labelCls}>CTA Button</label>
-                                <Input defaultValue={(block.ctaButton as CtaButton)?.label || ''} placeholder="CTA Label"
+                                <Input defaultValue={stripHtmlForDisplay((block.ctaButton as CtaButton)?.label)} placeholder="CTA Label"
                                     onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), label: e.target.value } })}
                                     variant="editor"
                                     className={editorInputClassName} />
@@ -1118,50 +1177,7 @@ function SettingsPanelInner({
                     </div>
                 </div>
 
-                {/* Theme editing */}
-                {theme && (
-                    <div className="border-t border-white/10 pt-4">
-                        <label className="text-xs font-medium uppercase text-gray-500">Global Theme</label>
-                        <div className="mt-3">
-                            <label className="text-xs text-gray-400">Primary Color</label>
-                            <div className="mt-1 flex items-center gap-2">
-                                <input type="color" value={(theme.primaryColor as string) || '#0ea5e9'}
-                                    onChange={e => onThemeChange('primaryColor', e.target.value)}
-                                    aria-label="Primary color picker"
-                                    className="h-7 w-7 rounded border-0 cursor-pointer bg-transparent" />
-                                <input value={(theme.primaryColor as string) || '#0ea5e9'}
-                                    onChange={e => onThemeChange('primaryColor', e.target.value)}
-                                    className="flex-1 rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none focus:border-blue-500/50" />
-                            </div>
-                        </div>
-                        <div className="mt-3">
-                            <label className="text-xs text-gray-400">Heading Font</label>
-                            <select value={(theme.fontHeading as string) || 'Outfit'} onChange={e => onThemeChange('fontHeading', e.target.value)}
-                                className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
-                                {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-                            </select>
-                        </div>
-                        <div className="mt-3">
-                            <label className="text-xs text-gray-400">Body Font</label>
-                            <select value={(theme.fontBody as string) || 'Inter'} onChange={e => onThemeChange('fontBody', e.target.value)}
-                                className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
-                                {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
-                            </select>
-                        </div>
-                        <div className="mt-3">
-                            <label className="text-xs text-gray-400">Color Mode</label>
-                            <div className="mt-1 flex gap-2">
-                                {(['dark', 'light'] as const).map(mode => (
-                                    <button key={mode} onClick={() => onThemeChange('colorMode', mode)}
-                                        className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors',
-                                            theme.colorMode === mode ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10')}>
-                                        {mode === 'dark' ? 'Dark' : 'Light'}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Theme editing removed from Block tab — available in Global tab */}
                     </>
                 ) : null}
                 </div>

@@ -58,10 +58,12 @@ function isRemoteDatabase(): boolean {
  * Fix: auto-push for local dev, explicit for Docker (db-setup sets the env var).
  */
 function shouldPushSchema(): boolean {
+  if (process.env.PAYLOAD_PUSH_SCHEMA === 'false') return false
   if (process.env.PAYLOAD_PUSH_SCHEMA === 'true') return true
-  // Auto-push for local dev (not Docker — Docker sets HOSTNAME=0.0.0.0)
+  // Auto-push for local dev only — detect Docker by container-like hostname
   const isDev = process.env.NODE_ENV === 'development'
-  const isDocker = process.env.HOSTNAME === '0.0.0.0'
+  const hostname = process.env.HOSTNAME || ''
+  const isDocker = hostname === '0.0.0.0' || /^[0-9a-f]{12}$/.test(hostname)
   return isDev && !isDocker
 }
 

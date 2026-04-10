@@ -6,6 +6,7 @@ import { InlineEditPopover } from './InlineEditPopover'
 import { RichTextToolbar } from './RichTextToolbar'
 import { ImageToolbar } from './ImageToolbar'
 import { useEditorStore } from '@/store/editorStore'
+import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -189,7 +190,7 @@ function PreviewFrameInner({
     onPageNavigate,
     disableDragDrop = false,
 }: PreviewFrameProps) {
-    const { blocks, updateBlock, performSave } = useEditorStore()
+    const { blocks, updateBlock, performSave, theme: storeTheme } = useEditorStore()
     const blocksRef = useRef(blocks)
     useEffect(() => { blocksRef.current = blocks }, [blocks])
     const [hoverData, setHoverData] = useState<HoveredElementData | null>(null)
@@ -214,6 +215,18 @@ function PreviewFrameInner({
     const [isImageProcessing, setIsImageProcessing] = useState(false)
     const [wysiwygState, setWysiwygState] = useState<Record<string, unknown>>({})
     const [frameElement, setFrameElement] = useState<HTMLIFrameElement | null>(null)
+
+    // Live theme update — send CSS variables to iframe without reload
+    useEffect(() => {
+        if (!frameElement || !storeTheme?.primaryColor) return
+        const resolved = resolveTheme(storeTheme)
+        const css = generateThemeCSS(resolved)
+        frameElement.contentWindow?.postMessage(
+            { type: 'THEME_UPDATE', css },
+            window.location.origin,
+        )
+    }, [frameElement, storeTheme])
+
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
     const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null)
     const clearHoverTimerRef = useRef<number | null>(null)
@@ -221,6 +234,7 @@ function PreviewFrameInner({
     const dragPointerStartYRef = useRef<number | null>(null)
     const dragPointerOffsetYRef = useRef<number | null>(null)
     const isHoveringControlsRef = useRef<boolean>(false)
+    const textEditStopTimerRef = useRef<number | null>(null)
     const latestBlockLayoutsRef = useRef<BlockLayoutRect[]>([])
     useEffect(() => {
         latestBlockLayoutsRef.current = blockLayouts
@@ -365,16 +379,21 @@ function PreviewFrameInner({
             } else if (e.data?.type === 'PREVIEW_CANVAS_CLICKED') {
                 onBlockSelect?.(null)
             } else if (e.data?.type === 'TEXT_EDITING_STARTED') {
+                // Cancel any pending STOPPED cleanup (race: stop fires before start on re-click)
+                if (textEditStopTimerRef.current) {
+                    clearTimeout(textEditStopTimerRef.current)
+                    textEditStopTimerRef.current = null
+                }
                 setTextEditingData({ rect: e.data.rect, blockIndex: e.data.blockIndex })
                 setImageClickData(null)
             } else if (e.data?.type === 'TEXT_EDITING_STOPPED') {
-                setTimeout(() => {
-                    // If the parent window focus moved to our WYSIWYG toolbar, DON'T drop active state
+                textEditStopTimerRef.current = window.setTimeout(() => {
+                    textEditStopTimerRef.current = null
                     if (document.activeElement?.closest('[data-wysiwyg-toolbar]')) {
                         return
                     }
                     setTextEditingData(null)
-                    performSave(true) // Trigger immediate auto save when focusing out
+                    performSave(true)
                 }, 150)
             } else if (e.data?.type === 'TEXT_EDITED') {
                 const { searchKey, newHtml, blockIndex } = e.data

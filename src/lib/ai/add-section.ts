@@ -33,6 +33,17 @@ export type SupportedAddSectionType =
     | 'menu-food'
     | 'service-cards'
     | 'carousel'
+    | 'hero'
+    | 'about'
+    | 'contact'
+    | 'pricing'
+    | 'stats'
+    | 'video'
+    | 'blog-list'
+    | 'products-grid'
+    | 'logo-cloud'
+    | 'custom-html'
+    | 'products-featured'
 
 type AddSectionContext = {
     instruction: string
@@ -73,6 +84,17 @@ const SECTION_TYPE_MATCHERS: Array<[SupportedAddSectionType, RegExp[]]> = [
     ['menu-food', [/\bmenu\b/i, /\bfood\b/i, /\brestaurant\b/i, /\bdish\b/i]],
     ['service-cards', [/\bservice\b/i, /\boffering\b/i]],
     ['carousel', [/\bcarousel\b/i, /\bslider\b/i, /\bslideshow\b/i]],
+    ['hero', [/\bhero\b/i, /\bbanner\b/i, /\blanding\b/i]],
+    ['about', [/\babout\b/i, /\bstory\b/i, /\bwho\s*we\b/i]],
+    ['contact', [/\bcontact\b/i, /\bform\b/i, /\breach\s*us\b/i]],
+    ['pricing', [/\bpricing\b/i, /\bplan(s)?\b/i, /\bpackage\b/i]],
+    ['stats', [/\bstat(s)?\b/i, /\bnumber(s)?\b/i, /\bcounter\b/i]],
+    ['video', [/\bvideo\b/i, /\byoutube\b/i, /\bembed\b/i]],
+    ['blog-list', [/\bblog\b/i, /\barticle(s)?\b/i, /\bpost(s)?\b/i]],
+    ['products-grid', [/\bproduct(s)?\b/i, /\bshop\b/i, /\bstore\b/i]],
+    ['logo-cloud', [/\blogo\b/i, /\bpartner\b/i, /\btrusted\b/i]],
+    ['custom-html', [/\bcustom\s*html\b/i, /\bembed\b/i, /\bhtml\b/i, /\bcode\b/i]],
+    ['products-featured', [/\bfeatured\s*product\b/i, /\bhero\s*product\b/i]],
 ]
 
 const ADD_SECTION_INTENT_MATCHERS = [/\badd\b/i, /\binsert\b/i, /\bappend\b/i, /\bcreate\b/i]
@@ -107,6 +129,17 @@ const SECTION_TYPE_LABELS: Record<SupportedAddSectionType, string> = {
     'menu-food': 'food menu',
     'service-cards': 'service cards',
     carousel: 'carousel',
+    hero: 'hero',
+    about: 'about',
+    contact: 'contact',
+    pricing: 'pricing',
+    stats: 'stats',
+    video: 'video',
+    'blog-list': 'blog list',
+    'products-grid': 'products grid',
+    'logo-cloud': 'logo cloud',
+    'custom-html': 'custom HTML',
+    'products-featured': 'featured products',
 }
 
 function getPlaceholderImage(index: number) {
@@ -500,6 +533,123 @@ export function createAddSectionBlock({
                     { imageUrl: '', title: 'Slide 2', description: 'Quality products and exceptional service.' },
                     { imageUrl: '', title: 'Slide 3', description: 'Join thousands of satisfied customers.' },
                 ],
+            }
+
+        case 'hero':
+            return {
+                blockType: 'hero',
+                variant: 'centered',
+                headline: `Welcome to ${brandName}`,
+                subheadline: 'We deliver exceptional products and services that help you achieve your goals. Discover what makes us different.',
+                ctaButtons: [
+                    { label: 'Get Started', url: '#contact', style: 'primary' },
+                    { label: 'Learn More', url: '#about', style: 'outline' },
+                ],
+            }
+
+        case 'about':
+            return {
+                blockType: 'about',
+                variant: 'simple',
+                sectionLabel: 'About Us',
+                headline: `Our Story`,
+                body: `${brandName} was founded with a simple mission: to deliver quality and value to every customer. With years of experience and a passionate team, we continue to grow and innovate.`,
+            }
+
+        case 'contact':
+            return {
+                blockType: 'contact',
+                headline: 'Get in Touch',
+                subtext: `Have a question or want to work together? We'd love to hear from you.`,
+                email: 'hello@example.com',
+                phone: '+1 (555) 123-4567',
+                address: '123 Business Street, Suite 100\nCity, State 10001',
+                formFields: [
+                    { fieldName: 'name', label: 'Your Name', fieldType: 'text', required: true },
+                    { fieldName: 'email', label: 'Email Address', fieldType: 'email', required: true },
+                    { fieldName: 'message', label: 'Message', fieldType: 'textarea', required: true },
+                ],
+            }
+
+        case 'pricing':
+            return {
+                blockType: 'pricing',
+                headline: 'Simple, Transparent Pricing',
+                subheadline: 'Choose the plan that works best for you.',
+                plans: [
+                    { name: 'Starter', price: '$9/mo', description: 'Perfect for getting started', features: [{ text: '5 Projects', included: true }, { text: 'Basic Support', included: true }, { text: 'Advanced Features', included: false }], ctaLabel: 'Get Started', ctaUrl: '#' },
+                    { name: 'Pro', price: '$29/mo', description: 'Best for growing businesses', isPopular: true, features: [{ text: 'Unlimited Projects', included: true }, { text: 'Priority Support', included: true }, { text: 'Advanced Features', included: true }], ctaLabel: 'Get Started', ctaUrl: '#' },
+                    { name: 'Enterprise', price: '$99/mo', description: 'For large organizations', features: [{ text: 'Everything in Pro', included: true }, { text: 'Dedicated Manager', included: true }, { text: 'Custom Integrations', included: true }], ctaLabel: 'Contact Us', ctaUrl: '#' },
+                ],
+            }
+
+        case 'stats':
+            return {
+                blockType: 'stats',
+                headline: `${brandName} by the Numbers`,
+                stats: [
+                    { value: '10K+', label: 'Happy Customers' },
+                    { value: '50+', label: 'Countries Served' },
+                    { value: '99%', label: 'Satisfaction Rate' },
+                    { value: '24/7', label: 'Support Available' },
+                ],
+            }
+
+        case 'video':
+            return {
+                blockType: 'video',
+                variant: 'embed',
+                headline: 'See Us in Action',
+                subheadline: 'Watch our story and learn what drives us forward.',
+                videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            }
+
+        case 'blog-list':
+            return {
+                blockType: 'blog-list',
+                variant: 'cards',
+                headline: 'Latest from Our Blog',
+                subheadline: 'Insights, tips, and stories from our team.',
+                limit: 3,
+            }
+
+        case 'products-grid':
+            return {
+                blockType: 'products-grid',
+                variant: 'grid-3',
+                headline: 'Our Products',
+                subheadline: 'Explore our curated collection.',
+                limit: 6,
+            }
+
+        case 'logo-cloud':
+            return {
+                blockType: 'logo-cloud',
+                variant: 'row',
+                headline: 'Trusted By Leading Brands',
+                logos: [
+                    { name: 'Partner 1' },
+                    { name: 'Partner 2' },
+                    { name: 'Partner 3' },
+                    { name: 'Partner 4' },
+                ],
+            }
+
+        case 'custom-html':
+            return {
+                blockType: 'custom-html',
+                html: `<div style="padding: 2rem; text-align: center; background: #f8f8f8; border-radius: 8px;">
+  <h3 style="margin-bottom: 0.5rem;">Custom HTML Block</h3>
+  <p style="color: #666;">Edit this HTML to add any custom content, embeds, or widgets.</p>
+</div>`,
+            }
+
+        case 'products-featured':
+            return {
+                blockType: 'products-featured',
+                variant: 'hero-product',
+                headline: 'Featured Products',
+                subheadline: 'Hand-picked selections just for you.',
             }
 
         default:

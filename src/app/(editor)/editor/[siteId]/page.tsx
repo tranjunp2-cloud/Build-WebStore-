@@ -336,7 +336,9 @@ export default function EditorPage() {
 
     const handleThemeChange = useCallback((key: string, value: string) => {
         updateTheme({ [key]: value })
-    }, [updateTheme])
+        // Save to DB but don't reload iframe — live CSS update handles preview
+        void handleSave({ showToast: false, refreshPreview: false })
+    }, [updateTheme, handleSave])
 
     const handleSiteSettingsChange = useCallback(async (changes: Partial<SiteData>) => {
         if (!siteId) return
@@ -412,20 +414,25 @@ export default function EditorPage() {
             if (index === prev) return null
             return prev
         })
-    }, [deleteBlock])
+        void handleSave({ showToast: false, refreshPreview: true })
+    }, [deleteBlock, handleSave])
 
     const handleDuplicateBlock = useCallback((index: number) => {
         duplicateBlock(index)
         setSelectedBlock(index + 1)
-    }, [duplicateBlock])
+        void handleSave({ showToast: false, refreshPreview: true })
+    }, [duplicateBlock, handleSave])
 
     const handleBlockFieldChange = useCallback((index: number, field: string, value: string) => {
         updateBlock(index, { [field]: value })
-    }, [updateBlock])
+        // Save + reload preview to show changes
+        void handleSave({ showToast: false, refreshPreview: true })
+    }, [updateBlock, handleSave])
 
     const handleBlockUpdate = useCallback((index: number, changes: Record<string, unknown>) => {
         updateBlock(index, changes)
-    }, [updateBlock])
+        void handleSave({ showToast: false, refreshPreview: true })
+    }, [updateBlock, handleSave])
 
     const handleReorderBlocks = useCallback((fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex) return

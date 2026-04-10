@@ -7,6 +7,7 @@ import type { PricingConfig } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard, staggerContainer, staggerItem } from '../shared/animations'
 import { GradientBlob } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../shared/RichText'
 
 export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
     const { headline, subheadline, plans = [], variant = 'cards' } = block
@@ -425,8 +426,8 @@ export function PricingBlock({ block, theme }: BlockProps<PricingConfig>) {
 function SectionHeader({ headline, subheadline }: { headline?: string; subheadline?: string }) {
     return (
         <div className="text-center max-w-2xl mx-auto mb-16">
-            {headline && <h2 className="text-4xl font-bold font-heading mb-4">{headline}</h2>}
-            {subheadline && <p className="text-lg opacity-70">{subheadline}</p>}
+            {headline && <RichText text={headline} as="h2" className="text-4xl font-bold font-heading mb-4" />}
+            {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-70" />}
         </div>
     )
 }

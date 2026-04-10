@@ -7,6 +7,7 @@ import { AnimatedSection } from '../../shared/animations'
 import { CTAButtons } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { getHeroImage } from '@/lib/images/industry-images'
+import { RichText } from '../../shared/RichText'
 
 export function CardsOverlayHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], image, badge } = block
@@ -53,13 +54,9 @@ export function CardsOverlayHero({ block, site }: BlockProps<HeroConfig>) {
                             {badge.text}
                         </div>
                     )}
-                    <h1 className="text-4xl md:text-5xl font-bold font-heading leading-[1.1] mb-6 text-white">
-                        {headline}
-                    </h1>
+                    <RichText text={headline} as="h1" className="text-4xl md:text-5xl font-bold font-heading leading-[1.1] mb-6 text-white" />
                     {subheadline && (
-                        <p className="text-lg text-white/70 mb-10 max-w-xl mx-auto leading-relaxed">
-                            {subheadline}
-                        </p>
+                        <RichText text={subheadline} as="p" className="text-lg text-white/70 mb-10 max-w-xl mx-auto leading-relaxed" />
                     )}
                     <div className="flex flex-wrap gap-4 justify-center">
                         <CTAButtons buttons={ctaButtons} variant="glass" />

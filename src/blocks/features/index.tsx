@@ -7,6 +7,7 @@ import type { FeaturesConfig } from './config'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard, staggerContainer, staggerItem } from '../shared/animations'
 import { IconContainer, SectionLabel, GradientBlob } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../shared/RichText'
 
 export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
     const { headline, subheadline, features = [], variant = 'grid-3' } = block
@@ -19,8 +20,8 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
                         {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                        {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                        {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                     </div>
                     <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {features.map((feature, i) => (
@@ -58,8 +59,8 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
                         {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                        {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                        {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                     </div>
                     <StaggerGrid className="flex flex-col gap-6 max-w-3xl mx-auto">
                         {features.map((feature, i) => (
@@ -102,8 +103,8 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
                         {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                        {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                        {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                     </div>
                     <motion.div
                         initial="hidden"
@@ -158,8 +159,8 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                 <div className="container mx-auto px-6 relative z-10">
                     <div className="text-center max-w-2xl mx-auto mb-16">
                         {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                        {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                        {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                     </div>
                     <StaggerGrid className="flex flex-col gap-5 max-w-3xl mx-auto">
                         {features.map((feature, i) => (
@@ -206,8 +207,8 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                     {block.sectionLabel && (
                         <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>
                     )}
-                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                    {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                 </div>
 
                 {/* Feature Cards */}
@@ -287,8 +288,8 @@ function FeaturesCarousel({
             <div className="container mx-auto px-6 relative z-10">
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                    {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                 </div>
 
                 <div className="relative">

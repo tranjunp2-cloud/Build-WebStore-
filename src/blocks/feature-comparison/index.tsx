@@ -4,6 +4,7 @@ import type { BlockProps } from '../types'
 import type { FeatureComparisonConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 function CheckIcon({ color }: { color: string }) {
     return (
@@ -29,7 +30,7 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
             <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     {headline && (
-                        <h2 className="text-3xl md:text-5xl font-bold font-heading text-center mb-12">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading text-center mb-12" />
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {products.map((product, pIdx) => (
@@ -71,7 +72,7 @@ export function FeatureComparisonBlock({ block, theme }: BlockProps<FeatureCompa
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
-                    <h2 className="text-3xl md:text-5xl font-bold font-heading text-center mb-12">{headline}</h2>
+                    <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading text-center mb-12" />
                 )}
                 <div className="overflow-x-auto rounded-2xl" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
                     <table className="w-full text-left">

@@ -4,12 +4,13 @@ import type { BlockProps } from '../types'
 import type { ClientLogosConfig, LogoItem } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 function LogoImage({ logo, className }: { logo: LogoItem; className?: string }) {
     const img = (
         <img
-            src={logo.url}
-            alt={logo.alt}
+            src={logo?.url}
+            alt={logo?.alt}
             className={`h-10 md:h-12 w-auto object-contain ${className || ''}`}
             loading="lazy"
         />
@@ -31,7 +32,7 @@ export function ClientLogosBlock({ block, theme }: BlockProps<ClientLogosConfig>
         return (
             <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
-                    {headline && <h2 className="text-lg font-heading font-semibold text-center mb-12 opacity-60">{headline}</h2>}
+                    {headline && <RichText text={headline} as="h2" className="text-lg font-heading font-semibold text-center mb-12 opacity-60" />}
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 items-center justify-items-center max-w-5xl mx-auto">
                         {logos.map((logo, i) => (
                             <div key={i} className="p-4 rounded-xl border flex items-center justify-center w-full" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.063)` }}>
@@ -48,7 +49,7 @@ export function ClientLogosBlock({ block, theme }: BlockProps<ClientLogosConfig>
         return (
             <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
-                    {headline && <h2 className="text-lg font-heading font-semibold text-center mb-12 opacity-60">{headline}</h2>}
+                    {headline && <RichText text={headline} as="h2" className="text-lg font-heading font-semibold text-center mb-12 opacity-60" />}
                     <div className="flex flex-wrap items-center justify-center gap-10 max-w-5xl mx-auto">
                         {logos.map((logo, i) => (
                             <div key={i} className="opacity-40 hover:opacity-100 transition-opacity duration-300">
@@ -66,7 +67,7 @@ export function ClientLogosBlock({ block, theme }: BlockProps<ClientLogosConfig>
     return (
         <AnimatedSection className="py-24 overflow-hidden">
             <div className="container mx-auto px-6">
-                {headline && <h2 className="text-lg font-heading font-semibold text-center mb-12 opacity-60">{headline}</h2>}
+                {headline && <RichText text={headline} as="h2" className="text-lg font-heading font-semibold text-center mb-12 opacity-60" />}
             </div>
             <div className="relative">
                 <div className="absolute left-0 top-0 bottom-0 w-24 z-10" style={{ background: 'linear-gradient(to right, var(--background, #09090b), transparent)' }} />

@@ -5,6 +5,7 @@ import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../../shared/RichText'
 
 export function MinimalHero({ block }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [] } = block
@@ -24,7 +25,7 @@ export function MinimalHero({ block }: BlockProps<HeroConfig>) {
                     transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
                     className="text-6xl md:text-8xl font-bold font-heading leading-[1.05] mb-8"
                 >
-                    {headline}
+                    <RichText text={headline} as="span" />
                 </motion.h1>
                 {subheadline && (
                     <motion.p
@@ -34,7 +35,7 @@ export function MinimalHero({ block }: BlockProps<HeroConfig>) {
                         transition={{ duration: 0.6, delay: 0.15 }}
                         className="text-xl opacity-50 mb-12 max-w-2xl mx-auto leading-relaxed"
                     >
-                        {subheadline}
+                        <RichText text={subheadline} as="span" />
                     </motion.p>
                 )}
                 {ctaButtons.length > 0 && (

@@ -5,6 +5,7 @@ import type { BlockProps } from '../types'
 import type { BeforeAfterConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>) {
     const { variant = 'slider', headline, beforeImage, afterImage } = block
@@ -49,11 +50,11 @@ export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>
             <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     {headline && (
-                        <h2 className="text-3xl md:text-5xl font-bold font-heading text-center mb-12">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading text-center mb-12" />
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
-                            <img src={beforeImage.url} alt={beforeImage.alt || 'Before'} className="w-full h-auto object-cover" />
+                            <img src={beforeImage?.url} alt={beforeImage?.alt || 'Before'} className="w-full h-auto object-cover" />
                             {beforeImage.label && (
                                 <span
                                     className="absolute top-4 left-4 px-3 py-1 rounded-full text-sm font-medium text-white"
@@ -64,7 +65,7 @@ export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>
                             )}
                         </div>
                         <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
-                            <img src={afterImage.url} alt={afterImage.alt || 'After'} className="w-full h-auto object-cover" />
+                            <img src={afterImage?.url} alt={afterImage?.alt || 'After'} className="w-full h-auto object-cover" />
                             {afterImage.label && (
                                 <span
                                     className="absolute top-4 left-4 px-3 py-1 rounded-full text-sm font-medium text-white"
@@ -85,7 +86,7 @@ export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 {headline && (
-                    <h2 className="text-3xl md:text-5xl font-bold font-heading text-center mb-12">{headline}</h2>
+                    <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading text-center mb-12" />
                 )}
                 <div
                     ref={containerRef}
@@ -96,13 +97,13 @@ export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>
                     onPointerUp={onPointerUp}
                 >
                     {/* After image (full) */}
-                    <img src={afterImage.url} alt={afterImage.alt || 'After'} className="w-full h-auto block" draggable={false} />
+                    <img src={afterImage?.url} alt={afterImage?.alt || 'After'} className="w-full h-auto block" draggable={false} />
 
                     {/* Before image (clipped) */}
                     <div className="absolute inset-0 overflow-hidden" style={{ width: `${position}%` }}>
                         <img
-                            src={beforeImage.url}
-                            alt={beforeImage.alt || 'Before'}
+                            src={beforeImage?.url}
+                            alt={beforeImage?.alt || 'Before'}
                             className="h-full object-cover"
                             style={{ width: containerRef.current ? `${containerRef.current.offsetWidth}px` : '100vw' }}
                             draggable={false}

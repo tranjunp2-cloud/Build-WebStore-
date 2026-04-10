@@ -12,7 +12,7 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 
 function NavLogo({ logo, logoText, className }: { logo?: { url: string; alt?: string }; logoText?: string; className?: string }) {
     if (logo?.url) {
-        return <img src={logo.url} alt={logoText || 'Logo'} className={className || 'h-6 sm:h-8 w-auto'} />
+        return <img src={logo?.url} alt={logoText || 'Logo'} className={className || 'h-6 sm:h-8 w-auto'} />
     }
     return (
         <span style={{
@@ -86,7 +86,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                     {links.map((link, i) => (
                         <motion.a
                             key={i}
-                            href={link.url}
+                            href={link?.url}
                             whileHover={{ y: -1 }}
                             className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04]"
                         >
@@ -142,7 +142,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                             {links.map((link, i) => (
                                 <a
                                     key={i}
-                                    href={link.url}
+                                    href={link?.url}
                                     className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200"
                                     onClick={() => setMobileMenuOpen(false)}
                                 >
@@ -204,7 +204,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
                 {/* Logo */}
                 <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
                     {mergedBlock.logo?.url ? (
-                        <img src={mergedBlock.logo.url} alt={logoText || 'Logo'} className="h-6 sm:h-8 w-auto" />
+                        <img src={mergedBlock.logo?.url} alt={logoText || 'Logo'} className="h-6 sm:h-8 w-auto" />
                     ) : (
                         <span style={scrolled ? {
                             background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.565))`,
@@ -222,7 +222,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
                     {links.map((link, i) => (
                         <motion.a
                             key={i}
-                            href={link.url}
+                            href={link?.url}
                             whileHover={{ y: -1 }}
                             className="px-4 py-2 text-sm font-medium opacity-70 hover:opacity-100 transition-all duration-200 rounded-lg"
                             style={{
@@ -279,7 +279,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
                     >
                         <div className="container mx-auto px-6 py-4 flex flex-col gap-1">
                             {links.map((link, i) => (
-                                <a key={i} href={link.url} className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200" onClick={() => setMobileMenuOpen(false)}>
+                                <a key={i} href={link?.url} className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200" onClick={() => setMobileMenuOpen(false)}>
                                     {link.label}
                                 </a>
                             ))}
@@ -370,7 +370,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                                 {links.map((link, i) => (
                                     <motion.a
                                         key={i}
-                                        href={link.url}
+                                        href={link?.url}
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         transition={{ delay: i * 0.05 }}
@@ -440,7 +440,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
                         {leftLinks.map((link, i) => (
                             <motion.a
                                 key={i}
-                                href={link.url}
+                                href={link?.url}
                                 whileHover={{ y: -1 }}
                                 className="px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04]"
                             >
@@ -464,7 +464,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
                         {rightLinks.map((link, i) => (
                             <motion.a
                                 key={i}
-                                href={link.url}
+                                href={link?.url}
                                 whileHover={{ y: -1 }}
                                 className="px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04]"
                             >
@@ -522,7 +522,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
                             {links.map((link, i) => (
                                 <a
                                     key={i}
-                                    href={link.url}
+                                    href={link?.url}
                                     className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200"
                                     onClick={() => setMobileMenuOpen(false)}
                                 >
@@ -606,7 +606,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
                             onMouseEnter={() => setHoveredIndex(i)}
                         >
                             <motion.a
-                                href={link.url}
+                                href={link?.url}
                                 whileHover={{ y: -1 }}
                                 className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] flex items-center gap-1"
                             >
@@ -675,7 +675,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
                                         {col.map((subLink, si) => (
                                             <a
                                                 key={si}
-                                                href={subLink.url}
+                                                href={subLink?.url}
                                                 className="block px-3 py-2.5 rounded-lg text-sm opacity-60 hover:opacity-100 hover:bg-white/[0.04] transition-all duration-200"
                                             >
                                                 {subLink.label}
@@ -707,7 +707,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
                             {links.map((link, i) => (
                                 <a
                                     key={i}
-                                    href={link.url}
+                                    href={link?.url}
                                     className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200"
                                     onClick={() => setMobileMenuOpen(false)}
                                 >
@@ -764,7 +764,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                 {/* Logo */}
                 <div className="font-bold text-lg font-heading text-zinc-900">
                     {mergedBlock.logo?.url ? (
-                        <img src={mergedBlock.logo.url} alt={logoText || 'Logo'} className="h-6 w-auto" />
+                        <img src={mergedBlock.logo?.url} alt={logoText || 'Logo'} className="h-6 w-auto" />
                     ) : (
                         <span style={{
                             background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.565))`,
@@ -782,7 +782,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                     {links.map((link, i) => (
                         <a
                             key={i}
-                            href={link.url}
+                            href={link?.url}
                             className="px-3 py-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors duration-200 rounded-full hover:bg-black/[0.04]"
                         >
                             {link.label}
@@ -835,7 +835,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                             {links.map((link, i) => (
                                 <a
                                     key={i}
-                                    href={link.url}
+                                    href={link?.url}
                                     className="px-4 py-2.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 rounded-xl hover:bg-black/[0.04] transition-all duration-200"
                                     onClick={() => setMobileMenuOpen(false)}
                                 >

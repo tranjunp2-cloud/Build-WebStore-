@@ -4,6 +4,7 @@ import type { BlockProps } from '../types'
 import type { SocialProofConfig, SocialProofReview } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 function StarRating({ rating, color }: { rating: number; color: string }) {
     return (
@@ -85,7 +86,7 @@ export function SocialProofBlock({ block, theme }: BlockProps<SocialProofConfig>
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-14">
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                     </div>
                 )}
 

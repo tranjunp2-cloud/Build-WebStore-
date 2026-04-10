@@ -20,6 +20,8 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
     const isActive = (cmd: string) => Boolean(activeState[cmd])
     const currentTag = String(activeState.formatBlock || 'P').toUpperCase()
     const currentValue = ['H1', 'H2', 'H3', 'H4'].includes(currentTag) ? currentTag : 'P'
+    const currentAlign = String(activeState.textAlign || 'left')
+    const isAlign = (align: string) => currentAlign === align
 
     return (
         <div
@@ -66,29 +68,29 @@ export function RichTextToolbar({ onCommand, activeState = {} }: RichTextToolbar
 
             <div className="w-px h-6 bg-gray-200 mx-1" />
 
-            <button 
-                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            <button
+                className={`p-1.5 rounded transition-colors ${isAlign('left') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('justifyLeft') }}
                 title="Align Left"
             >
                 <AlignLeft className="w-4 h-4" />
             </button>
-            <button 
-                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            <button
+                className={`p-1.5 rounded transition-colors ${isAlign('center') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('justifyCenter') }}
                 title="Align Center"
             >
                 <AlignCenter className="w-4 h-4" />
             </button>
-            <button 
-                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            <button
+                className={`p-1.5 rounded transition-colors ${isAlign('right') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('justifyRight') }}
                 title="Align Right"
             >
                 <AlignRight className="w-4 h-4" />
             </button>
             <button 
-                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                className={`p-1.5 rounded transition-colors ${isAlign('justify') ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
                 onClick={(e) => { e.preventDefault(); onCommand('justifyFull') }}
                 title="Justify"
             >

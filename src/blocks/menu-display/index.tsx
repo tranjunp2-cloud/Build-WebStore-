@@ -6,6 +6,7 @@ import type { BlockProps } from '../types'
 import type { MenuDisplayConfig, MenuDisplayItem, DietaryTag } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 const DIETARY_ICONS: Record<DietaryTag, { label: string; icon: string }> = {
     halal: { label: 'Halal', icon: '\u2714\uFE0F' },
@@ -258,8 +259,8 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                    {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                 </div>
 
                 {variant === 'tabs' && renderTabs()}

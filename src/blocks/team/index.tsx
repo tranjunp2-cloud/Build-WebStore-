@@ -4,6 +4,7 @@ import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/
 import type { BlockProps } from '../types'
 import type { TeamConfig, TeamMember } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../shared/RichText'
 
 function InitialsAvatar({ name }: { name: string }) {
     const initial = name.charAt(0).toUpperCase()
@@ -22,8 +23,8 @@ function MemberAvatar({ member }: { member: TeamMember }) {
     if (member.avatar?.url) {
         return (
             <img
-                src={member.avatar.url}
-                alt={member.avatar.alt || member.name}
+                src={member.avatar?.url}
+                alt={member.avatar?.alt || member.name}
                 className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
                 loading="lazy"
             />
@@ -39,7 +40,7 @@ function SocialLinks({ socials }: { socials: TeamMember['socials'] }) {
             {socials.map((s, i) => (
                 <a
                     key={i}
-                    href={s.url}
+                    href={s?.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs px-3 py-1 rounded-full transition-colors"
@@ -60,10 +61,8 @@ function SectionHeader({ headline, subheadline }: { headline?: string; subheadli
     if (!headline) return null
     return (
         <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
-                {headline}
-            </h2>
-            {subheadline && <p className="max-w-2xl mx-auto" style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
+            <RichText text={headline} as="h2" className="text-3xl md:text-4xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }} />
+            {subheadline && <RichText text={subheadline} as="p" className="max-w-2xl mx-auto" style={{ color: CSS_VARS.muted }} />}
         </div>
     )
 }

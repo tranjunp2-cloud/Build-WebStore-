@@ -8,6 +8,7 @@ import { motion } from 'framer-motion'
 import { mergeContactInfoWithSite } from '@/lib/site-settings'
 import { Mail, Phone, MapPin } from 'lucide-react'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../shared/RichText'
 
 // ── Shared form input styles ─────────────────────────────────────────────────
 
@@ -214,7 +215,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                 <div className="container mx-auto px-6">
                     {headline && (
                         <div className="mb-6">
-                            <h2 className="text-2xl font-bold font-heading">{headline}</h2>
+                            <RichText text={headline} as="h2" className="text-2xl font-bold font-heading" />
                             {subtext && <p className="text-sm opacity-50 mt-1">{subtext}</p>}
                         </div>
                     )}

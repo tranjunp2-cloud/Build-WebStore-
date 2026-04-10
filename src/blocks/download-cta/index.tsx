@@ -5,6 +5,7 @@ import type { BlockProps } from '../types'
 import type { DownloadCTAConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 function DownloadIcon({ color }: { color: string }) {
     return (
@@ -86,7 +87,7 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
         return (
             <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6 text-center">
-                    <h2 className="text-2xl md:text-3xl font-bold font-heading mb-3">{headline}</h2>
+                    <RichText text={headline} as="h2" className="text-2xl md:text-3xl font-bold font-heading mb-3" />
                     {description && <p className="opacity-50 mb-6 max-w-lg mx-auto">{description}</p>}
                     <div className="flex flex-col items-center gap-2">
                         {action}
@@ -109,7 +110,7 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
                         }}
                     >
                         <div className="flex-1">
-                            <h2 className="text-3xl md:text-4xl font-bold font-heading mb-3">{headline}</h2>
+                            <RichText text={headline} as="h2" className="text-3xl md:text-4xl font-bold font-heading mb-3" />
                             {description && <p className="opacity-50 max-w-lg">{description}</p>}
                             {fileMeta}
                         </div>
@@ -134,7 +135,7 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
                     >
                         <DownloadIcon color={CSS_VARS.primary} />
                     </div>
-                    <h2 className="text-2xl md:text-3xl font-bold font-heading mb-3">{headline}</h2>
+                    <RichText text={headline} as="h2" className="text-2xl md:text-3xl font-bold font-heading mb-3" />
                     {description && <p className="opacity-50 mb-6 max-w-sm mx-auto">{description}</p>}
                     <div className="flex flex-col items-center gap-2">
                         {action}

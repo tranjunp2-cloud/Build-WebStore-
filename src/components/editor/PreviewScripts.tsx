@@ -162,13 +162,23 @@ export function PreviewScripts() {
             const isItalic = /<i\b|<em\b/i.test(rawHtml)
             const isUnderline = /<u\b/i.test(rawHtml)
 
+            // Detect text alignment
+            const align = el.style.textAlign ||
+                (el.classList.contains('text-center') ? 'center' :
+                 el.classList.contains('text-right') ? 'right' :
+                 el.classList.contains('text-justify') ? 'justify' : '')
+
             let html = escapeHtml(text)
             if (isUnderline) html = `<u>${html}</u>`
             if (isItalic) html = `<i>${html}</i>`
             if (isBold) html = `<b>${html}</b>`
 
             if (HEADING_TAGS.includes(el.tagName)) {
-                html = `<${el.tagName.toLowerCase()}>${html}</${el.tagName.toLowerCase()}>`
+                const alignAttr = align && align !== 'left' ? ` style="text-align:${align}"` : ''
+                html = `<${el.tagName.toLowerCase()}${alignAttr}>${html}</${el.tagName.toLowerCase()}>`
+            } else if (align && align !== 'left') {
+                // Wrap in span with alignment for non-heading elements
+                html = `<span style="text-align:${align};display:block">${html}</span>`
             }
 
             return html
@@ -279,6 +289,29 @@ export function PreviewScripts() {
 
         const onClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement
+
+            // Notify parent which block was clicked → opens block settings tab
+            const clickedBlock = target.closest('[data-block-index]')
+            if (clickedBlock) {
+                const blockIndex = parseInt(clickedBlock.getAttribute('data-block-index') || '-1', 10)
+                const blockType = clickedBlock.getAttribute('data-block-type')
+                if (blockIndex >= 0) {
+                    const rect = clickedBlock.getBoundingClientRect()
+                    window.parent.postMessage({
+                        type: 'BLOCK_CONTAINER_CLICKED',
+                        blockIndex,
+                        layout: {
+                            top: rect.top, left: rect.left,
+                            width: rect.width, height: rect.height,
+                            blockIndex, blockType,
+                        },
+                    }, parentOrigin)
+                }
+            } else {
+                // Clicked outside any block → deselect
+                window.parent.postMessage({ type: 'PREVIEW_CANVAS_CLICKED' }, parentOrigin)
+            }
+
             let anchor = target.closest('a')
             if (anchor && window !== window.parent) {
                 e.preventDefault()
@@ -390,6 +423,10 @@ export function PreviewScripts() {
 
         const postSelectionState = () => {
             const html = currentEditingEl?.innerHTML || ''
+            const align = currentEditingEl?.style.textAlign ||
+                (currentEditingEl?.classList.contains('text-center') ? 'center' :
+                 currentEditingEl?.classList.contains('text-right') ? 'right' :
+                 currentEditingEl?.classList.contains('text-justify') ? 'justify' : 'left')
             window.parent.postMessage({
                 type: 'SELECTION_STATE',
                 state: {
@@ -397,6 +434,7 @@ export function PreviewScripts() {
                     italic: /<i\b|<em\b/i.test(html),
                     underline: /<u\b/i.test(html),
                     formatBlock: currentEditingEl?.tagName || 'P',
+                    textAlign: align,
                 }
             }, parentOrigin)
         }
@@ -428,17 +466,28 @@ export function PreviewScripts() {
 
                 // ── formatBlock: change element tag only, preserve inline formatting ──
                 const ALLOWED_FORMAT_TAGS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P']
+                const FORMAT_TAG_SIZES: Record<string, string> = {
+                    H1: 'text-4xl md:text-6xl',
+                    H2: 'text-3xl md:text-4xl',
+                    H3: 'text-2xl md:text-3xl',
+                    H4: 'text-xl md:text-2xl',
+                    H5: 'text-lg md:text-xl',
+                    H6: 'text-base md:text-lg',
+                    P: 'text-base',
+                }
+                const SIZE_RE = /\b(md:)?text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)\b/g
                 if (cmd === 'formatBlock' && val && ALLOWED_FORMAT_TAGS.includes(val.toUpperCase())) {
                     const newTag = val.toUpperCase()
                     if (currentEditingEl.tagName !== newTag) {
                         const newEl = document.createElement(newTag)
                         newEl.innerHTML = currentEditingEl.innerHTML
-                        // Only copy safe attributes (class, style) — skip event handlers
-                        const safeAttrs = ['class', 'style']
-                        for (const attr of safeAttrs) {
-                            const v = currentEditingEl.getAttribute(attr)
-                            if (v) newEl.setAttribute(attr, v)
-                        }
+                        // Copy safe attributes + update font-size classes for new heading level
+                        const oldClass = currentEditingEl.getAttribute('class') || ''
+                        const sizeClasses = FORMAT_TAG_SIZES[newTag] || ''
+                        const cleanedClass = oldClass.replace(SIZE_RE, '').replace(/\s+/g, ' ').trim()
+                        newEl.setAttribute('class', `${cleanedClass} ${sizeClasses}`.trim())
+                        const oldStyle = currentEditingEl.getAttribute('style')
+                        if (oldStyle) newEl.setAttribute('style', oldStyle)
                         newEl.setAttribute('contenteditable', 'true')
                         currentEditingEl.replaceWith(newEl)
                         currentEditingEl = newEl
@@ -481,7 +530,17 @@ export function PreviewScripts() {
                     sel?.addRange(range)
                     saveSelection()
 
-                // ── other commands (alignment, etc.): use execCommand ──
+                // ── alignment: set style.textAlign directly ──
+                } else if (['justifyLeft', 'justifyCenter', 'justifyRight', 'justifyFull'].includes(cmd)) {
+                    const alignMap: Record<string, string> = {
+                        justifyLeft: 'left', justifyCenter: 'center',
+                        justifyRight: 'right', justifyFull: 'justify',
+                    }
+                    currentEditingEl.style.textAlign = alignMap[cmd] || ''
+                    // Also remove Tailwind text-align classes that might conflict
+                    currentEditingEl.classList.remove('text-left', 'text-center', 'text-right', 'text-justify')
+
+                // ── other commands: fallback to execCommand ──
                 } else {
                     document.execCommand(cmd, false, val)
                 }
@@ -501,6 +560,16 @@ export function PreviewScripts() {
                 document.querySelectorAll('[data-block-index]').forEach((el) => {
                     ;(el as HTMLElement).style.opacity = ''
                 })
+            }
+            // Live theme update — inject CSS variables without page reload
+            if (e.data?.type === 'THEME_UPDATE' && e.data.css) {
+                let themeStyle = document.getElementById('live-theme-override')
+                if (!themeStyle) {
+                    themeStyle = document.createElement('style')
+                    themeStyle.id = 'live-theme-override'
+                    document.head.appendChild(themeStyle)
+                }
+                themeStyle.textContent = e.data.css
             }
         }
 

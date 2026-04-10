@@ -84,8 +84,8 @@ export function CenteredHero({ block }: BlockProps<HeroConfig>) {
                             className="mt-16 relative max-w-4xl mx-auto group"
                         >
                             <img
-                                src={image.url}
-                                alt={image.alt || headline}
+                                src={image?.url}
+                                alt={image?.alt || headline}
                                 className="w-full rounded-2xl object-cover"
                             />
                             {/* Gradient overlay for polish */}

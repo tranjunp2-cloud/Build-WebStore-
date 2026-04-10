@@ -5,6 +5,7 @@ import type { BlockProps } from '../types'
 import type { CountdownTimerConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 function calcTimeLeft(target: string) {
     const diff = new Date(target).getTime() - Date.now()
@@ -64,7 +65,7 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
         return (
             <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6 text-center">
-                    <h2 className="text-2xl md:text-3xl font-bold font-heading mb-4">{headline}</h2>
+                    <RichText text={headline} as="h2" className="text-2xl md:text-3xl font-bold font-heading mb-4" />
                     {!timeLeft ? (
                         <p className="text-lg opacity-60">{expiredMessage}</p>
                     ) : (
@@ -91,7 +92,7 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
                         className="rounded-2xl p-8 md:p-12 text-center max-w-lg w-full"
                         style={{ background: `rgba(var(--brand-primary-rgb), 0.031)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
                     >
-                        <h2 className="text-2xl md:text-4xl font-bold font-heading mb-8">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-2xl md:text-4xl font-bold font-heading mb-8" />
                         {!timeLeft ? (
                             <p className="text-lg opacity-60">{expiredMessage}</p>
                         ) : (
@@ -118,7 +119,7 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
                         border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`,
                     }}
                 >
-                    <h2 className="text-3xl md:text-5xl font-bold font-heading mb-10">{headline}</h2>
+                    <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading mb-10" />
                     {!timeLeft ? (
                         <p className="text-xl opacity-60">{expiredMessage}</p>
                     ) : (
