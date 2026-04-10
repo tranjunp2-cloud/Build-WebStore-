@@ -70,12 +70,19 @@ export async function PATCH(
             depth: 1, // Populate tenant
         })
         
+        let primaryDomain: string | null = null
         if (fullSite.tenant && typeof fullSite.tenant === 'object') {
-            tenantSlug = ((fullSite.tenant as Record<string, unknown>).slug as string) || 'site'
+            const tenant = fullSite.tenant as Record<string, unknown>
+            tenantSlug = (tenant.slug as string) || 'site'
+            const domains = Array.isArray(tenant.customDomains) ? tenant.customDomains : []
+            const primary = domains.find(
+                (d: Record<string, unknown>) => d.isPrimary === true && d.status === 'active'
+            )
+            primaryDomain = (primary as Record<string, unknown>)?.domain as string || null
         }
 
         const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
-        const domainUrl = `${tenantSlug}.${platformDomain}`
+        const domainUrl = primaryDomain || `${tenantSlug}.${platformDomain}`
 
         return NextResponse.json({
             success: true,

@@ -18,6 +18,7 @@ interface BuilderCompletionViewProps {
     previewMode: BuilderPreviewMode
     onPreviewModeChange: (mode: BuilderPreviewMode) => void
     isPublishing?: boolean
+    isNavigating?: boolean
 }
 
 function getBlockDisplayLabel(block: {
@@ -94,7 +95,7 @@ function CompletionStatusCard({
     generationTimeLabel: string
 }) {
     return (
-        <div className="relative h-[174px] w-full max-w-[448px] rounded-bl-2xl rounded-br-2xl rounded-tl-lg rounded-tr-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[21px] pb-px pt-[17px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
+        <div className="relative h-auto min-h-[174px] w-full max-w-[448px] rounded-bl-2xl rounded-br-2xl rounded-tl-lg rounded-tr-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[21px] pb-4 pt-[17px] shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
             <div className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0px_1px_0px_0px_rgba(255,255,255,0.05)]" />
             <div className="relative flex flex-col items-start gap-4">
                 <p className="text-sm font-medium leading-5 text-[#f8fafc]">
@@ -194,6 +195,7 @@ export default function BuilderCompletionView({
     previewMode,
     onPreviewModeChange,
     isPublishing = false,
+    isNavigating = false,
 }: BuilderCompletionViewProps) {
     const movableBlocks = blocks.filter(
         (block) => block._id && block.blockType !== 'navigation' && block.blockType !== 'footer',
@@ -295,9 +297,9 @@ export default function BuilderCompletionView({
     const leftFooter = (
         <div className="flex flex-col gap-3">
             <CompletionPrimaryButton
-                icon={<LayoutDashboard className="size-4" />}
-                disabled={isPublishing}
-                label="Dashboard"
+                icon={isNavigating ? <Loader2 className="size-4 animate-spin" /> : <LayoutDashboard className="size-4" />}
+                disabled={isPublishing || isNavigating}
+                label={isNavigating ? 'Loading...' : 'Dashboard'}
                 onClick={onDashboard}
             />
             <CompletionPrimaryButton

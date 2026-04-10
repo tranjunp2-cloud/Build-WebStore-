@@ -53,6 +53,7 @@ type SiteData = {
     }
     publishedAt?: string | null
     tenantSlug?: string | null
+    primaryDomain?: string | null
 }
 
 type LoadedPageData = {
@@ -133,11 +134,14 @@ export default function EditorPage() {
     const isPublished = site?.status === 'published'
     const wasPublished = !isPublished && !!site?.publishedAt
     const siteUrl = useMemo(() => {
+        if (site?.primaryDomain) {
+            return `https://${site.primaryDomain}`
+        }
         const slug = site?.tenantSlug
         if (!slug) return null
         const domain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
         return `https://${slug}.${domain}`
-    }, [site?.tenantSlug])
+    }, [site?.primaryDomain, site?.tenantSlug])
 
     const lastSavedLabel = useMemo(() => {
         if (!lastSavedAt) return null
@@ -434,16 +438,17 @@ export default function EditorPage() {
         void handleSave({ showToast: false, refreshPreview: true })
     }, [updateBlock, handleSave])
 
-    const handleReorderBlocks = useCallback((fromIndex: number, toIndex: number) => {
+    const handleReorderBlocks = useCallback(async (fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex) return
         reorderBlocks(fromIndex, toIndex)
         setSelectedBlock(toIndex)
-        setIframeKey(key => key + 1)
+        // Save FIRST so iframe reloads with correct order from DB
+        await handleSave({ showToast: false, refreshPreview: true })
         setChatActivity({
             id: `reorder-${Date.now()}`,
             content: `Moved block #${fromIndex + 1} to position #${toIndex + 1}`,
         })
-    }, [reorderBlocks])
+    }, [reorderBlocks, handleSave])
 
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
         const nextBlock = normalizeAddSectionBlock(

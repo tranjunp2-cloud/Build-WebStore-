@@ -110,6 +110,29 @@ export async function middleware(req: NextRequest) {
             return NextResponse.rewrite(new URL('/not-found', req.url))
         }
         const tenantSlug = hostname.replace(`.${PLATFORM_DOMAIN}`, '')
+
+        // F23: Check if this is an old slug that needs 301 redirect
+        try {
+            const internalOrigin = req.nextUrl.origin
+            const checkUrl = `${internalOrigin}/api/slug/redirect?slug=${encodeURIComponent(tenantSlug)}`
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 2000)
+            try {
+                const checkRes = await fetch(checkUrl, { cache: 'no-store', signal: controller.signal })
+                if (checkRes.ok) {
+                    const { redirect, newSlug } = await checkRes.json()
+                    if (redirect && newSlug && newSlug !== tenantSlug) {
+                        const redirectUrl = `https://${newSlug}.${PLATFORM_DOMAIN}${pathname}`
+                        return NextResponse.redirect(redirectUrl, { status: 301 })
+                    }
+                }
+            } finally {
+                clearTimeout(timeout)
+            }
+        } catch {
+            // Timeout or fetch fail → serve normally, don't block traffic
+        }
+
         url.pathname = `/sites/${tenantSlug}${pathname}`
         const response = NextResponse.rewrite(url)
         response.headers.set('x-tenant-slug', tenantSlug)
@@ -133,18 +156,24 @@ export async function middleware(req: NextRequest) {
     if (!isDoInternalHost) {
         // REQ-F19-06: 301 redirect non-primary custom domains → primary domain
         try {
-            const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || `https://${PLATFORM_DOMAIN}`
-            const checkUrl = `${serverUrl}/api/domain-primary?host=${encodeURIComponent(hostname)}`
-            const checkRes = await fetch(checkUrl, { cache: 'no-store' })
-            if (checkRes.ok) {
-                const { primaryDomain, isPrimary } = await checkRes.json()
-                if (!isPrimary && primaryDomain && primaryDomain !== hostname) {
-                    const redirectUrl = `https://${primaryDomain}${pathname}`
-                    return NextResponse.redirect(redirectUrl, { status: 301 })
+            const internalOrigin = req.nextUrl.origin
+            const checkUrl = `${internalOrigin}/api/domain-primary?host=${encodeURIComponent(hostname)}`
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 2000)
+            try {
+                const checkRes = await fetch(checkUrl, { cache: 'no-store', signal: controller.signal })
+                if (checkRes.ok) {
+                    const { primaryDomain, isPrimary } = await checkRes.json()
+                    if (!isPrimary && primaryDomain && primaryDomain !== hostname) {
+                        const redirectUrl = `https://${primaryDomain}${pathname}`
+                        return NextResponse.redirect(redirectUrl, { status: 301 })
+                    }
                 }
+            } finally {
+                clearTimeout(timeout)
             }
         } catch {
-            // If check fails, serve normally — don't block traffic
+            // Timeout or fetch fail → serve normally, don't block traffic
         }
 
         url.pathname = `/sites/custom${pathname}`

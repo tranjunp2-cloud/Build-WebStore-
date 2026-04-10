@@ -82,6 +82,7 @@ interface SettingsPanelProps {
         name: string
         status: string
         domain?: string | null
+        primaryDomain?: string | null
         branding?: {
             logo?: string
             favicon?: string
@@ -402,7 +403,7 @@ function SettingsPanelInner({
     const isHomepage = activePage?.isHomepage || activePage?.slug === 'home' || activePage?.slug === '/' || activePage?.slug === ''
     const normalizedPreviewPath = isHomepage ? '' : seoSlugValue.replace(/^\//, '')
     const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
-    const previewDomain = (site?.domain || `${(siteName || site?.name || 'site').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}.${platformDomain}`).replace(/^https?:\/\//, '')
+    const previewDomain = (site?.primaryDomain || site?.domain || `${(siteName || site?.name || 'site').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}.${platformDomain}`).replace(/^https?:\/\//, '')
     const metaTitleWarning = seoTitleValue.length > 60 ? 'Title may be truncated on Google Search.' : null
     const metaDescriptionWarning = seoDescriptionValue.length > 160 ? 'Description may be truncated on Google Search.' : null
 

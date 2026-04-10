@@ -12,7 +12,7 @@ const subscribeSchema = z.object({
 export async function POST(req: NextRequest) {
     // Rate limit: 5 requests per minute per IP
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-    const rateCheck = checkRateLimit(`subscribe:${ip}`, 5, 60000)
+    const rateCheck = await checkRateLimit(`subscribe:${ip}`, 5, 60000)
     if (!rateCheck.allowed) {
         return NextResponse.json(
             { error: 'Too many requests. Please try again later.' },

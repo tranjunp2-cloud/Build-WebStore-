@@ -58,8 +58,8 @@ async function injectUser(req: any) {
 export const Users: CollectionConfig = {
     slug: 'users',
     auth: {
-        maxLoginAttempts: 50, // Restore to 50 so Payload doesn't drop columns
-        lockTime: 10 * 60 * 1000,
+        maxLoginAttempts: 5,
+        lockTime: 15 * 60 * 1000, // 15 minutes
         forgotPassword: {
             generateEmailHTML: (args) => {
                 const token = args?.token || ''

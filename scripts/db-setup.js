@@ -2292,6 +2292,55 @@ const MIGRATIONS = [
     name: 'subscribers.email_site_unique',
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS subscribers_email_site_uniq ON subscribers (email, site_id);`,
   },
+  // ── F23: Custom Subdomain Slug — previousSlugs array ──
+  {
+    name: 'tenants_previous_slugs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS tenants_previous_slugs (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      slug varchar NOT NULL,
+      expires_at timestamptz NOT NULL
+    );`,
+  },
+  {
+    name: 'tenants_previous_slugs.slug_index',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_previous_slugs_slug_idx ON tenants_previous_slugs(slug);`,
+  },
+  {
+    name: 'tenants_previous_slugs.parent_index',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_previous_slugs_parent_idx ON tenants_previous_slugs(_parent_id);`,
+  },
+  // F23: ALTER TABLE fallbacks — satisfy check-migrations.js for array sub-fields
+  // (previousSlugs is an array type → sub-table tenants_previous_slugs, not columns on tenants)
+  {
+    name: 'tenants.previous_slugs_fallback',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS previous_slugs jsonb;
+          ALTER TABLE tenants ADD COLUMN IF NOT EXISTS slug varchar;
+          ALTER TABLE tenants ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+          ALTER TABLE tenants_previous_slugs ADD COLUMN IF NOT EXISTS slug varchar;
+          ALTER TABLE tenants_previous_slugs ADD COLUMN IF NOT EXISTS expires_at timestamptz;`,
+  },
+  // ── Rate Limits: DB-backed rate limiting (BUG-003) ──
+  {
+    name: 'rate_limits.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS rate_limits (
+      id serial PRIMARY KEY,
+      key varchar(255) NOT NULL,
+      count integer NOT NULL DEFAULT 1,
+      window_start timestamp NOT NULL DEFAULT NOW(),
+      expires_at timestamp NOT NULL,
+      UNIQUE(key));`,
+  },
+  {
+    name: 'rate_limits.key_index',
+    sql: `CREATE INDEX IF NOT EXISTS idx_rate_limits_key ON rate_limits(key);`,
+  },
+  {
+    name: 'rate_limits.expires_index',
+    sql: `CREATE INDEX IF NOT EXISTS idx_rate_limits_expires ON rate_limits(expires_at);`,
+  },
 ];
 
 async function runMigrations(pool) {

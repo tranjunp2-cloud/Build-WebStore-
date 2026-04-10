@@ -125,6 +125,17 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 tenantSlug: (typeof site.tenant === 'object' && site.tenant !== null)
                     ? (site.tenant as Record<string, unknown>).slug as string || null
                     : null,
+                primaryDomain: (() => {
+                    if (typeof site.tenant === 'object' && site.tenant !== null) {
+                        const tenant = site.tenant as Record<string, unknown>
+                        const domains = Array.isArray(tenant.customDomains) ? tenant.customDomains : []
+                        const primary = domains.find(
+                            (d: Record<string, unknown>) => d.isPrimary === true && d.status === 'active'
+                        )
+                        return (primary as Record<string, unknown>)?.domain as string || null
+                    }
+                    return null
+                })(),
             },
             page: page ? {
                 id: page.id,
