@@ -74,14 +74,34 @@ export const DELETE = withAuth<RouteContext>(async (user, _req, ctx) => {
             )
         }
 
-        // Soft delete: set status to 'deleted'
+        // Cascade: unset category from all posts referencing this category (TC-F17-05-06)
+        const affected = await payload.find({
+            collection: 'blogs',
+            where: { category: { equals: id } },
+            limit: 0,
+            depth: 0,
+        })
+
+        if (affected.docs.length > 0) {
+            await Promise.all(
+                affected.docs.map(blog =>
+                    payload.update({
+                        collection: 'blogs',
+                        id: blog.id,
+                        data: { category: null },
+                    })
+                )
+            )
+        }
+
+        // Soft delete category
         await payload.update({
             collection: 'blog_categories',
             id,
             data: { status: 'deleted' },
         })
 
-        return NextResponse.json({ success: true, data: { deleted: id } })
+        return NextResponse.json({ success: true, data: { deleted: id, affectedPosts: affected.docs.length } })
     } catch (error: any) {
         if (error?.message?.includes('not found') || error?.status === 404) {
             return NextResponse.json(

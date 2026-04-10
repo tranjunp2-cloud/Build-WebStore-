@@ -7,8 +7,9 @@ vi.mock('@/lib/auth', () => ({
 
 const mockFindByID = vi.fn()
 const mockUpdate = vi.fn()
+const mockDelete = vi.fn()
 vi.mock('payload', () => ({
-    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, update: mockUpdate })),
+    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, update: mockUpdate, delete: mockDelete })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
@@ -66,14 +67,14 @@ describe('PATCH /api/blogs/[id] [TC-F17]', () => {
 describe('DELETE /api/blogs/[id] [TC-F17]', () => {
     beforeEach(() => vi.clearAllMocks())
 
-    it('soft-deletes blog post', async () => {
+    it('hard-deletes blog post (AC F17-04 AC-3)', async () => {
         mockFindByID.mockResolvedValue({ id: 'blog-1', tenant: 'tenant-1' })
-        mockUpdate.mockResolvedValue({})
+        mockDelete.mockResolvedValue({})
         const res = await DELETE(new Request('http://localhost'), ctx as any)
         const body = await res.json()
         expect(res.status).toBe(200)
         expect(body.data.deleted).toBe('blog-1')
-        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'deleted' } }))
+        expect(mockDelete).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blogs', id: 'blog-1' }))
     })
 
     it('returns 403 for wrong tenant', async () => {

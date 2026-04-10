@@ -1043,6 +1043,12 @@
                 "deleteFailed": "Gagal mamadamkan kiriman blog",
                 "bulkDeleteSuccess": "{count} kiriman berjaya dipadamkan",
                 "bulkDeleteFailed": "Beberapa kiriman gagal dipadamkan",
+                "bulkDeleteConfirm": "Adakah anda pasti mahu memadamkan {count} kiriman?",
+                "bulkDeleteWarning": "Tindakan ini tidak dapat dibuat asal.",
+                "deletePublishedWarning": "Amaran: Kiriman ini sedang diterbitkan dan boleh dilihat oleh pelanggan anda. Memadamkannya akan segera mengalihkannya daripada etalase anda.",
+                "cancel": "Batal",
+                "deleting": "Memadamkan...",
+                "bulkPublish": "Terbitkan",
                 "bulkPublishSuccess": "{count} kiriman berjaya diterbitkan",
                 "bulkPublishFailed": "Beberapa kiriman gagal diterbitkan",
                 "statusUpdated": "Kiriman {status}",
@@ -1112,7 +1118,12 @@
                 "aiGeneratedContent": "Kandungan Dijana",
                 "slugLabel": "Slug:",
                 "aiRegenerate": "Jana Semula",
-                "aiInsertBtn": "Masukkan ke Penyunting"
+                "aiInsertBtn": "Masukkan ke Penyunting",
+                "fileTooLarge": "Fail melebihi had 10MB",
+                "invalidFileType": "Hanya fail JPEG dan PNG diterima",
+                "draftRecoveryMessage": "Draf yang belum disimpan ditemui. Pulihkan?",
+                "draftRestore": "Pulihkan",
+                "draftDismiss": "Abaikan"
             },
             "categoryModal": {
                 "title": "Urus Kategori",
@@ -1141,7 +1152,8 @@
                 "previous": "Sebelumnya",
                 "next": "Seterusnya"
             },
-            "noMatches": "Tiada kiriman yang sepadan dengan penapis anda"
+            "noMatches": "Tiada kiriman yang sepadan dengan penapis anda",
+            "resetFilters": "Set Semula Penapis"
         }
     },
     "auth": {

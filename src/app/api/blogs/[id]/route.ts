@@ -101,7 +101,8 @@ export const PATCH = withAuth<RouteContext>(async (user, req, ctx) => {
 })
 
 /**
- * DELETE /api/blogs/[id] — Soft delete a blog post
+ * DELETE /api/blogs/[id] — Hard delete a blog post (AC F17-04 AC-3: "permanently removed")
+ * NOTE: PM may prefer soft delete for safety — revisit if needed
  */
 export const DELETE = withAuth<RouteContext>(async (user, _req, ctx) => {
     try {
@@ -121,11 +122,10 @@ export const DELETE = withAuth<RouteContext>(async (user, _req, ctx) => {
             )
         }
 
-        // Soft delete: set status to 'deleted' instead of removing
-        await payload.update({
+        // Hard delete per AC F17-04 AC-3: "the post is permanently removed from the system"
+        await payload.delete({
             collection: 'blogs',
             id,
-            data: { status: 'deleted' },
         })
 
         return NextResponse.json({ success: true, data: { deleted: id } })

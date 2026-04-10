@@ -26,7 +26,7 @@ import {
     ChevronDown,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { getBlogCategoriesAction, listBlogsAction, deleteBlogAction, updateBlogStatusAction } from './actions'
+import { getBlogCategoriesAction, listBlogsAction, deleteBlogAction, bulkDeleteBlogsAction, updateBlogStatusAction } from './actions'
 
 type BlogPost = {
     id: string
@@ -130,6 +130,7 @@ export default function BlogListPage() {
     // Delete confirmation modal state
     const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string; status: string } | null>(null)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
 
     const openDeleteConfirm = (post: BlogPost) => {
         setDeleteTarget({ id: post.id, title: post.title, status: post.status })
@@ -170,9 +171,7 @@ export default function BlogListPage() {
         if (selectedIds.size === 0) return
         setBulkActionLoading(true)
         try {
-            await Promise.all(
-                Array.from(selectedIds).map((id) => deleteBlogAction(id))
-            )
+            await bulkDeleteBlogsAction(Array.from(selectedIds))
             toast.success(t.dashboard.blog.actions.bulkDeleteSuccess.replace('{count}', selectedIds.size.toString()))
             setSelectedIds(new Set())
             fetchPosts()
@@ -394,9 +393,17 @@ export default function BlogListPage() {
             </div>
 
             {selectedIds.size > 0 && (
-                <div className="flex items-center mt-[24px] -mb-[8px] w-full">
+                <div className="flex items-center gap-[12px] mt-[24px] -mb-[8px] w-full">
                     <button
-                        onClick={handleBulkDelete}
+                        onClick={handleBulkPublish}
+                        disabled={bulkActionLoading}
+                        className="flex items-center gap-[8px] rounded-[10px] px-[16px] py-[10px] bg-[#2DD4BF] text-white font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] hover:opacity-90 transition-opacity disabled:opacity-50 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)]"
+                    >
+                        <Eye className="w-[16px] h-[16px]" />
+                        <span>{t.dashboard.blog.actions.bulkPublish || 'Publish'}</span>
+                    </button>
+                    <button
+                        onClick={() => setShowBulkDeleteModal(true)}
                         disabled={bulkActionLoading}
                         className="flex items-center gap-[8px] rounded-[10px] px-[16px] py-[10px] bg-[#FF6B6B] text-white font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] hover:opacity-90 transition-opacity disabled:opacity-50 shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)]"
                     >
@@ -444,6 +451,15 @@ export default function BlogListPage() {
                                     <span className="font-['Inter'] text-[16px] font-[400] leading-[1.5em] text-[rgba(248,250,252,0.6)]">
                                         {t.dashboard.blog.noMatches}
                                     </span>
+                                    {(search || statusFilter || categoryFilter) && (
+                                        <button
+                                            onClick={() => { setSearch(''); setStatusFilter(''); setCategoryFilter(''); }}
+                                            className="flex items-center gap-[6px] px-[16px] py-[8px] rounded-[10px] border border-[rgba(248,250,252,0.15)] text-[rgba(248,250,252,0.6)] hover:text-white hover:border-[rgba(248,250,252,0.3)] transition-colors font-['Inter'] text-[14px] font-[500]"
+                                        >
+                                            <X className="w-[14px] h-[14px]" />
+                                            <span>{t.dashboard.blog.resetFilters || 'Reset Filters'}</span>
+                                        </button>
+                                    )}
                                 </div>
                             ) : posts.map((post, index) => (
                                 <div
@@ -506,7 +522,7 @@ export default function BlogListPage() {
                                     </div>
 
                                     <div className="w-[124.83px] h-[80.5px] pl-[24px] flex flex-row gap-[8px] items-center shrink-0" onClick={(e) => e.stopPropagation()}>
-                                        <button onClick={() => router.push(`/blog/edit/${post.id}`)} className="rounded-[8px] p-[6px] text-[rgba(248,250,252,0.6)] hover:bg-[rgba(255,255,255,0.05)] hover:text-white transition-all w-[32px] h-[32px] flex items-center justify-center" title={t.dashboard.blog.actions.edit}>
+                                        <button onClick={() => router.push(`/blog/${post.id}`)} className="rounded-[8px] p-[6px] text-[rgba(248,250,252,0.6)] hover:bg-[rgba(255,255,255,0.05)] hover:text-white transition-all w-[32px] h-[32px] flex items-center justify-center" title={t.dashboard.blog.actions.edit}>
                                             <SquarePen className="h-[16px] w-[16px]" strokeWidth={1.33} />
                                         </button>
                                         <button onClick={() => openDeleteConfirm(post)} className="rounded-[8px] p-[6px] text-[rgba(248,250,252,0.6)] hover:bg-[rgba(239,68,68,0.1)] hover:text-red-400 transition-all w-[32px] h-[32px] flex items-center justify-center" title={t.dashboard.blog.actions.delete}>
@@ -632,7 +648,7 @@ export default function BlogListPage() {
                                             <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#05DF72]">{t.dashboard.blog.actions.view}</span>
                                         </button>
                                         <button
-                                            onClick={() => router.push(`/blog/edit/${post.id}`)}
+                                            onClick={() => router.push(`/blog/${post.id}`)}
                                             className="flex flex-row justify-center items-center bg-[rgba(59,130,246,0.1)] rounded-[12px] hover:opacity-80 transition-opacity"
                                             style={{ width: '86px', height: '36px' }}
                                         >
@@ -672,7 +688,7 @@ export default function BlogListPage() {
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                                     <AlertTriangle className="w-5 h-5 text-red-400" />
-                                    Delete Post
+                                    {t.dashboard.blog.actions.deleteConfirmTitle}
                                 </h3>
                                 <button
                                     onClick={() => setDeleteTarget(null)}
@@ -683,19 +699,17 @@ export default function BlogListPage() {
                             </div>
 
                             <p className="text-sm text-gray-400 mb-2">
-                                Are you sure you want to delete{' '}
-                                <span className="text-white font-medium">&quot;{deleteTarget.title}&quot;</span>?
+                                {(t.dashboard.blog.actions.bulkDeleteConfirm || 'Are you sure you want to delete {count} posts?').replace('{count}', '1')}
                             </p>
                             <p className="text-xs text-gray-600 mb-4">
-                                This action cannot be undone.
+                                {t.dashboard.blog.actions.bulkDeleteWarning}
                             </p>
 
                             {deleteTarget.status === 'published' && (
                                 <div className="mb-5 flex items-start gap-2 rounded-lg border border-yellow-500/20 bg-yellow-500/5 px-4 py-3">
                                     <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
                                     <p className="text-xs text-yellow-400">
-                                        <strong>Warning:</strong> This post is currently published and visible to your customers.
-                                        Deleting it will immediately remove it from your storefront.
+                                        {t.dashboard.blog.actions.deletePublishedWarning || 'Warning: This post is currently published and visible to your customers. Deleting it will immediately remove it from your storefront.'}
                                     </p>
                                 </div>
                             )}
@@ -705,7 +719,7 @@ export default function BlogListPage() {
                                     onClick={() => setDeleteTarget(null)}
                                     className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
                                 >
-                                    Cancel
+                                    {t.dashboard.blog.actions.cancel || 'Cancel'}
                                 </button>
                                 <button
                                     onClick={handleConfirmDelete}
@@ -713,9 +727,62 @@ export default function BlogListPage() {
                                     className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {isDeleting ? (
+                                        <><Loader2 className="w-4 h-4 animate-spin" /> {t.dashboard.blog.actions.deleting || 'Deleting...'}</>
+                                    ) : (
+                                        <><Trash2 className="w-4 h-4" /> {t.dashboard.blog.actions.delete}</>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body
+                )
+            }
+
+            {/* Bulk Delete Confirmation Modal — TC-F17-01-12 */}
+            {
+                showBulkDeleteModal && typeof document !== 'undefined' && createPortal(
+                    <div className="fixed inset-0 w-screen h-screen z-[999] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-200">
+                        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1120] p-6 shadow-2xl">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                    <AlertTriangle className="w-5 h-5 text-red-400" />
+                                    {t.dashboard.blog.actions.delete}
+                                </h3>
+                                <button
+                                    onClick={() => setShowBulkDeleteModal(false)}
+                                    className="text-gray-400 hover:text-white transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <p className="text-sm text-gray-400 mb-2">
+                                {(t.dashboard.blog.actions.bulkDeleteConfirm || 'Bạn có chắc muốn xóa {count} bài viết?').replace('{count}', selectedIds.size.toString())}
+                            </p>
+                            <p className="text-xs text-gray-600 mb-4">
+                                {t.dashboard.blog.actions.bulkDeleteWarning || 'Hành động này không thể hoàn tác.'}
+                            </p>
+
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={() => setShowBulkDeleteModal(false)}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                                >
+                                    {t.dashboard.blog.actions.cancel || 'Hủy'}
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        await handleBulkDelete()
+                                        setShowBulkDeleteModal(false)
+                                    }}
+                                    disabled={bulkActionLoading}
+                                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {bulkActionLoading ? (
                                         <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
                                     ) : (
-                                        <><Trash2 className="w-4 h-4" /> Delete Post</>
+                                        <><Trash2 className="w-4 h-4" /> {t.dashboard.blog.actions.delete}</>
                                     )}
                                 </button>
                             </div>

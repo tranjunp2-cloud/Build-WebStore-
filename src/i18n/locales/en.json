@@ -1043,6 +1043,12 @@
                 "deleteFailed": "Failed to delete blog post",
                 "bulkDeleteSuccess": "{count} posts deleted successfully",
                 "bulkDeleteFailed": "Some posts failed to delete",
+                "bulkDeleteConfirm": "Are you sure you want to delete {count} posts?",
+                "bulkDeleteWarning": "This action cannot be undone.",
+                "deletePublishedWarning": "Warning: This post is currently published and visible to your customers. Deleting it will immediately remove it from your storefront.",
+                "cancel": "Cancel",
+                "deleting": "Deleting...",
+                "bulkPublish": "Publish",
                 "bulkPublishSuccess": "{count} posts published successfully",
                 "bulkPublishFailed": "Some posts failed to publish",
                 "statusUpdated": "Post {status}",
@@ -1112,7 +1118,12 @@
                 "aiGeneratedContent": "Generated Content",
                 "slugLabel": "Slug:",
                 "aiRegenerate": "Regenerate",
-                "aiInsertBtn": "Insert into Editor"
+                "aiInsertBtn": "Insert into Editor",
+                "fileTooLarge": "File exceeds 10MB limit",
+                "invalidFileType": "Only JPEG and PNG files are accepted",
+                "draftRecoveryMessage": "Unsaved draft found. Restore it?",
+                "draftRestore": "Restore",
+                "draftDismiss": "Dismiss"
             },
             "categoryModal": {
                 "title": "Manage Category",
@@ -1141,7 +1152,8 @@
                 "previous": "Previous",
                 "next": "Next"
             },
-            "noMatches": "No posts match your filters"
+            "noMatches": "No posts match your filters",
+            "resetFilters": "Reset Filters"
         }
     },
     "auth": {
