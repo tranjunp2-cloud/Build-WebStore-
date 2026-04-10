@@ -1,8 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useI18n } from '@/i18n'
-import { FileText, ShoppingBag, PenTool, Globe } from 'lucide-react'
 
 export type PerformingItem = {
     id: string
@@ -15,67 +13,88 @@ type Props = {
     pages: PerformingItem[]
     products: PerformingItem[]
     blogs: PerformingItem[]
-    referrers: PerformingItem[]
+    referrers?: PerformingItem[]
 }
 
-export function TopPerformingList({ pages, products, blogs, referrers }: Props) {
-    const { t } = useI18n()
-    const [activeTab, setActiveTab] = useState<'pages' | 'products' | 'blogs' | 'referrers'>('pages')
+export function TopPerformingList({ pages, products, blogs }: Props) {
+    const [activeTab, setActiveTab] = useState<'pages' | 'products' | 'blogs'>('pages')
 
     const TABS = [
-        { id: 'pages', label: t.dashboard.analytics.topPages, icon: FileText, data: pages },
-        { id: 'products', label: t.dashboard.analytics.topProducts, icon: ShoppingBag, data: products },
-        { id: 'blogs', label: t.dashboard.analytics.topBlogs, icon: PenTool, data: blogs },
-        { id: 'referrers', label: t.dashboard.analytics.topReferrers, icon: Globe, data: referrers },
+        { id: 'pages', icon: '📄', prefix: 'Top', name: 'Pages', data: pages },
+        { id: 'products', icon: '📦', prefix: 'Top', name: 'Products', data: products },
+        { id: 'blogs', icon: '📝', prefix: 'Top', name: 'Blogs', data: blogs },
     ] as const
 
     const activeData = TABS.find(t => t.id === activeTab)?.data || []
+    
+    // Calculate total for percentage
+    const totalValue = activeData.reduce((acc, curr) => acc + curr.value, 0)
+
+    const getRankClass = (index: number) => {
+        switch(index) {
+            case 0: return 'bg-amber-500/15 text-amber-500' // r1
+            case 1: return 'bg-blue-500/15 text-blue-500' // r2
+            case 2: return 'bg-emerald-500/15 text-emerald-500' // r3
+            default: return 'bg-[#1F2937] text-slate-400' // r4, r5
+        }
+    }
 
     return (
-        <div className="flex flex-col h-[400px] rounded-xl border border-white/10 bg-[#1E293B] shadow-sm">
+        <div className="bg-[#161E2E] border border-[#1F2937] rounded-xl p-6 shadow-sm">
             {/* Tabs */}
-            <div className="flex border-b border-white/10 p-2">
+            <div className="flex w-full gap-2 mb-6 sm:mb-4">
                 {TABS.map((tab) => {
-                    const Icon = tab.icon
                     const isActive = activeTab === tab.id
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as 'pages' | 'products' | 'blogs' | 'referrers')}
-                            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                            onClick={() => setActiveTab(tab.id as 'pages' | 'products' | 'blogs')}
+                            className={`flex flex-col sm:flex-row items-start sm:items-center justify-start sm:justify-center gap-[2px] sm:gap-1.5 p-3 px-3 sm:px-3.5 sm:py-1.5 flex-1 w-full sm:w-auto sm:flex-none rounded-[20px] sm:rounded-full transition-all border border-solid text-left ${
+                                isActive 
+                                    ? 'bg-[#3B82F6] text-white border-[#3B82F6]' 
+                                    : 'bg-transparent text-[#9CA3AF] border-[#1F2937] hover:border-[#3B82F6] hover:text-[#3B82F6]'
+                            }`}
                         >
-                            <Icon className="h-4 w-4" />
-                            <span className="hidden sm:inline">{tab.label}</span>
+                            <div className="flex items-center gap-1 font-semibold text-[13px] sm:text-xs">
+                                <span>{tab.icon}</span>
+                                <span>{tab.prefix}</span>
+                            </div>
+                            <span className="font-semibold text-[13px] sm:text-xs leading-[1.2] truncate w-full">{tab.name}</span>
                         </button>
                     )
                 })}
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex flex-col">
                 {activeData.length === 0 ? (
-                    <div className="flex h-full items-center justify-center text-sm text-gray-500">
-                        {t.dashboard.analytics.empty.description}
+                    <div className="py-8 text-center text-sm text-gray-500 italic">
+                        No data available for this period.
                     </div>
                 ) : (
-                    <div className="space-y-2">
-                        {activeData.map((item, index) => (
-                            <div key={item.id || index} className="flex items-center justify-between rounded-lg p-3 hover:bg-white/5 transition-colors">
-                                <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0F172A] text-xs font-bold text-gray-400">
-                                        {index + 1}
-                                    </div>
-                                    <div className="flex flex-col truncate">
-                                        <span className="truncate font-medium text-white">{item.name}</span>
-                                        {item.url && <span className="truncate text-xs text-gray-500">{item.url}</span>}
-                                    </div>
+                    activeData.map((item, index) => {
+                        const percentage = totalValue > 0 ? Math.round((item.value / totalValue) * 100) : 0
+                        
+                        return (
+                            <div 
+                                key={item.id || index} 
+                                className="flex items-center py-2.5 border-b border-[#1F2937] last:border-0"
+                            >
+                                <div className={`min-w-[28px] h-[28px] rounded-full flex items-center justify-center text-[12px] font-bold mr-3 ${getRankClass(index)}`}>
+                                    {index + 1}
                                 </div>
-                                <div className="shrink-0 font-semibold text-white">
-                                    {item.value.toLocaleString()}
+                                <div className="flex-1 text-[13px] font-medium text-white truncate pr-4">
+                                    {item.name}
+                                </div>
+                                <div className="text-[13px] font-semibold text-white mr-2 whitespace-nowrap">
+                                    {item.value.toLocaleString()} views
+                                </div>
+                                <div className="text-[12px] text-[#9CA3AF] w-12 text-right">
+                                    ({percentage}%)
                                 </div>
                             </div>
-                        ))}
-                    </div>
+                        )
+                    })
                 )}
             </div>
         </div>

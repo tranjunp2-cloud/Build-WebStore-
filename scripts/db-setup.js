@@ -2292,6 +2292,11 @@ const MIGRATIONS = [
     name: 'subscribers.email_site_unique',
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS subscribers_email_site_uniq ON subscribers (email, site_id);`,
   },
+  // ── Sites: SEO auto meta toggle ──
+  {
+    name: 'sites.seo_auto_meta_enabled',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS seo_auto_meta_enabled boolean DEFAULT true;`,
+  },
   // ── F23: Custom Subdomain Slug — previousSlugs array ──
   {
     name: 'tenants_previous_slugs.create_table',

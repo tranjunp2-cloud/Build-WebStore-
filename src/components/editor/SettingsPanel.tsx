@@ -509,12 +509,27 @@ function SettingsPanelInner({
                                 })
                                 if (res.ok) {
                                 const data = await res.json()
-                                    if (data.title) setSeoTitleInput(data.title)
-                                    if (data.description) setSeoDescriptionInput(data.description)
-                                    if (data.slug && !isHomepage) setSeoSlugInput(data.slug)
-                                    if (data.title) await handleSeoUpdate('seoTitle', data.title)
-                                    if (data.description) await handleSeoUpdate('seoDescription', data.description)
-                                    if (data.slug && !isHomepage) await handleSeoUpdate('slug', data.slug)
+                                    const proposed = data.proposed || data
+                                    const applyChanges = async () => {
+                                        if (proposed.title) setSeoTitleInput(proposed.title)
+                                        if (proposed.description) setSeoDescriptionInput(proposed.description)
+                                        if (proposed.slug && !isHomepage) setSeoSlugInput(proposed.slug)
+                                        if (proposed.title) await handleSeoUpdate('seoTitle', proposed.title)
+                                        if (proposed.description) await handleSeoUpdate('seoDescription', proposed.description)
+                                        if (proposed.slug && !isHomepage) await handleSeoUpdate('slug', proposed.slug)
+                                    }
+                                    // AC-16, BR-06: confirm before overwriting existing meta
+                                    if (data.hasExisting) {
+                                        toast.dismiss(loadingToastId)
+                                        const confirmed = window.confirm(
+                                            `Existing meta will be replaced:\n\nTitle: "${data.existing?.title || '(empty)'}"\n→ "${proposed.title}"\n\nDescription: "${data.existing?.description || '(empty)'}"\n→ "${proposed.description}"\n\nApply changes?`
+                                        )
+                                        if (!confirmed) {
+                                            toast.info('SEO changes cancelled')
+                                            return
+                                        }
+                                    }
+                                    await applyChanges()
                                     toast.success('SEO optimization successfully generated!', { id: loadingToastId })
                                 } else {
                                     toast.error('Failed to generate SEO', { id: loadingToastId })

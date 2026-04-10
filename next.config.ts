@@ -10,7 +10,7 @@ if (typeof globalThis.File === 'undefined') {
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify', 'web-push'],
+  serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify', 'web-push', 'googleapis'],
   eslint: {
     // CI runs lint separately — skip during build to save ~1 min
     ignoreDuringBuilds: true,

@@ -145,21 +145,14 @@ describe('AISmartInsights', () => {
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 
 describe('DashboardGreeting', () => {
-    it('[TC-F03.03] renders user name', () => {
-        render(<DashboardGreeting userName="Ahmad" />)
-        expect(screen.getByText(/Ahmad/)).toBeTruthy()
+    it('[TC-F03.03] renders dashboard title', () => {
+        render(<DashboardGreeting />)
+        expect(screen.getByText(/Welcome to PrimeWeb Dashboard/i)).toBeTruthy()
     })
 
-    it('displays greeting text', () => {
-        render(<DashboardGreeting userName="User" />)
-        expect(screen.getByText(/Hello/)).toBeTruthy()
-    })
-
-    it('displays current date', () => {
-        render(<DashboardGreeting userName="Test" />)
-        // Should contain a date string
-        const dateText = screen.getByText(/\d{4}/)
-        expect(dateText).toBeTruthy()
+    it('displays greeting subtitle', () => {
+        render(<DashboardGreeting />)
+        expect(screen.getByText(/Monitor your store/i)).toBeTruthy()
     })
 })
 
@@ -250,7 +243,7 @@ describe('AnalyticsChart', () => {
             { date: '2026-04-02', views: 150, clicks: 30 },
         ]
         render(<AnalyticsChart data={data} />)
-        expect(screen.getByText('Daily Traffic')).toBeTruthy()
+        expect(screen.getByText(/Daily Traffic/i)).toBeTruthy()
         expect(screen.getByTestId('bar-chart')).toBeTruthy()
     })
 
@@ -306,16 +299,14 @@ import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
 describe('PeriodSelector', () => {
     it('[TC-F03.35] renders with 3 period options', () => {
         render(<PeriodSelector />)
-        const select = screen.getByRole('combobox')
-        expect(select).toBeTruthy()
-        const options = select.querySelectorAll('option')
-        expect(options).toHaveLength(3)
+        const buttons = screen.getAllByRole('button')
+        expect(buttons).toHaveLength(3)
     })
 
     it('defaults to 7d when URL param is 7d', () => {
         render(<PeriodSelector />)
-        const select = screen.getByRole('combobox') as HTMLSelectElement
-        expect(select.value).toBe('7d')
+        const selectedBtn = screen.getByText('Last 7 days')
+        expect(selectedBtn.className).toContain('bg-[#161E2E]')
     })
 
     it('renders all period labels', () => {

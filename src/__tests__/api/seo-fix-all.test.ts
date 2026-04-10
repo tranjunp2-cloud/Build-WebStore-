@@ -53,13 +53,15 @@ describe('POST /api/seo/fix-all [TC-F03.33, TC-F03.34]', () => {
         } as unknown as Request
 
         const res = await POST(req, {} as any)
-        const body = await res.json()
+        const text = await res.text()
+        const dataLines = text.split('\n').filter(line => line.startsWith('data: '))
+        const parsedData = dataLines.map(line => JSON.parse(line.replace('data: ', '')))
 
         // Assert
-        expect(body.success).toBe(true)
-        expect(body.data).toHaveLength(1)
-        expect(body.data[0].proposedTitle).toBe('Generated Title')
-        expect(body.data[0].proposedDescription).toBeDefined()
+        expect(res.status).toBe(200)
+        expect(parsedData).toHaveLength(1)
+        expect(parsedData[0].proposedTitle).toBe('Generated Title')
+        expect(parsedData[0].proposedDescription).toBeDefined()
     })
 
     it('returns 404 when site not found', async () => {
@@ -109,9 +111,11 @@ describe('POST /api/seo/fix-all [TC-F03.33, TC-F03.34]', () => {
         } as unknown as Request
 
         const res = await POST(req, {} as any)
-        const body = await res.json()
+        const text = await res.text()
+        const dataLines = text.split('\n').filter(line => line.startsWith('data: '))
+        const parsedData = dataLines.map(line => JSON.parse(line.replace('data: ', '')))
 
-        expect(body.data[0].proposedTitle).toBeUndefined()
-        expect(body.data[0].proposedDescription).toBeDefined()
+        expect(parsedData[0].proposedTitle).toBeUndefined()
+        expect(parsedData[0].proposedDescription).toBeDefined()
     })
 })
