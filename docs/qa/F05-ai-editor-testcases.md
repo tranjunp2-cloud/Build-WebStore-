@@ -6,9 +6,9 @@
 
 ## 1. Mục Tiêu (Objective)
 
-Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi ro xuyên suốt 13 User Stories.
+Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi ro xuyên suốt 14 User Stories.
 
-**Tổng cộng 145 kịch bản chi tiết** bao phủ: Positive, Negative/Edge cases, UI States, Form Validation, Concurrency, Security.
+**Tổng cộng 155 kịch bản chi tiết** bao phủ: Positive, Negative/Edge cases, UI States, Form Validation, Concurrency, Security, Mobile UX.
 
 ---
 
@@ -251,6 +251,23 @@ Tài liệu đạt quy chuẩn **Comprehensive QA Expert**, Coverage 100% rủi 
 | **TC-F05-13-12** | `US-13/AC2` | `Race` | Spam click "✨ Tự động Tối ưu SEO" | 1. Click nhanh 3–5 lần vào nút AI generate. | - Nút disabled + spinner sau lần click đầu.<br>- Chỉ gọi API 1 lần.<br>- Kết quả điền đúng, không bị ghi đè bởi response chậm. | Blocker | [ ] |
 | **TC-F05-13-13** | `US-13/AC1` | `UI` | Google preview snippet cập nhật realtime | 1. Gõ Meta Title + Description từng ký tự. | - Google preview bên dưới cập nhật realtime (không cần save).<br>- Format: Title (xanh dương), URL (xanh lá), Description (xám). | High | [ ] |
 | **TC-F05-13-14** | `US-13/AC2` | `UI` | Loading state khi AI đang generate | 1. Click "✨ Tự động Tối ưu SEO". | - Nút chuyển sang loading spinner + "Đang tối ưu...".<br>- Input fields disabled.<br>- Sau khi AI trả về: fields điền data, nút enable lại. | High | [ ] |
+
+---
+
+### US-14: Mobile Web UX — Adaptive Editor Interface (10 Cases)
+
+| ID | Ref | Loại | Tiêu Đề | Các Bước Thực Hiện | Kết Quả Mong Đợi | Mức Độ | AUTO |
+|:---|:---|:---|:---|:---|:---|:---:|:---:|
+| **TC-F05-14-01** | `US-14/AC1` | `Env` | Viewport boundary: 767px → fullscreen preview | 1. Mở Editor ở viewport 768px → thu nhỏ xuống 767px. | - Tại 768px: layout 3-panel bình thường.<br>- Tại 767px: split-screen tắt, Preview chiếm 100%.<br>- FAB AI Chat xuất hiện góc phải dưới.<br>- Không vỡ layout ở ranh giới. | Blocker | [ ] |
+| **TC-F05-14-02** | `US-14/AC1` | `Mob` | Landscape orientation trên mobile | 1. Mở Editor trên mobile portrait.<br>2. Xoay ngang sang landscape (667×375). | - Editor vẫn ở mobile mode (short axis < 768px).<br>- Bottom Sheet không tràn.<br>- FAB vẫn hiển thị đúng vị trí. | High | [ ] |
+| **TC-F05-14-03** | `US-14/AC1` | `Env` | iOS Safari — FAB không bị che bởi address bar | 1. Mở Editor trên iPhone Safari.<br>2. Cuộn trang để address bar xuất hiện/ẩn. | - FAB luôn hiển thị trên viewport thực tế.<br>- Bottom Sheet không bị đẩy xuống dưới màn hình.<br>- Dùng `dvh` hoặc JS viewport calculation. | High | [ ] |
+| **TC-F05-14-04** | `US-14/AC1` | `State` | Resize browser desktop → mobile giữa chừng edit | 1. Đang edit text trên desktop (3-panel).<br>2. Thu nhỏ browser xuống < 768px. | - Layout chuyển sang mobile mode mượt mà.<br>- Dữ liệu chưa save không bị mất.<br>- Preview hiển thị đúng nội dung đang edit. | High | [ ] |
+| **TC-F05-14-05** | `US-14/AC2` | `Func` | Tap-to-Add component trên mobile | 1. Mở Component Library trên mobile.<br>2. Tap vào block "Hero". | - Block "Hero" tự động chèn xuống cuối trang.<br>- Màn hình auto-scroll tới block vừa thêm.<br>- Drag-and-drop bị tắt (không có drag handle). | Blocker | [ ] |
+| **TC-F05-14-06** | `US-14/AC2` | `Race` | Rapid tap-to-add nhiều blocks liên tục | 1. Tap nhanh 5 lần liên tiếp vào các blocks trong Library. | - Throttle chặn spam.<br>- Blocks thêm tuần tự, không bị trùng lặp.<br>- Auto-scroll tới block cuối cùng được thêm. | High | [ ] |
+| **TC-F05-14-07** | `US-14/AC3` | `UX` | Bottom Sheet mở khi tap element | 1. Trên mobile, tap vào một text element trên Preview. | - Bottom Sheet vuốt lên từ dưới (không phải floating popup).<br>- Chứa formatting tools + AI commands.<br>- Backdrop mờ phía sau. | Blocker | [ ] |
+| **TC-F05-14-08** | `US-14/AC3` | `State` | Bottom Sheet open → xoay thiết bị | 1. Mở Bottom Sheet bằng cách tap element.<br>2. Xoay device từ portrait sang landscape. | - Bottom Sheet reposition đúng.<br>- Content không tràn.<br>- Input focus được duy trì. | Medium | [ ] |
+| **TC-F05-14-09** | `US-14/AC1` | `Net` | AI Chat qua FAB — lỗi mạng | 1. Mở FAB Chat trên mobile.<br>2. Gửi prompt khi mất kết nối. | - Toast lỗi hiển thị trên FAB.<br>- Nội dung chat input được giữ nguyên.<br>- Nút retry xuất hiện. | High | [ ] |
+| **TC-F05-14-10** | `US-14/AC2` | `Perf` | Tap-to-Add trên page 50+ blocks | 1. Trang có 50+ blocks.<br>2. Tap thêm 1 block mới. | - Auto-scroll mượt tới vị trí block mới.<br>- Không lag/jank trên mobile.<br>- DOM render trong < 1 giây. | Medium | [ ] |
 
 ---
 

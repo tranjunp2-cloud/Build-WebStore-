@@ -36,6 +36,9 @@ Vet can toan bo AC cua F17 theo 5 ky thuat Comprehensive QA: Bao mat (RBAC, XSS 
 | **TC-F17-01-03** | `[UI State]` | Loading Skeleton khi blog list dang fetch | 1. Lam cham mang (Slow 3G).<br>2. Reload trang Blog Management. | - Skeleton rows hien thi thay vi trang trang.<br>- Khong flash hoac NULL error. | Medium | [ ] |
 | **TC-F17-01-04** | `[Positive]` | Danh sach hien du 4 cot: Title, Status, Author, Date | 1. Co san vai bai viet.<br>2. Xem trang Blog List. | - 4 cot hien day du: Title, Status (Draft/Published), Author, Last Modified Date.<br>- Sap xep chinh xac theo ngay. | High | [ ] |
 | **TC-F17-01-05** | `[Mobile]` | Table chuyen sang Card Stack tren 375px | 1. Mo trang Blog Management tren man 375px. | - Table an, thay bang Card doc (Title, Status, Date).<br>- Khong co thanh cuon ngang. | Blocker | [ ] |
+| **TC-F17-01-19** | `[State]` | Empty State "Create First Post" button dieu huong dung | 1. DB rong, vao Blog Management.<br>2. Nhan nut "Tao Bai Viet Dau Tien". | - Dieu huong den trang tao bai viet moi.<br>- Khong bi dead link hoac 404. | High | [ ] |
+| **TC-F17-01-20** | `[UI State]` | Empty State dung chung component voi F08/F10 | 1. So sanh Empty State cua Blog voi Products (F08) va Orders (F10). | - Cung layout, cung illustration pattern, cung CTA style.<br>- Dung shared component `EmptyState` / `NoData`. | High | [ ] |
+| **TC-F17-01-21** | `[Scale]` | CMS Blog List pagination khi co 100+ bai viet | 1. Co 100+ bai viet trong DB.<br>2. Vao trang Blog Management. | - Chi load trang dau (20 bai).<br>- Co pagination hoac infinite scroll.<br>- Khong load tat ca 1 luc. | High | [ ] |
 
 #### Nhom 1B — Tim Kiem, Loc, Sap Xep
 
@@ -47,6 +50,8 @@ Vet can toan bo AC cua F17 theo 5 ky thuat Comprehensive QA: Bao mat (RBAC, XSS 
 | **TC-F17-01-09** | `[UI State]` | Filter khong co ket qua — Empty State | 1. Dang co bai, nhung loc theo ngay hom qua khong co bai nao. | - Hien thong bao "Khong tim thay bai viet nao".<br>- Co nut Reset Filter ro rang. | Medium | [ ] |
 | **TC-F17-01-10** | `[Security]` | Chan XSS trong o tim kiem blog | 1. Nhap `<script>alert(1)</script>` vao o Search. | - Text duoc sanitize, JS khong thuc thi.<br>- Hien ket qua hop le hoac empty state. | Blocker | [ ] |
 | **TC-F17-01-11** | `[BVA]` | Tim kiem voi o trong / chi khoang trang | 1. Nhap toan bo khoang trang vao o Search. | - Hien thi toan bo danh sach (khong filter).<br>- Khong goi API voi query rong. | Medium | [ ] |
+| **TC-F17-01-16** | `[Positive]` | Sort theo Title A-Z / Z-A | 1. Nhan sort "Title A-Z". | - Bai sap xep theo ten A→Z, Unicode-aware.<br>- Doi sang Z-A thi dao nguoc. | High | [ ] |
+| **TC-F17-01-22** | `[Positive]` | Filter + Sort ket hop (Draft + Newest) | 1. Chon filter "Draft".<br>2. Chon sort "Newest First". | - Chi hien bai Draft, sap xep theo ngay moi nhat.<br>- Ca 2 dieu kien ap dung dong thoi. | Medium | [ ] |
 
 #### Nhom 1C — Bulk Actions
 
@@ -56,6 +61,8 @@ Vet can toan bo AC cua F17 theo 5 ky thuat Comprehensive QA: Bao mat (RBAC, XSS 
 | **TC-F17-01-13** | `[Negative]` | Huy Modal Bulk Delete | 1. Chon 3 bai, nhan Xoa hang loat.<br>2. Nhan "Huy" trong Modal. | - Modal dong lai.<br>- 3 bai viet **khong bi xoa**. | Medium | [ ] |
 | **TC-F17-01-14** | `[Perf]` | Bulk Delete 5,000 bai viet — Khong gay OOM | 1. Chon 5,000 bai ao.<br>2. Thuc thi Bulk Delete. | - Backend dung Job Queue / UpdateMany.<br>- Khong OOM Node.js, khong N+1 Query. | High | [ ] |
 | **TC-F17-01-15** | `[Negative]` | Bulk Action khi khong chon bai nao | 1. Khong check bai nao.<br>2. Tim nut Bulk Action. | - Nut Bulk Action bi disable.<br>- Khong cho phep submit rong. | Medium | [ ] |
+| **TC-F17-01-17** | `[Positive]` | Bulk Publish nhieu bai Draft cung luc | 1. Chon checkbox 3 bai Draft.<br>2. Nhan "Publish hang loat". | - Modal xac nhan: "Publish 3 bai viet?".<br>- Sau xac nhan, 3 bai chuyen Published, toast thanh cong.<br>- Storefront hien 3 bai moi. | Critical | [ ] |
+| **TC-F17-01-18** | `[Edge]` | Bulk Publish khi mot so bai da Published san | 1. Chon 3 bai: 2 Draft + 1 Published.<br>2. Nhan "Publish hang loat". | - Chi 2 bai Draft chuyen sang Published.<br>- Bai da Published giu nguyen, toast bao dung so luong. | Medium | [ ] |
 
 ---
 
