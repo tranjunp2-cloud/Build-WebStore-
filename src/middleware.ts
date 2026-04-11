@@ -67,16 +67,20 @@ export async function middleware(req: NextRequest) {
         return NextResponse.redirect(redirectUrl, { status: 301 })
     }
 
+    // ── API and admin routes: pass through ─────────────────────────────
+    // IMPORTANT: This MUST be checked BEFORE admin domain rewrite.
+    // When ADMIN_DOMAIN equals SERVER_DOMAIN (e.g. web-cms-v2.dev.ecommercehub.my),
+    // the admin rewrite would catch /api/* requests and rewrite them to /admin/api/*
+    // which returns HTML instead of JSON → "Fetching user failed" error.
+    if (pathname.startsWith('/api/') || pathname.startsWith('/admin')) {
+        return NextResponse.next()
+    }
+
     // ── Admin domain: web-cms-v2.dev.ecommercehub.my (explicit or fallback to admin.PLATFORM_DOMAIN) ──
     const ADMIN_DOMAIN = process.env.NEXT_PUBLIC_ADMIN_DOMAIN || `admin.${PLATFORM_DOMAIN}`
     if (hostname === ADMIN_DOMAIN) {
         url.pathname = `/admin${pathname}`
         return NextResponse.rewrite(url)
-    }
-
-    // ── API and admin routes: pass through ─────────────────────────────
-    if (pathname.startsWith('/api/') || pathname.startsWith('/admin')) {
-        return NextResponse.next()
     }
 
     // ── Local Direct Access (e.g. /sites/{slug}/...) ──────────────────
