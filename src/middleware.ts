@@ -68,9 +68,16 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next()
     }
 
-    // ── Admin domain: web-cms-v2.dev.ecommercehub.my (explicit or fallback to admin.PLATFORM_DOMAIN) ──
+    // ── Derived domains ──────────────────────────────────────────────
     const ADMIN_DOMAIN = process.env.NEXT_PUBLIC_ADMIN_DOMAIN || `admin.${PLATFORM_DOMAIN}`
-    if (hostname === ADMIN_DOMAIN) {
+    const SERVER_DOMAIN = (process.env.NEXT_PUBLIC_SERVER_URL || '').replace(/^https?:\/\//, '').split(':')[0]
+
+    // ── Admin domain: rewrite root → /admin for dedicated admin subdomain ──
+    // Only apply when ADMIN_DOMAIN is a SEPARATE domain from SERVER_URL.
+    // When they're the same (e.g. staging uses web-cms-v2.dev.ecommercehub.my for both),
+    // skip rewrite — Payload CMS is already accessible at /admin path,
+    // and rewriting would hijack frontend routes (/login, /dashboard, /builder).
+    if (hostname === ADMIN_DOMAIN && ADMIN_DOMAIN !== SERVER_DOMAIN) {
         url.pathname = `/admin${pathname}`
         return NextResponse.rewrite(url)
     }
@@ -137,7 +144,6 @@ export async function middleware(req: NextRequest) {
     }
 
     // ── Custom domain: hostname không phải platform/admin/local ──
-    const SERVER_DOMAIN = (process.env.NEXT_PUBLIC_SERVER_URL || '').replace(/^https?:\/\//, '').split(':')[0]
     const isPlatformHost =
         hostname === PLATFORM_DOMAIN ||
         hostname === `www.${PLATFORM_DOMAIN}` ||
