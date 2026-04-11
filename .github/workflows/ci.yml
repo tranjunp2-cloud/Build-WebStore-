@@ -116,56 +116,17 @@ jobs:
           retention-days: 3
 
   # ──────────────────────────────────────
-  # Job 3: Build (parallel with test, 3 min)
+  # Build skipped in CI — Vercel handles build + deploy.
+  # Typecheck catches 99% of build errors. Vercel is the safety net.
+  # Re-enable build job if needed: uncomment and add to notify-fail needs.
   # ──────────────────────────────────────
-  build:
-    name: "Build"
-    needs: quality-check
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Cache Next.js build
-        uses: actions/cache@v4
-        with:
-          path: .next/cache
-          key: nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
-          restore-keys: |
-            nextjs-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
-            nextjs-${{ runner.os }}-
-
-      - name: Build
-        id: build
-        env:
-          NODE_OPTIONS: '--require ./node-polyfill.js'
-        run: npm run build 2>&1 | tee build-output.txt
-
-      - name: Upload build output
-        if: success() && github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: build-output.txt
-          retention-days: 1
 
   # ──────────────────────────────────────
-  # Job 4: Quality Metrics (PR only, after test + build)
+  # Job 3: Quality Metrics (PR only, after test)
   # ──────────────────────────────────────
   metrics:
     name: "PR Metrics"
-    needs: [test, build]
+    needs: [test]
     if: success() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -177,12 +138,6 @@ jobs:
         with:
           name: coverage-report
           path: coverage/
-
-      - name: Download build output
-        uses: actions/download-artifact@v4
-        with:
-          name: build-output
-          path: .
 
       - name: Parse coverage report
         id: coverage
@@ -200,17 +155,6 @@ jobs:
           echo "functions=$FUNCTIONS" >> "$GITHUB_OUTPUT"
           echo "statements=$STATEMENTS" >> "$GITHUB_OUTPUT"
 
-      - name: Measure bundle size
-        id: bundle
-        run: |
-          if [ -f "build-output.txt" ]; then
-            FIRST_LOAD=$(grep -oP 'First Load JS shared by all\s+\K[\d.]+ [kKmM]?B' build-output.txt 2>/dev/null || echo "N/A")
-            [ -z "$FIRST_LOAD" ] && FIRST_LOAD="N/A"
-          else
-            FIRST_LOAD="N/A"
-          fi
-          echo "first_load=$FIRST_LOAD" >> "$GITHUB_OUTPUT"
-
       - name: Comment quality metrics on PR
         uses: actions/github-script@v7
         with:
@@ -221,8 +165,6 @@ jobs:
               functions: '${{ steps.coverage.outputs.functions }}',
               statements: '${{ steps.coverage.outputs.statements }}',
             };
-            const bundle = { firstLoad: '${{ steps.bundle.outputs.first_load }}' };
-
             const minimums = { lines: 60, branches: 65, functions: 55, statements: 60 };
             const targets = { lines: 95, branches: 85, functions: 90, statements: 95 };
 
@@ -246,8 +188,6 @@ jobs:
               `| Branches | ${coverage.branches}% | ${minimums.branches}% | ${targets.branches}% | ${badge(coverage.branches, minimums.branches, targets.branches)} |`,
               `| Functions | ${coverage.functions}% | ${minimums.functions}% | ${targets.functions}% | ${badge(coverage.functions, minimums.functions, targets.functions)} |`,
               `| Statements | ${coverage.statements}% | ${minimums.statements}% | ${targets.statements}% | ${badge(coverage.statements, minimums.statements, targets.statements)} |`,
-              '',
-              `### Bundle: First Load JS ${bundle.firstLoad}`,
               '',
               '---',
               `_Updated: ${new Date().toISOString()} | [View CI Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})_`,
@@ -275,7 +215,7 @@ jobs:
   # ──────────────────────────────────────
   notify-fail:
     name: "Notify: CI Failed"
-    needs: [quality-check, test, build]
+    needs: [quality-check, test]
     if: failure()
     runs-on: ubuntu-latest
     permissions:
