@@ -59,6 +59,7 @@
     "@types/nodemailer": "^7.0.11",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
+    "@vercel/analytics": "^2.0.1",
     "ai": "^4.1.0",
     "cheerio": "^1.2.0",
     "ckeditor5": "^48.0.0",
