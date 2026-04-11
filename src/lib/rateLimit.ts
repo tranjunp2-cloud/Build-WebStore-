@@ -1,14 +1,13 @@
 /**
- * DB-backed rate limiter for API routes.
- * Uses PostgreSQL rate_limits table for cross-instance consistency.
- * Falls back to in-memory Map if DB is unavailable (fail-open).
+ * Distributed rate limiter using Upstash Redis.
+ * Falls back to in-memory Map if Upstash is unavailable.
+ *
+ * Vercel serverless = each request may run on a different instance,
+ * so in-memory rate limiting doesn't work. Upstash Redis provides
+ * shared state across all instances via REST API (no TCP connection).
  */
-import { getPayload } from 'payload'
-import { sql } from 'drizzle-orm'
-import config from '@payload-config'
-
-// In-memory fallback when DB is unavailable
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
 
 export interface RateLimitResult {
     allowed: boolean
@@ -16,87 +15,37 @@ export interface RateLimitResult {
     resetAt: number
 }
 
-/**
- * Check rate limit using DB. Falls back to in-memory if DB query fails.
- */
-export async function checkRateLimit(
-    key: string,
-    limit: number = 20,
-    windowMs: number = 3600000
-): Promise<RateLimitResult> {
-    try {
-        return await checkRateLimitDB(key, limit, windowMs)
-    } catch {
-        // Fail-open: use in-memory fallback
-        return checkRateLimitMemory(key, limit, windowMs)
+// ── Upstash Redis (distributed) ─────────────────────────────────────────
+const hasUpstash = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+
+const redis = hasUpstash
+    ? new Redis({
+          url: process.env.UPSTASH_REDIS_REST_URL!,
+          token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+      })
+    : null
+
+// Pre-configured limiters for common use cases
+const limiters = new Map<string, Ratelimit>()
+
+function getUpstashLimiter(limit: number, windowMs: number): Ratelimit | null {
+    if (!redis) return null
+    const key = `${limit}:${windowMs}`
+    if (!limiters.has(key)) {
+        const windowStr = windowMs >= 3600000 ? `${windowMs / 3600000}h`
+            : windowMs >= 60000 ? `${windowMs / 60000}m`
+            : `${windowMs / 1000}s`
+        limiters.set(key, new Ratelimit({
+            redis,
+            limiter: Ratelimit.slidingWindow(limit, windowStr as Parameters<typeof Ratelimit.slidingWindow>[1]),
+            prefix: 'rl',
+        }))
     }
+    return limiters.get(key)!
 }
 
-/**
- * Two-tier rate limit: burst (per minute) + sustained (per hour).
- */
-export async function checkTwoTierRateLimit(
-    userId: string,
-    burstLimit: number = 5,
-    sustainedLimit: number = 20
-): Promise<RateLimitResult> {
-    const minuteResult = await checkRateLimit(`${userId}:minute`, burstLimit, 60_000)
-    if (!minuteResult.allowed) return minuteResult
-
-    const hourResult = await checkRateLimit(`${userId}:hour`, sustainedLimit, 3_600_000)
-    if (!hourResult.allowed) return hourResult
-
-    return {
-        allowed: true,
-        remaining: Math.min(minuteResult.remaining, hourResult.remaining),
-        resetAt: minuteResult.resetAt,
-    }
-}
-
-async function checkRateLimitDB(
-    key: string,
-    limit: number,
-    windowMs: number
-): Promise<RateLimitResult> {
-    const payload = await getPayload({ config })
-    const db = payload.db?.drizzle
-    if (!db) throw new Error('DB not available')
-
-    const now = new Date()
-    const expiresAt = new Date(now.getTime() + windowMs)
-
-    // Upsert: increment if not expired, reset if expired
-    const result = await db.execute(sql`
-        INSERT INTO rate_limits (key, count, window_start, expires_at)
-        VALUES (${key}, 1, ${now}, ${expiresAt})
-        ON CONFLICT (key) DO UPDATE SET
-            count = CASE
-                WHEN rate_limits.expires_at <= ${now} THEN 1
-                ELSE rate_limits.count + 1
-            END,
-            window_start = CASE
-                WHEN rate_limits.expires_at <= ${now} THEN ${now}
-                ELSE rate_limits.window_start
-            END,
-            expires_at = CASE
-                WHEN rate_limits.expires_at <= ${now} THEN ${expiresAt}
-                ELSE rate_limits.expires_at
-            END
-        RETURNING count, expires_at
-    `)
-
-    const row = result.rows?.[0] as { count: number; expires_at: string } | undefined
-    if (!row) throw new Error('No result from upsert')
-
-    const count = Number(row.count)
-    const resetAt = new Date(row.expires_at).getTime()
-
-    return {
-        allowed: count <= limit,
-        remaining: Math.max(0, limit - count),
-        resetAt,
-    }
-}
+// ── In-memory fallback ──────────────────────────────────────────────────
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
 
 function checkRateLimitMemory(
     key: string,
@@ -118,6 +67,54 @@ function checkRateLimitMemory(
 
     entry.count++
     return { allowed: true, remaining: limit - entry.count, resetAt: entry.resetAt }
+}
+
+// ── Public API (same interface as before) ───────────────────────────────
+
+/**
+ * Check rate limit. Uses Upstash Redis if available, falls back to in-memory.
+ */
+export async function checkRateLimit(
+    key: string,
+    limit: number = 20,
+    windowMs: number = 3600000
+): Promise<RateLimitResult> {
+    const limiter = getUpstashLimiter(limit, windowMs)
+    if (limiter) {
+        try {
+            const result = await limiter.limit(key)
+            return {
+                allowed: result.success,
+                remaining: result.remaining,
+                resetAt: result.reset,
+            }
+        } catch {
+            // Upstash down → fail-open with in-memory
+            return checkRateLimitMemory(key, limit, windowMs)
+        }
+    }
+    return checkRateLimitMemory(key, limit, windowMs)
+}
+
+/**
+ * Two-tier rate limit: burst (per minute) + sustained (per hour).
+ */
+export async function checkTwoTierRateLimit(
+    userId: string,
+    burstLimit: number = 5,
+    sustainedLimit: number = 20
+): Promise<RateLimitResult> {
+    const minuteResult = await checkRateLimit(`${userId}:minute`, burstLimit, 60_000)
+    if (!minuteResult.allowed) return minuteResult
+
+    const hourResult = await checkRateLimit(`${userId}:hour`, sustainedLimit, 3_600_000)
+    if (!hourResult.allowed) return hourResult
+
+    return {
+        allowed: true,
+        remaining: Math.min(minuteResult.remaining, hourResult.remaining),
+        resetAt: minuteResult.resetAt,
+    }
 }
 
 /**

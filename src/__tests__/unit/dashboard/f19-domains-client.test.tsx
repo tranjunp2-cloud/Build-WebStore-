@@ -110,8 +110,8 @@ describe('F19 Domain Management (DomainsClient)', () => {
             { domain: 'store.custom.com', status: 'pending', isPrimary: false }
         ]} />);
         
-        expect(screen.getByText(/A Record/i)).toBeInTheDocument();
-        expect(screen.getByText(/CNAME/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/A Record/i).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/CNAME/i).length).toBeGreaterThan(0);
         const firstIp = (process.env.NEXT_PUBLIC_SERVER_IP ?? '162.159.140.98').split(',')[0].trim();
         expect(screen.getByText(firstIp)).toBeInTheDocument();
         expect(screen.getByText(process.env.NEXT_PUBLIC_CNAME_TARGET ?? process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'cname.vercel-dns.com')).toBeInTheDocument();

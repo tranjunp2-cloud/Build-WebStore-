@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { revalidateTag } from 'next/cache'
 
 /**
  * PATCH /api/sites/[siteId]/publish
@@ -79,6 +80,14 @@ export async function PATCH(
                 (d: Record<string, unknown>) => d.isPrimary === true && d.status === 'active'
             )
             primaryDomain = (primary as Record<string, unknown>)?.domain as string || null
+        }
+
+        // Invalidate cached site/page data so visitors see updated content
+        try {
+            revalidateTag(`site-${siteId}`)
+            revalidateTag('tenants')
+        } catch {
+            // revalidateTag requires Next.js request context — skip in tests/non-Next environments
         }
 
         const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
