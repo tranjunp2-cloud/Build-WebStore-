@@ -68,19 +68,25 @@ jobs:
 
       - name: Run E2E tests
         id: e2e
+        shell: bash
         run: |
-          set -o pipefail
+          # Disable set -e so we can capture playwright exit code and parse stats
+          # even when tests fail. GitHub Actions defaults bash to `set -eo pipefail`.
+          set +e
           npx playwright test --project=smoke --project=setup --project=chromium 2>&1 | tee e2e-output.log
           EXIT_CODE=${PIPESTATUS[0]}
-          # Parse results from Playwright output: "53 passed (2.6m)" or "4 failed" or "5 skipped"
+          # Parse results. Playwright outputs: "53 passed", "4 failed", "5 skipped", "N did not run"
           PASSED=$(grep -oE '[0-9]+ passed' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")
           FAILED=$(grep -oE '[0-9]+ failed' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")
           SKIPPED=$(grep -oE '[0-9]+ skipped' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")
-          TOTAL=$((${PASSED:-0} + ${FAILED:-0} + ${SKIPPED:-0}))
+          DID_NOT_RUN=$(grep -oE '[0-9]+ did not run' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")
+          TOTAL=$((${PASSED:-0} + ${FAILED:-0} + ${SKIPPED:-0} + ${DID_NOT_RUN:-0}))
           echo "passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
           echo "failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
           echo "skipped=${SKIPPED:-0}" >> "$GITHUB_OUTPUT"
+          echo "did_not_run=${DID_NOT_RUN:-0}" >> "$GITHUB_OUTPUT"
           echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "=== Stats: $PASSED passed, $FAILED failed, $SKIPPED skipped, $DID_NOT_RUN did not run (total $TOTAL) ==="
           exit $EXIT_CODE
         env:
           BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
@@ -135,5 +141,5 @@ jobs:
           commit-sha: ${{ steps.notify_info.outputs.short_sha }}
           commit-msg: ${{ steps.notify_info.outputs.commit_msg }}
           failed-step: 'E2E Tests (staging)'
-          ci-status: "E2E: ${{ steps.e2e.outputs.passed }}/${{ steps.e2e.outputs.total }} passed, ${{ steps.e2e.outputs.failed }} failed, ${{ steps.e2e.outputs.skipped }} skipped"
+          ci-status: "E2E: ${{ steps.e2e.outputs.passed }}/${{ steps.e2e.outputs.total }} passed · ${{ steps.e2e.outputs.failed }} failed · ${{ steps.e2e.outputs.skipped }} skipped · ${{ steps.e2e.outputs.did_not_run }} did not run"
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
