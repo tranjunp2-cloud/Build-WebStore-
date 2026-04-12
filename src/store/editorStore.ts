@@ -63,6 +63,7 @@ type EditorState = {
 
     // Save status (F-07)
     hasUnsavedChanges: boolean
+    hasUnpublishedChanges: boolean
     lastSavedAt: number | null
     isSaving: boolean
     saveStatus: 'idle' | 'saving' | 'saved' | 'error'
@@ -118,6 +119,7 @@ type EditorActions = {
     handleContentChange: () => void
     performSave: (isManual?: boolean) => Promise<boolean>
     markSaved: () => void
+    markPublished: () => void
     setIsSaving: (saving: boolean) => void
 
     // Reset
@@ -174,6 +176,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     maxHistory: MAX_HISTORY,
     isAIStreaming: false,
     hasUnsavedChanges: false,
+    hasUnpublishedChanges: false,
     lastSavedAt: null,
     isSaving: false,
     autoSaveEnabled: true,
@@ -204,6 +207,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
             history: [snapshot],
             historyIndex: 0,
             hasUnsavedChanges: false,
+            hasUnpublishedChanges: false,
             lastSavedAt: null,
             autoSaveTimer: null,
             isSaving: false,
@@ -451,6 +455,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
                 if (res.ok) {
                     set({
                         hasUnsavedChanges: false,
+                        hasUnpublishedChanges: true,
                         saveStatus: 'saved',
                         lastSavedAt: Date.now(),
                         isSaving: false,
@@ -480,6 +485,7 @@ export const useEditorStore = create<EditorState & EditorActions>((set, get) => 
     },
 
     markSaved: () => set({ hasUnsavedChanges: false, lastSavedAt: Date.now(), saveStatus: 'saved' }),
+    markPublished: () => set({ hasUnpublishedChanges: false }),
     setIsSaving: (saving) => set({ isSaving: saving }),
 
     // ── Header/Footer (F-05-07) ──────────────────────────────────────────
