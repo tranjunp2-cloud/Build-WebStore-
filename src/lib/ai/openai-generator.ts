@@ -102,11 +102,14 @@ export async function generateSiteWithAI(
 
         events.push({ event: 'theme_set', data: { theme } })
 
+        // Detect site category for weighted variant selection
+        const detectedCategory = typeof parsed.category === 'string' ? parsed.category : undefined
+
         // Helper: validate and sanitize an array of raw blocks
         function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
             const valid: Record<string, unknown>[] = []
             for (const block of rawBlocks) {
-                const sanitized = sanitizeBlockData(block as Record<string, unknown>)
+                const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory)
                 if (typeof sanitized.blockType === 'string' && blockRegistry.has(sanitized.blockType)) {
                     const validation = blockRegistry.validate(sanitized.blockType, sanitized)
                     if (validation.success) {
@@ -224,12 +227,128 @@ function generateWithFallback(prompt: string, events: SSEEvent[]): { result: Gen
     return { result, events }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// VARIANT VARIETY SYSTEM
+// Fuzzy matching + weighted-by-category fallback instead of always-default
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Common AI hallucination patterns → correct variant name */
+const VARIANT_ALIASES: Record<string, string> = {
+    'three-column': 'grid-3',
+    'three-columns': 'grid-3',
+    'two-column': 'grid-2',
+    'two-columns': 'grid-2',
+    'four-column': 'grid-4',
+    'four-columns': 'grid-4',
+    'side-by-side': 'split',
+    'slider': 'carousel',
+    'full-width': 'fullscreen',
+    'compact': 'minimal',
+    'simple-grid': 'grid-2',
+    'default': 'simple',
+    'basic': 'simple',
+    'standard': 'simple',
+    'classic': 'simple',
+}
+
+/** Category-weighted variant preferences — preferred variants per category per block type */
+const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
+    restaurant: {
+        hero: ['split-left', 'magazine', 'gradient', 'parallax', 'fullscreen'],
+        features: ['grid-3', 'icon-top', 'zigzag', 'list'],
+        testimonials: ['cards', 'spotlight', 'masonry', 'carousel'],
+        footer: ['expanded', 'mega-footer', 'dark-gradient'],
+        contact: ['split', 'map-split', 'form'],
+    },
+    ecommerce: {
+        hero: ['slideshow', 'cards-overlay', 'gradient', 'split-right'],
+        features: ['grid-4', 'icon-left', 'carousel', 'grid-3'],
+        testimonials: ['masonry', 'avatar-row', 'cards', 'carousel'],
+        footer: ['expanded', 'minimal', 'simple'],
+        contact: ['card-float', 'split', 'minimal-inline'],
+    },
+    beauty: {
+        hero: ['gradient', 'minimal', 'parallax', 'split-left'],
+        features: ['icon-top', 'zigzag', 'grid-3', 'carousel'],
+        testimonials: ['minimal-quote', 'spotlight', 'carousel', 'masonry'],
+        footer: ['centered-stack', 'dark-gradient', 'mega-footer'],
+        contact: ['minimal-inline', 'card-float', 'split'],
+    },
+    tech: {
+        hero: ['gradient', 'split-video', 'minimal', 'parallax'],
+        features: ['zigzag', 'grid-2', 'icon-left', 'carousel'],
+        testimonials: ['spotlight', 'cards', 'video-text'],
+        footer: ['minimal', 'dark-gradient', 'expanded'],
+        contact: ['split', 'form', 'card-float'],
+    },
+    business: {
+        hero: ['centered', 'split-left', 'gradient', 'minimal'],
+        features: ['grid-3', 'icon-left', 'list', 'zigzag'],
+        testimonials: ['cards', 'carousel', 'spotlight'],
+        footer: ['expanded', 'mega-footer', 'dark-gradient'],
+        contact: ['split', 'form', 'map-split'],
+    },
+    portfolio: {
+        hero: ['magazine', 'parallax', 'cards-overlay', 'minimal'],
+        features: ['carousel', 'zigzag', 'grid-2'],
+        testimonials: ['video-text', 'minimal-quote', 'simple'],
+        footer: ['centered-stack', 'simple', 'dark-gradient'],
+        contact: ['minimal-inline', 'card-float', 'form'],
+    },
+    blog: {
+        hero: ['minimal', 'split-left', 'fullscreen', 'centered'],
+        features: ['list', 'icon-top', 'grid-3'],
+        testimonials: ['simple', 'avatar-row', 'cards'],
+        footer: ['simple', 'centered-stack', 'expanded'],
+        contact: ['minimal-inline', 'form', 'split'],
+    },
+}
+
+/**
+ * Pick a weighted-by-category variant when AI's choice is invalid.
+ * Uses category preferences if available, otherwise random from all valid variants.
+ */
+function pickWeightedVariant(blockType: string, validVariants: string[], category?: string): string {
+    if (category) {
+        const catWeights = CATEGORY_VARIANT_WEIGHTS[category]?.[blockType]
+        if (catWeights) {
+            // Find first preferred variant that's actually valid
+            const preferred = catWeights.filter(v => validVariants.includes(v))
+            if (preferred.length > 0) {
+                return preferred[Math.floor(Math.random() * preferred.length)]!
+            }
+        }
+    }
+    // Fallback: random from all valid variants
+    return validVariants[Math.floor(Math.random() * validVariants.length)]!
+}
+
+/**
+ * Try to match an AI-generated variant string to a valid variant.
+ * Steps: exact match → case-insensitive → alias lookup → null (not found)
+ */
+function fuzzyMatchVariant(requested: string, validVariants: string[]): string | null {
+    // 1. Exact match
+    if (validVariants.includes(requested)) return requested
+
+    // 2. Case-insensitive + normalize separators
+    const normalized = requested.toLowerCase().replace(/[_\s]+/g, '-')
+    const caseMatch = validVariants.find(v => v.toLowerCase() === normalized)
+    if (caseMatch) return caseMatch
+
+    // 3. Alias lookup
+    const aliased = VARIANT_ALIASES[normalized]
+    if (aliased && validVariants.includes(aliased)) return aliased
+
+    return null
+}
+
 /**
  * Sanitize a single AI-generated block for Payload CMS compatibility.
  * Removes hallucinated fields, enforces exact variant enums, and recursively normalizes
  * objects into the strictly required keys to prevent validation failures.
  */
-export function sanitizeBlockData(block: Record<string, unknown>): Record<string, unknown> {
+export function sanitizeBlockData(block: Record<string, unknown>, siteCategory?: string): Record<string, unknown> {
     const s = { ...block }
 
     // Helper: normalize array where strings should be objects
@@ -249,14 +368,30 @@ export function sanitizeBlockData(block: Record<string, unknown>): Record<string
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // VARIANT VALIDATION: Ensure variant matches block registry schema
+    // VARIANT VALIDATION: Fuzzy match → alias → weighted-by-category fallback
     // Uses blockRegistry as single source of truth (not a hardcoded list)
     // ═══════════════════════════════════════════════════════════════════════
     if (typeof s.blockType === 'string' && blockRegistry.has(s.blockType)) {
         const meta = blockRegistry.getBlockMeta(s.blockType)
-        if (meta && meta.variants.length > 0 && typeof s.variant === 'string') {
-            if (!meta.variants.includes(s.variant)) {
-                s.variant = meta.defaultVariant || meta.variants[0]
+        if (meta && meta.variants.length > 0) {
+            // Coerce variant to string (AI sometimes returns number/null)
+            const rawVariant = s.variant != null ? String(s.variant) : ''
+
+            if (rawVariant.length > 0) {
+                const matched = fuzzyMatchVariant(rawVariant, meta.variants)
+                if (matched) {
+                    s.variant = matched
+                } else {
+                    // No match — pick weighted-by-category variant instead of always-default
+                    const replacement = pickWeightedVariant(s.blockType, meta.variants, siteCategory)
+                    console.warn(
+                        `[AI Sanitizer] "${s.blockType}": variant "${rawVariant}" → "${replacement}" (not in [${meta.variants.join(', ')}])`
+                    )
+                    s.variant = replacement
+                }
+            } else {
+                // Empty/null variant — pick weighted variant
+                s.variant = pickWeightedVariant(s.blockType, meta.variants, siteCategory)
             }
         }
     }
@@ -518,17 +653,32 @@ export function sanitizeBlockData(block: Record<string, unknown>): Record<string
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // GALLERY
+    // GALLERY: Strip URL strings from image fields but keep alt/caption metadata
     // ═══════════════════════════════════════════════════════════════════════
     if (s.blockType === 'gallery' && Array.isArray(s.images)) {
-        s.images = []
+        s.images = s.images.map((img: unknown) => {
+            if (typeof img === 'string') return { alt: img } // URL string → keep as alt text
+            const iObj = (typeof img === 'object' && img !== null ? img : {}) as Record<string, unknown>
+            const cleaned: Record<string, unknown> = {}
+            if (iObj.alt) cleaned.alt = String(iObj.alt)
+            if (iObj.caption) cleaned.caption = String(iObj.caption)
+            // Strip image/url fields (Payload expects Media IDs, not URLs)
+            return cleaned
+        }).filter((img: Record<string, unknown>) => Object.keys(img).length > 0)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // LOGO CLOUD
+    // LOGO CLOUD: Strip URL strings but keep name/alt metadata
     // ═══════════════════════════════════════════════════════════════════════
-    if (s.blockType === 'logo-cloud') {
-        s.logos = []
+    if (s.blockType === 'logo-cloud' && Array.isArray(s.logos)) {
+        s.logos = s.logos.map((logo: unknown) => {
+            if (typeof logo === 'string') return { name: logo }
+            const lObj = (typeof logo === 'object' && logo !== null ? logo : {}) as Record<string, unknown>
+            const cleaned: Record<string, unknown> = {}
+            if (lObj.name) cleaned.name = String(lObj.name)
+            if (lObj.alt) cleaned.alt = String(lObj.alt)
+            return cleaned
+        }).filter((logo: Record<string, unknown>) => Object.keys(logo).length > 0)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
