@@ -66,6 +66,26 @@ jobs:
           done
           echo "::warning::Staging health check failed after 5 min, running tests anyway"
 
+      - name: Ensure E2E test user exists
+        run: |
+          BASE_URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
+          if [ -z "${{ secrets.E2E_SETUP_SECRET }}" ]; then
+            echo "::warning::E2E_SETUP_SECRET not set — skipping user provisioning"
+            exit 0
+          fi
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/e2e/ensure-test-user" \
+            -H "Authorization: Bearer ${{ secrets.E2E_SETUP_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg e "${{ secrets.TEST_EMAIL }}" --arg p "${{ secrets.TEST_PASSWORD }}" '{email:$e,password:$p}')")
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | sed '$d')
+          echo "Status: $STATUS"
+          echo "Body: $BODY"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::E2E user provisioning failed (status $STATUS)"
+            exit 1
+          fi
+
       - name: Run E2E tests
         id: e2e
         shell: bash
