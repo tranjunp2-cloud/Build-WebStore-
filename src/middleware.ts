@@ -253,7 +253,10 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
     matcher: [
-        // Match all paths except static files
-        '/((?!_next/static|_next/image|favicon.ico).*)',
+        // Exclude static files AND /api/ routes from middleware.
+        // Payload admin sends POST as multipart/form-data with _payload field.
+        // Vercel edge middleware corrupts multipart body when forwarding to serverless → 500.
+        // API routes don't need middleware (no subdomain/domain routing).
+        '/((?!_next/static|_next/image|favicon.ico|api/).*)',
     ],
 }
