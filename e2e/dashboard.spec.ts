@@ -1,71 +1,85 @@
 import { test, expect } from '@playwright/test'
+import { expectNoServerError, expectPageLoaded } from './helpers/assertions'
+import { navigateTo } from './helpers/navigation'
 
 /**
  * Dashboard E2E Tests — Verify dashboard loads and key elements render.
  *
- * TC-F03.01: Dashboard greeting
- * TC-F03.02: Site stats display
- * TC-F03.17: Customize modal
+ * TC-F03.01: Dashboard greeting + content
+ * TC-F03.02: Site cards / empty state
+ * TC-F03.03: Dashboard tab navigation
  */
 
 test.describe('Dashboard', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/dashboard')
-        // Wait for dashboard to load (may redirect if not authed)
-        await page.waitForLoadState('networkidle')
+        await navigateTo(page, '/dashboard')
     })
 
-    test('[TC-F03.01] shows greeting with user name', async ({ page }) => {
-        // Dashboard should have greeting or site info
-        const body = await page.textContent('body')
-        expect(body?.length).toBeGreaterThan(0)
+    test('[TC-F03.01] dashboard renders with user content', async ({ page }) => {
+        await expectPageLoaded(page)
 
-        // Should not show error page
-        await expect(page.locator('text=500')).not.toBeVisible()
-        await expect(page.locator('text=Internal Server Error')).not.toBeVisible()
-    })
+        // Should have main content area
+        const mainContent = page.locator('main, [role="main"]')
+        await expect(mainContent.first()).toBeVisible()
 
-    test('[TC-F03.02] displays site cards or empty state', async ({ page }) => {
-        // Must render EITHER site cards OR an empty state CTA — not a blank shell
-        const siteCards = page.locator('[data-testid="site-card"], a[href*="/builder"], a[href*="/editor"]')
-        const emptyState = page.locator('text=/create|get started|no site|build/i')
-        const mainContent = page.locator('main, [role="main"], #__next > div')
-
-        // At least one of these must be visible
-        const hasSites = await siteCards.count()
-        const hasEmpty = await emptyState.count()
-        const hasContent = await mainContent.count()
-        expect(hasSites + hasEmpty + hasContent).toBeGreaterThan(0)
-    })
-
-    test('sidebar navigation links work', async ({ page }) => {
-        // Check sidebar has key navigation items
-        const sidebar = page.locator('nav, [role="navigation"], aside')
-        if (await sidebar.count() > 0) {
-            // Verify at least some nav links exist
-            const links = await page.locator('a[href*="/products"], a[href*="/orders"], a[href*="/blog"]').count()
-            expect(links).toBeGreaterThan(0)
+        // Should have sidebar navigation with key links
+        const nav = page.locator('nav, [role="navigation"], aside')
+        if (await nav.count() > 0) {
+            const navLinks = await page.locator(
+                'a[href*="/products"], a[href*="/orders"], a[href*="/blog"], a[href*="/settings"]'
+            ).count()
+            expect(navLinks).toBeGreaterThan(0)
         }
     })
 
-    test('navigates to products page', async ({ page }) => {
-        await page.goto('/products')
-        await page.waitForLoadState('networkidle')
-        expect(page.url()).toContain('/products')
-        await expect(page.locator('text=Internal Server Error')).not.toBeVisible()
+    test('[TC-F03.02] dashboard KPI or empty state visible', async ({ page }) => {
+        await expectPageLoaded(page)
+
+        // Must render EITHER site cards, stats, OR an empty state CTA
+        const siteCards = page.locator('[data-testid="site-card"], a[href*="/builder"], a[href*="/editor"]')
+        const emptyState = page.locator('text=/create|get started|no site|build your/i')
+        const stats = page.locator('[data-testid*="stat"], [data-testid*="kpi"]')
+
+        const hasSites = await siteCards.count()
+        const hasEmpty = await emptyState.count()
+        const hasStats = await stats.count()
+
+        // At least one of these must be present
+        expect(hasSites + hasEmpty + hasStats).toBeGreaterThan(0)
     })
 
-    test('navigates to orders page', async ({ page }) => {
-        await page.goto('/orders')
-        await page.waitForLoadState('networkidle')
-        expect(page.url()).toContain('/orders')
-        await expect(page.locator('text=Internal Server Error')).not.toBeVisible()
+    test('[TC-F03.03] dashboard tab navigation works', async ({ page }) => {
+        await expectPageLoaded(page)
+
+        // Look for tab-like navigation (Overview, Analytics, SEO)
+        const tabs = page.locator('[role="tab"], button:has-text("Analytics"), button:has-text("SEO"), [data-state]')
+        const tabCount = await tabs.count()
+
+        if (tabCount > 1) {
+            // Click second tab
+            await tabs.nth(1).click()
+            await page.waitForLoadState('networkidle')
+            await expectNoServerError(page)
+
+            // Click back to first tab
+            await tabs.first().click()
+            await page.waitForLoadState('networkidle')
+            await expectNoServerError(page)
+        }
     })
 
-    test('navigates to settings page', async ({ page }) => {
-        await page.goto('/settings')
-        await page.waitForLoadState('networkidle')
-        expect(page.url()).toContain('/settings')
-        await expect(page.locator('text=Internal Server Error')).not.toBeVisible()
+    test('sidebar navigation links work', async ({ page }) => {
+        const routes = [
+            { path: '/products', name: 'products' },
+            { path: '/orders', name: 'orders' },
+            { path: '/dashboard/settings', name: 'settings' },
+        ]
+
+        for (const route of routes) {
+            await page.goto(route.path)
+            await page.waitForLoadState('networkidle')
+            expect(page.url()).toContain(route.name)
+            await expectNoServerError(page)
+        }
     })
 })
