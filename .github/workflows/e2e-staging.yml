@@ -1,20 +1,25 @@
-# E2E Tests on Staging — runs after staging deploy succeeds
-# Trigger: manual (workflow_dispatch) or after CI passes on staging push
+# E2E Tests on Staging — runs after staging push
+# Triggers: push to staging (when E2E files change), or manual dispatch
+#
+# Note: workflow_dispatch and workflow_run require file on default branch (main).
+# Until this workflow lands on main, we trigger via `push` on staging.
 #
 # Runs Playwright tests against live staging: https://web-v2.dev.ecommercehub.my
 name: E2E Staging
 
 on:
+  push:
+    branches: [staging]
+    paths:
+      - 'e2e/**'
+      - 'playwright.config.ts'
+      - '.github/workflows/e2e-staging.yml'
   workflow_dispatch:
     inputs:
       base_url:
         description: 'Staging URL to test'
         default: 'https://web-v2.dev.ecommercehub.my'
         required: false
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [staging]
 
 concurrency:
   group: e2e-staging
@@ -24,11 +29,7 @@ jobs:
   e2e:
     name: "E2E: Playwright on Staging"
     runs-on: ubuntu-latest
-    # Only run if CI succeeded (for workflow_run trigger)
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
@@ -47,20 +48,23 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Wait for staging to be ready
+      - name: Wait for staging deploy to be ready
         run: |
           URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
-          echo "Checking staging: $URL"
-          for i in {1..5}; do
+          echo "Waiting for Vercel deploy: $URL"
+          # Initial delay — Vercel deploy typically takes 2-3 min
+          sleep 60
+          # Poll health endpoint for up to 4 more minutes (24 × 10s)
+          for i in {1..24}; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/api/health" || echo "000")
             if [ "$STATUS" = "200" ]; then
               echo "Staging is ready (attempt $i)"
               exit 0
             fi
-            echo "Attempt $i: status $STATUS, retrying in 10s..."
+            echo "Attempt $i/24: status $STATUS, retrying in 10s..."
             sleep 10
           done
-          echo "::warning::Staging health check failed, running tests anyway"
+          echo "::warning::Staging health check failed after 5 min, running tests anyway"
 
       - name: Run E2E tests
         id: e2e
