@@ -90,14 +90,14 @@ export const CARD_PADDING = {
 export type CardPaddingToken = keyof typeof CARD_PADDING
 
 // ── Section Background Variants ─────────────────────────────────────────────
-// During migration (Phase 01 → Phase 03), tokens consume legacy `--surface-1/2/3`
-// vars from globals.css. Phase 03 codemod will rename those to semantic names
-// (`--surface-primary/secondary/card`). Block components never care — they just
-// reference the token class.
+// Consumes semantic surface vars from Phase 03 (--surface-primary/secondary/card).
+// globals.css provides dark-baseline fallbacks; generateThemeCSS() overrides
+// per site with light/dark-mode palette from generatePalette(). Blocks only
+// reference the token class and never touch raw CSS var names.
 export const SECTION_BACKGROUND = {
-    default: 'bg-[var(--surface-1)]',
-    alternate: 'bg-[var(--surface-2)]',
-    accent: 'bg-[var(--surface-3)]',
+    default: 'bg-[var(--surface-primary)]',
+    alternate: 'bg-[var(--surface-secondary)]',
+    accent: 'bg-[var(--surface-card)]',
     transparent: 'bg-transparent',
 } as const
 

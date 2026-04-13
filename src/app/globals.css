@@ -14,6 +14,19 @@
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
   --radius: 0.5rem;
+
+  /* Semantic layer (Plan B Phase 03) — dark baseline for admin + non-theme
+     contexts. Per-site generateThemeCSS() overrides these via <style> tag. */
+  --accent: var(--brand-primary);
+  --accent-hover: #0284c7;
+  --accent-rgb: 14, 165, 233;
+  --surface-primary: var(--surface-1);
+  --surface-secondary: var(--surface-2);
+  --surface-card: var(--surface-3);
+  --text-inverse: #09090b;
+  --text-muted: var(--text-secondary);
+  --border-semantic: var(--border);
+  --divider: var(--border);
 }
 
 /* ── Base Styles ──────────────────────────────────────────────────────────── */

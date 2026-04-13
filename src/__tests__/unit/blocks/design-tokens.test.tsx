@@ -116,31 +116,31 @@ describe('design-tokens.ts (Phase 01)', () => {
     })
 
     describe('TC-F01D-01.04: SectionWrapper background variants', () => {
-        it('default background uses --surface-1', () => {
+        it('default background uses --surface-primary (semantic)', () => {
             const { container } = render(
                 <SectionWrapper background="default">
                     <p>child</p>
                 </SectionWrapper>
             )
-            expect(container.querySelector('section')?.className).toContain('--surface-1')
+            expect(container.querySelector('section')?.className).toContain('--surface-primary')
         })
 
-        it('alternate background uses --surface-2', () => {
+        it('alternate background uses --surface-secondary (semantic)', () => {
             const { container } = render(
                 <SectionWrapper background="alternate">
                     <p>child</p>
                 </SectionWrapper>
             )
-            expect(container.querySelector('section')?.className).toContain('--surface-2')
+            expect(container.querySelector('section')?.className).toContain('--surface-secondary')
         })
 
-        it('accent background uses --surface-3', () => {
+        it('accent background uses --surface-card (semantic)', () => {
             const { container } = render(
                 <SectionWrapper background="accent">
                     <p>child</p>
                 </SectionWrapper>
             )
-            expect(container.querySelector('section')?.className).toContain('--surface-3')
+            expect(container.querySelector('section')?.className).toContain('--surface-card')
         })
 
         it('transparent background removes surface color', () => {
