@@ -5,9 +5,9 @@
 > Xem scope: [phase-05-block-audit.md](phase-05-block-audit.md)
 
 **Total:** 50 blocks (index.tsx) + hero 11 variant files
-**Done:** 7 / 50 (14%) — Batch A ✅ + Batch B 2/9
+**Done:** 8 / 50 (16%) — Batch A ✅ + Batch B 3/9 (sequential pilot done)
 **In progress:** 0
-**Pending:** 43
+**Pending:** 42
 
 ---
 
@@ -38,8 +38,8 @@
 | # | Block | LOC | Status | Commit | Notes |
 |---|---|---|---|---|---|
 | 6 | pricing | 727 → 789 (+62 helpers) | ✅ | `3092451` | Pilot Batch B #1. 5 helpers (PricingSection/PriceDisplay/PlanCTA/FeatureList + upgraded SectionHeader). 8 variants (cards/horizontal/toggle/tiered/comparison/table/minimal/slider — plan ghi 7, sai). Touch targets: slider arrows 40→44px, slider dots 10→44px hit, toggle switch 28→44px hit, minimal "view features" → 44px. 12/12 pricing tests, 91/91 cross, 3889/3890 full (1 flaky). |
-| 7 | gallery | 547 → 531 (-16) | ✅ | TBD | Batch B #2. 3 helpers (GallerySection/GalleryHeader/GalleryImageCard). 6 variants (grid/masonry/carousel/lightbox/filmstrip/justified). GalleryImageCard handles image+placeholder fallback + caption overlay (4+ inline dedupes). Touch targets: carousel arrows 40→44px, carousel dots 10→44px hit, lightbox close/prev/next p-2→44px. 9/9 gallery tests, 100/100 cross. |
-| 8 | contact | 486 | ☐ | — | Form-heavy |
+| 7 | gallery | 547 → 531 (-16) | ✅ | `537f61b` | Batch B #2. 3 helpers (GallerySection/GalleryHeader/GalleryImageCard). 6 variants (grid/masonry/carousel/lightbox/filmstrip/justified). GalleryImageCard handles image+placeholder fallback + caption overlay (4+ inline dedupes). Touch targets: carousel arrows 40→44px, carousel dots 10→44px hit, lightbox close/prev/next p-2→44px. 9/9 gallery tests, 100/100 cross. |
+| 8 | contact | 486 → 407 (**-79**) | ✅ | TBD | Batch B #3 (sequential pilot done). 4 new helpers (ContactSection/ContactHeader/ContactInfoCard/ContactForm) + upgraded SubmitButton TOUCH_TARGET. ContactInfoCard polymorphic (inline/center layout) replaces 9 inline copies — biggest dedup ratio. 6 variants (form/card-float/map-split/minimal-inline/info-only/split). Minimal-inline Send button +TOUCH_TARGET. 11/11 contact tests, 111/111 cross. |
 | 9 | newsletter | 215 | ☐ | — | |
 | 10 | about | 207 | ☐ | — | |
 | 11 | faq | 190 | ☐ | — | |
