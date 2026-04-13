@@ -12,6 +12,7 @@ import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
 import { LogoEditor } from './LogoEditor'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { PageData } from '@/store/editorStore'
+import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
@@ -157,6 +158,8 @@ function SettingsPanelInner({
     onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate
 }: SettingsPanelProps) {
+    const { t } = useI18n()
+    const pm = t.editor.pageManager
     // Version key: changes when block data changes (from inline editing or AI) → forces input re-mount
     const blockDataVersion = useMemo(() => {
         if (!block) return ''
@@ -471,7 +474,7 @@ function SettingsPanelInner({
                         className={editorInputClassName}
                     />
                     {site?.status === 'published' && !isHomepage ? (
-                        <p className="mt-1 text-[10px] text-amber-400">Slug is locked after publishing to protect SEO and external links.</p>
+                        <p className="mt-1 text-[10px] text-amber-400">{pm.slugLocked}</p>
                     ) : null}
                     {seoFieldError ? (
                         <p className="mt-1 text-[10px] text-rose-400">{seoFieldError}</p>
