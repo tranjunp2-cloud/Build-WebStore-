@@ -5,9 +5,25 @@
 > Xem scope: [phase-05-block-audit.md](phase-05-block-audit.md)
 
 **Total:** 50 blocks (index.tsx) + hero 11 variant files
-**Done:** 8 / 50 (16%) — Batch A ✅ + Batch B 3/9 (sequential pilot done)
+**Done:** 22 / 50 (44%) — Batch A ✅ + Batch B 8/9 + Batch C 9/36
 **In progress:** 0
-**Pending:** 42
+**Pending:** 28
+
+## Parallel Agent Batch — commit `a398ff7` (2026-04-13)
+Spawned 3 parallel subagents, all 3 hit API 500 errors mid-execution.
+14 blocks completed before crashes, committed as single batch (TSC + full
+suite pass). Remaining 28 blocks deferred to sequential main-agent work.
+
+**Blocks in a398ff7 (14):**
+- Batch B: newsletter, about, faq, stats, team (5/6, missing cta)
+- Batch C1: booking-widget, product-quick-view, property-card (3/9)
+- Batch C2: products-featured, social-widget, pricing-table, feature-comparison, step-process, portfolio-grid (6/14)
+
+**Remaining 28 blocks:**
+- Batch B (1): cta
+- Batch C1 (6): menu-display, class-schedule, doctor-profile, video-showcase, carousel, review-cards
+- Batch C2 (8): menu-food, download-cta, service-cards, before-after, countdown-timer, blog-list, products-grid, social-proof
+- Batch C3 (13): accordion, client-logos, video-background, cart-widget, google-maps, gallery-masonry, announcement-bar, whatsapp-button, divider, breadcrumb, video, logo-cloud, custom-html
 
 ---
 
@@ -39,7 +55,7 @@
 |---|---|---|---|---|---|
 | 6 | pricing | 727 → 789 (+62 helpers) | ✅ | `3092451` | Pilot Batch B #1. 5 helpers (PricingSection/PriceDisplay/PlanCTA/FeatureList + upgraded SectionHeader). 8 variants (cards/horizontal/toggle/tiered/comparison/table/minimal/slider — plan ghi 7, sai). Touch targets: slider arrows 40→44px, slider dots 10→44px hit, toggle switch 28→44px hit, minimal "view features" → 44px. 12/12 pricing tests, 91/91 cross, 3889/3890 full (1 flaky). |
 | 7 | gallery | 547 → 531 (-16) | ✅ | `537f61b` | Batch B #2. 3 helpers (GallerySection/GalleryHeader/GalleryImageCard). 6 variants (grid/masonry/carousel/lightbox/filmstrip/justified). GalleryImageCard handles image+placeholder fallback + caption overlay (4+ inline dedupes). Touch targets: carousel arrows 40→44px, carousel dots 10→44px hit, lightbox close/prev/next p-2→44px. 9/9 gallery tests, 100/100 cross. |
-| 8 | contact | 486 → 407 (**-79**) | ✅ | TBD | Batch B #3 (sequential pilot done). 4 new helpers (ContactSection/ContactHeader/ContactInfoCard/ContactForm) + upgraded SubmitButton TOUCH_TARGET. ContactInfoCard polymorphic (inline/center layout) replaces 9 inline copies — biggest dedup ratio. 6 variants (form/card-float/map-split/minimal-inline/info-only/split). Minimal-inline Send button +TOUCH_TARGET. 11/11 contact tests, 111/111 cross. |
+| 8 | contact | 486 → 407 (**-79**) | ✅ | `dc357f9` | Batch B #3 (sequential pilot done). 4 new helpers (ContactSection/ContactHeader/ContactInfoCard/ContactForm) + upgraded SubmitButton TOUCH_TARGET. ContactInfoCard polymorphic (inline/center layout) replaces 9 inline copies — biggest dedup ratio. 6 variants (form/card-float/map-split/minimal-inline/info-only/split). Minimal-inline Send button +TOUCH_TARGET. 11/11 contact tests, 111/111 cross. |
 | 9 | newsletter | 215 | ☐ | — | |
 | 10 | about | 207 | ☐ | — | |
 | 11 | faq | 190 | ☐ | — | |
