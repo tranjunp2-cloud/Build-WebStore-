@@ -179,8 +179,6 @@ jobs:
         with:
           bot-url: ${{ secrets.BOT_NOTIFY_URL }}
           bot-secret: ${{ secrets.BOT_SECRET }}
-          lark-webhook-url: ${{ secrets.LARK_WEBHOOK_CI || secrets.LARK_WEBHOOK_URL }}
-          lark-sign-key: ${{ secrets.LARK_SIGN_KEY_CI || secrets.LARK_SIGN_KEY }}
           event: 'ci_fail'
           branch: ${{ steps.notify_info.outputs.branch }}
           author: ${{ steps.notify_info.outputs.author }}
