@@ -1,6 +1,8 @@
 import { getCategoryContent } from '@/lib/ai/content'
 import type { CategoryContent, BusinessSample } from '@/lib/ai/content/types'
 import type { ThemePreset } from '@/lib/ai/theme-presets'
+import { blockRegistry } from '@/blocks/registry'
+import { enforceMinContent } from './openai-generator'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -9,6 +11,56 @@ export type ComposerInput = {
   businessIndex: number
   variant: 'starter' | 'professional' | 'premium'
   themePreset: ThemePreset
+  compositionSeed?: number  // Seed for variety — undefined = backward-compatible (no shuffle)
+}
+
+// ── Seeded PRNG Utilities ─────────────────────────────────────────────────
+
+function createSeededRandom(seed: number): () => number {
+  let s = seed
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
+    return (s >>> 0) / 0xFFFFFFFF
+  }
+}
+
+function shuffleArray<T>(arr: T[], rand: () => number): T[] {
+  const copy = [...arr]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [copy[i], copy[j]] = [copy[j]!, copy[i]!]
+  }
+  return copy
+}
+
+// ── Seed-Based Variant Selection ──────────────────────────────────────────
+
+const BROKEN_VARIANTS: Record<string, string[]> = {
+  hero: ['animated-gradient'],
+}
+
+function simpleHash(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash)
+}
+
+/**
+ * Select a variant deterministically based on seed.
+ * Same seed + blockType + category = always same variant.
+ */
+function selectVariant(blockType: string, seed: number, category: string): string {
+  const meta = blockRegistry.has(blockType) ? blockRegistry.getBlockMeta(blockType) : null
+  if (!meta || meta.variants.length <= 1) return meta?.defaultVariant ?? 'default'
+
+  const broken = BROKEN_VARIANTS[blockType] ?? []
+  const safe = meta.variants.filter(v => !broken.includes(v))
+  if (safe.length === 0) return meta.defaultVariant ?? meta.variants[0]!
+
+  const hash = simpleHash(blockType + category + seed)
+  return safe[hash % safe.length]!
 }
 
 export type TemplateSeed = {
@@ -820,62 +872,104 @@ function buildHomePage(
   variant: 'starter' | 'professional' | 'premium',
   themePresetIndex: number,
   pages: string[],
+  compositionSeed?: number,
 ): TemplatePage {
+  // Helper: get variant for a block type — seed-based if available, else hardcoded default
+  const getVariant = (blockType: string, fallback: string): string => {
+    if (compositionSeed != null) {
+      return selectVariant(blockType, compositionSeed, category)
+    }
+    // Legacy: use themePresetIndex for hero only, hardcoded for rest
+    if (blockType === 'hero') {
+      const heroVariants = CATEGORY_HERO_VARIANTS[category] ?? ['centered']
+      return heroVariants[themePresetIndex % heroVariants.length]!
+    }
+    return fallback
+  }
+
   const blocks: Record<string, unknown>[] = []
 
   // Navigation always first
-  blocks.push(buildNavigation(biz, pages))
+  blocks.push({ ...buildNavigation(biz, pages), variant: getVariant('navigation', 'simple') })
 
-  // Hero
-  blocks.push(buildHero(biz, category, themePresetIndex))
+  // Hero always second
+  blocks.push({ ...buildHero(biz, category, themePresetIndex), variant: getVariant('hero', 'centered') })
 
-  // Features / Services
-  blocks.push(buildFeatures(biz, category))
+  // Middle blocks — collect all, then optionally shuffle
+  const middleBlocks: Record<string, unknown>[] = []
+
+  // Features / Services (always included)
+  middleBlocks.push({ ...buildFeatures(biz, category), variant: getVariant('features', 'grid-3') })
 
   if (variant === 'professional' || variant === 'premium') {
-    // Stats
-    blocks.push(buildStats(category))
+    middleBlocks.push({ ...buildStats(category), variant: getVariant('stats', 'row') })
+    middleBlocks.push({ ...buildGallery(biz), variant: getVariant('gallery', 'grid') })
 
-    // Gallery
-    blocks.push(buildGallery(biz))
-
-    // 1-2 industry blocks for professional
+    // Industry blocks
     const industryBlockTypes = CATEGORY_INDUSTRY_BLOCKS[category] ?? []
     const maxIndustry = variant === 'premium' ? industryBlockTypes.length : Math.min(2, industryBlockTypes.length)
     for (let i = 0; i < maxIndustry; i++) {
       const block = buildIndustryBlock(industryBlockTypes[i]!, content, biz, category)
-      if (block) blocks.push(block)
+      if (block) middleBlocks.push(block)
     }
   }
 
   // Testimonials
-  blocks.push(buildTestimonials(content))
+  const testimonialsVariant = getVariant('testimonials', 'cards')
+  const finalTestimonialsVariant = enforceMinContent('testimonials', testimonialsVariant, content.testimonials.length)
+  middleBlocks.push({ ...buildTestimonials(content), variant: finalTestimonialsVariant })
 
   if (variant === 'professional' || variant === 'premium') {
-    // FAQ
-    blocks.push(buildFAQ(content))
-    // CTA
-    blocks.push(buildCTA(biz))
+    middleBlocks.push({ ...buildFAQ(content), variant: getVariant('faq', 'accordion') })
+    middleBlocks.push({ ...buildCTA(biz), variant: getVariant('cta', 'banner') })
   }
 
   if (variant === 'premium') {
-    // Pricing
-    blocks.push(buildPricing(category))
-    // Team
-    blocks.push(buildTeam(category))
-    // Newsletter
-    blocks.push(buildNewsletter(biz))
+    middleBlocks.push({ ...buildPricing(category), variant: getVariant('pricing', 'cards') })
+    middleBlocks.push({ ...buildTeam(category), variant: getVariant('team', 'grid') })
+    middleBlocks.push({ ...buildNewsletter(biz), variant: getVariant('newsletter', 'inline') })
+  }
+
+  // Shuffle middle blocks if seed provided (backward-compatible: no seed = no shuffle)
+  if (compositionSeed != null) {
+    const rand = createSeededRandom(compositionSeed)
+    // Ordering constraints: features must be before stats
+    const shuffled = shuffleArray(middleBlocks, rand)
+    // Enforce: features before stats, features before testimonials
+    const enforced = enforceBlockOrdering(shuffled)
+    blocks.push(...enforced)
+  } else {
+    blocks.push(...middleBlocks)
   }
 
   // Contact (starter only puts it on home page)
   if (variant === 'starter') {
-    blocks.push(buildContact(biz))
+    blocks.push({ ...buildContact(biz), variant: getVariant('contact', 'split') })
   }
 
   // Footer always last
-  blocks.push(buildFooter(biz, pages))
+  blocks.push({ ...buildFooter(biz, pages), variant: getVariant('footer', 'expanded') })
 
   return { title: 'Home', slug: '/', layout: blocks }
+}
+
+/** Enforce ordering: features before stats, about before team */
+function enforceBlockOrdering(blocks: Record<string, unknown>[]): Record<string, unknown>[] {
+  const result = [...blocks]
+  const deps: [string, string][] = [
+    ['features', 'stats'],
+    ['features', 'testimonials'],
+  ]
+  for (const [before, after] of deps) {
+    const beforeIdx = result.findIndex(b => b.blockType === before)
+    const afterIdx = result.findIndex(b => b.blockType === after)
+    if (beforeIdx >= 0 && afterIdx >= 0 && beforeIdx > afterIdx) {
+      const [moved] = result.splice(beforeIdx, 1)
+      const newAfterIdx = result.findIndex(b => b.blockType === after)
+      result.splice(newAfterIdx, 0, moved!)
+    }
+  }
+  return result
 }
 
 function buildAboutPage(biz: BusinessSample, content: CategoryContent, category: string, pages: string[]): TemplatePage {
@@ -959,6 +1053,7 @@ import type { TemplatePreset, BlockSpec } from './template-definitions'
 /**
  * Build a single block from a BlockSpec blueprint.
  * Dispatches to existing block builders, passing optional variant/count overrides.
+ * When spec.variant is undefined and compositionSeed is provided, auto-selects via selectVariant().
  */
 function buildBlockFromSpec(
   spec: BlockSpec,
@@ -966,44 +1061,47 @@ function buildBlockFromSpec(
   biz: BusinessSample,
   category: string,
   pageNames: string[],
+  compositionSeed?: number,
 ): Record<string, unknown> {
+  // Auto-select variant if not specified in blueprint and seed is available
+  const resolvedVariant = spec.variant ?? (compositionSeed != null ? selectVariant(spec.blockType, compositionSeed, category) : undefined)
   switch (spec.blockType) {
     case 'navigation':
-      return { ...buildNavigation(biz, pageNames), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildNavigation(biz, pageNames), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'hero':
       return {
         ...buildHero(biz, category, 0),
-        ...(spec.variant ? { variant: spec.variant } : {}),
+        ...(resolvedVariant ? { variant: resolvedVariant } : {}),
         ...(spec.overrides ?? {}),
       }
     case 'features':
-      return { ...buildFeatures(biz, category), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildFeatures(biz, category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'testimonials':
-      return { ...buildTestimonials(content), ...(spec.variant ? { variant: spec.variant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
+      return { ...buildTestimonials(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
     case 'contact':
-      return { ...buildContact(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildContact(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'footer':
-      return { ...buildFooter(biz, pageNames), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildFooter(biz, pageNames), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'stats':
-      return { ...buildStats(category), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildStats(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'gallery':
     case 'gallery-masonry':
-      return { ...buildGallery(biz), blockType: spec.blockType, ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildGallery(biz), blockType: spec.blockType, ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'faq':
-      return { ...buildFAQ(content), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildFAQ(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'cta':
-      return { ...buildCTA(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildCTA(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'about':
-      return { ...buildAbout(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildAbout(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'pricing':
-      return { ...buildPricing(category), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildPricing(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'team':
-      return { ...buildTeam(category), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildTeam(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'newsletter':
-      return { ...buildNewsletter(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildNewsletter(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'logo-cloud':
     case 'client-logos':
-      return { ...buildClientLogos(), blockType: spec.blockType, ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildClientLogos(), blockType: spec.blockType, ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     // Industry-specific blocks
     case 'menu-display':
       return buildMenuDisplay(content)
@@ -1030,25 +1128,25 @@ function buildBlockFromSpec(
     case 'pricing-table':
       return buildPricingTable()
     case 'before-after':
-      return { blockType: 'before-after', variant: spec.variant ?? 'slider' }
+      return { blockType: 'before-after', variant: resolvedVariant ?? 'slider' }
     case 'countdown-timer':
-      return { blockType: 'countdown-timer', variant: spec.variant ?? 'elegant', targetDate: '2026-12-31T00:00:00' }
+      return { blockType: 'countdown-timer', variant: resolvedVariant ?? 'elegant', targetDate: '2026-12-31T00:00:00' }
     case 'blog-list':
-      return { blockType: 'blog-list', variant: spec.variant ?? 'grid', count: spec.count ?? 3 }
+      return { blockType: 'blog-list', variant: resolvedVariant ?? 'grid', count: spec.count ?? 3 }
     case 'social-proof':
-      return { blockType: 'social-proof', variant: spec.variant ?? 'counter' }
+      return { blockType: 'social-proof', variant: resolvedVariant ?? 'counter' }
     case 'products-grid':
-      return { blockType: 'products-grid', variant: spec.variant ?? 'grid-3', count: spec.count ?? 6 }
+      return { blockType: 'products-grid', variant: resolvedVariant ?? 'grid-3', count: spec.count ?? 6 }
     // ── Aliases: map preset blockType names to actual block builders ──
     case 'contact-form':
-      return { ...buildContact(biz), blockType: 'contact', ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildContact(biz), blockType: 'contact', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'map':
     case 'map-embed':
     case 'google-maps':
-      return { blockType: 'google-maps', variant: spec.variant ?? 'default', address: biz.address, height: '400px' }
+      return { blockType: 'google-maps', variant: resolvedVariant ?? 'default', address: biz.address, height: '400px' }
     case 'content':
     case 'content-block':
-      return { ...buildAbout(biz), blockType: 'about', ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildAbout(biz), blockType: 'about', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'timeline':
       return { ...buildAbout(biz), blockType: 'about', variant: 'timeline' }
     default:
@@ -1057,15 +1155,16 @@ function buildBlockFromSpec(
       if (industryBlock) return industryBlock
       // Unknown block — return minimal spec to avoid silent skip
       console.warn(`[Composer] Unknown blockType: ${spec.blockType}`)
-      return { blockType: spec.blockType, variant: spec.variant ?? 'default' }
+      return { blockType: spec.blockType, variant: resolvedVariant ?? 'default' }
   }
 }
 
 /**
  * Compose a template from a TemplatePreset blueprint.
  * Reads pages[].blocks[] and builds each block — no algorithmic guessing.
+ * When BlockSpec.variant is undefined, uses selectVariant() for seed-based variety.
  */
-export function composeFromBlueprint(preset: TemplatePreset): TemplateSeed {
+export function composeFromBlueprint(preset: TemplatePreset, compositionSeed?: number): TemplateSeed {
   const content = getCategoryContent(preset.category)
   if (!content) {
     throw new Error(`[composeFromBlueprint] Content not found for category: ${preset.category}`)
@@ -1076,13 +1175,16 @@ export function composeFromBlueprint(preset: TemplatePreset): TemplateSeed {
     throw new Error(`[composeFromBlueprint] businessIndex ${preset.businessIndex} out of range for ${preset.category} (has ${content.businesses.length})`)
   }
 
+  // Use businessIndex as seed if not provided — each template gets deterministic but different variants
+  const seed = compositionSeed ?? preset.businessIndex * 7919
+
   const pageNames = preset.pages.map((p) => p.name)
 
   const pages: TemplatePage[] = preset.pages.map((page) => ({
     title: page.name,
     slug: page.slug,
     layout: page.blocks.map((spec) =>
-      buildBlockFromSpec(spec, content, biz, preset.category, pageNames),
+      buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed),
     ),
   }))
 
@@ -1115,7 +1217,7 @@ export function composeTemplate(input: ComposerInput): TemplateSeed {
   const templatePages: TemplatePage[] = []
 
   // Home page (always present)
-  templatePages.push(buildHomePage(biz, content, input.category, input.variant, input.businessIndex, pages))
+  templatePages.push(buildHomePage(biz, content, input.category, input.variant, input.businessIndex, pages, input.compositionSeed))
 
   // Additional pages for professional/premium
   if (input.variant === 'professional' || input.variant === 'premium') {
