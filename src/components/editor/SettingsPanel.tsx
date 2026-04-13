@@ -20,6 +20,25 @@ function stripHtmlForDisplay(value: unknown): string {
     return value.replace(/<[^>]*>/g, '')
 }
 
+/** Strip HTML tags from input to prevent XSS */
+function sanitizeInput(value: string): string {
+    return value.replace(/<[^>]*>/g, '').trim()
+}
+
+/** Check if input contains HTML/script injection */
+function containsHtml(value: string): boolean {
+    return /<[^>]*>/i.test(value)
+}
+
+/** Validate URL format — only allow http/https */
+function isValidUrl(value: string): boolean {
+    if (!value) return true
+    try {
+        const url = new URL(value)
+        return url.protocol === 'http:' || url.protocol === 'https:'
+    } catch { return false }
+}
+
 type SocialWidgetLink = {
     platform: 'facebook' | 'whatsapp' | 'instagram' | 'linkedin' | 'youtube'
     url: string
@@ -260,7 +279,12 @@ function SettingsPanelInner({
                         <Input
                             defaultValue={siteName || site?.name || ''}
                             key={`business-name-${siteName || site?.name || ''}`}
-                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ name: e.target.value })}
+                            onBlur={(e: FieldBlurEvent) => {
+                                const sanitized = sanitizeInput(e.target.value)
+                                if (sanitized !== e.target.value) e.target.value = sanitized
+                                onSiteSettingsChange?.({ name: sanitized })
+                            }}
+                            maxLength={200}
                             variant="editor"
                             className={editorInputClassName}
                             placeholder="Your Company"
@@ -332,22 +356,33 @@ function SettingsPanelInner({
 
             {renderGlobalAccordion('social', 'Social Links', (
                 <div className="space-y-3">
-                    <Input
-                        defaultValue={siteSocialLinks.facebook || ''}
-                        key={`social-facebook-${siteSocialLinks.facebook || ''}`}
-                        onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ socialLinks: { ...siteSocialLinks, facebook: e.target.value } })}
-                        variant="editor"
-                        className={editorInputClassName}
-                        placeholder="Facebook URL"
-                    />
-                    <Input
-                        defaultValue={siteSocialLinks.instagram || ''}
-                        key={`social-instagram-${siteSocialLinks.instagram || ''}`}
-                        onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ socialLinks: { ...siteSocialLinks, instagram: e.target.value } })}
-                        variant="editor"
-                        className={editorInputClassName}
-                        placeholder="Instagram URL"
-                    />
+                    {(['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok'] as const).map(platform => (
+                        <Input
+                            key={`social-${platform}-${(siteSocialLinks as Record<string, string>)[platform] || ''}`}
+                            defaultValue={(siteSocialLinks as Record<string, string>)[platform] || ''}
+                            onBlur={(e: FieldBlurEvent) => {
+                                const raw = e.target.value.trim()
+                                if (!raw) {
+                                    onSiteSettingsChange?.({ socialLinks: { ...siteSocialLinks, [platform]: null } })
+                                    return
+                                }
+                                if (containsHtml(raw)) {
+                                    toast.error(`Invalid input for ${platform} — HTML is not allowed`)
+                                    e.target.value = ''
+                                    return
+                                }
+                                if (!isValidUrl(raw)) {
+                                    toast.error(`Please enter a valid URL for ${platform} (https://...)`)
+                                    e.target.value = ''
+                                    return
+                                }
+                                onSiteSettingsChange?.({ socialLinks: { ...siteSocialLinks, [platform]: raw } })
+                            }}
+                            variant="editor"
+                            className={editorInputClassName}
+                            placeholder={`${platform.charAt(0).toUpperCase() + platform.slice(1)} URL`}
+                        />
+                    ))}
                 </div>
             ))}
 

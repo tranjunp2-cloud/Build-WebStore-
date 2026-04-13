@@ -1605,6 +1605,40 @@
         "maintenance": {
             "banner": "Website is in Maintenance Mode. Customers will see a maintenance page.",
             "republish": "Re-publish"
+        },
+        "pageManager": {
+            "addNewPage": "+ Add New Page",
+            "searchPlaceholder": "Search pages...",
+            "pageNamePlaceholder": "Page name (e.g. Promotions)",
+            "slugPreview": "Slug:",
+            "cancel": "Cancel",
+            "create": "Create",
+            "home": "Home",
+            "editing": "Editing",
+            "editWithAI": "Edit with AI Chat",
+            "visible": "Visible",
+            "hidden": "Hidden",
+            "delete": "Delete",
+            "pageCreated": "Page created successfully",
+            "pageHidden": "Page hidden",
+            "visibilityFailed": "Failed to update visibility",
+            "deleteFailed": "Failed to delete page",
+            "deleteSuccess": "Page deleted. Undo?",
+            "undo": "Undo",
+            "restored": "Page restored",
+            "restoreFailed": "Failed to restore page",
+            "hidePage": "Hide page",
+            "showPage": "Show page",
+            "deletePage": "Delete page",
+            "homeProtected": "Homepage cannot be deleted",
+            "homeHideProtected": "Homepage cannot be hidden",
+            "deleteConfirmTitle": "Delete this page?",
+            "deleteConfirmMsg": "Are you sure you want to delete page",
+            "deleteConfirmDesc": "You can undo within a few seconds after deletion.",
+            "confirmDelete": "Delete",
+            "customPage": "Custom 404 Page",
+            "emptyTitle": "No pages yet",
+            "emptyDesc": "Create your first page to get started."
         }
     }
 }

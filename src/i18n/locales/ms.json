@@ -1605,6 +1605,40 @@
         "maintenance": {
             "banner": "Laman web dalam Mod Penyelenggaraan. Pelanggan akan melihat halaman penyelenggaraan.",
             "republish": "Terbitkan Semula"
+        },
+        "pageManager": {
+            "addNewPage": "+ Tambah Halaman Baru",
+            "searchPlaceholder": "Cari halaman...",
+            "pageNamePlaceholder": "Nama halaman (cth: Promosi)",
+            "slugPreview": "Slug:",
+            "cancel": "Batal",
+            "create": "Cipta",
+            "home": "Utama",
+            "editing": "Menyunting",
+            "editWithAI": "Sunting dengan AI Chat",
+            "visible": "Terlihat",
+            "hidden": "Tersembunyi",
+            "delete": "Padam",
+            "pageCreated": "Halaman berjaya dicipta",
+            "pageHidden": "Halaman disembunyikan",
+            "visibilityFailed": "Gagal mengemas kini keterlihatan",
+            "deleteFailed": "Gagal memadam halaman",
+            "deleteSuccess": "Halaman dipadam. Buat asal?",
+            "undo": "Buat Asal",
+            "restored": "Halaman dipulihkan",
+            "restoreFailed": "Gagal memulihkan halaman",
+            "hidePage": "Sembunyikan halaman",
+            "showPage": "Tunjukkan halaman",
+            "deletePage": "Padam halaman",
+            "homeProtected": "Halaman utama tidak boleh dipadam",
+            "homeHideProtected": "Halaman utama tidak boleh disembunyikan",
+            "deleteConfirmTitle": "Padam halaman ini?",
+            "deleteConfirmMsg": "Adakah anda pasti mahu memadam halaman",
+            "deleteConfirmDesc": "Anda boleh buat asal dalam beberapa saat selepas pemadaman.",
+            "confirmDelete": "Padam",
+            "customPage": "Halaman 404 Tersuai",
+            "emptyTitle": "Tiada halaman lagi",
+            "emptyDesc": "Cipta halaman pertama anda untuk bermula."
         }
     }
 }

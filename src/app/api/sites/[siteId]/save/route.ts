@@ -61,7 +61,7 @@ export async function PATCH(
         }>;
         const siteUpdateData: SiteUpdateData = {}
         if (theme) siteUpdateData.theme = theme
-        if (siteName) siteUpdateData.name = siteName
+        if (siteName) siteUpdateData.name = siteName as string
         if (locale) siteUpdateData.locale = locale
         if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig
         if (headerBlock !== undefined) siteUpdateData.headerBlock = headerBlock
