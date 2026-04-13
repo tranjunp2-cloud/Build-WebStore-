@@ -116,3 +116,51 @@ export const TOUCH_TARGET = {
 } as const
 
 export type TouchTargetToken = keyof typeof TOUCH_TARGET
+
+// ── Typography Scale (Phase 02) ─────────────────────────────────────────────
+// Modular scale ratio 1.25 (minor third). Body text is NEVER smaller than 16px
+// to respect mobile zoom behavior and reading comfort.
+export const TYPE_SCALE = {
+    // Display — hero headlines only
+    display: 'text-4xl md:text-5xl lg:text-6xl',    // 36 → 60px
+    // H1 — page titles
+    h1: 'text-3xl md:text-4xl lg:text-5xl',          // 30 → 48px
+    // H2 — section titles
+    h2: 'text-2xl md:text-3xl',                       // 24 → 30px
+    // H3 — card titles, sub-sections
+    h3: 'text-xl md:text-2xl',                        // 20 → 24px
+    // H4 — small titles
+    h4: 'text-lg md:text-xl',                         // 18 → 20px
+    // Body — paragraphs (MIN 16px, never below)
+    body: 'text-base',                                // 16px
+    // Body large — emphasis paragraphs
+    bodyLg: 'text-lg md:text-xl',                     // 18 → 20px
+    // Small — captions, meta
+    small: 'text-sm',                                 // 14px
+} as const
+
+export type TypeScaleToken = keyof typeof TYPE_SCALE
+
+// ── Line Height (per type level) ────────────────────────────────────────────
+export const LINE_HEIGHT = {
+    display: 'leading-[1.1]',
+    heading: 'leading-[1.2]',
+    body: 'leading-[1.6]',
+    small: 'leading-[1.4]',
+} as const
+
+export type LineHeightToken = keyof typeof LINE_HEIGHT
+
+// ── Font Weight ─────────────────────────────────────────────────────────────
+export const FONT_WEIGHT = {
+    heading: 'font-bold',       // 700 — main headings
+    subheading: 'font-semibold', // 600 — sub-titles
+    body: 'font-normal',         // 400 — body copy
+    emphasis: 'font-medium',     // 500 — inline emphasis
+} as const
+
+export type FontWeightToken = keyof typeof FONT_WEIGHT
+
+// ── Max Prose Width (readability) ───────────────────────────────────────────
+// ~65ch — optimal measure for body reading (45-75 chars per line).
+export const MAX_PROSE = 'max-w-prose'

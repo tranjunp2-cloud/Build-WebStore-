@@ -1,5 +1,9 @@
 import type { ThemeConfig } from '@/blocks/types'
-import { getFontPairing } from '@/lib/fonts/pairings'
+import {
+    getFontPairing,
+    validateFontPairing,
+    fontNameToCSSVar,
+} from '@/lib/fonts/pairings'
 
 // ── Hex Color Manipulation Helpers ──────────────────────────────────────────
 
@@ -101,12 +105,32 @@ function resolveBodyFont(pairingId: string | null | undefined): string {
 // Resolves a partial theme (from DB with missing fields) into a full ThemeConfig.
 // Backward compatible: existing sites with only primaryColor + secondaryColor work identically.
 
+const DEFAULT_HEADING_FONT = 'Outfit'
+const DEFAULT_BODY_FONT = 'Inter'
+
 export function resolveTheme(
     partial: Partial<ThemeConfig> & { primaryColor?: string; colorMode?: 'light' | 'dark' },
 ): ThemeConfig {
     const colorMode = partial.colorMode || 'dark'
     const isDark = colorMode === 'dark'
     const primaryColor = partial.primaryColor || '#0ea5e9'
+
+    // Resolve font pair (pairingId → lookup, fallback to partial overrides)
+    let fontHeading = partial.fontHeading || resolveHeadingFont(partial.fontPairingId)
+    let fontBody = partial.fontBody || resolveBodyFont(partial.fontPairingId)
+
+    // Phase 02: validate contrast axis — reject same-font pairs silently.
+    // Fallback to safe default (Outfit + Inter) + warn. Never throw.
+    const validation = validateFontPairing(fontHeading, fontBody)
+    if (!validation.valid) {
+        if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+            console.warn(
+                `[design-quality] invalid font pairing "${fontHeading} + ${fontBody}": ${validation.reason}. Falling back to ${DEFAULT_HEADING_FONT} + ${DEFAULT_BODY_FONT}.`,
+            )
+        }
+        fontHeading = DEFAULT_HEADING_FONT
+        fontBody = DEFAULT_BODY_FONT
+    }
 
     return {
         primaryColor,
@@ -117,8 +141,8 @@ export function resolveTheme(
         mutedColor: partial.mutedColor || (isDark ? '#a1a1aa' : '#71717a'),
 
         fontPairingId: partial.fontPairingId ?? null,
-        fontHeading: partial.fontHeading || resolveHeadingFont(partial.fontPairingId),
-        fontBody: partial.fontBody || resolveBodyFont(partial.fontPairingId),
+        fontHeading,
+        fontBody,
 
         spacingPreset: partial.spacingPreset || 'default',
         borderRadius: partial.borderRadius || 'rounded',
@@ -160,9 +184,9 @@ export function generateThemeCSS(theme: ThemeConfig): string {
   --brand-secondary-rgb: ${hexToRGB(theme.secondaryColor || '#d946ef')};
   --brand-accent-rgb: ${hexToRGB(theme.accentColor || '#f59e0b')};
 
-  /* Typography */
-  --font-heading: '${theme.fontHeading || 'Outfit'}', sans-serif;
-  --font-body: '${theme.fontBody || 'Inter'}', sans-serif;
+  /* Typography — references next/font scoped vars from AppShell.tsx */
+  --font-heading: ${fontNameToCSSVar(theme.fontHeading || 'Outfit', 'heading')};
+  --font-body: ${fontNameToCSSVar(theme.fontBody || 'Inter', 'body')};
 
   /* Spacing */
   --space-xs: ${spacing.xs};
@@ -183,12 +207,14 @@ export function generateThemeCSS(theme: ThemeConfig): string {
   --shadow-lg: ${shadow.lg};
 }`
     } catch {
-        // Fallback CSS — prevents blank page on corrupted theme data
+        // Fallback CSS — prevents blank page on corrupted theme data.
+        // Fonts reference the always-loaded next/font vars from AppShell.tsx.
         return `:root {
   --brand-primary: #0ea5e9; --brand-secondary: #d946ef; --brand-accent: #f59e0b;
   --surface: #f8f8f8; --text: #09090b; --muted: #71717a; --background: #ffffff;
   --brand-primary-rgb: 14, 165, 233; --brand-secondary-rgb: 217, 70, 239; --brand-accent-rgb: 245, 158, 11;
-  --font-heading: 'Outfit', sans-serif; --font-body: 'Inter', sans-serif;
+  --font-heading: var(--font-outfit), 'Outfit', sans-serif;
+  --font-body: var(--font-inter), 'Inter', sans-serif;
   --space-xs: 0.25rem; --space-sm: 0.5rem; --space-md: 1rem; --space-lg: 1.5rem;
   --space-xl: 2.5rem; --space-2xl: 4rem; --section-padding: 5rem;
   --radius-sm: 4px; --radius-md: 8px; --radius-lg: 16px; --radius-full: 9999px;
@@ -213,9 +239,10 @@ export const CSS_VARS = {
     primaryRgb: 'var(--brand-primary-rgb, 14, 165, 233)',
     secondaryRgb: 'var(--brand-secondary-rgb, 217, 70, 239)',
     accentRgb: 'var(--brand-accent-rgb, 245, 158, 11)',
-    // Typography
-    fontHeading: "var(--font-heading, 'Outfit', sans-serif)",
-    fontBody: "var(--font-body, 'Inter', sans-serif)",
+    // Typography — --font-heading/--font-body are populated by generateThemeCSS
+    // with var(--font-<pairing>) references, falling back to --font-outfit/inter.
+    fontHeading: 'var(--font-heading, var(--font-outfit))',
+    fontBody: 'var(--font-body, var(--font-inter))',
     // Spacing
     spaceXs: 'var(--space-xs, 0.25rem)',
     spaceSm: 'var(--space-sm, 0.5rem)',

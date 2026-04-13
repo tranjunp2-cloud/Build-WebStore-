@@ -420,11 +420,14 @@ describe('generateThemeCSS — additional edge cases', () => {
         expect(css).toContain('--brand-accent-rgb: 0, 0, 0')
     })
 
-    it('font names are wrapped in single quotes in CSS output', () => {
+    it('font CSS vars reference next/font scoped variables (post-F01D fix)', () => {
+        // Phase 02 fix: generateThemeCSS now outputs var(--font-<pairing>)
+        // references instead of raw family name strings, so next/font-hosted
+        // fonts actually render. Editorial pairing = Playfair Display + Lora.
         const theme = resolveTheme({ fontPairingId: 'editorial' })
         const css = generateThemeCSS(theme)
-        expect(css).toContain("--font-heading: 'Playfair Display'")
-        expect(css).toContain("--font-body: 'Lora'")
+        expect(css).toContain('--font-heading: var(--font-playfair-display)')
+        expect(css).toContain('--font-body: var(--font-lora)')
     })
 
     it('output count contains at least 26 CSS variable declarations', () => {

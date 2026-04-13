@@ -16,8 +16,14 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-                heading: ['var(--font-outfit)', 'system-ui', 'sans-serif'],
+                // Theme-aware chain:
+                //   1. --font-body/heading — populated by generateThemeCSS()
+                //      per site, references the chosen pairing's next/font var
+                //   2. --font-inter/outfit — always loaded in AppShell.tsx,
+                //      safe fallback when no theme CSS present (admin routes)
+                //   3. System fallback
+                sans: ['var(--font-body)', 'var(--font-inter)', 'system-ui', 'sans-serif'],
+                heading: ['var(--font-heading)', 'var(--font-outfit)', 'system-ui', 'sans-serif'],
             },
             colors: {
                 brand: {
