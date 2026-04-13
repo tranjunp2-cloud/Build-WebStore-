@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { revalidateTag } from 'next/cache'
+import { checkTwoTierRateLimit } from '@/lib/rateLimit'
 
 /**
  * PATCH /api/sites/[siteId]/publish
@@ -124,6 +125,19 @@ export async function DELETE(
             return NextResponse.json(
                 { success: false, error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' } },
                 { status: 401 }
+            )
+        }
+
+        // BUG-F01-05: Rate limit unpublish — 5/min burst + 30/hr sustained
+        const rateLimit = await checkTwoTierRateLimit(`unpublish:${user.id}`, 5, 30)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' },
+                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                },
+                { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) } }
             )
         }
 

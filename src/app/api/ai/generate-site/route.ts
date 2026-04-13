@@ -14,6 +14,8 @@ import { blockRegistry } from '@/blocks/registry'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
 import { resolveTheme } from '@/lib/theme/resolve'
+import { ensureNavigationBlocks, type PageShape } from '@/lib/ai/ensure-navigation'
+import { enforcePageVariety } from '@/lib/ai/page-variety'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -392,11 +394,20 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const pageDefinitions = buildGeneratedPages({
+        const rawPageDefinitions = buildGeneratedPages({
             blocks: sanitizedBlocks,
             businessInfo,
             result,
         })
+
+        // BUG-F01-24: guarantee navigation + footer on every page (AI may omit)
+        // BUG-F01-23: enforce visual variety between pages (avoid 4 identical layouts)
+        const pageDefinitions = enforcePageVariety(
+            ensureNavigationBlocks(
+                rawPageDefinitions as unknown as PageShape[],
+                businessInfo.businessName,
+            ),
+        )
 
         const createdPages: Record<string, unknown>[] = []
 

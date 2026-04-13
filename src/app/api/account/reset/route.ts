@@ -3,6 +3,7 @@ import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
 import { assertStaging } from '@/lib/env'
 import { getCurrentUser } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rateLimit'
 
 type CollectionSlug = 'analytics' | 'orders' | 'subscriptions' | 'products' | 'pages' | 'sites'
 
@@ -66,6 +67,19 @@ export async function POST() {
             return NextResponse.json(
                 { success: false, error: { code: 'AUTH_REQUIRED', message: 'Login required' } },
                 { status: 401 },
+            )
+        }
+
+        // BUG-F01-05: Rate limit reset — 3/hr per user (destructive op)
+        const rateLimit = await checkRateLimit(`account-reset:${user.id}`, 3, 3_600_000)
+        if (!rateLimit.allowed) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: { code: 'RATE_LIMITED', message: 'Too many reset attempts. Try again later.' },
+                    retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+                },
+                { status: 429, headers: { 'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)) } },
             )
         }
 
