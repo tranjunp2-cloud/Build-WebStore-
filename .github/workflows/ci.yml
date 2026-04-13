@@ -268,12 +268,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Get commit subject
+        id: commit
+        # First line of the commit message, trimmed to 80 chars.
+        # Bot's extractPRNumber() parses `Merge pull request #N` or `(#N)`
+        # and fetches full PR details from GitHub API — richer cards.
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 80)
+          echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
 
       - name: Install Vercel CLI
         run: npm install --global vercel@50
@@ -370,6 +382,7 @@ jobs:
           branch: staging
           author: ${{ github.actor }}
           commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
           run-url: ${{ steps.deploy.outputs.url }}
 
       - name: Notify deploy fail
@@ -383,6 +396,7 @@ jobs:
           branch: staging
           author: ${{ github.actor }}
           commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
@@ -406,12 +420,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Get commit subject
+        id: commit
+        # First line of the commit message, trimmed to 80 chars.
+        # Bot's extractPRNumber() parses `Merge pull request #N` or `(#N)`
+        # and fetches full PR details from GitHub API — richer cards.
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 80)
+          echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
 
       - name: Install Vercel CLI
         run: npm install --global vercel@50
@@ -466,6 +492,7 @@ jobs:
           branch: main
           author: ${{ github.actor }}
           commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
           run-url: ${{ steps.deploy.outputs.url }}
 
       - name: Notify deploy fail
@@ -479,4 +506,5 @@ jobs:
           branch: main
           author: ${{ github.actor }}
           commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
