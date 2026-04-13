@@ -4,62 +4,19 @@ import {
     validateFontPairing,
     fontNameToCSSVar,
 } from '@/lib/fonts/pairings'
-import { generatePalette, validateThemeColors } from './color-utils'
+import {
+    generatePalette,
+    validateThemeColors,
+    isValidHex,
+    hexToRGBString,
+    lightenHex,
+    hexToHSL,
+    hslToHex,
+} from './color-utils'
 
-// ── Hex Color Manipulation Helpers ──────────────────────────────────────────
-
-const HEX_REGEX = /^#[0-9A-Fa-f]{6}$/
-
-function isValidHex(hex: string): boolean {
-    return HEX_REGEX.test(hex)
-}
-
-export function hexToHSL(hex: string): { h: number; s: number; l: number } {
-    if (!isValidHex(hex)) return { h: 0, s: 0, l: 50 }
-
-    const r = parseInt(hex.slice(1, 3), 16) / 255
-    const g = parseInt(hex.slice(3, 5), 16) / 255
-    const b = parseInt(hex.slice(5, 7), 16) / 255
-
-    const max = Math.max(r, g, b)
-    const min = Math.min(r, g, b)
-    const l = (max + min) / 2
-
-    if (max === min) return { h: 0, s: 0, l: l * 100 }
-
-    const d = max - min
-    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-
-    let h = 0
-    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6
-    else if (max === g) h = ((b - r) / d + 2) / 6
-    else h = ((r - g) / d + 4) / 6
-
-    return { h: h * 360, s: s * 100, l: l * 100 }
-}
-
-export function hslToHex(h: number, s: number, l: number): string {
-    h = ((h % 360) + 360) % 360
-    s = Math.max(0, Math.min(100, s)) / 100
-    l = Math.max(0, Math.min(100, l)) / 100
-
-    const a = s * Math.min(l, 1 - l)
-    const f = (n: number) => {
-        const k = (n + h / 30) % 12
-        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
-        return Math.round(255 * Math.max(0, Math.min(1, color)))
-            .toString(16)
-            .padStart(2, '0')
-    }
-    return `#${f(0)}${f(8)}${f(4)}`
-}
-
-export function lightenHex(hex: string, percent: number): string {
-    if (!isValidHex(hex)) return hex
-    const hsl = hexToHSL(hex)
-    const newL = Math.min(100, hsl.l + percent)
-    return hslToHex(hsl.h, hsl.s, newL)
-}
+// Re-export hex/HSL helpers so existing consumers (tests, AIBuilderPageClient)
+// that import from '@/lib/theme/resolve' keep working without change.
+export { hexToHSL, hslToHex, lightenHex } from './color-utils'
 
 // ── Spacing Presets ─────────────────────────────────────────────────────────
 
@@ -153,28 +110,10 @@ export function resolveTheme(
         backgroundColor: partial.backgroundColor || (isDark ? '#09090b' : '#ffffff'),
     }
 
-    // Phase 03: non-blocking design-quality warnings (pure black text, etc.)
-    if (typeof console !== 'undefined' && typeof console.warn === 'function') {
-        const warnings = validateThemeColors({
-            textColor: resolved.textColor,
-            backgroundColor: resolved.backgroundColor,
-            primaryColor: resolved.primaryColor,
-        })
-        for (const w of warnings) console.warn(w)
-    }
-
     return resolved
 }
 
 // ── CSS Custom Properties Generator ─────────────────────────────────────────
-
-function hexToRGB(hex: string): string {
-    if (!isValidHex(hex)) return '0, 0, 0'
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
-    return `${r}, ${g}, ${b}`
-}
 
 export function generateThemeCSS(theme: ThemeConfig): string {
     try {
@@ -190,6 +129,18 @@ export function generateThemeCSS(theme: ThemeConfig): string {
             theme.colorMode || 'dark',
         )
 
+        // Non-blocking design-quality warnings — runs ONCE per CSS emit
+        // (not per resolveTheme call). Safe because generateThemeCSS is only
+        // invoked when a site actually renders, not on every config read.
+        if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+            const warnings = validateThemeColors({
+                textColor: theme.textColor,
+                backgroundColor: theme.backgroundColor,
+                primaryColor: theme.primaryColor,
+            })
+            for (const w of warnings) console.warn(w)
+        }
+
         return `:root {
   /* Colors (legacy brand vars — preserved for backward compat) */
   --brand-primary: ${theme.primaryColor || '#0ea5e9'};
@@ -201,9 +152,9 @@ export function generateThemeCSS(theme: ThemeConfig): string {
   --background: ${theme.backgroundColor || '#ffffff'};
 
   /* RGB variants for opacity */
-  --brand-primary-rgb: ${hexToRGB(theme.primaryColor || '#0ea5e9')};
-  --brand-secondary-rgb: ${hexToRGB(theme.secondaryColor || '#d946ef')};
-  --brand-accent-rgb: ${hexToRGB(theme.accentColor || '#f59e0b')};
+  --brand-primary-rgb: ${hexToRGBString(theme.primaryColor || '#0ea5e9')};
+  --brand-secondary-rgb: ${hexToRGBString(theme.secondaryColor || '#d946ef')};
+  --brand-accent-rgb: ${hexToRGBString(theme.accentColor || '#f59e0b')};
 
   /* Semantic color layer (Phase 03 — 60-30-10) */
   --accent: ${palette.accent};
@@ -246,16 +197,18 @@ export function generateThemeCSS(theme: ThemeConfig): string {
 }`
     } catch {
         // Fallback CSS — prevents blank page on corrupted theme data.
-        // Fonts reference the always-loaded next/font vars from AppShell.tsx.
-        // Semantic layer uses static dark-mode values as safe defaults.
+        // Reuse the SAME palette generator as the happy path so values stay
+        // consistent and maintenance-free (no hardcoded drift). Safe defaults:
+        // sky blue primary + dark mode.
+        const palette = generatePalette('#0ea5e9', 'dark')
         return `:root {
   --brand-primary: #0ea5e9; --brand-secondary: #d946ef; --brand-accent: #f59e0b;
   --surface: #f8f8f8; --text: #09090b; --muted: #71717a; --background: #ffffff;
   --brand-primary-rgb: 14, 165, 233; --brand-secondary-rgb: 217, 70, 239; --brand-accent-rgb: 245, 158, 11;
-  --accent: #0ea5e9; --accent-hover: #0284c7; --accent-rgb: 14, 165, 233;
-  --surface-primary: #0f1114; --surface-secondary: #16181c; --surface-card: #1d2026;
-  --text-primary: #f6f8fa; --text-secondary: #a1a9b3; --text-inverse: #0f1114; --text-muted: #71797f;
-  --border-semantic: #2a2e34; --divider: #22262b;
+  --accent: ${palette.accent}; --accent-hover: ${palette.accentHover}; --accent-rgb: ${palette.accentRgb};
+  --surface-primary: ${palette.surface.primary}; --surface-secondary: ${palette.surface.secondary}; --surface-card: ${palette.surface.card};
+  --text-primary: ${palette.text.primary}; --text-secondary: ${palette.text.secondary}; --text-inverse: ${palette.text.inverse}; --text-muted: ${palette.text.muted};
+  --border-semantic: ${palette.border}; --divider: ${palette.divider};
   --font-heading: var(--font-outfit), 'Outfit', sans-serif;
   --font-body: var(--font-inter), 'Inter', sans-serif;
   --space-xs: 0.25rem; --space-sm: 0.5rem; --space-md: 1rem; --space-lg: 1.5rem;

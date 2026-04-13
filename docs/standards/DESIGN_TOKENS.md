@@ -188,6 +188,51 @@ Phase 05 block audit removes every instance of these.
 | Phase | Scope |
 |-------|-------|
 | Phase 01 | ✅ Tokens + SectionWrapper created |
-| Phase 02 | Typography tokens (TYPE_SCALE, LINE_HEIGHT, FONT_WEIGHT) appended |
-| Phase 03 | Color semantic vars replace `--brand-*` legacy |
+| Phase 02 | ✅ Typography tokens + Typography components + font pairing validator |
+| Phase 03 | ✅ Color semantic layer (additive — runs alongside legacy `--brand-*`) |
 | Phase 05 | 47 blocks refactored to consume tokens (3 batches) |
+
+## Semantic Color Layer (Phase 03)
+
+Phase 03 adds 12 semantic CSS variables computed from the brand color via the
+60-30-10 rule. **Legacy `--brand-*` vars are preserved** — block components
+migrate incrementally during Phase 05 audit.
+
+| Semantic var | Value source | Role |
+|--------------|-------------|------|
+| `--accent` | brand primary | CTA (10% rule) |
+| `--accent-hover` | hsl tuned | CTA hover state |
+| `--accent-rgb` | primary RGB string | rgba() with alpha |
+| `--surface-primary` | `tintNeutral(primary, 99)` light / `(8)` dark | main bg (60%) |
+| `--surface-secondary` | `tintNeutral(primary, 96)` / `(12)` | alternate sections |
+| `--surface-card` | `tintNeutral(primary, 93)` / `(16)` | elevated cards |
+| `--text-primary` | `brandTintedDark(primary)` / tinted light | never pure #000 / #fff |
+| `--text-secondary` | `tintNeutral(primary, 30)` / `(70)` | muted text |
+| `--text-inverse` | inverse of primary | text on dark bg |
+| `--text-muted` | `tintNeutral(primary, 45)` / `(55)` | meta text |
+| `--border-semantic` | `tintNeutral(primary, 85)` / `(22)` | subtle borders |
+| `--divider` | `tintNeutral(primary, 90)` / `(18)` | section dividers |
+
+### Note on `--border-semantic` naming
+
+`globals.css` already defines a legacy `--border: #3f3f46` used by pre-Phase-03
+block code. To avoid silently overriding that value, Phase 03 introduces
+`--border-semantic` as a **transitional** name.
+
+- **During Phase 05 block audit:** blocks consuming `var(--border)` stay on
+  the legacy value. New blocks / migrated blocks use `var(--border-semantic)`.
+- **Post-Phase-05 cleanup** (optional): once all consumers migrate, `--border`
+  can be aliased to `--border-semantic` and the `-semantic` suffix removed.
+
+Phase 03 intentionally does not rename `--border` to prevent breaking the 10+
+existing blocks that already reference it. This is the same additive strategy
+that applies to `--brand-*` → `--accent-*`: legacy stays, semantic adds.
+
+### WCAG AA guarantees
+
+`generatePalette()` is designed so `text-primary` passes WCAG 2.1 AA contrast
+(≥ 4.5:1) against `surface-primary` in both light and dark modes. Unit tests
+in `src/__tests__/unit/theme/color-utils.test.ts` assert this invariant.
+
+Use `checkContrast(fg, bg)` from `@/lib/theme/color-utils` to verify any
+custom foreground/background pair.

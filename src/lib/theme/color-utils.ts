@@ -7,14 +7,17 @@
  *   - 30% subdued (text-secondary/muted, borders)
  *   - 10% accent (CTA only)
  *
+ * This module is the single source of truth for color primitives (hex/HSL
+ * conversion, contrast checking, palette generation). resolve.ts imports
+ * and re-exports the low-level helpers for backward compatibility with
+ * existing test files.
+ *
  * Reference: plans/260412-2300-design-quality-rules/phase-03-color-system.md
  */
 
-import { hexToHSL, hslToHex } from './resolve'
-
 // ── Hex Validation ──────────────────────────────────────────────────────────
 
-const HEX_REGEX = /^#[0-9A-Fa-f]{6}$/
+export const HEX_REGEX = /^#[0-9A-Fa-f]{6}$/
 
 export function isValidHex(hex: string): boolean {
     return HEX_REGEX.test(hex)
@@ -27,6 +30,55 @@ export function hexToRGBString(hex: string): string {
     const g = parseInt(hex.slice(3, 5), 16)
     const b = parseInt(hex.slice(5, 7), 16)
     return `${r}, ${g}, ${b}`
+}
+
+// ── HSL Conversion (moved from resolve.ts to break circular import) ────────
+
+export function hexToHSL(hex: string): { h: number; s: number; l: number } {
+    if (!isValidHex(hex)) return { h: 0, s: 0, l: 50 }
+
+    const r = parseInt(hex.slice(1, 3), 16) / 255
+    const g = parseInt(hex.slice(3, 5), 16) / 255
+    const b = parseInt(hex.slice(5, 7), 16) / 255
+
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    const l = (max + min) / 2
+
+    if (max === min) return { h: 0, s: 0, l: l * 100 }
+
+    const d = max - min
+    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+
+    let h = 0
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+    else if (max === g) h = ((b - r) / d + 2) / 6
+    else h = ((r - g) / d + 4) / 6
+
+    return { h: h * 360, s: s * 100, l: l * 100 }
+}
+
+export function hslToHex(h: number, s: number, l: number): string {
+    h = ((h % 360) + 360) % 360
+    s = Math.max(0, Math.min(100, s)) / 100
+    l = Math.max(0, Math.min(100, l)) / 100
+
+    const a = s * Math.min(l, 1 - l)
+    const f = (n: number) => {
+        const k = (n + h / 30) % 12
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
+        return Math.round(255 * Math.max(0, Math.min(1, color)))
+            .toString(16)
+            .padStart(2, '0')
+    }
+    return `#${f(0)}${f(8)}${f(4)}`
+}
+
+export function lightenHex(hex: string, percent: number): string {
+    if (!isValidHex(hex)) return hex
+    const hsl = hexToHSL(hex)
+    const newL = Math.min(100, hsl.l + percent)
+    return hslToHex(hsl.h, hsl.s, newL)
 }
 
 // ── Brand-Tinted Neutrals ───────────────────────────────────────────────────
