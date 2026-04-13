@@ -23,7 +23,6 @@ on:
     branches: [main, staging]
     paths-ignore:
       - 'docs/**'
-      - '.github/workflows/**'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/CONTRIBUTING.md'
       - '.github/GIT_AND_CI_RULES.md'
@@ -34,7 +33,6 @@ on:
     branches: [main, staging]
     paths-ignore:
       - 'docs/**'
-      - '.github/workflows/**'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/CONTRIBUTING.md'
       - '.github/GIT_AND_CI_RULES.md'
@@ -299,10 +297,15 @@ jobs:
             echo "::error::DATABASE_URI not present in $ENV_FILE"
             exit 1
           fi
+          # TCP-level probe using node builtins — no npm install required.
           node -e "
-            const {Client} = require('pg');
-            const c = new Client({connectionString: process.env.DATABASE_URI});
-            c.connect().then(()=>c.query('SELECT 1')).then(()=>{console.log('pg ok'); return c.end();}).catch(e=>{console.error('pg err:', e.message); process.exit(1);});
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
           "
 
       - name: Build
@@ -390,10 +393,15 @@ jobs:
             echo "::error::DATABASE_URI not present in $ENV_FILE"
             exit 1
           fi
+          # TCP-level probe using node builtins — no npm install required.
           node -e "
-            const {Client} = require('pg');
-            const c = new Client({connectionString: process.env.DATABASE_URI});
-            c.connect().then(()=>c.query('SELECT 1')).then(()=>{console.log('pg ok'); return c.end();}).catch(e=>{console.error('pg err:', e.message); process.exit(1);});
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
           "
 
       - name: Build (prod)
