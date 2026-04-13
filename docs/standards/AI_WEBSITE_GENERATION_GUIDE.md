@@ -34,10 +34,10 @@ Template path (không qua AI):
 
 | File | Dòng | Vai trò |
 |------|------|---------|
-| `src/lib/ai/system-prompt.ts` | ~400 | System + user prompt builder, personalities, composition hints |
-| `src/lib/ai/openai-generator.ts` | ~560 | GPT-4o caller, sanitizer (validate variants, normalize fields) |
-| `src/lib/ai/generate-blocks.ts` | ~315 | Rule-based fallback generator (khi AI fail) |
-| `src/lib/ai/template-composer.ts` | ~1100 | Template builder, 15 builder functions, category content |
+| `src/lib/ai/system-prompt.ts` | 403 | System + user prompt builder, personalities, composition hints |
+| `src/lib/ai/openai-generator.ts` | 982 | GPT-4o caller, sanitizer, fuzzy matching, weighted variants, content guards |
+| `src/lib/ai/generate-blocks.ts` | 718 | Rule-based fallback generator with seeded PRNG |
+| `src/lib/ai/template-composer.ts` | 1248 | Template builder, seed-based variant selection, block shuffle |
 | `src/lib/ai/template-definitions.ts` | ~220 | 48 old + 56 new template definitions, CategoryDNA |
 | `src/lib/ai/content/*.ts` | ~16 files | Category-specific content (testimonials, FAQ, business samples) |
 | `src/blocks/registry.ts` | ~225 | Block metadata, variants, Zod schemas — 47 blocks registered |
@@ -114,10 +114,15 @@ LLMs tạo design trung bình — median training data:
 | Phase | Status | Nội dung |
 |-------|--------|---------|
 | 01 Audit | skipped | Root causes đã confirm từ code review |
-| 02 Fix System Prompt | **done** | VARIETY RULES, context-aware STYLE_PERSONALITIES, dynamic CATEGORY_BLOCK_HINTS, DESIGN QUALITY RULES trong prompt |
-| 03 Fix Sanitizer | pending | Case-insensitive match, weighted-by-category random fallback, logging |
-| 04 Fix Fallback Generator | pending | Seeded PRNG, block pool, 3 themes/category, seed param |
-| 05 Fix Template Composer | pending | compositionSeed, selectVariant(), variant param 15 builders |
+| 02 Fix System Prompt | **done** | VARIETY RULES, DESIGN QUALITY RULES, context-aware personalities, dynamic composition hints |
+| 03 Fix Sanitizer | **done** | Fuzzy match (3 bước), 40+ aliases, 14 categories × 14 block types weights, content-count guard, broken variant exclusion |
+| 04 Fix Fallback Generator | **done** | Seeded PRNG, block pool 4-6 random, 3 themes/category, 3 content variations/category, ordering constraints |
+| 05 Fix Template Composer | **done** | compositionSeed, selectVariant(simpleHash), auto-select in buildBlockFromSpec, middle block shuffle |
+
+### Test Results (2026-04-13)
+- **3694/3694 tests passed** (198 files) — 10 tests updated cho behavior mới
+- TypeScript: 0 errors | Lint: 0 errors
+- PR: https://github.com/primeproduction/ech-prime-web-v2/pull/555 (7 commits)
 
 ### Plan B: Design Quality Rules — Block-Level
 **Path:** `plans/260412-2300-design-quality-rules/`

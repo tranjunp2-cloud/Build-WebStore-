@@ -1,7 +1,7 @@
 ---
 title: "AI Website Generation Pipeline — Variety Audit & Fix"
 description: "Audit and fix why all AI-generated websites look identical despite 47+ blocks with 100+ variants"
-status: in_progress
+status: done
 priority: P1
 effort: 8-12d
 branch: feat/F01-ai-gen-variety-fix
@@ -29,8 +29,8 @@ All AI-generated websites look identical despite 47+ blocks with 100+ variants a
 | 01 | Audit & Diagnosis | **skipped** | - | - | User confirmed root causes |
 | 02 | [Fix System Prompt](phase-02-fix-system-prompt.md) | **done** | 1d | system-prompt.ts | `beffa9b` |
 | 03 | [Fix Sanitization](phase-03-fix-sanitization.md) | **done** | 1d | openai-generator.ts | `beffa9b`, `1da7134` |
-| 04 | [Fix Fallback Generator](phase-04-fix-fallback-generator.md) | pending | 2-3d | generate-blocks.ts | - |
-| 05 | [Fix Template Composer](phase-05-fix-template-composer.md) | pending | 2-3d | template-composer.ts | - |
+| 04 | [Fix Fallback Generator](phase-04-fix-fallback-generator.md) | **done** | 1d | generate-blocks.ts | `10d2f3d` |
+| 05 | [Fix Template Composer](phase-05-fix-template-composer.md) | **done** | 1d | template-composer.ts | `5dde872` |
 
 ## Completed Work Summary
 
@@ -50,25 +50,31 @@ All AI-generated websites look identical despite 47+ blocks with 100+ variants a
 - Console.warn logging mỗi variant replacement
 - Gallery/logo-cloud: giữ alt/caption metadata thay vì xóa sạch
 
-## Remaining Work
-
-### Phase 04 — Fallback Generator
+### Phase 04 — Fallback Generator (done)
 - Seeded PRNG (`createSeededRandom`, `pickRandom`, `shuffleArray`)
-- Middle block pool (9 blocks) → chọn 4-7 random
-- `VARIANT_OPTIONS` per block type → random variant selection
-- 3 theme palettes per category (thay vì 1)
-- 3 content variations per category
+- Middle block pool (9 blocks) → chọn 4-6 random + shuffle
+- `VARIANT_OPTIONS` (14 block types) → random variant selection
+- 3 theme palettes × 5 categories = 15 themes (was 5)
+- 3 content variations × 5 categories = 15 content sets (was 5)
 - Reuse `enforceMinContent()` + `BROKEN_VARIANTS` từ Phase 03
-- Update function signature: `generateBlocks(prompt, seed?)`
+- Ordering constraints: features→stats, features→testimonials, about→team
+- Function signature: `generateBlocks(prompt, seed?)` — Date.now() from caller
 
-### Phase 05 — Template Composer
-- `compositionSeed?: number` trong `ComposerInput`
-- `selectVariant(blockType, seed, category)` dùng `simpleHash`
-- Optional `variant?: string` param trên 15 builder functions
-- Shuffle middle blocks theo seed
-- Optional block inclusion (70% probability)
-- Reuse `enforceMinContent()` từ Phase 03
-- Update 48 old + 56 new template definitions
+### Phase 05 — Template Composer (done)
+- `compositionSeed?: number` trong `ComposerInput` — backward-compatible
+- `selectVariant(blockType, seed, category)` dùng `simpleHash` — deterministic per seed
+- `buildBlockFromSpec()`: auto-select variant khi `spec.variant` undefined
+- `buildHomePage()`: seed-based variant cho tất cả 15 block types
+- Middle block shuffle theo seed + ordering constraints
+- `enforceMinContent()` wired cho testimonials
+- `composeFromBlueprint()`: seed = `businessIndex * 7919` default
+- Legacy `composeTemplate()` truyền compositionSeed
+
+## Test Results
+- **3694/3694 tests passed** (198 test files)
+- 10 tests updated cho behavior mới
+- TypeScript: 0 errors
+- Lint: 0 errors
 
 ## Key Files
 - `src/lib/ai/system-prompt.ts` — 403 lines (was 176)
