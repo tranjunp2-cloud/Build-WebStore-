@@ -197,6 +197,39 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                     box-shadow: none !important;
                     padding: 8px 12px !important;
                     border-radius: 0 !important;
+                    flex-wrap: wrap !important;
+                }
+
+                /* ===== AC-1: STICKY TOOLBAR ON MOBILE ===== */
+                @media (max-width: 1279px) {
+                    .blog-ckeditor-wrapper .ck.ck-editor__top {
+                        position: sticky !important;
+                        bottom: 0 !important;
+                        z-index: 50 !important;
+                        order: 2 !important;
+                        border-bottom: none !important;
+                        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+                        background: rgba(11, 17, 32, 0.95) !important;
+                        backdrop-filter: blur(8px) !important;
+                    }
+                    .blog-ckeditor-wrapper .ck.ck-editor__main {
+                        order: 1 !important;
+                    }
+                    .blog-ckeditor-wrapper .ck.ck-editor {
+                        display: flex !important;
+                        flex-direction: column !important;
+                    }
+                    .blog-ckeditor-wrapper .ck.ck-editor__editable {
+                        min-height: 300px !important;
+                    }
+                    .blog-ckeditor-wrapper .ck.ck-toolbar {
+                        padding: 6px 8px !important;
+                    }
+                    .blog-ckeditor-wrapper .ck.ck-button {
+                        min-width: 32px !important;
+                        min-height: 32px !important;
+                        padding: 4px !important;
+                    }
                 }
                 .blog-ckeditor-wrapper .ck.ck-toolbar .ck-toolbar__separator {
                     background: rgba(255, 255, 255, 0.08) !important;
