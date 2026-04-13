@@ -6,6 +6,7 @@ import type { BlockProps } from '../types'
 import type { ReviewCardsConfig, ReviewItem } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 function StarRating({ rating, size = 'md' }: { rating: number; size?: 'sm' | 'md' | 'lg' }) {
     const sizeClass = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-6 h-6' : 'w-5 h-5'
@@ -185,8 +186,8 @@ export function ReviewCardsBlock({ block }: BlockProps<ReviewCardsConfig>) {
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                    {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                 </div>
 
                 <AverageHeader />

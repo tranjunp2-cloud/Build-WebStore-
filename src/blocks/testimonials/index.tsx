@@ -8,6 +8,7 @@ import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/
 import { AvatarRing, GradientBlob } from '../shared/decorative'
 import { getTeamAvatar } from '@/lib/images/industry-images'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../shared/RichText'
 
 export function TestimonialsBlock({ block, theme, site }: BlockProps<TestimonialsConfig>) {
     const { headline, testimonials = [] } = block

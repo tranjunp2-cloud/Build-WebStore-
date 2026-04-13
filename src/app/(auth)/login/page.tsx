@@ -258,24 +258,36 @@ function LoginFormContent() {
             // Get correct post-login destination (e.g. /onboarding for new users)
             const actualReturnUrl = user ? getRedirectByRole(user, returnUrl) : returnUrl
 
-            // Trigger OTP send
+            // Trigger OTP send and check if email was actually delivered
+            let otpEmailSent = true
             try {
-                await fetch('/api/users/send-otp', {
+                const otpRes = await fetch('/api/users/send-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: userEmail }),
                 })
+                const otpData = await otpRes.json().catch(() => ({}))
+                if (otpData.emailSent === false) {
+                    otpEmailSent = false
+                }
             } catch {
-                // Non-blocking — OTP may still arrive
+                otpEmailSent = false
             }
 
             // Clear previous OTP countdowns so verify-otp starts fresh
             sessionStorage.removeItem('otp_resend_end')
             sessionStorage.removeItem('otp_expiry_end')
 
-            toast.success('Verification code sent!', {
-                description: 'Check your email for the 6-digit code.',
-            })
+            if (otpEmailSent) {
+                toast.success('Verification code sent!', {
+                    description: 'Check your email for the 6-digit code.',
+                })
+            } else {
+                toast.warning('Email delivery issue', {
+                    description: 'OTP saved but email may not arrive. Try "Resend code" on the next screen.',
+                    duration: 8000,
+                })
+            }
 
             // Redirect to OTP verification page
             const returnParam = actualReturnUrl !== '/dashboard' ? `&returnUrl=${encodeURIComponent(actualReturnUrl)}` : ''

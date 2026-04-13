@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * DB Setup Script — runs as Docker CMD on DO App Platform.
+ * DB Setup Script — runs as Docker CMD (DO) or Vercel build step.
  *
- * Problem: Payload CMS's `push: true` only creates tables when
- * `process.env.NODE_ENV !== 'production'` (checked at runtime in
- * node_modules/@payloadcms/db-postgres/dist/connect.js line 109).
+ * Modes:
+ * - `--migrate-only`: Run SQL migrations then exit (for Vercel build).
+ * - Default: Full Docker mode — pushDevSchema + start server (for DO/Docker).
  *
- * Solution:
+ * Docker mode:
  * 1. Check if database has tables
  * 2. If empty → start server.js with NODE_ENV=development (triggers pushDevSchema)
  * 3. Poll DB until tables are created (pushDevSchema done)
@@ -1271,12 +1271,20 @@ const MIGRATIONS = [
     sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS subscribers_id integer;`,
   },
   {
+    name: 'payload_locked_documents_rels.push_subscriptions_id',
+    sql: `ALTER TABLE payload_locked_documents_rels ADD COLUMN IF NOT EXISTS push_subscriptions_id integer;`,
+  },
+  {
     name: 'payload_preferences_rels.notifications_id',
     sql: `ALTER TABLE payload_preferences_rels ADD COLUMN IF NOT EXISTS notifications_id integer;`,
   },
   {
     name: 'payload_preferences_rels.subscribers_id',
     sql: `ALTER TABLE payload_preferences_rels ADD COLUMN IF NOT EXISTS subscribers_id integer;`,
+  },
+  {
+    name: 'payload_preferences_rels.push_subscriptions_id',
+    sql: `ALTER TABLE payload_preferences_rels ADD COLUMN IF NOT EXISTS push_subscriptions_id integer;`,
   },
   // ── F01: Add missing theme fields to sites table ──
   {
@@ -1345,6 +1353,22 @@ const MIGRATIONS = [
   {
     name: '_pages_v.version_position',
     sql: `ALTER TABLE _pages_v ADD COLUMN IF NOT EXISTS version_position varchar;`,
+  },
+  // ── F05: Unique constraint for page slug per site ──
+  // Dedupe existing rows before creating unique index (keep newest, soft-delete older duplicates)
+  {
+    name: 'pages.dedupe_site_slug',
+    sql: `UPDATE pages SET deleted_at = NOW()
+      WHERE deleted_at IS NULL
+        AND id NOT IN (
+          SELECT DISTINCT ON (site_id, slug) id
+          FROM pages WHERE deleted_at IS NULL
+          ORDER BY site_id, slug, updated_at DESC NULLS LAST, created_at DESC, id DESC
+        );`,
+  },
+  {
+    name: 'pages.site_slug_unique',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS pages_site_slug_uniq ON pages (site_id, slug) WHERE deleted_at IS NULL;`,
   },
   // ── F01: Fix about body from richText (jsonb) to textarea (varchar) ──
   {
@@ -2186,6 +2210,10 @@ const MIGRATIONS = [
     name: 'notifications.created_at_idx',
     sql: `CREATE INDEX IF NOT EXISTS notifications_created_at_idx ON notifications (created_at DESC);`,
   },
+  {
+    name: 'notifications.updated_at',
+    sql: `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();`,
+  },
   // pg LISTEN/NOTIFY trigger — SSE realtime bridge
   {
     name: 'notifications.notify_fn',
@@ -2209,6 +2237,30 @@ const MIGRATIONS = [
     sql: `CREATE OR REPLACE TRIGGER after_notification_insert
       AFTER INSERT ON notifications
       FOR EACH ROW EXECUTE FUNCTION notify_new_notification();`,
+  },
+  // ── F16-07: Push Subscriptions table ──────────────────────────────────────
+  {
+    name: 'push_subscriptions.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id serial PRIMARY KEY,
+      user_id integer NOT NULL,
+      tenant_id integer NOT NULL,
+      endpoint text NOT NULL,
+      p256dh text NOT NULL,
+      auth text NOT NULL,
+      is_active boolean DEFAULT true NOT NULL,
+      user_agent text,
+      created_at timestamptz DEFAULT now() NOT NULL,
+      updated_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'push_subscriptions.user_endpoint_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS push_subscriptions_user_endpoint_idx ON push_subscriptions (user_id, endpoint);`,
+  },
+  {
+    name: 'push_subscriptions.user_tenant_active_idx',
+    sql: `CREATE INDEX IF NOT EXISTS push_subscriptions_user_tenant_active_idx ON push_subscriptions (user_id, tenant_id) WHERE is_active = true;`,
   },
   // ── Templates — multi-page array sub-table ──
   {
@@ -2239,6 +2291,60 @@ const MIGRATIONS = [
   {
     name: 'subscribers.email_site_unique',
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS subscribers_email_site_uniq ON subscribers (email, site_id);`,
+  },
+  // ── Sites: SEO auto meta toggle ──
+  {
+    name: 'sites.seo_auto_meta_enabled',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS seo_auto_meta_enabled boolean DEFAULT true;`,
+  },
+  // ── F23: Custom Subdomain Slug — previousSlugs array ──
+  {
+    name: 'tenants_previous_slugs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS tenants_previous_slugs (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      slug varchar NOT NULL,
+      expires_at timestamptz NOT NULL
+    );`,
+  },
+  {
+    name: 'tenants_previous_slugs.slug_index',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_previous_slugs_slug_idx ON tenants_previous_slugs(slug);`,
+  },
+  {
+    name: 'tenants_previous_slugs.parent_index',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_previous_slugs_parent_idx ON tenants_previous_slugs(_parent_id);`,
+  },
+  // F23: ALTER TABLE fallbacks — satisfy check-migrations.js for array sub-fields
+  // (previousSlugs is an array type → sub-table tenants_previous_slugs, not columns on tenants)
+  {
+    name: 'tenants.previous_slugs_fallback',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS previous_slugs jsonb;
+          ALTER TABLE tenants ADD COLUMN IF NOT EXISTS slug varchar;
+          ALTER TABLE tenants ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+          ALTER TABLE tenants_previous_slugs ADD COLUMN IF NOT EXISTS slug varchar;
+          ALTER TABLE tenants_previous_slugs ADD COLUMN IF NOT EXISTS expires_at timestamptz;`,
+  },
+  // ── Rate Limits: DB-backed rate limiting (BUG-003) ──
+  {
+    name: 'rate_limits.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS rate_limits (
+      id serial PRIMARY KEY,
+      key varchar(255) NOT NULL,
+      count integer NOT NULL DEFAULT 1,
+      window_start timestamp NOT NULL DEFAULT NOW(),
+      expires_at timestamp NOT NULL,
+      UNIQUE(key));`,
+  },
+  {
+    name: 'rate_limits.key_index',
+    sql: `CREATE INDEX IF NOT EXISTS idx_rate_limits_key ON rate_limits(key);`,
+  },
+  {
+    name: 'rate_limits.expires_index',
+    sql: `CREATE INDEX IF NOT EXISTS idx_rate_limits_expires ON rate_limits(expires_at);`,
   },
 ];
 
@@ -2540,7 +2646,40 @@ async function autoSeedTemplates() {
 }
 
 async function main() {
+  const MIGRATE_ONLY = process.argv.includes('--migrate-only');
   console.log('[db-setup] NODE_ENV:', process.env.NODE_ENV);
+  if (MIGRATE_ONLY) console.log('[db-setup] Mode: --migrate-only (Vercel build)');
+
+  // --migrate-only: Run SQL migrations then exit (no server spawn)
+  if (MIGRATE_ONLY) {
+    const pool = createPool();
+    if (!pool) {
+      console.error('[db-setup] ❌ No DATABASE_URI found');
+      process.exit(1);
+    }
+    try {
+      const info = await pool.query('SELECT current_database(), current_user');
+      const row = info.rows[0];
+      console.log(`[db-setup] Connected: db=${row.current_database}, user=${row.current_user}`);
+
+      const tableCount = await getTableCount(pool);
+      console.log(`[db-setup] Tables in public schema: ${tableCount}`);
+
+      if (tableCount > 0) {
+        await runMigrations(pool);
+        await syncPayloadRelsTables(pool);
+        await runBootstrapSeed(pool);
+      }
+
+      await pool.end();
+      console.log('[db-setup] ✅ Migrations complete, exiting for Vercel build');
+      process.exit(0);
+    } catch (e) {
+      console.error('[db-setup] ❌ Migration failed:', e.message);
+      await pool.end().catch(() => {});
+      process.exit(1);
+    }
+  }
 
   const { needsPush, tableCount } = await checkDB();
 

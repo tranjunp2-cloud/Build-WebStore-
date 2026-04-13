@@ -21,7 +21,7 @@ export const POST = withAuth(async (user, request) => {
         const payload = await getPayload({ config })
 
         // Rate Limit: 20 AI tasks per hour
-        const rateLimit = checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(String(user.id), 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },

@@ -8,9 +8,10 @@ vi.mock('@/lib/auth', () => ({
 }))
 
 const mockFindByID = vi.fn()
+const mockFind = vi.fn()
 const mockUpdate = vi.fn()
 vi.mock('payload', () => ({
-    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, update: mockUpdate })),
+    getPayload: vi.fn(() => Promise.resolve({ findByID: mockFindByID, find: mockFind, update: mockUpdate })),
 }))
 vi.mock('@payload-config', () => ({ default: {} }))
 
@@ -75,9 +76,10 @@ describe('DELETE /api/blog-categories/[id] [TC-F17.020]', () => {
         vi.clearAllMocks()
     })
 
-    it('soft-deletes category (sets status to deleted)', async () => {
+    it('deletes category and cascades unset on posts (TC-F17-05-06)', async () => {
         // Arrange
         mockFindByID.mockResolvedValue({ id: 'cat-1', tenant: 'tenant-1' })
+        mockFind.mockResolvedValue({ docs: [{ id: 'blog-1' }, { id: 'blog-2' }] })
         mockUpdate.mockResolvedValue({})
 
         // Act
@@ -87,9 +89,12 @@ describe('DELETE /api/blog-categories/[id] [TC-F17.020]', () => {
         // Assert
         expect(res.status).toBe(200)
         expect(body.data.deleted).toBe('cat-1')
-        expect(mockUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({ data: { status: 'deleted' } }),
-        )
+        expect(body.data.affectedPosts).toBe(2)
+        // Cascade: unset category on 2 blogs
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blogs', id: 'blog-1', data: { category: null } }))
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blogs', id: 'blog-2', data: { category: null } }))
+        // Soft delete the category itself
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ collection: 'blog_categories', data: { status: 'deleted' } }))
     })
 
     it('returns 403 for IDOR attempt [TC-F19.38]', async () => {

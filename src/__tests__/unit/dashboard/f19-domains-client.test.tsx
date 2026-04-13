@@ -41,7 +41,7 @@ describe('F19 Domain Management (DomainsClient)', () => {
     it('[TC-F19.01] Renders active and pending domains in the directory', () => {
         render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={mockDomains} />);
         
-        const platform = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'ech-prime-web-v2-staging-pzdwc.ondigitalocean.app';
+        const platform = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'cname.vercel-dns.com';
         expect(screen.getByText(`mywebstore.${platform}`)).toBeInTheDocument();
         expect(screen.getAllByText('store.custom.com').length).toBeGreaterThan(0);
         expect(screen.getByText('pending.custom.com')).toBeInTheDocument();
@@ -110,11 +110,11 @@ describe('F19 Domain Management (DomainsClient)', () => {
             { domain: 'store.custom.com', status: 'pending', isPrimary: false }
         ]} />);
         
-        expect(screen.getByText(/A Record/i)).toBeInTheDocument();
-        expect(screen.getByText(/CNAME/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/A Record/i).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/CNAME/i).length).toBeGreaterThan(0);
         const firstIp = (process.env.NEXT_PUBLIC_SERVER_IP ?? '162.159.140.98').split(',')[0].trim();
         expect(screen.getByText(firstIp)).toBeInTheDocument();
-        expect(screen.getByText(process.env.NEXT_PUBLIC_CNAME_TARGET ?? process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'ech-prime-web-v2-staging-pzdwc.ondigitalocean.app')).toBeInTheDocument();
+        expect(screen.getByText(process.env.NEXT_PUBLIC_CNAME_TARGET ?? process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'cname.vercel-dns.com')).toBeInTheDocument();
     });
 
     it('[TC-F19.11] Prevents Setting Primary for Pending domains', () => {
@@ -176,7 +176,7 @@ describe('F19 Domain Management (DomainsClient)', () => {
     it('[TC-F19.10] Protects default platform subdomain from removal', () => {
         render(<DomainsClient tenantId="tenant-1" tenantSlug="mywebstore" customDomains={[]} />);
         
-        const platform = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'ech-prime-web-v2-staging-pzdwc.ondigitalocean.app';
+        const platform = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'cname.vercel-dns.com';
         expect(screen.getByText(`mywebstore.${platform}`)).toBeInTheDocument();
 
         // There shouldn't be a generic Remove Domain button for it.

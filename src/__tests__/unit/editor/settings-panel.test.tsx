@@ -115,17 +115,16 @@ describe('SettingsPanel', () => {
     // ── Theme settings ───────────────────────────────────────────────────
 
     it('renders theme section with primary color picker', () => {
-        // Arrange & Act
-        render(<SettingsPanel {...defaultProps} />)
+        // Arrange & Act — render without block to stay on Global tab
+        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
 
         // Assert
-        expect(screen.getByText('Global Theme')).toBeInTheDocument()
         expect(screen.getByLabelText('Primary color picker')).toBeInTheDocument()
     })
 
     it('color picker change calls onThemeChange with primaryColor', () => {
-        // Arrange
-        render(<SettingsPanel {...defaultProps} />)
+        // Arrange — render without block to stay on Global tab
+        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
         const colorPicker = screen.getByLabelText('Primary color picker')
 
         // Act
@@ -137,7 +136,7 @@ describe('SettingsPanel', () => {
 
     it('renders heading font selector with current value', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} />)
+        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
 
         // Assert
         expect(screen.getByText('Heading Font')).toBeInTheDocument()
@@ -148,7 +147,7 @@ describe('SettingsPanel', () => {
 
     it('changing heading font calls onThemeChange', () => {
         // Arrange
-        render(<SettingsPanel {...defaultProps} />)
+        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
         const selects = screen.getAllByRole('combobox')
 
         // Act
@@ -160,7 +159,7 @@ describe('SettingsPanel', () => {
 
     it('renders body font selector with current value', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} />)
+        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
 
         // Assert
         expect(screen.getByText('Body Font')).toBeInTheDocument()
@@ -171,7 +170,7 @@ describe('SettingsPanel', () => {
 
     it('changing body font calls onThemeChange', () => {
         // Arrange
-        render(<SettingsPanel {...defaultProps} />)
+        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
         const selects = screen.getAllByRole('combobox')
 
         // Act
@@ -185,7 +184,7 @@ describe('SettingsPanel', () => {
 
     it('renders dark/light color mode buttons', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} />)
+        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
 
         // Assert
         expect(screen.getByText('Dark')).toBeInTheDocument()
@@ -194,7 +193,7 @@ describe('SettingsPanel', () => {
 
     it('clicking Light mode calls onThemeChange with colorMode', () => {
         // Arrange
-        render(<SettingsPanel {...defaultProps} />)
+        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
 
         // Act
         fireEvent.click(screen.getByText('Light'))
@@ -234,6 +233,6 @@ describe('SettingsPanel', () => {
         render(<SettingsPanel {...defaultProps} theme={undefined} />)
 
         // Assert
-        expect(screen.queryByText('Global Theme')).not.toBeInTheDocument()
+        expect(screen.queryByLabelText('Primary color picker')).not.toBeInTheDocument()
     })
 })

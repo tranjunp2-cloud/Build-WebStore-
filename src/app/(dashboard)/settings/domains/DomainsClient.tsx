@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useTransition } from 'react';
-import { Globe, Plus, AlertCircle, Copy, Check, ChevronRight, Loader2 } from 'lucide-react';
+import React, { useState, useTransition, useCallback, useRef, useEffect } from 'react';
+import { Globe, Plus, AlertCircle, Copy, Check, ChevronRight, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
 
 // Đọc từ env vars — deploy production chỉ cần set các biến này, không sửa code
 const DNS_A_RECORD = process.env.NEXT_PUBLIC_SERVER_IP ?? '162.159.140.98';
-const DNS_CNAME = process.env.NEXT_PUBLIC_CNAME_TARGET ?? process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'ech-prime-web-v2-staging-pzdwc.ondigitalocean.app';
+const DNS_CNAME = process.env.NEXT_PUBLIC_CNAME_TARGET ?? process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'cname.vercel-dns.com';
 
 type DomainEntry = { domain: string; status: string; isPrimary?: boolean | null };
 
@@ -145,6 +145,62 @@ export function DomainsClient({
     const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null);
     const [removingDomain, setRemovingDomain] = useState<string | null>(null);
 
+    // F23: Slug editor state
+    const [currentSlug, setCurrentSlug] = useState(tenantSlug);
+    const [isEditingSlug, setIsEditingSlug] = useState(false);
+    const [slugInput, setSlugInput] = useState(tenantSlug);
+    const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable' | 'invalid'>('idle');
+    const [slugMessage, setSlugMessage] = useState('');
+    const [showSlugConfirm, setShowSlugConfirm] = useState(false);
+    const [savingSlug, setSavingSlug] = useState(false);
+    const slugDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const checkSlugAvailability = useCallback(async (slug: string) => {
+        if (slug === currentSlug) { setSlugStatus('idle'); return; }
+        if (slug.length < 3) { setSlugStatus('invalid'); setSlugMessage('At least 3 characters'); return; }
+        setSlugStatus('checking');
+        try {
+            const res = await fetch(`/api/slug/check?slug=${encodeURIComponent(slug)}`);
+            const data = await res.json();
+            if (res.ok && data.available) { setSlugStatus('available'); setSlugMessage(''); }
+            else if (res.status === 422) { setSlugStatus('invalid'); setSlugMessage(data.message || 'Invalid format'); }
+            else if (res.status === 409) { setSlugStatus('unavailable'); setSlugMessage('Reserved'); }
+            else { setSlugStatus('unavailable'); setSlugMessage('Already taken'); }
+        } catch { setSlugStatus('invalid'); setSlugMessage('Check failed'); }
+    }, [currentSlug]);
+
+    useEffect(() => {
+        if (!isEditingSlug || slugInput === currentSlug) return;
+        if (slugDebounceRef.current) clearTimeout(slugDebounceRef.current);
+        slugDebounceRef.current = setTimeout(() => checkSlugAvailability(slugInput), 400);
+        return () => { if (slugDebounceRef.current) clearTimeout(slugDebounceRef.current); };
+    }, [slugInput, isEditingSlug, checkSlugAvailability, currentSlug]);
+
+    const handleSaveSlug = async () => {
+        setSavingSlug(true);
+        try {
+            const res = await fetch('/api/tenant/slug', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ slug: slugInput }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setCurrentSlug(data.slug);
+                setIsEditingSlug(false);
+                setShowSlugConfirm(false);
+                toast.success('Subdomain updated successfully!');
+            } else {
+                toast.error(data.message || 'Failed to update subdomain');
+            }
+        } catch {
+            toast.error('Failed to update subdomain. Please try again.');
+        } finally {
+            setSavingSlug(false);
+        }
+    };
+
     const handleAddDomain = () => {
         const domainValue = newDomainInput.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
         const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
@@ -276,23 +332,115 @@ export function DomainsClient({
                     </div>
                 </div>
 
-                {/* Platform subdomain card — always present */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-[25px] px-[25px] pb-[1px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-[16px]">
-                    <div className="flex flex-col gap-2 pb-[25px]">
-                        <div className="flex flex-wrap items-center gap-3">
-                            <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{tenantSlug}.{DNS_CNAME}</h3>
-                            {!hasCustomPrimary && (
-                                <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
-                                    <span className="text-[12px] font-semibold text-[#C4B5FD]">Current Primary Domain</span>
+                {/* Platform subdomain card — F23: with slug editor */}
+                <div className="flex flex-col pt-[25px] px-[25px] pb-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60 gap-[16px]">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px]">
+                        <div className="flex flex-col gap-2">
+                            {!isEditingSlug ? (
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{currentSlug}.{DNS_CNAME}</h3>
+                                    {!hasCustomPrimary && (
+                                        <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
+                                            <span className="text-[12px] font-semibold text-[#C4B5FD]">Current Primary Domain</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-0">
+                                    <input
+                                        type="text"
+                                        value={slugInput}
+                                        onChange={(e) => setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 63))}
+                                        className="h-[44px] w-full max-w-[240px] px-4 rounded-l-[12px] border border-r-0 border-white/[0.08] bg-[#0B1120]/60 text-[14px] text-[#F8FAFC] font-mono focus:outline-none focus:border-blue-500/50 transition-colors"
+                                        autoFocus
+                                    />
+                                    <div className="h-[44px] flex items-center px-3 rounded-r-[12px] border border-l-0 border-white/[0.08] bg-[#0B1120]/40 text-[13px] text-slate-500 whitespace-nowrap">
+                                        .{DNS_CNAME}
+                                    </div>
+                                    <div className="ml-2">
+                                        {slugStatus === 'checking' && <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />}
+                                        {slugStatus === 'available' && <Check className="h-4 w-4 text-[#05DF72]" />}
+                                        {(slugStatus === 'unavailable' || slugStatus === 'invalid') && (
+                                            <span className="text-[12px] text-[#FF6467]">{slugMessage}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
+                                <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
+                                <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">Connected</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                            {!isEditingSlug ? (
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsEditingSlug(true); setSlugInput(currentSlug); setSlugStatus('idle'); }}
+                                    className="flex items-center gap-2 py-[10px] px-[16px] rounded-[12px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[13px] font-medium hover:bg-white/5 transition-colors"
+                                >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Change subdomain
+                                </button>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setIsEditingSlug(false); setSlugInput(currentSlug); setSlugStatus('idle'); }}
+                                        className="py-[10px] px-[16px] rounded-[12px] border border-white/[0.08] text-[#F8FAFC] text-[13px] font-medium hover:bg-white/5 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={slugStatus !== 'available' || slugInput === currentSlug}
+                                        onClick={() => setShowSlugConfirm(true)}
+                                        className="py-[10px] px-[16px] rounded-[12px] text-white text-[13px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+                                        style={{ background: slugStatus === 'available' ? 'linear-gradient(90deg, #3B82F6, #2DD4BF)' : '#374151' }}
+                                    >
+                                        Save
+                                    </button>
                                 </div>
                             )}
                         </div>
-                        <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
-                            <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
-                            <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">Connected</span>
-                        </div>
                     </div>
                 </div>
+
+                {/* F23: Slug change confirmation dialog */}
+                {showSlugConfirm && (
+                    <>
+                        <div className="fixed inset-0 z-[100] bg-[#0B1120]/60 animate-in fade-in duration-200" onClick={() => setShowSlugConfirm(false)} />
+                        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-full max-w-[420px] rounded-[16px] border border-white/[0.08] bg-[#1E293B] p-6 shadow-xl animate-in zoom-in-95 duration-200">
+                            <h3 className="text-[18px] font-semibold text-[#F8FAFC]">Change subdomain?</h3>
+                            <div className="mt-3 space-y-2">
+                                <p className="text-[14px] text-[rgba(248,250,252,0.6)]">
+                                    Your current subdomain <span className="font-mono text-[#F8FAFC]">{currentSlug}</span> will redirect to <span className="font-mono text-[#F8FAFC]">{slugInput}</span> for 30 days.
+                                </p>
+                                <p className="text-[14px] text-orange-400">
+                                    After 30 days, the old link will stop working. Update your marketing materials.
+                                </p>
+                            </div>
+                            <div className="mt-5 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSlugConfirm(false)}
+                                    className="py-[10px] px-[20px] rounded-[12px] border border-white/[0.08] text-[#F8FAFC] text-[14px] font-medium hover:bg-white/5 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={savingSlug}
+                                    onClick={handleSaveSlug}
+                                    className="flex items-center gap-2 py-[10px] px-[20px] rounded-[12px] text-white text-[14px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+                                    style={{ background: 'linear-gradient(90deg, #3B82F6, #2DD4BF)' }}
+                                >
+                                    {savingSlug && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    Confirm change
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 {/* Custom Domain Cards */}
                 {domains.map((domainObj) => {

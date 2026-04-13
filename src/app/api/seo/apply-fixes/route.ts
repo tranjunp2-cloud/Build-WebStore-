@@ -34,10 +34,8 @@ export const POST = withAuth(async (_user, request) => {
             t.tenant && typeof t.tenant === 'object' ? t.tenant.id : t.tenant
         ).map(String) || []
 
-        // Process sequentially to avoid SQLite locking issues if using local DB,
-        // or just Promise.all for Postgres. We use Promise.all for speed.
-        const undoData = await Promise.all(fixes.map(async (fix) => {
-            // First fetch current to check access and merge
+        // Process all fixes — use allSettled so partial failures don't lose successful updates
+        const results = await Promise.allSettled(fixes.map(async (fix) => {
             const current = await payload.findByID({
                 collection: fix.collection,
                 id: fix.targetId,
@@ -56,7 +54,7 @@ export const POST = withAuth(async (_user, request) => {
             if (!_user.roles?.includes('super-admin') && !userTenantIds.includes(String(recordTenantId))) {
                 throw new Error(`Forbidden access to ${fix.targetId}`)
             }
-            
+
             await payload.update({
                 collection: fix.collection,
                 id: fix.targetId,
@@ -78,7 +76,19 @@ export const POST = withAuth(async (_user, request) => {
             }
         }))
 
-        return NextResponse.json({ success: true, undoData })
+        const undoData = results
+            .filter(r => r.status === 'fulfilled')
+            .map(r => (r as PromiseFulfilledResult<{ targetId: string; collection: string; seo: { title: string; description: string } }>).value)
+        const failedCount = results.filter(r => r.status === 'rejected').length
+
+        if (undoData.length === 0) {
+            return NextResponse.json(
+                { success: false, error: { code: 'ALL_FAILED', message: `All ${failedCount} fixes failed` } },
+                { status: 500 }
+            )
+        }
+
+        return NextResponse.json({ success: true, undoData, failedCount })
     } catch (error: any) {
         console.error('[AI Apply Fixes Error]', error)
         return NextResponse.json(

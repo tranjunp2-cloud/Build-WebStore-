@@ -48,16 +48,16 @@ function describeAction(result: AIEditResult): string {
 
     switch (result.action) {
         case 'update_theme':
-            return 'Da cap nhat giao dien va mau sac cho website.'
+            return 'Updated the website theme and colors.'
         case 'add_block': {
             const sectionType = inferAddSectionType('', String(result.block?.blockType || ''))
-            return `Da them section ${getAddSectionLabel(sectionType)} vao cuoi trang.`
+            return `Added a ${getAddSectionLabel(sectionType)} section to the page.`
         }
         case 'delete_block':
-            return 'Da xoa section duoc chon khoi trang.'
+            return 'Removed the selected section from the page.'
         case 'update_block':
         default:
-            return 'Da cap nhat noi dung cho section duoc chon.'
+            return 'Updated the content of the selected section.'
     }
 }
 
@@ -148,7 +148,7 @@ For undoing the previous action:
                     action: 'add_block',
                     afterIndex: defaultAfterIndex,
                     block: fallbackBlock,
-                    message: `Da them section ${getAddSectionLabel(inferredSectionType)} vao cuoi trang.`,
+                    message: `Added a ${getAddSectionLabel(inferredSectionType)} section to the page.`,
                 }
             }
         }
@@ -225,7 +225,7 @@ function createSSEMessage(event: string, data: unknown) {
 export const POST = withAuth(async (user, req) => {
     try {
         // Rate Limit: 20 AI tasks per hour
-        const rateLimit = checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(String(user.id), 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },
@@ -250,8 +250,8 @@ export const POST = withAuth(async (user, req) => {
                 }
 
                 try {
-                    send('status', { message: 'AI dang doc yeu cau cua ban...' })
-                    send('status', { message: 'Dang chuan bi thay doi cho preview...' })
+                    send('status', { message: 'AI is reading your request...' })
+                    send('status', { message: 'Preparing changes for preview...' })
 
                     const result = await generateEditResult(data!)
                     send('action', result)

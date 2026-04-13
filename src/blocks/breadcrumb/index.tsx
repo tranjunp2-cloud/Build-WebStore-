@@ -42,7 +42,7 @@ export function BreadcrumbBlock({ block, theme }: BlockProps<BreadcrumbConfig>) 
                                         </span>
                                     ) : (
                                         <a
-                                            href={item.url}
+                                            href={item?.url}
                                             className="opacity-70 hover:opacity-100 transition-opacity"
                                         >
                                             {item.label}

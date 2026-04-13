@@ -9,8 +9,10 @@ import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { getCurrentUser } from '@/lib/auth'
 import { checkTwoTierRateLimit } from '@/lib/rateLimit'
+import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { blockRegistry } from '@/blocks/registry'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
+import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
 import { resolveTheme } from '@/lib/theme/resolve'
 
 
@@ -79,7 +81,16 @@ export async function POST(req: NextRequest) {
         const { data, errorResponse } = await parseRequest(req, generateSiteSchema)
         if (errorResponse) return errorResponse
 
-        const { businessInfo, extraInstructions, language = 'en', contentBrief: rawContentBrief } = data!
+        const { businessInfo: rawBusinessInfo, extraInstructions: rawExtraInstructions, language = 'en', contentBrief: rawContentBrief } = data!
+
+        // Normalize text inputs before sending to AI
+        const businessInfo = {
+            ...rawBusinessInfo,
+            businessName: normalizeBusinessInput(rawBusinessInfo.businessName),
+            shortDescription: normalizeBusinessInput(rawBusinessInfo.shortDescription),
+            products: normalizeBusinessInput(rawBusinessInfo.products),
+        }
+        const extraInstructions = rawExtraInstructions ? normalizeBusinessInput(rawExtraInstructions) : undefined
 
         // Authenticate — handles both Payload JWT and custom Jose JWT (from verify-otp)
         const user = await getCurrentUser()
@@ -90,7 +101,7 @@ export async function POST(req: NextRequest) {
         const payload = await getPayload({ config })
 
         // Rate Limit: 5 requests/min (burst) + 20 requests/hour (sustained)
-        const rateLimit = checkTwoTierRateLimit(String(user.id), 5, 20)
+        const rateLimit = await checkTwoTierRateLimit(String(user.id), 5, 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 {
@@ -112,12 +123,11 @@ export async function POST(req: NextRequest) {
         let resolvedTenantId: number | string | undefined = typeof tenantId === 'object' && tenantId ? (tenantId as { id: number | string }).id : (tenantId as number | string | undefined)
 
         if (!resolvedTenantId) {
-            const fallbackSlug = `store-${user.id}`
-
-            // Recover an orphaned tenant first before creating a new one.
+            // Try recovering orphaned tenant with legacy slug first
+            const legacySlug = `store-${user.id}`
             const existingTenantBySlug = await payload.find({
                 collection: 'tenants',
-                where: { slug: { equals: fallbackSlug } },
+                where: { slug: { equals: legacySlug } },
                 limit: 1,
             })
 
@@ -134,17 +144,22 @@ export async function POST(req: NextRequest) {
 
                 resolvedTenantId = recoveredTenant.id as number | string
             } else {
-                // Auto-create tenant for legacy users without one
+                // Smart slug from business name (F23), prefer user-chosen slug
+                const businessName = businessInfo?.businessName || ''
                 const firstName = (user as { firstName?: string }).firstName || (user as { name?: string }).name || 'My'
+                const tenantName = businessName || `${firstName}'s Store`
+                const userChosenSlug = (businessInfo as Record<string, unknown>)?.slug as string | undefined
+                const baseSlug = userChosenSlug || slugify(businessName || firstName)
+                const tenantSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
+
                 const newTenant = await payload.create({
                     collection: 'tenants',
                     data: {
-                        name: `${firstName}'s Store`,
-                        slug: fallbackSlug,
+                        name: tenantName,
+                        slug: tenantSlug,
                         aiGenerationsCount: 0,
                     },
                 })
-                // Assign tenant to user
                 await payload.update({
                     collection: 'users',
                     id: user.id,
@@ -153,6 +168,30 @@ export async function POST(req: NextRequest) {
                     } as Record<string, unknown>,
                 })
                 resolvedTenantId = newTenant.id as number | string
+            }
+        }
+
+        // F23: Auto-upgrade legacy store-{id} slug to smart slug from business name
+        if (resolvedTenantId) {
+            try {
+                const tenant = await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
+                const currentSlug = tenant?.slug as string | undefined
+                const userChosenSlug = (businessInfo as Record<string, unknown>)?.slug as string | undefined
+                const businessName = businessInfo?.businessName || ''
+
+                if (currentSlug && /^store-\d+$/.test(currentSlug) && (userChosenSlug || businessName)) {
+                    const baseSlug = userChosenSlug || slugify(businessName)
+                    if (baseSlug && baseSlug !== currentSlug) {
+                        const newSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
+                        await payload.update({
+                            collection: 'tenants',
+                            id: resolvedTenantId,
+                            data: { slug: newSlug } as Record<string, unknown>,
+                        })
+                    }
+                }
+            } catch {
+                // Non-critical — slug upgrade failure shouldn't block site generation
             }
         }
 
@@ -606,6 +645,22 @@ function buildGeneratedPages({
     businessInfo: { businessName: string; shortDescription: string; products: string }
     result: Record<string, unknown>
 }) {
+    // Use AI-generated multi-page content when available
+    const aiPages = (result as { pages?: Array<{ title: string; slug: string; isHomepage?: boolean; blocks: AIBlock[]; seo?: Record<string, unknown> }> }).pages
+    if (aiPages && aiPages.length > 0) {
+        return aiPages.map((page, index) => ({
+            title: page.title || `Page ${index + 1}`,
+            slug: page.slug || (index === 0 ? '/' : `page-${index}`),
+            isHomepage: page.isHomepage === true || index === 0,
+            layout: cloneBlockData(page.blocks || []),
+            seo: {
+                title: String(page.seo?.title || page.title || ''),
+                description: String(page.seo?.description || ''),
+            },
+        }))
+    }
+
+    // Fallback: clone-based page generation for single-page AI response
     const navigation = blocks.find((block) => block.blockType === 'navigation') || null
     const hero = blocks.find((block) => block.blockType === 'hero') || null
     const about = blocks.find((block) => block.blockType === 'about') || null
@@ -620,7 +675,7 @@ function buildGeneratedPages({
     return [
         {
             title: 'Homepage',
-            slug: 'home',
+            slug: '/',
             isHomepage: true,
             layout: cloneBlockData(blocks),
             seo: {

@@ -35,6 +35,10 @@ async function backgroundSeoProcessor(
         })
         const siteName = site.businessName || site.name || 'Website'
 
+        // Fetch tracked keywords (AC-15)
+        const trackedKeywords = ((site as any)?.seo?.trackedKeywords as Array<{ keyword: string }> | undefined)
+            ?.map(k => k.keyword).filter(Boolean) || []
+
         // 2. Create pending job
         const job = await payload.create({
             collection: 'seo-meta-jobs',
@@ -53,7 +57,8 @@ async function backgroundSeoProcessor(
             collection === 'products' ? 'product' : 'page',
             name,
             siteName,
-            context
+            context,
+            trackedKeywords,
         )
 
         // 4. Update the target collection

@@ -2,15 +2,21 @@
 
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
+    AlertTriangle,
     ChevronDown,
     Check,
+    Copy,
+    ExternalLink,
+    EyeOff,
     FilePenLine,
     FileWarning,
     FileText,
+    Globe,
     Home,
     Loader2,
     Menu,
     Monitor,
+    RefreshCw,
     ShoppingBag,
     Smartphone,
     SquareArrowOutUpRight,
@@ -22,6 +28,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 import type { PageData } from '@/store/editorStore'
 
 interface EditorToolbarProps {
@@ -34,6 +41,7 @@ interface EditorToolbarProps {
     isSaving: boolean
     saveSuccess: boolean
     hasUnsavedChanges: boolean
+    hasUnpublishedChanges?: boolean
     isPublishing: boolean
     publishSuccess: boolean
     canUndo: boolean
@@ -47,6 +55,12 @@ interface EditorToolbarProps {
     onRedo: () => void
     onSave: () => void
     onPublish: () => void
+    onRepublish?: () => void
+    onUnpublish?: () => void
+    onViewLive?: () => void
+    onCopyLink?: () => void
+    siteUrl?: string | null
+    wasPublished?: boolean
     onViewportChange: (viewport: 'desktop' | 'mobile') => void
 }
 
@@ -60,6 +74,7 @@ export function EditorToolbar({
     isSaving,
     saveSuccess,
     hasUnsavedChanges,
+    hasUnpublishedChanges = false,
     isPublishing,
     publishSuccess,
     canUndo,
@@ -73,8 +88,18 @@ export function EditorToolbar({
     onRedo,
     onSave,
     onPublish,
+    onRepublish,
+    onUnpublish,
+    onViewLive,
+    onCopyLink,
+    siteUrl,
+    wasPublished,
     onViewportChange,
 }: EditorToolbarProps) {
+    const { t } = useI18n()
+    const et = t.editor.toolbar
+    const vm = t.editor.viewLiveMenu
+    const mt = t.editor.maintenance
     const selectablePages = pages.filter(page => !page.deletedAt)
     const currentPage = selectablePages.find(page => page.id === currentPageId) ?? null
 
@@ -130,30 +155,49 @@ export function EditorToolbar({
                         </a>
                     </Button>
 
-                    <Button
-                        type="button"
-                        size="sm"
-                        onClick={onPublish}
-                        disabled={isPublishing || publishSuccess}
-                        className={cn(
-                            'h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white hover:opacity-95',
-                            publishSuccess && 'from-emerald-500 to-emerald-400',
+                    {isPublished && siteUrl ? (
+                        <>
+                        {(hasUnsavedChanges || hasUnpublishedChanges) && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={onRepublish}
+                                disabled={isPublishing}
+                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
+                            >
+                                {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5" /> {et.update}</>}
+                            </Button>
                         )}
-                    >
-                        {isPublishing ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : publishSuccess ? (
-                            <>
-                                <Check className="h-3.5 w-3.5" />
-                                Live
-                            </>
-                        ) : (
-                            <>
-                                <Rocket className="h-3.5 w-3.5" />
-                                Publish
-                            </>
-                        )}
-                    </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={onViewLive}
+                            className="h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
+                        >
+                            <Globe className="h-3.5 w-3.5" />
+                            {et.live}
+                        </Button>
+                        </>
+                    ) : (
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={onPublish}
+                            disabled={isPublishing || publishSuccess}
+                            className={cn(
+                                'h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white hover:opacity-95',
+                                publishSuccess && 'from-emerald-500 to-emerald-400',
+                            )}
+                        >
+                            {isPublishing ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : publishSuccess ? (
+                                <><Check className="h-3.5 w-3.5" /> {et.live}</>
+                            ) : (
+                                <><Rocket className="h-3.5 w-3.5" /> {et.publish}</>
+                            )}
+                        </Button>
+                    )}
 
                 </div>
             </header>
@@ -161,6 +205,7 @@ export function EditorToolbar({
     }
 
     return (
+        <>
         <header className="relative flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] bg-[#0F172A]/90 backdrop-blur-sm px-5">
             <div className="flex min-w-0 items-center gap-3">
                 <button
@@ -253,9 +298,13 @@ export function EditorToolbar({
 
                 <div className={cn(
                     'inline-flex h-6 items-center rounded-md px-2 text-[10px] font-semibold uppercase tracking-wider',
-                    isPublished ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/[0.06] text-slate-400',
+                    isPublished
+                        ? hasUnpublishedChanges
+                            ? 'bg-amber-500/15 text-amber-400'
+                            : 'bg-emerald-500/15 text-emerald-400'
+                        : 'bg-white/[0.06] text-slate-400',
                 )}>
-                    {isPublished ? 'Live' : 'Draft'}
+                    {isPublished ? (hasUnpublishedChanges ? 'Changes pending' : et.live) : et.draft}
                 </div>
 
                 <Button variant="ghost" size="sm" asChild className="h-8 rounded-lg border border-white/[0.08] px-3 text-[11px] font-medium text-slate-300 hover:bg-white/[0.06] hover:text-white">
@@ -269,34 +318,104 @@ export function EditorToolbar({
                     </a>
                 </Button>
 
-                <Button
-                    type="button"
-                    size="sm"
-                    onClick={onPublish}
-                    disabled={isPublishing || publishSuccess}
-                    className={cn(
-                        'h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-4 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95',
-                        publishSuccess && 'from-emerald-500 to-emerald-400',
-                    )}
-                >
-                    {isPublishing ? (
-                        <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Publishing
-                        </>
-                    ) : publishSuccess ? (
-                        <>
-                            <Check className="h-3.5 w-3.5" />
-                            Published
-                        </>
-                    ) : (
-                        <>
-                            <Rocket className="h-3.5 w-3.5" />
-                            Publish
-                        </>
-                    )}
-                </Button>
+                {isPublished && siteUrl ? (
+                    <>
+                        {/* Re-publish / Update button (AC-2: visible when has unsaved or unpublished changes) */}
+                        {(hasUnsavedChanges || hasUnpublishedChanges) && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={onRepublish}
+                                disabled={isPublishing}
+                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95"
+                            >
+                                {isPublishing ? (
+                                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {et.updating}</>
+                                ) : (
+                                    <><RefreshCw className="h-3.5 w-3.5" /> {et.update}</>
+                                )}
+                            </Button>
+                        )}
+
+                        {/* View Live dropdown (AC-1: persistent link access) */}
+                        <DropdownMenu.Root>
+                            <DropdownMenu.Trigger asChild>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-8 rounded-lg border-0 bg-gradient-to-r from-emerald-500 to-emerald-400 px-3.5 text-[11px] font-semibold text-white shadow-lg shadow-emerald-500/15 hover:shadow-emerald-500/25 hover:opacity-95"
+                                >
+                                    <Globe className="h-3.5 w-3.5" />
+                                    {et.viewLive}
+                                    <ChevronDown className="ml-1 h-3 w-3" />
+                                </Button>
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Portal>
+                                <DropdownMenu.Content
+                                    className="z-50 min-w-[180px] rounded-xl border border-white/[0.08] bg-[#1E293B] p-1.5 shadow-2xl"
+                                    sideOffset={8}
+                                    align="end"
+                                >
+                                    <DropdownMenu.Item
+                                        onSelect={onViewLive}
+                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-slate-200 outline-none hover:bg-white/[0.06] focus:bg-white/[0.06]"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
+                                        {vm.openWebsite}
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Item
+                                        onSelect={onCopyLink}
+                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-slate-200 outline-none hover:bg-white/[0.06] focus:bg-white/[0.06]"
+                                    >
+                                        <Copy className="h-3.5 w-3.5 text-slate-400" />
+                                        {vm.copyLink}
+                                    </DropdownMenu.Item>
+                                    <DropdownMenu.Separator className="my-1 h-px bg-white/[0.08]" />
+                                    <DropdownMenu.Item
+                                        onSelect={onUnpublish}
+                                        className="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] font-medium text-red-400 outline-none hover:bg-red-500/10 focus:bg-red-500/10"
+                                    >
+                                        <EyeOff className="h-3.5 w-3.5" />
+                                        {vm.unpublish}
+                                    </DropdownMenu.Item>
+                                </DropdownMenu.Content>
+                            </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                    </>
+                ) : (
+                    /* Draft state: Publish button */
+                    <Button
+                        type="button"
+                        size="sm"
+                        onClick={onPublish}
+                        disabled={isPublishing || publishSuccess}
+                        className={cn(
+                            'h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-4 text-[11px] font-semibold text-white shadow-lg shadow-blue-500/15 hover:shadow-blue-500/25 hover:opacity-95',
+                            publishSuccess && 'from-emerald-500 to-emerald-400',
+                        )}
+                    >
+                        {isPublishing ? (
+                            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {et.publishing}</>
+                        ) : publishSuccess ? (
+                            <><Check className="h-3.5 w-3.5" /> {et.published}</>
+                        ) : (
+                            <><Rocket className="h-3.5 w-3.5" /> {et.publish}</>
+                        )}
+                    </Button>
+                )}
             </div>
+
         </header>
+            {/* Maintenance mode warning banner (AC-4) — outside header to avoid overlap */}
+            {wasPublished && !isPublished && (
+                <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/20 bg-amber-500/10 px-5 py-2 text-xs text-amber-400">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                    <span>{mt.banner}</span>
+                    <Button size="sm" variant="ghost" onClick={onPublish} className="ml-auto h-6 px-2 text-[10px] text-amber-400 hover:bg-amber-500/10 hover:text-amber-300">
+                        {mt.republish}
+                    </Button>
+                </div>
+            )}
+        </>
     )
 }

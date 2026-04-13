@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import dynamic from 'next/dynamic'
 import { getBlogCategoriesAction, getCurrentUserAction, saveBlogAction, getBlogByIdAction } from '../actions'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { validateImageMagicBytes, MAX_IMAGE_SIZE } from '@/lib/validate-image'
 import { useI18n } from '@/i18n'
 import { CategoryModal } from '../_components/CategoryModal'
 
@@ -170,6 +171,78 @@ export default function BlogEditorPage() {
         loadPost()
     }, [blogId, isNew])
 
+    // ─── localStorage auto-save (TC-F17-02-17) ───────────────────────────
+    const DRAFT_KEY = `blog-draft-${blogId}`
+    const [showDraftRecovery, setShowDraftRecovery] = useState(false)
+    const draftCheckedRef = useRef(false)
+
+    // Check for unsaved draft on mount
+    useEffect(() => {
+        if (draftCheckedRef.current) return
+        draftCheckedRef.current = true
+        try {
+            const saved = localStorage.getItem(DRAFT_KEY)
+            if (saved) {
+                const draft = JSON.parse(saved)
+                if (draft.updatedAt && Date.now() - draft.updatedAt < 24 * 60 * 60 * 1000) {
+                    setShowDraftRecovery(true)
+                } else {
+                    localStorage.removeItem(DRAFT_KEY)
+                }
+            }
+        } catch (err) {
+            console.error('[Draft] Failed to parse saved draft', err)
+            localStorage.removeItem(DRAFT_KEY)
+        }
+    }, [DRAFT_KEY])
+
+    const restoreDraft = () => {
+        try {
+            const saved = localStorage.getItem(DRAFT_KEY)
+            if (saved) {
+                const draft = JSON.parse(saved)
+                setForm(prev => ({
+                    ...prev,
+                    title: draft.title ?? prev.title,
+                    content: draft.content ?? prev.content,
+                    slug: draft.slug ?? prev.slug,
+                    category: draft.category ?? prev.category,
+                    seoTitle: draft.seoTitle ?? prev.seoTitle,
+                    seoDescription: draft.seoDescription ?? prev.seoDescription,
+                }))
+                toast.success('Draft restored')
+            }
+        } catch (err) {
+            console.error('[Draft] Failed to restore draft', err)
+            localStorage.removeItem(DRAFT_KEY)
+        }
+        setShowDraftRecovery(false)
+    }
+
+    const dismissDraft = () => {
+        localStorage.removeItem(DRAFT_KEY)
+        setShowDraftRecovery(false)
+    }
+
+    // Auto-save to localStorage every 30s
+    useEffect(() => {
+        if (isLoading) return
+        const timer = setInterval(() => {
+            if (form.title || form.content) {
+                localStorage.setItem(DRAFT_KEY, JSON.stringify({
+                    title: form.title,
+                    content: form.content,
+                    slug: form.slug,
+                    category: form.category,
+                    seoTitle: form.seoTitle,
+                    seoDescription: form.seoDescription,
+                    updatedAt: Date.now(),
+                }))
+            }
+        }, 30000)
+        return () => clearInterval(timer)
+    }, [DRAFT_KEY, form, isLoading])
+
     const updateField = useCallback((field: keyof BlogForm, value: string) => {
         setForm(prev => {
             const updated = { ...prev, [field]: value }
@@ -228,6 +301,7 @@ export default function BlogEditorPage() {
 
             if (result) {
                 setSuccess(true)
+                localStorage.removeItem(DRAFT_KEY)
                 toast.success(isNew ? 'Post created!' : 'Post saved!')
                 if (overrideStatus) {
                     setForm(prev => ({ ...prev, status: overrideStatus }))
@@ -475,6 +549,28 @@ export default function BlogEditorPage() {
                         </div>
                     )}
 
+                    {showDraftRecovery && (
+                        <div className="flex items-center justify-between rounded-lg bg-yellow-500/10 border border-yellow-500/30 px-4 py-3">
+                            <p className="text-sm text-yellow-400">
+                                {t.dashboard.blog.editor.draftRecoveryMessage || 'Unsaved draft found. Restore it?'}
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={restoreDraft}
+                                    className="px-3 py-1.5 rounded-lg bg-yellow-500/20 text-sm font-medium text-yellow-300 hover:bg-yellow-500/30 transition-colors"
+                                >
+                                    {t.dashboard.blog.editor.draftRestore || 'Restore'}
+                                </button>
+                                <button
+                                    onClick={dismissDraft}
+                                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                                >
+                                    {t.dashboard.blog.editor.draftDismiss || 'Dismiss'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <style jsx global>{`
                         .panel-outline {
                             border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -567,13 +663,24 @@ export default function BlogEditorPage() {
                                     accept="image/png, image/jpeg, image/jpg"
                                     className="hidden"
                                     id="thumbnail-upload"
-                                    onChange={e => {
+                                    onChange={async (e) => {
                                         const file = e.target.files?.[0]
-                                        if (file) {
-                                            const url = URL.createObjectURL(file)
-                                            setThumbnailPreview(url)
-                                            setThumbnailFile(file)
+                                        if (!file) return
+                                        if (file.size > MAX_IMAGE_SIZE) {
+                                            toast.error(t.dashboard.blog.editor.fileTooLarge || 'File exceeds 10MB limit')
+                                            e.target.value = ''
+                                            return
                                         }
+                                        const buffer = await file.slice(0, 8).arrayBuffer()
+                                        const { valid } = validateImageMagicBytes(buffer)
+                                        if (!valid) {
+                                            toast.error(t.dashboard.blog.editor.invalidFileType || 'Only JPEG and PNG files are accepted')
+                                            e.target.value = ''
+                                            return
+                                        }
+                                        const url = URL.createObjectURL(file)
+                                        setThumbnailPreview(url)
+                                        setThumbnailFile(file)
                                     }}
                                 />
                             </label>

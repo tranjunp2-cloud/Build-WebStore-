@@ -1,10 +1,32 @@
 import type { CollectionConfig } from 'payload'
+import { isReservedSlug, validateSlugFormat } from '@/lib/utils/reserved-slugs'
 
 export const Tenants: CollectionConfig = {
     slug: 'tenants',
     admin: {
         useAsTitle: 'name',
         description: 'Each tenant is a customer who has a subscription and owns one or more websites.',
+    },
+    hooks: {
+        beforeChange: [
+            ({ data, operation }) => {
+                // F23: Validate slug format on create and update
+                if (data?.slug) {
+                    const slug = (data.slug as string).toLowerCase().trim()
+                    data.slug = slug
+
+                    const formatError = validateSlugFormat(slug)
+                    if (formatError) {
+                        throw new Error(`Invalid slug: ${formatError}`)
+                    }
+
+                    if (isReservedSlug(slug)) {
+                        throw new Error(`Invalid slug: "${slug}" is a reserved subdomain`)
+                    }
+                }
+                return data
+            },
+        ],
     },
     access: {
         read: ({ req }) => {
@@ -49,6 +71,18 @@ export const Tenants: CollectionConfig = {
             admin: {
                 description: 'Unique slug used for subdomain (e.g. "mybakery" → mybakery.primeweb.app)',
             },
+        },
+        {
+            name: 'previousSlugs',
+            type: 'array',
+            admin: {
+                description: 'Previous slugs for 301 redirect (30-day grace period)',
+                readOnly: true,
+            },
+            fields: [
+                { name: 'slug', type: 'text', required: true },
+                { name: 'expiresAt', type: 'date', required: true },
+            ],
         },
         {
             name: 'customDomains',

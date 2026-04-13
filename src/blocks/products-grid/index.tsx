@@ -6,6 +6,7 @@ import type { ProductsGridConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import { SectionLabel, GradientBlob } from '../shared/decorative'
+import { RichText } from '../shared/RichText'
 
 // Mock Data
 const MOCK_PRODUCTS = [
@@ -38,8 +39,8 @@ export function ProductsGridBlock({ block, theme }: BlockProps<ProductsGridConfi
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-4">{headline}</h2>
-                    {subheadline && <p className="opacity-60 text-lg">{subheadline}</p>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
+                    {subheadline && <RichText text={subheadline} as="p" className="opacity-60 text-lg" />}
                 </div>
 
                 {/* Grid */}

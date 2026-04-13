@@ -44,15 +44,47 @@ const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc,
     return slug
 }
 
-const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation }) => {
+const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
     const isPublishingUpdate = operation === 'update' && doc.status === 'active' && previousDoc?.status !== 'active'
     const isActiveCreate = operation === 'create' && doc.status === 'active'
 
     // Wait until it becomes active and seo title is empty
     if ((isPublishingUpdate || isActiveCreate) && !doc.seo?.title) {
+        const siteId = typeof doc.site === 'object' ? doc.site.id : doc.site
+
+        // Check if auto meta generation is enabled for this site
+        try {
+            const site = await req.payload.findByID({ collection: 'sites', id: siteId, depth: 0 })
+            if (site.seo?.autoMetaEnabled === false) return
+        } catch { /* proceed if can't check */ }
+
         // Trigger background generation
-        queueSEOAutoGeneration('products', doc.id, typeof doc.site === 'object' ? doc.site.id : doc.site, doc.name, doc.shortDescription)
+        queueSEOAutoGeneration('products', doc.id, siteId, doc.name, doc.shortDescription)
     }
+}
+
+export const LOW_STOCK_THRESHOLD = 10
+
+export const lowStockHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
+    if (operation !== 'update') return doc
+    const prevInventory = previousDoc?.inventory ?? 0
+    const currInventory = doc.inventory ?? 0
+
+    // Only notify when crossing threshold downward (anti-spam)
+    if (prevInventory >= LOW_STOCK_THRESHOLD && currInventory < LOW_STOCK_THRESHOLD && currInventory >= 0) {
+        import('@/lib/notifications/notify-tenant-owners')
+            .then(({ notifyTenantOwners }) => {
+                const tenantId = typeof doc.tenant === 'object' ? doc.tenant.id : doc.tenant
+                return notifyTenantOwners(req.payload, tenantId, {
+                    type: 'PRODUCT_LOW_STOCK',
+                    title: 'Low Stock Alert',
+                    message: `${doc.name} is running low (${currInventory} units left)`,
+                    actionUrl: '/products',
+                })
+            })
+            .catch((err) => console.error('[Notification] PRODUCT_LOW_STOCK hook failed', err))
+    }
+    return doc
 }
 
 // Auto-inject tenant and site from logged-in user if not provided by client
@@ -90,7 +122,7 @@ export const Products: CollectionConfig = {
     slug: 'products',
     hooks: {
         beforeChange: [beforeChangeHook],
-        afterChange: [afterChangeHook],
+        afterChange: [afterChangeHook, lowStockHook],
     },
     admin: {
         useAsTitle: 'name',

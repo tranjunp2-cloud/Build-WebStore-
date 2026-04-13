@@ -140,7 +140,7 @@ function AIChatPanelInner({
             const payload = JSON.parse(dataLines.join('\n'))
 
             if (eventName === 'status') {
-                updateAssistantMessage(messageId, { content: payload.message || 'AI dang xu ly...' })
+                updateAssistantMessage(messageId, { content: payload.message || 'AI is drafting...' })
                 return
             }
 
@@ -151,7 +151,7 @@ function AIChatPanelInner({
 
             if (eventName === 'done') {
                 updateAssistantMessage(messageId, {
-                    content: payload.message || 'Da ap dung thay doi cho website.',
+                    content: payload.message || 'Applied changes to website.',
                     isStreaming: false,
                     undoable: true,
                 })
@@ -235,7 +235,7 @@ function AIChatPanelInner({
             const data = await res.json()
             await onAIAction(data as AIAction)
             updateAssistantMessage(assistantMessageId, {
-                content: data.message || 'Da ap dung thay doi cho website.',
+                content: data.message || 'Applied changes to website.',
                 isStreaming: false,
                 undoable: true,
             })

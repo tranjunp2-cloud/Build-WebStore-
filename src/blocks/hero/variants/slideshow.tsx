@@ -8,6 +8,7 @@ import { AnimatedSection } from '../../shared/animations'
 import { CTAButtons } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { getHeroImage } from '@/lib/images/industry-images'
+import { RichText } from '../../shared/RichText'
 
 export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], badge, image, images = [] } = block
@@ -75,7 +76,7 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
                     transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
                     className="text-5xl md:text-7xl font-bold font-heading leading-[1.05] mb-6 text-white"
                 >
-                    {headline}
+                    <RichText text={headline} as="span" />
                 </motion.h1>
                 {subheadline && (
                     <motion.p
@@ -85,7 +86,7 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
                         transition={{ duration: 0.6, delay: 0.15 }}
                         className="text-xl text-white/70 mb-10 max-w-2xl mx-auto leading-relaxed"
                     >
-                        {subheadline}
+                        <RichText text={subheadline} as="span" />
                     </motion.p>
                 )}
                 <motion.div

@@ -8,6 +8,7 @@ import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import { SectionLabel } from '../shared/decorative'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { RichText } from '../shared/RichText'
 
 export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
     const { headline, images = [], variant = 'grid' } = block
@@ -44,7 +45,7 @@ export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
                 {headline && (
                     <div className="text-center mb-14">
                         <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                     </div>
                 )}
                 <StaggerGrid className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -53,7 +54,7 @@ export function GalleryBlock({ block, theme }: BlockProps<GalleryConfig>) {
                             {item.image?.url ? (
                                 <div className="relative overflow-hidden rounded-2xl aspect-square">
                                     <img
-                                        src={item.image.url}
+                                        src={item.image?.url}
                                         alt={item.caption || item.image.alt || ''}
                                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                     />
@@ -91,7 +92,7 @@ function MasonryGallery({ headline, images, theme }: { headline?: string; images
                 {headline && (
                     <div className="text-center mb-14">
                         <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                     </div>
                 )}
                 <StaggerGrid className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
@@ -100,7 +101,7 @@ function MasonryGallery({ headline, images, theme }: { headline?: string; images
                             {item.image?.url ? (
                                 <div className="relative overflow-hidden rounded-2xl">
                                     <img
-                                        src={item.image.url}
+                                        src={item.image?.url}
                                         alt={item.caption || item.image.alt || ''}
                                         className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
                                     />
@@ -166,7 +167,7 @@ function CarouselGallery({ headline, images, theme }: { headline?: string; image
                 {headline && (
                     <div className="text-center mb-14">
                         <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                     </div>
                 )}
 
@@ -186,7 +187,7 @@ function CarouselGallery({ headline, images, theme }: { headline?: string; image
                                     {item.image?.url ? (
                                         <div className="relative overflow-hidden rounded-2xl aspect-[4/3] group">
                                             <img
-                                                src={item.image.url}
+                                                src={item.image?.url}
                                                 alt={item.caption || item.image.alt || ''}
                                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                             />
@@ -291,7 +292,7 @@ function LightboxGallery({ headline, images, theme }: { headline?: string; image
                 {headline && (
                     <div className="text-center mb-14">
                         <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                     </div>
                 )}
 
@@ -301,7 +302,7 @@ function LightboxGallery({ headline, images, theme }: { headline?: string; image
                             {item.image?.url ? (
                                 <div className="relative overflow-hidden rounded-2xl aspect-square">
                                     <img
-                                        src={item.image.url}
+                                        src={item.image?.url}
                                         alt={item.caption || item.image.alt || ''}
                                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                     />
@@ -375,7 +376,7 @@ function LightboxGallery({ headline, images, theme }: { headline?: string; image
                         >
                             {images[selectedIndex]?.image?.url && (
                                 <img
-                                    src={images[selectedIndex].image.url}
+                                    src={images[selectedIndex]?.image?.url}
                                     alt={images[selectedIndex].caption || images[selectedIndex].image.alt || ''}
                                     className="max-w-full max-h-[80vh] object-contain rounded-lg"
                                 />
@@ -402,7 +403,7 @@ function FilmstripGallery({ headline, images, theme }: { headline?: string; imag
                 {headline && (
                     <div className="text-center mb-14">
                         <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                     </div>
                 )}
 
@@ -458,7 +459,7 @@ function FilmstripGallery({ headline, images, theme }: { headline?: string; imag
                             >
                                 {item.image?.url ? (
                                     <img
-                                        src={item.image.url}
+                                        src={item.image?.url}
                                         alt={item.caption || item.image.alt || ''}
                                         className="w-full h-full object-cover"
                                     />
@@ -490,7 +491,7 @@ function JustifiedGallery({ headline, images, theme }: { headline?: string; imag
                 {headline && (
                     <div className="text-center mb-14">
                         <SectionLabel color={CSS_VARS.primary}>Gallery</SectionLabel>
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                     </div>
                 )}
 
@@ -511,7 +512,7 @@ function JustifiedGallery({ headline, images, theme }: { headline?: string; imag
                                 {item.image?.url ? (
                                     <>
                                         <img
-                                            src={item.image.url}
+                                            src={item.image?.url}
                                             alt={item.caption || item.image.alt || ''}
                                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                         />

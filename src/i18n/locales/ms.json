@@ -296,11 +296,11 @@
             "morning": "pagi",
             "afternoon": "petang",
             "evening": "malam",
-            "customize": "Sesuaikan Papan Pemuka",
+            "customize": "Sesuaikan",
             "stats": {
-                "views": "Trafik / Paparan",
-                "leads": "Prospek / Klik",
-                "engagement": "Penglibatan",
+                "views": "Paparan (Trafik)",
+                "leads": "Klik (Prospek)",
+                "engagement": "Daftar Keluar (Penglibatan)",
                 "revenue": "Pendapatan",
                 "pendingOrders": "pesanan tertangguh"
             },
@@ -420,6 +420,54 @@
                 "description": "Cipta laman terlebih dahulu untuk menggunakan Papan Pemuka SEO",
                 "cta": "Pergi ke Papan Pemuka"
             },
+            "healthOverview": "Gambaran Kesihatan SEO",
+            "scoreLabel": "Skor: {score}/100",
+            "fixAllButton": "✨ Baiki Semua Isu",
+            "contentQuality": "Kualiti Kandungan",
+            "technicalSeo": "SEO Teknikal",
+            "sitemapAndMeta": "Peta Laman & Tag Meta",
+            "lastUpdated": "Kemaskini terakhir: {date}",
+            "generating": "Sedang menjana...",
+            "sitemapCount": "Peta Laman dijana — {count} halaman",
+            "sitemapEmpty": "Peta Laman dijana — tiada halaman lagi",
+            "autoMeta": {
+                "enabled": "Penjanaan Meta Auto: Aktif",
+                "disabled": "Penjanaan Meta Auto: Tidak Aktif"
+            },
+            "keywordColumns": {
+                "keyword": "Kata Kunci",
+                "rank": "Kedudukan",
+                "trend": "Trend",
+                "action": "Tindakan",
+                "delete": "Padam"
+            },
+            "keywordModal": {
+                "title": "Tambah Kata Kunci",
+                "label": "Masukkan kata kunci baharu",
+                "placeholder": "Masukkan kata kunci...",
+                "cancel": "Batal",
+                "save": "Simpan"
+            },
+            "emptySlot": "(Slot kosong)",
+            "fixAllProgress": "Pembaikan AI Sedang Berjalan",
+            "reviewTitle": "Semak Pembaikan Dicadangkan",
+            "currentLabel": "Semasa",
+            "proposedLabel": "Dicadangkan",
+            "fixAllComplete": "Semua Isu Telah Dibaiki!",
+            "fixAllFailed": "Pembaikan Gagal",
+            "overallProgress": "Kemajuan Keseluruhan",
+            "fixAllAnalysing": "Sedang menganalisis {count} item...",
+            "fixAllApply": "Gunakan {count} Pembaikan",
+            "selectAll": "Pilih semua",
+            "deselectAll": "Nyahpilih semua",
+            "warningLabel": "Amaran",
+            "allGood": "Semuanya baik! Tiada isu SEO kritikal.",
+            "issueMissingProductTitle": "Tajuk Meta tiada dalam {count} produk",
+            "issueMissingPageTitle": "Tajuk Meta tiada dalam {count} halaman",
+            "issueMissingBlogTitle": "Tajuk Meta tiada dalam {count} catatan blog",
+            "issueMissingDesc": "Penerangan Meta tiada merentasi {count} sumber",
+            "issueMissingAlt": "Imej tiada teks Alt dalam {count} produk",
+            "issueScoreLow": "Skor SEO {score}/100 — perbaiki Kandungan & SEO Teknikal",
             "error": {
                 "failed": "Analisis SEO gagal",
                 "retry": "Cuba Lagi"
@@ -1043,6 +1091,12 @@
                 "deleteFailed": "Gagal mamadamkan kiriman blog",
                 "bulkDeleteSuccess": "{count} kiriman berjaya dipadamkan",
                 "bulkDeleteFailed": "Beberapa kiriman gagal dipadamkan",
+                "bulkDeleteConfirm": "Adakah anda pasti mahu memadamkan {count} kiriman?",
+                "bulkDeleteWarning": "Tindakan ini tidak dapat dibuat asal.",
+                "deletePublishedWarning": "Amaran: Kiriman ini sedang diterbitkan dan boleh dilihat oleh pelanggan anda. Memadamkannya akan segera mengalihkannya daripada etalase anda.",
+                "cancel": "Batal",
+                "deleting": "Memadamkan...",
+                "bulkPublish": "Terbitkan",
                 "bulkPublishSuccess": "{count} kiriman berjaya diterbitkan",
                 "bulkPublishFailed": "Beberapa kiriman gagal diterbitkan",
                 "statusUpdated": "Kiriman {status}",
@@ -1112,7 +1166,12 @@
                 "aiGeneratedContent": "Kandungan Dijana",
                 "slugLabel": "Slug:",
                 "aiRegenerate": "Jana Semula",
-                "aiInsertBtn": "Masukkan ke Penyunting"
+                "aiInsertBtn": "Masukkan ke Penyunting",
+                "fileTooLarge": "Fail melebihi had 10MB",
+                "invalidFileType": "Hanya fail JPEG dan PNG diterima",
+                "draftRecoveryMessage": "Draf yang belum disimpan ditemui. Pulihkan?",
+                "draftRestore": "Pulihkan",
+                "draftDismiss": "Abaikan"
             },
             "categoryModal": {
                 "title": "Urus Kategori",
@@ -1141,7 +1200,8 @@
                 "previous": "Sebelumnya",
                 "next": "Seterusnya"
             },
-            "noMatches": "Tiada kiriman yang sepadan dengan penapis anda"
+            "noMatches": "Tiada kiriman yang sepadan dengan penapis anda",
+            "resetFilters": "Set Semula Penapis"
         }
     },
     "auth": {
@@ -1521,6 +1581,58 @@
             "removedBulk": "Staf yang dipilih telah dibuang",
             "updated": "Pengguna ditandakan sebagai {status}",
             "resent": "E-mel jemputan berjaya dihantar semula"
+        }
+    },
+    "editor": {
+        "toolbar": {
+            "publish": "Terbitkan",
+            "publishing": "Menerbitkan",
+            "published": "Diterbitkan",
+            "viewLive": "Lihat Laman",
+            "update": "Kemas kini",
+            "updating": "Mengemaskini...",
+            "preview": "Pratonton",
+            "live": "Aktif",
+            "draft": "Draf"
+        },
+        "publishModal": {
+            "title": "Sedia untuk Terbitkan?",
+            "homepageReady": "Halaman utama telah ditetapkan",
+            "homepageReadyDesc": "Halaman utama anda sudah sedia",
+            "unsavedChanges": "Perubahan belum disimpan",
+            "unsavedChangesDesc": "Kami akan menyimpan perubahan terkini sebelum menerbitkan.",
+            "seoNeeded": "Pengoptimuman SEO diperlukan",
+            "seoSet": "Metadata SEO telah ditetapkan",
+            "seoSetDesc": "Semua halaman mempunyai tajuk dan penerangan meta.",
+            "cancel": "Batal",
+            "publishNow": "Terbitkan Sekarang"
+        },
+        "unpublishModal": {
+            "title": "Nyahterbit Laman Web",
+            "warningTitle": "Pelanggan tidak dapat mengakses",
+            "warningDesc": "Laman web anda akan memaparkan halaman \"Sedang Penyelenggaraan\" kepada semua pelawat.",
+            "ownerAccessTitle": "Anda masih boleh mengedit",
+            "ownerAccessDesc": "Pratonton dan edit melalui Editor seperti biasa. Terbitkan semula bila-bila masa.",
+            "cancel": "Batal",
+            "confirm": "Aktifkan Mod Penyelenggaraan",
+            "processing": "Memproses..."
+        },
+        "viewLiveMenu": {
+            "openWebsite": "Buka Laman Web",
+            "copyLink": "Salin Pautan",
+            "unpublish": "Nyahterbit"
+        },
+        "toast": {
+            "publishSuccess": "Laman web telah aktif!",
+            "publishSuccessDomain": "Domain: {domain}",
+            "unpublishSuccess": "Laman web kini dalam mod penyelenggaraan.",
+            "linkCopied": "Pautan disalin!",
+            "publishFailed": "Gagal menerbitkan",
+            "updateSuccess": "Laman web dikemaskini!"
+        },
+        "maintenance": {
+            "banner": "Laman web dalam Mod Penyelenggaraan. Pelanggan akan melihat halaman penyelenggaraan.",
+            "republish": "Terbitkan Semula"
         }
     }
 }

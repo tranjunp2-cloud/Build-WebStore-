@@ -14,6 +14,7 @@ import { PreviewFrame } from '@/components/editor/PreviewFrame'
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
 import { useEditorStore } from '@/store/editorStore'
 import type { AIAction } from '@/types/editor'
+import { useI18n } from '@/i18n'
 import { PrePublishModal } from '@/components/editor/PrePublishModal'
 import { UnpublishModal } from '@/components/editor/UnpublishModal'
 import { EditorTemplateModal } from '@/components/editor/EditorTemplateModal'
@@ -50,6 +51,9 @@ type SiteData = {
         metaDescription?: string
         ogImage?: string | number | null
     }
+    publishedAt?: string | null
+    tenantSlug?: string | null
+    primaryDomain?: string | null
 }
 
 type LoadedPageData = {
@@ -72,6 +76,7 @@ export default function EditorPage() {
     const siteId = params?.siteId as string
     const selectedPageId = searchParams.get('pageId')
 
+    const { t, ti } = useI18n()
     const [selectedBlock, setSelectedBlock] = useState<number | null>(null)
     const [site, setSite] = useState<SiteData | null>(null)
     const [page, setPage] = useState<LoadedPageData | null>(null)
@@ -96,6 +101,7 @@ export default function EditorPage() {
     const pages = useEditorStore(state => state.pages)
     const currentPageId = useEditorStore(state => state.currentPageId)
     const hasUnsavedChanges = useEditorStore(state => state.hasUnsavedChanges)
+    const hasUnpublishedChanges = useEditorStore(state => state.hasUnpublishedChanges)
     const lastSavedAt = useEditorStore(state => state.lastSavedAt)
     const isSaving = useEditorStore(state => state.isSaving)
     const autoSaveEnabled = useEditorStore(state => state.autoSaveEnabled)
@@ -110,6 +116,7 @@ export default function EditorPage() {
     const duplicateBlock = useEditorStore(state => state.duplicateBlock)
     const reorderBlocks = useEditorStore(state => state.reorderBlocks)
     const updateTheme = useEditorStore(state => state.updateTheme)
+    const updateSiteName = useEditorStore(state => state.updateSiteName)
     const headerBlock = useEditorStore(state => state.headerBlock)
     const footerBlock = useEditorStore(state => state.footerBlock)
     const updateHeaderBlock = useEditorStore(state => state.updateHeaderBlock)
@@ -119,6 +126,7 @@ export default function EditorPage() {
     const canUndo = useEditorStore(state => state.canUndo)
     const canRedo = useEditorStore(state => state.canRedo)
     const markSaved = useEditorStore(state => state.markSaved)
+    const markPublished = useEditorStore(state => state.markPublished)
     const setIsSaving = useEditorStore(state => state.setIsSaving)
 
     const currentBlock = useMemo(
@@ -126,6 +134,17 @@ export default function EditorPage() {
         [blocks, selectedBlock],
     )
     const isPublished = site?.status === 'published'
+    const wasPublished = !isPublished && !!site?.publishedAt
+    const siteUrl = useMemo(() => {
+        if (site?.primaryDomain) {
+            return `https://${site.primaryDomain}`
+        }
+        const slug = site?.tenantSlug
+        if (!slug) return null
+        const domain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+        return `https://${slug}.${domain}`
+    }, [site?.primaryDomain, site?.tenantSlug])
+
     const lastSavedLabel = useMemo(() => {
         if (!lastSavedAt) return null
         return new Date(lastSavedAt).toLocaleTimeString([], {
@@ -247,6 +266,7 @@ export default function EditorPage() {
                     theme: currentTheme,
                     headerBlock: snapshot.headerBlock,
                     footerBlock: snapshot.footerBlock,
+                    isDraft: true,
                 }),
             })
 
@@ -322,10 +342,16 @@ export default function EditorPage() {
 
     const handleThemeChange = useCallback((key: string, value: string) => {
         updateTheme({ [key]: value })
-    }, [updateTheme])
+        // Save to DB but don't reload iframe — live CSS update handles preview
+        void handleSave({ showToast: false, refreshPreview: false })
+    }, [updateTheme, handleSave])
 
     const handleSiteSettingsChange = useCallback(async (changes: Partial<SiteData>) => {
         if (!siteId) return
+
+        if (changes.name) {
+            updateSiteName(changes.name)
+        }
 
         setSite(prev => {
             if (!prev) return prev
@@ -384,7 +410,7 @@ export default function EditorPage() {
             console.error('Failed to update site settings', error)
             toast.error('Failed to update site settings', { description: 'Please try again later.' })
         }
-    }, [currentPageId, siteId])
+    }, [currentPageId, siteId, updateSiteName])
 
     const handleDeleteBlock = useCallback((index: number) => {
         deleteBlock(index)
@@ -394,31 +420,37 @@ export default function EditorPage() {
             if (index === prev) return null
             return prev
         })
-    }, [deleteBlock])
+        void handleSave({ showToast: false, refreshPreview: true })
+    }, [deleteBlock, handleSave])
 
     const handleDuplicateBlock = useCallback((index: number) => {
         duplicateBlock(index)
         setSelectedBlock(index + 1)
-    }, [duplicateBlock])
+        void handleSave({ showToast: false, refreshPreview: true })
+    }, [duplicateBlock, handleSave])
 
     const handleBlockFieldChange = useCallback((index: number, field: string, value: string) => {
         updateBlock(index, { [field]: value })
-    }, [updateBlock])
+        // Save + reload preview to show changes
+        void handleSave({ showToast: false, refreshPreview: true })
+    }, [updateBlock, handleSave])
 
     const handleBlockUpdate = useCallback((index: number, changes: Record<string, unknown>) => {
         updateBlock(index, changes)
-    }, [updateBlock])
+        void handleSave({ showToast: false, refreshPreview: true })
+    }, [updateBlock, handleSave])
 
-    const handleReorderBlocks = useCallback((fromIndex: number, toIndex: number) => {
+    const handleReorderBlocks = useCallback(async (fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex) return
         reorderBlocks(fromIndex, toIndex)
         setSelectedBlock(toIndex)
-        setIframeKey(key => key + 1)
+        // Save FIRST so iframe reloads with correct order from DB
+        await handleSave({ showToast: false, refreshPreview: true })
         setChatActivity({
             id: `reorder-${Date.now()}`,
             content: `Moved block #${fromIndex + 1} to position #${toIndex + 1}`,
         })
-    }, [reorderBlocks])
+    }, [reorderBlocks, handleSave])
 
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
         const nextBlock = normalizeAddSectionBlock(
@@ -555,33 +587,85 @@ export default function EditorPage() {
 
             setIsPublishModalOpen(false)
             setIsUnpublishModalOpen(false)
-            
+
+            // Clear unpublished changes flag after successful publish
+            if (!currentlyPublished) {
+                markPublished()
+            }
+
             if (!currentlyPublished) {
                 const data = await res.json()
                 const siteUrl = data?.data?.url || data?.data?.domain
                 if (siteUrl) {
-                    toast.success('🎉 Website đã live!', {
-                        description: `Domain: ${siteUrl.replace(/^https?:\/\//, '')}`,
+                    toast.success(`🎉 ${t.editor.toast.publishSuccess}`, {
+                        description: ti(t.editor.toast.publishSuccessDomain, { domain: siteUrl.replace(/^https?:\/\//, '') }),
                         action: {
                             label: 'View',
                             onClick: () => window.open(siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`, '_blank')
                         }
                     })
                 } else {
-                    toast.success('🎉 Website đã live!')
+                    toast.success(`🎉 ${t.editor.toast.publishSuccess}`)
                 }
             } else {
-                toast.success('Đã đưa website về trạng thái bảo trì.')
+                toast.success(t.editor.toast.unpublishSuccess)
             }
 
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Publish failed'
-            toast.error('Publish failed', { description: message })
+            toast.error(t.editor.toast.publishFailed, { description: message })
         } finally {
             setIsPublishing(false)
         }
-    }, [handleSave, hasUnsavedChanges, isPublishing, site?.status, siteId, siteName])
+    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, site?.status, siteId, siteName])
+
+    // Re-publish: always PATCH (never DELETE). Used by "Update" button on published sites.
+    const handleRepublish = useCallback(async () => {
+        if (!siteId || isPublishing) return
+
+        setIsPublishing(true)
+        try {
+            if (hasUnsavedChanges) {
+                const saved = await handleSave({ showToast: false, refreshPreview: true })
+                if (!saved) {
+                    setIsPublishing(false)
+                    return
+                }
+            }
+
+            const res = await fetch(`/api/sites/${siteId}/publish`, {
+                method: 'PATCH',
+                credentials: 'include',
+            })
+
+            if (!res.ok) throw new Error(`Server returned ${res.status}`)
+
+            markPublished()
+            setPublishSuccess(true)
+
+            const data = await res.json()
+            const url = data?.data?.url || data?.data?.domain
+            if (url) {
+                toast.success(`🎉 ${t.editor.toast.publishSuccess}`, {
+                    description: ti(t.editor.toast.publishSuccessDomain, { domain: url.replace(/^https?:\/\//, '') }),
+                    action: {
+                        label: 'View',
+                        onClick: () => window.open(url.startsWith('http') ? url : `https://${url}`, '_blank')
+                    }
+                })
+            } else {
+                toast.success(`🎉 ${t.editor.toast.publishSuccess}`)
+            }
+
+            window.setTimeout(() => setPublishSuccess(false), 3000)
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Publish failed'
+            toast.error(t.editor.toast.publishFailed, { description: message })
+        } finally {
+            setIsPublishing(false)
+        }
+    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, siteId])
 
     const handlePageSelected = useCallback(async (pageId: string) => {
         const store = useEditorStore.getState()
@@ -710,6 +794,7 @@ export default function EditorPage() {
                 isSaving={isSaving}
                 saveSuccess={saveSuccess}
                 hasUnsavedChanges={hasUnsavedChanges}
+                hasUnpublishedChanges={hasUnpublishedChanges}
                 isPublishing={isPublishing}
                 publishSuccess={publishSuccess}
                 canUndo={canUndo()}
@@ -722,7 +807,18 @@ export default function EditorPage() {
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onSave={() => void handleSave()}
-                onPublish={() => isPublished ? setIsUnpublishModalOpen(true) : setIsPublishModalOpen(true)}
+                onPublish={() => setIsPublishModalOpen(true)}
+                onRepublish={handleRepublish}
+                onUnpublish={() => setIsUnpublishModalOpen(true)}
+                onViewLive={() => siteUrl && window.open(siteUrl, '_blank')}
+                onCopyLink={() => {
+                    if (siteUrl) {
+                        navigator.clipboard.writeText(siteUrl)
+                        toast.success(t.editor.toast.linkCopied, { description: siteUrl })
+                    }
+                }}
+                siteUrl={siteUrl}
+                wasPublished={wasPublished}
                 onViewportChange={setViewport}
             />
 
@@ -822,6 +918,8 @@ export default function EditorPage() {
                                     id: `inline-${Date.now()}`,
                                     content,
                                 })
+                                void handleSave({ showToast: false, refreshPreview: true })
+                                setIframeKey(key => key + 1)
                             }}
                             onReorderBlocks={handleReorderBlocks}
                             onBlockDrop={handleBlockDrop}

@@ -4,6 +4,8 @@ import { importMap } from '../importMap.js'
 
 // Force dynamic — Payload CMS admin requires full server context
 export const dynamic = 'force-dynamic'
+// Vercel serverless default is 10s — admin dashboard queries multiple collections
+export const maxDuration = 60
 
 type PageProps = {
     params: Promise<{ segments?: string[] }>

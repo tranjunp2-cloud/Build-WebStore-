@@ -33,6 +33,7 @@ export type BusinessInfo = {
     language?: 'en' | 'ms' | 'vi' | 'auto'
     businessUrl?: string
     source?: 'form' | 'url'
+    slug?: string
 }
 
 type BuilderState = {

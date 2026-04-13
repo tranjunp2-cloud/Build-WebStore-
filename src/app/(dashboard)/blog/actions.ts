@@ -1,6 +1,6 @@
 'use server'
 
-import { getPayload } from 'payload'
+import { getPayload, type Where } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 
@@ -130,6 +130,26 @@ export async function deleteBlogCategoryAction(id: string) {
 
         if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
             return { error: 'Unauthorized delete access' }
+        }
+
+        // Cascade: unset category from all posts (TC-F17-05-06)
+        const affected = await payload.find({
+            collection: 'blogs',
+            where: { category: { equals: id } },
+            limit: 0,
+            depth: 0,
+        })
+
+        if (affected.docs.length > 0) {
+            await Promise.all(
+                affected.docs.map(blog =>
+                    payload.update({
+                        collection: 'blogs',
+                        id: blog.id,
+                        data: { category: null },
+                    })
+                )
+            )
         }
 
         await payload.delete({
@@ -288,6 +308,31 @@ export async function deleteBlogAction(id: string) {
     })
 
     return { success: true }
+}
+
+// ─── Bulk Delete Blogs (TC-F17-01-14: no N+1) ────────────────────────────
+export async function bulkDeleteBlogsAction(ids: string[]) {
+    const user = await getCurrentUser()
+    if (!user) throw new Error('Unauthorized')
+
+    if (!ids || ids.length === 0) return { deleted: 0 }
+
+    const payload = await getPayload({ config: configPromise })
+    const tenantId = getTenantId(user as UserWithTenants)
+
+    // Single query: delete all matching IDs scoped to tenant
+    const where: Where = {
+        id: { in: ids },
+    }
+    if (tenantId) where.tenant = { equals: tenantId }
+
+    const result = await payload.delete({
+        collection: 'blogs',
+        where,
+    })
+
+    const deletedCount = Array.isArray(result.docs) ? result.docs.length : 0
+    return { deleted: deletedCount }
 }
 
 // ─── Update Blog Status ────────────────────────────────────────────────────

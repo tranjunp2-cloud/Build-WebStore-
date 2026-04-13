@@ -54,6 +54,9 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
         console.error('Failed to persist wizard dismiss state', error)
       })
     }
+
+    // Trigger push notification opt-in prompt after wizard closes
+    window.dispatchEvent(new CustomEvent('wizard-closed'))
   }
 
   const handleNext = () => {

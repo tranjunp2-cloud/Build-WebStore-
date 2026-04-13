@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F23 Personal Profile — Interactive UI Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0B1120;--surface:#161E2E;--surface2:#1a2436;--primary:#3B82F6;--teal:#2DD4BF;--text:#FFFFFF;--muted:#9CA3AF;--border:#1F2937;--border2:#374151;--error:#EF4444;--success:#10B981;--warning:#F59E0B;--info:#3B82F6;--gradient:linear-gradient(135deg,#3B82F6,#2DD4BF);--radius:8px;--radius-lg:12px;--sidebar-w:260px;--header-h:64px;--font:'Inter',sans-serif}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow:hidden}
+
+/* === CMS LAYOUT === */
+.cms{display:flex;flex-direction:column;height:100vh}
+.header{height:var(--header-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:fixed;top:0;left:0;right:0;z-index:100}
+.header-left{display:flex;align-items:center;gap:12px}
+.hamburger{display:none;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:8px}
+.logo{font-size:18px;font-weight:700;background:var(--gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-right{display:flex;align-items:center;gap:16px}
+.bell{position:relative;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer}
+.bell-badge{position:absolute;top:-4px;right:-4px;background:var(--error);color:#fff;font-size:10px;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.avatar-btn{display:flex;align-items:center;gap:8px;background:none;border:none;cursor:pointer;color:var(--text)}
+.avatar-img{width:36px;height:36px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff}
+.avatar-name{font-size:14px;font-weight:500}
+
+/* === SIDEBAR === */
+.body-wrap{display:flex;margin-top:var(--header-h);height:calc(100vh - var(--header-h))}
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);padding:16px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;transition:transform .3s}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:90}
+.nav-label{font-size:11px;text-transform:uppercase;color:var(--muted);padding:12px 12px 6px;letter-spacing:.5px;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);font-size:14px;color:var(--muted);cursor:pointer;transition:all .15s;text-decoration:none}
+.nav-item:hover{background:var(--border);color:var(--text)}
+.nav-item.active{background:rgba(59,130,246,.12);color:var(--primary)}
+.nav-item .icon{width:20px;text-align:center;font-size:16px}
+.nav-spacer{flex:1}
+.nav-item.wa{color:var(--success)}
+
+/* === MAIN CONTENT === */
+.main{flex:1;overflow-y:auto;padding:32px;background:var(--bg)}
+.main-inner{max-width:800px;margin:0 auto}
+
+/* === ROLE TOGGLE (Demo) === */
+.demo-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);flex-wrap:wrap;gap:12px}
+.demo-bar-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.role-toggle{display:flex;gap:4px;background:var(--border);border-radius:6px;padding:3px}
+.role-btn{padding:6px 16px;border:none;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font);background:transparent;color:var(--muted)}
+.role-btn.active{background:var(--primary);color:#fff}
+
+/* === PAGE HEADER === */
+.page-title{font-size:24px;font-weight:700;margin-bottom:4px}
+.page-desc{font-size:14px;color:var(--muted);margin-bottom:24px}
+
+/* === PROFILE BANNER === */
+.profile-banner{background:linear-gradient(135deg,#1e3a5f 0%,#0d2137 50%,#0f2d45 100%);border-radius:var(--radius-lg);padding:32px;display:flex;align-items:center;gap:24px;margin-bottom:24px;position:relative;overflow:hidden}
+.profile-banner::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 20% 50%,rgba(59,130,246,.15) 0%,transparent 60%);pointer-events:none}
+.profile-avatar{position:relative;flex-shrink:0}
+.profile-avatar-img{width:96px;height:96px;border-radius:50%;background:var(--gradient);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;color:#fff;border:3px solid rgba(255,255,255,.2)}
+.avatar-upload-btn{position:absolute;bottom:0;right:0;width:32px;height:32px;border-radius:50%;background:var(--primary);border:2px solid var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:#fff;transition:transform .2s}
+.avatar-upload-btn:hover{transform:scale(1.1)}
+.profile-info h2{font-size:20px;font-weight:700;margin-bottom:4px}
+.profile-info .email-line{font-size:14px;color:var(--muted)}
+.profile-info .role-badge{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.role-badge.owner{background:rgba(251,191,36,.15);color:#FBBF24;border:1px solid rgba(251,191,36,.25)}
+.role-badge.staff{background:rgba(59,130,246,.15);color:#60A5FA;border:1px solid rgba(59,130,246,.25)}
+
+/* === TABS === */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:24px}
+.tab{padding:12px 24px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;background:none;border-top:none;border-left:none;border-right:none;font-family:var(--font)}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* === CARD === */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:16px}
+.card-title{font-size:16px;font-weight:600;margin-bottom:4px}
+.card-desc{font-size:13px;color:var(--muted);margin-bottom:20px}
+.card-divider{height:1px;background:var(--border);margin:20px 0}
+
+/* === FORM === */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.form-group{margin-bottom:16px}
+.form-label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:var(--muted);margin-bottom:6px}
+.lock-icon{font-size:12px;color:var(--warning)}
+.form-input{width:100%;height:40px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:0 12px;font-size:14px;color:var(--text);font-family:var(--font);transition:border-color .2s}
+.form-input:focus{outline:none;border-color:var(--primary)}
+.form-input.disabled{opacity:.5;cursor:not-allowed;background:rgba(31,41,55,.6)}
+.form-input.error{border-color:var(--error)}
+.form-helper{font-size:12px;margin-top:4px;color:var(--muted)}
+.form-helper.error{color:var(--error)}
+.phone-wrap{display:flex;gap:8px}
+.phone-code{width:90px;height:40px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:0 8px;font-size:14px;color:var(--text);font-family:var(--font);cursor:pointer;-webkit-appearance:none;appearance:none}
+.phone-code.disabled{opacity:.5;cursor:not-allowed}
+.phone-input{flex:1}
+
+/* === SSO BOX === */
+.sso-box{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:var(--radius-lg);padding:20px;display:flex;align-items:flex-start;gap:14px}
+.sso-icon{font-size:24px;flex-shrink:0;margin-top:2px}
+.sso-content h4{font-size:15px;font-weight:600;margin-bottom:4px}
+.sso-content p{font-size:13px;color:var(--muted);line-height:1.6}
+.tooltip-text{font-size:12px;color:var(--warning);margin-top:6px;display:flex;align-items:center;gap:6px}
+
+/* === BUTTONS === */
+.btn{height:40px;padding:0 20px;border-radius:var(--radius);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);transition:all .2s;display:inline-flex;align-items:center;gap:8px;border:none}
+.btn-primary{background:var(--gradient);color:#fff}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+.btn-secondary{background:var(--border);color:var(--text);border:1px solid var(--border2)}
+.btn-secondary:hover{background:var(--border2)}
+.btn-outline{background:transparent;color:var(--primary);border:1px solid var(--primary)}
+.btn-outline:hover{background:rgba(59,130,246,.1)}
+.btn-sso{background:rgba(59,130,246,.15);color:var(--primary);border:1px solid rgba(59,130,246,.3)}
+.btn-sso:hover{background:rgba(59,130,246,.25)}
+.btn-group{display:flex;gap:10px;margin-top:8px}
+
+/* === PASSWORD FIELD === */
+.pw-wrap{position:relative}
+.pw-wrap .form-input{padding-right:40px}
+.pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px}
+.pw-strength{display:flex;gap:4px;margin-top:8px}
+.pw-bar{height:3px;flex:1;border-radius:2px;background:var(--border)}
+.pw-bar.weak{background:var(--error)}
+.pw-bar.medium{background:var(--warning)}
+.pw-bar.strong{background:var(--success)}
+.pw-label{font-size:11px;margin-top:4px}
+.pw-label.weak{color:var(--error)}
+.pw-label.medium{color:var(--warning)}
+.pw-label.strong{color:var(--success)}
+
+/* === TOAST === */
+.toast{position:fixed;bottom:24px;right:24px;padding:14px 20px;border-radius:var(--radius);font-size:14px;font-weight:500;display:flex;align-items:center;gap:10px;z-index:1000;transform:translateY(100px);opacity:0;transition:all .4s cubic-bezier(.4,0,.2,1);pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1;pointer-events:auto}
+.toast.success{background:#065F46;color:#6EE7B7;border:1px solid #10B981}
+.toast.error{background:#7F1D1D;color:#FCA5A5;border:1px solid #EF4444}
+
+/* === MOBILE === */
+@media(max-width:768px){
+  .hamburger{display:block}
+  .sidebar{position:fixed;left:0;top:var(--header-h);bottom:0;z-index:95;transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay.open{display:block;z-index:90;top:var(--header-h)}
+  .main{padding:16px}
+  .form-row{grid-template-columns:1fr}
+  .profile-banner{flex-direction:column;text-align:center;padding:24px 16px}
+  .avatar-name{display:none}
+  .demo-bar{flex-direction:column;align-items:stretch}
+}
+
+/* === ANIMATIONS === */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .3s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
+.shake{animation:shake .4s ease}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+    <span class="logo">PrimeWeb</span>
+  </div>
+  <div class="header-right">
+    <button class="bell">🔔<span class="bell-badge">3</span></button>
+    <button class="avatar-btn">
+      <div class="avatar-img">TD</div>
+      <span class="avatar-name" id="headerName">Trần Dũng</span>
+      <span style="color:var(--muted);font-size:12px">▼</span>
+    </button>
+  </div>
+</header>
+
+<div class="body-wrap">
+  <!-- SIDEBAR -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <nav class="sidebar" id="sidebar">
+    <span class="nav-label">Main</span>
+    <a class="nav-item" href="#"><span class="icon">📊</span>Dashboard</a>
+    <a class="nav-item" href="#"><span class="icon">🌐</span>My Webstore</a>
+    <a class="nav-item" href="#"><span class="icon">📦</span>Products</a>
+    <a class="nav-item" href="#"><span class="icon">🛒</span>Orders</a>
+    <a class="nav-item" href="#"><span class="icon">⚙️</span>Store Config</a>
+    <div class="nav-spacer"></div>
+    <a class="nav-item wa" href="#"><span class="icon">💬</span>Help Support</a>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+    <div class="main-inner">
+
+      <!-- DEMO CONTROL BAR -->
+      <div class="demo-bar">
+        <div>
+          <div class="demo-bar-label">🎭 Demo Role Switch</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Chuyển đổi Role để xem UI thay đổi theo quyền</div>
+        </div>
+        <div class="role-toggle">
+          <button class="role-btn active" onclick="setRole('staff')">👤 Staff</button>
+          <button class="role-btn" onclick="setRole('owner')">👑 Owner</button>
+        </div>
+      </div>
+
+      <!-- PAGE HEADER -->
+      <h1 class="page-title">Personal Profile</h1>
+      <p class="page-desc">Quản lý thông tin cá nhân và bảo mật tài khoản của bạn.</p>
+
+      <!-- PROFILE BANNER -->
+      <div class="profile-banner fade-in">
+        <div class="profile-avatar">
+          <div class="profile-avatar-img" id="avatarDisplay">TD</div>
+          <label class="avatar-upload-btn" for="avatarInput" title="Upload avatar">📷</label>
+          <input type="file" id="avatarInput" accept="image/jpeg,image/png" hidden onchange="handleAvatar(event)">
+        </div>
+        <div class="profile-info">
+          <h2 id="bannerName">Trần Dũng</h2>
+          <div class="email-line">trandung@example.com</div>
+          <span class="role-badge staff" id="roleBadge">Staff</span>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="tabs">
+        <button class="tab active" onclick="setTab('general')">General Info</button>
+        <button class="tab" onclick="setTab('security')">Security</button>
+      </div>
+
+      <!-- TAB: GENERAL INFO -->
+      <div id="tab-general">
+        <!-- SSO Notice (Owner only) -->
+        <div id="ssoNoticeGeneral" class="card" style="display:none">
+          <div class="sso-box">
+            <span class="sso-icon">🔒</span>
+            <div class="sso-content">
+              <h4>Thông tin được quản lý bởi SSO</h4>
+              <p>Các trường thông tin cá nhân được đồng bộ từ hệ thống SSO. Bạn không thể chỉnh sửa tại đây.</p>
+              <div class="tooltip-text">⚠️ Để thay đổi, vui lòng truy cập cổng SSO</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card fade-in">
+          <div class="card-title">Personal Information</div>
+          <div class="card-desc">Cập nhật thông tin cá nhân của bạn.</div>
+          <div class="card-divider"></div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">First Name <span class="lock-icon" id="lockFN" style="display:none">🔒</span></label>
+              <input type="text" class="form-input" id="inputFN" value="Dũng" placeholder="First Name">
+              <div class="form-helper error" id="errFN" style="display:none">Tên phải từ 2–50 ký tự</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Last Name <span class="lock-icon" id="lockLN" style="display:none">🔒</span></label>
+              <input type="text" class="form-input" id="inputLN" value="Trần" placeholder="Last Name">
+              <div class="form-helper error" id="errLN" style="display:none">Họ phải từ 2–50 ký tự</div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Email Address 🔒</label>
+            <input type="email" class="form-input disabled" value="trandung@example.com" disabled>
+            <div class="form-helper">Email không thể thay đổi (Login Identity)</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Phone Number <span class="lock-icon" id="lockPhone" style="display:none">🔒</span></label>
+            <div class="phone-wrap">
+              <select class="phone-code" id="phoneCode">
+                <option value="+84">🇻🇳 +84</option>
+                <option value="+60">🇲🇾 +60</option>
+                <option value="+65">🇸🇬 +65</option>
+                <option value="+1">🇺🇸 +1</option>
+                <option value="+44">🇬🇧 +44</option>
+              </select>
+              <input type="tel" class="form-input phone-input" id="inputPhone" value="912345678" placeholder="Phone number">
+            </div>
+            <div class="form-helper error" id="errPhone" style="display:none">Số điện thoại không hợp lệ</div>
+          </div>
+
+          <div class="card-divider"></div>
+          <div class="btn-group" id="generalActions">
+            <button class="btn btn-primary" onclick="saveGeneral()">Save Changes</button>
+            <button class="btn btn-secondary" onclick="resetGeneral()">Cancel</button>
+          </div>
+          <div class="btn-group" id="ownerActions" style="display:none">
+            <button class="btn btn-sso" onclick="openSSO()">🔗 Manage Account in SSO →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: SECURITY -->
+      <div id="tab-security" style="display:none">
+
+        <!-- STAFF: Change Password -->
+        <div id="securityStaff">
+          <div class="card fade-in">
+            <div class="card-title">Change Password</div>
+            <div class="card-desc">Đổi mật khẩu đăng nhập của bạn. Mật khẩu mới phải đáp ứng các tiêu chuẩn bảo mật.</div>
+            <div class="card-divider"></div>
+
+            <div class="form-group">
+              <label class="form-label">Current Password</label>
+              <div class="pw-wrap">
+                <input type="password" class="form-input" id="inputCurPw" placeholder="Enter current password">
+                <button class="pw-toggle" onclick="togglePw('inputCurPw',this)">👁</button>
+              </div>
+              <div class="form-helper error" id="errCurPw" style="display:none">Vui lòng nhập mật khẩu hiện tại</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">New Password</label>
+              <div class="pw-wrap">
+                <input type="password" class="form-input" id="inputNewPw" placeholder="Enter new password" oninput="checkStrength()">
+                <button class="pw-toggle" onclick="togglePw('inputNewPw',this)">👁</button>
+              </div>
+              <div class="pw-strength" id="pwStrength" style="display:none">
+                <div class="pw-bar" id="bar1"></div>
+                <div class="pw-bar" id="bar2"></div>
+                <div class="pw-bar" id="bar3"></div>
+                <div class="pw-bar" id="bar4"></div>
+              </div>
+              <div class="pw-label" id="pwLabel" style="display:none"></div>
+              <div class="form-helper error" id="errNewPw" style="display:none"></div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Confirm New Password</label>
+              <div class="pw-wrap">
+                <input type="password" class="form-input" id="inputConfPw" placeholder="Confirm new password">
+                <button class="pw-toggle" onclick="togglePw('inputConfPw',this)">👁</button>
+              </div>
+              <div class="form-helper error" id="errConfPw" style="display:none">Mật khẩu xác nhận không khớp</div>
+            </div>
+
+            <div class="card-divider"></div>
+            <div class="btn-group">
+              <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+              <button class="btn btn-secondary" onclick="resetPassword()">Cancel</button>
+            </div>
+          </div>
+
+          <div class="card fade-in" style="margin-top:16px">
+            <div class="card-title" style="font-size:14px;color:var(--muted)">Password Requirements</div>
+            <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;color:var(--muted)">
+              <div id="req-len">○ Ít nhất 8 ký tự</div>
+              <div id="req-upper">○ 1 chữ hoa (A-Z)</div>
+              <div id="req-lower">○ 1 chữ thường (a-z)</div>
+              <div id="req-num">○ 1 chữ số (0-9)</div>
+              <div id="req-special">○ 1 ký tự đặc biệt (!@#...)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OWNER: SSO Guard -->
+        <div id="securityOwner" style="display:none">
+          <div class="card fade-in">
+            <div class="card-title">Account Security</div>
+            <div class="card-desc">Tài khoản của bạn được bảo mật thông qua hệ thống SSO.</div>
+            <div class="card-divider"></div>
+            <div class="sso-box" style="margin-bottom:20px">
+              <span class="sso-icon">🛡️</span>
+              <div class="sso-content">
+                <h4>SSO Protected Account</h4>
+                <p>Mật khẩu và cài đặt bảo mật của bạn được quản lý bởi hệ thống Single Sign-On (SSO). Để thay đổi mật khẩu, bật xác thực hai yếu tố (2FA), hoặc cập nhật bất kỳ cài đặt bảo mật nào, vui lòng truy cập cổng quản lý SSO.</p>
+              </div>
+            </div>
+            <button class="btn btn-sso" onclick="openSSO()" style="width:100%;justify-content:center">🔗 Manage SSO Account →</button>
+          </div>
+
+          <div class="card fade-in" style="margin-top:16px">
+            <div class="card-title" style="font-size:14px">Account Info</div>
+            <div class="card-divider"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px">
+              <div><span style="color:var(--muted)">Auth Provider</span><div style="margin-top:4px;font-weight:600">SSO (PrimeID)</div></div>
+              <div><span style="color:var(--muted)">Last Login</span><div style="margin-top:4px;font-weight:600">01/04/2026 14:30</div></div>
+              <div><span style="color:var(--muted)">2FA Status</span><div style="margin-top:4px;font-weight:600;color:var(--success)">✓ Enabled</div></div>
+              <div><span style="color:var(--muted)">Sessions</span><div style="margin-top:4px;font-weight:600">2 active</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+let currentRole='staff', currentTab='general';
+
+function setRole(role){
+  currentRole=role;
+  document.querySelectorAll('.role-btn').forEach(b=>{b.classList.toggle('active',b.textContent.includes(role==='staff'?'Staff':'Owner'))});
+  const isOwner=role==='owner';
+
+  // Badge
+  const badge=document.getElementById('roleBadge');
+  badge.textContent=isOwner?'Owner':'Staff';
+  badge.className='role-badge '+(isOwner?'owner':'staff');
+
+  // Banner name
+  document.getElementById('bannerName').textContent=isOwner?'Nguyễn Minh Quân':'Trần Dũng';
+  document.getElementById('headerName').textContent=isOwner?'Minh Quân':'Trần Dũng';
+  document.getElementById('avatarDisplay').textContent=isOwner?'MQ':'TD';
+  document.querySelector('.profile-avatar-img').textContent=isOwner?'MQ':'TD';
+
+  // General Info fields
+  const fnInput=document.getElementById('inputFN');
+  const lnInput=document.getElementById('inputLN');
+  const phoneInput=document.getElementById('inputPhone');
+  const phoneCode=document.getElementById('phoneCode');
+  [fnInput,lnInput,phoneInput].forEach(el=>{el.classList.toggle('disabled',isOwner);el.disabled=isOwner});
+  phoneCode.classList.toggle('disabled',isOwner);phoneCode.disabled=isOwner;
+  if(isOwner){fnInput.value='Quân';lnInput.value='Nguyễn Minh'}else{fnInput.value='Dũng';lnInput.value='Trần'}
+
+  // Lock icons
+  ['lockFN','lockLN','lockPhone'].forEach(id=>{document.getElementById(id).style.display=isOwner?'inline':'none'});
+
+  // SSO Notice
+  document.getElementById('ssoNoticeGeneral').style.display=isOwner?'block':'none';
+
+  // Buttons
+  document.getElementById('generalActions').style.display=isOwner?'none':'flex';
+  document.getElementById('ownerActions').style.display=isOwner?'flex':'none';
+
+  // Security tab
+  document.getElementById('securityStaff').style.display=isOwner?'none':'block';
+  document.getElementById('securityOwner').style.display=isOwner?'block':'none';
+
+  clearErrors();
+}
+
+function setTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>{if((tab==='general'&&t.textContent==='General Info')||(tab==='security'&&t.textContent==='Security'))t.classList.add('active')});
+  document.getElementById('tab-general').style.display=tab==='general'?'block':'none';
+  document.getElementById('tab-security').style.display=tab==='security'?'block':'none';
+}
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('open');
+}
+
+function togglePw(id,btn){
+  const inp=document.getElementById(id);
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈'}else{inp.type='password';btn.textContent='👁'}
+}
+
+function handleAvatar(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  if(!['image/jpeg','image/png'].includes(file.type)){showToast('Chỉ chấp nhận file JPG hoặc PNG','error');e.target.value='';return}
+  if(file.size>2*1024*1024){showToast('File phải nhỏ hơn 2MB','error');e.target.value='';return}
+  const previewUrl=URL.createObjectURL(file);
+  if(window._currentAvatarUrl)URL.revokeObjectURL(window._currentAvatarUrl);
+  window._currentAvatarUrl=previewUrl;
+  const avatarEl=document.getElementById('avatarDisplay');
+  avatarEl.style.backgroundImage=`url(${previewUrl})`;
+  avatarEl.style.backgroundSize='cover';
+  avatarEl.style.backgroundPosition='center';
+  avatarEl.textContent='';
+  showToast('Avatar đã được cập nhật thành công!','success');
+}
+
+function saveGeneral(){
+  clearErrors();
+  let valid=true;
+  const fn=document.getElementById('inputFN').value.trim();
+  const ln=document.getElementById('inputLN').value.trim();
+  const ph=document.getElementById('inputPhone').value.trim();
+  if(fn.length<2||fn.length>50){showError('inputFN','errFN');valid=false}
+  if(ln.length<2||ln.length>50){showError('inputLN','errLN');valid=false}
+  const phonePatterns={'+84':/^\d{9,10}$/,'+60':/^\d{9,10}$/,'+65':/^\d{8}$/,'+1':/^\d{10}$/,'+44':/^\d{10,11}$/};
+  const selCode=document.getElementById('phoneCode').value;
+  const phoneRegex=phonePatterns[selCode]||/^\d{7,15}$/;
+  if(!phoneRegex.test(ph)){showError('inputPhone','errPhone');valid=false}
+  if(valid){showToast('Thông tin cá nhân đã được cập nhật!','success')}
+}
+
+function resetGeneral(){
+  document.getElementById('inputFN').value='Dũng';
+  document.getElementById('inputLN').value='Trần';
+  document.getElementById('inputPhone').value='912345678';
+  clearErrors();
+}
+
+function checkStrength(){
+  const pw=document.getElementById('inputNewPw').value;
+  const s=document.getElementById('pwStrength');
+  const l=document.getElementById('pwLabel');
+  if(!pw){s.style.display='none';l.style.display='none';updateReqs('');return}
+  s.style.display='flex';l.style.display='block';
+  let score=0;
+  if(pw.length>=8)score++;
+  if(/[A-Z]/.test(pw))score++;
+  if(/[a-z]/.test(pw))score++;
+  if(/[0-9]/.test(pw))score++;
+  if(/[^A-Za-z0-9]/.test(pw))score++;
+  const bars=[document.getElementById('bar1'),document.getElementById('bar2'),document.getElementById('bar3'),document.getElementById('bar4')];
+  bars.forEach(b=>{b.className='pw-bar'});
+  if(score<=2){bars[0].classList.add('weak');l.textContent='Weak';l.className='pw-label weak'}
+  else if(score<=3){bars.slice(0,2).forEach(b=>b.classList.add('medium'));l.textContent='Medium';l.className='pw-label medium'}
+  else if(score<=4){bars.slice(0,3).forEach(b=>b.classList.add('strong'));l.textContent='Strong';l.className='pw-label strong'}
+  else{bars.forEach(b=>b.classList.add('strong'));l.textContent='Very Strong';l.className='pw-label strong'}
+  updateReqs(pw);
+}
+
+function updateReqs(pw){
+  const r=[{id:'req-len',test:pw.length>=8},{id:'req-upper',test:/[A-Z]/.test(pw)},{id:'req-lower',test:/[a-z]/.test(pw)},{id:'req-num',test:/[0-9]/.test(pw)},{id:'req-special',test:/[^A-Za-z0-9]/.test(pw)}];
+  r.forEach(({id,test})=>{const el=document.getElementById(id);const txt=el.textContent.substring(2);el.textContent=(test?'✓ ':'○ ')+txt;el.style.color=test?'var(--success)':'var(--muted)'});
+}
+
+function changePassword(){
+  clearErrors();
+  let valid=true;
+  const cur=document.getElementById('inputCurPw').value;
+  const np=document.getElementById('inputNewPw').value;
+  const conf=document.getElementById('inputConfPw').value;
+  if(!cur){document.getElementById('errCurPw').style.display='block';document.getElementById('inputCurPw').classList.add('error','shake');valid=false}
+  if(np.length<8||!/[A-Z]/.test(np)||!/[a-z]/.test(np)||!/[0-9]/.test(np)||!/[^A-Za-z0-9]/.test(np)){
+    const e=document.getElementById('errNewPw');e.textContent='Mật khẩu chưa đáp ứng đủ yêu cầu bảo mật';e.style.display='block';document.getElementById('inputNewPw').classList.add('error','shake');valid=false}
+  if(np!==conf||!conf){document.getElementById('errConfPw').style.display='block';document.getElementById('inputConfPw').classList.add('error','shake');valid=false}
+  if(valid){showToast('Mật khẩu đã được cập nhật! Các phiên khác đã bị đăng xuất.','success');resetPassword()}
+}
+
+function resetPassword(){
+  ['inputCurPw','inputNewPw','inputConfPw'].forEach(id=>{document.getElementById(id).value=''});
+  document.getElementById('pwStrength').style.display='none';
+  document.getElementById('pwLabel').style.display='none';
+  updateReqs('');clearErrors();
+}
+
+function openSSO(){window.open('https://sso.primecommerce.sg/account','_blank','noopener,noreferrer');showToast('Đang mở cổng SSO trong tab mới...','success')}
+
+function showError(inputId,errId){
+  document.getElementById(inputId).classList.add('error','shake');
+  document.getElementById(errId).style.display='block';
+}
+
+function clearErrors(){
+  document.querySelectorAll('.form-input').forEach(el=>{el.classList.remove('error','shake')});
+  document.querySelectorAll('.form-helper.error').forEach(el=>{el.style.display='none'});
+}
+
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=(type==='success'?'✓ ':'✗ ')+msg;
+  t.className='toast '+type+' show';
+  setTimeout(()=>{t.className='toast'},3000);
+}
+</script>
+</body>
+</html>

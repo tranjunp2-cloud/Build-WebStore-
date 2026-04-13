@@ -124,6 +124,7 @@ export function TemplatePreviewModal({
                         )}
                         <iframe
                             src={`/api/templates/preview?id=${template.id}`}
+                            sandbox="allow-scripts allow-same-origin"
                             className={cn("w-full h-full border-0 transition-opacity duration-500", iframeLoaded ? "opacity-100" : "opacity-0")}
                             title={`Preview: ${template.name}`}
                             onLoad={() => setIframeLoaded(true)}

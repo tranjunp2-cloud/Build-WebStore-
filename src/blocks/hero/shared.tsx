@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import type { HeroConfig } from './config'
+import { RichText } from '../shared/RichText'
 
 // ── Shared CTA renderer ──────────────────────────────────────────────────────
 export function CTAButtons({ buttons, variant = 'default' }: { buttons: HeroConfig['ctaButtons']; variant?: 'default' | 'glass' }) {
@@ -12,7 +13,7 @@ export function CTAButtons({ buttons, variant = 'default' }: { buttons: HeroConf
             {buttons.map((btn, i) => (
                 <motion.a
                     key={i}
-                    href={btn.url}
+                    href={btn?.url}
                     whileHover={{ scale: 1.03, y: -2 }}
                     whileTap={{ scale: 0.98 }}
                     className="px-8 py-4 rounded-xl font-semibold text-sm transition-all duration-300"
@@ -43,7 +44,7 @@ export function CTAButtons({ buttons, variant = 'default' }: { buttons: HeroConf
                                 boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)`,
                             }}
                 >
-                    {btn.label}
+                    <RichText text={btn.label} as="span" />
                 </motion.a>
             ))}
         </div>

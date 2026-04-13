@@ -8,6 +8,7 @@ export const generateSiteSchema = z.object({
         shortDescription: z.string().min(1),
         businessUrl: z.string().url().optional(),
         source: z.enum(['form', 'url', 'image']).optional(),
+        slug: z.string().regex(/^[a-z0-9-]+$/).min(3).max(63).optional(),
     }),
     extraInstructions: z.string().optional(),
     language: z.enum(['en', 'ms', 'vi', 'auto']).optional(),

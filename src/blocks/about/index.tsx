@@ -8,6 +8,7 @@ import { getAboutImage } from '@/lib/images/industry-images'
 import { SectionLabel } from '../shared/decorative'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { toPlainText } from '@/lib/utils/to-plain-text'
+import { RichText } from '../shared/RichText'
 
 function SimpleVariant({ block }: { block: AboutConfig }) {
     const { headline, sectionLabel } = block
@@ -16,13 +17,9 @@ function SimpleVariant({ block }: { block: AboutConfig }) {
         <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6 max-w-3xl text-center">
                 {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
-                <h2 className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                    {headline}
-                </h2>
+                <RichText text={headline} as="h2" className="text-3xl md:text-4xl font-bold mb-6" style={{ fontFamily: CSS_VARS.fontHeading }} />
                 {body && (
-                    <p className="text-lg leading-relaxed" style={{ color: CSS_VARS.muted }}>
-                        {body}
-                    </p>
+                    <RichText text={body} as="p" className="text-lg leading-relaxed" style={{ color: CSS_VARS.muted }} />
                 )}
             </div>
         </AnimatedSection>
@@ -64,13 +61,9 @@ function SplitVariant({ block, category }: { block: AboutConfig; category: strin
                         transition={{ duration: 0.6, delay: 0.1 }}
                     >
                         {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
-                        <h2 className="text-3xl md:text-4xl font-bold mb-6 leading-tight" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                            {headline}
-                        </h2>
+                        <RichText text={headline} as="h2" className="text-3xl md:text-4xl font-bold mb-6 leading-tight" style={{ fontFamily: CSS_VARS.fontHeading }} />
                         {body && (
-                            <p className="text-lg leading-relaxed" style={{ color: CSS_VARS.muted }}>
-                                {body}
-                            </p>
+                            <RichText text={body} as="p" className="text-lg leading-relaxed" style={{ color: CSS_VARS.muted }} />
                         )}
                     </motion.div>
 
@@ -110,10 +103,8 @@ function StoryVariant({ block }: { block: AboutConfig }) {
             <div className="container mx-auto px-6 max-w-3xl">
                 <div className="text-center mb-12">
                     {sectionLabel && <SectionLabel color={CSS_VARS.primary}>{sectionLabel}</SectionLabel>}
-                    <h2 className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                        {headline}
-                    </h2>
-                    {body && <p className="text-lg" style={{ color: CSS_VARS.muted }}>{body}</p>}
+                    <RichText text={headline} as="h2" className="text-3xl md:text-4xl font-bold mb-4" style={{ fontFamily: CSS_VARS.fontHeading }} />
+                    {body && <RichText text={body} as="p" className="text-lg" style={{ color: CSS_VARS.muted }} />}
                 </div>
 
                 <ol className="relative" aria-label="Company timeline">

@@ -8,6 +8,7 @@ import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
 import { CTAButtons } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { getHeroImage } from '@/lib/images/industry-images'
+import { RichText } from '../../shared/RichText'
 
 export function MagazineHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], image, badge } = block
@@ -51,11 +52,9 @@ export function MagazineHero({ block, site }: BlockProps<HeroConfig>) {
                         {badge?.show && (
                             <SectionLabel color={CSS_VARS.primary}>{badge.text}</SectionLabel>
                         )}
-                        <h1 className="text-4xl lg:text-5xl font-bold font-heading leading-[1.1] mb-6">
-                            {headline}
-                        </h1>
+                        <RichText text={headline} as="h1" className="text-4xl lg:text-5xl font-bold font-heading leading-[1.1] mb-6" />
                         {subheadline && (
-                            <p className="text-lg opacity-60 mb-8 leading-relaxed">{subheadline}</p>
+                            <RichText text={subheadline} as="p" className="text-lg opacity-60 mb-8 leading-relaxed" />
                         )}
                         <CTAButtons buttons={ctaButtons} />
                     </motion.div>

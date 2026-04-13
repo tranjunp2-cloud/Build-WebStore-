@@ -6,6 +6,7 @@ import type { BlockProps } from '../types'
 import type { BookingWidgetConfig, BookingService } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -213,8 +214,8 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
             <AnimatedSection className="py-24">
                 <div className="container mx-auto px-6">
                     <div className="text-center max-w-2xl mx-auto mb-12">
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                        {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                        {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                     </div>
                     <div className="max-w-2xl mx-auto">
                         <BookingForm {...formProps} />
@@ -231,8 +232,8 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
                 <div className="container mx-auto px-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
                         <div>
-                            <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                            {subheadline && <p className="text-lg opacity-50 leading-relaxed mb-8">{subheadline}</p>}
+                            <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                            {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed mb-8" />}
                             <div className="space-y-4">
                                 {services.map((s, i) => (
                                     <div
@@ -266,8 +267,8 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto">
-                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                    {subheadline && <p className="text-lg opacity-50 leading-relaxed mb-8">{subheadline}</p>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed mb-8" />}
                     <button
                         onClick={() => setShowModal(true)}
                         className="px-8 py-4 rounded-xl font-semibold text-white text-lg transition-opacity hover:opacity-90"
@@ -324,8 +325,8 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6">
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                    {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                 </div>
                 <div className="max-w-2xl mx-auto">
                     <BookingForm {...formProps} />

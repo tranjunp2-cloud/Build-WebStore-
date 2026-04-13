@@ -7,8 +7,14 @@ import { withAuth } from '@/lib/auth'
 import { parseRequest } from '@/lib/validations/helpers'
 import { z } from 'zod'
 
+const MAX_PAGES_PER_SITE = 100
+
+function stripHtml(input: string): string {
+    return input.replace(/<[^>]*>/g, '')
+}
+
 const newPageSchema = z.object({
-    title: z.string().min(1, 'Title is required'),
+    title: z.string().min(1, 'Title is required').max(100, 'Title must be 100 characters or less'),
     slug: z.string().regex(/^[a-z0-9-\/]+$/, 'Slug must be kebab-case or valid path').min(1, 'Slug is required'),
 })
 type RouteContext = { params: Promise<{ siteId: string }> }
@@ -66,6 +72,7 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
             isVisible?: boolean | null
             seo?: { title?: string; description?: string }
             updatedAt: string
+            layout?: unknown[]
         }
 
         const formattedPages = (pages as unknown as PageDoc[]).map((p: PageDoc) => ({
@@ -78,6 +85,7 @@ export const GET = withAuth<RouteContext>(async (user, request, ctx) => {
             seoTitle: p.seo?.title ?? null,
             seoDescription: p.seo?.description ?? null,
             updatedAt: p.updatedAt,
+            blockCount: Array.isArray(p.layout) ? p.layout.length : 0,
         }))
 
         return NextResponse.json({ pages: formattedPages })
@@ -117,37 +125,63 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         const { data, errorResponse } = await parseRequest(request, newPageSchema)
         if (errorResponse) return errorResponse
 
-        const { title, slug } = data!
+        const { title: rawTitle, slug } = data!
+        const title = stripHtml(rawTitle.trim())
+
+        if (!title) {
+            return new NextResponse('Title is required', { status: 400 })
+        }
 
         let normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`
         if (normalizedSlug === '//') normalizedSlug = '/'
 
-        const existingPages = await payload.find({
+        // Soft guard: page count limit. Not atomic under concurrent writes, but acceptable —
+        // worst case is 101 pages instead of 100 (harmless). Hard enforcement would need a DB trigger.
+        const { totalDocs: pageCount } = await payload.find({
+            collection: 'pages',
+            where: { site: { equals: siteId } },
+            limit: 0,
+        })
+        if (pageCount >= MAX_PAGES_PER_SITE) {
+            return new NextResponse(`Maximum ${MAX_PAGES_PER_SITE} pages per site reached`, { status: 400 })
+        }
+
+        // Optimistic check: slug uniqueness (DB constraint is the real guard)
+        const { docs: existing } = await payload.find({
             collection: 'pages',
             where: {
                 and: [
                     { site: { equals: siteId } },
-                    { slug: { equals: normalizedSlug } }
-                ]
+                    { slug: { equals: normalizedSlug } },
+                ],
             },
-            limit: 1
+            limit: 1,
         })
-
-        if (existingPages.docs.length > 0) {
+        if (existing.length > 0) {
             return new NextResponse('Page slug already exists in this site', { status: 409 })
         }
 
-        const newPage = await payload.create({
-            collection: 'pages',
-            data: {
-                title,
-                slug: normalizedSlug,
-                site: siteId,
-                isVisible: true,
-                layout: [],
-                _status: 'draft',
-            },
-        })
+        let newPage: Record<string, unknown>
+        try {
+            newPage = await payload.create({
+                collection: 'pages',
+                data: {
+                    title,
+                    slug: normalizedSlug,
+                    site: siteId,
+                    isVisible: true,
+                    layout: [],
+                    _status: 'draft',
+                },
+            })
+        } catch (err: unknown) {
+            // Handle DB unique constraint violation (concurrent slug creation)
+            const message = err instanceof Error ? err.message : String(err)
+            if (message.includes('unique') || message.includes('duplicate')) {
+                return new NextResponse('Page slug already exists in this site', { status: 409 })
+            }
+            throw err
+        }
 
         return NextResponse.json({
             page: {
@@ -157,8 +191,8 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                 status: newPage._status || 'draft',
                 isHomepage: Boolean(newPage.isHomepage),
                 isVisible: newPage.isVisible ?? true,
-                seoTitle: newPage.seo?.title ?? null,
-                seoDescription: newPage.seo?.description ?? null,
+                seoTitle: (newPage.seo as Record<string, unknown> | undefined)?.title ?? null,
+                seoDescription: (newPage.seo as Record<string, unknown> | undefined)?.description ?? null,
                 updatedAt: newPage.updatedAt,
             }
         })

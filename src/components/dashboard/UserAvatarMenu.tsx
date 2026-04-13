@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { ChevronDown, LogOut, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
@@ -15,6 +16,7 @@ type UserAvatarMenuProps = {
 export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarMenuProps) {
     const [open, setOpen] = useState(false)
     const menuRef = useRef<HTMLDivElement>(null)
+    const router = useRouter()
     const { t } = useI18n()
 
     // Close on click outside
@@ -76,7 +78,10 @@ export function UserAvatarMenu({ userName, userInitial, userEmail }: UserAvatarM
                     <div className="my-1 h-px bg-white/10" />
 
                     {/* Profile */}
-                    <button className="flex w-full items-center gap-3 rounded-[12px] px-3 py-2 bg-transparent border-none outline-none hover:bg-white/5 cursor-pointer transition-colors text-left text-[14px] font-normal leading-[1.43] text-[#F8FAFC]">
+                    <button
+                        onClick={() => { setOpen(false); router.push('/dashboard/settings') }}
+                        className="flex w-full items-center gap-3 rounded-[12px] px-3 py-2 bg-transparent border-none outline-none hover:bg-white/5 cursor-pointer transition-colors text-left text-[14px] font-normal leading-[1.43] text-[#F8FAFC]"
+                    >
                         <User className="h-4 w-4" />
                         {t.cms.profile}
                     </button>

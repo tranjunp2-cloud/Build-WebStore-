@@ -6,7 +6,7 @@
 ## Project Context
 
 - **Stack:** Next.js 15 + Payload CMS 3 + PostgreSQL + TypeScript
-- **Deploy:** Docker standalone → DigitalOcean App Platform
+- **Deploy:** Vercel Pro + Neon PostgreSQL (migrated from DO)
 - **Git flow:** Merge thẳng staging. 1 US = 1 branch = 1 PR vào staging.
 
 ## Review Rules (P0 — always flag)
@@ -72,10 +72,12 @@ If PR links to an issue (`Relates to #N`):
 - `sendEmail()` utility uses Payload SMTP (AWS SES) — do NOT add Resend/other providers
 - Email calls must use `.catch()` pattern (fire-and-forget, non-blocking)
 
-### 9. Docker Standalone
+### 9. Vercel Deployment
 
 - All pages using `getPayload()` must have `export const dynamic = 'force-dynamic'`
 - Payload `pushDevSchema` does NOT work reliably — always use SQL migrations
+- API routes must have `maxDuration <= 60` (Vercel Pro limit)
+- DB migrations via `scripts/db-setup.js --migrate-only` (runs in Vercel build step)
 
 ### 10. Performance
 
@@ -83,11 +85,25 @@ If PR links to an issue (`Relates to #N`):
 - Check bundle size impact for new frontend dependencies
 - Images should use Next.js `<Image>` component
 
-### 11. Testing
+### 11. Testing — E2E Required for New Features
 
-- New business logic should have unit tests
-- Coverage must not drop below thresholds in `vitest.config.ts`
-- Follow `docs/TEST_CONVENTION.md` for patterns and rules
+**P1 — Flag if missing:**
+- PR adds new **page/route** (`src/app/**/page.tsx` or `src/app/api/**/route.ts`) → **MUST** have E2E test in `tests/*.spec.ts`
+- PR fixes **user-reported bug** → **SHOULD** have E2E test reproducing the bug
+- PR only changes **CSS/refactor/docs** → no test needed
+
+**What to check:**
+- If `git diff --name-only` has new files in `src/app/` but NO new/modified files in `tests/` → flag: "⚠️ New route/page added without E2E test"
+- E2E tests must test real browser flow (Playwright), NOT mocked unit tests
+- Unit tests (Vitest) only needed for **pure functions** (utils, helpers)
+
+**Do NOT flag:**
+- Unit test coverage drops (existing unit tests are smoke tests with mocks)
+- Missing unit tests for API routes (E2E covers this better)
+
+**Test file locations:**
+- E2E: `tests/*.spec.ts` (Playwright, browser-based)
+- Unit: `src/__tests__/**` (Vitest, mock-based — existing only, don't require new)
 
 ### 13. Test Generation (when generating tests)
 

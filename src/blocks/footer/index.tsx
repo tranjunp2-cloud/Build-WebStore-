@@ -41,7 +41,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                     {/* Logo */}
                     <div className="font-bold text-2xl font-heading mb-4">
                         {mergedBlock.logo?.url ? (
-                            <img src={mergedBlock.logo.url} alt={logoText} className="h-8 w-auto mx-auto" />
+                            <img src={mergedBlock.logo?.url} alt={logoText} className="h-8 w-auto mx-auto" />
                         ) : (
                             <span style={{
                                 background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
@@ -63,7 +63,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                                     <h4 className="text-xs font-semibold uppercase tracking-widest opacity-50 mb-2">{col.title}</h4>
                                     <div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
                                         {(col.links || []).map((link, j) => (
-                                            <a key={j} href={link.url} className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200">
+                                            <a key={j} href={link?.url} className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200">
                                                 {link.label}
                                             </a>
                                         ))}
@@ -133,7 +133,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                             <div className="col-span-2 md:col-span-1">
                                 <div className="font-bold text-xl font-heading mb-3">
                                     {mergedBlock.logo?.url ? (
-                                        <img src={mergedBlock.logo.url} alt={logoText} className="h-8 w-auto" />
+                                        <img src={mergedBlock.logo?.url} alt={logoText} className="h-8 w-auto" />
                                     ) : (
                                         <span style={{
                                             background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
@@ -155,7 +155,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                                     <ul className="space-y-2.5">
                                         {(col.links || []).map((link, j) => (
                                             <li key={j}>
-                                                <a href={link.url} className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200">
+                                                <a href={link?.url} className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200">
                                                     {link.label}
                                                 </a>
                                             </li>
@@ -217,7 +217,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                         <div className="lg:max-w-xs">
                             <div className="font-bold text-2xl font-heading mb-3">
                                 {mergedBlock.logo?.url ? (
-                                    <img src={mergedBlock.logo.url} alt={logoText} className="h-8 w-auto" />
+                                    <img src={mergedBlock.logo?.url} alt={logoText} className="h-8 w-auto" />
                                 ) : (
                                     <span style={{
                                         background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
@@ -241,7 +241,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                                         <ul className="space-y-2.5">
                                             {(col.links || []).map((link, j) => (
                                                 <li key={j}>
-                                                    <a href={link.url} className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200">
+                                                    <a href={link?.url} className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200">
                                                         {link.label}
                                                     </a>
                                                 </li>
@@ -295,7 +295,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                         <div>
                             <div className="font-bold text-2xl font-heading mb-4">
                                 {mergedBlock.logo?.url ? (
-                                    <img src={mergedBlock.logo.url} alt={logoText} className="h-8 w-auto" />
+                                    <img src={mergedBlock.logo?.url} alt={logoText} className="h-8 w-auto" />
                                 ) : (
                                     <span style={{
                                         background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
@@ -336,7 +336,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                                     {(col.links || []).map((link, j) => (
                                         <li key={j}>
                                             <a
-                                                href={link.url}
+                                                href={link?.url}
                                                 className="text-sm opacity-40 hover:opacity-80 transition-all duration-200 hover:translate-x-1 inline-block"
                                             >
                                                 {link.label}
@@ -399,7 +399,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                         {/* Logo / brand text — left */}
                         <div className="font-bold text-lg font-heading flex items-center gap-2 flex-shrink-0">
                             {mergedBlock.logo?.url ? (
-                                <img src={mergedBlock.logo.url} alt={logoText} className="h-6 w-auto" />
+                                <img src={mergedBlock.logo?.url} alt={logoText} className="h-6 w-auto" />
                             ) : (
                                 <span style={{
                                     background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
@@ -418,7 +418,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                                 {allLinks.slice(0, 6).map((link, i) => (
                                     <a
                                         key={i}
-                                        href={link.url}
+                                        href={link?.url}
                                         className="text-sm opacity-40 hover:opacity-80 transition-opacity duration-200"
                                     >
                                         {link.label}
@@ -447,7 +447,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                     <div className="md:col-span-1">
                         <div className="font-bold text-2xl font-heading mb-4">
                             {mergedBlock.logo?.url ? (
-                                <img src={mergedBlock.logo.url} alt={logoText} className="h-8 w-auto" />
+                                <img src={mergedBlock.logo?.url} alt={logoText} className="h-8 w-auto" />
                             ) : (
                                 <span style={{
                                     background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
@@ -490,7 +490,7 @@ export function FooterBlock({ block, theme, site }: BlockProps<FooterConfig>) {
                                 {(col.links || []).map((link, j) => (
                                     <li key={j}>
                                         <a
-                                            href={link.url}
+                                            href={link?.url}
                                             className="text-sm opacity-40 hover:opacity-80 transition-all duration-200 hover:translate-x-1 inline-block"
                                         >
                                             {link.label}

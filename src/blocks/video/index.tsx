@@ -2,6 +2,7 @@ import type { BlockProps } from '../types'
 import type { VideoConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 export function VideoBlock({ block, theme }: BlockProps<VideoConfig>) {
     const { headline, subheadline, videoUrl, variant = 'embed' } = block
@@ -29,8 +30,8 @@ export function VideoBlock({ block, theme }: BlockProps<VideoConfig>) {
                 <div className="absolute inset-0 z-10 bg-black/60" />
                 {/* Content */}
                 <div className="relative z-20 text-center px-6 max-w-3xl mx-auto">
-                    {headline && <h2 className="text-4xl md:text-6xl font-bold font-heading text-white mb-5">{headline}</h2>}
-                    {subheadline && <p className="text-lg md:text-xl text-white/80 leading-relaxed">{subheadline}</p>}
+                    {headline && <RichText text={headline} as="h2" className="text-4xl md:text-6xl font-bold font-heading text-white mb-5" />}
+                    {subheadline && <RichText text={subheadline} as="p" className="text-lg md:text-xl text-white/80 leading-relaxed" />}
                 </div>
             </section>
         )
@@ -40,8 +41,8 @@ export function VideoBlock({ block, theme }: BlockProps<VideoConfig>) {
     return (
         <AnimatedSection className="py-24">
             <div className="container mx-auto px-6 max-w-4xl">
-                {headline && <h2 className="text-4xl font-bold font-heading text-center mb-4">{headline}</h2>}
-                {subheadline && <p className="text-center opacity-70 mb-10">{subheadline}</p>}
+                {headline && <RichText text={headline} as="h2" className="text-4xl font-bold font-heading text-center mb-4" />}
+                {subheadline && <RichText text={subheadline} as="p" className="text-center opacity-70 mb-10" />}
                 <div className="rounded-2xl overflow-hidden aspect-video" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
                     <iframe src={embedUrl} className="w-full h-full" allowFullScreen title={headline || 'Video'} />
                 </div>

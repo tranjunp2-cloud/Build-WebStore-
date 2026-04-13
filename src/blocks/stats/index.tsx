@@ -6,6 +6,7 @@ import { AnimatedSection, StaggerGrid, StaggerItem } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { StatsConfig, StatItem } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../shared/RichText'
 
 function CountUp({ value, duration = 1200 }: { value: string; duration?: number }) {
     const ref = useRef<HTMLSpanElement>(null)
@@ -55,9 +56,7 @@ function RowVariant({ headline, stats }: { headline?: string; stats: StatItem[] 
         <AnimatedSection className="py-16 md:py-20" style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
             <div className="container mx-auto px-6">
                 {headline && (
-                    <h2 className="text-3xl font-bold text-center mb-10" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                        {headline}
-                    </h2>
+                    <RichText text={headline} as="h2" className="text-3xl font-bold text-center mb-10" style={{ fontFamily: CSS_VARS.fontHeading }} />
                 )}
                 <StaggerGrid className="flex flex-col sm:flex-row flex-wrap justify-center gap-8 md:gap-12">
                     {stats.map((stat, i) => (
@@ -83,9 +82,7 @@ function GridVariant({ headline, stats }: { headline?: string; stats: StatItem[]
         <AnimatedSection className="py-16 md:py-20" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
             <div className="container mx-auto px-6">
                 {headline && (
-                    <h2 className="text-3xl font-bold text-center mb-10" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                        {headline}
-                    </h2>
+                    <RichText text={headline} as="h2" className="text-3xl font-bold text-center mb-10" style={{ fontFamily: CSS_VARS.fontHeading }} />
                 )}
                 <StaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {stats.map((stat, i) => (
@@ -122,9 +119,7 @@ function HighlightVariant({ headline, stats }: { headline?: string; stats: StatI
         >
             <div className="container mx-auto px-6 max-w-3xl">
                 {headline && (
-                    <h2 className="text-3xl font-bold text-center mb-10" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                        {headline}
-                    </h2>
+                    <RichText text={headline} as="h2" className="text-3xl font-bold text-center mb-10" style={{ fontFamily: CSS_VARS.fontHeading }} />
                 )}
                 <StaggerGrid className="flex flex-col gap-6">
                     {stats.map((stat, i) => {

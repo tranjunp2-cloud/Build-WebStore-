@@ -13,6 +13,7 @@ import { BuilderPromoCard } from '@/components/builder/onboarding/BuilderPromoCa
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useBuilderStore, type BusinessInfo } from '@/store/builderStore'
 import { useI18n } from '@/i18n'
+import SlugPicker from '@/components/onboarding/SlugPicker'
 
 type IndustryOption = {
     value: string
@@ -73,6 +74,10 @@ export default function BusinessInfoForm({
     const [industryOptions, setIndustryOptions] = useState<IndustryOption[]>([])
     const [isLoadingIndustries, setIsLoadingIndustries] = useState(true)
 
+    // Slug picker state (F23)
+    const [chosenSlug, setChosenSlug] = useState('')
+    const [slugAvailable, setSlugAvailable] = useState(true) // true by default — slug is optional
+
     // URL extraction state
     const [inputMode, setInputMode] = useState<'manual' | 'url'>('manual')
     const [urlValue, setUrlValue] = useState('')
@@ -85,7 +90,8 @@ export default function BusinessInfoForm({
         form.businessName.trim().length >= 3 &&
         form.industry.trim().length > 0 &&
         form.shortDescription.trim().length >= 3 &&
-        form.products.trim().length >= 3
+        form.products.trim().length >= 3 &&
+        slugAvailable // true by default; only false if user entered an unavailable slug
 
     useEffect(() => {
         let isMounted = true
@@ -160,6 +166,7 @@ export default function BusinessInfoForm({
         const payload: BusinessInfo = {
             ...form,
             ...(extractionResult ? { businessUrl: urlValue, source: 'url' as const } : { source: 'form' as const }),
+            ...(chosenSlug ? { slug: chosenSlug } : {}),
         }
 
         if (onSubmit) {
@@ -502,6 +509,17 @@ export default function BusinessInfoForm({
                             value={form.businessName}
                         />
                     </BuilderField>
+
+                    {/* F23: Slug picker — auto-generate from business name */}
+                    {form.businessName.trim().length >= 3 && (
+                        <SlugPicker
+                            businessName={form.businessName}
+                            onSlugChange={(slug, available) => {
+                                setChosenSlug(slug)
+                                setSlugAvailable(available)
+                            }}
+                        />
+                    )}
 
                     <BuilderField
                         error={errors.industry}

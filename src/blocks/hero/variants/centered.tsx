@@ -7,6 +7,7 @@ import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
 import { CTAButtons } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { RichText } from '../../shared/RichText'
 
 export function CenteredHero({ block }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], image, badge } = block
@@ -46,7 +47,7 @@ export function CenteredHero({ block }: BlockProps<HeroConfig>) {
                         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
                         className="text-5xl md:text-7xl font-bold font-heading leading-[1.05] mb-6"
                     >
-                        {headline}
+                        <RichText text={headline} as="span" />
                     </motion.h1>
 
                     {subheadline && (
@@ -57,7 +58,7 @@ export function CenteredHero({ block }: BlockProps<HeroConfig>) {
                             transition={{ duration: 0.6, delay: 0.15 }}
                             className="text-xl opacity-60 mb-10 max-w-2xl mx-auto leading-relaxed"
                         >
-                            {subheadline}
+                            <RichText text={subheadline} as="span" />
                         </motion.p>
                     )}
 
@@ -83,8 +84,8 @@ export function CenteredHero({ block }: BlockProps<HeroConfig>) {
                             className="mt-16 relative max-w-4xl mx-auto group"
                         >
                             <img
-                                src={image.url}
-                                alt={image.alt || headline}
+                                src={image?.url}
+                                alt={image?.alt || headline}
                                 className="w-full rounded-2xl object-cover"
                             />
                             {/* Gradient overlay for polish */}

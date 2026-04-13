@@ -24,6 +24,7 @@ import { BlogCategories } from './collections/BlogCategories'
 import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import { Categories } from './collections/Categories'
 import { Notifications } from './collections/Notifications'
+import { PushSubscriptions } from './collections/PushSubscriptions'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -47,11 +48,21 @@ function isRemoteDatabase(): boolean {
   )
 }
 
-/** Schema push is expensive in dev Docker and can block auth/API requests.
- * Enable it explicitly only when you intend to sync schema changes.
+/** Schema push: auto-enable for local dev, explicit for Docker/staging.
+ * - Local dev (NODE_ENV=development): always push (dev needs latest schema)
+ * - Docker/staging: only when PAYLOAD_PUSH_SCHEMA=true (db-setup controls this)
+ * - Production: never push
+ *
+ * History: commit 5934144 disabled auto-push to fix 45s timeout in dev Docker.
+ * But this broke local dev — fields added to collections didn't create columns.
+ * Fix: auto-push for local dev, explicit for Docker (db-setup sets the env var).
  */
 function shouldPushSchema(): boolean {
-  return process.env.PAYLOAD_PUSH_SCHEMA === 'true'
+  if (process.env.PAYLOAD_PUSH_SCHEMA === 'false') return false
+  if (process.env.PAYLOAD_PUSH_SCHEMA === 'true') return true
+  // Auto-push for local dev only
+  const isDev = process.env.NODE_ENV === 'development'
+  return isDev
 }
 
 
@@ -110,6 +121,7 @@ export default buildConfig({
     BlogCategories,
     Categories,
     Notifications,
+    PushSubscriptions,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',
@@ -119,9 +131,9 @@ export default buildConfig({
   db: postgresAdapter({
     pool: {
       connectionString: getDatabaseConnectionString(),
-      // DB từ xa (DO managed): ép chấp nhận cert để tránh SELF_SIGNED_CERT_IN_CHAIN.
-      // Truyền rõ ở đây vì parse(connectionString) có thể ghi đè nếu URL còn sslmode.
-      ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: false } } : {}),
+      // Remote DB (Neon): require valid SSL cert.
+      // Local dev: no SSL needed.
+      ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: true } } : {}),
     },
     // Push schema only when explicitly requested to avoid expensive sync on every
     // local Docker request. Use `PAYLOAD_PUSH_SCHEMA=true` or the db push script
@@ -141,12 +153,6 @@ export default buildConfig({
                   const s3Endpoint = process.env.S3_ENDPOINT || ''
                   const publicEndpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || s3Endpoint
                   const bucket = process.env.S3_BUCKET || ''
-                  
-                  // Handle DigitalOcean Spaces (Virtual Host style) vs MinIO (Path style)
-                  if (publicEndpoint.includes('digitaloceanspaces')) {
-                    const host = publicEndpoint.replace('https://', '').replace('http://', '')
-                    return `https://${bucket}.${host}/${prefix ? `${prefix}/` : ''}${filename}`
-                  }
                   
                   return `${publicEndpoint}/${bucket}/${prefix ? `${prefix}/` : ''}${filename}`
                 }

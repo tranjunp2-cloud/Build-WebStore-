@@ -4,6 +4,7 @@ import type { BlockProps } from '../types'
 import type { GalleryMasonryConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryConfig>) {
     const { variant = 'masonry', headline, images = [] } = block
@@ -22,7 +23,7 @@ export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryC
             <div className="container mx-auto px-6">
                 {headline && (
                     <div className="text-center mb-14">
-                        <h2 className="text-4xl md:text-5xl font-bold font-heading">{headline}</h2>
+                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
                     </div>
                 )}
 
@@ -31,8 +32,8 @@ export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryC
                         {images.map((img, i) => (
                             <div key={i} className="relative group overflow-hidden rounded-2xl aspect-square">
                                 <img
-                                    src={img.url}
-                                    alt={img.alt || ''}
+                                    src={img?.url}
+                                    alt={img?.alt || ''}
                                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                 />
                                 <div
@@ -49,8 +50,8 @@ export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryC
                         {images.map((img, i) => (
                             <div key={i} className="relative group overflow-hidden rounded-2xl break-inside-avoid">
                                 <img
-                                    src={img.url}
-                                    alt={img.alt || ''}
+                                    src={img?.url}
+                                    alt={img?.alt || ''}
                                     className="w-full h-auto transition-transform duration-500 group-hover:scale-110"
                                 />
                                 <div

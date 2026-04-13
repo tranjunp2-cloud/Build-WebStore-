@@ -178,9 +178,21 @@ describe('generateAutoSEOMeta — OpenAI error path [TC-F08-03-01]', () => {
         delete process.env.OPENAI_API_KEY
     })
 
-    it('throws when OpenAI API call fails [TC-F08-03-01]', async () => {
-        // Arrange
-        mockCreate.mockRejectedValue(new Error('OpenAI rate limit exceeded'))
+    it('falls back to template when OpenAI rate limit hit [TC-F08-03-01]', async () => {
+        // Arrange — rate limit error triggers fallback, not throw
+        mockCreate.mockRejectedValue(new Error('429 You exceeded your current quota'))
+
+        // Act
+        const result = await generateAutoSEOMeta('product', 'Item', 'Shop')
+
+        // Assert — returns template fallback
+        expect(result.title).toContain('Item')
+        expect(result.title).toContain('Shop')
+    })
+
+    it('throws when OpenAI fails with non-quota error [TC-F08-03-01]', async () => {
+        // Arrange — non-rate-limit error should still throw
+        mockCreate.mockRejectedValue(new Error('Network connection timeout'))
 
         // Act & Assert
         await expect(

@@ -4,6 +4,7 @@ import type { BlockProps } from '../types'
 import type { ServiceCardsConfig, ServiceItem } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { RichText } from '../shared/RichText'
 
 export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfig>) {
     const { headline, subheadline, services = [], variant = 'grid' } = block
@@ -12,7 +13,7 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
         if (!cta) return null
         return (
             <a
-                href={cta.url}
+                href={cta?.url}
                 className="inline-flex items-center gap-1 text-sm font-semibold mt-4 transition-opacity hover:opacity-80"
                 style={{ color: 'var(--brand-primary)' }}
             >
@@ -100,7 +101,7 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
                     )}
                     {featured.cta && (
                         <a
-                            href={featured.cta.url}
+                            href={featured.cta?.url}
                             className="inline-block mt-4 px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
                             style={{ background: 'var(--brand-primary)' }}
                         >
@@ -121,8 +122,8 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
             <div className="container mx-auto px-6">
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
-                    <h2 className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight">{headline}</h2>
-                    {subheadline && <p className="text-lg opacity-50 leading-relaxed">{subheadline}</p>}
+                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
                 </div>
 
                 {/* Content */}
