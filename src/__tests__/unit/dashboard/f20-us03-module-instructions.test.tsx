@@ -125,8 +125,8 @@ describe('ModuleGuidesTab Component (US-F20-03)', () => {
 
     it('[TC-F20.08] Phân nhóm Link định vị nội bộ (Anchor Hash URL jump)', () => {
         // Arrange: Giả lập user đang truy cập có sẵn Hash ở URL (ví dụ link từ email gửi tới)
-        window.location.hash = '#orders'
-        
+        window.location.hash = '#builder'
+
         // Act
         render(
             <I18nProvider>
@@ -140,11 +140,11 @@ describe('ModuleGuidesTab Component (US-F20-03)', () => {
         })
 
         // Assert
-        // 1. Tab Orders (🛒 Orders) phải ở trạng thái active color (bg-[#3B82F6])
-        const ordersTab = screen.getByRole('button', { name: /Orders/i })
-        expect(ordersTab).toHaveClass('bg-[#3B82F6]')
+        // 1. Tab Builder (🚀 AI Website Builder) phải ở trạng thái active color (bg-[#3B82F6])
+        const builderTab = screen.getByRole('button', { name: /AI Website Builder/i })
+        expect(builderTab).toHaveClass('bg-[#3B82F6]')
 
-        // 2. Element orders phải được scrollIntoView
+        // 2. Element builder phải được scrollIntoView
         expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
     })
 
@@ -156,9 +156,9 @@ describe('ModuleGuidesTab Component (US-F20-03)', () => {
             </I18nProvider>
         )
         
-        // Giả sử lấy Screenshot đầu tiên thuộc về Products để click (Do Products là default tab)
+        // Lấy Screenshot đầu tiên thuộc về Dashboard để click (Dashboard là default tab)
         const firstScreenshotOverlay = screen.getAllByText(/Click to zoom/i)[0]
-        
+
         // Act: Click vô Overlay để Zoom mở Lightbox
         fireEvent.click(firstScreenshotOverlay.closest('div.cursor-pointer')!)
 
@@ -166,8 +166,8 @@ describe('ModuleGuidesTab Component (US-F20-03)', () => {
         const dialog = screen.getByRole('dialog')
         const img = within(dialog).getByTestId('next-image')
         expect(img).toBeInTheDocument()
-        expect(img).toHaveAttribute('alt', 'Product List View')
-        expect(img).toHaveAttribute('src', '/help/products-1-list.webp')
+        expect(img).toHaveAttribute('alt', 'Dashboard Overview')
+        expect(img).toHaveAttribute('src', '/help/dashboard-1-overview.jpg')
     })
 
     it('[TC-F20.10] Sử dụng Phím ESC để tắt Trình xem Modal', async () => {

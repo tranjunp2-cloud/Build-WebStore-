@@ -137,8 +137,8 @@ describe('[TC-F20.04] QnAPageClient Integration', () => {
         fireEvent.click(buttons[1]);
         
         // Both answers should be visible in the DOM
-        expect(screen.getByText('Products')).toBeInTheDocument(); // q1 answer snippet
-        expect(screen.getByText('Browse Files')).toBeInTheDocument(); // q2 answer snippet
+        expect(screen.getByText(/Traffic/i)).toBeInTheDocument(); // q1 answer snippet (Dashboard Metrics)
+        expect(screen.getAllByText(/Customize/i).length).toBeGreaterThanOrEqual(1); // q2 answer snippet (Dashboard Customize)
     });
 
     it('[TC-F20.05] displays Empty State when search yields no results', () => {
