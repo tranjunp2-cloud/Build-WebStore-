@@ -3,6 +3,7 @@ import type { CategoryContent, BusinessSample } from '@/lib/ai/content/types'
 import type { ThemePreset } from '@/lib/ai/theme-presets'
 import { blockRegistry } from '@/blocks/registry'
 import { enforceMinContent } from './openai-generator'
+import { applyContentValidation, type ContentLang } from './content-rules'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -1180,12 +1181,19 @@ export function composeFromBlueprint(preset: TemplatePreset, compositionSeed?: n
 
   const pageNames = preset.pages.map((p) => p.name)
 
+  // Template path content language — defaults to 'en' since template content
+  // in src/lib/ai/content/*.ts is pre-curated. Phase 04 wires the SAME
+  // content-rules validator used by the AI path, so any blocked CTA in the
+  // hand-authored template content is caught + fixed uniformly.
+  const templateLang: ContentLang = 'en'
+
   const pages: TemplatePage[] = preset.pages.map((page) => ({
     title: page.name,
     slug: page.slug,
-    layout: page.blocks.map((spec) =>
-      buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed),
-    ),
+    layout: page.blocks.map((spec) => {
+      const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed)
+      return applyContentValidation(block, templateLang)
+    }),
   }))
 
   return {
@@ -1235,6 +1243,17 @@ export function composeTemplate(input: ComposerInput): TemplateSeed {
   const name = `${biz.name} — ${input.themePreset.name}`
   const description = `${tierLabel} template for ${input.category}: ${biz.tagline}`
 
+  // Phase 04 — apply content validation across every block built by the
+  // legacy path (same rules as AI path + blueprint path, single source of
+  // truth in content-rules.ts).
+  const legacyLang: ContentLang = 'en'
+  const validatedPages: TemplatePage[] = templatePages.map((page) => ({
+    ...page,
+    layout: page.layout.map((block) =>
+      applyContentValidation(block as Record<string, unknown>, legacyLang),
+    ),
+  }))
+
   return {
     name,
     description,
@@ -1242,7 +1261,7 @@ export function composeTemplate(input: ComposerInput): TemplateSeed {
     tier: input.variant,
     isPremium: input.variant === 'premium',
     theme: input.themePreset,
-    pages: templatePages,
+    pages: validatedPages,
   }
 }
 

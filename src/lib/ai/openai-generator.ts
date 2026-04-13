@@ -9,6 +9,14 @@ import { blockRegistry } from '@/blocks/registry'
 import { buildSystemPrompt, type BusinessInfoInput } from './system-prompt'
 import { generateBlocks, type GenerationResult, type GeneratedBlock, type GeneratedPage } from './generate-blocks'
 import { buildUserPrompt } from './system-prompt'
+import {
+    validateBlockContent,
+    validateOrdering,
+    checkPageBlockCount,
+    normalizeLang,
+    MIN_BLOCKS_PER_PAGE,
+    type ContentLang,
+} from './content-rules'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -105,11 +113,15 @@ export async function generateSiteWithAI(
         // Detect site category for weighted variant selection
         const detectedCategory = typeof parsed.category === 'string' ? parsed.category : undefined
 
+        // Normalize pipeline language for content-rules lookups.
+        // normalizeLang handles 'auto' → 'en' internally.
+        const contentLang: ContentLang = normalizeLang(language)
+
         // Helper: validate and sanitize an array of raw blocks
         function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
             const valid: Record<string, unknown>[] = []
             for (const block of rawBlocks) {
-                const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory)
+                const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang)
                 if (typeof sanitized.blockType === 'string' && blockRegistry.has(sanitized.blockType)) {
                     const validation = blockRegistry.validate(sanitized.blockType, sanitized)
                     if (validation.success) {
@@ -159,6 +171,22 @@ export async function generateSiteWithAI(
 
             validBlocks = allBlocks
 
+            // Phase 04 — page-level guards: min block count + AIDA ordering.
+            // Both log warnings only; they do not mutate pages or throw.
+            for (const genPage of generatedPages) {
+                const pageBlocks = genPage.blocks as Record<string, unknown>[]
+                const stats = checkPageBlockCount(pageBlocks)
+                if (!stats.viable) {
+                    console.warn(
+                        `[design-quality] page "${genPage.title}" has ${pageBlocks.length} blocks (min ${MIN_BLOCKS_PER_PAGE}). Missing: ${!stats.hasNav ? 'nav ' : ''}${!stats.hasHero ? 'hero ' : ''}${!stats.hasFooter ? 'footer' : ''}`.trim(),
+                    )
+                }
+                const ordering = validateOrdering(pageBlocks, detectedCategory)
+                if (!ordering.valid) {
+                    for (const w of ordering.warnings) console.warn(`${w} (page: ${genPage.title})`)
+                }
+            }
+
             for (let i = 0; i < validBlocks.length; i++) {
                 events.push({ event: 'block_complete', data: { block: validBlocks[i], index: i } })
             }
@@ -166,6 +194,18 @@ export async function generateSiteWithAI(
             // Single-page backward compat
             const rawBlocks = Array.isArray(parsed.blocks) ? parsed.blocks : []
             validBlocks = validateBlocks(rawBlocks)
+
+            // Phase 04 — page-level guards for single-page path
+            const singleStats = checkPageBlockCount(validBlocks)
+            if (!singleStats.viable) {
+                console.warn(
+                    `[design-quality] single-page has ${validBlocks.length} blocks (min ${MIN_BLOCKS_PER_PAGE}). Missing: ${!singleStats.hasNav ? 'nav ' : ''}${!singleStats.hasHero ? 'hero ' : ''}${!singleStats.hasFooter ? 'footer' : ''}`.trim(),
+                )
+            }
+            const singleOrdering = validateOrdering(validBlocks, detectedCategory)
+            if (!singleOrdering.valid) {
+                for (const w of singleOrdering.warnings) console.warn(w)
+            }
 
             for (let i = 0; i < validBlocks.length; i++) {
                 const progress = 60 + Math.round((i / validBlocks.length) * 30)
@@ -610,7 +650,11 @@ function fuzzyMatchVariant(requested: string, validVariants: string[]): string |
  * Removes hallucinated fields, enforces exact variant enums, and recursively normalizes
  * objects into the strictly required keys to prevent validation failures.
  */
-export function sanitizeBlockData(block: Record<string, unknown>, siteCategory?: string): Record<string, unknown> {
+export function sanitizeBlockData(
+    block: Record<string, unknown>,
+    siteCategory?: string,
+    language: 'en' | 'vi' | 'ms' = 'en',
+): Record<string, unknown> {
     const s = { ...block }
 
     // Helper: normalize array where strings should be objects
@@ -665,6 +709,15 @@ export function sanitizeBlockData(block: Record<string, unknown>, siteCategory?:
                 }
             }
         }
+    }
+
+    // Phase 04 — Content validation (headline length, blocked CTAs, generic copy).
+    // Auto-fixes merge into `s` with console.warn per violation.
+    // NEVER throws: AI pipeline must always succeed.
+    const contentValidation = validateBlockContent(s, language)
+    if (!contentValidation.valid) {
+        for (const w of contentValidation.warnings) console.warn(w)
+        Object.assign(s, contentValidation.fixes)
     }
 
     // Clean up hallucinated fields that cause validation issues
