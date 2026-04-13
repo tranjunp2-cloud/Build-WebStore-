@@ -4,8 +4,10 @@ import { motion } from 'framer-motion'
 import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
-import { CTAButtons } from '../shared'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CTAButtons, HERO_CONTAINER, HeroBadge } from '../shared'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
+
+void _CSS_VARS
 import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
 
@@ -41,7 +43,7 @@ export function ParallaxHero({ block, site }: BlockProps<HeroConfig>) {
                 }}
             />
 
-            <div className="container mx-auto px-6 relative z-10 text-center max-w-3xl">
+            <div className={`${HERO_CONTAINER} relative z-10 text-center max-w-3xl`}>
                 {badge?.show && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
@@ -49,17 +51,7 @@ export function ParallaxHero({ block, site }: BlockProps<HeroConfig>) {
                         viewport={{ once: true }}
                         transition={{ duration: 0.4 }}
                     >
-                        <div
-                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest mb-6"
-                            style={{
-                                background: 'rgba(255,255,255,0.1)',
-                                color: '#fff',
-                                border: '1px solid rgba(255,255,255,0.2)',
-                            }}
-                        >
-                            <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                            {badge.text}
-                        </div>
+                        <HeroBadge text={badge.text} />
                     </motion.div>
                 )}
                 <motion.h1

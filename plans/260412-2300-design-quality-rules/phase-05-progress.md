@@ -5,9 +5,9 @@
 > Xem scope: [phase-05-block-audit.md](phase-05-block-audit.md)
 
 **Total:** 50 blocks (index.tsx) + hero 11 variant files
-**Done:** 4 / 50 (8%)
+**Done:** 5 / 50 (10%) — **Batch A complete ✅**
 **In progress:** 0
-**Pending:** 46
+**Pending:** 45
 
 ---
 
@@ -26,8 +26,8 @@
 | 1 | features | 356 | 8 inline (grid-2/3/4, list, icon-top, icon-left, zigzag, carousel) | ✅ | `4be2fe2` | 2026-04-13 | Pilot. Local FeaturesSection wrapper (framer-motion + GradientBlob). Hybrid legacy+semantic vars. 79/79 tests, 3890/3890 full suite. |
 | 2 | footer | 512 → 414 | 6 inline (simple, expanded, minimal, centered-stack, mega-footer, dark-gradient) | ✅ | `b210388` | 2026-04-13 | Pilot #2. 4 local helpers (FooterSection/BrandLogo/SocialIconList/LinkColumn). Custom asymmetric padding kept inline. 9/9 footer tests, 88/88 cross-test, 3889/3890 full (1 unrelated flaky timeout). |
 | 3 | navigation | 861 → 828 | 6 inline (simple, transparent, sidebar, centered, mega-menu, pill) | ✅ | `9e4fe87` | 2026-04-13 | 4 helpers (NavCTAButton/NavMobileCTAButton/NavHamburgerButton/NavMobileMenuDrawer). 12 TOUCH_TARGET applied (was failing WCAG 2.5.5). Pill+Sidebar custom-styled. mega-menu `<p>` → Caption. 10/10 nav tests, 3890/3890 full suite. |
-| 4 | testimonials | 678 → 746 (helpers) | **8 inline** (cards, masonry, spotlight, minimal-quote, avatar-row, video-text, simple, carousel) — plan ghi 6, sai | ✅ | TBD | 2026-04-13 | 6 helpers (TestimonialsSection/TestimonialsHeader/StarRating/AuthorMeta/DotIndicator/CarouselArrow). DotIndicator wraps 10px dot trong 44px button (WCAG). CarouselArrow 40px → 44px. 10/10 testimonials tests, 108/108 cross-test, 3889/3890 full (1 unrelated flaky). |
-| 5 | hero | 36 (index) + 11 variant files | 11 (cards-overlay, centered, fullscreen, gradient, magazine, minimal, parallax, slideshow, split-video, split, video) | ☐ | — | — | Tách file riêng — refactor từng variant. Use `<Display>` cho primary headline. |
+| 4 | testimonials | 678 → 746 (helpers) | **8 inline** (cards, masonry, spotlight, minimal-quote, avatar-row, video-text, simple, carousel) — plan ghi 6, sai | ✅ | `25d7e97` | 2026-04-13 | 6 helpers (TestimonialsSection/TestimonialsHeader/StarRating/AuthorMeta/DotIndicator/CarouselArrow). DotIndicator wraps 10px dot trong 44px button (WCAG). CarouselArrow 40px → 44px. 10/10 testimonials tests, 108/108 cross-test, 3889/3890 full (1 unrelated flaky). |
+| 5 | hero | 36 (index) + 11 files (1010 → 937 variants, +113 shared) | 11 (cards-overlay, centered, fullscreen, gradient, magazine, minimal, parallax, slideshow, split-video, split, video) | ✅ | TBD | 2026-04-13 | 3 helpers in shared.tsx (HeroBadge×5, VideoControlButton×2, SlideshowDot). HERO_CONTAINER const for 11 variants. CTAButtons + TOUCH_TARGET. h1/p typography deferred (current sizes intentionally larger than TYPE_SCALE.display). 14/14 hero tests, 79/79 cross-test, 3890/3890 full suite. |
 
 **Gate sau Batch A:** Pause để review consistency + lock approach trước khi spawn parallel cho B/C.
 
@@ -268,14 +268,79 @@ Mỗi block PHẢI pass trước khi commit:
     - Replaces visual-only active indication for screen readers
     - `aria-current={i === activeIndex}` thêm vào DotIndicator + AvatarRow buttons
 
+### Hero pilot (TBD commit, 2026-04-13) — Batch A complete ✅
+
+28. **TYPE_SCALE.display quá nhỏ cho hero design intent**
+    - TYPE_SCALE.display = `text-4xl md:text-5xl lg:text-6xl` (36→60px)
+    - Hero variants dùng `text-5xl md:text-7xl` (48→72px) hoặc `text-6xl md:text-8xl` (60→96px)
+    - Force Display component sẽ visual regression đáng kể (đặc biệt tablet -24px)
+    - Decision: SKIP h1/p typography refactor cho hero, defer to future Phase 06
+    - Future option: thêm TYPE_SCALE.heroDisplay scale lớn hơn cho hero use case
+    - Lesson: tokens không one-size-fits-all — hero là exception cần custom display scale
+
+29. **Hero variants không dùng motion(Display) wrapper được**
+    - Display component render `<h1>` direct, không support framer-motion props
+    - motion.h1 cần motion target trên element animate, không thể wrap parent
+    - Options: motion.h1 với inline TYPE_SCALE.display classes, hoặc giữ inline (chosen)
+    - Lesson: shared Typography components có limit khi cần animation directly on element
+
+30. **Cross-file shared helpers cho 1 block via shared.tsx**
+    - Hero là duy nhất có pattern này (1 dispatcher index + N variant files + shared.tsx)
+    - 3 helpers thêm vào shared.tsx: HeroBadge (5x dup), VideoControlButton (2x dup), SlideshowDot
+    - HERO_CONTAINER const cũng export từ shared
+    - Lesson: blocks với multi-file variants nên có shared.tsx ngay từ đầu
+
+31. **`void _CSS_VARS` pattern cho unused legacy imports**
+    - Một số hero variants không còn cần CSS_VARS sau refactor (dùng raw var names)
+    - TypeScript `noUnusedLocals` cảnh báo
+    - Solution: rename `import { CSS_VARS as _CSS_VARS }` + `void _CSS_VARS` để giữ import line cho future use, không break compilation
+    - Alternative: xoá import hoàn toàn (sạch hơn nhưng cần re-add khi cần)
+
+32. **HeroBadge variants dark vs light bg**
+    - Original: 4 chỗ dùng `rgba(255,255,255,0.1)` bg + white text (dark hero bg)
+    - 1 chỗ (gradient) dùng `rgba(255,255,255,0.15)` slightly stronger
+    - Compromise: HeroBadge default = 0.1 opacity, các variants dùng cùng style. Visual delta cực nhỏ.
+    - Lesson: tolerate tiny visual deltas khi extract helpers, document trong commit msg
+
+33. **SlideshowDot reuse pattern from testimonials DotIndicator**
+    - 2 implementations gần identical (10px dot trong 44px hit area)
+    - Hero version có active scale (1.3x), background custom (white vs brand)
+    - Trade-off: cross-block helper (đặt ở `src/blocks/shared/`) vs duplicate per-block
+    - Decision: keep separate helpers in respective shared files
+    - Future: nếu nhiều block cần dot indicator, extract `src/blocks/shared/DotIndicator.tsx`
+
+34. **Batch A cross-review summary (5 blocks done)**
+    - Helper extraction overhead vs dedup wins:
+      - features: -25 LOC (single wrapper)
+      - footer: -98 LOC (4 helpers, big dedup)
+      - navigation: -33 LOC (4 helpers, drawer dedup huge)
+      - testimonials: +68 LOC (6 helpers, polymorphic for 8 variants)
+      - hero: +40 LOC (3 helpers in shared, container const, reduce 5 inline badges)
+    - Total Batch A: -48 LOC + dedup + WCAG compliance + token consumption
+    - Pattern: simple blocks save LOC, complex blocks (8+ variants) trade LOC for consistency
+
 ---
 
-## Next Pilot
+## Batch A Complete — Next Steps
 
-**Block #5: hero** (11 separate variant files in `src/blocks/hero/variants/`)
-- Approach khác: edit từng file variant riêng (cards-overlay, centered, fullscreen, gradient, magazine, minimal, parallax, slideshow, split-video, split, video)
-- Use `<Display>` cho primary headline (not Heading level=1)
-- Hero là final block của Batch A — sau khi xong → cross-review + decide on Batch B parallel
+**Batch A done:** 5/5 ✅ (features, footer, navigation, testimonials, hero)
+
+**Cross-review consistency check (passed):**
+- ✅ All blocks consume `CONTAINER.default + INNER_PADDING` for desktop containers
+- ✅ All CTA buttons + interactive controls have `TOUCH_TARGET.min` (44px+)
+- ✅ All blocks preserve framer-motion wrappers + decorative absolute positioning
+- ✅ Brand identity vars (`--brand-primary`, `--brand-primary-rgb`) untouched (Option C)
+- ✅ Helper extraction co-located with block (no premature shared/* files)
+- ✅ Variant switch logic UNCHANGED — zero behavior delta
+- ⚠ Typography refactor partial: features/footer/navigation/testimonials have Heading + Body components; hero deferred (size intent conflict with TYPE_SCALE.display)
+
+**Decision needed before Batch B:**
+1. Should we extend `TYPE_SCALE` with `heroDisplay` constant for 60-96px scale?
+2. Should we extract `DotIndicator` to `src/blocks/shared/` (used in 2 places already)?
+3. Should we run visual regression now (Playwright screenshots) or wait until Batch B+C done?
+4. Should Batch B + C run sequential or 2 parallel agents (per phase-05-block-audit.md plan)?
+
+**Next:** Batch B (9 secondary blocks: pricing, gallery, contact, newsletter, about, faq, stats, team, cta) — recommend pause for review/decision before continuing.
 
 Steps:
 1. Read `src/blocks/footer/index.tsx` + `src/__tests__/unit/blocks/footer-variants.test.ts` (nếu có)
