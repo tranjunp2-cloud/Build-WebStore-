@@ -1,10 +1,26 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { TeamConfig, TeamMember } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+
+// ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
+
+const TEAM_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
+const TEAM_CONTAINER_4XL = `max-w-4xl mx-auto ${INNER_PADDING}`
+
+function TeamSection({ children, container = 'default' }: { children: ReactNode; container?: 'default' | '4xl' }) {
+    return (
+        <AnimatedSection className={SECTION_PADDING.default} style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
+            <div className={container === '4xl' ? TEAM_CONTAINER_4XL : TEAM_CONTAINER}>{children}</div>
+        </AnimatedSection>
+    )
+}
 
 function InitialsAvatar({ name }: { name: string }) {
     const initial = name.charAt(0).toUpperCase()
@@ -43,7 +59,7 @@ function SocialLinks({ socials }: { socials: TeamMember['socials'] }) {
                     href={s?.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs px-3 py-1 rounded-full transition-colors"
+                    className={`text-xs px-3 py-1 rounded-full transition-colors ${TOUCH_TARGET.min} inline-flex items-center justify-center`}
                     style={{
                         color: CSS_VARS.primary,
                         background: 'rgba(var(--brand-primary-rgb), 0.1)',
@@ -61,57 +77,43 @@ function SectionHeader({ headline, subheadline }: { headline?: string; subheadli
     if (!headline) return null
     return (
         <div className="text-center mb-12">
-            <RichText text={headline} as="h2" className="text-3xl md:text-4xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }} />
-            {subheadline && <RichText text={subheadline} as="p" className="max-w-2xl mx-auto" style={{ color: CSS_VARS.muted }} />}
+            <Heading level={2} className="mb-3" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
+                <RichText text={headline} as="span" />
+            </Heading>
+            {subheadline && (
+                <Body className="max-w-2xl mx-auto" style={{ color: CSS_VARS.muted }}>
+                    <RichText text={subheadline} as="span" />
+                </Body>
+            )}
         </div>
+    )
+}
+
+function MemberMeta({ member, align = 'center' }: { member: TeamMember; align?: 'center' | 'left' }) {
+    return (
+        <>
+            <Heading level={4} className="font-bold" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
+                {member.name}
+            </Heading>
+            <Body size="small" className="mb-2" style={{ color: CSS_VARS.primary }}>{member.role}</Body>
+            {member.bio && (
+                <Body size="small" className={align === 'center' ? 'line-clamp-3' : 'mt-1'} style={{ color: CSS_VARS.muted }}>
+                    {member.bio}
+                </Body>
+            )}
+        </>
     )
 }
 
 function GridVariant({ headline, subheadline, members }: { headline?: string; subheadline?: string; members: TeamMember[] }) {
     return (
-        <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
-            <div className="container mx-auto px-6">
-                <SectionHeader headline={headline} subheadline={subheadline} />
-                <StaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {members.map((m, i) => (
-                        <StaggerItem key={i}>
-                            <HoverCard
-                                className="text-center p-6 transition-shadow"
-                                style={{
-                                    background: CSS_VARS.surface,
-                                    borderRadius: CSS_VARS.radiusLg,
-                                    boxShadow: CSS_VARS.shadowSm,
-                                    border: '1px solid rgba(var(--brand-primary-rgb), 0.08)',
-                                }}
-                            >
-                                <article aria-label={`${m.name}, ${m.role}`}>
-                                    <MemberAvatar member={m} />
-                                    <h3 className="font-bold text-lg" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
-                                        {m.name}
-                                    </h3>
-                                    <p className="text-sm mb-2" style={{ color: CSS_VARS.primary }}>{m.role}</p>
-                                    {m.bio && <p className="text-sm line-clamp-3" style={{ color: CSS_VARS.muted }}>{m.bio}</p>}
-                                    <SocialLinks socials={m.socials} />
-                                </article>
-                            </HoverCard>
-                        </StaggerItem>
-                    ))}
-                </StaggerGrid>
-            </div>
-        </AnimatedSection>
-    )
-}
-
-function ListVariant({ headline, subheadline, members }: { headline?: string; subheadline?: string; members: TeamMember[] }) {
-    return (
-        <AnimatedSection className="py-16 md:py-24" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
-            <div className="container mx-auto px-6 max-w-4xl">
-                <SectionHeader headline={headline} subheadline={subheadline} />
-                <StaggerGrid className="flex flex-col gap-4">
-                    {members.map((m, i) => (
-                        <StaggerItem
-                            key={i}
-                            className="flex flex-col sm:flex-row items-center sm:items-start gap-4 p-5 transition-shadow hover:shadow-md"
+        <TeamSection>
+            <SectionHeader headline={headline} subheadline={subheadline} />
+            <StaggerGrid className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {members.map((m, i) => (
+                    <StaggerItem key={i}>
+                        <HoverCard
+                            className={`text-center ${CARD_PADDING.md} transition-shadow`}
                             style={{
                                 background: CSS_VARS.surface,
                                 borderRadius: CSS_VARS.radiusLg,
@@ -119,24 +121,48 @@ function ListVariant({ headline, subheadline, members }: { headline?: string; su
                                 border: '1px solid rgba(var(--brand-primary-rgb), 0.08)',
                             }}
                         >
-                            <article className="flex flex-col sm:flex-row items-center sm:items-start gap-4 w-full" aria-label={`${m.name}, ${m.role}`}>
-                                <div className="flex-shrink-0">
-                                    <MemberAvatar member={m} />
-                                </div>
-                                <div className="flex-1 text-center sm:text-left">
-                                    <h3 className="font-bold text-lg" style={{ fontFamily: CSS_VARS.fontHeading, color: CSS_VARS.text }}>
-                                        {m.name}
-                                    </h3>
-                                    <p className="text-sm mb-1" style={{ color: CSS_VARS.primary }}>{m.role}</p>
-                                    {m.bio && <p className="text-sm mt-1" style={{ color: CSS_VARS.muted }}>{m.bio}</p>}
-                                    <SocialLinks socials={m.socials} />
-                                </div>
+                            <article aria-label={`${m.name}, ${m.role}`}>
+                                <MemberAvatar member={m} />
+                                <MemberMeta member={m} align="center" />
+                                <SocialLinks socials={m.socials} />
                             </article>
-                        </StaggerItem>
-                    ))}
-                </StaggerGrid>
-            </div>
-        </AnimatedSection>
+                        </HoverCard>
+                    </StaggerItem>
+                ))}
+            </StaggerGrid>
+        </TeamSection>
+    )
+}
+
+function ListVariant({ headline, subheadline, members }: { headline?: string; subheadline?: string; members: TeamMember[] }) {
+    return (
+        <TeamSection container="4xl">
+            <SectionHeader headline={headline} subheadline={subheadline} />
+            <StaggerGrid className="flex flex-col gap-4">
+                {members.map((m, i) => (
+                    <StaggerItem
+                        key={i}
+                        className="flex flex-col sm:flex-row items-center sm:items-start gap-4 p-5 transition-shadow hover:shadow-md"
+                        style={{
+                            background: CSS_VARS.surface,
+                            borderRadius: CSS_VARS.radiusLg,
+                            boxShadow: CSS_VARS.shadowSm,
+                            border: '1px solid rgba(var(--brand-primary-rgb), 0.08)',
+                        }}
+                    >
+                        <article className="flex flex-col sm:flex-row items-center sm:items-start gap-4 w-full" aria-label={`${m.name}, ${m.role}`}>
+                            <div className="flex-shrink-0">
+                                <MemberAvatar member={m} />
+                            </div>
+                            <div className="flex-1 text-center sm:text-left">
+                                <MemberMeta member={m} align="left" />
+                                <SocialLinks socials={m.socials} />
+                            </div>
+                        </article>
+                    </StaggerItem>
+                ))}
+            </StaggerGrid>
+        </TeamSection>
     )
 }
 
