@@ -134,13 +134,35 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const title = page?.seo?.title || site.seo?.metaTitle || site.name
     const description = page?.seo?.description || site.seo?.metaDescription
 
+    // Resolve canonical URL from middleware-injected headers
+    const reqHeaders = await headers()
+    const tenantHostname = reqHeaders.get('x-tenant-hostname')
+    const tenantSlug = reqHeaders.get('x-tenant-slug')
+    const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+
+    let baseUrl: string
+    if (tenantHostname) {
+        baseUrl = `https://${tenantHostname}`
+    } else if (tenantSlug) {
+        baseUrl = `https://${tenantSlug}.${PLATFORM_DOMAIN}`
+    } else if (slug !== 'custom') {
+        baseUrl = `https://${slug}.${PLATFORM_DOMAIN}`
+    } else {
+        baseUrl = ''
+    }
+
+    const canonicalPath = pagePath ? `/${pagePath}` : ''
+    const canonical = baseUrl ? `${baseUrl}${canonicalPath}` : undefined
+
     return {
         title,
         description,
+        alternates: canonical ? { canonical } : undefined,
         openGraph: {
             title: title ?? undefined,
             description: description ?? undefined,
             type: 'website',
+            ...(canonical ? { url: canonical } : {}),
         },
         robots: page?.seo?.noIndex ? { index: false, follow: false } : undefined,
     }
