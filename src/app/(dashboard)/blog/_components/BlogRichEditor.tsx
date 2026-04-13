@@ -48,11 +48,10 @@ class PayloadUploadAdapter implements UploadAdapter {
         // Use server action — bypasses REST API cookie auth
         const doc = await uploadMediaAction(formData)
 
-        // Fix Docker-internal minio URL to browser-accessible URL
+        // Fix Docker-internal MinIO URL to browser-accessible URL
         const s3Public = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
         const fixUrl = (url: string) => {
             if (!url) return url
-            // Replace Docker hostname (minio:9000) with public endpoint
             return url.replace(/https?:\/\/minio:\d+/, s3Public)
         }
 
@@ -100,9 +99,86 @@ interface BlogRichEditorProps {
 
 export function BlogRichEditor({ content, onChange, placeholder = 'Start writing...' }: BlogRichEditorProps) {
     const [charCount, setCharCount] = useState(0)
+    const [editorInstance, setEditorInstance] = useState<Editor | null>(null)
+    const [selectedText, setSelectedText] = useState('')
+    const [showImproveMenu, setShowImproveMenu] = useState(false)
+    const [improveMenuPos, setImproveMenuPos] = useState({ top: 0, left: 0 })
+    const [isRewriting, setIsRewriting] = useState(false)
+
+    const handleImproveText = async (instruction: string) => {
+        if (!editorInstance || !selectedText.trim()) return
+        setIsRewriting(true)
+        setShowImproveMenu(false)
+        try {
+            const res = await fetch('/api/ai/rewrite-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ text: selectedText, instruction }),
+            })
+            if (res.ok) {
+                const { rewritten } = await res.json()
+                if (rewritten && rewritten !== selectedText) {
+                    const viewDoc = editorInstance.editing.view.document
+                    const selection = viewDoc.selection
+                    if (!selection.isCollapsed) {
+                        editorInstance.model.change(writer => {
+                            const modelSelection = editorInstance.model.document.selection
+                            const range = modelSelection.getFirstRange()
+                            if (range) {
+                                writer.remove(range)
+                                writer.insertText(rewritten, range.start)
+                            }
+                        })
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('[Improve Text]', err)
+        } finally {
+            setIsRewriting(false)
+            setSelectedText('')
+        }
+    }
 
     return (
-        <div className="blog-ckeditor-wrapper flex flex-col bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px] overflow-hidden">
+        <div className="blog-ckeditor-wrapper relative flex flex-col bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px] overflow-hidden">
+            {/* Improve Text floating menu */}
+            {showImproveMenu && selectedText && (
+                <div
+                    className="absolute z-50 flex flex-col gap-1 p-2 bg-[#1E293B] border border-white/10 rounded-xl shadow-2xl min-w-[180px]"
+                    style={{ top: improveMenuPos.top, left: improveMenuPos.left }}
+                >
+                    <span className="text-[10px] uppercase tracking-wider text-gray-500 px-2 py-1">AI Improve</span>
+                    {[
+                        { label: 'Make Professional', instruction: 'Rewrite this text to sound more professional and polished' },
+                        { label: 'Make Shorter', instruction: 'Make this text shorter and more concise while keeping the meaning' },
+                        { label: 'Improve Writing', instruction: 'Improve the grammar, clarity, and readability of this text' },
+                    ].map((action) => (
+                        <button
+                            key={action.label}
+                            onClick={() => handleImproveText(action.instruction)}
+                            className="text-left px-3 py-2 text-sm text-gray-300 hover:bg-white/10 rounded-lg transition-colors"
+                        >
+                            {action.label}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setShowImproveMenu(false)}
+                        className="text-left px-3 py-1 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
+            {isRewriting && (
+                <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm rounded-[16px]">
+                    <div className="flex items-center gap-2 text-sm text-white bg-[#1E293B] px-4 py-2 rounded-lg border border-white/10">
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Rewriting...
+                    </div>
+                </div>
+            )}
             <CKEditor
                 editor={ClassicEditor}
                 config={{
@@ -158,10 +234,46 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                     setCharCount(div.textContent?.length || 0)
                 }}
                 onReady={(editor) => {
+                    setEditorInstance(editor)
                     const html = editor.getData()
                     const div = document.createElement('div')
                     div.innerHTML = html
                     setCharCount(div.textContent?.length || 0)
+
+                    // Listen for selection changes to show "Improve Text" menu
+                    editor.editing.view.document.on('selectionChange', () => {
+                        const modelSel = editor.model.document.selection
+                        const range = modelSel.getFirstRange()
+                        if (!range || modelSel.isCollapsed) {
+                            setSelectedText('')
+                            setShowImproveMenu(false)
+                            return
+                        }
+                        let text = ''
+                        for (const item of range.getItems()) {
+                            if (item.is('$textProxy')) text += item.data
+                        }
+                        setSelectedText(text)
+                    })
+
+                    // Show improve menu on mouseup when text is selected
+                    editor.editing.view.document.on('mouseup', () => {
+                        setTimeout(() => {
+                            const nativeSel = window.getSelection()
+                            if (nativeSel && nativeSel.toString().trim().length > 3) {
+                                const rect = nativeSel.getRangeAt(0).getBoundingClientRect()
+                                const wrapper = (editor.editing.view.getDomRoot() as HTMLElement)?.closest('.blog-ckeditor-wrapper')
+                                if (wrapper) {
+                                    const wrapperRect = wrapper.getBoundingClientRect()
+                                    setImproveMenuPos({
+                                        top: rect.bottom - wrapperRect.top + 8,
+                                        left: Math.min(rect.left - wrapperRect.left, wrapperRect.width - 200),
+                                    })
+                                    setShowImproveMenu(true)
+                                }
+                            }
+                        }, 50)
+                    })
                 }}
             />
             <div className="flex items-center justify-end px-[16px] py-[8px] border-t border-[rgba(255,255,255,0.08)]">
@@ -226,9 +338,9 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                         padding: 6px 8px !important;
                     }
                     .blog-ckeditor-wrapper .ck.ck-button {
-                        min-width: 32px !important;
-                        min-height: 32px !important;
-                        padding: 4px !important;
+                        min-width: 44px !important;
+                        min-height: 44px !important;
+                        padding: 8px !important;
                     }
                 }
                 .blog-ckeditor-wrapper .ck.ck-toolbar .ck-toolbar__separator {

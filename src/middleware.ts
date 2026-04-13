@@ -28,6 +28,7 @@ const protectedPaths = [
     '/settings',
     '/account',
     '/help',
+    '/blog',
 ]
 
 const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password']

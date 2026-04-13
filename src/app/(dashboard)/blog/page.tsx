@@ -83,7 +83,7 @@ export default function BlogListPage() {
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<'' | 'draft' | 'published'>('')
     const [page, setPage] = useState(1)
-    const [sortBy, setSortBy] = useState('-createdAt')
+    const [sortBy, setSortBy] = useState('-updatedAt')
     const [categoryFilter, setCategoryFilter] = useState('')
     const [categories, setCategories] = useState<BlogCategory[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -302,7 +302,7 @@ export default function BlogListPage() {
     }
 
     return (
-        <div className="flex flex-col w-full max-w-[1594px] mx-auto p-[24px] font-['Inter'] h-[calc(100vh-120px)] overflow-hidden">
+        <div className="flex flex-col w-full max-w-[1594px] mx-auto p-[12px] md:p-[24px] font-['Inter'] h-[calc(100vh-120px)] overflow-hidden">
             {/* Header Container */}
             <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center w-full gap-4 xl:gap-0">
                 <div className="flex flex-col items-stretch gap-[4px] min-w-[242.98px] h-[56px]">
@@ -383,8 +383,8 @@ export default function BlogListPage() {
                         onChange={setSortBy}
                         placeholder={t.dashboard.blog.filters.sortNewest}
                         options={[
-                            { label: t.dashboard.blog.filters.sortNewest, value: '-createdAt' },
-                            { label: t.dashboard.blog.filters.sortOldest, value: 'createdAt' },
+                            { label: t.dashboard.blog.filters.sortNewest, value: '-updatedAt' },
+                            { label: t.dashboard.blog.filters.sortOldest, value: 'updatedAt' },
                             { label: t.dashboard.blog.filters.sortNameAsc, value: 'title' },
                             { label: t.dashboard.blog.filters.sortNameDesc, value: '-title' }
                         ]}

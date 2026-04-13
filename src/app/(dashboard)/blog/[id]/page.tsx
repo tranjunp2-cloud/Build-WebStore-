@@ -98,6 +98,9 @@ export default function BlogEditorPage() {
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false)
     const [publishDate, setPublishDate] = useState<Date | undefined>()
 
+    // Editor key — increment to force CKEditor remount when AI inserts content
+    const [editorKey, setEditorKey] = useState(0)
+
     // AI Generator State
     const [showAIGenerator, setShowAIGenerator] = useState(false)
     const [aiPrompt, setAiPrompt] = useState('')
@@ -146,17 +149,20 @@ export default function BlogEditorPage() {
                         seoTitle: data.seo?.metaTitle || '',
                         seoDescription: data.seo?.metaDescription || '',
                     })
-                    if (data.thumbnail?.url) {
-                        const s3Public = process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000'
-                        const thumbUrl = data.thumbnail.url ? data.thumbnail.url.replace(/https?:\/\/minio:\d+/, s3Public) : ''
-                        setThumbnailPreview(thumbUrl)
-                        const existingThumbId = typeof data.thumbnail === 'object' ? data.thumbnail.id : data.thumbnail
-                        if (existingThumbId) setThumbnailId(existingThumbId)
+                    if (data.thumbnail) {
+                        const thumb = typeof data.thumbnail === 'object' ? data.thumbnail : null
+                        if (thumb?.url) {
+                            // Fix Docker-internal MinIO URL to browser-accessible URL
+                            // On local: minio:9000 → localhost:9000 (port-mapped)
+                            // On staging/prod: S3 URL is already correct, no replacement needed
+                            const thumbUrl = thumb.url.replace(/https?:\/\/minio:\d+/, process.env.NEXT_PUBLIC_S3_ENDPOINT || 'http://localhost:9000')
+                            setThumbnailPreview(thumbUrl)
+                        }
+                        const existingThumbId = thumb?.id || (typeof data.thumbnail === 'number' ? String(data.thumbnail) : data.thumbnail)
+                        if (existingThumbId) setThumbnailId(String(existingThumbId))
                     }
 
-                    if (data.createdAt) {
-                        setPublishDate(new Date(data.createdAt))
-                    }
+                    setPublishDate(new Date(data.publishedAt || data.createdAt))
                 } else {
                     toast.error('Failed to load post')
                     setError('Failed to load post')
@@ -285,14 +291,23 @@ export default function BlogEditorPage() {
                 }
             }
 
+            // If publishing with a future date, warn and keep as draft
+            const finalStatus = overrideStatus ?? form.status
+            let effectiveStatus = finalStatus
+            if (finalStatus === 'published' && publishDate && publishDate > new Date()) {
+                toast.warning('Scheduled publish is not yet supported. Saving as draft.')
+                effectiveStatus = 'draft'
+            }
+
             const result = await saveBlogAction({
                 id: isNew ? undefined : blogId as string,
                 title: form.title.trim(),
                 slug: form.slug || slugify(form.title),
                 content: form.content,
-                status: overrideStatus ?? form.status,
+                status: effectiveStatus,
                 category: form.category || null,
                 thumbnail: resolvedThumbnailId || (thumbnailPreview ? undefined : null),
+                publishedAt: publishDate?.toISOString() || null,
                 seo: {
                     metaTitle: form.seoTitle,
                     metaDescription: form.seoDescription,
@@ -304,7 +319,7 @@ export default function BlogEditorPage() {
                 localStorage.removeItem(DRAFT_KEY)
                 toast.success(isNew ? 'Post created!' : 'Post saved!')
                 if (overrideStatus) {
-                    setForm(prev => ({ ...prev, status: overrideStatus }))
+                    setForm(prev => ({ ...prev, status: effectiveStatus }))
                 }
                 setTimeout(() => {
                     router.push('/blog')
@@ -372,7 +387,7 @@ export default function BlogEditorPage() {
                         seoDescription: contentText.substring(0, 155),
                     }))
                     setShowSEO(true)
-                    toast.success('SEO auto-filled from content')
+                    toast.warning('AI unavailable — filled from content')
                 }
             } else {
                 setForm(prev => ({
@@ -381,7 +396,7 @@ export default function BlogEditorPage() {
                     seoDescription: contentText.substring(0, 155),
                 }))
                 setShowSEO(true)
-                toast.success('SEO auto-filled from content')
+                toast.warning('AI unavailable — filled from content')
             }
         } catch {
             setForm(prev => ({
@@ -390,7 +405,7 @@ export default function BlogEditorPage() {
                 seoDescription: contentText.substring(0, 155),
             }))
             setShowSEO(true)
-            toast.success('SEO auto-filled from content')
+            toast.warning('AI unavailable — filled from content')
         } finally {
             setIsGeneratingSEO(false)
         }
@@ -693,6 +708,7 @@ export default function BlogEditorPage() {
                     </div>
 
                     <BlogRichEditor
+                        key={editorKey}
                         content={form.content}
                         onChange={(html: string) => updateField('content', html)}
                         placeholder={t.dashboard.blog.editor.startWriting}
@@ -1019,6 +1035,9 @@ export default function BlogEditorPage() {
                                                 seoTitle: generatedAiData.seoTitle || generatedAiData.title || prev.seoTitle,
                                                 seoDescription: generatedAiData.seoDescription || prev.seoDescription
                                             }))
+                                            if (generatedAiData.content) {
+                                                setEditorKey(k => k + 1)
+                                            }
                                         }
                                         setShowAIGenerator(false);
                                     }}
