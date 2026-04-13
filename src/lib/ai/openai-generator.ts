@@ -234,21 +234,50 @@ function generateWithFallback(prompt: string, events: SSEEvent[]): { result: Gen
 
 /** Common AI hallucination patterns → correct variant name */
 const VARIANT_ALIASES: Record<string, string> = {
+    // Grid layouts
     'three-column': 'grid-3',
     'three-columns': 'grid-3',
     'two-column': 'grid-2',
     'two-columns': 'grid-2',
     'four-column': 'grid-4',
     'four-columns': 'grid-4',
-    'side-by-side': 'split',
-    'slider': 'carousel',
-    'full-width': 'fullscreen',
-    'compact': 'minimal',
+    '3-column': 'grid-3',
+    '2-column': 'grid-2',
+    '4-column': 'grid-4',
     'simple-grid': 'grid-2',
+    // Layout aliases
+    'side-by-side': 'split',
+    'left-right': 'split',
+    'two-panel': 'split',
+    'split-layout': 'split',
+    // Carousel/slider
+    'slider': 'carousel',
+    'slideshow': 'carousel',
+    'swiper': 'carousel',
+    // Size/style
+    'full-width': 'fullscreen',
+    'full-screen': 'fullscreen',
+    'compact': 'minimal',
+    'clean': 'minimal',
+    // Defaults
     'default': 'simple',
     'basic': 'simple',
     'standard': 'simple',
     'classic': 'simple',
+    'normal': 'simple',
+    // Vietnamese AI output
+    'don-gian': 'simple',
+    'toi-gian': 'minimal',
+    'luoi': 'grid-3',
+    'danh-sach': 'list',
+    'bang': 'table',
+    'the': 'cards',
+    // Malay AI output
+    'mudah': 'simple',
+    'ringkas': 'minimal',
+    'senarai': 'list',
+    'kad': 'cards',
+    'jadual': 'table',
 }
 
 /** Category-weighted variant preferences — preferred variants per category per block type */
@@ -302,25 +331,123 @@ const CATEGORY_VARIANT_WEIGHTS: Record<string, Record<string, string[]>> = {
         footer: ['simple', 'centered-stack', 'expanded'],
         contact: ['minimal-inline', 'form', 'split'],
     },
+    health: {
+        hero: ['centered', 'split-left', 'minimal', 'gradient'],
+        features: ['icon-top', 'grid-3', 'list', 'zigzag'],
+        testimonials: ['cards', 'spotlight', 'minimal-quote'],
+        footer: ['expanded', 'simple', 'centered-stack'],
+        contact: ['split', 'map-split', 'form'],
+    },
+    education: {
+        hero: ['centered', 'split-right', 'gradient', 'magazine'],
+        features: ['grid-3', 'zigzag', 'icon-top', 'carousel'],
+        testimonials: ['carousel', 'avatar-row', 'cards'],
+        footer: ['expanded', 'mega-footer', 'simple'],
+        contact: ['split', 'form', 'card-float'],
+    },
+    realestate: {
+        hero: ['fullscreen', 'parallax', 'slideshow', 'split-left'],
+        features: ['grid-3', 'icon-left', 'list'],
+        testimonials: ['spotlight', 'masonry', 'cards'],
+        footer: ['expanded', 'mega-footer', 'dark-gradient'],
+        contact: ['map-split', 'split', 'card-float'],
+    },
+    fitness: {
+        hero: ['fullscreen', 'parallax', 'split-video', 'gradient'],
+        features: ['grid-4', 'zigzag', 'icon-top', 'carousel'],
+        testimonials: ['carousel', 'spotlight', 'cards'],
+        footer: ['dark-gradient', 'mega-footer', 'expanded'],
+        contact: ['split', 'form', 'card-float'],
+    },
+    creative: {
+        hero: ['magazine', 'parallax', 'cards-overlay', 'minimal'],
+        features: ['carousel', 'zigzag', 'grid-2', 'icon-left'],
+        testimonials: ['video-text', 'minimal-quote', 'masonry'],
+        footer: ['centered-stack', 'dark-gradient', 'simple'],
+        contact: ['minimal-inline', 'card-float', 'form'],
+    },
+    fnb: {
+        hero: ['split-left', 'gradient', 'magazine', 'parallax'],
+        features: ['icon-top', 'grid-3', 'zigzag', 'list'],
+        testimonials: ['cards', 'masonry', 'carousel', 'minimal-quote'],
+        footer: ['expanded', 'centered-stack', 'dark-gradient'],
+        contact: ['split', 'map-split', 'form'],
+    },
+    events: {
+        hero: ['fullscreen', 'gradient', 'split-left', 'centered'],
+        features: ['grid-3', 'zigzag', 'icon-top'],
+        testimonials: ['carousel', 'spotlight', 'cards'],
+        footer: ['mega-footer', 'dark-gradient', 'expanded'],
+        contact: ['map-split', 'split', 'form'],
+    },
+    travel: {
+        hero: ['fullscreen', 'parallax', 'slideshow', 'gradient'],
+        features: ['zigzag', 'grid-3', 'carousel', 'icon-left'],
+        testimonials: ['masonry', 'spotlight', 'carousel'],
+        footer: ['mega-footer', 'expanded', 'dark-gradient'],
+        contact: ['map-split', 'split', 'card-float'],
+    },
+}
+
+/** Variants confirmed broken (no implementation or renders wrong) — NEVER select these */
+const BROKEN_VARIANTS: Record<string, string[]> = {
+    hero: ['animated-gradient'],  // No implementation — falls back to centered silently
+}
+
+/** Minimum content items required per variant — if below, fallback to simpler variant */
+const VARIANT_MIN_CONTENT: Record<string, Record<string, number>> = {
+    testimonials: { carousel: 3, masonry: 4, 'avatar-row': 3, 'video-text': 2, spotlight: 1, cards: 2, simple: 1, 'minimal-quote': 1 },
+    features: { 'grid-4': 4, 'grid-3': 3, 'grid-2': 2, carousel: 3, zigzag: 2, list: 2, 'icon-top': 2, 'icon-left': 2 },
+    gallery: { masonry: 6, carousel: 3, grid: 4, lightbox: 4, filmstrip: 3, justified: 4 },
+    pricing: { comparison: 2, table: 2, slider: 3, cards: 2, horizontal: 2, toggle: 2, tiered: 2, minimal: 1 },
+    team: { grid: 2, list: 2 },
 }
 
 /**
  * Pick a weighted-by-category variant when AI's choice is invalid.
- * Uses category preferences if available, otherwise random from all valid variants.
+ * Excludes broken variants. Uses category preferences if available, otherwise random.
  */
 function pickWeightedVariant(blockType: string, validVariants: string[], category?: string): string {
+    // Filter out broken variants
+    const broken = BROKEN_VARIANTS[blockType] ?? []
+    const safeVariants = validVariants.filter(v => !broken.includes(v))
+    const pool = safeVariants.length > 0 ? safeVariants : validVariants
+
     if (category) {
         const catWeights = CATEGORY_VARIANT_WEIGHTS[category]?.[blockType]
         if (catWeights) {
-            // Find first preferred variant that's actually valid
-            const preferred = catWeights.filter(v => validVariants.includes(v))
+            const preferred = catWeights.filter(v => pool.includes(v))
             if (preferred.length > 0) {
                 return preferred[Math.floor(Math.random() * preferred.length)]!
             }
         }
     }
-    // Fallback: random from all valid variants
-    return validVariants[Math.floor(Math.random() * validVariants.length)]!
+    return pool[Math.floor(Math.random() * pool.length)]!
+}
+
+/**
+ * Enforce minimum content count for a variant.
+ * If block doesn't have enough items, fallback to a simpler variant that fits.
+ */
+export function enforceMinContent(blockType: string, variant: string, contentCount: number): string {
+    const mins = VARIANT_MIN_CONTENT[blockType]
+    if (!mins) return variant
+
+    const required = mins[variant]
+    if (required && contentCount < required) {
+        // Find best variant that fits current count (largest min that still fits)
+        const fitting = Object.entries(mins)
+            .filter(([, min]) => contentCount >= min)
+            .sort((a, b) => b[1] - a[1])
+        if (fitting.length > 0) {
+            const fallback = fitting[0]![0]
+            console.warn(
+                `[AI Content Guard] "${blockType}": variant "${variant}" needs ${required} items but got ${contentCount} → fallback to "${fallback}"`
+            )
+            return fallback
+        }
+    }
+    return variant
 }
 
 /**
@@ -392,6 +519,15 @@ export function sanitizeBlockData(block: Record<string, unknown>, siteCategory?:
             } else {
                 // Empty/null variant — pick weighted variant
                 s.variant = pickWeightedVariant(s.blockType, meta.variants, siteCategory)
+            }
+
+            // Content-count guard: ensure variant has enough items to render properly
+            const contentArrays = ['testimonials', 'features', 'items', 'images', 'plans', 'members', 'logos']
+            for (const field of contentArrays) {
+                if (Array.isArray(s[field])) {
+                    s.variant = enforceMinContent(s.blockType, s.variant as string, (s[field] as unknown[]).length)
+                    break
+                }
             }
         }
     }
