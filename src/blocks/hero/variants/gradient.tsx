@@ -8,7 +8,7 @@ import { CTAButtons } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 
-export function GradientHero({ block }: BlockProps<HeroConfig>) {
+export function GradientHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], badge, gradientPreset = 'aurora' } = block
 
     const presets: Record<string, [string, string, string]> = {
@@ -97,7 +97,7 @@ export function GradientHero({ block }: BlockProps<HeroConfig>) {
                     transition={{ duration: 0.5, delay: 0.25 }}
                     className="flex flex-wrap gap-4 justify-center"
                 >
-                    <CTAButtons buttons={ctaButtons} variant="glass" />
+                    <CTAButtons buttons={ctaButtons} variant="glass" siteId={site?.id ? String(site.id) : undefined} />
                 </motion.div>
             </div>
         </AnimatedSection>

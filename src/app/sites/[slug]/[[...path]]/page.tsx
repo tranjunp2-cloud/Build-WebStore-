@@ -59,20 +59,21 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     const site = sitesResult.docs[0]
     if (!site) return null
 
+    // Check ownership (used for draft gate + tracking skip)
+    interface TenantRef {
+        tenant: string | number | { id: string | number }
+    }
+
+    const isOwner = !!user && (user.tenants?.map((t: TenantRef) =>
+        typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+    ) ?? []).includes(String(tenant.id))
+
     // Require authentication to view draft sites
     if (site.status === 'draft') {
-        interface TenantRef {
-            tenant: string | number | { id: string | number }
-        }
-
-        const isOwner = !!user && (user.tenants?.map((t: TenantRef) =>
-            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
-        ) ?? []).includes(String(tenant.id))
-
         if (!isOwner) {
             // AC-3: Was published → maintenance mode (503); never published → 404
             if (site.publishedAt) {
-                return { tenant, site, page: null, pages: [], maintenance: true }
+                return { tenant, site, page: null, pages: [], maintenance: true, isOwner: false }
             }
             return null // Never published → 404
         }
@@ -121,7 +122,7 @@ async function getTenantAndPage(slug: string, pagePath: string) {
 
     // Blog listing page: /blogs or /blogs?category=X&page=N
     if (!page && pagePath === 'blogs') {
-        return { tenant, site, page: null, pages: navigationPages.docs, blogListing: true }
+        return { tenant, site, page: null, pages: navigationPages.docs, blogListing: true, isOwner }
     }
 
     // Blog detail page: /blogs/{slug}
@@ -142,12 +143,12 @@ async function getTenantAndPage(slug: string, pagePath: string) {
             })
             const blogPost = blogResult.docs[0]
             if (blogPost) {
-                return { tenant, site, page: null, pages: navigationPages.docs, blogPost }
+                return { tenant, site, page: null, pages: navigationPages.docs, blogPost, isOwner }
             }
         }
     }
 
-    return { tenant, site, page, pages: navigationPages.docs }
+    return { tenant, site, page, pages: navigationPages.docs, isOwner }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -294,13 +295,15 @@ export default async function TenantSitePage({ params }: Props) {
         notFound()
     }
 
-    const { site, page, pages } = data
+    const { site, page, pages, isOwner } = data
 
     return (
         <SiteRenderer
             site={site as unknown as SiteData}
             page={page as unknown as PageData}
             pages={pages as unknown as NavPage[]}
+            siteId={String(site.id)}
+            isOwner={isOwner}
         />
     )
 }

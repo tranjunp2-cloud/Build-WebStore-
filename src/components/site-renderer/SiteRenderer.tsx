@@ -7,6 +7,7 @@ import { GoogleFontsLoader } from './GoogleFontsLoader'
 import { generatePageSchemas } from '@/lib/seo/json-ld'
 import { HeadingProvider } from '@/lib/seo/heading-context'
 import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
+import { TrackingManager } from './TrackingManager'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
@@ -41,9 +42,11 @@ export type SiteRendererProps = {
     }
     pages?: NavPage[]
     isEditor?: boolean
+    siteId?: string
+    isOwner?: boolean
 }
 
-export function SiteRenderer({ site, page, pages = [], isEditor = false }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId, isOwner }: SiteRendererProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
         secondaryColor: site.theme?.secondaryColor,
@@ -113,6 +116,11 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false }: SiteR
             <noscript>
                 <style>{`[style*="opacity: 0"], [style*="opacity:0"] { opacity: 1 !important; transform: none !important; }`}</style>
             </noscript>
+
+            {/* Analytics & Tracking */}
+            {siteId && !isEditor && (
+                <TrackingManager siteId={siteId} isOwner={isOwner} />
+            )}
 
             {/* JSON-LD Structured Data */}
             {jsonLdSchemas.map((schema, i) => (
