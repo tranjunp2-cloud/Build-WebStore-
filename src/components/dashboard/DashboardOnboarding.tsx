@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Wand2, LayoutTemplate, CheckCircle2, Circle, Globe, ShoppingBag, CreditCard, Rocket } from 'lucide-react'
+import { Wand2, LayoutTemplate, CheckCircle2, Circle, Globe, Rocket } from 'lucide-react'
 
 interface OnboardingStep {
     id: string
@@ -14,15 +14,11 @@ interface OnboardingStep {
 interface DashboardOnboardingProps {
     hasWebsite: boolean
     hasPublishedSite: boolean
-    hasProducts: boolean
-    hasPaymentSetup: boolean
 }
 
 export function DashboardOnboarding({
     hasWebsite,
     hasPublishedSite,
-    hasProducts,
-    hasPaymentSetup,
 }: DashboardOnboardingProps) {
     const steps: OnboardingStep[] = [
         {
@@ -31,20 +27,6 @@ export function DashboardOnboarding({
             icon: <Globe className="h-4 w-4" />,
             done: hasWebsite,
             href: '/builder/new',
-        },
-        {
-            id: 'products',
-            label: 'Add your products',
-            icon: <ShoppingBag className="h-4 w-4" />,
-            done: hasProducts,
-            href: '/dashboard/products',
-        },
-        {
-            id: 'payments',
-            label: 'Set up payments',
-            icon: <CreditCard className="h-4 w-4" />,
-            done: hasPaymentSetup,
-            href: '/dashboard/settings/payments',
         },
         {
             id: 'publish',

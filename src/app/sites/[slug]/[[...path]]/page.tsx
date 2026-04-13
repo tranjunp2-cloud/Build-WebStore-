@@ -8,6 +8,8 @@ import { SiteRenderer, type NavPage } from '@/components/site-renderer/SiteRende
 import { MaintenancePage } from '@/components/site-renderer/MaintenancePage'
 import type { SiteData } from '@/blocks/types'
 import type { PageData } from '@/store/editorStore'
+import { StorefrontBlogList } from '@/components/site-renderer/StorefrontBlogList'
+import DOMPurify from 'isomorphic-dompurify'
 
 // Force dynamic — uses getPayload() + SiteRenderer (jsdom chain) at runtime
 export const dynamic = 'force-dynamic'
@@ -57,20 +59,21 @@ async function getTenantAndPage(slug: string, pagePath: string) {
     const site = sitesResult.docs[0]
     if (!site) return null
 
+    // Check ownership (used for draft gate + tracking skip)
+    interface TenantRef {
+        tenant: string | number | { id: string | number }
+    }
+
+    const isOwner = !!user && (user.tenants?.map((t: TenantRef) =>
+        typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+    ) ?? []).includes(String(tenant.id))
+
     // Require authentication to view draft sites
     if (site.status === 'draft') {
-        interface TenantRef {
-            tenant: string | number | { id: string | number }
-        }
-
-        const isOwner = !!user && (user.tenants?.map((t: TenantRef) =>
-            typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
-        ) ?? []).includes(String(tenant.id))
-
         if (!isOwner) {
             // AC-3: Was published → maintenance mode (503); never published → 404
             if (site.publishedAt) {
-                return { tenant, site, page: null, pages: [], maintenance: true }
+                return { tenant, site, page: null, pages: [], maintenance: true, isOwner: false }
             }
             return null // Never published → 404
         }
@@ -117,7 +120,35 @@ async function getTenantAndPage(slug: string, pagePath: string) {
         sort: 'createdAt',
     })
 
-    return { tenant, site, page, pages: navigationPages.docs }
+    // Blog listing page: /blogs or /blogs?category=X&page=N
+    if (!page && pagePath === 'blogs') {
+        return { tenant, site, page: null, pages: navigationPages.docs, blogListing: true, isOwner }
+    }
+
+    // Blog detail page: /blogs/{slug}
+    if (!page && pagePath.startsWith('blogs/')) {
+        const blogSlug = pagePath.replace('blogs/', '')
+        if (blogSlug) {
+            const blogResult = await payload.find({
+                collection: 'blogs',
+                where: {
+                    and: [
+                        { tenant: { equals: tenant.id } },
+                        { slug: { equals: blogSlug } },
+                        { status: { equals: 'published' } },
+                    ],
+                },
+                limit: 1,
+                depth: 2,
+            })
+            const blogPost = blogResult.docs[0]
+            if (blogPost) {
+                return { tenant, site, page: null, pages: navigationPages.docs, blogPost, isOwner }
+            }
+        }
+    }
+
+    return { tenant, site, page, pages: navigationPages.docs, isOwner }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -131,16 +162,40 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
 
     const { site, page } = data
-    const title = page?.seo?.title || site.seo?.metaTitle || site.name
-    const description = page?.seo?.description || site.seo?.metaDescription
+    const blogPost = 'blogPost' in data ? data.blogPost : null
+
+    const title = blogPost?.seo?.metaTitle || blogPost?.title || page?.seo?.title || site.seo?.metaTitle || site.name
+    const description = blogPost?.seo?.metaDescription || page?.seo?.description || site.seo?.metaDescription
+
+    // Resolve canonical URL from middleware-injected headers
+    const reqHeaders = await headers()
+    const tenantHostname = reqHeaders.get('x-tenant-hostname')
+    const tenantSlug = reqHeaders.get('x-tenant-slug')
+    const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+
+    let baseUrl: string
+    if (tenantHostname) {
+        baseUrl = `https://${tenantHostname}`
+    } else if (tenantSlug) {
+        baseUrl = `https://${tenantSlug}.${PLATFORM_DOMAIN}`
+    } else if (slug !== 'custom') {
+        baseUrl = `https://${slug}.${PLATFORM_DOMAIN}`
+    } else {
+        baseUrl = ''
+    }
+
+    const canonicalPath = pagePath ? `/${pagePath}` : ''
+    const canonical = baseUrl ? `${baseUrl}${canonicalPath}` : undefined
 
     return {
         title,
         description,
+        alternates: canonical ? { canonical } : undefined,
         openGraph: {
             title: title ?? undefined,
             description: description ?? undefined,
-            type: 'website',
+            type: blogPost ? 'article' : 'website',
+            ...(canonical ? { url: canonical } : {}),
         },
         robots: page?.seo?.noIndex ? { index: false, follow: false } : undefined,
     }
@@ -160,17 +215,95 @@ export default async function TenantSitePage({ params }: Props) {
         return <MaintenancePage siteName={data.site?.name as string} />
     }
 
+    // Blog listing page — /blogs
+    if ('blogListing' in data && data.blogListing) {
+        const { tenant, site } = data
+        return (
+            <div className="min-h-screen bg-[#0B1120] text-white">
+                <div className="max-w-5xl mx-auto px-6 py-16">
+                    <h1 className="text-4xl md:text-5xl font-bold mb-4">Blog</h1>
+                    <p className="text-lg opacity-60 mb-12">Latest stories and insights</p>
+                    <StorefrontBlogList tenantId={String(tenant.id)} />
+                </div>
+            </div>
+        )
+    }
+
+    // Blog detail page — render published blog post
+    if ('blogPost' in data && data.blogPost) {
+        const { blogPost } = data
+        const post = blogPost as any
+        const thumbUrl = typeof post.thumbnail === 'object' ? post.thumbnail?.url : null
+        const catName = typeof post.category === 'object' ? post.category?.name : null
+        const authorName = typeof post.author === 'object'
+            ? [post.author?.firstName, post.author?.lastName].filter(Boolean).join(' ') || post.author?.email
+            : null
+        const publishDate = post.publishedAt || post.createdAt
+
+        const jsonLd = {
+            '@context': 'https://schema.org',
+            '@type': 'Article',
+            headline: post.title,
+            ...(thumbUrl && { image: thumbUrl }),
+            ...(publishDate && { datePublished: new Date(publishDate).toISOString() }),
+            ...(post.updatedAt && { dateModified: new Date(post.updatedAt).toISOString() }),
+            ...(authorName && { author: { '@type': 'Person', name: authorName } }),
+            ...(post.seo?.metaDescription && { description: post.seo.metaDescription }),
+        }
+
+        return (
+            <div className="min-h-screen bg-[#0B1120] text-white">
+                <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+                <article className="max-w-3xl mx-auto px-6 py-16">
+                    {catName && (
+                        <span className="text-sm font-bold uppercase tracking-wider text-blue-500 mb-4 block">{catName}</span>
+                    )}
+                    <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">{post.title}</h1>
+                    <div className="flex items-center gap-4 text-sm opacity-60 mb-8">
+                        {authorName && <span>By {authorName}</span>}
+                        {publishDate && (
+                            <time dateTime={publishDate}>
+                                {new Date(publishDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                            </time>
+                        )}
+                    </div>
+                    {thumbUrl && (
+                        <div className="rounded-2xl overflow-hidden mb-10 aspect-video bg-white/5 flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={thumbUrl}
+                                alt={post.title}
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                    )}
+                    <div
+                        className="prose prose-lg prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
+                    />
+                    <div className="mt-16 pt-8 border-t border-white/10">
+                        <a href="/blogs" className="text-blue-500 hover:text-blue-400 font-medium">
+                            ← Back to all posts
+                        </a>
+                    </div>
+                </article>
+            </div>
+        )
+    }
+
     if (!data.page) {
         notFound()
     }
 
-    const { site, page, pages } = data
+    const { site, page, pages, isOwner } = data
 
     return (
         <SiteRenderer
             site={site as unknown as SiteData}
             page={page as unknown as PageData}
             pages={pages as unknown as NavPage[]}
+            siteId={String(site.id)}
+            isOwner={isOwner}
         />
     )
 }

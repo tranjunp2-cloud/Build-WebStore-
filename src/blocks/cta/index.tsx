@@ -8,10 +8,11 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+import { trackEvent } from '@/lib/analytics/track-event'
 
 const CTA_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
-function CTAButton({ label, url, style, variant }: { label: string; url: string; style: 'primary' | 'outline'; variant: string }) {
+function CTAButton({ label, url, style, variant, siteId }: { label: string; url: string; style: 'primary' | 'outline'; variant: string; siteId?: string }) {
     const shouldReduce = useReducedMotion()
     const isPrimary = style === 'primary'
 
@@ -23,9 +24,13 @@ function CTAButton({ label, url, style, variant }: { label: string; url: string;
 
     const btnCls = `inline-flex items-center justify-center px-8 py-3.5 font-semibold text-sm transition-colors ${TOUCH_TARGET.min}`
 
+    const handleClick = () => {
+        if (siteId) trackEvent({ siteId, event: 'click', metadata: { label, url, variant } })
+    }
+
     if (shouldReduce) {
         return (
-            <a href={url} rel="noopener noreferrer" className={`${btnCls} hover:opacity-90`} style={buttonStyle}>
+            <a href={url} rel="noopener noreferrer" onClick={handleClick} className={`${btnCls} hover:opacity-90`} style={buttonStyle}>
                 <RichText text={label} as="span" />
             </a>
         )
@@ -35,6 +40,7 @@ function CTAButton({ label, url, style, variant }: { label: string; url: string;
         <motion.a
             href={url}
             rel="noopener noreferrer"
+            onClick={handleClick}
             whileHover={{ scale: 1.03, y: -2 }}
             whileTap={{ scale: 0.97 }}
             className={btnCls}
@@ -45,7 +51,7 @@ function CTAButton({ label, url, style, variant }: { label: string; url: string;
     )
 }
 
-function BannerVariant({ block }: { block: CTAConfig }) {
+function BannerVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
     const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary' } = block
     return (
         <AnimatedSection
@@ -64,13 +70,13 @@ function BannerVariant({ block }: { block: CTAConfig }) {
                         <RichText text={subheadline} as="span" />
                     </Body>
                 )}
-                <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="banner" />
+                <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="banner" siteId={siteId} />
             </div>
         </AnimatedSection>
     )
 }
 
-function InlineVariant({ block }: { block: CTAConfig }) {
+function InlineVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
     const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary' } = block
     return (
         <AnimatedSection className="py-12 md:py-16" style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
@@ -87,7 +93,7 @@ function InlineVariant({ block }: { block: CTAConfig }) {
                         )}
                     </div>
                     <div className="flex-shrink-0">
-                        <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="inline" />
+                        <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="inline" siteId={siteId} />
                     </div>
                 </div>
             </div>
@@ -95,7 +101,7 @@ function InlineVariant({ block }: { block: CTAConfig }) {
     )
 }
 
-function FloatingVariant({ block }: { block: CTAConfig }) {
+function FloatingVariant({ block, siteId }: { block: CTAConfig; siteId?: string }) {
     const { headline, subheadline, ctaLabel, ctaUrl, ctaStyle = 'primary' } = block
     return (
         <AnimatedSection className="py-16 md:py-20" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
@@ -117,23 +123,24 @@ function FloatingVariant({ block }: { block: CTAConfig }) {
                             <RichText text={subheadline} as="span" />
                         </Body>
                     )}
-                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="floating" />
+                    <CTAButton label={ctaLabel} url={ctaUrl} style={ctaStyle} variant="floating" siteId={siteId} />
                 </div>
             </div>
         </AnimatedSection>
     )
 }
 
-export function CTABlock({ block }: BlockProps<CTAConfig>) {
+export function CTABlock({ block, site }: BlockProps<CTAConfig>) {
     const { variant = 'banner' } = block
+    const siteId = site?.id ? String(site.id) : undefined
 
     switch (variant) {
         case 'inline':
-            return <InlineVariant block={block} />
+            return <InlineVariant block={block} siteId={siteId} />
         case 'floating':
-            return <FloatingVariant block={block} />
+            return <FloatingVariant block={block} siteId={siteId} />
         case 'banner':
         default:
-            return <BannerVariant block={block} />
+            return <BannerVariant block={block} siteId={siteId} />
     }
 }

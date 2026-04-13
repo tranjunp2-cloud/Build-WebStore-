@@ -1,0 +1,189 @@
+# E2E Tests on Staging — runs after staging push
+# Triggers: push to staging (when E2E files change), or manual dispatch
+#
+# Note: workflow_dispatch and workflow_run require file on default branch (main).
+# Until this workflow lands on main, we trigger via `push` on staging.
+#
+# Runs Playwright tests against live staging: https://web-v2.dev.ecommercehub.my
+name: E2E Staging
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - 'e2e/**'
+      - 'playwright.config.ts'
+      - '.github/workflows/e2e-staging.yml'
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Staging URL to test'
+        default: 'https://web-v2.dev.ecommercehub.my'
+        required: false
+
+concurrency:
+  group: e2e-staging
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: "E2E: Playwright on Staging"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for NEW staging deploy to be ready
+        run: |
+          URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
+          echo "Waiting for Vercel deploy: $URL"
+          # We probe the E2E provisioning endpoint itself. Old deployments return
+          # 404 (route doesn't exist), new deployments return 401/503 (route exists
+          # but auth/config rejects our empty request). Either 401 or 503 means the
+          # new code is live. /api/health would pass on old deploy → race condition.
+          #
+          # Vercel deploy typically takes 2-3 min for Next.js apps.
+          sleep 45
+          for i in {1..30}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$URL/api/e2e/ensure-test-user" \
+              -H "Authorization: Bearer probe" \
+              -H "Content-Type: application/json" \
+              -d '{}' || echo "000")
+            # 401 = endpoint exists + wrong token (new deploy ready)
+            # 503 = endpoint exists + E2E_SETUP_SECRET not set on server (config issue, not a deploy issue)
+            if [ "$STATUS" = "401" ] || [ "$STATUS" = "503" ]; then
+              echo "New deploy detected (endpoint responded $STATUS) on attempt $i"
+              # Also verify health for good measure
+              curl -s -o /dev/null -w "health: %{http_code}\n" "$URL/api/health"
+              exit 0
+            fi
+            echo "Attempt $i/30: status $STATUS (still waiting for new deploy), retrying in 10s..."
+            sleep 10
+          done
+          echo "::error::New deploy didn't appear after 6 min — aborting"
+          exit 1
+
+      - name: Ensure E2E test user exists
+        run: |
+          BASE_URL="${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}"
+          if [ -z "${{ secrets.E2E_SETUP_SECRET }}" ]; then
+            echo "::warning::E2E_SETUP_SECRET not set — skipping user provisioning"
+            exit 0
+          fi
+          RESP=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/e2e/ensure-test-user" \
+            -H "Authorization: Bearer ${{ secrets.E2E_SETUP_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg e "${{ secrets.TEST_EMAIL }}" --arg p "${{ secrets.TEST_PASSWORD }}" '{email:$e,password:$p}')")
+          STATUS=$(echo "$RESP" | tail -1)
+          BODY=$(echo "$RESP" | sed '$d')
+          echo "Status: $STATUS"
+          echo "Body: $BODY"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::E2E user provisioning failed (status $STATUS)"
+            exit 1
+          fi
+
+      - name: Run E2E tests
+        id: e2e
+        shell: bash
+        run: |
+          # Disable set -e so we can capture playwright exit code and parse stats
+          # even when tests fail. GitHub Actions defaults bash to `set -eo pipefail`.
+          set +e
+          # Run only specs compatible with a fresh e2e-bot tenant (no pre-existing
+          # data). Legacy specs (blog-crud, products-crud, orders-flow, settings-flow,
+          # storefront) assume real data and time out on empty state × retry × 3.
+          npx playwright test \
+            smoke.spec.ts \
+            auth.setup.ts \
+            auth-flow.spec.ts \
+            dashboard.spec.ts \
+            builder.spec.ts \
+            editor.spec.ts \
+            admin.spec.ts \
+            notifications.spec.ts \
+            products.spec.ts \
+            orders.spec.ts \
+            --project=smoke --project=setup --project=chromium 2>&1 | tee e2e-output.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          # Parse results. Playwright outputs: "53 passed", "4 failed", "5 skipped", "N did not run"
+          PASSED=$(grep -oE '[0-9]+ passed' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")
+          FAILED=$(grep -oE '[0-9]+ failed' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")
+          SKIPPED=$(grep -oE '[0-9]+ skipped' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")
+          DID_NOT_RUN=$(grep -oE '[0-9]+ did not run' e2e-output.log | tail -1 | grep -oE '^[0-9]+' || echo "0")
+          TOTAL=$((${PASSED:-0} + ${FAILED:-0} + ${SKIPPED:-0} + ${DID_NOT_RUN:-0}))
+          echo "passed=${PASSED:-0}" >> "$GITHUB_OUTPUT"
+          echo "failed=${FAILED:-0}" >> "$GITHUB_OUTPUT"
+          echo "skipped=${SKIPPED:-0}" >> "$GITHUB_OUTPUT"
+          echo "did_not_run=${DID_NOT_RUN:-0}" >> "$GITHUB_OUTPUT"
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+          echo "=== Stats: $PASSED passed, $FAILED failed, $SKIPPED skipped, $DID_NOT_RUN did not run (total $TOTAL) ==="
+          exit $EXIT_CODE
+        env:
+          BASE_URL: ${{ inputs.base_url || 'https://web-v2.dev.ecommercehub.my' }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+          E2E_TEST_OTP_CODE: ${{ secrets.E2E_TEST_OTP_CODE }}
+          ADMIN_EMAIL: ${{ secrets.BOOTSTRAP_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.BOOTSTRAP_ADMIN_PASSWORD }}
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 3
+
+      - name: Prepare notification info
+        if: always()
+        id: notify_info
+        run: |
+          # Works for both workflow_dispatch and workflow_run triggers
+          BRANCH="${{ github.event.workflow_run.head_branch || github.ref_name }}"
+          COMMIT_SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          AUTHOR="${{ github.event.workflow_run.actor.login || github.actor }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          COMMIT_MSG=$(git log --format='%s' -n 1 2>/dev/null | head -c 80 || echo "E2E staging run")
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "author=$AUTHOR" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
+
+      - name: Notify E2E Failed
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'ci_fail'
+          branch: ${{ steps.notify_info.outputs.branch }}
+          author: ${{ steps.notify_info.outputs.author }}
+          commit-sha: ${{ steps.notify_info.outputs.short_sha }}
+          commit-msg: ${{ steps.notify_info.outputs.commit_msg }}
+          failed-step: 'E2E Tests (staging)'
+          ci-status: "E2E: ${{ steps.e2e.outputs.passed }}/${{ steps.e2e.outputs.total }} passed · ${{ steps.e2e.outputs.failed }} failed · ${{ steps.e2e.outputs.skipped }} skipped · ${{ steps.e2e.outputs.did_not_run }} did not run"
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -48,7 +48,7 @@ export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartW
                         </button>
                     </div>
                 </section>
-                <CartDrawer siteSlug={siteSlug} />
+                <CartDrawer siteSlug={siteSlug} siteId={site?.id ? String(site.id) : undefined} />
             </>
         )
     }
@@ -73,7 +73,7 @@ export function CartWidgetBlock({ block, theme: _theme, site }: BlockProps<CartW
                     </span>
                 </button>
             </section>
-            <CartDrawer siteSlug={siteSlug} />
+            <CartDrawer siteSlug={siteSlug} siteId={site?.id ? String(site.id) : undefined} />
         </>
     )
 }

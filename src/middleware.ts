@@ -28,9 +28,13 @@ const protectedPaths = [
     '/settings',
     '/account',
     '/help',
+    '/blog',
 ]
 
 const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password']
+
+// SEO paths with dots that need tenant rewriting (not static files)
+const SEO_PATHS = ['/sitemap.xml', '/robots.txt']
 
 /**
  * Multi-tenant middleware
@@ -50,13 +54,15 @@ export async function middleware(req: NextRequest) {
     const hostname = req.headers.get('host')?.split(':')[0] || req.nextUrl.hostname
 
     // Allow Next.js internals and static files
-    if (
-        pathname.startsWith('/_next') ||
-        pathname.startsWith('/favicon') ||
-        pathname.startsWith('/public') ||
-        pathname.includes('.')
-    ) {
-        return NextResponse.next()
+    if (!SEO_PATHS.includes(pathname)) {
+        if (
+            pathname.startsWith('/_next') ||
+            pathname.startsWith('/favicon') ||
+            pathname.startsWith('/public') ||
+            pathname.includes('.')
+        ) {
+            return NextResponse.next()
+        }
     }
 
     // ── API and admin routes: pass through ─────────────────────────────
@@ -253,7 +259,10 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
     matcher: [
-        // Match all paths except static files
-        '/((?!_next/static|_next/image|favicon.ico).*)',
+        // Exclude static files AND /api/ routes from middleware.
+        // Payload admin sends POST as multipart/form-data with _payload field.
+        // Vercel edge middleware corrupts multipart body when forwarding to serverless → 500.
+        // API routes don't need middleware (no subdomain/domain routing).
+        '/((?!_next/static|_next/image|favicon.ico|api/).*)',
     ],
 }

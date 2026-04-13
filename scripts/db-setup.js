@@ -2346,6 +2346,10 @@ const MIGRATIONS = [
     name: 'rate_limits.expires_index',
     sql: `CREATE INDEX IF NOT EXISTS idx_rate_limits_expires ON rate_limits(expires_at);`,
   },
+  {
+    name: 'blogs.published_at',
+    sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS published_at timestamp(3) with time zone;`,
+  },
 ];
 
 async function runMigrations(pool) {

@@ -88,7 +88,7 @@ export function SlideshowHero({ block, site }: BlockProps<HeroConfig>) {
                     transition={{ duration: 0.5, delay: 0.25 }}
                     className="flex flex-wrap gap-4 justify-center"
                 >
-                    <CTAButtons buttons={ctaButtons} variant="glass" />
+                    <CTAButtons buttons={ctaButtons} variant="glass" siteId={site?.id ? String(site.id) : undefined} />
                 </motion.div>
 
                 {/* Dot indicators — 10px visual dot in 44px hit area (WCAG 2.5.5) */}

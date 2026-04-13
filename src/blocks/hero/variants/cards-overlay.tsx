@@ -49,7 +49,7 @@ export function CardsOverlayHero({ block, site }: BlockProps<HeroConfig>) {
                         <RichText text={subheadline} as="p" className="text-lg text-white/70 mb-10 max-w-xl mx-auto leading-relaxed" />
                     )}
                     <div className="flex flex-wrap gap-4 justify-center">
-                        <CTAButtons buttons={ctaButtons} variant="glass" />
+                        <CTAButtons buttons={ctaButtons} variant="glass" siteId={site?.id ? String(site.id) : undefined} />
                     </div>
                 </motion.div>
             </div>

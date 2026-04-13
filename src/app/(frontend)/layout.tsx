@@ -1,5 +1,6 @@
 import { AppShell } from '@/components/AppShell'
 import { I18nProvider } from '@/i18n'
+import { Analytics } from '@vercel/analytics/next'
 
 // force-dynamic prevents ISR cache from serving stale marketing page
 // when subdomain requests hit middleware rewrite → /sites/{slug}
@@ -12,6 +13,7 @@ export default function FrontendLayout({ children }: { children: React.ReactNode
             <I18nProvider defaultLocale="en">
                 {children}
             </I18nProvider>
+            <Analytics />
         </AppShell>
     )
 }

@@ -38,7 +38,7 @@ export function SplitHero({ block, site }: BlockProps<HeroConfig>) {
                         {subheadline && (
                             <RichText text={subheadline} as="p" className="text-xl opacity-60 mb-10 max-w-lg leading-relaxed" />
                         )}
-                        <CTAButtons buttons={ctaButtons} />
+                        <CTAButtons buttons={ctaButtons} siteId={site?.id ? String(site.id) : undefined} />
                     </motion.div>
 
                     {/* Right — Image / Illustration placeholder */}

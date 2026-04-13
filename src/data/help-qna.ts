@@ -14,55 +14,86 @@ export interface QnACategory {
 
 export const getQnAData = (t: Translations): QnACategory[] => [
     {
-        id: 'products',
-        title: t.help.qna.categories.productsTitle,
+        id: 'dashboard',
+        title: t.help.qna.categories.dashboardTitle,
         items: [
             {
-                id: 'q-add-product',
-                question: t.help.qna.categories.qAddProduct,
-                answer: t.help.qna.categories.aAddProduct,
+                id: 'q-dashboard-metrics',
+                question: t.help.qna.categories.qDashboardMetrics,
+                answer: t.help.qna.categories.aDashboardMetrics,
             },
             {
-                id: 'q-multiple-images',
-                question: t.help.qna.categories.qMultipleImages,
-                answer: t.help.qna.categories.aMultipleImages,
+                id: 'q-dashboard-customize',
+                question: t.help.qna.categories.qDashboardCustomize,
+                answer: t.help.qna.categories.aDashboardCustomize,
             },
             {
-                id: 'q-halal',
-                question: t.help.qna.categories.qHalal,
-                answer: t.help.qna.categories.aHalal,
+                id: 'q-dashboard-seo',
+                question: t.help.qna.categories.qDashboardSeo,
+                answer: t.help.qna.categories.aDashboardSeo,
             }
         ]
     },
     {
-        id: 'orders',
-        title: t.help.qna.categories.ordersTitle,
+        id: 'builder',
+        title: t.help.qna.categories.builderTitle,
         items: [
             {
-                id: 'q-cod',
-                question: t.help.qna.categories.qCod,
-                answer: t.help.qna.categories.aCod,
+                id: 'q-builder-create',
+                question: t.help.qna.categories.qBuilderCreate,
+                answer: t.help.qna.categories.aBuilderCreate,
             },
             {
-                id: 'q-invoice',
-                question: t.help.qna.categories.qInvoice,
-                answer: t.help.qna.categories.aInvoice,
+                id: 'q-builder-edit',
+                question: t.help.qna.categories.qBuilderEdit,
+                answer: t.help.qna.categories.aBuilderEdit,
+            },
+            {
+                id: 'q-builder-mobile',
+                question: t.help.qna.categories.qBuilderMobile,
+                answer: t.help.qna.categories.aBuilderMobile,
             }
         ]
     },
     {
-        id: 'payments',
-        title: t.help.qna.categories.paymentsTitle,
+        id: 'blog',
+        title: t.help.qna.categories.blogTitle,
         items: [
             {
-                id: 'q-fpx',
-                question: t.help.qna.categories.qFpx,
-                answer: t.help.qna.categories.aFpx,
+                id: 'q-blog-create',
+                question: t.help.qna.categories.qBlogCreate,
+                answer: t.help.qna.categories.aBlogCreate,
             },
             {
-                id: 'q-sst',
-                question: t.help.qna.categories.qSst,
-                answer: t.help.qna.categories.aSst,
+                id: 'q-blog-ai',
+                question: t.help.qna.categories.qBlogAi,
+                answer: t.help.qna.categories.aBlogAi,
+            },
+            {
+                id: 'q-blog-seo',
+                question: t.help.qna.categories.qBlogSeo,
+                answer: t.help.qna.categories.aBlogSeo,
+            }
+        ]
+    },
+    {
+        id: 'settings',
+        title: t.help.qna.categories.settingsTitle,
+        items: [
+            {
+                id: 'q-settings-domain',
+                question: t.help.qna.categories.qSettingsDomain,
+                answer: t.help.qna.categories.aSettingsDomain,
+            },
+            {
+                id: 'q-settings-dns',
+                question: t.help.qna.categories.qSettingsDns,
+                answer: t.help.qna.categories.aSettingsDns,
+            },
+            {
+                id: 'q-settings-staff',
+                question: t.help.qna.categories.qSettingsStaff,
+                answer: t.help.qna.categories.aSettingsStaff,
             }
         ]
     }

@@ -29,7 +29,7 @@ type AIEditPayload = {
 }
 
 type AIEditResult = {
-    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block'
+    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block' | 'none'
     changes?: Record<string, unknown>
     blockIndex?: number
     afterIndex?: number
@@ -131,7 +131,14 @@ For undoing the previous action:
 7. If the user asks to add a section, use add_block with appropriate content
 8. Supported add-section types: testimonials, faq, gallery, features, team, newsletter, banner, cta
 9. New sections should be appended to the bottom by default unless the user explicitly asks otherwise
-10. If the user asks to undo, revert, or go back to the previous state, use the "undo" action with a polite message.`
+10. If the user asks to undo, revert, or go back to the previous state, use the "undo" action with a polite message.
+
+## SCOPE RESTRICTIONS
+- You are ONLY allowed to edit this website's content, layout, theme, and blocks.
+- If the user asks anything unrelated to website editing (general knowledge, coding help, personal questions, etc.), respond with:
+  {"action": "none", "message": "I can only help with editing your website. Please ask me to change text, colors, layout, or add/remove sections."}
+- When a specific block is selected (block #${blockIndex + 1}), PREFER "update_block" targeting that block. Only use "update_theme" if the user explicitly asks to change the overall theme/colors/fonts.
+- Do NOT use "update_theme" when the user asks to change a specific section's color — use "update_block" with the block's own color/style fields instead.`
 
     const openai = getOpenAI()
     if (!openai) {
@@ -178,6 +185,11 @@ For undoing the previous action:
     }
 
     const result = JSON.parse(content) as AIEditResult
+
+    // Handle scope rejection — AI determined the request is out of scope
+    if (result.action === 'none') {
+        return result
+    }
 
     if (result.action === 'add_block') {
         const normalizedBlock = normalizeAddSectionBlock(

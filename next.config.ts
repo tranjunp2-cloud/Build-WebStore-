@@ -9,7 +9,9 @@ if (typeof globalThis.File === 'undefined') {
 }
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  // standalone is required for Docker (DO) but breaks multipart form-data on Vercel.
+  // Vercel sets VERCEL=1 at build time — skip standalone for Vercel deployments.
+  ...(process.env.VERCEL ? {} : { output: 'standalone' as const }),
   serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify', 'web-push', 'googleapis'],
   eslint: {
     // CI runs lint separately — skip during build to save ~1 min

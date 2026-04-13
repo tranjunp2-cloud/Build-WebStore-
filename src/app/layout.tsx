@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { Analytics } from '@vercel/analytics/next'
 
 export const metadata: Metadata = {
     title: {
@@ -41,7 +40,6 @@ export default function RootLayout({
         <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
             <body>
                 {children}
-                <Analytics />
             </body>
         </html>
     )

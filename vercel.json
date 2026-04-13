@@ -5,7 +5,16 @@
   "functions": {
     "src/app/api/**/*.ts": {
       "maxDuration": 60
+    },
+    "src/app/(payload)/api/[...slug]/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/(payload)/admin/[[...segments]]/page.tsx": {
+      "maxDuration": 60
     }
+  },
+  "git": {
+    "deploymentEnabled": false
   },
   "crons": [
     {

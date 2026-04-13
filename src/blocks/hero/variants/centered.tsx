@@ -9,7 +9,7 @@ import { CTAButtons, HERO_CONTAINER } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 
-export function CenteredHero({ block }: BlockProps<HeroConfig>) {
+export function CenteredHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], image, badge } = block
 
     return (
@@ -70,7 +70,7 @@ export function CenteredHero({ block }: BlockProps<HeroConfig>) {
                             transition={{ duration: 0.5, delay: 0.25 }}
                             className="flex flex-wrap gap-4 justify-center"
                         >
-                            <CTAButtons buttons={ctaButtons} />
+                            <CTAButtons buttons={ctaButtons} siteId={site?.id ? String(site.id) : undefined} />
                         </motion.div>
                     )}
 

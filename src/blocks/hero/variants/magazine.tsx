@@ -56,7 +56,7 @@ export function MagazineHero({ block, site }: BlockProps<HeroConfig>) {
                         {subheadline && (
                             <RichText text={subheadline} as="p" className="text-lg opacity-60 mb-8 leading-relaxed" />
                         )}
-                        <CTAButtons buttons={ctaButtons} />
+                        <CTAButtons buttons={ctaButtons} siteId={site?.id ? String(site.id) : undefined} />
                     </motion.div>
                 </div>
             </div>

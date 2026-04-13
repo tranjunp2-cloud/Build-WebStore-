@@ -1,22 +1,24 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const isStaging = process.env.BASE_URL?.includes('dev.ecommercehub')
+
 export default defineConfig({
     testDir: './e2e',
     fullyParallel: false, // Run sequentially — tests share auth state
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
-    workers: process.env.CI ? 1 : 1,
+    workers: 1,
     reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'html',
-    timeout: 60_000, // 60s per test — some flows are slow (AI builder)
+    timeout: isStaging ? 90_000 : 60_000, // Staging needs more time (network latency)
     expect: {
-        timeout: 10_000, // 10s for assertions
+        timeout: isStaging ? 15_000 : 10_000,
     },
     use: {
         baseURL: process.env.BASE_URL || 'http://localhost:3000',
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
         video: 'on-first-retry',
-        actionTimeout: 15_000,
+        actionTimeout: isStaging ? 20_000 : 15_000,
     },
     projects: [
         // Smoke tests — no auth needed, run independently

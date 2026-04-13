@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { AddToCartButton } from '@/components/storefront/AddToCartButton'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
+import { TrackingManager } from '@/components/site-renderer/TrackingManager'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -124,6 +125,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
     return (
         <>
+            <TrackingManager siteId={String(site.id)} />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
             <div style={{ fontFamily: `${(site.theme as any)?.fontBody || 'Inter'}, sans-serif` }}>
@@ -255,6 +257,7 @@ export default async function ProductDetailPage({ params }: Props) {
                             }}
                             primaryColor={primaryColor}
                             siteSlug={slug}
+                            siteId={String(site.id)}
                         />
 
                         {/* Extended Attributes Grid (US-F08-06) */}
@@ -299,7 +302,7 @@ export default async function ProductDetailPage({ params }: Props) {
             </div>
 
             {/* Cart Drawer */}
-            <CartDrawer siteSlug={slug} />
+            <CartDrawer siteSlug={slug} siteId={String(site.id)} />
         </>
     )
 }

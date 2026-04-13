@@ -65,7 +65,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
 
         const xmlLines = pagesResult.docs.map(p => {
             const isHome = p.isHomepage || p.slug === '/' || p.slug === 'home' || !p.slug
-            const path = isHome ? '' : `/${p.slug}`
+            const slug = typeof p.slug === 'string' ? p.slug.replace(/^\//, '') : ''
+            const path = isHome || !slug ? '' : `/${slug}`
             const lastMod = p.updatedAt ? new Date(p.updatedAt).toISOString() : new Date().toISOString()
             return `    <url><loc>${baseUrl}${path}</loc><lastmod>${lastMod}</lastmod></url>`
         })
