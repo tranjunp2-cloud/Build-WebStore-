@@ -457,7 +457,7 @@ function SettingsPanelInner({
                     <label className={labelCls}>URL Slug</label>
                     <Input
                         value={isHomepage ? '/' : seoSlugValue}
-                        disabled={isHomepage}
+                        disabled={isHomepage || site?.status === 'published'}
                         onChange={(e) => {
                             setSeoSlugInput(e.target.value)
                             setSeoFieldError(null)
@@ -470,6 +470,9 @@ function SettingsPanelInner({
                         variant="editor"
                         className={editorInputClassName}
                     />
+                    {site?.status === 'published' && !isHomepage ? (
+                        <p className="mt-1 text-[10px] text-amber-400">Slug is locked after publishing to protect SEO and external links.</p>
+                    ) : null}
                     {seoFieldError ? (
                         <p className="mt-1 text-[10px] text-rose-400">{seoFieldError}</p>
                     ) : null}
