@@ -1,12 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type CSSProperties, type ReactNode } from 'react'
 import type { BlockProps } from '../types'
 import type { NavigationConfig } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
 import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { Caption } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+
+// Token shortcut: nav containers consume CONTAINER.default + INNER_PADDING.
+// h-16 stays because nav row height is a layout invariant, not section padding.
+const NAV_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
 // ── Shared Logo Component ────────────────────────────────────────────────────
 
@@ -23,6 +28,146 @@ function NavLogo({ logo, logoText, className }: { logo?: { url: string; alt?: st
         }}>
             {logoText}
         </span>
+    )
+}
+
+// ── Shared Nav Helpers (Phase 05 refactor) ──────────────────────────────────
+// Extract repeated CTA / hamburger / mobile drawer blocks. Variants pass
+// `motionWrap=false` to opt out of framer-motion (sidebar/pill have their
+// own motion choreography). Brand identity vars unchanged per Option C.
+
+const CTA_GRADIENT_STYLE: CSSProperties = {
+    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
+    boxShadow: `0 4px 15px rgba(var(--brand-primary-rgb), 0.188)`,
+}
+
+type NavCTAButtonProps = {
+    href?: string
+    label: string
+    className?: string
+    motionWrap?: boolean
+    onClick?: () => void
+}
+
+/** Desktop CTA button — gradient bg + min-h 44px (WCAG 2.5.5). */
+function NavCTAButton({
+    href = '#',
+    label,
+    className = 'hidden sm:inline-flex px-5 py-2.5',
+    motionWrap = true,
+    onClick,
+}: NavCTAButtonProps) {
+    const cls = `${className} rounded-lg text-sm font-semibold text-white transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`.trim()
+    if (motionWrap) {
+        return (
+            <motion.a
+                href={href}
+                whileHover={{ scale: 1.04, y: -1 }}
+                whileTap={{ scale: 0.97 }}
+                className={cls}
+                style={CTA_GRADIENT_STYLE}
+                onClick={onClick}
+            >
+                {label}
+            </motion.a>
+        )
+    }
+    return (
+        <a href={href} className={cls} style={CTA_GRADIENT_STYLE} onClick={onClick}>
+            {label}
+        </a>
+    )
+}
+
+/** Mobile drawer CTA — full-width, centered, min-h 44px. */
+function NavMobileCTAButton({ href = '#', label, onClick }: { href?: string; label: string; onClick?: () => void }) {
+    return (
+        <a
+            href={href}
+            className={`mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
+            style={{ background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))` }}
+            onClick={onClick}
+        >
+            {label}
+        </a>
+    )
+}
+
+type NavHamburgerProps = {
+    open: boolean
+    onClick: () => void
+    className?: string
+    style?: CSSProperties
+}
+
+/** Mobile hamburger button — min 44px touch target (was p-2 ≈ 36px ❌). */
+function NavHamburgerButton({ open, onClick, className = '', style }: NavHamburgerProps) {
+    return (
+        <button
+            type="button"
+            className={`md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center ${className}`.trim()}
+            onClick={onClick}
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            aria-expanded={open}
+            style={style}
+        >
+            {open ? <X size={20} /> : <Menu size={20} />}
+        </button>
+    )
+}
+
+type NavMobileDrawerProps = {
+    open: boolean
+    onClose: () => void
+    links: { label: string; url: string }[]
+    ctaButton?: { show: boolean; label: string; url: string }
+    background?: string
+    children?: ReactNode
+}
+
+/**
+ * Mobile menu drawer used by simple/transparent/centered/mega-menu variants.
+ * Sidebar + pill have their own drawer designs and don't use this helper.
+ */
+function NavMobileMenuDrawer({
+    open,
+    onClose,
+    links,
+    ctaButton,
+    background = 'rgba(9,9,11,0.95)',
+}: NavMobileDrawerProps) {
+    return (
+        <AnimatePresence>
+            {open && (
+                <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className="md:hidden overflow-hidden"
+                    style={{
+                        background,
+                        borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
+                    }}
+                >
+                    <div className={`${NAV_CONTAINER} py-4 flex flex-col gap-1`}>
+                        {links.map((link, i) => (
+                            <a
+                                key={i}
+                                href={link?.url}
+                                className={`px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200 ${TOUCH_TARGET.min} flex items-center`}
+                                onClick={onClose}
+                            >
+                                {link.label}
+                            </a>
+                        ))}
+                        {ctaButton?.show && (
+                            <NavMobileCTAButton href={ctaButton.url || '#'} label={ctaButton.label} onClick={onClose} />
+                        )}
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
     )
 }
 
@@ -72,7 +217,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                 WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
             }}
         >
-            <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+            <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
                 {/* Logo */}
                 <motion.div
                     whileHover={{ scale: 1.02 }}
@@ -98,73 +243,25 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                 {/* Desktop CTA + Mobile Menu Button */}
                 <div className="flex items-center gap-3">
                     {ctaButton?.show && (
-                        <motion.a
+                        <NavCTAButton
                             href={ctaButton.url || '#'}
-                            whileHover={{ scale: 1.04, y: -1 }}
-                            whileTap={{ scale: 0.97 }}
-                            className="hidden sm:inline-flex px-4 py-2 sm:px-5 sm:py-2.5 rounded-lg text-sm font-semibold text-white transition-all duration-200"
-                            style={{
-                                background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                                boxShadow: `0 4px 15px rgba(var(--brand-primary-rgb), 0.188)`,
-                            }}
-                        >
-                            {ctaButton.label}
-                        </motion.a>
+                            label={ctaButton.label}
+                            className="hidden sm:inline-flex px-4 py-2 sm:px-5 sm:py-2.5"
+                        />
                     )}
-
-                    {/* Mobile hamburger button */}
-                    <button
-                        className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+                    <NavHamburgerButton
+                        open={mobileMenuOpen}
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                        aria-expanded={mobileMenuOpen}
-                    >
-                        {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                    </button>
+                    />
                 </div>
             </div>
 
-            {/* Mobile Menu Drawer */}
-            <AnimatePresence>
-                {mobileMenuOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2, ease: 'easeInOut' }}
-                        className="md:hidden overflow-hidden"
-                        style={{
-                            background: 'rgba(9,9,11,0.95)',
-                            borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
-                        }}
-                    >
-                        <div className="container mx-auto px-6 py-4 flex flex-col gap-1">
-                            {links.map((link, i) => (
-                                <a
-                                    key={i}
-                                    href={link?.url}
-                                    className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    {link.label}
-                                </a>
-                            ))}
-                            {ctaButton?.show && (
-                                <a
-                                    href={ctaButton.url || '#'}
-                                    className="mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200"
-                                    style={{
-                                        background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                                    }}
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    {ctaButton.label}
-                                </a>
-                            )}
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <NavMobileMenuDrawer
+                open={mobileMenuOpen}
+                onClose={() => setMobileMenuOpen(false)}
+                links={links}
+                ctaButton={ctaButton}
+            />
         </motion.nav>
     )
 }
@@ -200,7 +297,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
                 color: scrolled ? '#18181b' : '#fff',
             }}
         >
-            <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+            <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
                 {/* Logo */}
                 <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
                     {mergedBlock.logo?.url ? (
@@ -237,61 +334,22 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
                 {/* CTA + Mobile */}
                 <div className="flex items-center gap-3">
                     {ctaButton?.show && (
-                        <motion.a
-                            href={ctaButton.url || '#'}
-                            whileHover={{ scale: 1.04, y: -1 }}
-                            whileTap={{ scale: 0.97 }}
-                            className="hidden sm:inline-flex px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-all duration-200"
-                            style={{
-                                background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                                boxShadow: `0 4px 15px rgba(var(--brand-primary-rgb), 0.188)`,
-                            }}
-                        >
-                            {ctaButton.label}
-                        </motion.a>
+                        <NavCTAButton href={ctaButton.url || '#'} label={ctaButton.label} />
                     )}
-                    <button
-                        className="md:hidden p-2 rounded-lg transition-colors"
+                    <NavHamburgerButton
+                        open={mobileMenuOpen}
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                        aria-expanded={mobileMenuOpen}
                         style={{ color: 'inherit' }}
-                    >
-                        {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                    </button>
+                    />
                 </div>
             </div>
 
-            {/* Mobile Menu */}
-            <AnimatePresence>
-                {mobileMenuOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2, ease: 'easeInOut' }}
-                        className="md:hidden overflow-hidden"
-                        style={{
-                            background: 'rgba(9,9,11,0.95)',
-                            borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
-                            color: '#fff',
-                        }}
-                    >
-                        <div className="container mx-auto px-6 py-4 flex flex-col gap-1">
-                            {links.map((link, i) => (
-                                <a key={i} href={link?.url} className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200" onClick={() => setMobileMenuOpen(false)}>
-                                    {link.label}
-                                </a>
-                            ))}
-                            {ctaButton?.show && (
-                                <a href={ctaButton.url || '#'} className="mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white text-center" style={{ background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))` }} onClick={() => setMobileMenuOpen(false)}>
-                                    {ctaButton.label}
-                                </a>
-                            )}
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <NavMobileMenuDrawer
+                open={mobileMenuOpen}
+                onClose={() => setMobileMenuOpen(false)}
+                links={links}
+                ctaButton={ctaButton}
+            />
         </motion.nav>
     )
 }
@@ -310,7 +368,8 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
         <>
             {/* Hamburger trigger — always visible */}
             <button
-                className="fixed top-4 left-4 z-50 p-2.5 rounded-xl transition-all duration-200"
+                type="button"
+                className={`fixed top-4 left-4 z-50 p-2.5 rounded-xl transition-all duration-200 ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
                 onClick={() => setIsOpen(true)}
                 aria-label="Open navigation"
                 style={{
@@ -357,8 +416,9 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                                     <NavLogo logo={mergedBlock.logo} logoText={logoText} />
                                 </div>
                                 <button
+                                    type="button"
                                     onClick={() => setIsOpen(false)}
-                                    className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                                    className={`p-1.5 rounded-lg hover:bg-white/10 transition-colors ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
                                     aria-label="Close navigation"
                                 >
                                     <X size={18} />
@@ -387,7 +447,7 @@ function SidebarNav({ mergedBlock, logoText, links, ctaButton }: {
                                 <div className="p-6">
                                     <a
                                         href={ctaButton.url || '#'}
-                                        className="block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200"
+                                        className={`block w-full px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200 ${TOUCH_TARGET.min} flex items-center justify-center`}
                                         style={{
                                             background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
                                             boxShadow: `0 4px 15px rgba(var(--brand-primary-rgb), 0.188)`,
@@ -432,7 +492,7 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
                 WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
             }}
         >
-            <div className="container mx-auto px-6 h-16">
+            <div className={`${NAV_CONTAINER} h-16`}>
                 {/* Desktop: 3-column grid layout */}
                 <div className="hidden md:grid grid-cols-3 items-center h-full">
                     {/* Left links */}
@@ -472,18 +532,11 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
                             </motion.a>
                         ))}
                         {ctaButton?.show && (
-                            <motion.a
+                            <NavCTAButton
                                 href={ctaButton.url || '#'}
-                                whileHover={{ scale: 1.04, y: -1 }}
-                                whileTap={{ scale: 0.97 }}
-                                className="ml-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-all duration-200"
-                                style={{
-                                    background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                                    boxShadow: `0 4px 15px rgba(var(--brand-primary-rgb), 0.188)`,
-                                }}
-                            >
-                                {ctaButton.label}
-                            </motion.a>
+                                label={ctaButton.label}
+                                className="ml-2 inline-flex px-5 py-2.5"
+                            />
                         )}
                     </div>
                 </div>
@@ -493,58 +546,19 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
                     <motion.div whileHover={{ scale: 1.02 }} className="font-bold text-xl font-heading">
                         <NavLogo logo={mergedBlock.logo} logoText={logoText} />
                     </motion.div>
-                    <button
-                        className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                    <NavHamburgerButton
+                        open={mobileMenuOpen}
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                        aria-expanded={mobileMenuOpen}
-                    >
-                        {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                    </button>
+                    />
                 </div>
             </div>
 
-            {/* Mobile Menu Drawer */}
-            <AnimatePresence>
-                {mobileMenuOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2, ease: 'easeInOut' }}
-                        className="md:hidden overflow-hidden"
-                        style={{
-                            background: 'rgba(9,9,11,0.95)',
-                            borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
-                        }}
-                    >
-                        <div className="container mx-auto px-6 py-4 flex flex-col gap-1">
-                            {links.map((link, i) => (
-                                <a
-                                    key={i}
-                                    href={link?.url}
-                                    className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    {link.label}
-                                </a>
-                            ))}
-                            {ctaButton?.show && (
-                                <a
-                                    href={ctaButton.url || '#'}
-                                    className="mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200"
-                                    style={{
-                                        background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                                    }}
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    {ctaButton.label}
-                                </a>
-                            )}
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <NavMobileMenuDrawer
+                open={mobileMenuOpen}
+                onClose={() => setMobileMenuOpen(false)}
+                links={links}
+                ctaButton={ctaButton}
+            />
         </motion.nav>
     )
 }
@@ -588,7 +602,7 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
             }}
             onMouseLeave={() => setHoveredIndex(null)}
         >
-            <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+            <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
                 {/* Logo */}
                 <motion.div
                     whileHover={{ scale: 1.02 }}
@@ -622,27 +636,12 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
                 {/* Desktop CTA + Mobile Menu Button */}
                 <div className="flex items-center gap-3">
                     {ctaButton?.show && (
-                        <motion.a
-                            href={ctaButton.url || '#'}
-                            whileHover={{ scale: 1.04, y: -1 }}
-                            whileTap={{ scale: 0.97 }}
-                            className="hidden sm:inline-flex px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-all duration-200"
-                            style={{
-                                background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                                boxShadow: `0 4px 15px rgba(var(--brand-primary-rgb), 0.188)`,
-                            }}
-                        >
-                            {ctaButton.label}
-                        </motion.a>
+                        <NavCTAButton href={ctaButton.url || '#'} label={ctaButton.label} />
                     )}
-                    <button
-                        className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+                    <NavHamburgerButton
+                        open={mobileMenuOpen}
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
-                        aria-expanded={mobileMenuOpen}
-                    >
-                        {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                    </button>
+                    />
                 </div>
             </div>
 
@@ -664,11 +663,13 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
                         onMouseEnter={() => {/* keep open */}}
                         onMouseLeave={() => setHoveredIndex(null)}
                     >
-                        <div className="container mx-auto px-6 py-8">
-                            <p className="text-xs font-semibold uppercase tracking-widest opacity-40 mb-5"
-                                style={{ color: 'var(--brand-primary)' }}>
+                        <div className={`${NAV_CONTAINER} py-8`}>
+                            <Caption
+                                className="block font-semibold uppercase tracking-widest opacity-40 mb-5"
+                                style={{ color: 'var(--brand-primary)' }}
+                            >
                                 {links[hoveredIndex]?.label}
-                            </p>
+                            </Caption>
                             <div className="grid grid-cols-3 gap-8">
                                 {getSubLinks(hoveredIndex).map((col, ci) => (
                                     <div key={ci} className="flex flex-col gap-2">
@@ -689,47 +690,12 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
                 )}
             </AnimatePresence>
 
-            {/* Mobile Menu Drawer */}
-            <AnimatePresence>
-                {mobileMenuOpen && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2, ease: 'easeInOut' }}
-                        className="md:hidden overflow-hidden"
-                        style={{
-                            background: 'rgba(9,9,11,0.95)',
-                            borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
-                        }}
-                    >
-                        <div className="container mx-auto px-6 py-4 flex flex-col gap-1">
-                            {links.map((link, i) => (
-                                <a
-                                    key={i}
-                                    href={link?.url}
-                                    className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    {link.label}
-                                </a>
-                            ))}
-                            {ctaButton?.show && (
-                                <a
-                                    href={ctaButton.url || '#'}
-                                    className="mt-2 px-4 py-3 rounded-lg text-sm font-semibold text-white text-center transition-all duration-200"
-                                    style={{
-                                        background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
-                                    }}
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    {ctaButton.label}
-                                </a>
-                            )}
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <NavMobileMenuDrawer
+                open={mobileMenuOpen}
+                onClose={() => setMobileMenuOpen(false)}
+                links={links}
+                ctaButton={ctaButton}
+            />
         </motion.nav>
     )
 }
@@ -795,7 +761,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                     {ctaButton?.show && (
                         <a
                             href={ctaButton.url || '#'}
-                            className="hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white transition-all duration-200"
+                            className={`hidden sm:inline-flex px-4 py-1.5 rounded-full text-sm font-semibold text-white transition-all duration-200 ${TOUCH_TARGET.min} items-center justify-center`}
                             style={{
                                 background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
                             }}
@@ -804,7 +770,8 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                         </a>
                     )}
                     <button
-                        className="md:hidden p-1.5 rounded-full text-zinc-600 hover:text-zinc-900 transition-colors"
+                        type="button"
+                        className={`md:hidden p-1.5 rounded-full text-zinc-600 hover:text-zinc-900 transition-colors ${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center`}
                         onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                         aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
                         aria-expanded={mobileMenuOpen}
@@ -836,7 +803,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                                 <a
                                     key={i}
                                     href={link?.url}
-                                    className="px-4 py-2.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 rounded-xl hover:bg-black/[0.04] transition-all duration-200"
+                                    className={`px-4 py-2.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 rounded-xl hover:bg-black/[0.04] transition-all duration-200 ${TOUCH_TARGET.min} flex items-center`}
                                     onClick={() => setMobileMenuOpen(false)}
                                 >
                                     {link.label}
@@ -845,7 +812,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                             {ctaButton?.show && (
                                 <a
                                     href={ctaButton.url || '#'}
-                                    className="mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white text-center"
+                                    className={`mt-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white text-center ${TOUCH_TARGET.min} flex items-center justify-center`}
                                     style={{ background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))` }}
                                     onClick={() => setMobileMenuOpen(false)}
                                 >

@@ -5,9 +5,9 @@
 > Xem scope: [phase-05-block-audit.md](phase-05-block-audit.md)
 
 **Total:** 50 blocks (index.tsx) + hero 11 variant files
-**Done:** 2 / 50 (4%)
+**Done:** 3 / 50 (6%)
 **In progress:** 0
-**Pending:** 48
+**Pending:** 47
 
 ---
 
@@ -24,8 +24,8 @@
 | # | Block | LOC | Variants | Status | Commit | Date | Notes |
 |---|---|---|---|---|---|---|---|
 | 1 | features | 356 | 8 inline (grid-2/3/4, list, icon-top, icon-left, zigzag, carousel) | ✅ | `4be2fe2` | 2026-04-13 | Pilot. Local FeaturesSection wrapper (framer-motion + GradientBlob). Hybrid legacy+semantic vars. 79/79 tests, 3890/3890 full suite. |
-| 2 | footer | 512 → 414 | 6 inline (simple, expanded, minimal, centered-stack, mega-footer, dark-gradient) | ✅ | TBD | 2026-04-13 | Pilot #2. 4 local helpers (FooterSection/BrandLogo/SocialIconList/LinkColumn). Custom asymmetric padding kept inline. 9/9 footer tests, 88/88 cross-test, 3889/3890 full (1 unrelated flaky timeout). |
-| 3 | navigation | 861 | 6 inline | ☐ | — | — | Largest inline block |
+| 2 | footer | 512 → 414 | 6 inline (simple, expanded, minimal, centered-stack, mega-footer, dark-gradient) | ✅ | `b210388` | 2026-04-13 | Pilot #2. 4 local helpers (FooterSection/BrandLogo/SocialIconList/LinkColumn). Custom asymmetric padding kept inline. 9/9 footer tests, 88/88 cross-test, 3889/3890 full (1 unrelated flaky timeout). |
+| 3 | navigation | 861 → 829 | 6 inline (simple, transparent, sidebar, centered, mega-menu, pill) | ✅ | TBD | 2026-04-13 | 4 helpers (NavCTAButton/NavMobileCTAButton/NavHamburgerButton/NavMobileMenuDrawer). 12 TOUCH_TARGET applied (was failing WCAG 2.5.5). Pill+Sidebar custom-styled. mega-menu `<p>` → Caption. 10/10 nav tests, 3890/3890 full suite. |
 | 4 | testimonials | 677 | 6 inline (spotlight, masonry, carousel, ...) | ☐ | — | — | Complex variants |
 | 5 | hero | 36 (index) + 11 variant files | 11 (cards-overlay, centered, fullscreen, gradient, magazine, minimal, parallax, slideshow, split-video, split, video) | ☐ | — | — | Tách file riêng — refactor từng variant. Use `<Display>` cho primary headline. |
 
@@ -194,11 +194,50 @@ Mỗi block PHẢI pass trước khi commit:
     - Subscribe buttons (mega-footer/expanded) thêm `min-h-[44px]`
     - WCAG 2.5.5 compliance
 
+### Navigation pilot (TBD commit, 2026-04-13)
+
+14. **Nav block KHÔNG dùng SectionWrapper / SECTION_PADDING**
+    - Outer là `<nav>` element (sticky/fixed), không phải `<section>`
+    - Layout dùng `h-16` flex/grid, không `py-*` section padding
+    - Solution: const `NAV_CONTAINER` = `${CONTAINER.default} mx-auto ${INNER_PADDING}` cho 5 desktop containers + 1 mega-menu panel + 1 drawer container
+    - Acceptance gate item #1 ("SectionWrapper") không apply cho nav block — note vào checklist
+
+15. **Touch target audit critical cho nav**
+    - Trước refactor: hamburgers `p-2` ≈ 32-36px ❌, CTA `py-2.5` ≈ 40px ❌, sidebar trigger `p-2.5` ≈ 40px ❌
+    - 12 `TOUCH_TARGET.min` (`min-h-[44px]`) applied across 6 variants
+    - Helper `NavHamburgerButton` ép buộc `min-h-[44px] min-w-[44px]` luôn
+
+16. **Mobile drawer dedup qua NavMobileMenuDrawer helper**
+    - 4 variants (simple/transparent/centered/mega-menu) có drawer gần identical
+    - Extract chung — variants chỉ khác background string
+    - Sidebar + Pill có drawer riêng (different design language) — không dùng helper
+    - Save ~120 dòng dup logic
+
+17. **NavCTAButton helper với `motionWrap` opt-out**
+    - Default render `motion.a` (whileHover scale + tap)
+    - Pass `motionWrap={false}` cho variants không cần (sidebar bottom CTA, pill CTA)
+    - Tránh nesting motion components không cần thiết
+
+18. **Link labels KHÔNG refactor sang `<Body>`**
+    - Link labels là interactive text trong `<a>`, không phải body copy
+    - Body small = text-sm = same as `text-sm font-medium` hiện tại
+    - Refactor tạo overhead không value → skip
+    - Acceptance gate item #3 ("body <p> → Body") không apply cho nav
+
+19. **Mega-menu category label `<p>` → `<Caption>`**
+    - Original `text-xs font-semibold uppercase tracking-widest`
+    - Caption = text-sm (slight bump up, better a11y)
+    - Pass `as="span"`? — Caption đã render `<span>` nên display inline; thêm `block` class
+
+20. **`type="button"` thêm cho buttons không submit**
+    - Tránh form-submit accidental khi nest trong form (rare nhưng safe)
+    - Áp dụng cho hamburgers + sidebar close
+
 ---
 
 ## Next Pilot
 
-**Block #3: navigation** (861 LOC, 6 variants — biggest inline block)
+**Block #4: testimonials** (677 LOC, 6 variants — complex layout: spotlight, masonry, carousel)
 
 Steps:
 1. Read `src/blocks/footer/index.tsx` + `src/__tests__/unit/blocks/footer-variants.test.ts` (nếu có)
