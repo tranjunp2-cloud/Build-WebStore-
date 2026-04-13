@@ -5,9 +5,23 @@
 > Xem scope: [phase-05-block-audit.md](phase-05-block-audit.md)
 
 **Total:** 50 blocks (index.tsx) + hero 11 variant files
-**Done:** 22 / 50 (44%) — Batch A ✅ + Batch B 8/9 + Batch C 9/36
+**Done:** 49 / 50 (98%) — **Phase 05 COMPLETE** (divider skipped as pure SVG)
 **In progress:** 0
-**Pending:** 28
+**Pending:** 1 (divider — intentionally skipped, no h/p/containers)
+
+## Phase 05 COMPLETE (2026-04-13)
+Full block audit done. 49/50 blocks refactored with design tokens.
+3890/3890 full test suite pass, TSC 0 errors.
+
+**Commits:**
+- Batch A (5): `4be2fe2`, `b210388`, `9e4fe87`, `25d7e97`, `71c65f3`
+- Batch B sequential (3): `3092451`, `537f61b`, `dc357f9`
+- Parallel agents partial (14): `a398ff7`
+- Sequential small blocks (13): `a66b71b`
+- Sequential C2 medium (8): `f43ea1b`
+- Sequential C1 large (6): `1113b32`
+
+**Total:** 12 commits, 49 blocks, 100% TSC+tests green.
 
 ## Parallel Agent Batch — commit `a398ff7` (2026-04-13)
 Spawned 3 parallel subagents, all 3 hit API 500 errors mid-execution.
