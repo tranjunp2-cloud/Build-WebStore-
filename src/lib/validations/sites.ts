@@ -2,25 +2,48 @@ import { z } from 'zod'
 
 const nullableString = z.string().nullable().optional()
 
+/** Strip all HTML tags to prevent XSS */
+function stripHtml(input: string): string {
+    return input.replace(/<[^>]*>/g, '')
+}
+
+/** Zod transform: strip HTML from nullable string fields */
+const sanitizedString = z.string()
+    .transform(v => stripHtml(v).trim())
+    .nullable().optional()
+
+/** Validate URL format — only allow https:// or http:// */
+const socialUrlString = z.string()
+    .transform(v => stripHtml(v).trim())
+    .pipe(
+        z.string().url('Invalid URL format')
+            .refine(v => {
+                try { const u = new URL(v); return u.protocol === 'https:' || u.protocol === 'http:' }
+                catch { return false }
+            }, 'Only http:// and https:// URLs are allowed')
+            .or(z.literal(''))
+    )
+    .nullable().optional()
+
 export const saveSiteSchema = z.object({
     blocks: z.array(z.record(z.unknown())).optional(),
     headerBlock: z.record(z.unknown()).nullable().optional(),
     footerBlock: z.record(z.unknown()).nullable().optional(),
     theme: z.record(z.unknown()).optional(),
-    siteName: z.string().min(1).optional(),
+    siteName: z.string().min(1).max(200).transform(v => stripHtml(v).trim()).optional(),
     locale: z.enum(['en', 'ms']).optional(),
     contactInfo: z.object({
-        phone: nullableString,
-        email: nullableString,
-        address: nullableString,
+        phone: sanitizedString,
+        email: sanitizedString,
+        address: sanitizedString,
     }).optional(),
     socialLinks: z.object({
-        facebook: nullableString,
-        instagram: nullableString,
-        twitter: nullableString,
-        linkedin: nullableString,
-        youtube: nullableString,
-        tiktok: nullableString,
+        facebook: socialUrlString,
+        instagram: socialUrlString,
+        twitter: socialUrlString,
+        linkedin: socialUrlString,
+        youtube: socialUrlString,
+        tiktok: socialUrlString,
     }).optional(),
     branding: z.object({
         logo: nullableString,

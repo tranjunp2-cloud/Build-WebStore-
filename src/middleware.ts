@@ -28,9 +28,13 @@ const protectedPaths = [
     '/settings',
     '/account',
     '/help',
+    '/blog',
 ]
 
 const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password']
+
+// SEO paths with dots that need tenant rewriting (not static files)
+const SEO_PATHS = ['/sitemap.xml', '/robots.txt']
 
 /**
  * Multi-tenant middleware
@@ -50,13 +54,15 @@ export async function middleware(req: NextRequest) {
     const hostname = req.headers.get('host')?.split(':')[0] || req.nextUrl.hostname
 
     // Allow Next.js internals and static files
-    if (
-        pathname.startsWith('/_next') ||
-        pathname.startsWith('/favicon') ||
-        pathname.startsWith('/public') ||
-        pathname.includes('.')
-    ) {
-        return NextResponse.next()
+    if (!SEO_PATHS.includes(pathname)) {
+        if (
+            pathname.startsWith('/_next') ||
+            pathname.startsWith('/favicon') ||
+            pathname.startsWith('/public') ||
+            pathname.includes('.')
+        ) {
+            return NextResponse.next()
+        }
     }
 
     // ── API and admin routes: pass through ─────────────────────────────

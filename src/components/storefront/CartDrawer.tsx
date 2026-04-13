@@ -3,6 +3,7 @@
 import { useCartStore, type CartItem } from '@/store/cartStore'
 import { X, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react'
 import { toast } from 'sonner'
+import { trackEvent } from '@/lib/analytics/track-event'
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -10,7 +11,7 @@ function formatPrice(price: number, currency: string) {
     return `$${price.toFixed(2)}`
 }
 
-export function CartDrawer({ siteSlug }: { siteSlug: string }) {
+export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: string }) {
     const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, itemCount } = useCartStore()
     const hasCheckoutRoute = Boolean(siteSlug)
 
@@ -131,6 +132,13 @@ export function CartDrawer({ siteSlug }: { siteSlug: string }) {
                         </div>
                         {hasCheckoutRoute ? (
                             <a href={`/sites/${siteSlug}/checkout`}
+                                onClick={() => {
+                                    if (siteId) trackEvent({
+                                        siteId,
+                                        event: 'checkout',
+                                        metadata: { itemCount: items.length, subtotal: subtotal() },
+                                    })
+                                }}
                                 style={{
                                     display: 'block', background: '#111', color: 'white', textAlign: 'center',
                                     padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: 600,
