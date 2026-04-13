@@ -5,9 +5,9 @@
 > Xem scope: [phase-05-block-audit.md](phase-05-block-audit.md)
 
 **Total:** 50 blocks (index.tsx) + hero 11 variant files
-**Done:** 3 / 50 (6%)
+**Done:** 4 / 50 (8%)
 **In progress:** 0
-**Pending:** 47
+**Pending:** 46
 
 ---
 
@@ -25,8 +25,8 @@
 |---|---|---|---|---|---|---|---|
 | 1 | features | 356 | 8 inline (grid-2/3/4, list, icon-top, icon-left, zigzag, carousel) | ✅ | `4be2fe2` | 2026-04-13 | Pilot. Local FeaturesSection wrapper (framer-motion + GradientBlob). Hybrid legacy+semantic vars. 79/79 tests, 3890/3890 full suite. |
 | 2 | footer | 512 → 414 | 6 inline (simple, expanded, minimal, centered-stack, mega-footer, dark-gradient) | ✅ | `b210388` | 2026-04-13 | Pilot #2. 4 local helpers (FooterSection/BrandLogo/SocialIconList/LinkColumn). Custom asymmetric padding kept inline. 9/9 footer tests, 88/88 cross-test, 3889/3890 full (1 unrelated flaky timeout). |
-| 3 | navigation | 861 → 829 | 6 inline (simple, transparent, sidebar, centered, mega-menu, pill) | ✅ | TBD | 2026-04-13 | 4 helpers (NavCTAButton/NavMobileCTAButton/NavHamburgerButton/NavMobileMenuDrawer). 12 TOUCH_TARGET applied (was failing WCAG 2.5.5). Pill+Sidebar custom-styled. mega-menu `<p>` → Caption. 10/10 nav tests, 3890/3890 full suite. |
-| 4 | testimonials | 677 | 6 inline (spotlight, masonry, carousel, ...) | ☐ | — | — | Complex variants |
+| 3 | navigation | 861 → 828 | 6 inline (simple, transparent, sidebar, centered, mega-menu, pill) | ✅ | `9e4fe87` | 2026-04-13 | 4 helpers (NavCTAButton/NavMobileCTAButton/NavHamburgerButton/NavMobileMenuDrawer). 12 TOUCH_TARGET applied (was failing WCAG 2.5.5). Pill+Sidebar custom-styled. mega-menu `<p>` → Caption. 10/10 nav tests, 3890/3890 full suite. |
+| 4 | testimonials | 678 → 746 (helpers) | **8 inline** (cards, masonry, spotlight, minimal-quote, avatar-row, video-text, simple, carousel) — plan ghi 6, sai | ✅ | TBD | 2026-04-13 | 6 helpers (TestimonialsSection/TestimonialsHeader/StarRating/AuthorMeta/DotIndicator/CarouselArrow). DotIndicator wraps 10px dot trong 44px button (WCAG). CarouselArrow 40px → 44px. 10/10 testimonials tests, 108/108 cross-test, 3889/3890 full (1 unrelated flaky). |
 | 5 | hero | 36 (index) + 11 variant files | 11 (cards-overlay, centered, fullscreen, gradient, magazine, minimal, parallax, slideshow, split-video, split, video) | ☐ | — | — | Tách file riêng — refactor từng variant. Use `<Display>` cho primary headline. |
 
 **Gate sau Batch A:** Pause để review consistency + lock approach trước khi spawn parallel cho B/C.
@@ -233,11 +233,49 @@ Mỗi block PHẢI pass trước khi commit:
     - Tránh form-submit accidental khi nest trong form (rare nhưng safe)
     - Áp dụng cho hamburgers + sidebar close
 
+### Testimonials pilot (TBD commit, 2026-04-13)
+
+21. **Plan ghi sai số variants — luôn verify từ test/config**
+    - Plan ghi testimonials có 6 variants
+    - Test + index.tsx thực tế: **8 variants** (cards, masonry, spotlight, minimal-quote, avatar-row, video-text, simple, carousel)
+    - Lesson: đếm variants từ test enum (`TESTIMONIALS_VARIANTS`) hoặc dispatch logic, không trust plan
+    - Update tracker với số đúng
+
+22. **Helpers thay vì local wrappers khi shared rộng**
+    - Footer/nav: 1 wrapper component cho 1 block
+    - Testimonials: 6 helpers (TestimonialsSection, TestimonialsHeader, StarRating, AuthorMeta, DotIndicator, CarouselArrow)
+    - Trade-off: LOC tăng (+68) nhưng dedup massive — 8 variants × 5 patterns = 40 lần dup → 6 helper component
+
+23. **DotIndicator pattern: 10px visual trong 44px hit area**
+    - Original dot: `<button className="w-2.5 h-2.5">` = 10px (visual + hit) ❌
+    - Refactor: `<button className="w-11 h-11"><span className="w-2.5 h-2.5"></span></button>`
+    - Visual unchanged, hit area meets WCAG 2.5.5
+    - Dùng cho 4 chỗ: spotlight mobile, minimal-quote, carousel, (avatar-row buttons đã 56px ✅)
+
+24. **CarouselArrow `w-10 h-10` (40px) → TOUCH_TARGET.min (44px)**
+    - Mở rộng button frame, icon size unchanged
+
+25. **AuthorMeta polymorphic: `layout="inline" | "stacked"` + `nameWeight="semibold" | "bold"`**
+    - 8 variants có 3-4 styles meta khác nhau (text-sm vs default, inline vs stacked)
+    - Single helper với enum props giảm duplication mà không lose flexibility
+
+26. **`Body` component default `<p>` không hợp lệ trong `<div className="text-left">` wrapper khi parent là flex item**
+    - AuthorMeta layout=stacked render bên trong `<div className="text-left">`
+    - Body default `<p>` ổn, nhưng nếu nest trong inline element thì cần `as="span"`
+    - Lesson: kiểm tra parent context khi dùng Body
+
+27. **`aria-current` cho dot/avatar buttons (active state)**
+    - Replaces visual-only active indication for screen readers
+    - `aria-current={i === activeIndex}` thêm vào DotIndicator + AvatarRow buttons
+
 ---
 
 ## Next Pilot
 
-**Block #4: testimonials** (677 LOC, 6 variants — complex layout: spotlight, masonry, carousel)
+**Block #5: hero** (11 separate variant files in `src/blocks/hero/variants/`)
+- Approach khác: edit từng file variant riêng (cards-overlay, centered, fullscreen, gradient, magazine, minimal, parallax, slideshow, split-video, split, video)
+- Use `<Display>` cho primary headline (not Heading level=1)
+- Hero là final block của Batch A — sau khi xong → cross-review + decide on Batch B parallel
 
 Steps:
 1. Read `src/blocks/footer/index.tsx` + `src/__tests__/unit/blocks/footer-variants.test.ts` (nếu có)
