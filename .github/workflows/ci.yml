@@ -278,7 +278,7 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@50
 
-      - name: Pull Vercel env (preview / staging branch)
+      - name: Pull Vercel env (staging custom environment)
         run: vercel pull --yes --environment=preview --git-branch=staging --token="$VERCEL_TOKEN"
 
       - name: Preflight — Postgres reachable
@@ -311,13 +311,43 @@ jobs:
       - name: Build
         run: vercel build --token="$VERCEL_TOKEN"
 
-      - name: Deploy --prebuilt
+      - name: Deploy --prebuilt --target=staging
         id: deploy
         run: |
+          # --target=staging routes this deploy at the custom "staging"
+          # environment so Vercel auto-aliases it to web-v2.dev.ecommercehub.my.
+          # Without --target the deploy lands in generic Preview and the
+          # staging alias stays on the previous deployment.
           set -e
-          URL=$(vercel deploy --prebuilt --archive=tgz --token="$VERCEL_TOKEN")
+          URL=$(vercel deploy --prebuilt --target=staging --archive=tgz --token="$VERCEL_TOKEN")
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Deployed: $URL"
+
+      - name: Verify alias rollover
+        run: |
+          # Authoritative API check — does web-v2.dev.ecommercehub.my now
+          # point at the deployment we just created? If not, fail the job
+          # with a clear error so we don't silently serve stale staging.
+          set -e
+          DEPLOY_URL="${{ steps.deploy.outputs.url }}"
+          EXPECTED="${DEPLOY_URL#https://}"
+          for i in 1 2 3 4 5; do
+            # -s (silent) not -sf — HTTP errors still pipe body to node,
+            # which returns empty string via try/catch. `set -e` therefore
+            # never aborts the loop on a transient API blip.
+            ACTUAL=$(curl -s \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v4/aliases/web-v2.dev.ecommercehub.my?teamId=$VERCEL_ORG_ID" \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).deployment?.url||'')}catch{console.log('')}})")
+            if [ "$ACTUAL" = "$EXPECTED" ]; then
+              echo "✓ alias rolled over: web-v2.dev.ecommercehub.my -> $ACTUAL"
+              exit 0
+            fi
+            echo "attempt $i: expected=$EXPECTED actual=$ACTUAL — retrying in 5s..."
+            sleep 5
+          done
+          echo "::error::alias web-v2.dev.ecommercehub.my did not roll over to $EXPECTED (still $ACTUAL)"
+          exit 1
 
       - name: Notify deploy success
         if: success()
