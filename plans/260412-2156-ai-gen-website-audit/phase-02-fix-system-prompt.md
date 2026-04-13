@@ -2,89 +2,38 @@
 
 ## Context
 - Parent: [plan.md](plan.md)
-- Depends on: Phase 01 (audit data)
-- File: `src/lib/ai/system-prompt.ts`
-- Priority: P1 — highest-impact single change
-- Status: pending
+- File: `src/lib/ai/system-prompt.ts` (176 → 403 lines)
+- Status: **done** ✅
+- Commit: `beffa9b`
 
-## Overview
-System prompt lists all 47 blocks + variants but NEVER instructs GPT-4o to vary them. User prompt is flat 4-line format with no style/mood signal.
+## Implemented Changes
 
-## Key Insights
-- Rule #1 only says "Generate 4 pages: Homepage (8-14 blocks)" — no block TYPE diversity
-- No instruction like "use different variants" or "vary block ordering"
-- Category palettes are suggestions only, same format every time
-- No randomization seed or style personality concept
+### 2.1 PROFESSIONAL DESIGN RULES (research-backed)
+Nguồn: Anthropic Claude Cookbook, Impeccable (15K GitHub stars), v0 Vercel, CRO Research
 
-## Implementation Steps
+| Rule | Chi tiết |
+|------|---------|
+| Hero Section | Headline 5-8 words, subheadline 12-20 words, 1 primary CTA (action verb + benefit) |
+| Color 60-30-10 | 60% neutral surface, 30% secondary, 10% accent (CTA only). Never pure #000000 |
+| Typography | 2 fonts, contrast axes (serif+sans). Cấm Inter+Inter, DM Sans+DM Sans |
+| Section Ordering | AIDA funnel, CTA mỗi 3-4 sections, xen kẽ text-heavy/visual-heavy |
+| Anti-Patterns | Cấm purple gradient, cards-in-cards, "Welcome to our website", same font heading+body |
 
-### 2.1 Add Variety Rules Section (after line 100)
+### 2.2 Context-Aware Style Personalities
+- 8 personalities với keyword matching từ user input
+- `selectPersonality(info)`: phân tích businessName + industry + products + description
+- Top 3 matching personalities → random 1 → inject vào user prompt
+- Skip khi reference mode (tạo lại từ URL)
 
-```
-## VARIETY RULES
-1. NEVER default to the first variant listed. Choose from the FULL list.
-2. For blocks with 3+ variants, rotate — do NOT always pick the same one.
-3. Homepage MUST include at least 2 blocks from different categories.
-4. Each generation should feel visually unique. Vary:
-   - Hero variant (12 options — use them ALL)
-   - Features layout (grid-2, grid-3, grid-4, list, icon-top, zigzag, carousel)
-   - Testimonials style (cards, carousel, masonry, spotlight, minimal-quote)
-   - Footer style (simple, expanded, minimal, centered-stack, mega-footer)
-5. Include at least ONE less-common block: step-process, accordion, before-after, countdown-timer, or download-cta.
-6. Block ORDER should vary — do not always put features right after hero.
-```
+### 2.3 Dynamic Composition Hints
+- `generateCompositionHint(category)`: tạo bố cục MỚI mỗi lần gọi
+- `CATEGORY_SIGNATURE_BLOCKS`: 14 categories × 2-3 signature blocks
+- `HERO_VARIANTS_BY_CATEGORY`: 14 categories × 5 preferred hero variants
+- Common block pool + shuffle → vô hạn combinations
 
-### 2.2 Add Style Personality to User Prompt
-
-Add `STYLE_PERSONALITIES` array (8 options):
-- Bold and energetic
-- Minimal and sophisticated
-- Warm and inviting
-- Professional and authoritative
-- Creative and playful
-- Luxurious and premium
-- Modern tech
-- Editorial and storytelling
-
-In `buildUserPrompt()`, pick one at random:
-```typescript
-const personality = STYLE_PERSONALITIES[Math.floor(Math.random() * STYLE_PERSONALITIES.length)]
-parts.push(`\nDesign personality: ${personality}`)
-```
-
-### 2.3 Add Category Block Composition Hints
-
-New `CATEGORY_BLOCK_HINTS` with 3 different block sequences per category. Include a random hint in user prompt: "Consider this composition (feel free to modify): [hint]"
-
-### 2.4 Add Variant Preference by Mood
-
-```
-For hero blocks:
-- Dramatic: fullscreen, parallax, split-video
-- Professional: centered, gradient, minimal
-- Creative: magazine, cards-overlay, slideshow
-- Personal: split-left, split-right
-```
-
-## Related Files
-- `src/lib/ai/system-prompt.ts` (main target)
-- `src/lib/ai/openai-generator.ts` (calls buildSystemPrompt/buildUserPrompt)
-
-## Todo
-- [ ] Add VARIETY RULES section to system prompt
-- [ ] Add STYLE_PERSONALITIES array
-- [ ] Add random personality selection in buildUserPrompt()
-- [ ] Add CATEGORY_BLOCK_HINTS constant
-- [ ] Add variant-by-mood hints in system prompt
-- [ ] Test: 10 identical inputs should yield 5+ distinct hero variants
-
-## Success Criteria
-- [ ] Hero variant diversity: 2 -> 5+ across 10 runs
-- [ ] Features variant no longer exclusively grid-3
-- [ ] At least 3 different footer variants appear
-- [ ] Block ordering varies across runs
-
-## Risk Assessment
-- GPT-4o may still gravitate toward "safe" choices despite instructions — mitigated by explicit "NEVER default to first" rule
-- Longer prompt = more tokens = higher cost — acceptable tradeoff for variety
-- Random personality selection means non-reproducible results — acceptable for AI path (template path uses seeds)
+### 2.4 VARIETY RULES (7 rules)
+- Never default to first variant
+- Vary hero (12), features (8), testimonials (8), footer (6), contact (6)
+- Include ≥1 uncommon block (step-process, before-after, countdown-timer...)
+- Block order must vary
+- VARIANT MOOD MAPPING: dramatic→fullscreen, professional→centered, creative→magazine

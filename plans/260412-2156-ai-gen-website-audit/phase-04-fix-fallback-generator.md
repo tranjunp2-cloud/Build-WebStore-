@@ -2,24 +2,22 @@
 
 ## Context
 - Parent: [plan.md](plan.md)
-- Depends on: Phase 01 (confirmed determinism)
+- Depends on: Phase 03 (reuse `enforceMinContent`, `BROKEN_VARIANTS`)
 - File: `src/lib/ai/generate-blocks.ts` (315 lines)
 - Priority: P2
 - Status: pending
 
-## Overview
-Rule-based fallback is 100% deterministic: fixed block order, hardcoded variants, one theme per category, same content every time.
+## Mục tiêu
+Rule-based fallback hiện 100% deterministic. Cần seeded PRNG + variety logic.
 
-## Key Insights
-- Triggered when OpenAI API key missing or AI call fails
-- 7 blocks always in same order: nav -> hero -> about -> features -> testimonials -> contact -> footer
-- Only 5 theme palettes (one per business type)
-- Features hardcoded per category — same 3 features every "restaurant"
-- All variants hardcoded: nav "simple", features "grid-3", testimonials "cards", etc.
+## Reuse từ Phase 03
+- `enforceMinContent()` — import từ openai-generator.ts
+- `BROKEN_VARIANTS` — hero:animated-gradient exclusion
+- Pattern: content-count guard trước khi assign variant
 
 ## Implementation Steps
 
-### 4.1 Add Seeded PRNG
+### 4.1 Seeded PRNG Utilities
 
 ```typescript
 function createSeededRandom(seed?: number): () => number {
@@ -44,23 +42,14 @@ function shuffleArray<T>(arr: T[], rand: () => number): T[] {
 }
 ```
 
-### 4.2 Randomize Block Composition
+**Test:** `Date.now()` > 2^32 — `& 0xFFFFFFFF` handles overflow. Verify cùng seed → cùng output.
 
-Replace fixed 7-block sequence with pool selection:
-
-```typescript
-const MIDDLE_BLOCK_POOL = ['about', 'features', 'stats', 'gallery', 'testimonials', 'faq', 'cta', 'newsletter', 'team']
-const middleCount = 4 + Math.floor(rand() * 4) // 4-7 blocks
-const middleBlocks = shuffleArray(MIDDLE_BLOCK_POOL, rand).slice(0, middleCount)
-```
-
-Keep nav first, footer last. Shuffle everything in between.
-
-### 4.3 Randomize Variant Per Block
+### 4.2 Variant Options per Block Type
 
 ```typescript
 const VARIANT_OPTIONS: Record<string, string[]> = {
-    hero: ['centered', 'split-left', 'split-right', 'fullscreen', 'gradient', 'parallax', 'magazine', 'minimal'],
+    hero: ['centered', 'split-left', 'fullscreen', 'gradient', 'parallax', 'magazine', 'minimal', 'slideshow'],
+    // ↑ Exclude animated-gradient (broken) + split-right (same as split-left)
     features: ['grid-2', 'grid-3', 'grid-4', 'list', 'icon-top', 'icon-left', 'zigzag'],
     testimonials: ['cards', 'carousel', 'simple', 'masonry', 'spotlight', 'minimal-quote'],
     contact: ['form', 'split', 'card-float', 'minimal-inline'],
@@ -70,58 +59,101 @@ const VARIANT_OPTIONS: Record<string, string[]> = {
     stats: ['row', 'grid', 'highlight'],
     gallery: ['grid', 'masonry', 'carousel', 'lightbox'],
     navigation: ['simple', 'centered', 'transparent', 'pill'],
+    about: ['simple', 'split', 'story'],
+    newsletter: ['inline', 'popup', 'banner'],
+    team: ['grid', 'list'],
+    pricing: ['cards', 'table', 'horizontal', 'toggle'],
 }
 ```
 
-### 4.4 Expand Theme Palettes (3 per category)
+### 4.3 Middle Block Pool + Shuffle
+
+```typescript
+const MIDDLE_BLOCK_POOL = ['about', 'features', 'stats', 'gallery', 'testimonials', 'faq', 'cta', 'newsletter', 'team']
+
+// Chọn 4-7 blocks random, shuffle thứ tự
+const middleCount = 4 + Math.floor(rand() * 4)
+const middleBlocks = shuffleArray(MIDDLE_BLOCK_POOL, rand).slice(0, middleCount)
+```
+
+**Ordering constraints** (từ scenario analysis #25):
+- `features` phải trước `stats` (stats cần context)
+- `about` phải trước `team`
+- `features` phải trước `pricing`
+
+### 4.4 Theme Palettes — 3 per Category
+
+Thay 1 palette cố định bằng 3 options random:
 
 ```typescript
 const THEME_PALETTES: Record<BusinessIntent['type'], GenerationResult['theme'][]> = {
     restaurant: [
         { primaryColor: '#D97706', secondaryColor: '#92400E', fontHeading: 'Playfair Display', fontBody: 'Inter', colorMode: 'light' },
         { primaryColor: '#DC2626', secondaryColor: '#7F1D1D', fontHeading: 'DM Sans', fontBody: 'Lato', colorMode: 'dark' },
-        { primaryColor: '#059669', secondaryColor: '#065F46', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
+        { primaryColor: '#059669', secondaryColor: '#065F46', fontHeading: 'Raleway', fontBody: 'Open Sans', colorMode: 'light' },
     ],
-    // ... 3 per category
+    ecommerce: [
+        { primaryColor: '#0EA5E9', secondaryColor: '#6366F1', fontHeading: 'DM Sans', fontBody: 'Inter', colorMode: 'light' },
+        { primaryColor: '#8B5CF6', secondaryColor: '#EC4899', fontHeading: 'Outfit', fontBody: 'Nunito', colorMode: 'dark' },
+        { primaryColor: '#10B981', secondaryColor: '#3B82F6', fontHeading: 'Poppins', fontBody: 'Lato', colorMode: 'light' },
+    ],
+    // ... 3 palettes per remaining categories
 }
 ```
 
-### 4.5 Vary Content Templates (3 per category)
+**Font pairing rule:** heading !== body (từ Phase 02 DESIGN RULES). Không dùng Inter+Inter.
 
-Expand from 1 to 3 content variations per category:
-- Different hero headlines
-- Different feature descriptions
-- Different CTA text
+### 4.5 Content Variations — 3 per Category
+
+Mỗi category có 3 sets:
+- Hero headline + subheadline
+- Feature titles + descriptions
+- CTA text
+- About body text
+
+Random chọn 1 set per generation.
 
 ### 4.6 Update Function Signature
 
 ```typescript
+// TRƯỚC
+export function generateBlocks(prompt: string): GenerationResult
+
+// SAU
 export function generateBlocks(prompt: string, seed?: number): GenerationResult
 ```
 
-Caller passes `Date.now()` as seed.
+Caller trong `openai-generator.ts` line 209 truyền `Date.now()`:
+```typescript
+const generated = generateBlocks(prompt, Date.now())
+```
 
-## Related Files
-- `src/lib/ai/generate-blocks.ts` (main target)
-- `src/lib/ai/openai-generator.ts` (caller, line 209)
+### 4.7 Wire Content Guards
+
+```typescript
+import { enforceMinContent } from './openai-generator'
+
+// Sau khi chọn variant, enforce content count
+const variant = pickRandom(VARIANT_OPTIONS[blockType], rand)
+const finalVariant = enforceMinContent(blockType, variant, contentItems.length)
+```
 
 ## Todo
-- [ ] Add seeded PRNG utilities
-- [ ] Implement middle block pool + shuffle
-- [ ] Add VARIANT_OPTIONS map + random selection
-- [ ] Expand THEME_PALETTES to 3 per category
-- [ ] Add 3 content variations per category
-- [ ] Update function signature with seed param
-- [ ] Update caller in openai-generator.ts
+- [ ] Thêm seeded PRNG utilities (createSeededRandom, pickRandom, shuffleArray)
+- [ ] Thêm VARIANT_OPTIONS (14 block types, exclude broken variants)
+- [ ] Implement middle block pool + shuffle + ordering constraints
+- [ ] Expand THEME_PALETTES → 3 per category (5 categories × 3 = 15 palettes)
+- [ ] Thêm 3 content variations per category
+- [ ] Update function signature + caller
+- [ ] Wire enforceMinContent() cho mỗi block
+- [ ] Test: same seed → same output (reproducibility)
+- [ ] Test: 10 calls no seed → 7+ distinct layouts
 
 ## Success Criteria
-- [ ] 10 calls with no seed -> 7+ distinct layouts
-- [ ] Same seed twice -> identical output
-- [ ] Hero variant varies across calls
-- [ ] Features/testimonials/footer variants vary
-- [ ] Theme colors vary within same category
-
-## Risk Assessment
-- Medium: changing fallback behavior affects users without OpenAI key
-- Seeded PRNG ensures reproducibility for debugging
-- Content variations need careful writing to maintain quality
+- [ ] 10 calls no seed → 7+ distinct block compositions
+- [ ] Same seed → identical output
+- [ ] Hero variant varies (không luôn centered)
+- [ ] Theme colors vary (không luôn cùng palette)
+- [ ] Content varies (không luôn cùng headline)
+- [ ] Features before stats ordering maintained
+- [ ] No broken variants in output

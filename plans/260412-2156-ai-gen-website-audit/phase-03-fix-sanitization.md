@@ -2,87 +2,46 @@
 
 ## Context
 - Parent: [plan.md](plan.md)
-- Depends on: Phase 01 (audit data), Phase 02 (better AI output)
-- File: `src/lib/ai/openai-generator.ts` (lines 232-561)
-- Priority: P1
-- Status: pending
+- File: `src/lib/ai/openai-generator.ts` (562 → 847 lines)
+- Status: **done** ✅
+- Commits: `beffa9b`, `1da7134`
 
-## Overview
-Sanitizer at lines 255-261 silently replaces ALL invalid variants with `meta.defaultVariant || meta.variants[0]`. This kills variety even when AI tries creative choices.
+## Implemented Changes
 
-## Key Insights
-- No logging — we never know how much variety is killed
-- Case sensitivity — AI might return "Grid-3" instead of "grid-3"
-- All invalid variants collapse to SAME default per block type
-- Gallery images (line 523) and logo-cloud (line 530) always emptied
+### 3.1 Fuzzy Variant Matching (`fuzzyMatchVariant()`)
+3 bước thay vì chỉ exact match:
+1. Exact match: `"grid-3"` === `"grid-3"`
+2. Case-insensitive + normalize: `"Grid-3"` → `"grid-3"`
+3. Alias lookup: `"slider"` → `"carousel"`
 
-## Implementation Steps
+### 3.2 Variant Aliases (40+ patterns)
+- EN: three-column→grid-3, slider→carousel, full-width→fullscreen, compact→minimal
+- VI: đơn giản→simple, tối giản→minimal, lưới→grid-3, thẻ→cards, bảng→table
+- MS: mudah→simple, ringkas→minimal, senarai→list, kad→cards, jadual→table
 
-### 3.1 Replace Hard Fallback with Smart Matching (lines 255-261)
+### 3.3 Weighted-by-Category Random Fallback
+- `CATEGORY_VARIANT_WEIGHTS`: **14/14 categories** × 5 block types (hero, features, testimonials, footer, contact)
+- `pickWeightedVariant()`: random từ preferred list theo ngành → phù hợp hơn pure random
+- Fallback: random từ tất cả valid variants nếu category không match
 
-```typescript
-if (!meta.variants.includes(s.variant)) {
-    // Try case-insensitive match first
-    const lowerVariant = s.variant.toLowerCase().replace(/[_\s]/g, '-')
-    const matched = meta.variants.find(v => v.toLowerCase() === lowerVariant)
+### 3.4 Broken Variant Exclusion
+- `BROKEN_VARIANTS`: hero:animated-gradient never selected
+- Filter trước khi random → tránh render broken blocks
 
-    if (matched) {
-        s.variant = matched  // Preserve AI intent
-    } else {
-        // Log replacement for audit
-        console.warn(`[AI Sanitizer] "${s.blockType}": "${s.variant}" -> random (not in [${meta.variants.join(', ')}])`)
-        // Random valid variant instead of always defaulting
-        s.variant = meta.variants[Math.floor(Math.random() * meta.variants.length)]
-    }
-}
-```
+### 3.5 Content-Count Guard (`enforceMinContent()`)
+- `VARIANT_MIN_CONTENT`: testimonials(carousel≥3, masonry≥4), features(grid-4≥4, carousel≥3), gallery(masonry≥6), pricing(slider≥3)
+- Auto-fallback: carousel với 1 item → cards. Masonry với 2 items → cards.
+- Console.warn log: `[AI Content Guard] "testimonials": variant "carousel" needs 3 items but got 1 → fallback to "cards"`
+- Exported function — reusable cho Phase 04 + 05
 
-### 3.2 Add Fuzzy Variant Matching Helper
+### 3.6 Logging
+- Console.warn cho mỗi variant replacement: `[AI Sanitizer] "hero": "hexagonal" → "parallax"`
+- Console.warn cho content guard fallback
 
-Handle common AI hallucination patterns:
-```typescript
-const VARIANT_ALIASES: Record<string, string> = {
-    'three-column': 'grid-3',
-    'two-column': 'grid-2',
-    'four-column': 'grid-4',
-    'side-by-side': 'split',
-    'slider': 'carousel',
-    'full-width': 'fullscreen',
-    'compact': 'minimal',
-}
-```
+### 3.7 Gallery/Logo-Cloud Fix
+- Gallery: giữ alt + caption metadata, chỉ strip URL (trước: xóa sạch `images = []`)
+- Logo-cloud: giữ name + alt metadata, strip URL (trước: xóa sạch `logos = []`)
 
-### 3.3 Fix Gallery Image Stripping (line 523)
-
-Current: `s.images = []` — always empties.
-Fix: Strip only `image` sub-field if string URL, keep alt text and caption.
-
-### 3.4 Optional: Sanitization Stats Counter
-
-```typescript
-const sanitizationStats = new Map<string, { replaced: number, total: number }>()
-export function getSanitizationStats() { return Object.fromEntries(sanitizationStats) }
-```
-
-## Related Files
-- `src/lib/ai/openai-generator.ts` (main target)
-- `src/blocks/registry.ts` (variant source of truth)
-
-## Todo
-- [ ] Replace hard fallback with case-insensitive match + random fallback
-- [ ] Add VARIANT_ALIASES map
-- [ ] Add console.warn logging for replacements
-- [ ] Fix gallery image stripping to preserve alt/caption
-- [ ] Fix logo-cloud stripping similarly
-- [ ] Optional: Add sanitization stats counter
-
-## Success Criteria
-- [ ] Case-insensitive variants preserved (e.g., "Grid-3" -> "grid-3")
-- [ ] Invalid variants now get random valid variant instead of always default
-- [ ] Every replacement logged with blockType + original + replacement
-- [ ] Gallery blocks retain structure (even without images)
-
-## Risk Assessment
-- Low risk: fuzzy matching is additive, doesn't remove existing validation
-- Random fallback might produce variants that look bad with certain content — acceptable tradeoff vs always-same-default
-- Gallery fix is safe: just keeps metadata, images still need Media IDs from upload flow
+### 3.8 API Compatibility
+- `sanitizeBlockData(block, siteCategory?)` — thêm optional param, backward-compatible
+- Caller truyền `parsed.category` từ GPT-4o response

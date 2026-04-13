@@ -2,23 +2,36 @@
 
 ## Context
 - Parent: [plan.md](plan.md)
-- Depends on: Phase 04 (shared PRNG utilities)
+- Depends on: Phase 03 (reuse enforceMinContent), Phase 04 (reuse PRNG utils)
 - Files: `src/lib/ai/template-composer.ts` (~1100 lines), `src/lib/ai/template-definitions.ts`
 - Priority: P2
 - Status: pending
 
-## Overview
-14/15 builder functions hardcode a single variant. `buildHomePage()` always produces same block order per tier. 48 old templates only vary businessIndex + themePreset, NOT block structure.
+## Mục tiêu
+14/15 builder functions hardcode 1 variant. Cần seed-based variety cho templates.
 
-## Key Insights
-- Only `buildHero` varies (via `themePresetIndex % variants.length`)
-- buildFeatures always "grid-3", buildTestimonials always "cards", buildContact always "split", etc.
-- Block order in `buildHomePage()` is fixed: nav -> hero -> features -> [stats, gallery, industry] -> testimonials -> [faq, cta] -> [pricing, team, newsletter] -> footer
-- New blueprints (56 presets) have `BlockSpec[]` but many leave variant undefined
+## Reuse từ Phase 03 + 04
+- `enforceMinContent()` — content-count guard
+- `BROKEN_VARIANTS` — exclude animated-gradient
+- `createSeededRandom()`, `pickRandom()`, `shuffleArray()` — PRNG utilities
+  - **Option A:** Import từ generate-blocks.ts
+  - **Option B:** Extract vào shared `src/lib/ai/utils.ts` (recommended — DRY)
 
 ## Implementation Steps
 
-### 5.1 Add compositionSeed to ComposerInput
+### 5.1 Extract Shared PRNG Utilities
+
+Tạo `src/lib/ai/utils.ts`:
+```typescript
+export function createSeededRandom(seed?: number): () => number
+export function pickRandom<T>(arr: T[], rand: () => number): T
+export function shuffleArray<T>(arr: T[], rand: () => number): T[]
+export function simpleHash(str: string): number
+```
+
+Cả Phase 04 + 05 import từ đây.
+
+### 5.2 Add compositionSeed to ComposerInput
 
 ```typescript
 export type ComposerInput = {
@@ -26,92 +39,127 @@ export type ComposerInput = {
     businessIndex: number
     variant: 'starter' | 'professional' | 'premium'
     themePreset: ThemePreset
-    compositionSeed?: number  // NEW
+    compositionSeed?: number  // NEW — undefined = backward-compatible
 }
 ```
 
-### 5.2 Create Seed-Based Variant Selector
+### 5.3 Seed-Based Variant Selector
 
 ```typescript
 function selectVariant(blockType: string, seed: number, category: string): string {
     const meta = blockRegistry.getBlockMeta(blockType)
     if (!meta || meta.variants.length <= 1) return meta?.defaultVariant ?? 'default'
+
+    // Exclude broken variants
+    const broken = BROKEN_VARIANTS[blockType] ?? []
+    const safe = meta.variants.filter(v => !broken.includes(v))
+    if (safe.length === 0) return meta.defaultVariant ?? meta.variants[0]!
+
     const hash = simpleHash(blockType + category + seed)
-    return meta.variants[hash % meta.variants.length]!
+    return safe[hash % safe.length]!
 }
 ```
 
-### 5.3 Refactor All 15 Builder Functions
+### 5.4 Refactor 15 Builder Functions
 
-Add optional `variant?: string` parameter to each:
+Add optional `variant?: string` param. Existing hardcode = default fallback:
 
 ```typescript
-// Before:
+// TRƯỚC
 function buildFeatures(biz, category) {
     return { blockType: 'features', variant: 'grid-3', ... }
 }
-// After:
+
+// SAU
 function buildFeatures(biz, category, variant?: string) {
     return { blockType: 'features', variant: variant ?? 'grid-3', ... }
 }
 ```
 
-Apply to: buildNavigation, buildFeatures, buildTestimonials, buildContact, buildFooter, buildStats, buildGallery, buildFAQ, buildCTA, buildAbout, buildPricing, buildTeam, buildNewsletter, + all industry block builders.
+**15 functions:**
+buildNavigation, buildHero, buildFeatures, buildTestimonials, buildContact, buildFooter, buildStats, buildGallery, buildFAQ, buildCTA, buildAbout, buildPricing, buildTeam, buildNewsletter + tất cả industry block builders (buildMenuDisplay, buildBookingWidget, etc.)
 
-### 5.4 Shuffle Middle Blocks in buildHomePage
-
-After building all blocks, shuffle everything between nav (first) and footer (last):
-
-```typescript
-const rand = createSeededRandom(compositionSeed)
-const shuffled = shuffleArray(middleBlocks.filter(Boolean), rand)
-blocks = [navBlock, ...shuffled, footerBlock]
-```
-
-### 5.5 Optional Block Inclusion by Seed
-
-For professional/premium tiers, 70% chance per optional block:
+### 5.5 Shuffle Middle Blocks in buildHomePage
 
 ```typescript
-const optionalBlocks = ['newsletter', 'team', 'faq']
-const included = optionalBlocks.filter(() => rand() > 0.3)
+function buildHomePage(biz, content, category, variant, themePresetIndex, pages, compositionSeed?) {
+    const blocks = []
+    
+    // Fixed: nav first
+    blocks.push(buildNavigation(biz, pages, selectVariant('navigation', seed, category)))
+    
+    // Fixed: hero second
+    blocks.push(buildHero(biz, category, themePresetIndex, selectVariant('hero', seed, category)))
+    
+    // Middle blocks: build all, then shuffle
+    const middleBlocks = []
+    middleBlocks.push(buildFeatures(biz, category, selectVariant('features', seed, category)))
+    // ... stats, gallery, industry blocks, testimonials, faq, cta, pricing, team, newsletter
+    
+    // Shuffle middle section (seed-based)
+    if (compositionSeed != null) {
+        const rand = createSeededRandom(compositionSeed)
+        // Ordering constraints: features before stats, about before team
+        const shuffled = shuffleWithConstraints(middleBlocks, rand)
+        blocks.push(...shuffled)
+    } else {
+        blocks.push(...middleBlocks) // backward-compatible: no shuffle
+    }
+    
+    // Fixed: footer last
+    blocks.push(buildFooter(biz, pages, selectVariant('footer', seed, category)))
+}
 ```
 
-### 5.6 Update Template Definitions
+### 5.6 Optional Block Inclusion
 
-Add `compositionSeed` to each of 48 definitions:
+Professional/premium tiers: 70% chance per optional block:
+```typescript
+const optionalTypes = ['newsletter', 'team', 'faq']
+// rand() > 0.3 → include (seed-based, reproducible)
+```
+
+### 5.7 Update Template Definitions
+
+48 old definitions: thêm `compositionSeed`:
 ```typescript
 TEMPLATE_DEFINITIONS.map((def, i) => ({ ...def, compositionSeed: i * 7919 }))
 ```
 
-### 5.7 Update composeFromBlueprint
+56 new blueprints: trong `composeFromBlueprint()`, khi `BlockSpec.variant` undefined → dùng `selectVariant()`.
 
-For 56 new presets: if `BlockSpec.variant` is undefined, use `selectVariant()` instead of letting builder use hardcoded default.
+### 5.8 Wire Content Guards
 
-## Related Files
-- `src/lib/ai/template-composer.ts` (main target — 15 builder functions)
-- `src/lib/ai/template-definitions.ts` (48 old + 56 new definitions)
-- `src/blocks/registry.ts` (variant metadata source)
+Mỗi builder function output → run `enforceMinContent()`:
+```typescript
+const variant = selectVariant('testimonials', seed, category)
+const finalVariant = enforceMinContent('testimonials', variant, content.testimonials.length)
+```
 
 ## Todo
+- [ ] Extract shared PRNG vào `src/lib/ai/utils.ts`
 - [ ] Add compositionSeed to ComposerInput type
 - [ ] Implement selectVariant() + simpleHash()
-- [ ] Add variant param to all 15 builder functions
+- [ ] Add variant param to 15 builder functions
 - [ ] Wire seed-based variant selection in buildHomePage()
-- [ ] Implement middle block shuffling
-- [ ] Add optional block inclusion logic
+- [ ] Implement middle block shuffle with ordering constraints
+- [ ] Add optional block inclusion logic (70% probability)
 - [ ] Add compositionSeed to 48 old template definitions
-- [ ] Update composeFromBlueprint for undefined variants
-- [ ] Test: 4 same-category templates have different variant combos
+- [ ] Update composeFromBlueprint() for undefined variants
+- [ ] Wire enforceMinContent() cho mỗi builder output
+- [ ] Test: 4 same-category templates → different variant combos
+- [ ] Test: same seed → same output
 
 ## Success Criteria
 - [ ] No two templates in same category have identical block order + variant combination
-- [ ] 4 restaurant templates: features/testimonials/footer variants all differ
-- [ ] Same seed -> same output (reproducibility)
-- [ ] New blueprints get varied variants when spec.variant is undefined
+- [ ] Same seed → same output (reproducibility)
+- [ ] compositionSeed undefined → behavior cũ (backward-compatible)
+- [ ] No broken variants in output
+- [ ] Content-count guard active cho template path
+- [ ] Features before stats ordering maintained
 
 ## Risk Assessment
-- High: touching 15 builder functions across 1100-line file
-- Mitigated by: optional variant param with existing hardcoded default as fallback
-- Seed approach ensures backward compatibility: seed=undefined -> current behavior
-- Must validate all 47 blocks still render correctly with non-default variants
+- **High**: 15 builder functions × 1100-line file
+- **Mitigation**: optional variant param, hardcoded default = fallback
+- **Mitigation**: compositionSeed undefined → no change (backward-compatible)
+- **Must test**: all 142 variants still render correctly (visual regression)
