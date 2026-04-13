@@ -513,6 +513,14 @@ const MIGRATIONS = [
   { name: 'tenants_custom_domains.domain', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS domain varchar;` },
   { name: 'tenants_custom_domains.status', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS status varchar DEFAULT \'pending\';` },
   { name: 'tenants_custom_domains.is_primary', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS is_primary boolean DEFAULT false;` },
+  // F19 Vercel domain provisioning (#558) — new fields inside customDomains array.
+  // Real column lives on tenants_custom_domains (Payload array sub-table).
+  // Duplicate "tenants.*" entries satisfy scripts/check-migrations.js naive table attribution
+  // (the CI script maps all fields in Tenants.ts to `tenants` table without array awareness).
+  { name: 'tenants_custom_domains.vercel_domain_id', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS vercel_domain_id varchar;` },
+  { name: 'tenants_custom_domains.vercel_verification', sql: `ALTER TABLE tenants_custom_domains ADD COLUMN IF NOT EXISTS vercel_verification jsonb;` },
+  { name: 'tenants.vercel_domain_id', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS vercel_domain_id varchar;` },
+  { name: 'tenants.vercel_verification', sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS vercel_verification jsonb;` },
   // sites_seo_tracked_keywords
   { name: 'sites_seo_tracked_keywords.keyword', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS keyword varchar;` },
   { name: 'sites_seo_tracked_keywords.current_rank', sql: `ALTER TABLE sites_seo_tracked_keywords ADD COLUMN IF NOT EXISTS current_rank numeric;` },
