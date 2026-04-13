@@ -279,14 +279,19 @@ jobs:
         run: npm install --global vercel@50
 
       - name: Pull Vercel env (staging custom environment)
-        run: vercel pull --yes --environment=preview --git-branch=staging --token="$VERCEL_TOKEN"
+        # --environment=staging pulls the custom env directly, which stamps
+        # .vercel/.env.staging.local with VERCEL_TARGET_ENV=staging. This
+        # metadata must match `vercel build --target=staging` and
+        # `vercel deploy --prebuilt --target=staging` below, otherwise the
+        # CLI aborts with a "prebuilt environment mismatch" error.
+        run: vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
 
       - name: Preflight — Postgres reachable
         run: |
           # Ensure the DB is reachable from the runner before build runs migrations.
           # Reads DATABASE_URI from the env file that vercel pull just wrote.
           set -e
-          ENV_FILE=".vercel/.env.preview.local"
+          ENV_FILE=".vercel/.env.staging.local"
           if [ ! -f "$ENV_FILE" ]; then
             echo "::error::vercel pull did not produce $ENV_FILE"
             exit 1
@@ -308,8 +313,13 @@ jobs:
             s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
           "
 
-      - name: Build
-        run: vercel build --token="$VERCEL_TOKEN"
+      - name: Build --target=staging
+        # --target=staging must match both the pulled env metadata
+        # (VERCEL_TARGET_ENV=staging from --environment=staging) and the
+        # deploy flag below. Without it, vercel build stamps the prebuilt
+        # output with target=preview and vercel deploy --prebuilt
+        # --target=staging fails the prebuilt environment mismatch check.
+        run: vercel build --target=staging --token="$VERCEL_TOKEN"
 
       - name: Deploy --prebuilt --target=staging
         id: deploy
