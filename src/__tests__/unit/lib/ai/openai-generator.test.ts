@@ -255,10 +255,12 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
 import { sanitizeBlockData } from '@/lib/ai/openai-generator'
 
 describe('sanitizeBlockData - Normalize AI outputs', () => {
-    it('normalizes legacy/hallucinated string variants to fallback valid enums', () => {
+    it('normalizes invalid variant to a valid one from registry', () => {
         const input = { blockType: 'features', variant: 'grid-5' } // invalid
         const output = sanitizeBlockData(input)
-        expect(output.variant).toBe('grid-2') // fallback for 'features'
+        // Weighted random picks from valid variants — not always the same default
+        const validVariants = ['grid-2', 'grid-3', 'grid-4', 'list', 'icon-top', 'icon-left', 'zigzag', 'carousel']
+        expect(validVariants).toContain(output.variant)
     })
 
     it('forces footer socials into array of object format', () => {
@@ -293,10 +295,13 @@ describe('sanitizeBlockData - Normalize AI outputs', () => {
         expect(plans[1].price).toBe('RM 0')
     })
 
-    it('cleans up logo-cloud blocks', () => {
-        const input = { blockType: 'logo-cloud', logos: ['logo1', 'logo2'] }
+    it('preserves logo-cloud name metadata while stripping URLs', () => {
+        const input = { blockType: 'logo-cloud', logos: ['Acme Corp', { name: 'Partner Inc', url: 'http://example.com' }] }
         const output = sanitizeBlockData(input)
-        expect(output.logos).toEqual([])
+        const logos = output.logos as Array<Record<string, unknown>>
+        expect(logos).toHaveLength(2)
+        expect(logos[0]).toEqual({ name: 'Acme Corp' })
+        expect(logos[1]).toEqual({ name: 'Partner Inc' })
     })
 
     it('handles nulls or completely broken objects safely', () => {

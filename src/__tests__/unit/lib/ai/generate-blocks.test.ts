@@ -5,7 +5,7 @@ import { generateBlocks } from '@/lib/ai/generate-blocks'
 // ─── TC-F01.10: Business type/intent detection ───────────────────────
 
 describe('generateBlocks — output structure [TC-F01.08]', () => {
-    const result = generateBlocks('Create a website for My Cafe, a coffee shop in KL')
+    const result = generateBlocks('Create a website for My Cafe, a coffee shop in KL', 12345)
 
     it('returns siteName extracted from prompt', () => {
         expect(result.siteName).toBe('My Cafe')
@@ -15,16 +15,22 @@ describe('generateBlocks — output structure [TC-F01.08]', () => {
         expect(['business', 'ecommerce', 'restaurant', 'portfolio', 'blog']).toContain(result.siteType)
     })
 
-    it('returns exactly 7 blocks', () => {
-        expect(result.blocks).toHaveLength(7)
+    it('returns 6-10 blocks (dynamic pool)', () => {
+        expect(result.blocks.length).toBeGreaterThanOrEqual(6)
+        expect(result.blocks.length).toBeLessThanOrEqual(10)
     })
 
-    it('has correct block types in order: navigation, hero, about, features, testimonials, contact, footer', () => {
-        const blockTypes = result.blocks.map(b => b.blockType)
-        expect(blockTypes).toEqual([
-            'navigation', 'hero', 'about', 'features',
-            'testimonials', 'contact', 'footer',
-        ])
+    it('always has navigation first and footer last', () => {
+        expect(result.blocks[0]!.blockType).toBe('navigation')
+        expect(result.blocks[result.blocks.length - 1]!.blockType).toBe('footer')
+    })
+
+    it('always has hero as second block', () => {
+        expect(result.blocks[1]!.blockType).toBe('hero')
+    })
+
+    it('always has contact as second-to-last', () => {
+        expect(result.blocks[result.blocks.length - 2]!.blockType).toBe('contact')
     })
 
     it('returns theme with required fields', () => {
@@ -76,24 +82,39 @@ describe('generateBlocks — business type detection [TC-F01.10]', () => {
 })
 
 describe('generateBlocks — theme palette [TC-F01.08]', () => {
-    it('restaurant gets warm palette (amber/brown)', () => {
-        const result = generateBlocks('Create a restaurant website')
-        expect(result.theme.primaryColor).toBe('#D97706')
+    it('restaurant gets one of 3 restaurant palettes', () => {
+        const result = generateBlocks('Create a restaurant website', 12345)
+        expect(['#D97706', '#DC2626', '#059669']).toContain(result.theme.primaryColor)
     })
 
-    it('ecommerce gets cool palette (sky/indigo)', () => {
-        const result = generateBlocks('Build an online store')
-        expect(result.theme.primaryColor).toBe('#0EA5E9')
+    it('ecommerce gets one of 3 ecommerce palettes', () => {
+        const result = generateBlocks('Build an online store', 12345)
+        expect(['#0EA5E9', '#8B5CF6', '#10B981']).toContain(result.theme.primaryColor)
     })
 
-    it('portfolio uses dark mode', () => {
-        const result = generateBlocks('Create a portfolio for a photographer')
-        expect(result.theme.colorMode).toBe('dark')
+    it('theme has valid colorMode', () => {
+        const result = generateBlocks('Create a portfolio for a photographer', 12345)
+        expect(['light', 'dark']).toContain(result.theme.colorMode)
     })
 
-    it('business gets blue palette', () => {
-        const result = generateBlocks('Create a consulting company website')
-        expect(result.theme.primaryColor).toBe('#3B82F6')
+    it('business gets one of 3 business palettes', () => {
+        const result = generateBlocks('Create a consulting company website', 12345)
+        expect(['#3B82F6', '#0F766E', '#1E293B']).toContain(result.theme.primaryColor)
+    })
+
+    it('same seed produces same theme (reproducibility)', () => {
+        const r1 = generateBlocks('Create a restaurant website', 42)
+        const r2 = generateBlocks('Create a restaurant website', 42)
+        expect(r1.theme).toEqual(r2.theme)
+    })
+
+    it('different seeds produce potentially different themes', () => {
+        const results = new Set<string>()
+        for (let seed = 0; seed < 100; seed++) {
+            const r = generateBlocks('Create a restaurant website', seed * 9973)
+            results.add(r.theme.primaryColor)
+        }
+        expect(results.size).toBeGreaterThan(1)
     })
 })
 
