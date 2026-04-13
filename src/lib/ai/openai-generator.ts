@@ -209,7 +209,7 @@ export async function generateSiteWithAI(
 function generateWithFallback(prompt: string, events: SSEEvent[]): { result: GenerationResult; events: SSEEvent[] } {
     events.push({ event: 'step', data: { step: 'fallback', label: 'Creating from smart templates...', progress: 50 } })
 
-    const generated = generateBlocks(prompt)
+    const generated = generateBlocks(prompt, Date.now())
     const result: GenerationResult = {
         ...generated,
         language: 'en' as const

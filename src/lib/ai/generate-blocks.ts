@@ -1,11 +1,12 @@
 /**
- * Rule-based AI Block Generator (Phase 1)
+ * Rule-based AI Block Generator with Seeded Variety
  * Parses user prompt → generates blocks JSON matching Pages collection schema.
- * Phase 2 will replace this with real LLM calls.
+ * Uses seeded PRNG for reproducible but varied output.
  *
  * Target Market: Malaysia (EN / MS)
- * All content is in English. Vietnamese keywords kept in TYPE_KEYWORDS for backward compat.
  */
+
+import { enforceMinContent } from './openai-generator'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -45,6 +46,29 @@ type GenerationResult = {
     }
 }
 
+// ─── Seeded PRNG Utilities ─────────────────────────────────────────────
+
+function createSeededRandom(seed?: number): () => number {
+    let s = seed ?? Date.now()
+    return () => {
+        s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
+        return (s >>> 0) / 0xFFFFFFFF
+    }
+}
+
+function pickRandom<T>(arr: T[], rand: () => number): T {
+    return arr[Math.floor(rand() * arr.length)]!
+}
+
+function shuffleArray<T>(arr: T[], rand: () => number): T[] {
+    const copy = [...arr]
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [copy[i], copy[j]] = [copy[j]!, copy[i]!]
+    }
+    return copy
+}
+
 // ─── Intent Parser ──────────────────────────────────────────────────────
 
 const TYPE_KEYWORDS: Record<BusinessIntent['type'], string[]> = {
@@ -55,18 +79,9 @@ const TYPE_KEYWORDS: Record<BusinessIntent['type'], string[]> = {
     business: ['company', 'agency', 'service', 'startup', 'tech', 'consulting', 'marketing', 'spa', 'gym', 'fitness', 'clinic', 'dental', 'real estate', 'property'],
 }
 
-const THEME_PALETTES: Record<BusinessIntent['type'], GenerationResult['theme']> = {
-    restaurant: { primaryColor: '#D97706', secondaryColor: '#92400E', fontHeading: 'Playfair Display', fontBody: 'Inter', colorMode: 'light' },
-    ecommerce: { primaryColor: '#0EA5E9', secondaryColor: '#6366F1', fontHeading: 'DM Sans', fontBody: 'Inter', colorMode: 'light' },
-    portfolio: { primaryColor: '#F43F5E', secondaryColor: '#8B5CF6', fontHeading: 'Outfit', fontBody: 'DM Sans', colorMode: 'dark' },
-    blog: { primaryColor: '#10B981', secondaryColor: '#3B82F6', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
-    business: { primaryColor: '#3B82F6', secondaryColor: '#8B5CF6', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
-}
-
 function parseIntent(prompt: string): BusinessIntent {
     const lower = prompt.toLowerCase()
 
-    // Extract business name (look for quoted text, "called", or capitalize words)
     let name = 'My Website'
     const namePatterns = [
         /(?:called|named|for)\s+["']?([^"'\n,]+)/i,
@@ -81,7 +96,6 @@ function parseIntent(prompt: string): BusinessIntent {
         }
     }
 
-    // Detect business type
     let type: BusinessIntent['type'] = 'business'
     let maxScore = 0
     for (const [bizType, keywords] of Object.entries(TYPE_KEYWORDS)) {
@@ -92,7 +106,6 @@ function parseIntent(prompt: string): BusinessIntent {
         }
     }
 
-    // Detect style
     let style: BusinessIntent['style'] = 'modern'
     if (lower.includes('minimal') || lower.includes('clean')) style = 'minimal'
     else if (lower.includes('classic') || lower.includes('elegant') || lower.includes('traditional')) style = 'classic'
@@ -101,204 +114,594 @@ function parseIntent(prompt: string): BusinessIntent {
     return { name, type, description: prompt, style }
 }
 
-// ─── Content Templates ──────────────────────────────────────────────────
+// ─── Theme Palettes (3 per category) ────────────────────────────────────
 
-const CONTENT: Record<BusinessIntent['type'], {
+const THEME_PALETTES: Record<BusinessIntent['type'], GenerationResult['theme'][]> = {
+    restaurant: [
+        { primaryColor: '#D97706', secondaryColor: '#92400E', fontHeading: 'Playfair Display', fontBody: 'Inter', colorMode: 'light' },
+        { primaryColor: '#DC2626', secondaryColor: '#7F1D1D', fontHeading: 'DM Sans', fontBody: 'Lato', colorMode: 'dark' },
+        { primaryColor: '#059669', secondaryColor: '#065F46', fontHeading: 'Raleway', fontBody: 'Open Sans', colorMode: 'light' },
+    ],
+    ecommerce: [
+        { primaryColor: '#0EA5E9', secondaryColor: '#6366F1', fontHeading: 'DM Sans', fontBody: 'Inter', colorMode: 'light' },
+        { primaryColor: '#8B5CF6', secondaryColor: '#EC4899', fontHeading: 'Outfit', fontBody: 'Nunito', colorMode: 'dark' },
+        { primaryColor: '#10B981', secondaryColor: '#3B82F6', fontHeading: 'Poppins', fontBody: 'Lato', colorMode: 'light' },
+    ],
+    portfolio: [
+        { primaryColor: '#F43F5E', secondaryColor: '#8B5CF6', fontHeading: 'Outfit', fontBody: 'DM Sans', colorMode: 'dark' },
+        { primaryColor: '#0EA5E9', secondaryColor: '#14B8A6', fontHeading: 'Raleway', fontBody: 'Inter', colorMode: 'light' },
+        { primaryColor: '#F59E0B', secondaryColor: '#EF4444', fontHeading: 'Playfair Display', fontBody: 'Lato', colorMode: 'dark' },
+    ],
+    blog: [
+        { primaryColor: '#10B981', secondaryColor: '#3B82F6', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
+        { primaryColor: '#6366F1', secondaryColor: '#EC4899', fontHeading: 'Playfair Display', fontBody: 'Open Sans', colorMode: 'light' },
+        { primaryColor: '#1E293B', secondaryColor: '#64748B', fontHeading: 'DM Sans', fontBody: 'Nunito', colorMode: 'dark' },
+    ],
+    business: [
+        { primaryColor: '#3B82F6', secondaryColor: '#8B5CF6', fontHeading: 'Outfit', fontBody: 'Inter', colorMode: 'light' },
+        { primaryColor: '#0F766E', secondaryColor: '#065F46', fontHeading: 'Raleway', fontBody: 'Lato', colorMode: 'light' },
+        { primaryColor: '#1E293B', secondaryColor: '#3B82F6', fontHeading: 'DM Sans', fontBody: 'Open Sans', colorMode: 'dark' },
+    ],
+}
+
+// ─── Variant Options (safe variants per block type) ─────────────────────
+
+const VARIANT_OPTIONS: Record<string, string[]> = {
+    hero: ['centered', 'split-left', 'fullscreen', 'gradient', 'parallax', 'magazine', 'minimal', 'slideshow'],
+    features: ['grid-2', 'grid-3', 'grid-4', 'list', 'icon-top', 'icon-left', 'zigzag'],
+    testimonials: ['cards', 'carousel', 'simple', 'masonry', 'spotlight', 'minimal-quote'],
+    contact: ['form', 'split', 'card-float', 'minimal-inline'],
+    footer: ['simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient'],
+    faq: ['accordion', 'grid', 'simple'],
+    cta: ['banner', 'inline', 'floating'],
+    stats: ['row', 'grid', 'highlight'],
+    gallery: ['grid', 'masonry', 'carousel', 'lightbox'],
+    navigation: ['simple', 'centered', 'transparent', 'pill'],
+    about: ['simple', 'split', 'story'],
+    newsletter: ['inline', 'popup', 'banner'],
+    team: ['grid', 'list'],
+    pricing: ['cards', 'table', 'horizontal', 'toggle'],
+}
+
+// ─── Content Variations (3 per category) ────────────────────────────────
+
+type ContentSet = {
     heroHeadline: string
     heroSub: string
-    aboutHeadline: string
     aboutBody: string
     features: Array<{ icon: string; title: string; description: string }>
     testimonials: Array<{ quote: string; name: string; title: string; rating: number }>
     contactSubtext: string
-}> = {
-    restaurant: {
-        heroHeadline: 'Authentic Flavours, Unforgettable Experiences',
-        heroSub: 'Savour dishes crafted from the freshest ingredients in a warm, elegant setting that makes every meal memorable.',
-        aboutHeadline: 'Our Story',
-        aboutBody: 'With a passion for culinary excellence and over 10 years of experience, we bring you unforgettable dining moments. Every dish is meticulously prepared with hand-selected ingredients.',
-        features: [
-            { icon: '🍳', title: 'Expert Chefs', description: 'Our team of chefs brings over a decade of experience from award-winning restaurants.' },
-            { icon: '🥬', title: 'Fresh Ingredients', description: 'Carefully sourced ingredients from trusted local and international suppliers.' },
-            { icon: '🎵', title: 'Elegant Ambience', description: 'Modern design with soothing music — the perfect setting for any occasion.' },
-        ],
-        testimonials: [
-            { quote: 'Absolutely amazing food! The atmosphere is beautiful and the staff is incredibly attentive.', name: 'Sarah L.', title: 'Food Blogger', rating: 5 },
-            { quote: 'Every visit is a delight. Consistent quality and great value for money.', name: 'James T.', title: 'Entrepreneur', rating: 5 },
-        ],
-        contactSubtext: 'Book a table or contact us today to host your special event.',
-    },
-    ecommerce: {
-        heroHeadline: 'Quality Products, Best Prices',
-        heroSub: 'Explore our diverse collection of thousands of authentic products. Fast delivery, hassle-free returns.',
-        aboutHeadline: 'About Us',
-        aboutBody: 'We are committed to delivering the best shopping experience. With our "Quality First" promise, every product is carefully inspected before it reaches your doorstep.',
-        features: [
-            { icon: '🚚', title: 'Fast Delivery', description: 'Free shipping on orders above RM150. Receive your items within 1-3 business days.' },
-            { icon: '🔄', title: 'Easy Returns', description: 'Hassle-free returns within 30 days if you are not completely satisfied.' },
-            { icon: '💎', title: '100% Authentic', description: 'Guaranteed authentic products with verified origins and certifications.' },
-        ],
-        testimonials: [
-            { quote: 'Shopping here is stress-free. Products look exactly like the photos, delivery is fast.', name: 'Aina R.', title: 'VIP Customer', rating: 5 },
-            { quote: 'Excellent customer service and great product advice. Will definitely return!', name: 'Ahmad K.', title: 'Customer', rating: 5 },
-        ],
-        contactSubtext: 'Need help? Get in touch with our support team anytime.',
-    },
-    portfolio: {
-        heroHeadline: 'Creative Work That Inspires',
-        heroSub: 'I create meaningful digital experiences through thoughtful design and clean code.',
-        aboutHeadline: 'About Me',
-        aboutBody: 'I am a passionate creative professional with years of experience in crafting beautiful, functional digital products. I believe in the power of design to transform ideas into impactful experiences.',
-        features: [
-            { icon: '🎨', title: 'UI/UX Design', description: 'Creating intuitive user interfaces with a focus on user experience and visual appeal.' },
-            { icon: '💻', title: 'Web Development', description: 'Building responsive, performant websites using modern frameworks and best practices.' },
-            { icon: '📱', title: 'Mobile Apps', description: 'Designing and developing cross-platform mobile applications.' },
-        ],
-        testimonials: [
-            { quote: 'Absolutely outstanding work. Delivered beyond expectations and was great to collaborate with.', name: 'Sarah Chen', title: 'CEO, TechStart', rating: 5 },
-            { quote: 'Professional, creative, and incredibly talented. Highly recommended!', name: 'James Wilson', title: 'Marketing Director', rating: 5 },
-        ],
-        contactSubtext: 'Got a project in mind? Let\'s chat and bring your vision to life.',
-    },
-    blog: {
-        heroHeadline: 'Discover Knowledge Every Day',
-        heroSub: 'A space for sharing stories, insights, and inspiration for a better life and career.',
-        aboutHeadline: 'About This Blog',
-        aboutBody: 'Welcome to our blog — a curated collection of quality articles on technology, lifestyle, and personal growth.',
-        features: [
-            { icon: '📝', title: 'Quality Articles', description: 'Well-researched content that stays current with the latest trends and insights.' },
-            { icon: '🎯', title: 'Diverse Topics', description: 'From technology and marketing to personal development and productivity.' },
-            { icon: '💡', title: 'Practical Knowledge', description: 'Real-world experience you can apply immediately to your work and life.' },
-        ],
-        testimonials: [
-            { quote: 'The articles are insightful and practical. I can apply them right away!', name: 'Daniel W.', title: 'Developer', rating: 5 },
-            { quote: 'One of the best blogs I follow for tech and productivity content.', name: 'Lisa M.', title: 'Content Creator', rating: 5 },
-        ],
-        contactSubtext: 'Want to collaborate or contribute articles? Get in touch!',
-    },
-    business: {
-        heroHeadline: 'Professional Solutions for Your Business',
-        heroSub: 'We help your business grow with innovative, effective, and scalable solutions tailored to your needs.',
-        aboutHeadline: 'Why Choose Us',
-        aboutBody: 'With a team of experienced professionals, we are committed to delivering the best solutions — helping your business save costs and achieve sustainable growth.',
-        features: [
-            { icon: '🚀', title: 'Rapid Growth', description: 'Effective growth strategies with measurable results within 30 days.' },
-            { icon: '🛡️', title: 'Safe & Reliable', description: 'Absolute data security, compliant with international standards and best practices.' },
-            { icon: '🤝', title: '24/7 Support', description: 'Our support team is always ready to assist you anytime, anywhere.' },
-        ],
-        testimonials: [
-            { quote: 'Revenue increased 40% within 3 months of using the service. Highly professional!', name: 'David H.', title: 'CEO, TechCo', rating: 5 },
-            { quote: 'The consulting team really understands our needs. Solutions that fit perfectly.', name: 'Maya L.', title: 'Marketing Director', rating: 5 },
-        ],
-        contactSubtext: 'Contact us today for a free consultation and detailed quote.',
-    },
+    ctaLabel: string
 }
 
-// ─── Block Generator ────────────────────────────────────────────────────
+const CONTENT_VARIATIONS: Record<BusinessIntent['type'], ContentSet[]> = {
+    restaurant: [
+        {
+            heroHeadline: 'Authentic Flavours, Unforgettable Experiences',
+            heroSub: 'Savour dishes crafted from the freshest ingredients in a warm, elegant setting.',
+            aboutBody: 'With a passion for culinary excellence and over 10 years of experience, we bring you unforgettable dining moments.',
+            features: [
+                { icon: '🍳', title: 'Expert Chefs', description: 'Our team brings over a decade of experience from award-winning restaurants.' },
+                { icon: '🥬', title: 'Fresh Ingredients', description: 'Carefully sourced from trusted local and international suppliers.' },
+                { icon: '🎵', title: 'Elegant Ambience', description: 'Modern design with soothing music — perfect for any occasion.' },
+            ],
+            testimonials: [
+                { quote: 'Absolutely amazing food! The atmosphere is beautiful and the staff is incredibly attentive.', name: 'Sarah L.', title: 'Food Blogger', rating: 5 },
+                { quote: 'Every visit is a delight. Consistent quality and great value for money.', name: 'James T.', title: 'Entrepreneur', rating: 5 },
+                { quote: 'The best dining experience in the city. We come back every week!', name: 'Priya K.', title: 'Regular Customer', rating: 5 },
+            ],
+            contactSubtext: 'Book a table or contact us today to host your special event.',
+            ctaLabel: 'Book a Table',
+        },
+        {
+            heroHeadline: 'Where Every Meal Tells a Story',
+            heroSub: 'Experience culinary artistry that brings together tradition and innovation on every plate.',
+            aboutBody: 'Born from a family recipe book and a dream, our restaurant celebrates the rich flavours of home cooking with a modern twist.',
+            features: [
+                { icon: '🔥', title: 'Wood-Fired Cooking', description: 'Traditional techniques that bring out deep, smoky flavours in every dish.' },
+                { icon: '🌿', title: 'Farm-to-Table', description: 'Ingredients sourced directly from local farms every morning.' },
+                { icon: '🍷', title: 'Curated Wine List', description: 'Hand-picked wines to complement every course and occasion.' },
+            ],
+            testimonials: [
+                { quote: 'A hidden gem! The flavours are extraordinary and the service is impeccable.', name: 'Marcus W.', title: 'Food Critic', rating: 5 },
+                { quote: 'Celebrated our anniversary here. The tasting menu was an unforgettable journey.', name: 'Aisha N.', title: 'Loyal Customer', rating: 5 },
+                { quote: 'Finally a restaurant that respects tradition while being creative.', name: 'Chef Lim', title: 'Fellow Chef', rating: 5 },
+            ],
+            contactSubtext: 'Reserve your table for a memorable dining experience.',
+            ctaLabel: 'Reserve Now',
+        },
+        {
+            heroHeadline: 'Taste the Tradition, Feel the Warmth',
+            heroSub: 'Handcrafted recipes passed down through generations, served with love in a cozy setting.',
+            aboutBody: 'For three generations, our family has been serving authentic recipes. Every dish carries the warmth and care of home cooking.',
+            features: [
+                { icon: '👨‍🍳', title: 'Family Recipes', description: 'Treasured recipes from grandmother\'s kitchen, perfected over decades.' },
+                { icon: '🏠', title: 'Cozy Atmosphere', description: 'A welcoming space designed to make you feel right at home.' },
+                { icon: '🚗', title: 'Easy Delivery', description: 'Available on all major platforms with delivery within 30 minutes.' },
+            ],
+            testimonials: [
+                { quote: 'Tastes exactly like my grandmother used to cook. Pure comfort food!', name: 'Mei Ling', title: 'Regular', rating: 5 },
+                { quote: 'The warmest restaurant in town. Staff remembers your name!', name: 'Raj P.', title: 'Local Resident', rating: 5 },
+                { quote: 'Best value for money. Big portions, amazing taste.', name: 'Ahmad B.', title: 'Customer', rating: 5 },
+            ],
+            contactSubtext: 'Visit us or order delivery — we\'d love to feed you.',
+            ctaLabel: 'Order Now',
+        },
+    ],
+    ecommerce: [
+        {
+            heroHeadline: 'Quality Products, Unbeatable Prices',
+            heroSub: 'Explore thousands of authentic products. Fast delivery, hassle-free returns.',
+            aboutBody: 'We are committed to delivering the best shopping experience with our "Quality First" promise.',
+            features: [
+                { icon: '🚚', title: 'Fast Delivery', description: 'Free shipping above RM150. Receive within 1-3 business days.' },
+                { icon: '🔄', title: 'Easy Returns', description: 'Hassle-free returns within 30 days, no questions asked.' },
+                { icon: '💎', title: '100% Authentic', description: 'Every product verified with authenticity guarantee.' },
+            ],
+            testimonials: [
+                { quote: 'Shopping here is stress-free. Products match the photos exactly.', name: 'Aina R.', title: 'VIP Customer', rating: 5 },
+                { quote: 'Excellent service and fast delivery. My go-to online store!', name: 'Ahmad K.', title: 'Customer', rating: 5 },
+                { quote: 'Great quality at fair prices. The return process was smooth too.', name: 'Jenny L.', title: 'Shopper', rating: 5 },
+            ],
+            contactSubtext: 'Need help? Our support team is available 24/7.',
+            ctaLabel: 'Shop Now',
+        },
+        {
+            heroHeadline: 'Discover Your Style, Define Your Look',
+            heroSub: 'Curated collections that blend trending fashion with timeless elegance.',
+            aboutBody: 'We believe everyone deserves to express their unique style. Our curators travel the world to bring you the finest selections.',
+            features: [
+                { icon: '✨', title: 'Curated Selection', description: 'Hand-picked by our style experts from top brands worldwide.' },
+                { icon: '📦', title: 'Same-Day Dispatch', description: 'Order before 2pm, shipped the same day. Track every step.' },
+                { icon: '💬', title: 'Style Advisor', description: 'Free personal styling advice via chat or video call.' },
+            ],
+            testimonials: [
+                { quote: 'Found my entire wardrobe here. The quality is consistently excellent.', name: 'Siti M.', title: 'Fashion Blogger', rating: 5 },
+                { quote: 'The style advisor helped me find the perfect outfit for my interview!', name: 'David C.', title: 'Customer', rating: 5 },
+                { quote: 'Finally an online store with genuine premium products at fair prices.', name: 'Lisa T.', title: 'Repeat Buyer', rating: 5 },
+            ],
+            contactSubtext: 'Chat with our style advisor or reach our support team.',
+            ctaLabel: 'Explore Collection',
+        },
+        {
+            heroHeadline: 'Shop Smart, Live Better',
+            heroSub: 'Everything you need under one roof. From daily essentials to premium picks.',
+            aboutBody: 'Started in 2020 as a small local shop, we\'ve grown into a trusted marketplace serving thousands of happy customers across Malaysia.',
+            features: [
+                { icon: '🏷️', title: 'Best Price Guarantee', description: 'Found it cheaper elsewhere? We\'ll match the price plus 10% off.' },
+                { icon: '🔒', title: 'Secure Payment', description: 'FPX, credit card, e-wallets — all encrypted and protected.' },
+                { icon: '⭐', title: 'Reward Points', description: 'Earn points on every purchase. Redeem for discounts on next order.' },
+            ],
+            testimonials: [
+                { quote: 'The reward points system is brilliant. Saved RM200 last month!', name: 'Farah A.', title: 'Gold Member', rating: 5 },
+                { quote: 'Trust this store completely. Every product is exactly as described.', name: 'Kevin W.', title: 'Customer', rating: 5 },
+                { quote: 'Best customer service I\'ve experienced online. Quick and helpful.', name: 'Nurul H.', title: 'Customer', rating: 5 },
+            ],
+            contactSubtext: 'Questions about an order? We respond within 1 hour.',
+            ctaLabel: 'Start Shopping',
+        },
+    ],
+    portfolio: [
+        {
+            heroHeadline: 'Creative Work That Inspires',
+            heroSub: 'Meaningful digital experiences through thoughtful design and clean code.',
+            aboutBody: 'A passionate creative professional crafting beautiful, functional digital products.',
+            features: [
+                { icon: '🎨', title: 'UI/UX Design', description: 'Intuitive interfaces with focus on user experience and visual appeal.' },
+                { icon: '💻', title: 'Web Development', description: 'Responsive websites using modern frameworks and best practices.' },
+                { icon: '📱', title: 'Mobile Apps', description: 'Cross-platform mobile applications with native feel.' },
+            ],
+            testimonials: [
+                { quote: 'Outstanding work. Delivered beyond expectations.', name: 'Sarah Chen', title: 'CEO, TechStart', rating: 5 },
+                { quote: 'Professional, creative, incredibly talented. Highly recommended!', name: 'James Wilson', title: 'Marketing Director', rating: 5 },
+                { quote: 'Transformed our brand with a stunning website. Best investment we made.', name: 'Alex P.', title: 'Startup Founder', rating: 5 },
+            ],
+            contactSubtext: 'Got a project in mind? Let\'s bring your vision to life.',
+            ctaLabel: 'View Portfolio',
+        },
+        {
+            heroHeadline: 'Design That Moves People',
+            heroSub: 'Crafting visual stories that connect brands with their audience.',
+            aboutBody: 'With 8+ years in design, I help businesses tell their story through compelling visuals and intuitive experiences.',
+            features: [
+                { icon: '🖼️', title: 'Brand Identity', description: 'Complete brand systems from logo to guidelines to collateral.' },
+                { icon: '🌐', title: 'Digital Strategy', description: 'Data-driven design decisions backed by user research.' },
+                { icon: '✏️', title: 'Illustration', description: 'Custom illustrations that give your brand a unique personality.' },
+            ],
+            testimonials: [
+                { quote: 'Our rebrand increased customer inquiries by 60%. Worth every cent.', name: 'Diana K.', title: 'Business Owner', rating: 5 },
+                { quote: 'Incredible attention to detail. Every pixel perfect.', name: 'Tom R.', title: 'Creative Director', rating: 5 },
+                { quote: 'Finally found a designer who truly listens and delivers.', name: 'Mei H.', title: 'Founder', rating: 5 },
+            ],
+            contactSubtext: 'Let\'s discuss your next project over coffee.',
+            ctaLabel: 'Get in Touch',
+        },
+        {
+            heroHeadline: 'Building Digital Products That Matter',
+            heroSub: 'Full-stack development with a design-first approach.',
+            aboutBody: 'Engineer and designer who believes great products come from the intersection of technology and creativity.',
+            features: [
+                { icon: '⚡', title: 'Fast & Performant', description: 'Websites that score 95+ on Core Web Vitals every time.' },
+                { icon: '🔧', title: 'Full-Stack', description: 'From database design to pixel-perfect frontend, all in one.' },
+                { icon: '📊', title: 'Growth-Focused', description: 'Built-in analytics, SEO, and conversion optimization.' },
+            ],
+            testimonials: [
+                { quote: 'Our site loads in under 1 second now. Conversions doubled.', name: 'Ryan M.', title: 'SaaS Founder', rating: 5 },
+                { quote: 'Rare combination of design sense and engineering skill.', name: 'Nina S.', title: 'Product Manager', rating: 5 },
+                { quote: 'Shipped our MVP in 3 weeks. Clean code, beautiful design.', name: 'Jake L.', title: 'CTO', rating: 5 },
+            ],
+            contactSubtext: 'Ready to build something great together?',
+            ctaLabel: 'Start a Project',
+        },
+    ],
+    blog: [
+        {
+            heroHeadline: 'Discover Knowledge Every Day',
+            heroSub: 'Stories, insights, and inspiration for a better life and career.',
+            aboutBody: 'A curated collection of quality articles on technology, lifestyle, and personal growth.',
+            features: [
+                { icon: '📝', title: 'Quality Articles', description: 'Well-researched content on the latest trends and insights.' },
+                { icon: '🎯', title: 'Diverse Topics', description: 'Technology, marketing, personal development and more.' },
+                { icon: '💡', title: 'Practical Knowledge', description: 'Real-world experience you can apply immediately.' },
+            ],
+            testimonials: [
+                { quote: 'Insightful and practical. I apply these articles right away!', name: 'Daniel W.', title: 'Developer', rating: 5 },
+                { quote: 'One of the best blogs for tech and productivity content.', name: 'Lisa M.', title: 'Content Creator', rating: 5 },
+                { quote: 'Subscribe to the newsletter. Every issue is gold.', name: 'Hao Z.', title: 'Reader', rating: 5 },
+            ],
+            contactSubtext: 'Want to collaborate or contribute? Get in touch!',
+            ctaLabel: 'Read More',
+        },
+        {
+            heroHeadline: 'Ideas Worth Sharing',
+            heroSub: 'Deep dives into technology, business, and the future of work.',
+            aboutBody: 'Written by industry practitioners, not just observers. Every article comes from real experience.',
+            features: [
+                { icon: '🔬', title: 'Deep Analysis', description: 'Go beyond the headlines with thorough research and data.' },
+                { icon: '🎙️', title: 'Expert Interviews', description: 'Conversations with leaders shaping the industry.' },
+                { icon: '📊', title: 'Case Studies', description: 'Real-world examples with actionable takeaways.' },
+            ],
+            testimonials: [
+                { quote: 'The case studies alone are worth the subscription.', name: 'Mark T.', title: 'Product Manager', rating: 5 },
+                { quote: 'Best writing on tech I\'ve found. No fluff, all substance.', name: 'Sara K.', title: 'Engineer', rating: 5 },
+                { quote: 'Changed how I think about product development.', name: 'Leo C.', title: 'Founder', rating: 5 },
+            ],
+            contactSubtext: 'Have a story to tell? We\'d love to hear from you.',
+            ctaLabel: 'Subscribe',
+        },
+        {
+            heroHeadline: 'Your Daily Dose of Inspiration',
+            heroSub: 'Bite-sized insights on design, code, and creativity delivered fresh.',
+            aboutBody: 'Started as a personal journal, now a community of 10,000+ readers who believe in continuous learning.',
+            features: [
+                { icon: '☕', title: '5-Minute Reads', description: 'Quick insights you can absorb during your morning coffee.' },
+                { icon: '🎨', title: 'Visual Guides', description: 'Complex topics explained with infographics and diagrams.' },
+                { icon: '🗂️', title: 'Curated Resources', description: 'Hand-picked tools, books, and courses every week.' },
+            ],
+            testimonials: [
+                { quote: 'Love the 5-minute format. Perfect for my commute!', name: 'Anita B.', title: 'Designer', rating: 5 },
+                { quote: 'The visual guides make complex topics so accessible.', name: 'Chris D.', title: 'Student', rating: 5 },
+                { quote: 'Best curated newsletter in the design space.', name: 'Yuki M.', title: 'UX Lead', rating: 5 },
+            ],
+            contactSubtext: 'Join our community of curious minds.',
+            ctaLabel: 'Join Free',
+        },
+    ],
+    business: [
+        {
+            heroHeadline: 'Professional Solutions for Your Business',
+            heroSub: 'Innovative, effective, and scalable solutions tailored to your needs.',
+            aboutBody: 'A team of experienced professionals committed to delivering solutions that drive sustainable growth.',
+            features: [
+                { icon: '🚀', title: 'Rapid Growth', description: 'Effective strategies with measurable results within 30 days.' },
+                { icon: '🛡️', title: 'Safe & Reliable', description: 'Data security compliant with international standards.' },
+                { icon: '🤝', title: '24/7 Support', description: 'Our team is always ready to assist you anytime.' },
+            ],
+            testimonials: [
+                { quote: 'Revenue increased 40% within 3 months. Highly professional!', name: 'David H.', title: 'CEO, TechCo', rating: 5 },
+                { quote: 'Solutions that fit perfectly. They really understand our needs.', name: 'Maya L.', title: 'Marketing Director', rating: 5 },
+                { quote: 'Best business partner decision we ever made.', name: 'John S.', title: 'Operations Head', rating: 5 },
+            ],
+            contactSubtext: 'Contact us for a free consultation and detailed quote.',
+            ctaLabel: 'Get Free Consultation',
+        },
+        {
+            heroHeadline: 'Grow Smarter, Scale Faster',
+            heroSub: 'Data-driven consulting that transforms businesses across Southeast Asia.',
+            aboutBody: 'Founded in 2018, we\'ve helped 200+ companies streamline operations and accelerate growth across ASEAN.',
+            features: [
+                { icon: '📈', title: 'Growth Strategy', description: 'Custom roadmaps based on your market data and goals.' },
+                { icon: '⚙️', title: 'Process Automation', description: 'Reduce manual work by 60% with smart automation.' },
+                { icon: '🎯', title: 'Performance Tracking', description: 'Real-time dashboards to measure what matters.' },
+            ],
+            testimonials: [
+                { quote: 'Automated our invoicing — saved 20 hours per week!', name: 'Tan A.', title: 'Finance Director', rating: 5 },
+                { quote: 'Their strategy doubled our leads in 2 months.', name: 'Sarah W.', title: 'CMO', rating: 5 },
+                { quote: 'Finally a consultant who delivers, not just advises.', name: 'Ravi K.', title: 'CEO', rating: 5 },
+            ],
+            contactSubtext: 'Schedule a strategy call — first session is free.',
+            ctaLabel: 'Book Strategy Call',
+        },
+        {
+            heroHeadline: 'Your Success Is Our Mission',
+            heroSub: 'End-to-end business solutions from strategy to execution.',
+            aboutBody: 'We don\'t just advise — we roll up our sleeves and build alongside you. 500+ projects delivered on time.',
+            features: [
+                { icon: '💼', title: 'Full-Service Agency', description: 'Marketing, tech, operations — everything under one roof.' },
+                { icon: '🏆', title: 'Award-Winning Work', description: 'Recognized by industry leaders for innovation and results.' },
+                { icon: '🌏', title: 'Regional Expertise', description: 'Deep knowledge of ASEAN markets and regulations.' },
+            ],
+            testimonials: [
+                { quote: 'They handled our entire digital transformation. Seamless.', name: 'Patricia L.', title: 'Managing Director', rating: 5 },
+                { quote: 'The only agency that treats our business like their own.', name: 'Hafiz M.', title: 'Founder', rating: 5 },
+                { quote: 'ROI positive in month one. Exceeded all expectations.', name: 'Grace T.', title: 'VP Sales', rating: 5 },
+            ],
+            contactSubtext: 'Let\'s build something great together.',
+            ctaLabel: 'Start a Conversation',
+        },
+    ],
+}
 
-export function generateBlocks(prompt: string): GenerationResult {
+// ─── Middle Block Pool ─────────────────────────────────────────────────
+
+const MIDDLE_BLOCK_POOL = ['about', 'features', 'stats', 'gallery', 'testimonials', 'faq', 'cta', 'newsletter', 'team'] as const
+
+// ─── Block Builders ────────────────────────────────────────────────────
+
+function buildNavigation(name: string, variant: string): GeneratedBlock {
+    return {
+        blockType: 'navigation',
+        variant,
+        logoText: name,
+        links: [
+            { label: 'Home', url: '#' },
+            { label: 'About', url: '#about' },
+            { label: 'Services', url: '#features' },
+            { label: 'Contact', url: '#contact' },
+        ],
+        ctaButton: { show: true, label: 'Get in Touch', url: '#contact' },
+    }
+}
+
+function buildHero(name: string, content: ContentSet, variant: string): GeneratedBlock {
+    return {
+        blockType: 'hero',
+        variant,
+        headline: content.heroHeadline,
+        subheadline: content.heroSub,
+        ctaButtons: [
+            { label: content.ctaLabel, url: '#contact', style: 'primary' },
+            { label: 'Learn More', url: '#about', style: 'outline' },
+        ],
+        badge: { show: true, text: '✨ ' + name },
+        overlay: variant === 'fullscreen' || variant === 'parallax',
+        overlayOpacity: 0.4,
+        height: '90vh',
+    }
+}
+
+function buildMiddleBlock(
+    blockType: string,
+    name: string,
+    content: ContentSet,
+    variant: string,
+): GeneratedBlock | null {
+    switch (blockType) {
+        case 'about':
+            return {
+                blockType: 'about',
+                variant,
+                sectionLabel: 'About',
+                headline: 'Our Story',
+                body: { root: { children: [{ type: 'paragraph', children: [{ text: content.aboutBody }] }] } },
+            }
+        case 'features':
+            return {
+                blockType: 'features',
+                variant,
+                sectionLabel: 'Services',
+                headline: 'What We Offer',
+                subheadline: 'The core values we deliver to you',
+                features: content.features,
+            }
+        case 'stats':
+            return {
+                blockType: 'stats',
+                variant,
+                headline: 'By the Numbers',
+                stats: [
+                    { value: '10', label: 'Years Experience', suffix: '+' },
+                    { value: '5000', label: 'Happy Customers', suffix: '+' },
+                    { value: '4.9', label: 'Average Rating' },
+                    { value: '50', label: 'Awards Won', suffix: '+' },
+                ],
+            }
+        case 'gallery':
+            return {
+                blockType: 'gallery',
+                variant,
+                headline: 'Our Gallery',
+                images: [],
+            }
+        case 'testimonials': {
+            const finalVariant = enforceMinContent('testimonials', variant, content.testimonials.length)
+            return {
+                blockType: 'testimonials',
+                variant: finalVariant,
+                headline: 'What Our Clients Say',
+                testimonials: content.testimonials,
+            }
+        }
+        case 'faq':
+            return {
+                blockType: 'faq',
+                variant,
+                headline: 'Frequently Asked Questions',
+                items: [
+                    { question: 'How do I get started?', answer: 'Simply contact us through the form below or give us a call. We\'ll guide you through everything.' },
+                    { question: 'What are your operating hours?', answer: 'We are open Monday to Saturday, 9am to 6pm. Online support is available 24/7.' },
+                    { question: 'Do you offer custom solutions?', answer: 'Yes! Every client gets a tailored solution designed specifically for their needs.' },
+                    { question: 'What payment methods do you accept?', answer: 'We accept FPX, credit/debit cards, e-wallets, and bank transfers.' },
+                ],
+            }
+        case 'cta':
+            return {
+                blockType: 'cta',
+                variant,
+                headline: 'Ready to Get Started?',
+                subheadline: `Join thousands of satisfied customers who chose ${name}.`,
+                ctaLabel: content.ctaLabel,
+                ctaUrl: '#contact',
+            }
+        case 'newsletter':
+            return {
+                blockType: 'newsletter',
+                variant,
+                headline: 'Stay Updated',
+                subheadline: 'Get the latest news and offers delivered to your inbox.',
+                buttonLabel: 'Subscribe',
+            }
+        case 'team':
+            return {
+                blockType: 'team',
+                variant,
+                headline: 'Meet Our Team',
+                members: [
+                    { name: 'Alex Johnson', role: 'Founder & CEO', bio: 'Visionary leader with 15+ years of industry experience.' },
+                    { name: 'Sarah Lee', role: 'Creative Director', bio: 'Award-winning designer passionate about user experience.' },
+                    { name: 'Raj Patel', role: 'Head of Operations', bio: 'Keeps everything running smoothly behind the scenes.' },
+                ],
+            }
+        default:
+            return null
+    }
+}
+
+function buildContact(name: string, content: ContentSet, variant: string): GeneratedBlock {
+    return {
+        blockType: 'contact',
+        variant,
+        headline: 'Get in Touch',
+        subtext: content.contactSubtext,
+        email: 'hello@' + name.toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]/g, '') + '.com',
+        phone: '(+60) 12-345 6789',
+        formFields: [
+            { fieldName: 'name', fieldType: 'text', label: 'Full Name', required: true },
+            { fieldName: 'email', fieldType: 'email', label: 'Email', required: true },
+            { fieldName: 'message', fieldType: 'textarea', label: 'Message', required: true },
+        ],
+    }
+}
+
+function buildFooter(name: string, heroSub: string, variant: string): GeneratedBlock {
+    return {
+        blockType: 'footer',
+        variant,
+        logoText: name,
+        tagline: heroSub.substring(0, 60) + '...',
+        columns: [
+            {
+                title: 'Links',
+                links: [
+                    { label: 'Home', url: '#' },
+                    { label: 'About', url: '#about' },
+                    { label: 'Services', url: '#features' },
+                ],
+            },
+            {
+                title: 'Support',
+                links: [
+                    { label: 'Contact', url: '#contact' },
+                    { label: 'FAQ', url: '#' },
+                    { label: 'Privacy Policy', url: '#' },
+                ],
+            },
+        ],
+        copyrightText: `© ${new Date().getFullYear()} ${name}. All rights reserved.`,
+        socials: [
+            { platform: 'facebook', url: '#' },
+            { platform: 'instagram', url: '#' },
+            { platform: 'whatsapp', url: '#' },
+        ],
+    }
+}
+
+// ─── Ordering Constraints ──────────────────────────────────────────────
+
+/** Enforce ordering: A must come before B */
+const ORDERING_DEPS: [string, string][] = [
+    ['features', 'stats'],
+    ['features', 'testimonials'],
+    ['about', 'team'],
+]
+
+function enforceOrdering(blocks: GeneratedBlock[]): GeneratedBlock[] {
+    const result = [...blocks]
+    for (const [before, after] of ORDERING_DEPS) {
+        const beforeIdx = result.findIndex(b => b.blockType === before)
+        const afterIdx = result.findIndex(b => b.blockType === after)
+        if (beforeIdx >= 0 && afterIdx >= 0 && beforeIdx > afterIdx) {
+            // Swap: move 'before' block to just before 'after' block
+            const [moved] = result.splice(beforeIdx, 1)
+            const newAfterIdx = result.findIndex(b => b.blockType === after)
+            result.splice(newAfterIdx, 0, moved!)
+        }
+    }
+    return result
+}
+
+// ─── Main Generator ────────────────────────────────────────────────────
+
+export function generateBlocks(prompt: string, seed?: number): GenerationResult {
+    const rand = createSeededRandom(seed)
     const intent = parseIntent(prompt)
-    const content = CONTENT[intent.type]
-    const theme = THEME_PALETTES[intent.type]
 
-    const blocks: GeneratedBlock[] = [
-        // 1. Navigation
-        {
-            blockType: 'navigation',
-            style: 'fixed',
-            logoText: intent.name,
-            links: [
-                { label: 'Home', url: '#' },
-                { label: 'About', url: '#about' },
-                { label: 'Services', url: '#features' },
-                { label: 'Contact', url: '#contact' },
-            ],
-            ctaButton: { show: true, label: 'Get in Touch', url: '#contact' },
-        },
+    // Pick random theme palette (3 options per category)
+    const palettes = THEME_PALETTES[intent.type]
+    const theme = pickRandom(palettes, rand)
 
-        // 2. Hero
-        {
-            blockType: 'hero',
-            variant: 'centered',
-            headline: content.heroHeadline,
-            subheadline: content.heroSub,
-            ctaButtons: [
-                { label: 'Get Started', url: '#contact', style: 'primary' },
-                { label: 'Learn More', url: '#about', style: 'outline' },
-            ],
-            badge: { show: true, text: '✨ ' + intent.name },
-        },
+    // Pick random content variation (3 options per category)
+    const contentSets = CONTENT_VARIATIONS[intent.type]
+    const content = pickRandom(contentSets, rand)
 
-        // 3. About
-        {
-            blockType: 'about',
-            layout: 'image-right',
-            sectionLabel: 'About',
-            headline: content.aboutHeadline,
-            body: { root: { children: [{ type: 'paragraph', children: [{ text: content.aboutBody }] }] } },
-        },
+    // Pick random variants per block type
+    const getVariant = (blockType: string): string => {
+        const options = VARIANT_OPTIONS[blockType]
+        return options ? pickRandom(options, rand) : 'simple'
+    }
 
-        // 4. Features
-        {
-            blockType: 'features',
-            sectionLabel: 'Services',
-            headline: 'What We Offer',
-            subheadline: 'The core values we deliver to you',
-            layout: 'grid-3',
-            features: content.features,
-        },
+    // Build blocks
+    const blocks: GeneratedBlock[] = []
 
-        // 5. Testimonials
-        {
-            blockType: 'testimonials',
-            headline: 'What Our Clients Say',
-            variant: 'grid',
-            testimonials: content.testimonials,
-        },
+    // 1. Navigation (always first)
+    blocks.push(buildNavigation(intent.name, getVariant('navigation')))
 
-        // 6. Contact
-        {
-            blockType: 'contact',
-            headline: 'Get in Touch',
-            subtext: content.contactSubtext,
-            email: 'hello@' + intent.name.toLowerCase()
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .replace(/[^a-z0-9]/g, '') + '.com',
-            phone: '(+60) 12-345 6789',
-            formFields: [
-                { fieldName: 'name', fieldType: 'text', label: 'Full Name', required: true },
-                { fieldName: 'email', fieldType: 'email', label: 'Email', required: true },
-                { fieldName: 'message', fieldType: 'textarea', label: 'Message', required: true },
-            ],
-        },
+    // 2. Hero (always second)
+    blocks.push(buildHero(intent.name, content, getVariant('hero')))
 
-        // 7. Footer
-        {
-            blockType: 'footer',
-            logoText: intent.name,
-            tagline: content.heroSub.substring(0, 60) + '...',
-            columns: [
-                {
-                    title: 'Links',
-                    links: [
-                        { label: 'Home', url: '#' },
-                        { label: 'About', url: '#about' },
-                        { label: 'Services', url: '#features' },
-                    ],
-                },
-                {
-                    title: 'Support',
-                    links: [
-                        { label: 'Contact', url: '#contact' },
-                        { label: 'FAQ', url: '#' },
-                        { label: 'Privacy Policy', url: '#' },
-                    ],
-                },
-            ],
-            copyrightText: `© ${new Date().getFullYear()} ${intent.name}. All rights reserved.`,
-            showSocialLinks: true,
-        },
-    ]
+    // 3. Middle blocks — pick 4-6 from pool, shuffle
+    const middleCount = 4 + Math.floor(rand() * 3) // 4-6 blocks
+    const selectedMiddle = shuffleArray([...MIDDLE_BLOCK_POOL], rand).slice(0, middleCount)
+
+    const middleBlocks: GeneratedBlock[] = []
+    for (const blockType of selectedMiddle) {
+        const variant = getVariant(blockType)
+        const block = buildMiddleBlock(blockType, intent.name, content, variant)
+        if (block) middleBlocks.push(block)
+    }
+
+    // Enforce ordering constraints (features before stats, about before team)
+    const orderedMiddle = enforceOrdering(middleBlocks)
+    blocks.push(...orderedMiddle)
+
+    // 4. Contact (always second-to-last)
+    blocks.push(buildContact(intent.name, content, getVariant('contact')))
+
+    // 5. Footer (always last)
+    blocks.push(buildFooter(intent.name, content.heroSub, getVariant('footer')))
 
     return {
         siteName: intent.name,
