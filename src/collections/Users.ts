@@ -235,12 +235,18 @@ export const Users: CollectionConfig = {
                             return Response.json({ errors: [{ message: 'This user is an owner of another workspace and cannot be added as staff' }] }, { status: 400 })
                         }
 
-                        // Add to tenant
+                        // Generate new temp password for re-invited staff
+                        // So they can login even if they forgot the old password
+                        tempPassword = randomBytes(8).toString('base64url').slice(0, 12)
+
+                        // Add to tenant + reset password
                         const normalizedExisting = normalizeTenants(targetUser.tenants || [])
                         await req.payload.update({
                             collection: 'users',
                             id: targetUser.id,
+                            overrideAccess: true,
                             data: {
+                                password: tempPassword,
                                 tenants: [
                                     ...normalizedExisting,
                                     { tenant: tenantId, role, status: 'pending', permissions: role === 'custom' ? (permissions || []) : [] }
@@ -254,6 +260,7 @@ export const Users: CollectionConfig = {
 
                         targetUser = await req.payload.create({
                             collection: 'users',
+                            overrideAccess: true,
                             data: {
                                 email,
                                 firstName: name,
@@ -275,7 +282,7 @@ export const Users: CollectionConfig = {
                         userName: name || targetUser.firstName || email.split('@')[0],
                         workspaceName: tenant.name as string,
                         loginUrl,
-                        temporaryPassword: isNewUser ? tempPassword : undefined
+                        temporaryPassword: tempPassword || undefined
                     })
 
                     req.payload.sendEmail({ to: email, subject, html }).catch((err: unknown) => {
@@ -356,6 +363,7 @@ export const Users: CollectionConfig = {
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
+                    overrideAccess: true,
                     data: { tenants: normalizedTenants }
                 })
 
@@ -429,6 +437,7 @@ export const Users: CollectionConfig = {
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
+                    overrideAccess: true,
                     data: {
                         firstName: name,
                         tenants: normalizedTenants
@@ -494,6 +503,7 @@ export const Users: CollectionConfig = {
                 await req.payload.update({
                     collection: 'users',
                     id: userId,
+                    overrideAccess: true,
                     data: { tenants: normalizedTenants }
                 })
 
@@ -582,7 +592,7 @@ export const Users: CollectionConfig = {
                         const normalizedTenants = normalizeTenants(targetUser.tenants || [])
                         normalizedTenants.splice(targetTenantIndex, 1)
 
-                        await req.payload.update({ collection: 'users', id: userId, data: { tenants: normalizedTenants } })
+                        await req.payload.update({ collection: 'users', id: userId, overrideAccess: true, data: { tenants: normalizedTenants } })
                         removedCount++;
                     } catch (e) {
                         errorCount++;
