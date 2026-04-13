@@ -1,3 +1,5 @@
+# Files excluded from `vercel deploy --prebuilt` uploads.
+# Keep tight — anything here is invisible to the running app.
 node_modules
 coverage
 playwright-report
