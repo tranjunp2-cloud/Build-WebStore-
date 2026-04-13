@@ -25,6 +25,8 @@ interface PageAnalysis {
     slug: string
     score: number
     issues: SEOIssue[]
+    currentMetaTitle?: string
+    currentMetaDescription?: string
 }
 
 function analysePage(page: any, siteSEO: any): PageAnalysis {
@@ -95,6 +97,8 @@ function analysePage(page: any, siteSEO: any): PageAnalysis {
         slug: page.slug || '/',
         score,
         issues,
+        currentMetaTitle: metaTitle || undefined,
+        currentMetaDescription: metaDesc || undefined,
     }
 }
 

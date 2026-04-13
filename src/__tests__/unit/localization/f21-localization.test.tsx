@@ -81,7 +81,7 @@ describe('[TC-F21.07] Default Language = EN (BR-01)', () => {
 
     it('loads English translation strings on first-touch', () => {
         renderWithI18n()
-        expect(screen.getByTestId('dashboard-label').textContent).toBe('Customize Dashboard')
+        expect(screen.getByTestId('dashboard-label').textContent).toBe('Customize')
     })
 })
 
@@ -348,13 +348,13 @@ describe('[TC-F21.04] Language Switcher in CMS Sidebar footer', () => {
 describe('[TC-F21.05] UI labels translate, user data stays original (BR-02)', () => {
     it('switches UI locale without altering user-typed data', async () => {
         renderWithI18n('en')
-        expect(screen.getByTestId('dashboard-label').textContent).toBe('Customize Dashboard')
+        expect(screen.getByTestId('dashboard-label').textContent).toBe('Customize')
 
         fireEvent.click(screen.getByTestId('set-ms'))
 
         await waitFor(() => {
             // Sidebar/UI labels change to BM
-            expect(screen.getByTestId('dashboard-label').textContent).toBe('Sesuaikan Papan Pemuka')
+            expect(screen.getByTestId('dashboard-label').textContent).toBe('Sesuaikan')
             // Locale switches
             expect(screen.getByTestId('locale').textContent).toBe('ms')
         })

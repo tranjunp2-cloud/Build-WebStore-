@@ -59,24 +59,27 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next()
     }
 
-    // ── Redirect DO internal URL → custom domain ───────────────────────
-    // Exclude /api/ and /admin paths (DO health checks use internal URL)
-    if (hostname.includes('ondigitalocean.app') && !pathname.startsWith('/api/') && !pathname.startsWith('/admin')) {
-        const customDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
-        const redirectUrl = `https://${customDomain}${pathname}${req.nextUrl.search}`
-        return NextResponse.redirect(redirectUrl, { status: 301 })
-    }
-
-    // ── Admin domain: web-cms-v2.dev.ecommercehub.my (explicit or fallback to admin.PLATFORM_DOMAIN) ──
-    const ADMIN_DOMAIN = process.env.NEXT_PUBLIC_ADMIN_DOMAIN || `admin.${PLATFORM_DOMAIN}`
-    if (hostname === ADMIN_DOMAIN) {
-        url.pathname = `/admin${pathname}`
-        return NextResponse.rewrite(url)
-    }
-
     // ── API and admin routes: pass through ─────────────────────────────
+    // IMPORTANT: This MUST be checked BEFORE admin domain rewrite.
+    // When ADMIN_DOMAIN equals SERVER_DOMAIN (e.g. web-cms-v2.dev.ecommercehub.my),
+    // the admin rewrite would catch /api/* requests and rewrite them to /admin/api/*
+    // which returns HTML instead of JSON → "Fetching user failed" error.
     if (pathname.startsWith('/api/') || pathname.startsWith('/admin')) {
         return NextResponse.next()
+    }
+
+    // ── Derived domains ──────────────────────────────────────────────
+    const ADMIN_DOMAIN = process.env.NEXT_PUBLIC_ADMIN_DOMAIN || `admin.${PLATFORM_DOMAIN}`
+    const SERVER_DOMAIN = (process.env.NEXT_PUBLIC_SERVER_URL || '').replace(/^https?:\/\//, '').split(':')[0]
+
+    // ── Admin domain: rewrite root → /admin for dedicated admin subdomain ──
+    // Only apply when ADMIN_DOMAIN is a SEPARATE domain from SERVER_URL.
+    // When they're the same (e.g. staging uses web-cms-v2.dev.ecommercehub.my for both),
+    // skip rewrite — Payload CMS is already accessible at /admin path,
+    // and rewriting would hijack frontend routes (/login, /dashboard, /builder).
+    if (hostname === ADMIN_DOMAIN && ADMIN_DOMAIN !== SERVER_DOMAIN) {
+        url.pathname = `/admin${pathname}`
+        return NextResponse.rewrite(url)
     }
 
     // ── Local Direct Access (e.g. /sites/{slug}/...) ──────────────────
@@ -110,6 +113,29 @@ export async function middleware(req: NextRequest) {
             return NextResponse.rewrite(new URL('/not-found', req.url))
         }
         const tenantSlug = hostname.replace(`.${PLATFORM_DOMAIN}`, '')
+
+        // F23: Check if this is an old slug that needs 301 redirect
+        try {
+            const internalOrigin = req.nextUrl.origin
+            const checkUrl = `${internalOrigin}/api/slug/redirect?slug=${encodeURIComponent(tenantSlug)}`
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 2000)
+            try {
+                const checkRes = await fetch(checkUrl, { cache: 'no-store', signal: controller.signal })
+                if (checkRes.ok) {
+                    const { redirect, newSlug } = await checkRes.json()
+                    if (redirect && newSlug && newSlug !== tenantSlug) {
+                        const redirectUrl = `https://${newSlug}.${PLATFORM_DOMAIN}${pathname}`
+                        return NextResponse.redirect(redirectUrl, { status: 301 })
+                    }
+                }
+            } finally {
+                clearTimeout(timeout)
+            }
+        } catch {
+            // Timeout or fetch fail → serve normally, don't block traffic
+        }
+
         url.pathname = `/sites/${tenantSlug}${pathname}`
         const response = NextResponse.rewrite(url)
         response.headers.set('x-tenant-slug', tenantSlug)
@@ -117,34 +143,37 @@ export async function middleware(req: NextRequest) {
         return response
     }
 
-    // ── Custom domain: hostname không phải platform, không phải admin, không phải DO app URL ──
-    // SERVER_DOMAIN = web-cms-v2.dev.ecommercehub.my (dashboard/API domain, different from PLATFORM_DOMAIN)
-    const SERVER_DOMAIN = (process.env.NEXT_PUBLIC_SERVER_URL || '').replace(/^https?:\/\//, '').split(':')[0]
-    const isDoInternalHost =
+    // ── Custom domain: hostname không phải platform/admin/local ──
+    const isPlatformHost =
         hostname === PLATFORM_DOMAIN ||
         hostname === `www.${PLATFORM_DOMAIN}` ||
         hostname === ADMIN_DOMAIN ||
         hostname === SERVER_DOMAIN ||
-        hostname === '0.0.0.0' ||
         hostname.includes('localhost') ||
         hostname.includes('127.0.0.1') ||
-        hostname.includes('ondigitalocean.app') // DO internal app URL – không phải custom domain
+        hostname.endsWith('.vercel.app')
 
-    if (!isDoInternalHost) {
+    if (!isPlatformHost) {
         // REQ-F19-06: 301 redirect non-primary custom domains → primary domain
         try {
-            const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || `https://${PLATFORM_DOMAIN}`
-            const checkUrl = `${serverUrl}/api/domain-primary?host=${encodeURIComponent(hostname)}`
-            const checkRes = await fetch(checkUrl, { cache: 'no-store' })
-            if (checkRes.ok) {
-                const { primaryDomain, isPrimary } = await checkRes.json()
-                if (!isPrimary && primaryDomain && primaryDomain !== hostname) {
-                    const redirectUrl = `https://${primaryDomain}${pathname}`
-                    return NextResponse.redirect(redirectUrl, { status: 301 })
+            const internalOrigin = req.nextUrl.origin
+            const checkUrl = `${internalOrigin}/api/domain-primary?host=${encodeURIComponent(hostname)}`
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 2000)
+            try {
+                const checkRes = await fetch(checkUrl, { cache: 'no-store', signal: controller.signal })
+                if (checkRes.ok) {
+                    const { primaryDomain, isPrimary } = await checkRes.json()
+                    if (!isPrimary && primaryDomain && primaryDomain !== hostname) {
+                        const redirectUrl = `https://${primaryDomain}${pathname}`
+                        return NextResponse.redirect(redirectUrl, { status: 301 })
+                    }
                 }
+            } finally {
+                clearTimeout(timeout)
             }
         } catch {
-            // If check fails, serve normally — don't block traffic
+            // Timeout or fetch fail → serve normally, don't block traffic
         }
 
         url.pathname = `/sites/custom${pathname}`
@@ -224,7 +253,10 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
     matcher: [
-        // Match all paths except static files
-        '/((?!_next/static|_next/image|favicon.ico).*)',
+        // Exclude static files AND /api/ routes from middleware.
+        // Payload admin sends POST as multipart/form-data with _payload field.
+        // Vercel edge middleware corrupts multipart body when forwarding to serverless → 500.
+        // API routes don't need middleware (no subdomain/domain routing).
+        '/((?!_next/static|_next/image|favicon.ico|api/).*)',
     ],
 }

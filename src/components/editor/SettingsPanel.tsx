@@ -82,6 +82,7 @@ interface SettingsPanelProps {
         name: string
         status: string
         domain?: string | null
+        primaryDomain?: string | null
         branding?: {
             logo?: string
             favicon?: string
@@ -402,7 +403,7 @@ function SettingsPanelInner({
     const isHomepage = activePage?.isHomepage || activePage?.slug === 'home' || activePage?.slug === '/' || activePage?.slug === ''
     const normalizedPreviewPath = isHomepage ? '' : seoSlugValue.replace(/^\//, '')
     const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
-    const previewDomain = (site?.domain || `${(siteName || site?.name || 'site').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}.${platformDomain}`).replace(/^https?:\/\//, '')
+    const previewDomain = (site?.primaryDomain || site?.domain || `${(siteName || site?.name || 'site').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}.${platformDomain}`).replace(/^https?:\/\//, '')
     const metaTitleWarning = seoTitleValue.length > 60 ? 'Title may be truncated on Google Search.' : null
     const metaDescriptionWarning = seoDescriptionValue.length > 160 ? 'Description may be truncated on Google Search.' : null
 
@@ -508,12 +509,27 @@ function SettingsPanelInner({
                                 })
                                 if (res.ok) {
                                 const data = await res.json()
-                                    if (data.title) setSeoTitleInput(data.title)
-                                    if (data.description) setSeoDescriptionInput(data.description)
-                                    if (data.slug && !isHomepage) setSeoSlugInput(data.slug)
-                                    if (data.title) await handleSeoUpdate('seoTitle', data.title)
-                                    if (data.description) await handleSeoUpdate('seoDescription', data.description)
-                                    if (data.slug && !isHomepage) await handleSeoUpdate('slug', data.slug)
+                                    const proposed = data.proposed || data
+                                    const applyChanges = async () => {
+                                        if (proposed.title) setSeoTitleInput(proposed.title)
+                                        if (proposed.description) setSeoDescriptionInput(proposed.description)
+                                        if (proposed.slug && !isHomepage) setSeoSlugInput(proposed.slug)
+                                        if (proposed.title) await handleSeoUpdate('seoTitle', proposed.title)
+                                        if (proposed.description) await handleSeoUpdate('seoDescription', proposed.description)
+                                        if (proposed.slug && !isHomepage) await handleSeoUpdate('slug', proposed.slug)
+                                    }
+                                    // AC-16, BR-06: confirm before overwriting existing meta
+                                    if (data.hasExisting) {
+                                        toast.dismiss(loadingToastId)
+                                        const confirmed = window.confirm(
+                                            `Existing meta will be replaced:\n\nTitle: "${data.existing?.title || '(empty)'}"\n→ "${proposed.title}"\n\nDescription: "${data.existing?.description || '(empty)'}"\n→ "${proposed.description}"\n\nApply changes?`
+                                        )
+                                        if (!confirmed) {
+                                            toast.info('SEO changes cancelled')
+                                            return
+                                        }
+                                    }
+                                    await applyChanges()
                                     toast.success('SEO optimization successfully generated!', { id: loadingToastId })
                                 } else {
                                     toast.error('Failed to generate SEO', { id: loadingToastId })

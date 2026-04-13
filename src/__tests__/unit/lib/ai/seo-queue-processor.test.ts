@@ -127,7 +127,8 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
             'product',
             'Ayam Percik',
             'Restoran ABC',
-            'Grilled chicken'
+            'Grilled chicken',
+            []
         )
     })
 
@@ -144,7 +145,8 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
             'page',
             'About Us',
             'MyBiz',
-            undefined
+            undefined,
+            []
         )
     })
 
@@ -204,7 +206,8 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
             'product',
             'Product X',
             'plain-site',
-            undefined
+            undefined,
+            []
         )
     })
 
@@ -221,7 +224,8 @@ describe('queueSEOAutoGeneration — background processor [TC-F08-03-01]', () =>
             'product',
             'No-Name Product',
             'Website',
-            undefined
+            undefined,
+            []
         )
     })
 })

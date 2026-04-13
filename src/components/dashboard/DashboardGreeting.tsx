@@ -1,32 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useI18n } from '@/i18n'
 
-export function DashboardGreeting({ userName }: { userName: string }) {
-    const { t, locale } = useI18n()
-    const [timeKey, setTimeKey] = useState<'morning' | 'afternoon' | 'evening'>('morning')
-
-    useEffect(() => {
-        const hour = new Date().getHours()
-        if (hour < 12) setTimeKey('morning')
-        else if (hour < 18) setTimeKey('afternoon')
-        else setTimeKey('evening')
-    }, [])
-
+export function DashboardGreeting() {
     return (
-        <div>
-            <h1 className="text-2xl font-bold text-white">
-                {t.dashboard.overview.greeting} {t.dashboard.overview[timeKey]}, {userName}! 👋
+        <div className="flex flex-col w-full m-0 p-0">
+            <h1 className="m-0 p-0 text-[30px] font-bold leading-[36px] text-[#F8FAFC]">
+                Welcome to PrimeWeb Dashboard
             </h1>
-            <p className="mt-1 text-sm text-gray-400">
-                {new Date().toLocaleDateString(locale === 'ms' ? 'ms-MY' : 'en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                })}
-            </p>
+            <div className="m-0 p-0 mt-[8px] text-[14px] leading-[1.42em] text-[#F8FAFC]/60 max-w-[330px] sm:max-w-none">
+                Monitor your store performance and manage your online business from one place.
+            </div>
         </div>
     )
 }

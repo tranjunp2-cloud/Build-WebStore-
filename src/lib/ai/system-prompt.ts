@@ -36,25 +36,57 @@ You MUST respond with a valid JSON object in this exact format:
     "colorMode": "light|dark"
   },
   "seo": {
-    "title": "Page title (max 60 chars)",
-    "description": "Meta description (max 160 chars)"
+    "title": "Homepage title (max 60 chars)",
+    "description": "Homepage meta description (max 160 chars)"
   },
   "language": "en|ms|vi",
-  "blocks": [
-    { "blockType": "navigation", "variant": "simple", ... },
-    { "blockType": "hero", "variant": "centered", ... },
-    ...
+  "pages": [
+    {
+      "title": "Homepage",
+      "slug": "/",
+      "isHomepage": true,
+      "blocks": [
+        { "blockType": "navigation", "variant": "simple", ... },
+        { "blockType": "hero", "variant": "centered", ... },
+        ...
+      ],
+      "seo": { "title": "...", "description": "..." }
+    },
+    {
+      "title": "About Us",
+      "slug": "about",
+      "isHomepage": false,
+      "blocks": [ ... ],
+      "seo": { "title": "About - Business Name", "description": "..." }
+    },
+    {
+      "title": "Services",
+      "slug": "services",
+      "isHomepage": false,
+      "blocks": [ ... ],
+      "seo": { "title": "Services - Business Name", "description": "..." }
+    },
+    {
+      "title": "Contact",
+      "slug": "contact",
+      "isHomepage": false,
+      "blocks": [ ... ],
+      "seo": { "title": "Contact - Business Name", "description": "..." }
+    }
   ]
 }
+
+NOTE: For backward compatibility, "blocks" at the root level is also accepted (treated as single homepage).
 
 ## AVAILABLE BLOCK TYPES (${blockMetas.length} total)
 ${blockList}
 
 ## RULES
-1. Generate 8-14 blocks per site (minimum: navigation, hero, about/features, contact, footer)
-2. Each block MUST have "blockType" and "variant" fields
-3. blockType MUST be one of the listed types — no custom types
-4. variant MUST be one of the listed variants for that block type
+1. Generate 4 pages: Homepage (8-14 blocks), About (4-6 blocks), Services/Products (4-6 blocks), Contact (4-5 blocks)
+2. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
+3. Each block MUST have "blockType" and "variant" fields
+4. blockType MUST be one of the listed types — no custom types
+5. variant MUST be one of the listed variants for that block type
 5. **LANGUAGE DETECTION & OUTPUT**: 
    - If user input is in Bahasa Melayu, output ALL text in formal Bahasa Melayu (\`"language": "ms"\`).
    - If user input is in Vietnamese, output ALL text in professional Vietnamese (\`"language": "vi"\`).
@@ -66,6 +98,12 @@ ${blockList}
 9. Navigation should have relevant links matching other sections
 10. Footer should reference the business name
 11. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
+
+## VIETNAMESE INPUT HANDLING
+- If user input contains Vietnamese slang, abbreviations, or informal language,
+  interpret the meaning and generate professional Vietnamese content.
+  Example: "ban banh mi ship tan noi" → Bakery/restaurant selling bánh mì with delivery service
+- Preserve the business intent even when input is poorly formatted or uses shorthand
 
 ## CONTENT QUALITY RULES
 11. Hero headline must mention the ACTUAL business name

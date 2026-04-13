@@ -1,8 +1,8 @@
 'use client'
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import { Calendar } from 'lucide-react'
 import { useI18n } from '@/i18n'
+import { cn } from '@/lib/utils'
 
 export function PeriodSelector() {
     const router = useRouter()
@@ -18,24 +18,31 @@ export function PeriodSelector() {
         { id: '30d', label: t.dashboard.overview.periods['30d'] },
     ]
 
-    const handleSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleSelect = (id: string) => {
         const params = new URLSearchParams(searchParams.toString())
-        params.set('period', e.target.value)
+        params.set('period', id)
         router.push(`${pathname}?${params.toString()}`)
     }
 
     return (
-        <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5">
-            <Calendar className="h-4 w-4 text-gray-400" />
-            <select
-                value={currentPeriod}
-                onChange={handleSelect}
-                className="bg-transparent text-sm font-medium text-white outline-none focus:ring-0 [&>option]:bg-[#1E293B] [&>option]:text-white"
-            >
-                {PERIODS.map(p => (
-                    <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-            </select>
+        <div className="flex flex-1 sm:flex-none items-center gap-[2px] rounded-[8px] bg-[#1F2937] p-[3px]">
+            {PERIODS.map(p => {
+                const isActive = currentPeriod === p.id
+                return (
+                    <button
+                        key={p.id}
+                        onClick={() => handleSelect(p.id)}
+                        className={cn(
+                            "px-[14px] py-[6px] text-[13px] font-semibold rounded-[6px] transition-all leading-none",
+                            isActive 
+                                ? "bg-[#161E2E] text-[#3B82F6] shadow-[0px_1px_3px_0px_rgba(0,0,0,0.5)]" 
+                                : "text-[#9CA3AF] hover:text-[#E5E7EB] hover:bg-white/5"
+                        )}
+                    >
+                        {p.label}
+                    </button>
+                )
+            })}
         </div>
     )
 }

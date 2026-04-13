@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * DB Setup Script — runs as Docker CMD on DO App Platform.
+ * DB Setup Script — runs as Docker CMD (DO) or Vercel build step.
  *
- * Problem: Payload CMS's `push: true` only creates tables when
- * `process.env.NODE_ENV !== 'production'` (checked at runtime in
- * node_modules/@payloadcms/db-postgres/dist/connect.js line 109).
+ * Modes:
+ * - `--migrate-only`: Run SQL migrations then exit (for Vercel build).
+ * - Default: Full Docker mode — pushDevSchema + start server (for DO/Docker).
  *
- * Solution:
+ * Docker mode:
  * 1. Check if database has tables
  * 2. If empty → start server.js with NODE_ENV=development (triggers pushDevSchema)
  * 3. Poll DB until tables are created (pushDevSchema done)
@@ -2292,6 +2292,60 @@ const MIGRATIONS = [
     name: 'subscribers.email_site_unique',
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS subscribers_email_site_uniq ON subscribers (email, site_id);`,
   },
+  // ── Sites: SEO auto meta toggle ──
+  {
+    name: 'sites.seo_auto_meta_enabled',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS seo_auto_meta_enabled boolean DEFAULT true;`,
+  },
+  // ── F23: Custom Subdomain Slug — previousSlugs array ──
+  {
+    name: 'tenants_previous_slugs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS tenants_previous_slugs (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      _order integer NOT NULL DEFAULT 0,
+      _parent_id integer NOT NULL,
+      _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
+      slug varchar NOT NULL,
+      expires_at timestamptz NOT NULL
+    );`,
+  },
+  {
+    name: 'tenants_previous_slugs.slug_index',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_previous_slugs_slug_idx ON tenants_previous_slugs(slug);`,
+  },
+  {
+    name: 'tenants_previous_slugs.parent_index',
+    sql: `CREATE INDEX IF NOT EXISTS tenants_previous_slugs_parent_idx ON tenants_previous_slugs(_parent_id);`,
+  },
+  // F23: ALTER TABLE fallbacks — satisfy check-migrations.js for array sub-fields
+  // (previousSlugs is an array type → sub-table tenants_previous_slugs, not columns on tenants)
+  {
+    name: 'tenants.previous_slugs_fallback',
+    sql: `ALTER TABLE tenants ADD COLUMN IF NOT EXISTS previous_slugs jsonb;
+          ALTER TABLE tenants ADD COLUMN IF NOT EXISTS slug varchar;
+          ALTER TABLE tenants ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+          ALTER TABLE tenants_previous_slugs ADD COLUMN IF NOT EXISTS slug varchar;
+          ALTER TABLE tenants_previous_slugs ADD COLUMN IF NOT EXISTS expires_at timestamptz;`,
+  },
+  // ── Rate Limits: DB-backed rate limiting (BUG-003) ──
+  {
+    name: 'rate_limits.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS rate_limits (
+      id serial PRIMARY KEY,
+      key varchar(255) NOT NULL,
+      count integer NOT NULL DEFAULT 1,
+      window_start timestamp NOT NULL DEFAULT NOW(),
+      expires_at timestamp NOT NULL,
+      UNIQUE(key));`,
+  },
+  {
+    name: 'rate_limits.key_index',
+    sql: `CREATE INDEX IF NOT EXISTS idx_rate_limits_key ON rate_limits(key);`,
+  },
+  {
+    name: 'rate_limits.expires_index',
+    sql: `CREATE INDEX IF NOT EXISTS idx_rate_limits_expires ON rate_limits(expires_at);`,
+  },
 ];
 
 async function runMigrations(pool) {
@@ -2592,7 +2646,40 @@ async function autoSeedTemplates() {
 }
 
 async function main() {
+  const MIGRATE_ONLY = process.argv.includes('--migrate-only');
   console.log('[db-setup] NODE_ENV:', process.env.NODE_ENV);
+  if (MIGRATE_ONLY) console.log('[db-setup] Mode: --migrate-only (Vercel build)');
+
+  // --migrate-only: Run SQL migrations then exit (no server spawn)
+  if (MIGRATE_ONLY) {
+    const pool = createPool();
+    if (!pool) {
+      console.error('[db-setup] ❌ No DATABASE_URI found');
+      process.exit(1);
+    }
+    try {
+      const info = await pool.query('SELECT current_database(), current_user');
+      const row = info.rows[0];
+      console.log(`[db-setup] Connected: db=${row.current_database}, user=${row.current_user}`);
+
+      const tableCount = await getTableCount(pool);
+      console.log(`[db-setup] Tables in public schema: ${tableCount}`);
+
+      if (tableCount > 0) {
+        await runMigrations(pool);
+        await syncPayloadRelsTables(pool);
+        await runBootstrapSeed(pool);
+      }
+
+      await pool.end();
+      console.log('[db-setup] ✅ Migrations complete, exiting for Vercel build');
+      process.exit(0);
+    } catch (e) {
+      console.error('[db-setup] ❌ Migration failed:', e.message);
+      await pool.end().catch(() => {});
+      process.exit(1);
+    }
+  }
 
   const { needsPush, tableCount } = await checkDB();
 

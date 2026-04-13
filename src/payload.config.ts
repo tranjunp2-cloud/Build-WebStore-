@@ -60,11 +60,9 @@ function isRemoteDatabase(): boolean {
 function shouldPushSchema(): boolean {
   if (process.env.PAYLOAD_PUSH_SCHEMA === 'false') return false
   if (process.env.PAYLOAD_PUSH_SCHEMA === 'true') return true
-  // Auto-push for local dev only — detect Docker by container-like hostname
+  // Auto-push for local dev only
   const isDev = process.env.NODE_ENV === 'development'
-  const hostname = process.env.HOSTNAME || ''
-  const isDocker = hostname === '0.0.0.0' || /^[0-9a-f]{12}$/.test(hostname)
-  return isDev && !isDocker
+  return isDev
 }
 
 
@@ -133,9 +131,9 @@ export default buildConfig({
   db: postgresAdapter({
     pool: {
       connectionString: getDatabaseConnectionString(),
-      // DB từ xa (DO managed): ép chấp nhận cert để tránh SELF_SIGNED_CERT_IN_CHAIN.
-      // Truyền rõ ở đây vì parse(connectionString) có thể ghi đè nếu URL còn sslmode.
-      ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: false } } : {}),
+      // Remote DB (Neon): require valid SSL cert.
+      // Local dev: no SSL needed.
+      ...(isRemoteDatabase() ? { ssl: { rejectUnauthorized: true } } : {}),
     },
     // Push schema only when explicitly requested to avoid expensive sync on every
     // local Docker request. Use `PAYLOAD_PUSH_SCHEMA=true` or the db push script
@@ -155,12 +153,6 @@ export default buildConfig({
                   const s3Endpoint = process.env.S3_ENDPOINT || ''
                   const publicEndpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || s3Endpoint
                   const bucket = process.env.S3_BUCKET || ''
-                  
-                  // Handle DigitalOcean Spaces (Virtual Host style) vs MinIO (Path style)
-                  if (publicEndpoint.includes('digitaloceanspaces')) {
-                    const host = publicEndpoint.replace('https://', '').replace('http://', '')
-                    return `https://${bucket}.${host}/${prefix ? `${prefix}/` : ''}${filename}`
-                  }
                   
                   return `${publicEndpoint}/${bucket}/${prefix ? `${prefix}/` : ''}${filename}`
                 }

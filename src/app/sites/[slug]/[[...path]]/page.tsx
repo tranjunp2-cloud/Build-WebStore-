@@ -76,20 +76,37 @@ async function getTenantAndPage(slug: string, pagePath: string) {
         }
     }
 
-    // Find the page
+    // Find the page by slug
+    const pageSlug = pagePath === '' ? '/' : `/${pagePath}`
     const pagesResult = await payload.find({
         collection: 'pages',
         where: {
             and: [
                 { site: { equals: site.id } },
-                { slug: { equals: pagePath === '' ? '/' : `/${pagePath}` } },
+                { slug: { equals: pageSlug } },
             ],
         },
         limit: 1,
         depth: 3, // Resolve media relationships
     })
 
-    const page = pagesResult.docs[0]
+    let page = pagesResult.docs[0]
+
+    // Fallback: homepage may have slug 'home' (legacy) — match by isHomepage flag
+    if (!page && pagePath === '') {
+        const homepageFallback = await payload.find({
+            collection: 'pages',
+            where: {
+                and: [
+                    { site: { equals: site.id } },
+                    { isHomepage: { equals: true } },
+                ],
+            },
+            limit: 1,
+            depth: 3,
+        })
+        page = homepageFallback.docs[0]
+    }
 
     const navigationPages = await payload.find({
         collection: 'pages',

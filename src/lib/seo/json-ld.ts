@@ -21,13 +21,23 @@ export function generateOrganizationSchema(site: Record<string, unknown> | null 
     if (!site) return null
     const name = (site.name as string) || 'Business Name'
     const url = (site.domain as string) ? `https://${site.domain}` : ''
+    const branding = site.branding as { logo?: string } | undefined
+    const contactInfo = site.contactInfo as { phone?: string; email?: string } | undefined
+    const socialLinks = site.socialLinks as Record<string, string | null | undefined> | undefined
+
+    const sameAs = socialLinks
+        ? Object.values(socialLinks).filter((v): v is string => Boolean(v))
+        : []
 
     return {
         '@context': 'https://schema.org',
         '@type': 'Organization',
         name,
         ...(url && { url }),
-        ...(site.logo ? { logo: site.logo } : {}),
+        ...(branding?.logo ? { logo: branding.logo } : {}),
+        ...(sameAs.length > 0 && { sameAs }),
+        ...(contactInfo?.phone && { telephone: contactInfo.phone }),
+        ...(contactInfo?.email && { email: contactInfo.email }),
     }
 }
 
@@ -121,17 +131,53 @@ export function generateLocalBusinessSchema(
     if (!contactBlock && !site) return null
 
     const name = (site?.name as string) || 'Business'
-    const address = (contactBlock?.address as string) || (site?.address as string) || ''
-    const phone = (contactBlock?.phone as string) || (site?.phone as string) || ''
-    const email = (contactBlock?.email as string) || (site?.email as string) || ''
+    const domain = site?.domain as string | undefined
+    const url = domain ? `https://${domain}` : ''
+    const contactInfo = site?.contactInfo as { phone?: string; email?: string; address?: string } | undefined
+    const socialLinks = site?.socialLinks as Record<string, string | null | undefined> | undefined
+
+    const address = (contactBlock?.address as string) || contactInfo?.address || ''
+    const phone = (contactBlock?.phone as string) || contactInfo?.phone || ''
+    const email = (contactBlock?.email as string) || contactInfo?.email || ''
+
+    const sameAs = socialLinks
+        ? Object.values(socialLinks).filter((v): v is string => Boolean(v))
+        : []
 
     return {
         '@context': 'https://schema.org',
         '@type': 'LocalBusiness',
         name,
-        ...(address && { address }),
+        ...(url && { url }),
+        ...(address && { address: { '@type': 'PostalAddress', streetAddress: address } }),
         ...(phone && { telephone: phone }),
         ...(email && { email }),
+        ...(sameAs.length > 0 && { sameAs }),
+    }
+}
+
+export function generateWebPageSchema(
+    page: Record<string, unknown> | null | undefined,
+    site: Record<string, unknown> | null | undefined,
+): Record<string, unknown> | null {
+    if (!page) return null
+
+    const seo = page.seo as { title?: string; description?: string } | undefined
+    const name = seo?.title || (page.name as string) || ''
+    const description = seo?.description || ''
+    const siteDomain = site?.domain as string | undefined
+    const siteUrl = siteDomain ? `https://${siteDomain}` : ''
+    const slug = (page.slug as string) || ''
+    const url = slug === 'home' ? siteUrl : `${siteUrl}/${slug}`
+    const siteName = (site?.name as string) || ''
+
+    return {
+        '@context': 'https://schema.org',
+        '@type': 'WebPage',
+        ...(name && { name }),
+        ...(description && { description }),
+        ...(url && { url }),
+        ...(siteName && { isPartOf: { '@type': 'WebSite', name: siteName } }),
     }
 }
 
@@ -152,6 +198,12 @@ export function generatePageSchemas({ blocks, site, page, isHomepage }: PageSche
             if (org) schemas.push(org)
             const ws = generateWebSiteSchema(site)
             if (ws) schemas.push(ws)
+        }
+
+        // WebPage — non-homepage pages
+        if (!isHomepage) {
+            const wp = generateWebPageSchema(page, site)
+            if (wp) schemas.push(wp)
         }
 
         // FAQPage — if any FAQ blocks present (merged into single schema)

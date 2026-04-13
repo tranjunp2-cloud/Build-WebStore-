@@ -41,6 +41,7 @@ interface EditorToolbarProps {
     isSaving: boolean
     saveSuccess: boolean
     hasUnsavedChanges: boolean
+    hasUnpublishedChanges?: boolean
     isPublishing: boolean
     publishSuccess: boolean
     canUndo: boolean
@@ -73,6 +74,7 @@ export function EditorToolbar({
     isSaving,
     saveSuccess,
     hasUnsavedChanges,
+    hasUnpublishedChanges = false,
     isPublishing,
     publishSuccess,
     canUndo,
@@ -154,6 +156,18 @@ export function EditorToolbar({
                     </Button>
 
                     {isPublished && siteUrl ? (
+                        <>
+                        {(hasUnsavedChanges || hasUnpublishedChanges) && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={onRepublish}
+                                disabled={isPublishing}
+                                className="h-8 rounded-lg border-0 bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] px-3.5 text-[11px] font-semibold text-white hover:opacity-95"
+                            >
+                                {isPublishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5" /> {et.update}</>}
+                            </Button>
+                        )}
                         <Button
                             type="button"
                             size="sm"
@@ -163,6 +177,7 @@ export function EditorToolbar({
                             <Globe className="h-3.5 w-3.5" />
                             {et.live}
                         </Button>
+                        </>
                     ) : (
                         <Button
                             type="button"
@@ -283,9 +298,13 @@ export function EditorToolbar({
 
                 <div className={cn(
                     'inline-flex h-6 items-center rounded-md px-2 text-[10px] font-semibold uppercase tracking-wider',
-                    isPublished ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/[0.06] text-slate-400',
+                    isPublished
+                        ? hasUnpublishedChanges
+                            ? 'bg-amber-500/15 text-amber-400'
+                            : 'bg-emerald-500/15 text-emerald-400'
+                        : 'bg-white/[0.06] text-slate-400',
                 )}>
-                    {isPublished ? et.live : et.draft}
+                    {isPublished ? (hasUnpublishedChanges ? 'Changes pending' : et.live) : et.draft}
                 </div>
 
                 <Button variant="ghost" size="sm" asChild className="h-8 rounded-lg border border-white/[0.08] px-3 text-[11px] font-medium text-slate-300 hover:bg-white/[0.06] hover:text-white">
@@ -301,8 +320,8 @@ export function EditorToolbar({
 
                 {isPublished && siteUrl ? (
                     <>
-                        {/* Re-publish / Update button (AC-2: visible when has unsaved changes) */}
-                        {hasUnsavedChanges && (
+                        {/* Re-publish / Update button (AC-2: visible when has unsaved or unpublished changes) */}
+                        {(hasUnsavedChanges || hasUnpublishedChanges) && (
                             <Button
                                 type="button"
                                 size="sm"

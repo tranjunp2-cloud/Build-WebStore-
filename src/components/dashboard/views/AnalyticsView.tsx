@@ -1,21 +1,16 @@
-import { Suspense } from 'react'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentTenantId } from '@/lib/auth'
-import { AnalyticsHeader } from '@/components/dashboard/AnalyticsHeader'
 import { AnalyticsChart, ChartData } from '@/components/dashboard/AnalyticsChart'
 import { TopPerformingList, PerformingItem } from '@/components/dashboard/TopPerformingList'
-import { AnalyticsSummaryCards } from '@/components/dashboard/AnalyticsSummaryCards'
 import { AnalyticsEmptyState } from '@/components/dashboard/AnalyticsEmptyState'
-import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
-
 export const dynamic = 'force-dynamic'
 
 interface Props {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-export default async function AnalyticsDashboardPage({ searchParams }: Props) {
+export async function AnalyticsView({ searchParams }: Props) {
     const tenantId = await getCurrentTenantId()
     if (!tenantId) return null
 
@@ -63,7 +58,6 @@ export default async function AnalyticsDashboardPage({ searchParams }: Props) {
     if (currentMetrics.views === 0 && currentMetrics.clicks === 0) {
         return (
             <div className="space-y-6">
-                <AnalyticsHeader />
                 <AnalyticsEmptyState />
             </div>
         )
@@ -133,8 +127,12 @@ export default async function AnalyticsDashboardPage({ searchParams }: Props) {
         const d = new Date()
         d.setDate(d.getDate() - i)
         const key = d.toISOString().split('T')[0]
+        
+        // Format date string to D/M for chart display to match Figma
+        const displayDate = `${d.getDate()}/${d.getMonth() + 1}`
+
         chartData.push({
-            date: key,
+            date: displayDate,
             views: dailyCounts[key]?.views || 0,
             clicks: dailyCounts[key]?.clicks || 0
         })
@@ -158,30 +156,15 @@ export default async function AnalyticsDashboardPage({ searchParams }: Props) {
     const topReferrers = mapToPerformingItem(referrers)
 
     return (
-        <Suspense fallback={<DashboardSkeleton />}>
-            <div className="space-y-6">
-                <AnalyticsHeader />
+        <div className="space-y-6">
+            <AnalyticsChart data={chartData} />
 
-                <AnalyticsSummaryCards 
-                    currentViews={currentMetrics.views}
-                    prevViews={prevMetrics.views}
-                    currentClicks={currentMetrics.clicks}
-                    prevClicks={prevMetrics.clicks}
-                />
-
-                <AnalyticsChart data={chartData} />
-
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    <div className="lg:col-span-3">
-                        <TopPerformingList 
-                            pages={topPages}
-                            products={topProducts}
-                            blogs={topBlogs}
-                            referrers={topReferrers}
-                        />
-                    </div>
-                </div>
-            </div>
-        </Suspense>
+            <TopPerformingList 
+                pages={topPages}
+                products={topProducts}
+                blogs={topBlogs}
+                referrers={topReferrers}
+            />
+        </div>
     )
 }

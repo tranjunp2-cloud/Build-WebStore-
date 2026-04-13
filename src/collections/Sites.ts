@@ -234,6 +234,12 @@ export const Sites: CollectionConfig = {
                     type: 'text',
                 },
                 {
+                    name: 'autoMetaEnabled',
+                    type: 'checkbox',
+                    defaultValue: true,
+                    admin: { description: 'Automatically generate SEO meta tags when publishing pages/products' },
+                },
+                {
                     name: 'trackedKeywords',
                     type: 'array',
                     maxRows: 5,
