@@ -3,9 +3,15 @@
 import { useState, useEffect } from 'react'
 import type { BlockProps } from '../types'
 import type { CountdownTimerConfig } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body, Caption } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
+
+void _CSS_VARS
+
+const CT_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
 function calcTimeLeft(target: string) {
     const diff = new Date(target).getTime() - Date.now()
@@ -27,12 +33,13 @@ function TimeBox({ value, label }: { value: number; label: string }) {
             <span className="text-3xl md:text-5xl font-bold font-heading" style={{ color: 'var(--brand-primary)' }}>
                 {String(value).padStart(2, '0')}
             </span>
-            <span className="text-xs uppercase tracking-wider opacity-50">{label}</span>
+            <Caption className="uppercase tracking-wider opacity-50">{label}</Caption>
         </div>
     )
 }
 
-export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerConfig>) {
+export function CountdownTimerBlock({ block, theme: _theme }: BlockProps<CountdownTimerConfig>) {
+    void _theme
     const {
         variant = 'banner',
         headline,
@@ -63,11 +70,13 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
 
     if (variant === 'minimal') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6 text-center">
-                    <RichText text={headline} as="h2" className="text-2xl md:text-3xl font-bold font-heading mb-4" />
+            <AnimatedSection className={SECTION_PADDING.default}>
+                <div className={`${CT_CONTAINER} text-center`}>
+                    <Heading level={3} className="mb-4">
+                        <RichText text={headline} as="span" />
+                    </Heading>
                     {!timeLeft ? (
-                        <p className="text-lg opacity-60">{expiredMessage}</p>
+                        <Body size="lg" className="opacity-60">{expiredMessage}</Body>
                     ) : (
                         <p className="text-xl md:text-2xl font-heading" style={{ color: 'var(--brand-primary)' }}>
                             {units.map((u, i) => (
@@ -86,15 +95,17 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
 
     if (variant === 'card') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6 flex justify-center">
+            <AnimatedSection className={SECTION_PADDING.default}>
+                <div className={`${CT_CONTAINER} flex justify-center`}>
                     <div
                         className="rounded-2xl p-8 md:p-12 text-center max-w-lg w-full"
                         style={{ background: `rgba(var(--brand-primary-rgb), 0.031)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
                     >
-                        <RichText text={headline} as="h2" className="text-2xl md:text-4xl font-bold font-heading mb-8" />
+                        <Heading level={2} className="mb-8">
+                            <RichText text={headline} as="span" />
+                        </Heading>
                         {!timeLeft ? (
-                            <p className="text-lg opacity-60">{expiredMessage}</p>
+                            <Body size="lg" className="opacity-60">{expiredMessage}</Body>
                         ) : (
                             <div className="flex justify-center gap-3 md:gap-4">
                                 {units.map((u) => (
@@ -110,8 +121,8 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
 
     // banner (default)
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={CT_CONTAINER}>
                 <div
                     className="rounded-3xl p-10 md:p-16 text-center relative overflow-hidden"
                     style={{
@@ -119,9 +130,11 @@ export function CountdownTimerBlock({ block, theme }: BlockProps<CountdownTimerC
                         border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`,
                     }}
                 >
-                    <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading mb-10" />
+                    <Heading level={2} className="mb-10">
+                        <RichText text={headline} as="span" />
+                    </Heading>
                     {!timeLeft ? (
-                        <p className="text-xl opacity-60">{expiredMessage}</p>
+                        <Body size="lg" className="opacity-60">{expiredMessage}</Body>
                     ) : (
                         <div className="flex justify-center gap-4 md:gap-6">
                             {units.map((u) => (

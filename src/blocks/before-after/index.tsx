@@ -3,11 +3,16 @@
 import { useState, useRef, useCallback } from 'react'
 import type { BlockProps } from '../types'
 import type { BeforeAfterConfig } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
 
-export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>) {
+void _CSS_VARS
+
+export function BeforeAfterBlock({ block, theme: _theme }: BlockProps<BeforeAfterConfig>) {
+    void _theme
     const { variant = 'slider', headline, beforeImage, afterImage } = block
 
     const containerRef = useRef<HTMLDivElement>(null)
@@ -47,10 +52,12 @@ export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>
 
     if (variant === 'side-by-side') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6">
+            <AnimatedSection className={SECTION_PADDING.default}>
+                <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                     {headline && (
-                        <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading text-center mb-12" />
+                        <Heading level={2} className="text-center mb-12">
+                            <RichText text={headline} as="span" />
+                        </Heading>
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="relative rounded-2xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
@@ -83,10 +90,12 @@ export function BeforeAfterBlock({ block, theme }: BlockProps<BeforeAfterConfig>
 
     // slider (default)
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 {headline && (
-                    <RichText text={headline} as="h2" className="text-3xl md:text-5xl font-bold font-heading text-center mb-12" />
+                    <Heading level={2} className="text-center mb-12">
+                        <RichText text={headline} as="span" />
+                    </Heading>
                 )}
                 <div
                     ref={containerRef}
