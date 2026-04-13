@@ -63,8 +63,22 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false }: SiteR
 
     const themeCSS = generateThemeCSS(theme)
 
-    type PreviewBlock = { blockType: string; links?: NavLinkItem[]; [key: string]: unknown }
-    const blocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
+    type PreviewBlock = { blockType: string; links?: NavLinkItem[]; ctaButton?: { url?: string; [key: string]: unknown }; ctaButtons?: Array<{ url?: string; [key: string]: unknown }>; [key: string]: unknown }
+    const rawBlocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
+
+    // In editor preview, rewrite internal nav/CTA links to '#' to prevent iframe navigation to 404
+    const blocks = isEditor
+        ? rawBlocks.map(b => {
+            if (b.blockType === 'navigation') {
+                return {
+                    ...b,
+                    links: b.links?.map(l => ({ ...l, url: l.url?.startsWith('http') ? l.url : '#' })),
+                    ctaButton: b.ctaButton ? { ...b.ctaButton, url: '#' } : b.ctaButton,
+                }
+            }
+            return b
+        })
+        : rawBlocks
 
     // JSON-LD schemas — auto-detect from blocks present
     const isHomepage = blocks.some(b => b.blockType === 'hero') && blocks[0]?.blockType === 'navigation'
