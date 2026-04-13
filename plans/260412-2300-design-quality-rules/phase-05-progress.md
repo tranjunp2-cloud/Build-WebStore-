@@ -5,9 +5,9 @@
 > Xem scope: [phase-05-block-audit.md](phase-05-block-audit.md)
 
 **Total:** 50 blocks (index.tsx) + hero 11 variant files
-**Done:** 5 / 50 (10%) — **Batch A complete ✅**
+**Done:** 6 / 50 (12%) — Batch A ✅ + Batch B 1/9
 **In progress:** 0
-**Pending:** 45
+**Pending:** 44
 
 ---
 
@@ -27,7 +27,7 @@
 | 2 | footer | 512 → 414 | 6 inline (simple, expanded, minimal, centered-stack, mega-footer, dark-gradient) | ✅ | `b210388` | 2026-04-13 | Pilot #2. 4 local helpers (FooterSection/BrandLogo/SocialIconList/LinkColumn). Custom asymmetric padding kept inline. 9/9 footer tests, 88/88 cross-test, 3889/3890 full (1 unrelated flaky timeout). |
 | 3 | navigation | 861 → 828 | 6 inline (simple, transparent, sidebar, centered, mega-menu, pill) | ✅ | `9e4fe87` | 2026-04-13 | 4 helpers (NavCTAButton/NavMobileCTAButton/NavHamburgerButton/NavMobileMenuDrawer). 12 TOUCH_TARGET applied (was failing WCAG 2.5.5). Pill+Sidebar custom-styled. mega-menu `<p>` → Caption. 10/10 nav tests, 3890/3890 full suite. |
 | 4 | testimonials | 678 → 746 (helpers) | **8 inline** (cards, masonry, spotlight, minimal-quote, avatar-row, video-text, simple, carousel) — plan ghi 6, sai | ✅ | `25d7e97` | 2026-04-13 | 6 helpers (TestimonialsSection/TestimonialsHeader/StarRating/AuthorMeta/DotIndicator/CarouselArrow). DotIndicator wraps 10px dot trong 44px button (WCAG). CarouselArrow 40px → 44px. 10/10 testimonials tests, 108/108 cross-test, 3889/3890 full (1 unrelated flaky). |
-| 5 | hero | 36 (index) + 11 files (1010 → 937 variants, +113 shared) | 11 (cards-overlay, centered, fullscreen, gradient, magazine, minimal, parallax, slideshow, split-video, split, video) | ✅ | TBD | 2026-04-13 | 3 helpers in shared.tsx (HeroBadge×5, VideoControlButton×2, SlideshowDot). HERO_CONTAINER const for 11 variants. CTAButtons + TOUCH_TARGET. h1/p typography deferred (current sizes intentionally larger than TYPE_SCALE.display). 14/14 hero tests, 79/79 cross-test, 3890/3890 full suite. |
+| 5 | hero | 36 (index) + 11 files (1010 → 937 variants, +113 shared) | 11 (cards-overlay, centered, fullscreen, gradient, magazine, minimal, parallax, slideshow, split-video, split, video) | ✅ | `71c65f3` | 2026-04-13 | 3 helpers in shared.tsx (HeroBadge×5, VideoControlButton×2, SlideshowDot). HERO_CONTAINER const for 11 variants. CTAButtons + TOUCH_TARGET. h1/p typography deferred (current sizes intentionally larger than TYPE_SCALE.display). 14/14 hero tests, 79/79 cross-test, 3890/3890 full suite. |
 
 **Gate sau Batch A:** Pause để review consistency + lock approach trước khi spawn parallel cho B/C.
 
@@ -37,7 +37,7 @@
 
 | # | Block | LOC | Status | Commit | Notes |
 |---|---|---|---|---|---|
-| 6 | pricing | 727 | ☐ | — | Lớn, nhiều variants |
+| 6 | pricing | 727 → 789 (+62 helpers) | ✅ | TBD | Pilot Batch B #1. 5 helpers (PricingSection/PriceDisplay/PlanCTA/FeatureList + upgraded SectionHeader). 8 variants (cards/horizontal/toggle/tiered/comparison/table/minimal/slider — plan ghi 7, sai). Touch targets: slider arrows 40→44px, slider dots 10→44px hit, toggle switch 28→44px hit, minimal "view features" → 44px. 12/12 pricing tests, 91/91 cross, 3889/3890 full (1 flaky). |
 | 7 | gallery | 547 | ☐ | — | |
 | 8 | contact | 486 | ☐ | — | Form-heavy |
 | 9 | newsletter | 215 | ☐ | — | |
