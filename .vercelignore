@@ -1,0 +1,16 @@
+node_modules
+coverage
+playwright-report
+test-results
+.github
+plans
+.claude
+.cursor
+.wiki-repo
+.gstack
+.worktrees
+docs
+e2e
+scripts/seed-templates-v3.ts
+scripts/seed-ngoc-dzung-tea.ts
+scripts/test-apply-t*

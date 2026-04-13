@@ -12,8 +12,13 @@ type PageProps = {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
+// IMPORTANT: Do NOT convert undefined segments to [].
+// Payload's RootPage uses Array.isArray(segments) to detect root /admin path.
+// undefined → path:null → currentRoute='/admin' → matches adminRoute → dashboard renders.
+// []        → path:'/'  → currentRoute='/admin/' → MISMATCH → notFound() → 404!
+// Type assertion needed: Payload types require string[] but runtime handles undefined correctly.
 const paramsPromise = (params: Promise<{ segments?: string[] }>) =>
-    params.then((p) => ({ segments: p.segments ?? [] }))
+    params.then((p) => ({ segments: p.segments as string[] }))
 
 const searchParamsPromise = (searchParams: Promise<{ [key: string]: string | string[] | undefined }>) =>
     searchParams.then((s) => s as { [key: string]: string | string[] })
