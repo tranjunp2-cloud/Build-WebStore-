@@ -419,6 +419,13 @@ export type BusinessInfoInput = {
   industry: string
   products: string
   shortDescription: string
+  // User-supplied optional fields (plan 260414-2249 phase-01). Wire-level ephemeral
+  // — phone/email/address flow into composer via mapBusinessInfo() and override
+  // canned BusinessSample fields. tagline falls back to shortDescription slice.
+  tagline?: string
+  phone?: string
+  email?: string
+  address?: string
 }
 
 export function buildUserPrompt(
@@ -433,6 +440,20 @@ export function buildUserPrompt(
     `Main products/services: ${info.products}`,
     `Business description: ${info.shortDescription}`,
   ]
+  // Plan 260414-2249 phase-01: forward user-supplied contact + tagline so
+  // GPT happy-path output mirrors what the composer fallback emits.
+  if (info.tagline && info.tagline.trim()) {
+    parts.push(`Tagline: ${info.tagline.trim()}`)
+  }
+  if (info.phone && info.phone.trim()) {
+    parts.push(`Contact phone: ${info.phone.trim()} (use this verbatim in any contact block)`)
+  }
+  if (info.email && info.email.trim()) {
+    parts.push(`Contact email: ${info.email.trim()} (use this verbatim)`)
+  }
+  if (info.address && info.address.trim()) {
+    parts.push(`Physical address: ${info.address.trim()} (use this verbatim)`)
+  }
   if (extraInstructions) {
     parts.push(`Additional instructions: ${extraInstructions}`)
   }

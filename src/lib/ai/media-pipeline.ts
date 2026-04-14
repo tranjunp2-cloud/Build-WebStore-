@@ -29,6 +29,9 @@ export interface MediaPipelineContext {
     businessName: string
     tenantId: string
     category?: string
+    // Plan 260414-2249 phase-01: user-supplied products drive primary Unsplash
+    // query via deriveKeywords. vi/ms terms are translated at query time.
+    products?: string[]
 }
 
 export interface BatchFetchResult {

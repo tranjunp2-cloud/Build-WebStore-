@@ -8,12 +8,17 @@
  * (Unsplash only supports English search).
  */
 
+import { translateProductTerm } from './product-translator'
+
 export type KeywordLanguage = 'en' | 'ms' | 'vi' | 'auto'
 
 export interface KeywordContext {
     businessName?: string
     industry?: string
     language?: KeywordLanguage
+    // Plan 260414-2249 phase-01: top product term drives the primary Unsplash
+    // query when present (translated via product-translator for vi/ms input).
+    products?: string[]
 }
 
 /** Category → 3-5 specific English base terms. Covers all 14 CATEGORY_SIGNATURE_BLOCKS keys. */
@@ -175,6 +180,10 @@ function pickRandom<T>(arr: T[]): T | undefined {
 /**
  * Derive search keywords for a given (category, blockType, ctx).
  * Returns 1-3 non-empty strings ready for `.join(' ')` into an Unsplash query.
+ *
+ * Plan 260414-2249 phase-01: when `ctx.products[0]` is present, it becomes
+ * the PRIMARY term (translated via `translateProductTerm` for vi/ms input).
+ * This makes Unsplash searches actually reflect what the user is selling.
  */
 export function deriveKeywords(
     category: string,
@@ -186,6 +195,18 @@ export function deriveKeywords(
     const modifiers = BLOCK_MODIFIER_KEYWORDS[blockType] ?? []
     const modifier = pickRandom(modifiers)
     const industryBoost = translateIndustryToEn(ctx.industry, ctx.language)
+
+    // Product-primary path: user's top product → translated term → primary
+    // keyword. Fall back to category base for downstream variety.
+    const topProduct = ctx.products && ctx.products.length > 0 ? ctx.products[0] : undefined
+    if (topProduct) {
+        const productTerm = translateProductTerm(topProduct)
+        const keywords: string[] = [productTerm]
+        if (modifier) keywords.push(modifier)
+        if (industryBoost && industryBoost !== productTerm) keywords.push(industryBoost)
+        else if (base && base !== productTerm) keywords.push(base)
+        return keywords.filter((k) => k && k.length > 0)
+    }
 
     const keywords: string[] = [base]
     if (modifier) keywords.push(modifier)

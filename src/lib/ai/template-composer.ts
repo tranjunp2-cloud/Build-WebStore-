@@ -153,6 +153,100 @@ function buildHero(biz: BusinessSample, category: string, variantIndex: number):
   }
 }
 
+// Icon rotation for product-derived feature cards — keyed by category so the
+// cards still feel on-brand. Order drives card 1→N.
+const PRODUCT_FEATURE_ICONS: Record<string, string[]> = {
+  restaurant: ['Utensils', 'ChefHat', 'Flame', 'Soup', 'Pizza', 'Coffee'],
+  fnb: ['Coffee', 'Cake', 'Utensils', 'Croissant', 'Wine', 'IceCream'],
+  ecommerce: ['ShoppingBag', 'Package', 'Star', 'Tag', 'Gift', 'Heart'],
+  beauty: ['Sparkles', 'Flower', 'Heart', 'Gem', 'Palette', 'Brush'],
+  health: ['Stethoscope', 'HeartPulse', 'Pill', 'Syringe', 'Activity', 'Plus'],
+  fitness: ['Dumbbell', 'Activity', 'Flame', 'Trophy', 'Zap', 'Timer'],
+  education: ['BookOpen', 'GraduationCap', 'Pencil', 'Library', 'Award', 'Brain'],
+  tech: ['Zap', 'Code', 'Cpu', 'Cloud', 'Shield', 'Rocket'],
+  creative: ['Palette', 'Brush', 'Layers', 'Camera', 'Film', 'PenTool'],
+  business: ['Briefcase', 'TrendingUp', 'Target', 'BarChart', 'Handshake', 'Award'],
+  realestate: ['Home', 'Key', 'Building', 'MapPin', 'TrendingUp', 'Shield'],
+  events: ['Calendar', 'Sparkles', 'Music', 'Gift', 'Star', 'Camera'],
+  blog: ['PenTool', 'BookOpen', 'Bookmark', 'Coffee', 'Feather', 'Newspaper'],
+  travel: ['Map', 'Compass', 'Plane', 'Camera', 'Mountain', 'Globe'],
+}
+
+// Category-tuned TITLE templates for product-derived feature cards. `{P}` is
+// replaced with the capitalized product name, and templates rotate by index
+// so 3 cards never share the same suffix. Matches the spec example format:
+// "Ramen Specialties / Fresh Sushi / Handmade Gyoza".
+const FEATURE_TITLE_TEMPLATES: Record<string, string[]> = {
+  restaurant: ['{P} Specialties', 'Fresh {P}', 'Handmade {P}', 'Signature {P}', 'House {P}', 'Authentic {P}'],
+  fnb: ['Signature {P}', 'Our {P}', 'Fresh {P}', 'House {P}', 'Artisan {P}', 'Daily {P}'],
+  ecommerce: ['Premium {P}', 'Best-Selling {P}', '{P} Collection', '{P} Essentials', 'Curated {P}', 'Exclusive {P}'],
+  beauty: ['Signature {P}', 'Custom {P}', 'Premium {P}', '{P} Treatment', 'Expert {P}', 'Luxury {P}'],
+  health: ['{P} Service', 'Expert {P}', 'Comprehensive {P}', 'Specialist {P}', 'Trusted {P}'],
+  fitness: ['{P} Program', 'Signature {P}', 'Expert {P}', 'Personal {P}', 'Group {P}'],
+  education: ['{P} Program', '{P} Course', 'Comprehensive {P}', 'Expert {P}', 'Intensive {P}'],
+  tech: ['{P} Platform', 'Enterprise {P}', 'Scalable {P}', 'Advanced {P}', 'Cloud {P}'],
+  creative: ['{P} Service', 'Signature {P}', 'Premium {P}', 'Custom {P}', 'Award-winning {P}'],
+  business: ['{P} Advisory', 'Strategic {P}', '{P} Consulting', 'Expert {P}', 'Bespoke {P}'],
+  realestate: ['Featured {P}', 'Exclusive {P}', 'Premium {P}', 'Curated {P}', 'Signature {P}'],
+  events: ['{P} Package', 'Signature {P}', 'Custom {P}', 'Luxury {P}', 'Bespoke {P}'],
+  blog: ['{P} Stories', '{P} Coverage', '{P} Insights', 'Latest {P}', 'In-depth {P}'],
+  travel: ['{P} Experience', 'Guided {P}', 'Signature {P}', 'Curated {P}', 'Adventure {P}'],
+}
+
+// Category-tuned body copy template for a product. `{product}` is replaced
+// with the product name as provided by the user (first letter capitalized).
+// Kept short, benefit-oriented, Malaysia-audience friendly.
+const FEATURE_BODY_TEMPLATES: Record<string, string> = {
+  restaurant: 'Our signature {product} is crafted from scratch with locally sourced ingredients — a guest favorite.',
+  fnb: 'Enjoy our house {product} — freshly made every day using premium ingredients.',
+  ecommerce: 'Shop our best-selling {product} — quality you can feel, delivered across Malaysia.',
+  beauty: 'Experience our signature {product} treatment — personalized for your skin type and goals.',
+  health: 'Our {product} service is delivered by licensed practitioners with modern equipment.',
+  fitness: 'Train smarter with our {product} program — structured for real, lasting results.',
+  education: 'Our {product} program is designed for measurable progress and exam-ready confidence.',
+  tech: 'Ship faster with our {product} — production-ready, battle-tested, fully supported.',
+  creative: 'Our {product} service blends strategy and craft — delivered on time, on brand.',
+  business: 'Our {product} engagement is tailored to your goals, timelines, and budget.',
+  realestate: 'Browse our {product} — hand-picked listings across the Klang Valley.',
+  events: 'Let us handle your {product} — from planning to day-of coordination, covered.',
+  blog: 'Dive into our {product} coverage — curated stories that actually move the needle.',
+  travel: 'Join our {product} experience — local expertise, insider routes, zero guesswork.',
+}
+
+function capitalizeFirst(s: string): string {
+  if (!s) return s
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/**
+ * Build feature cards from user-supplied products. Each card gets:
+ *  - icon rotated from PRODUCT_FEATURE_ICONS[category]
+ *  - title rotated from FEATURE_TITLE_TEMPLATES[category] (e.g. "{P} Specialties")
+ *  - description from FEATURE_BODY_TEMPLATES[category]
+ *
+ * Caps at `maxCards` (usually 3-4) to match existing featureMap cardinality
+ * and prevent layout overflow. Spec example: ["ramen","sushi","gyoza"] in
+ * restaurant category → "Ramen Specialties / Fresh Sushi / Handmade Gyoza".
+ */
+function featuresFromProducts(
+  products: string[],
+  category: string,
+  maxCards: number,
+): { icon: string; title: string; description: string }[] {
+  const icons = PRODUCT_FEATURE_ICONS[category] ?? PRODUCT_FEATURE_ICONS['business']!
+  const titleTpls = FEATURE_TITLE_TEMPLATES[category] ?? FEATURE_TITLE_TEMPLATES['business']!
+  const bodyTpl = FEATURE_BODY_TEMPLATES[category] ?? FEATURE_BODY_TEMPLATES['business']!
+
+  return products.slice(0, maxCards).map((product, idx) => {
+    const capitalized = capitalizeFirst(product)
+    return {
+      icon: icons[idx % icons.length]!,
+      title: titleTpls[idx % titleTpls.length]!.replace('{P}', capitalized),
+      description: bodyTpl.replace('{product}', product),
+    }
+  })
+}
+
 function buildFeatures(biz: BusinessSample, category: string): Record<string, unknown> {
   const featureMap: Record<string, { icon: string; title: string; description: string }[]> = {
     restaurant: [
@@ -227,7 +321,15 @@ function buildFeatures(biz: BusinessSample, category: string): Record<string, un
     ],
   }
 
-  const features = featureMap[category] ?? featureMap['business']!
+  const canned = featureMap[category] ?? featureMap['business']!
+  // Plan 260414-2249 phase-01: when user supplies ≥2 products, emit
+  // product-derived cards instead of canned. Keeps canned count so layout
+  // variants (grid-3, grid-4) still render cleanly.
+  const userProducts = biz.products ?? []
+  const features =
+    userProducts.length >= 2
+      ? featuresFromProducts(userProducts, category, canned.length)
+      : canned
   return {
     blockType: 'features',
     variant: 'grid-3',
@@ -701,21 +803,56 @@ function buildPropertyCard(): Record<string, unknown> {
   }
 }
 
-function buildProductQuickView(): Record<string, unknown> {
+// Canned product-quick-view items. Used as fallback + padded when user supplies
+// fewer than 3 products (extracted so buildProductQuickView can reuse them).
+const CANNED_QUICK_VIEW_PRODUCTS = [
+  { name: 'Baju Kurung Moden', price: 89, originalPrice: 120, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Kurung'], description: 'Elegant modern baju kurung in premium cotton.', variants: ['S', 'M', 'L', 'XL'], badge: 'Sale', ctaLabel: 'Add to Cart', ctaUrl: '#' },
+  { name: 'Wireless Earbuds Pro', price: 199, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Earbuds'], description: 'Active noise cancellation with 30-hour battery life.', variants: ['Black', 'White'], badge: 'New', ctaLabel: 'Add to Cart', ctaUrl: '#' },
+  { name: 'Organic Honey (500g)', price: 45, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Honey'], description: 'Pure Malaysian kelulut honey from Cameron Highlands.', ctaLabel: 'Add to Cart', ctaUrl: '#' },
+  { name: 'Batik Silk Scarf', price: 65, originalPrice: 85, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Batik'], description: 'Handmade batik silk scarf in traditional Malaysian motifs.', badge: 'Sale', ctaLabel: 'Add to Cart', ctaUrl: '#' },
+] as const
+
+/**
+ * Turn user-supplied products into product-quick-view items, padded with
+ * canned items when fewer than 3 provided. Placeholder imageUrl is used —
+ * the downstream Unsplash pipeline replaces these based on deriveKeywords.
+ */
+function quickViewItemsFromProducts(
+  products: string[],
+  category: string,
+): Record<string, unknown>[] {
+  const userItems: Record<string, unknown>[] = products.map((product) => ({
+    name: capitalizeFirst(product),
+    price: 0, // unknown — storefront can edit later
+    imageUrls: [`https://placehold.co/400x500/e2e8f0/64748b?text=${encodeURIComponent(product)}`],
+    description: (FEATURE_BODY_TEMPLATES[category] ?? FEATURE_BODY_TEMPLATES['business']!).replace('{product}', product),
+    ctaLabel: 'Shop Now',
+    ctaUrl: '#',
+  }))
+  // Pad to 3 minimum from canned so grid variants don't collapse.
+  if (userItems.length >= 3) return userItems
+  for (const canned of CANNED_QUICK_VIEW_PRODUCTS) {
+    if (userItems.length >= 3) break
+    userItems.push({ ...canned })
+  }
+  return userItems
+}
+
+function buildProductQuickView(biz: BusinessSample, category: string): Record<string, unknown> {
+  const userProducts = biz.products ?? []
+  const products =
+    userProducts.length >= 1
+      ? quickViewItemsFromProducts(userProducts, category)
+      : (CANNED_QUICK_VIEW_PRODUCTS as readonly unknown[]).map((p) => ({ ...(p as object) }))
   return {
     blockType: 'product-quick-view',
     variant: 'grid',
-    headline: 'Best Sellers',
-    subheadline: 'Shop our most popular items.',
+    headline: userProducts.length > 0 ? `Shop ${biz.name}` : 'Best Sellers',
+    subheadline: userProducts.length > 0 ? 'Our most loved picks.' : 'Shop our most popular items.',
     columns: 4 as const,
     showQuickView: true,
     currency: 'RM',
-    products: [
-      { name: 'Baju Kurung Moden', price: 89, originalPrice: 120, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Kurung'], description: 'Elegant modern baju kurung in premium cotton.', variants: ['S', 'M', 'L', 'XL'], badge: 'Sale', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-      { name: 'Wireless Earbuds Pro', price: 199, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Earbuds'], description: 'Active noise cancellation with 30-hour battery life.', variants: ['Black', 'White'], badge: 'New', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-      { name: 'Organic Honey (500g)', price: 45, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Honey'], description: 'Pure Malaysian kelulut honey from Cameron Highlands.', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-      { name: 'Batik Silk Scarf', price: 65, originalPrice: 85, imageUrls: ['https://placehold.co/400x500/e2e8f0/64748b?text=Batik'], description: 'Handmade batik silk scarf in traditional Malaysian motifs.', badge: 'Sale', ctaLabel: 'Add to Cart', ctaUrl: '#' },
-    ],
+    products,
   }
 }
 
@@ -750,15 +887,32 @@ function buildServiceCards(biz: BusinessSample, category: string): Record<string
     ],
   }
 
+  const canned = servicesMap[category] ?? servicesMap['business']!
+
+  // Plan 260414-2249 phase-01: when user supplies ≥2 products, emit them as
+  // service cards (title = product, description = category template, icon =
+  // rotated from PRODUCT_FEATURE_ICONS). Leaves price empty — storefront can
+  // add pricing later via the editor.
+  const userProducts = biz.products ?? []
+  const services =
+    userProducts.length >= 2
+      ? featuresFromProducts(userProducts, category, canned.length).map((card) => ({
+          title: card.title,
+          description: card.description,
+          icon: card.icon,
+          cta: { label: 'Learn More', url: '/contact' },
+        }))
+      : canned.map((s) => ({
+          ...s,
+          cta: { label: 'Learn More', url: '/contact' },
+        }))
+
   return {
     blockType: 'service-cards',
     variant: 'grid',
     headline: `Our Services`,
     subheadline: `Discover what ${biz.name} can do for you.`,
-    services: (servicesMap[category] ?? servicesMap['business']!).map((s) => ({
-      ...s,
-      cta: { label: 'Learn More', url: '/contact' },
-    })),
+    services,
   }
 }
 
@@ -858,7 +1012,7 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
     case 'property-card':
       return buildPropertyCard()
     case 'product-quick-view':
-      return buildProductQuickView()
+      return buildProductQuickView(biz, category)
     case 'portfolio-grid': {
       const items = Array.from({ length: 6 }, (_, i) => ({
         title: `${biz.name} Project ${i + 1}`,
@@ -1165,7 +1319,7 @@ function buildBlockFromSpec(
     case 'property-card':
       return buildPropertyCard()
     case 'product-quick-view':
-      return buildProductQuickView()
+      return buildProductQuickView(biz, category)
     case 'portfolio-grid': {
       const count = spec.count ?? 6
       const items = Array.from({ length: count }, (_, i) => ({
