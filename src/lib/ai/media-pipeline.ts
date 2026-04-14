@@ -26,6 +26,7 @@ import {
 } from './unsplash-client'
 
 import type { ThemeMood } from './theme-moods'
+import type { ImagePool } from './image-pool'
 
 export interface MediaPipelineContext {
     businessName: string
@@ -37,6 +38,10 @@ export interface MediaPipelineContext {
     // Plan 260414-2249 phase-02: theme mood appends 1-2 imagery adjectives
     // (warm/candlelit/minimalist/...) to every Unsplash query for cohesion.
     mood?: ThemeMood
+    // Plan 260414-2249 phase-03: per-site image pool (1-2 Unsplash calls total
+    // before fulfillment runs). When present, block needs pick from pool
+    // instead of calling searchPhotos per block → visual cohesion by design.
+    pool?: ImagePool
 }
 
 export interface BatchFetchResult {
@@ -172,6 +177,66 @@ async function fetchAndStorePhoto(
         alt,
         tenantId: ctx.tenantId,
     })
+}
+
+/**
+ * Download + upload a PoolPhoto (normalized Unsplash photo from image-pool).
+ * Bridges the pool abstraction to the existing upload pipeline.
+ *
+ * Plan 260414-2249 phase-03.
+ */
+async function fetchAndStorePoolPhoto(
+    photo: { id: string; url: string; alt: string; downloadLocation: string },
+    blockType: string,
+    ctx: MediaPipelineContext,
+    payload: Parameters<typeof uploadBufferToMedia>[0],
+): Promise<number> {
+    const { buffer, mimetype } = await downloadPhotoBuffer(photo.url)
+    // Fire-and-forget license-mandatory download tracking
+    if (photo.downloadLocation) trackDownload(photo.downloadLocation)
+    const extension = mimetype.includes('png') ? 'png' : 'jpg'
+    const filename = `${blockType}-${photo.id}-${Date.now()}.${extension}`
+    const alt = photo.alt || `${ctx.businessName} ${blockType}`
+    return uploadBufferToMedia(payload, {
+        buffer,
+        filename,
+        mimetype,
+        alt,
+        tenantId: ctx.tenantId,
+    })
+}
+
+/**
+ * Batch-download + upload pre-selected pool photos. Skips Unsplash search —
+ * caller already picked from the site-level pool.
+ *
+ * Plan 260414-2249 phase-03: public API consumed by media-injector when
+ * ctx.pool is present. Preserves partial-failure tolerance of batchFetch.
+ */
+export async function batchFetchFromPool(
+    poolPhotos: Array<{ id: string; url: string; alt: string; downloadLocation: string }>,
+    blockType: string,
+    ctx: MediaPipelineContext,
+    payload: Parameters<typeof uploadBufferToMedia>[0],
+): Promise<BatchFetchResult> {
+    const mediaIds: number[] = []
+    const failures: BatchFetchResult['failures'] = []
+    const sem = new Semaphore(CONCURRENCY)
+    await Promise.all(
+        poolPhotos.map((photo) =>
+            sem.run(async () => {
+                try {
+                    const id = await fetchAndStorePoolPhoto(photo, blockType, ctx, payload)
+                    mediaIds.push(id)
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err)
+                    failures.push({ photoId: photo.id, error: msg })
+                    console.warn(`[Media Pipeline] pool photo ${photo.id} (${blockType}) failed: ${msg}`)
+                }
+            }),
+        ),
+    )
+    return { mediaIds, photos: [], failures }
 }
 
 /** Concurrent batch fetch with partial-failure tolerance. */
