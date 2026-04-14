@@ -144,6 +144,10 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
                 _status: page._status || 'published',
                 updatedAt: page.updatedAt,
             } : null,
+            user: {
+                firstName: (user as Record<string, unknown>).firstName as string || null,
+                email: user.email || null,
+            },
         })
 
     } catch (error) {

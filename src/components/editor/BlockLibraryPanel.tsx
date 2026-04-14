@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Search } from 'lucide-react'
 import { blockRegistry } from '@/blocks/registry'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData } from '@/types/editor'
+import { useI18n } from '@/i18n'
 
 type LibraryCategoryId = 'basics' | 'store' | 'content' | 'form' | 'widgets' | 'media' | 'layout' | 'commerce'
 
@@ -78,6 +79,8 @@ export function BlockLibraryPanel({
     selectedBlock,
     onAIAction,
 }: BlockLibraryPanelProps) {
+    const { t } = useI18n()
+    const bl = t.editor.blockLibrary
     const [query, setQuery] = useState('')
     const [expandedCategory, setExpandedCategory] = useState<LibraryCategoryId>('basics')
 
@@ -125,7 +128,7 @@ export function BlockLibraryPanel({
                         type="text"
                         value={query}
                         onChange={event => setQuery(event.target.value)}
-                        placeholder="Search blocks..."
+                        placeholder={bl.searchPlaceholder}
                         className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] pl-9 pr-4 text-[13px] text-white placeholder:text-slate-500 outline-none transition-all focus:border-cyan-400/40 focus:bg-[#1E293B] focus:shadow-[0_0_0_1px_rgba(34,211,238,0.1)]"
                     />
                 </div>
@@ -178,7 +181,7 @@ export function BlockLibraryPanel({
                                                     <p className="truncate text-[11px] text-slate-500">{item.description}</p>
                                                 </div>
                                                 <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
-                                                    click or drag
+                                                    {bl.dragHint}
                                                 </span>
                                             </button>
                                         ))}
@@ -192,7 +195,7 @@ export function BlockLibraryPanel({
 
             <div className="border-t border-white/[0.06] bg-[#0B1120]/60 px-4 py-3">
                 <p className="text-center text-[11px] text-slate-500">
-                    Click to add or drag blocks into preview
+                    {bl.footerHint}
                 </p>
             </div>
         </div>

@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { GripVertical, Plus, Trash2, ChevronRight, ChevronDown, ExternalLink, FileText, Mail, Phone } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 export type NavLinkItem = {
     id: string
@@ -18,14 +19,31 @@ interface NavigationEditorProps {
 }
 
 const LINK_TYPE_OPTIONS = [
-    { value: 'page', label: 'Internal Page', icon: FileText },
-    { value: 'external', label: 'External URL', icon: ExternalLink },
-    { value: 'email', label: 'Email', icon: Mail },
-    { value: 'phone', label: 'Phone', icon: Phone },
+    { value: 'page', icon: FileText },
+    { value: 'external', icon: ExternalLink },
+    { value: 'email', icon: Mail },
+    { value: 'phone', icon: Phone },
 ] as const
 
 function generateId() {
     return `nav_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+}
+
+type NavTranslations = {
+    internalPage: string
+    externalUrl: string
+    email: string
+    phone: string
+    selectPage: string
+    addSubLink: string
+    moveUp: string
+    moveDown: string
+    moveLeft: string
+    makeSubItem: string
+    newLink: string
+    title: string
+    noLinks: string
+    addLink: string
 }
 
 function NavLinkRow({
@@ -41,6 +59,7 @@ function NavLinkRow({
     isFirst,
     isLast,
     pages,
+    nav,
 }: {
     link: NavLinkItem
     depth: number
@@ -54,12 +73,20 @@ function NavLinkRow({
     isFirst: boolean
     isLast: boolean
     pages?: { id: string; title: string; slug: string }[]
+    nav: NavTranslations
 }) {
     const [isExpanded, setIsExpanded] = useState(true)
     const [isEditing, setIsEditing] = useState(false)
     const hasChildren = (link.children || []).length > 0
 
-    const typeIcon = LINK_TYPE_OPTIONS.find(o => o.value === link.type)?.icon || ExternalLink
+    const linkTypeOptions = useMemo(() => [
+        { value: 'page', label: nav.internalPage, icon: FileText },
+        { value: 'external', label: nav.externalUrl, icon: ExternalLink },
+        { value: 'email', label: nav.email, icon: Mail },
+        { value: 'phone', label: nav.phone, icon: Phone },
+    ], [nav])
+
+    const typeIcon = linkTypeOptions.find(o => o.value === link.type)?.icon || ExternalLink
     const TypeIcon = typeIcon
 
     return (
@@ -104,21 +131,21 @@ function NavLinkRow({
                 {/* Actions */}
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     {depth < 2 && (
-                        <button onClick={(e) => { e.stopPropagation(); onAddChild(link.id) }} title="Add sub-link" className="p-1 text-gray-500 hover:text-cyan-400 rounded">
+                        <button onClick={(e) => { e.stopPropagation(); onAddChild(link.id) }} title={nav.addSubLink} className="p-1 text-gray-500 hover:text-cyan-400 rounded">
                             <Plus className="w-3 h-3" />
                         </button>
                     )}
                     {!isFirst && (
-                        <button onClick={(e) => { e.stopPropagation(); onMoveUp(link.id) }} title="Move up" className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">↑</button>
+                        <button onClick={(e) => { e.stopPropagation(); onMoveUp(link.id) }} title={nav.moveUp} className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">↑</button>
                     )}
                     {!isLast && (
-                        <button onClick={(e) => { e.stopPropagation(); onMoveDown(link.id) }} title="Move down" className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">↓</button>
+                        <button onClick={(e) => { e.stopPropagation(); onMoveDown(link.id) }} title={nav.moveDown} className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">↓</button>
                     )}
                     {depth > 0 && (
-                        <button onClick={(e) => { e.stopPropagation(); onOutdent(link.id) }} title="Move left" className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">←</button>
+                        <button onClick={(e) => { e.stopPropagation(); onOutdent(link.id) }} title={nav.moveLeft} className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">←</button>
                     )}
                     {depth < 2 && !isFirst && (
-                        <button onClick={(e) => { e.stopPropagation(); onIndent(link.id) }} title="Make sub-item" className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">→</button>
+                        <button onClick={(e) => { e.stopPropagation(); onIndent(link.id) }} title={nav.makeSubItem} className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">→</button>
                     )}
                     <button onClick={(e) => { e.stopPropagation(); onDelete(link.id) }} className="p-1 text-gray-500 hover:text-red-400 rounded">
                         <Trash2 className="w-3 h-3" />
@@ -134,7 +161,7 @@ function NavLinkRow({
                         onChange={(e) => onUpdate(link.id, { type: e.target.value as NavLinkItem['type'] })}
                         className="h-6 text-[10px] bg-white/5 border border-white/10 rounded px-1 text-gray-400 outline-none"
                     >
-                        {LINK_TYPE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                        {linkTypeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
                     {link.type === 'page' && pages ? (
                         <select
@@ -142,7 +169,7 @@ function NavLinkRow({
                             onChange={(e) => onUpdate(link.id, { url: e.target.value })}
                             className="flex-1 h-6 text-[10px] bg-white/5 border border-white/10 rounded px-1 text-gray-300 outline-none"
                         >
-                            <option value="#">Select page</option>
+                            <option value="#">{nav.selectPage}</option>
                             {pages.map(p => <option key={p.id} value={`/${p.slug}`}>{p.title}</option>)}
                         </select>
                     ) : (
@@ -174,6 +201,7 @@ function NavLinkRow({
                             isFirst={idx === 0}
                             isLast={idx === link.children.length - 1}
                             pages={pages}
+                            nav={nav}
                         />
                     ))}
                 </div>
@@ -199,13 +227,13 @@ function deleteLinkInTree(links: NavLinkItem[], id: string): NavLinkItem[] {
         .map(link => ({ ...link, children: deleteLinkInTree(link.children || [], id) }))
 }
 
-function addChildInTree(links: NavLinkItem[], parentId: string): NavLinkItem[] {
+function addChildInTree(links: NavLinkItem[], parentId: string, newLinkLabel: string): NavLinkItem[] {
     if (!links) return []
     return links.map(link => {
         if (link.id === parentId) {
-            return { ...link, children: [...(link.children || []), { id: generateId(), label: 'New Link', url: '#', type: 'external' as const, children: [] }] }
+            return { ...link, children: [...(link.children || []), { id: generateId(), label: newLinkLabel, url: '#', type: 'external' as const, children: [] }] }
         }
-        if (link.children && link.children.length > 0) return { ...link, children: addChildInTree(link.children, parentId) }
+        if (link.children && link.children.length > 0) return { ...link, children: addChildInTree(link.children, parentId, newLinkLabel) }
         return link
     })
 }
@@ -270,6 +298,9 @@ function outdentLinkInTree(links: NavLinkItem[], id: string, parentArray: NavLin
 }
 
 export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorProps) {
+    const { t } = useI18n()
+    const nav = t.editor.navigation
+
     const handleUpdate = useCallback((id: string, changes: Partial<NavLinkItem>) => {
         onUpdate(updateLinkInTree(links, id, changes))
     }, [links, onUpdate])
@@ -279,8 +310,8 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
     }, [links, onUpdate])
 
     const handleAddChild = useCallback((parentId: string) => {
-        onUpdate(addChildInTree(links, parentId))
-    }, [links, onUpdate])
+        onUpdate(addChildInTree(links, parentId, nav.newLink))
+    }, [links, onUpdate, nav.newLink])
 
     const handleMoveUp = useCallback((id: string) => {
         const found = findLinkAndParent(links, id)
@@ -328,15 +359,15 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
     }, [links, onUpdate])
 
     const handleAddRoot = useCallback(() => {
-        onUpdate([...links, { id: generateId(), label: 'New Link', url: '#', type: 'external', children: [] }])
-    }, [links, onUpdate])
+        onUpdate([...links, { id: generateId(), label: nav.newLink, url: '#', type: 'external', children: [] }])
+    }, [links, onUpdate, nav.newLink])
 
     return (
         <div className="space-y-1">
-            <label className="text-xs font-medium uppercase text-gray-500">Navigation Links</label>
+            <label className="text-xs font-medium uppercase text-gray-500">{nav.title}</label>
             <div className="rounded-lg border border-white/5 bg-white/[0.02] py-1">
                 {links.length === 0 ? (
-                    <p className="px-3 py-4 text-center text-xs text-gray-600">No links yet. Add one below.</p>
+                    <p className="px-3 py-4 text-center text-xs text-gray-600">{nav.noLinks}</p>
                 ) : (
                     links.map((link, idx) => (
                         <NavLinkRow
@@ -353,6 +384,7 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                             isFirst={idx === 0}
                             isLast={idx === links.length - 1}
                             pages={pages}
+                            nav={nav}
                         />
                     ))
                 )}
@@ -361,7 +393,7 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                 onClick={handleAddRoot}
                 className="w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors"
             >
-                + Add Link
+                {nav.addLink}
             </button>
         </div>
     )

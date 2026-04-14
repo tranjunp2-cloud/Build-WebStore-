@@ -372,4 +372,15 @@
       transform: translateX(0);
     }
   }
+
+/* Notification dropdown inside editor sidebar — open upward instead of downward */
+.notification-bell-sidebar [class*="top-"][class*="rounded-"] {
+  top: auto !important;
+  bottom: 60px !important;
+  left: 12px !important;
+  right: auto !important;
+  transform: none !important;
+  width: 320px !important;
+  max-width: 320px !important;
+}
 }
