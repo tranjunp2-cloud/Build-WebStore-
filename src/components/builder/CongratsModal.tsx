@@ -57,10 +57,15 @@ export function CongratsModal({
                         </Dialog.Overlay>
                         <Dialog.Content asChild>
                             <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/10 bg-[#0B1120] p-8 shadow-2xl focus:outline-none"
+                                initial={{ opacity: 0, scale: 0.96 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.96 }}
+                                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                                // Centering via motion's own transform so it composes with `scale` without
+                                // clashing with Tailwind -translate classes (framer-motion writes inline
+                                // `transform` which would otherwise drop the centering offset).
+                                style={{ x: '-50%', y: '-50%' }}
+                                className="fixed left-1/2 top-1/2 z-50 w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1120] p-8 shadow-2xl focus:outline-none"
                             >
                                 {/* Close button — subtle, top-right */}
                                 <Dialog.Close
