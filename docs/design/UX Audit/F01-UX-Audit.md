@@ -25,12 +25,11 @@ Cross-reference giữa Wireframe (`F01-wireframe-lowfi.md`), PRD (`F01-ai-builde
 
 | GAP | Severity | Mô tả ngắn | Wireframe | PRD | Code |
 |-----|----------|-----------|-----------|-----|------|
-| **GAP-01** | :red_circle: Blocker | Scope Mismatch: Tính năng Reorder không nằm trong scope F01 nhưng vẫn tồn tại trong PRD/Stories | :x: Cần loại bỏ | FR-21, 22, 26 | Cần disable/xóa code Up/Down |
-| **GAP-02** | :red_circle: Blocker | Error Recovery Flow — Partial generation failure không có wireframe | :x: Chỉ có toast retry | FR-08 | `generation-errors.ts` có map nhưng UI thiếu |
-| **GAP-03** | :orange_circle: High | Draft Recovery Dialog — Wireframe có vẽ nhưng không có state machine & trigger conditions | :warning: Chỉ có 1 wireframe tĩnh | FR-07, AC-4 (US-F01-01) | Zustand localStorage có, dialog UI thiếu |
-| **GAP-04** | :orange_circle: High | Rate Limit Paywall — Wireframe có vẽ nhưng không có entry point rõ ràng trong flow | :warning: Wireframe rời | FR-15, BR-03 | HTTP 402 mapped nhưng UI chưa integrate |
-| **GAP-05** | :yellow_circle: Medium | Mobile Immersive Preview transition — Floating Pill + Form slide-away chưa có chi tiết animation | :warning: Concept wireframe | FR-24, FR-25, AC-7 (US-F01-09) | Chưa implement |
-| **GAP-06** | :red_circle: Blocker | Post-failure Dashboard Recovery — AI fail → user kẹt, Dashboard không detect site incomplete, không có fallback Template CMS | :x: Không có | Không có | `DashboardOnboarding.tsx` chỉ check `!hasWebsite` |
+| **GAP-01** | :red_circle: Blocker | Error Recovery Flow — Partial generation failure không có wireframe | :x: Chỉ có toast retry | FR-08 | `generation-errors.ts` có map nhưng UI thiếu |
+| **GAP-02** | :orange_circle: High | Draft Recovery Dialog — Wireframe có vẽ nhưng không có state machine & trigger conditions | :warning: Chỉ có 1 wireframe tĩnh | FR-07, AC-4 (US-F01-01) | Zustand localStorage có, dialog UI thiếu |
+| **GAP-03** | :orange_circle: High | Rate Limit Paywall — Wireframe có vẽ nhưng không có entry point rõ ràng trong flow | :warning: Wireframe rời | FR-15, BR-03 | HTTP 402 mapped nhưng UI chưa integrate |
+| **GAP-04** | :yellow_circle: Medium | Website creation via URL/Images — Chưa có UI nhập ảnh và flow review thông tin bóc tách chưa tối ưu | :warning: Concept wireframe | FR-02 (PRD v2.1) | URL extraction đã có code, Image chưa có |
+| **GAP-05** | :red_circle: Blocker | Post-failure Dashboard Recovery — AI fail → user kẹt, Dashboard không detect site incomplete, không có fallback Template CMS | :x: Không có | Không có | `DashboardOnboarding.tsx` chỉ check `!hasWebsite` |
 
 ### Nguồn tham chiếu đã đọc
 
@@ -49,20 +48,7 @@ Cross-reference giữa Wireframe (`F01-wireframe-lowfi.md`), PRD (`F01-ai-builde
 
 ## 2. Phân tích chi tiết từng GAP
 
-### GAP-01 · :red_circle: Blocker — Scope Mismatch: Loại bỏ tính năng Reorder
-
-**Vấn đề cốt lõi:**
-
-Tính năng đổi thứ tự Section (Reorder) đã được xác nhận là **không thuộc phạm vi (Out of Scope)** của phiên bản F01 để giảm thiểu friction và tập trung vào "Aha moment" của việc tạo web bằng AI. Tuy nhiên:
-- PRD v2.1 vẫn liệt kê FR-21, FR-22, FR-26 là P0.
-- User Stories vẫn có US-F01-08 và US-F01-10 (Ready).
-- Source Code `BuilderCompletionView.tsx` đang hiển thị UI Up/Down buttons trên Mobile.
-
-**Yêu cầu:** Đồng bộ hóa lại tài liệu và gỡ bỏ UI hỗ trợ Reorder để tránh gây hiểu lầm cho người dùng và QA.
-
----
-
-### GAP-02 · :red_circle: Blocker — Error Recovery Flow thiếu wireframe cho Partial Failure
+### GAP-01 · :red_circle: Blocker — Error Recovery Flow thiếu wireframe cho Partial Failure
 
 **Vấn đề cốt lõi:**
 
@@ -95,7 +81,7 @@ Wireframe Section 1.4 chỉ vẽ 1 error state đơn giản (toast + retry). Nh�
 
 ---
 
-### GAP-03 · :orange_circle: High — Draft Recovery Dialog thiếu trigger conditions
+### GAP-02 · :orange_circle: High — Draft Recovery Dialog thiếu trigger conditions
 
 **Vấn đề cốt lõi:**
 
@@ -124,7 +110,7 @@ Wireframe Section 4.1 vẽ dialog "Bạn có một bản nháp!" nhưng:
 
 ---
 
-### GAP-04 · :orange_circle: High — Rate Limit Paywall không có entry point trong flow
+### GAP-03 · :orange_circle: High — Rate Limit Paywall không có entry point trong flow
 
 **Vấn đề cốt lõi:**
 
@@ -155,9 +141,22 @@ Wireframe Section 4.2 vẽ màn hình Paywall đẹp nhưng:
          - Redirect về /builder/new?
 ```
 
+### GAP-04 · :yellow_circle: Medium — Website Creation via URL/Images: Thiếu luồng nhập liệu đa phương thức
+
+**Vấn đề cốt lõi:**
+
+PRD và yêu cầu người dùng đề cập đến việc tạo website từ **Link website (Clone)** hoặc **Upload hình ảnh**. Tuy nhiên:
+- **URL Flow**: Hiện đã có tab nhập URL trong code, nhưng sau khi bóc tách (extraction), hệ thống tự động điền form và chuyển về tab Manual mà không thông báo rõ ràng "đã bóc tách thành công những gì".
+- **Image Flow**: Hoàn toàn thiếu UI để upload ảnh (screenshot/sketch). Không có component Dropzone hay Gallery picker.
+- **Biến động dữ liệu**: Khi người dùng chuyển đổi giữa URL -> Image -> Manual, dữ liệu có thể bị ghi đè gây mất mát thông tin (data loss) mà không có cảnh báo.
+
+**Tác động:**
+- Giảm tỷ lệ chuyển đổi (Conversion rate) vì người dùng lười nhập text thủ công nhưng không thấy chỗ dán link/ảnh.
+- AI Vision (mạnh nhất của GPT-4o) chưa được tận dụng tối đa trong luồng Onboarding.
+
 ---
 
-### GAP-06 · :red_circle: Blocker — Post-failure Dashboard Recovery: AI fail → User Dead-end
+### GAP-05 · :red_circle: Blocker — Post-failure Dashboard Recovery: AI fail → User Dead-end
 
 **Vấn đề cốt lõi:**
 
@@ -210,20 +209,7 @@ Khi AI generation fail, toàn bộ error handling hiện tại chỉ xử lý **
 
 ## 3. Giải pháp đề xuất
 
-### 3.1 GAP-01: Cleanup & Scope Sync
-
-**Quyết định:** Loại bỏ hoàn toàn khả năng tương tác đổi thứ tự block trong Builder Flow.
-
-**Các bước xử lý:**
-1.  **Cập nhật tài liệu:** 
-    *   Xóa FR-21, FR-22, FR-26 trong `F01-ai-builder.md`.
-    *   Chuyển US-F01-08 và US-F01-10 sang trạng thái `Deprioritized` hoặc Xóa.
-2.  **Chỉnh sửa Code:**
-    *   Ẩn/Xóa block code xử lý `onMoveBlock` và các nút `ArrowUp`, `ArrowDown` trong `BuilderCompletionView.tsx`.
-    *   Đảm bảo `BuilderPreview` chỉ hiển thị ở chế độ View-only cho đến khi sang Editor.
-3.  **UI/UX:** Người dùng muốn thay đổi thứ tự sẽ được hướng dẫn nhấn **"Open Editor"** sau khi hoàn tất quá trình generate.
-
-### 3.2 GAP-02: Error Recovery — Phân loại UI theo Error Type
+### 3.1 GAP-01: Error Recovery — Phân loại UI theo Error Type
 
 **Nguyên tắc:** Mỗi loại error có **UI riêng** thay vì 1 toast chung.
 
@@ -238,7 +224,7 @@ Khi AI generation fail, toàn bộ error handling hiện tại chỉ xử lý **
 | **PARTIAL_SUCCESS** | Toast vàng "Đã tạo N/4 trang. Tạo tiếp?" + nút "Tiếp tục" | Click tiếp tục | Không |
 | **QUOTA_LOST** | Toast đỏ + "Credit đã được hoàn lại" (sau khi fix BUG-F01-08) | Thông báo | 5 giây |
 
-### 3.3 GAP-03: Draft Recovery Dialog — Trigger & Flow
+### 3.2 GAP-02: Draft Recovery — Trigger & Flow
 
 **Trigger Conditions:**
 
@@ -265,7 +251,7 @@ Khi AI generation fail, toàn bộ error handling hiện tại chỉ xử lý **
             Hiện form trống
 ```
 
-### 3.4 GAP-04: Rate Limit Paywall — Integration vào Flow
+### 3.3 GAP-03: Rate Limit Paywall — Integration vào Flow
 
 **Entry Points:**
 
@@ -291,7 +277,23 @@ Khi AI generation fail, toàn bộ error handling hiện tại chỉ xử lý **
                                     +------------------+
 ```
 
-### 3.5 GAP-06: Post-failure Dashboard Recovery — Redirect + Banner + Fallback
+### 3.4 GAP-04: Website creation via URL/Images — Multiple Input Methods
+
+**Giải pháp:** Tái cấu trúc Form Panel thành hệ thống **3 Tab** đồng cấp.
+
+1. **Tab 1: ✏️ Thủ công (Manual)**: Form như hiện tại.
+2. **Tab 2: 🔗 Link website (URL)**:
+   - Thêm trạng thái **Reviewing**: Sau khi dán link và bóc tách xong, hiện danh sách các thông tin đã bóc tách được (Tên, Ngành nghề...) kèm icon ✅ để user xác nhận trước khi dùng.
+3. **Tab 3: 📸 Tải ảnh (Image)**:
+   - Thêm component **File Dropzone** hỗ trợ JPG, PNG (max 5MB).
+   - Tích hợp AI Vision để tự động nhận diện: Layout (header, hero, shop), Màu sắc chủ đạo (palette), Text nội dung.
+
+**Nguyên tắc ghi đè dữ liệu (Sync Rule):**
+- Khi có dữ liệu mới từ URL/Ảnh -> Hiện thông báo: *"Chúng tôi tìm thấy thông tin mới, bạn có muốn cập nhật form không?"* -> [Cập nhật] / [Bỏ qua].
+
+---
+
+### 3.5 GAP-05: Post-failure Dashboard Recovery — Redirect + Banner + Fallback
 
 **Nguyên tắc UX:**
 
@@ -544,7 +546,52 @@ Dashboard **LUÔN** hiện CTA Template CMS khi site chưa publish, bất kể A
   +---------------------------+
 ```
 
-### Screen B.7: Dashboard — AI Incomplete State (Banner + Fallback CTA)
+### Screen B.7: Tab Image Upload & AI Vision Processing
+
+```text
+  +--------------------------------+
+  | [✏️ Manual]  [🔗 URL]  [📸 Image]| <-- 3 Tabs hệ thống
+  +--------------------------------+
+  |                                |
+  | Tải lên ảnh giao diện mẫu      |
+  | (Screenshot hoặc bản vẽ tay)   |
+  |                                |
+  | +----------------------------+ |
+  | |                            | |
+  | |   [Cloud Icon]             | |
+  | |   Kéo thả ảnh vào đây      | |
+  | |   hoặc [Chọn từ máy]       | |
+  | |                            | |
+  | +----------------------------+ |
+  |                                |
+  | [!] AI sẽ phân tích bố cục và  |
+  | màu sắc từ ảnh này.            |
+  |                                |
+  | [ Tạo Website → ] (disabled)   |
+  +--------------------------------+
+```
+
+### Screen B.8: Review Extracted Data (Post-URL/Image)
+
+```text
+  +--------------------------------+
+  | ✨ AI đã bóc tách thông tin!   |
+  +--------------------------------+
+  | Vui lòng kiểm tra lại:         |
+  |                                |
+  | 📝 Tên: Prime Coffee     [edit]|
+  | 🏢 Ngành: Quán cà phê    [edit]|
+  | 📦 Dịch vụ: Espresso...  [edit]|
+  | 🎨 Mood: Hiện đại, ấm    [edit]|
+  |                                |
+  | [ Cập nhật vào Form ] (primary)|
+  | [ Bỏ qua & nhập tay ]          |
+  +--------------------------------+
+```
+
+---
+
+### Screen B.9: Dashboard — AI Incomplete State (Banner + Fallback CTA)
 
 ```text
   +------------------------------------------------------------------+
@@ -646,11 +693,7 @@ Dashboard **LUÔN** hiện CTA Template CMS khi site chưa publish, bất kể A
 
 ## 5. Business Rules bổ sung
 
-### 5.1 Reorder Mode Rules (TRẠNG THÁI: ĐÃ BỎ)
-
-- Không áp dụng cho phiên bản F01.
-
-### 5.2 Error Recovery Rules
+### 5.1 Error Recovery Rules
 
 | Rule ID | Mô tả |
 |---------|-------|
@@ -660,7 +703,7 @@ Dashboard **LUÔN** hiện CTA Template CMS khi site chưa publish, bất kể A
 | **BR-ERR-04** | Khi generation fail do server/API → credit/quota KHÔNG bị trừ (BR-07 PRD). UI phải hiện "Credit đã hoàn" |
 | **BR-ERR-05** | Retry từ toast → dùng cached form data, KHÔNG mở lại Pre-publish Checklist |
 
-### 5.3 Draft Recovery Rules
+### 5.2 Draft Recovery Rules
 
 | Rule ID | Mô tả |
 |---------|-------|
@@ -670,7 +713,7 @@ Dashboard **LUÔN** hiện CTA Template CMS khi site chưa publish, bất kể A
 | **BR-DRAFT-04** | Draft từ userId khác → tự động xóa (không hỏi) — chống cross-user contamination (BUG-F01-06) |
 | **BR-DRAFT-05** | Draft corrupted (JSON parse fail) → tự động xóa, hiện form trống, toast "Đã xóa bản nháp cũ" |
 
-### 5.4 Rate Limit Paywall Rules
+### 5.3 Rate Limit Paywall Rules
 
 | Rule ID | Mô tả |
 |---------|-------|
@@ -678,6 +721,18 @@ Dashboard **LUÔN** hiện CTA Template CMS khi site chưa publish, bất kể A
 | **BR-PAY-02** | Khi quota = 0 → Replace form panel bằng Paywall card (Screen B.5). Giữ preview panel hiện trạng thái cũ |
 | **BR-PAY-03** | Sau khi upgrade thành công → redirect về /builder/new với form data giữ nguyên |
 | **BR-PAY-04** | Hiện quota còn lại ở form panel header: "Còn N lượt tạo" (informative, không chặn) |
+
+### 5.4 Website creation via URL/Image Rules
+
+| Rule ID | Mô tả |
+|---------|-------|
+| **BR-URL-01** | Chỉ chấp nhận URL có giao thức `http://` hoặc `https://`. |
+| **BR-IMG-01** | Chỉ chấp nhận định dạng `.jpg`, `.png`, `.webp`. Dung lượng tối đa 5MB. |
+| **BR-IMG-02** | Sử dụng GPT-4o (Vision) để phân tích ảnh. Nếu ảnh không hợp lệ (không phải UI/UX) -> Toast lỗi. |
+| **BR-SYNC-01** | Dữ liệu bóc tách được từ URL/Ảnh phải qua bước Verify (Screen B.10) trước khi ghi đè vào Form manual. |
+| **BR-SYNC-02** | Nếu user đang nhập dở Form manual mà chuyển sang URL/Ảnh -> Giữ lại state manual cũ (draft) để user có thể quay lại. |
+
+---
 
 ### 5.5 Post-failure Dashboard Recovery Rules
 
@@ -694,8 +749,6 @@ Dashboard **LUÔN** hiện CTA Template CMS khi site chưa publish, bất kể A
 ---
 
 ## 6. Acceptance Criteria bổ sung
-
-* Acceptance Criteria cho Reorder Mode (AC-REORDER-01, AC-REORDER-02) đã bị loại bỏ.*
 
 ### AC-ERR-01: SSE Disconnect Recovery
 
@@ -767,6 +820,30 @@ WHEN   user quay lại (nhấn nút Back / navigate)
 THEN   Paywall vẫn hiện (không tự động reset)
   AND  Chỉ reset khi user upgrade thành công
 ```
+
+### AC-URL-01: Bóc tách thông tin từ URL
+
+```gherkin
+GIVEN  user đang ở Tab [🔗 URL]
+WHEN   user dán link website và nhấn "Phân tích"
+THEN   hiện trạng thái loading "Đang bóc tách dữ liệu..."
+WHEN   API extract thành công
+THEN   hiện màn hình Review (B.10) với các field: Tên, Ngành nghề, Mô tả
+  AND  nếu user click "Cập nhật" -> chuyển về Tab Manual với dữ liệu đã điền sẵn
+```
+
+### AC-IMG-01: Upload ảnh và AI Vision
+
+```gherkin
+GIVEN  user đang ở Tab [📸 Image]
+WHEN   user upload một screenshot website
+THEN   gọi API AI Vision để phân tích
+WHEN   xử lý xong
+THEN   tự động gợi ý Theme (Primary Color) dựa trên màu chủ đạo của ảnh
+  AND  hiện các thông tin nội dung bóc tách được để user review
+```
+
+---
 
 ### AC-FAIL-01: Builder Error → Redirect Dashboard
 
@@ -851,16 +928,15 @@ Các bug hiện tại ảnh hưởng trực tiếp đến UX Audit này:
 |--------|--------------|-------|----------|
 | BUG-F01-06 | GAP-03 | Client state contamination cross-account | P0 |
 | BUG-F01-07 | GAP-03 | Draft not persisted on F5 refresh | P1 |
-| BUG-F01-08 | GAP-02 | Quota deducted even on failed generation | P1 |
+| BUG-F01-08 | GAP-01 | Quota deducted even on failed generation | P1 |
 | BUG-F01-20 | GAP-05 | Input font 14px causes iOS auto-zoom | P1 |
 | BUG-F01-21 | GAP-05 | Mobile Step 2 layout broken | P1 |
 
 ---
 
 > **Next Steps:**
-> 1. Cập nhật PRD và Stories để chính thức loại bỏ tính năng Reorder khỏi F01
-> 2. Fix 8 P0 blockers (Security & Stability)
-> 3. **[HIGH PRIORITY] Fix GAP-06 — BUG-FAIL-01:** Sửa condition `DashboardOnboarding.tsx` từ `!hasWebsite` → `!hasWebsite || !hasPublishedSite`
-> 4. Implement theo thứ tự: GAP-06 (Dashboard Recovery) → GAP-02 (Error Recovery) → GAP-03 (Draft Recovery) → GAP-04 (Paywall)
+> 1. Fix 8 P0 blockers (Security & Stability)
+> 2. **[HIGH PRIORITY] Fix GAP-05 — BUG-FAIL-01:** Sửa condition `DashboardOnboarding.tsx` từ `!hasWebsite` → `!hasWebsite || !hasPublishedSite`
+> 3. Implement theo thứ tự: GAP-05 (Dashboard Recovery) → GAP-01 (Error Recovery) → GAP-02 (Draft Recovery) → GAP-03 (Paywall)
 > 5. Update QA test cases (`F01-ai-chat-builder.md`) với các AC mới (AC-FAIL-01 ~ AC-FAIL-03)
 > 6. Cross-reference với [User Flow F01](../user-flows/F01-website-creation-flow.md) để đảm bảo tất cả flows đều có next action

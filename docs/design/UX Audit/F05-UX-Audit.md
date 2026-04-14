@@ -14,6 +14,10 @@
 - [GAP-03 · 🟡 Minor — Offline Fallback](#gap-03--minor--offline-fallback-br-07)
 - [GAP-04 · 🟢 Enhancement — Context-Aware AI Chat](#gap-04--enhancement--chat-ai-theo-block-context-aware-ai-chat)
 - [GAP-05 · 🟡 Minor — Multi-tab Editing](#gap-05--minor--multi-tab-editing)
+- [GAP-06 · 🟡 Minor — Component Spacing](#gap-06--minor--component-spacing-thiếu-khoảng-thở-giữa-các-khối)
+- [GAP-07 · 🔴 Blocker — Block Image Editing](#gap-07--blocker--block-image-editing-không-thể-đổi-ảnh-component)
+- [GAP-08 · 🟡 Minor — Limited Footer Editing](#gap-08--minor--limited-footer-editing-không-thể-sửa-link-trong-footer)
+- [GAP-09 · 🔴 Blocker — Missing Breadcrumb Settings](#gap-09--blocker--missing-breadcrumb-settings-breadcrumb-không-có-settings)
 
 ---
 
@@ -1717,3 +1721,223 @@ Editor Viewport (Tab cũ):
 - **GIVEN** Người dùng đang ở Tab 1 (đã bị lock).
 - **WHEN** Người dùng click "Tiếp tục ở tab này".
 - **THEN** Tab 2 sẽ bị lock, Tab 1 tải lại dữ liệu mới nhất từ server và cho phép chỉnh sửa bình thường.
+
+---
+
+# GAP-06 · 🟡 Minor — Component Spacing: Thiếu khoảng thở giữa các khối
+
+## 1. Vấn đề (Problem)
+Hiện tại, khi người dùng thêm các component (blocks) vào trang web, các khối này dính sát vào nhau mà không có bất kỳ khoảng trống (white-space) nào. Điều này làm cho giao diện trở nên "ngộp", thiếu sự phân tách thị giác và trông không chuyên nghiệp (không giống các trang web hiện đại).
+
+**Nguyên nhân:**
+- `SiteRenderer.tsx` chưa định nghĩa default padding cho các block container.
+- `Block Settings` chưa có trường cho phép người dùng tùy chỉnh spacing (Top/Bottom padding).
+
+## 2. Giải pháp (Solution)
+
+### A. Default Spacing
+- Mọi block khi được thêm mới sẽ có default vertical padding là **32px** (Desktop) và **24px** (Mobile) để đảm bảo độ thoáng tối thiểu.
+
+### B. Block Spacing UI (Settings Panel)
+- Thêm mục **"Layout & Spacing"** vào đầu tab **Block Settings**.
+- Cung cấp 2 slider hoặc input số:
+  - **Padding Top**: `0 - 120px`
+  - **Padding Bottom**: `0 - 120px`
+
+## 3. Wireframe Low-fi
+
+### Screen G.1: Block Settings — Spacing Section
+```text
+┌──────────────────────────────┐
+│       BLOCK SETTINGS         │
+├──────────────────────────────┤
+│ [🏔️ Hero Banner ]         #1 │ 
+├──────────────────────────────┤
+│ ▼ LAYOUT & SPACING           │
+│                              │
+│  Top Spacing    [───●────] 48│
+│  Bottom Spacing [──●─────] 32│
+│                              │
+├──────────────────────────────┤
+│ ▼ CONTENT                    │
+│  Headline: [................]│
+│  ...                         │
+└──────────────────────────────┘
+```
+
+## 4. Business Rules & Acceptance Criteria
+
+### Business Rules (BR-SPC)
+- **BR-SPC-01:** Giá trị spacing phải được lưu trực tiếp vào block data (ví dụ: `block.style.paddingTop`).
+- **BR-SPC-02:** Nếu block là `navigation` (Header), padding mặc định nên là 0 hoặc rất nhỏ để tránh chiếm diện tích hero.
+
+### Acceptance Criteria (AC-SPC)
+- **GIVEN** Người dùng chọn một block bất kỳ.
+- **WHEN** Người dùng kéo slider "Top Spacing" trong Settings Panel.
+- **THEN** Khối nội dung trong Preview Iframe phải thay đổi khoảng cách phía trên ngay lập tức (real-time).
+- **GIVEN** Người dùng add 2 block liên tiếp.
+- **THEN** Giữa 2 block phải có một khoảng trắng mặc định (default padding).
+
+---
+
+# GAP-07 · 🔴 Blocker — Block Image Editing: Không thể đổi ảnh Component
+
+## 1. Vấn đề (Problem)
+Người dùng phàn nàn rằng họ không tìm thấy chỗ để thay đổi hình ảnh cho Component Hero Banner hoặc các khối có ảnh khác. Mặc dù hệ thống có tính năng AI Image, nhưng việc quản lý ảnh thủ công (Upload/Replace) đang bị bỏ sót trong Settings Panel.
+
+**Nguyên nhân:**
+- `SettingsPanel.tsx` mới chỉ dừng lại ở việc edit Text, CTA và Links. Phần Image Editor cho block levels chưa được implement.
+
+## 2. Giải pháp (Solution)
+
+### A. Image Field in Settings Tab
+- Khi một block có trường `image` (như Hero) hoặc `images` (như Gallery/Features), Settings Panel phải hiển thị một **Image Upload UI**.
+
+### B. Image Editor Component
+- Hỗ trợ các hành động:
+  - **Upload ảnh mới** từ thiết bị.
+  - **Replace**: Mở Stock Image library hoặc AI Image Generator.
+  - **Alt text**: Cho phép nhập alt text để tối ưu SEO.
+
+## 3. Wireframe Low-fi
+
+### Screen G.2: Hero Block — Image Upload Field
+```text
+┌──────────────────────────────┐
+│       BLOCK SETTINGS         │
+├──────────────────────────────┤
+│ ▼ CONTENT                    │
+│  Headline: [................]│
+│                              │
+│  IMAGE                       │
+│  ┌────────────────────────┐  │
+│  │       [ IMAGE    ]     │  │
+│  │       [ PREVIEW  ]     │  │
+│  └────────────────────────┘  │
+│  [ 📤 Change ] [ ✨ AI ]      │
+│                              │
+│  Alt Text: [................]│
+│                              │
+├──────────────────────────────┤
+│ ▼ CTA BUTTONS                │
+└──────────────────────────────┘
+```
+
+## 4. Business Rules & Acceptance Criteria
+
+### Business Rules (BR-IMG)
+- **BR-IMG-01:** Ảnh upload phải tuân thủ limit 2MB và được auto-compress/resize (tối đa 1920px width) để đảm bảo tốc độ load trang.
+- **BR-IMG-02:** Khi dùng AI để đổi ảnh, hệ thống phải tự động cập nhật cả trường `alt` text dựa trên nội dung ảnh AI sinh ra.
+
+### Acceptance Criteria (AC-IMG)
+- **GIVEN** Người dùng đang edit Hero Banner.
+- **WHEN** Người dùng click vào box Image trong Settings Panel.
+- **THEN** Hộp thoại chọn file hiện lên. Sau khi chọn, ảnh mới phải được hiển thị ngay lập tức trên Preview Iframe.
+- **GIVEN** Người dùng click nút "✨ AI" tại trường Image.
+- **WHEN** AI sinh xong ảnh.
+- **THEN** Ảnh mới tự động apply vào block và đồng bộ vào database.
+
+---
+
+# GAP-08 · 🟡 Minor — Limited Footer Editing: Không thể sửa Link trong Footer
+
+## 1. Vấn đề (Problem)
+Hiện tại, khi người dùng muốn chỉnh sửa Footer, hệ thống chỉ cho phép sửa **Copyright** và **Tiêu đề cột**. Những đường dẫn quan trọng (ví dụ: Chính sách bảo mật, Điều khoản sử dụng, Social links trong cột) không có giao diện chỉnh sửa trong Settings Panel.
+
+**Nguyên nhân:**
+- `SettingsPanel.tsx` (L1034) mới chỉ hiển thị field `title` cho mỗi column, chưa tích hợp list editor cho mảng `links` bên trong mỗi column đó.
+
+## 2. Giải pháp (Solution)
+
+### A. Nested Link Editor for Footer
+- Cải tiến giao diện edit Footer Column: Mỗi cột sau khi mở ra sẽ có một danh sách các Link bên dưới.
+- Mỗi link gồm: **Label** và **URL/Page**.
+- Cho phép **Thêm/Xóa/Sắp xếp** lại các link này.
+
+## 3. Wireframe Low-fi
+
+### Screen G.3: Footer Settings — Column Links
+```text
+┌──────────────────────────────┐
+│       BLOCK SETTINGS         │
+├──────────────────────────────┤
+│ ▼ FOOTER COLUMNS             │
+│                              │
+│ ┌─ Column 1 ───────────────┐ │
+│ │ Title: [ Company       ] │ │
+│ │                          │ │
+│ │ LINKS                    │ │
+│ │ 1. [ About Us  ] [ /abt ]│ │
+│ │ 2. [ Careers   ] [ /car ]│ │
+│ │ [+] Add Link             │ │
+│ └──────────────────────────┘ │
+│                              │
+│ [+] Add Column               │
+└──────────────────────────────┘
+```
+
+## 4. Business Rules & Acceptance Criteria
+
+### Business Rules (BR-FTR)
+- **BR-FTR-01:** Mỗi Footer Column tối đa nên có **10 links** để đảm bảo layout hiển thị tốt trên Mobile.
+- **BR-FTR-02:** Hỗ trợ link đến **Page nội bộ** (thông qua dropdown chọn page) hoặc **URL ngoại sàn**.
+
+### Acceptance Criteria (AC-FTR)
+- **GIVEN** Người dùng mở tab Block khi đang chọn Footer.
+- **WHEN** Người dùng sửa Label của một Link trong cột.
+- **THEN** Link tương ứng dưới chân trang trong Preview Iframe phải cập nhật text ngay lập tức.
+- **GIVEN** Người dùng xóa một Link.
+- **THEN** Layout footer phải tự động căn chỉnh lại các link còn lại.
+
+---
+
+# GAP-09 · 🔴 Blocker — Missing Breadcrumb Settings: Breadcrumb không có settings
+
+## 1. Vấn đề (Problem)
+Block Breadcrumb đã được đăng ký trong hệ thống nhưng khi chọn vào block này, Settings Panel hiển thị trống rỗng hoặc chỉ có các field Headline không liên quan. User không thể chỉnh sửa logic điều hướng của Breadcrumb.
+
+**Nguyên nhân:**
+- `breadcrumb/config.ts` có định nghĩa trường `items`, nhưng `SettingsPanel.tsx` thiếu logic render cho `blockType === 'breadcrumb'`.
+
+## 2. Giải pháp (Solution)
+
+### A. Breadcrumb Editor Section
+- Thêm section **"Navigation Path"** vào tab Block Settings.
+- Cho phép user chọn giữa 2 chế độ:
+  - **Auto**: Tự động sinh dựa trên cấu trúc trang.
+  - **Manual**: Cho phép user tự nhập các mốc điều hướng (Label + URL).
+
+## 3. Wireframe Low-fi
+
+### Screen G.4: Breadcrumb Settings
+```text
+┌──────────────────────────────┐
+│       BLOCK SETTINGS         │
+├──────────────────────────────┤
+│ ▼ NAVIGATION PATH            │
+│                              │
+│ Path Mode: (o) Auto  ( ) Man │
+│                              │
+│ Home Label: [ Home       ]   │
+│ Separator:  [ / ]            │
+│                              │
+├──────────────────────────────┤
+│ ▼ APPEARANCE                 │
+│ Show Icon: [x]               │
+└──────────────────────────────┘
+```
+
+## 4. Business Rules & Acceptance Criteria
+
+### Business Rules (BR-BCR)
+- **BR-BCR-01:** Chế độ **Auto** sẽ tự động lấy `Page Title` làm mốc cuối cùng của breadcrumb.
+- **BR-BCR-02:** Nếu Breadcrumb đặt ở Homepage, mặc định nó sẽ bị ẩn (hoặc chỉ hiện Home label) nếu không có path sâu hơn.
+
+### Acceptance Criteria (AC-BCR)
+- **GIVEN** Người dùng chọn block Breadcrumb.
+- **WHEN** Người dùng thay đổi "Separator" từ `/` sang `>`.
+- **THEN** Ký tự phân cách giữa các cấp điều hướng trên Iframe phải đổi sang `>`.
+- **GIVEN** Người dùng đổi "Home Label" thành "Trang chủ".
+- **THEN** Mốc đầu tiên của breadcrumb phải đổi thành "Trang chủ".
+
+
