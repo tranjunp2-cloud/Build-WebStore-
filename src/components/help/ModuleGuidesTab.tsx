@@ -45,7 +45,13 @@ interface HelpModulesData {
 export function ModuleGuidesTab() {
   const { t } = useI18n()
 
-  const d = t.help.modules.data as unknown as HelpModulesData
+  const raw = t.help.modules.data as unknown as Partial<HelpModulesData> | undefined
+  const d: HelpModulesData = {
+    dashboard: raw?.dashboard ?? { label: '', steps: [] },
+    builder: raw?.builder ?? { label: '', steps: [] },
+    blog: raw?.blog ?? { label: '', steps: [] },
+    settings: raw?.settings ?? { label: '', steps: [] },
+  }
 
   const MODULES_DATA: ModuleData[] = [
     {
