@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { generateSiteWithAI, type SSEEvent } from '@/lib/ai/openai-generator'
 import { generateAndUploadHeroImage } from '@/lib/ai/openai-image'
+import { planImageNeeds, fulfillImageNeeds, cleanupNonNumericImageFields } from '@/lib/ai/media-injector'
 import { checkBusinessInfoSafety } from '@/lib/ai/content-safety'
 import { generateSiteSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
@@ -229,9 +230,17 @@ export async function POST(req: NextRequest) {
         const isStreaming = req.nextUrl.searchParams.get('stream') === 'true'
 
         // ────────────────────────────────────────────────────────────────────
-        // Start DALL-E Hero Image generation in parallel with GPT-4 Site Gen
+        // Image sourcing strategy — feature flag
         // ────────────────────────────────────────────────────────────────────
-        const heroImagePromise = generateAndUploadHeroImage(businessInfo, String(resolvedTenantId), payload)
+        // Default: Unsplash pipeline (free, 8+ images per gen). Runs AFTER AI
+        // returns blocks so we know exactly which fields need images.
+        //
+        // Legacy: DALL-E hero-only ($0.04/gen). Enable via ENABLE_DALLE_HERO=true.
+        // Kept for research/rollback. Plan 260414-1400-ai-gen-unsplash-pipeline.
+        const ENABLE_DALLE_HERO = process.env.ENABLE_DALLE_HERO === 'true'
+        const heroImagePromise = ENABLE_DALLE_HERO
+            ? generateAndUploadHeroImage(businessInfo, String(resolvedTenantId), payload)
+            : Promise.resolve(null)
 
         // Build reference prompt from ContentBrief (if provided from URL/Image extraction)
         let referencePrompt: string | undefined
@@ -267,12 +276,47 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Wait for hero image if it hasn't finished yet
+        // Wait for hero image if it hasn't finished yet (DALL-E path, legacy)
         let heroMedia: { id: string } | null = null
         try {
             heroMedia = await heroImagePromise
         } catch (e) {
             console.error('[AI Generate] Hero image promise error:', e)
+        }
+
+        // ────────────────────────────────────────────────────────────────────
+        // Unsplash media pipeline — default path (ENABLE_DALLE_HERO=false)
+        // ────────────────────────────────────────────────────────────────────
+        // Fetches 5-10 real stock images (hero, gallery, team, testimonials, about)
+        // and injects Media IDs into block fields before sanitizer runs.
+        // Partial failure tolerated: blocks without images degrade gracefully.
+        if (!ENABLE_DALLE_HERO) {
+            try {
+                const mutableBlocks = result.blocks as Record<string, unknown>[]
+                const needs = planImageNeeds(mutableBlocks)
+                if (needs.length > 0) {
+                    const resolvedLang = (result.language || language) as 'en' | 'ms' | 'vi' | 'auto'
+                    await fulfillImageNeeds(
+                        needs,
+                        {
+                            businessName: businessInfo.businessName,
+                            tenantId: String(resolvedTenantId),
+                            category: businessInfo.industry,
+                            language: resolvedLang,
+                        },
+                        payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
+                    )
+                }
+                // Strip any slot still holding a URL/object (Unsplash failed or missing) —
+                // Payload upload fields are optional; better empty than reject.
+                cleanupNonNumericImageFields(mutableBlocks)
+            } catch (unsplashErr) {
+                console.error('[AI Generate] Unsplash pipeline error (non-fatal):', unsplashErr)
+                // Best-effort cleanup on any unexpected throw
+                try {
+                    cleanupNonNumericImageFields(result.blocks as Record<string, unknown>[])
+                } catch { /* ignore */ }
+            }
         }
 
         // ────────────────────────────────────────────────────────────────────
@@ -351,8 +395,8 @@ export async function POST(req: NextRequest) {
             result.siteName,
         )
 
-        // Inject generated Hero Image into the hero block
-        if (heroMedia) {
+        // Inject DALL-E generated Hero Image into the hero block (legacy path, flag-gated)
+        if (ENABLE_DALLE_HERO && heroMedia) {
             const heroBlock = sanitizedBlocks.find(b => b.blockType === 'hero')
             if (heroBlock) {
                 // Attach the payload block's backgroundImage field to the uploaded media ID (for DB save)

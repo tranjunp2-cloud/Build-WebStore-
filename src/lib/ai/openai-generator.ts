@@ -11,6 +11,8 @@ import { generateBlocks, type GenerationResult, type GeneratedBlock, type Genera
 import { buildUserPrompt } from './system-prompt'
 import { composeFallbackResult } from './fallback-adapter'
 import { isUnsupportedBlock } from './unsupported-blocks'
+import { selectModel } from './config'
+import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
 import {
     validateBlockContent,
     validateOrdering,
@@ -64,7 +66,7 @@ export async function generateSiteWithAI(
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
 
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: selectModel('site-generation'),
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPromptText },
@@ -159,9 +161,26 @@ export async function generateSiteWithAI(
             generatedPages = []
             const allBlocks: Record<string, unknown>[] = []
 
+            const enforcerCtx = {
+                businessName: businessInfo.businessName,
+                industry: businessInfo.industry,
+            }
+
             for (let p = 0; p < rawPages.length; p++) {
                 const rawPage = rawPages[p] as Record<string, unknown>
-                const pageBlocks = validateBlocks(Array.isArray(rawPage.blocks) ? rawPage.blocks : [])
+                let pageBlocks = validateBlocks(Array.isArray(rawPage.blocks) ? rawPage.blocks : [])
+                // Apply structure enforcer ONLY to homepage (other pages have own content requirements)
+                if (p === 0 && detectedCategory) {
+                    pageBlocks = enforceMinimumStructure(
+                        pageBlocks as Record<string, unknown>[],
+                        detectedCategory,
+                        enforcerCtx,
+                    ) as typeof pageBlocks
+                    pageBlocks = enforceMinItems(
+                        pageBlocks as Record<string, unknown>[],
+                        detectedCategory,
+                    ) as typeof pageBlocks
+                }
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
 
                 generatedPages.push({
@@ -206,6 +225,22 @@ export async function generateSiteWithAI(
             // Single-page backward compat
             const rawBlocks = Array.isArray(parsed.blocks) ? parsed.blocks : []
             validBlocks = validateBlocks(rawBlocks)
+            // Apply structure enforcer to ensure min block count + item counts
+            if (detectedCategory) {
+                const enforcerCtx = {
+                    businessName: businessInfo.businessName,
+                    industry: businessInfo.industry,
+                }
+                validBlocks = enforceMinimumStructure(
+                    validBlocks as Record<string, unknown>[],
+                    detectedCategory,
+                    enforcerCtx,
+                ) as typeof validBlocks
+                validBlocks = enforceMinItems(
+                    validBlocks as Record<string, unknown>[],
+                    detectedCategory,
+                ) as typeof validBlocks
+            }
 
             // Phase 04 — page-level guards for single-page path
             const singleStats = checkPageBlockCount(validBlocks)

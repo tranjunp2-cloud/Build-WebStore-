@@ -16,11 +16,15 @@
  * filter must apply there. Extracted here to avoid drift.
  */
 
-/** Blocks needing a media pipeline that does not exist yet. */
+/** Blocks needing a media pipeline that does not exist yet.
+ *  Re-enabled via plan 260414-1400-ai-gen-unsplash-pipeline phase-04:
+ *    - gallery, portfolio-grid → now filled by media-pipeline.ts (Unsplash)
+ *  Still dropped (separate followup):
+ *    - before-after (needs Payload schema migration per validation Q3)
+ *    - menu-display, review-cards, booking-widget (not image-related)
+ */
 export const BLOCKS_REQUIRE_MEDIA_PIPELINE: ReadonlySet<string> = new Set([
-    'gallery',
     'before-after',
-    'portfolio-grid',
     'menu-display',
     'review-cards',
     'booking-widget',
