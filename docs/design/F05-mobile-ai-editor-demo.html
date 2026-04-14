@@ -1,0 +1,3313 @@
+<!DOCTYPE html>
+<!-- saved from url=(0097)file:///Users/tranthibichdung/Desktop/ech-prime-web-v2/docs/design/F05-mobile-editor-ui-demo.html -->
+<html lang="vi" data-theme="light"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>F05 Mobile AI Editor — Full Flow Interactive Demo (v2)</title>
+  <link href="./F05 Mobile AI Editor — Full Flow Interactive Demo (v2)_files/css2" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════
+   DESIGN TOKENS
+   ═══════════════════════════════════════════ */
+    :root {
+      --bg: #0B1120;
+      --surface: #161E2E;
+      --primary-blue: #3B82F6;
+      --primary-teal: #2DD4BF;
+      --fg: #FFFFFF;
+      --muted: #9CA3AF;
+      --border: #1F2937;
+      --secondary-bg: #1F2937;
+      --success: #10B981;
+      --error: #EF4444;
+      --warning: #F59E0B;
+      --info: #3B82F6;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --shadow-card: 0 1px 3px 0 rgb(0 0 0/0.5);
+      --shadow-panel: 0 4px 6px -1px rgb(0 0 0/0.6);
+      --shadow-float: 0 20px 25px -5px rgb(0 0 0/0.8);
+      --gradient-primary: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-teal) 100%);
+      --active-bg: rgba(59, 130, 246, .12);
+      --hover-bg: rgba(255, 255, 255, .05);
+      --header-h: 48px;
+      --bottom-bar-h: 56px;
+    }
+
+    [data-theme="light"] {
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --primary-blue: #2563EB;
+      --primary-teal: #0D9488;
+      --fg: #0F172A;
+      --muted: #64748B;
+      --border: #E2E8F0;
+      --secondary-bg: #F1F5F9;
+      --success: #059669;
+      --error: #DC2626;
+      --warning: #D97706;
+      --info: #2563EB;
+      --shadow-card: 0 1px 3px 0 rgb(0 0 0/0.1), 0 1px 2px -1px rgb(0 0 0/0.1);
+      --shadow-panel: 0 4px 6px -1px rgb(0 0 0/0.1), 0 2px 4px -2px rgb(0 0 0/0.1);
+      --shadow-float: 0 20px 25px -5px rgb(0 0 0/0.1), 0 8px 10px -6px rgb(0 0 0/0.1);
+      --active-bg: rgba(37, 99, 235, .08);
+      --hover-bg: rgba(0, 0, 0, .04);
+    }
+
+    /* ═══════════════════════════════════════════
+   RESET
+   ═══════════════════════════════════════════ */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #111;
+      color: var(--fg);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow-x: hidden;
+      min-height: 100vh;
+      transition: background .3s, color .3s;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: inherit;
+      font-size: inherit;
+    }
+
+    input,
+    textarea,
+    select {
+      font-family: inherit;
+    }
+
+    /* ═══════════════════════════════════════════
+   PHONE FRAME
+   ═══════════════════════════════════════════ */
+    .phone-frame {
+      width: 390px;
+      height: 844px;
+      margin: 20px auto;
+      border-radius: 44px;
+      overflow: hidden;
+      border: 3px solid #333;
+      position: relative;
+      background: var(--bg);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, .5);
+    }
+
+    /* Screen nav dots */
+    .screen-nav {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 4px;
+      z-index: 9999;
+      background: rgba(0, 0, 0, .8);
+      padding: 6px 12px;
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      flex-wrap: wrap;
+      max-width: 460px;
+      justify-content: center;
+    }
+
+    .screen-nav button {
+      min-width: 24px;
+      height: 24px;
+      border-radius: 12px;
+      background: #444;
+      transition: all .2s;
+      font-size: 10px;
+      color: #999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 6px;
+    }
+
+    .screen-nav button.active {
+      background: var(--primary-blue);
+      color: #fff;
+    }
+
+    .screen-nav button:hover {
+      background: #666;
+    }
+
+    /* Screens */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    /* ═══════════════════════════════════════════
+   SHARED: HEADER BAR
+   ═══════════════════════════════════════════ */
+    .ed-header {
+      height: var(--header-h);
+      min-height: var(--header-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 6px;
+      z-index: 50;
+      flex-shrink: 0;
+    }
+
+    .ed-header .hbtn {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-md);
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .ed-header .hbtn:active {
+      background: var(--hover-bg);
+    }
+
+    .page-sel {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 10px;
+      border-radius: var(--radius-md);
+      background: var(--secondary-bg);
+      font-size: 12px;
+      font-weight: 600;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .page-sel span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .page-sel .chevron {
+      font-size: 8px;
+      opacity: .5;
+      flex-shrink: 0;
+      margin-left: 2px;
+    }
+
+    .h-actions {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .h-status {
+      color: var(--muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .btn-pub {
+      background: var(--gradient-primary);
+      color: #fff;
+      height: 32px;
+      padding: 0 12px;
+      border-radius: var(--radius-md);
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .btn-pub:active {
+      opacity: .8;
+    }
+
+    /* ═══════════════════════════════════════════
+   SHARED: PREVIEW AREA (Mock website)
+   ═══════════════════════════════════════════ */
+    .preview {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      background: #f8fafc;
+      position: relative;
+    }
+
+    .preview-inner {
+      min-height: 100%;
+    }
+
+    .m-nav {
+      display: flex;
+      align-items: center;
+      padding: 10px 16px;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .m-logo {
+      font-weight: 700;
+      font-size: 14px;
+      color: #1f2937;
+    }
+
+    .m-links {
+      margin-left: auto;
+      display: flex;
+      gap: 12px;
+    }
+
+    .m-links span {
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    .m-hero {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      padding: 40px 20px;
+      text-align: center;
+      color: #fff;
+      position: relative;
+    }
+
+    .m-hero h1 {
+      font-size: 22px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      line-height: 1.2;
+    }
+
+    .m-hero p {
+      font-size: 12px;
+      opacity: .85;
+      margin-bottom: 16px;
+    }
+
+    .m-hero-btn {
+      display: inline-block;
+      padding: 8px 20px;
+      background: #fff;
+      color: #764ba2;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .m-products {
+      padding: 16px;
+      background: #fff;
+    }
+
+    .m-products h2 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 10px;
+    }
+
+    .p-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .p-card {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #e5e7eb;
+    }
+
+    .p-card .p-img {
+      height: 80px;
+      background: #f3f4f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .p-card .p-info {
+      padding: 8px;
+    }
+
+    .p-card .p-info h3 {
+      font-size: 12px;
+      color: #1f2937;
+      font-weight: 600;
+    }
+
+    .p-card .p-info .price {
+      font-size: 11px;
+      color: #7c3aed;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .m-footer {
+      padding: 16px;
+      background: #1f2937;
+      color: #9ca3af;
+      font-size: 10px;
+      text-align: center;
+    }
+
+    /* Block selection */
+    .blk {
+      position: relative;
+      transition: outline .15s;
+    }
+
+    .blk.sel {
+      outline: 2px solid var(--primary-blue);
+      outline-offset: -2px;
+    }
+
+    .blk.sel::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(59, 130, 246, .06);
+      pointer-events: none;
+    }
+
+    .ai-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: var(--gradient-primary);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, .4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+      z-index: 55;
+    }
+
+    .blk.sel .ai-badge {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Inline toolbar */
+    .il-toolbar {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: -44px;
+      background: #1f2937;
+      border-radius: 10px;
+      padding: 5px 3px;
+      display: flex;
+      gap: 1px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+      z-index: 60;
+    }
+
+    .il-toolbar button {
+      width: 34px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      color: #d1d5db;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .il-toolbar button:active {
+      background: rgba(255, 255, 255, .15);
+    }
+
+    .il-toolbar button.on {
+      color: var(--primary-blue);
+      background: rgba(59, 130, 246, .15);
+    }
+
+    .il-toolbar .sep {
+      width: 1px;
+      background: #374151;
+      margin: 3px 1px;
+    }
+
+    /* ═══════════════════════════════════════════
+   SHARED: BOTTOM BAR & FAB
+   ═══════════════════════════════════════════ */
+    .bot-bar {
+      height: var(--bottom-bar-h);
+      min-height: var(--bottom-bar-h);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 16px;
+      z-index: 50;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .swipe-h {
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--muted);
+      opacity: .35;
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .bot-bar-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--primary-blue);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .fab {
+      position: absolute;
+      bottom: calc(var(--bottom-bar-h) + 12px);
+      right: 14px;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: var(--gradient-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, .4);
+      z-index: 55;
+      font-size: 20px;
+      color: #fff;
+      transition: transform .2s;
+    }
+
+    .fab:active {
+      transform: scale(.9);
+    }
+
+    .fab.hide {
+      display: none;
+    }
+
+    /* Undo/Redo float */
+    .ur-float {
+      position: absolute;
+      bottom: calc(var(--bottom-bar-h) + 12px);
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      z-index: 54;
+    }
+
+    .ur-float button {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      color: var(--muted);
+      box-shadow: var(--shadow-card);
+      transition: all .15s;
+      position: relative;
+    }
+
+    .ur-float button:active {
+      transform: scale(.9);
+    }
+
+    .ur-float button.has {
+      color: var(--fg);
+    }
+
+    .ur-float .cnt {
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      background: var(--primary-blue);
+      color: #fff;
+      font-size: 8px;
+      font-weight: 700;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ═══════════════════════════════════════════
+   SHARED: BOTTOM SHEET
+   ═══════════════════════════════════════════ */
+    .bs-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, .45);
+      z-index: 70;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .3s;
+    }
+
+    .bs-overlay.on {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .bs {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border-radius: 16px 16px 0 0;
+      z-index: 80;
+      transform: translateY(100%);
+      transition: transform .35s cubic-bezier(.32, .72, 0, 1);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -8px 30px rgba(0, 0, 0, .4);
+    }
+
+    .bs.open {
+      transform: translateY(0);
+    }
+
+    .bs.h50 {
+      max-height: 50%;
+    }
+
+    .bs.h60 {
+      max-height: 60%;
+    }
+
+    .bs.h75 {
+      max-height: 75%;
+    }
+
+    .bs.h85 {
+      max-height: 85%;
+    }
+
+    .bs-handle {
+      width: 36px;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--muted);
+      opacity: .3;
+      margin: 8px auto 4px;
+      flex-shrink: 0;
+    }
+
+    /* Tabs */
+    .bs-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      padding: 0 4px;
+      flex-shrink: 0;
+    }
+
+    .bs-tab {
+      flex: 1;
+      padding: 10px 6px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      position: relative;
+      transition: color .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      min-height: 44px;
+    }
+
+    .bs-tab.on {
+      color: var(--primary-blue);
+    }
+
+    .bs-tab.on::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 12px;
+      right: 12px;
+      height: 2px;
+      background: var(--primary-blue);
+      border-radius: 1px;
+    }
+
+    /* Tab panels */
+    .bs-panel {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .bs-panel.on {
+      display: flex;
+    }
+
+    /* ─── Chat ─── */
+    .chat-msgs {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .bubble {
+      max-width: 82%;
+      padding: 9px 12px;
+      border-radius: 14px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .bubble.ai {
+      align-self: flex-start;
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+
+    .bubble.user {
+      align-self: flex-end;
+      background: var(--primary-blue);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .bubble.sys {
+      align-self: center;
+      background: rgba(245, 158, 11, .1);
+      border: 1px solid rgba(245, 158, 11, .3);
+      color: var(--warning);
+      font-size: 11px;
+      text-align: center;
+      border-radius: 10px;
+    }
+
+    .bubble .act {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 3px 8px;
+      margin-top: 5px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      background: rgba(59, 130, 246, .15);
+      color: var(--primary-blue);
+    }
+
+    .typing {
+      display: flex;
+      gap: 4px;
+      padding: 8px 12px;
+      align-self: flex-start;
+    }
+
+    .typing span {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--muted);
+      animation: typ 1.4s infinite;
+    }
+
+    .typing span:nth-child(2) {
+      animation-delay: .2s;
+    }
+
+    .typing span:nth-child(3) {
+      animation-delay: .4s;
+    }
+
+    @keyframes typ {
+
+      0%,
+      60%,
+      100% {
+        opacity: .3;
+        transform: translateY(0)
+      }
+
+      30% {
+        opacity: 1;
+        transform: translateY(-3px)
+      }
+    }
+
+    .chat-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .chat-in {
+      flex: 1;
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 9px 14px;
+      color: var(--fg);
+      font-size: 12px;
+      outline: none;
+      min-height: 40px;
+      transition: border .2s;
+    }
+
+    .chat-in:focus {
+      border-color: var(--primary-blue);
+    }
+
+    .chat-in::placeholder {
+      color: var(--muted);
+    }
+
+    .chat-in.off {
+      opacity: .45;
+      pointer-events: none;
+    }
+
+    .chat-send {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--gradient-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .chat-send:active {
+      transform: scale(.88);
+    }
+
+    .chat-send.off {
+      opacity: .35;
+      pointer-events: none;
+    }
+
+    /* ─── Blocks ─── */
+    .blk-search {
+      padding: 8px 14px;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .blk-search input {
+      width: 100%;
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 9px 12px 9px 34px;
+      color: var(--fg);
+      font-size: 12px;
+      outline: none;
+      min-height: 40px;
+    }
+
+    .blk-search .si {
+      position: absolute;
+      left: 24px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .blk-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 14px 14px;
+    }
+
+    .blk-cat {
+      margin-bottom: 12px;
+    }
+
+    .blk-cat-t {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 6px 0;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .blk-row {
+      display: flex;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      margin-bottom: 5px;
+      gap: 8px;
+      min-height: 44px;
+      transition: background .12s;
+    }
+
+    .blk-row:active {
+      background: var(--hover-bg);
+    }
+
+    .blk-row .ico {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-md);
+      background: var(--secondary-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .blk-row .lbl {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .blk-row .add {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--gradient-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .blk-row .add:active {
+      transform: scale(.85);
+    }
+
+    /* ─── Settings ─── */
+    .stg-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 14px 14px;
+    }
+
+    .stg-grp {
+      margin-bottom: 2px;
+    }
+
+    .stg-hdr {
+      display: flex;
+      align-items: center;
+      padding: 10px 0;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      min-height: 44px;
+    }
+
+    .stg-hdr .arr {
+      color: var(--muted);
+      font-size: 9px;
+      transition: transform .2s;
+    }
+
+    .stg-hdr .arr.open {
+      transform: rotate(90deg);
+    }
+
+    .stg-body {
+      padding: 10px 0;
+      display: none;
+    }
+
+    .stg-body.open {
+      display: block;
+    }
+
+    .stg-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      min-height: 40px;
+    }
+
+    .stg-lbl {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .stg-in {
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 7px 10px;
+      color: var(--fg);
+      font-size: 11px;
+      width: 110px;
+      text-align: right;
+      outline: none;
+      min-height: 32px;
+    }
+
+    .stg-in:focus {
+      border-color: var(--primary-blue);
+    }
+
+    .stg-sel {
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 7px 10px;
+      color: var(--fg);
+      font-size: 11px;
+      outline: none;
+    }
+
+    .swatch {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      border: 2px solid var(--border);
+    }
+
+    /* ═══════════════════════════════════════════
+   CMS MENU DRAWER
+   ═══════════════════════════════════════════ */
+    .drawer-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, .55);
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .3s;
+    }
+
+    .drawer-overlay.on {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .drawer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 270px;
+      background: var(--surface);
+      z-index: 110;
+      transform: translateX(-100%);
+      transition: transform .3s cubic-bezier(.32, .72, 0, 1);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 8px 0 30px rgba(0, 0, 0, .4);
+    }
+
+    .drawer.on {
+      transform: translateX(0);
+    }
+
+    .drawer-header {
+      padding: 20px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .drawer-logo {
+      font-size: 16px;
+      font-weight: 800;
+      background: var(--gradient-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      flex: 1;
+    }
+
+    .drawer-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--secondary-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .drawer-nav {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .drawer-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background .12s;
+      min-height: 44px;
+      position: relative;
+    }
+
+    .drawer-item:active {
+      background: var(--hover-bg);
+    }
+
+    .drawer-item.current {
+      color: var(--primary-blue);
+      background: var(--active-bg);
+    }
+
+    .drawer-item.current::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      background: var(--primary-blue);
+      border-radius: 0 2px 2px 0;
+    }
+
+    .drawer-item .di-icon {
+      width: 20px;
+      text-align: center;
+      font-size: 15px;
+    }
+
+    .drawer-item .di-label {
+      flex: 1;
+    }
+
+    .drawer-item .di-badge {
+      background: var(--error);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 8px;
+    }
+
+    .drawer-sep {
+      height: 1px;
+      background: var(--border);
+      margin: 6px 16px;
+    }
+
+    .drawer-section {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      padding: 12px 16px 4px;
+    }
+
+    .drawer-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .drawer-lang {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .drawer-lang button {
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+    }
+
+    .drawer-lang button.on {
+      background: rgba(45, 212, 191, .15);
+      color: var(--primary-teal);
+      border-color: rgba(45, 212, 191, .3);
+    }
+
+    .drawer-logout {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--error);
+      font-weight: 600;
+      padding: 8px 0;
+    }
+
+    /* ═══════════════════════════════════════════
+   PAGE MANAGER DROPDOWN (Enhanced)
+   ═══════════════════════════════════════════ */
+    .pg-drop {
+      position: absolute;
+      top: var(--header-h);
+      left: 8px;
+      right: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-float);
+      z-index: 90;
+      padding: 6px;
+      max-height: 70vh;
+      overflow-y: auto;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-6px);
+      transition: all .25s cubic-bezier(.32, .72, 0, 1);
+    }
+
+    .pg-drop.on {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .pg-drop-header {
+      display: flex;
+      align-items: center;
+      padding: 8px 10px;
+      gap: 8px;
+    }
+
+    .pg-drop-header span {
+      font-size: 12px;
+      font-weight: 700;
+      flex: 1;
+    }
+
+    .pg-drop-header button {
+      font-size: 11px;
+      color: var(--primary-blue);
+      font-weight: 600;
+    }
+
+    .pg-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: var(--radius-md);
+      gap: 8px;
+      min-height: 44px;
+      transition: background .12s;
+    }
+
+    .pg-item:active {
+      background: var(--hover-bg);
+    }
+
+    .pg-item.cur {
+      background: var(--active-bg);
+    }
+
+    .pg-item .pg-ico {
+      font-size: 14px;
+      flex-shrink: 0;
+      width: 18px;
+      text-align: center;
+    }
+
+    .pg-item .pg-name {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 500;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .pg-item .pg-tag {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .pg-tag.live {
+      background: rgba(16, 185, 129, .15);
+      color: var(--success);
+    }
+
+    .pg-tag.draft {
+      background: rgba(245, 158, 11, .15);
+      color: var(--warning);
+    }
+
+    .pg-tag.hidden {
+      background: rgba(156, 163, 175, .15);
+      color: var(--muted);
+    }
+
+    .pg-item .pg-acts {
+      display: flex;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .pg-item .pg-acts button {
+      width: 30px;
+      height: 30px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .pg-item .pg-acts button:active {
+      background: var(--hover-bg);
+    }
+
+    .pg-item .pg-acts button.danger {
+      color: var(--error);
+    }
+
+    .pg-item .pg-acts button.disabled {
+      opacity: .3;
+      pointer-events: none;
+    }
+
+    .pg-div {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 10px;
+    }
+
+    .pg-add {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px;
+      color: var(--primary-blue);
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: var(--radius-md);
+      min-height: 44px;
+    }
+
+    .pg-add:active {
+      background: var(--active-bg);
+    }
+
+    /* Add page form (inline in dropdown) */
+    .pg-form {
+      padding: 8px 10px;
+      border: 1px solid var(--primary-blue);
+      border-radius: var(--radius-md);
+      margin: 4px 6px;
+      background: rgba(59, 130, 246, .05);
+      display: none;
+    }
+
+    .pg-form.on {
+      display: block;
+    }
+
+    .pg-form label {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .pg-form input {
+      width: 100%;
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      color: var(--fg);
+      font-size: 12px;
+      outline: none;
+      min-height: 36px;
+      margin-bottom: 6px;
+    }
+
+    .pg-form input:focus {
+      border-color: var(--primary-blue);
+    }
+
+    .pg-form .slug-preview {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .pg-form .slug-preview span {
+      color: var(--primary-teal);
+      font-weight: 600;
+    }
+
+    .pg-form-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .pg-form-actions button {
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      font-size: 11px;
+      font-weight: 600;
+      min-height: 32px;
+    }
+
+    .pg-form .btn-cancel {
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+    }
+
+    .pg-form .btn-create {
+      background: var(--gradient-primary);
+      color: #fff;
+    }
+
+    /* ═══════════════════════════════════════════
+   TOAST
+   ═══════════════════════════════════════════ */
+    .toast {
+      position: absolute;
+      top: calc(var(--header-h) + 8px);
+      left: 12px;
+      right: 12px;
+      background: var(--surface);
+      border: 1px solid var(--success);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow-float);
+      z-index: 95;
+      transform: translateY(-16px);
+      opacity: 0;
+      transition: all .3s;
+      pointer-events: none;
+    }
+
+    .toast.on {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .toast .t-ico {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .toast .t-txt {
+      font-size: 12px;
+      font-weight: 500;
+      flex: 1;
+    }
+
+    .toast .t-act {
+      font-size: 11px;
+      color: var(--primary-blue);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .toast.warn {
+      border-color: var(--warning);
+    }
+
+    /* ═══════════════════════════════════════════
+   PROCESSING OVERLAY
+   ═══════════════════════════════════════════ */
+    .proc-ov {
+      position: absolute;
+      inset: 0;
+      background: rgba(11, 17, 32, .55);
+      z-index: 60;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(2px);
+    }
+
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 3px solid rgba(59, 130, 246, .2);
+      border-top-color: var(--primary-blue);
+      animation: spin .8s linear infinite;
+      margin-bottom: 10px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    /* ═══════════════════════════════════════════
+   TOKEN BANNER
+   ═══════════════════════════════════════════ */
+    .tok-banner {
+      background: linear-gradient(135deg, rgba(245, 158, 11, .08), rgba(239, 68, 68, .08));
+      border: 1px solid rgba(245, 158, 11, .25);
+      border-radius: 12px;
+      padding: 14px;
+      margin: 8px 14px;
+      text-align: center;
+    }
+
+    .tok-banner .ico {
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+
+    .tok-banner .title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--warning);
+      margin-bottom: 3px;
+    }
+
+    .tok-banner .desc {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .tok-banner .up-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 8px 18px;
+      background: var(--gradient-primary);
+      color: #fff;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* ═══════════════════════════════════════════
+   PUBLISH SHEET & ALERT DIALOG
+   ═══════════════════════════════════════════ */
+    .pub-sheet {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      top: 15%;
+      background: var(--surface);
+      border-radius: 16px 16px 0 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 -8px 30px rgba(0, 0, 0, .4);
+    }
+
+    .pub-hdr {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .pub-hdr h3 {
+      font-size: 15px;
+      font-weight: 700;
+      flex: 1;
+    }
+
+    .pub-hdr .x {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--secondary-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .checklist {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 18px;
+    }
+
+    .chk-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chk-item:last-child {
+      border-bottom: none;
+    }
+
+    .chk-ico {
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .chk-c h4 {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 1px;
+    }
+
+    .chk-c p {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+
+    .pub-foot {
+      padding: 14px 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .pub-foot button {
+      flex: 1;
+      padding: 11px;
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      font-weight: 700;
+      min-height: 44px;
+    }
+
+    .btn-back {
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+    }
+
+    .btn-gopub {
+      background: var(--gradient-primary);
+      color: #fff;
+    }
+
+    /* Alert */
+    .alert-ov {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, .55);
+      z-index: 110;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .alert-box {
+      background: var(--surface);
+      border-radius: var(--radius-xl);
+      padding: 20px;
+      width: 100%;
+      max-width: 340px;
+      box-shadow: var(--shadow-float);
+    }
+
+    .alert-box h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin: 8px 0 6px;
+    }
+
+    .alert-box p {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .alert-box ul {
+      margin: 8px 0 14px;
+      padding-left: 16px;
+    }
+
+    .alert-box li {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 3px;
+      line-height: 1.4;
+    }
+
+    .alert-acts {
+      display: flex;
+      gap: 8px;
+    }
+
+    .alert-acts button {
+      flex: 1;
+      padding: 11px;
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      font-weight: 700;
+      min-height: 44px;
+    }
+
+    .btn-cancel {
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+    }
+
+    .btn-danger {
+      background: var(--error);
+      color: #fff;
+    }
+
+    /* ═══════════════════════════════════════════
+   BLOCK SETTINGS HEADER + MOVE BAR
+   ═══════════════════════════════════════════ */
+    .bs-blk-hdr {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .bs-blk-hdr .btype {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: var(--radius-sm);
+      background: rgba(59, 130, 246, .1);
+      color: var(--primary-blue);
+    }
+
+    .bs-blk-hdr .bname {
+      font-size: 13px;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .bs-blk-hdr .bdel {
+      width: 30px;
+      height: 30px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--error);
+      font-size: 14px;
+    }
+
+    .mv-bar {
+      display: flex;
+      gap: 5px;
+      padding: 6px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .mv-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 7px;
+      border-radius: var(--radius-md);
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      min-height: 36px;
+    }
+
+    .mv-btn:active {
+      background: var(--hover-bg);
+    }
+
+    /* ═══════════════════════════════════════════
+   NAV EDITOR
+   ═══════════════════════════════════════════ */
+    .nav-list {
+      padding: 10px 14px;
+    }
+
+    .nv-item {
+      display: flex;
+      align-items: center;
+      padding: 9px 6px;
+      gap: 6px;
+      border-radius: var(--radius-md);
+      min-height: 44px;
+    }
+
+    .nv-item:active {
+      background: var(--hover-bg);
+    }
+
+    .nv-item.sub {
+      padding-left: 28px;
+    }
+
+    .nv-grip {
+      color: var(--muted);
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .nv-label {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .nv-acts {
+      display: flex;
+      gap: 2px;
+    }
+
+    .nv-acts button {
+      width: 30px;
+      height: 30px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .nv-acts button:active {
+      background: var(--hover-bg);
+    }
+
+    .nv-add {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 9px 6px;
+      margin-top: 6px;
+      color: var(--primary-blue);
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-md);
+      justify-content: center;
+      min-height: 44px;
+    }
+
+    /* Image edit toolbar */
+    .img-toolbar {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, .85);
+      backdrop-filter: blur(8px);
+      border-radius: 10px;
+      padding: 6px;
+      display: flex;
+      gap: 4px;
+      z-index: 56;
+    }
+
+    .img-toolbar button {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+      min-height: 36px;
+      white-space: nowrap;
+    }
+
+    .img-toolbar .btn-up {
+      background: rgba(255, 255, 255, .15);
+    }
+
+    .img-toolbar .btn-up:active {
+      background: rgba(255, 255, 255, .25);
+    }
+
+    .img-toolbar .btn-aig {
+      background: rgba(59, 130, 246, .2);
+      color: rgba(255, 255, 255, .35);
+      pointer-events: none;
+    }
+
+    /* ═══════════════════════════════════════════
+   STOP AI + MISC
+   ═══════════════════════════════════════════ */
+    .stop-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 7px 14px;
+      margin: 0 auto 4px;
+      background: var(--error);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 18px;
+    }
+
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .5
+      }
+    }
+
+    .fade {
+      animation: fadeIn .3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    .slide-up {
+      animation: slideUp .35s cubic-bezier(.32, .72, 0, 1);
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(100%)
+      }
+
+      to {
+        transform: translateY(0)
+      }
+    }
+
+    .theme-btn {
+      position: absolute;
+      top: 56px;
+      right: 6px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--secondary-bg);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 95;
+      font-size: 12px;
+    }
+
+    /* Undo toast (with action) */
+    .undo-toast {
+      position: absolute;
+      bottom: calc(var(--bottom-bar-h) + 70px);
+      left: 12px;
+      right: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: var(--shadow-float);
+      z-index: 95;
+      transform: translateY(10px);
+      opacity: 0;
+      transition: all .3s;
+      pointer-events: none;
+    }
+
+    .undo-toast.on {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .undo-toast .ut-txt {
+      flex: 1;
+      font-size: 12px;
+    }
+
+    .undo-toast .ut-btn {
+      color: var(--primary-blue);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .undo-toast .ut-timer {
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    /* Delete confirmation inside page dropdown */
+    .pg-confirm {
+      padding: 8px 10px;
+      background: rgba(239, 68, 68, .08);
+      border: 1px solid rgba(239, 68, 68, .2);
+      border-radius: var(--radius-md);
+      margin: 4px 6px;
+      display: none;
+    }
+
+    .pg-confirm.on {
+      display: block;
+    }
+
+    .pg-confirm p {
+      font-size: 11px;
+      color: var(--fg);
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .pg-confirm-acts {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .pg-confirm-acts button {
+      padding: 6px 14px;
+      border-radius: var(--radius-md);
+      font-size: 11px;
+      font-weight: 600;
+      min-height: 32px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="phone-frame" id="phone">
+    <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀️</button>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 1: DEFAULT PREVIEW — Main editor screen
+     Features: Preview, FAB, Undo/Redo, Bottom Sheet (Chat/Blocks/Settings),
+               CMS Menu Drawer, Page Manager Dropdown (reorder, add, delete, visibility)
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen active" id="s1">
+      <!-- Header -->
+      <div class="ed-header">
+        <button class="hbtn" onclick="openDrawer()">☰</button>
+        <button class="page-sel" onclick="togglePages()">
+          <span id="currentPageName">🏠 Trang chủ</span>
+          <span class="chevron">▼</span>
+        </button>
+        <div class="h-actions">
+          <span class="h-status">Đã lưu ✓</span>
+          <button class="btn-pub" onclick="showS(7)">🚀</button>
+        </div>
+      </div>
+
+      <!-- CMS MENU DRAWER -->
+      <div class="drawer-overlay" id="drawerOv" onclick="closeDrawer()"></div>
+      <div class="drawer" id="drawer">
+        <div class="drawer-header">
+          <span class="drawer-logo">⚡ Prime AI</span>
+          <button class="drawer-close" onclick="closeDrawer()">✕</button>
+        </div>
+        <div class="drawer-nav">
+          <div class="drawer-item" onclick="closeDrawer()"><span class="di-icon">📊</span><span class="di-label">Dashboard</span></div>
+          <div class="drawer-sep"></div>
+          <div class="drawer-section">Cửa hàng của tôi</div>
+          <div class="drawer-item current"><span class="di-icon">🎨</span><span class="di-label">Editor</span></div>
+          <div class="drawer-item" onclick="closeDrawer()"><span class="di-icon">📝</span><span class="di-label">Blog</span></div>
+          <div class="drawer-sep"></div>
+          <div class="drawer-item" onclick="closeDrawer()"><span class="di-icon">🛍️</span><span class="di-label">Sản
+              phẩm</span></div>
+          <div class="drawer-item" onclick="closeDrawer()">
+            <span class="di-icon">📦</span><span class="di-label">Đơn hàng</span>
+            <span class="di-badge">5</span>
+          </div>
+          <div class="drawer-sep"></div>
+          <div class="drawer-item" onclick="closeDrawer()"><span class="di-icon">⚙️</span><span class="di-label">Cấu
+              hình Store</span></div>
+          <div class="drawer-item" onclick="closeDrawer()"><span class="di-icon">❓</span><span class="di-label">Trung
+              tâm hỗ trợ</span></div>
+        </div>
+        <div class="drawer-footer">
+          <div class="drawer-lang">
+            <button class="on">VN</button>
+            <button>EN</button>
+          </div>
+          <button class="drawer-logout">🚪 Đăng xuất</button>
+        </div>
+      </div>
+
+      <!-- PAGE MANAGER DROPDOWN -->
+      <div class="pg-drop" id="pgDrop">
+        <div class="pg-drop-header">
+          <span>📄 Quản lý trang</span>
+          <button onclick="togglePages()">Đóng</button>
+        </div>
+
+        <!-- Page list -->
+        <div id="pageList">
+          <div class="pg-item cur" data-page="home">
+            <span class="pg-ico">🏠</span>
+            <span class="pg-name">Trang chủ</span>
+            <span class="pg-tag live">Live</span>
+            <div class="pg-acts">
+              <button class="disabled" title="Không thể ẩn trang chủ">👁️</button>
+              <button onclick="pageAction(&#39;home&#39;,&#39;edit&#39;)" title="Chỉnh sửa">✏️</button>
+              <button class="disabled" title="Không thể ẩn trang chủ">↑</button>
+              <button onclick="pageAction(&#39;home&#39;,&#39;down&#39;)" title="Di chuyển xuống">↓</button>
+            </div>
+          </div>
+          <div class="pg-item" data-page="products">
+            <span class="pg-ico">🛍️</span>
+            <span class="pg-name">Sản phẩm</span>
+            <span class="pg-tag live">Live</span>
+            <div class="pg-acts">
+              <button onclick="pageAction(&#39;products&#39;,&#39;toggleVis&#39;)" title="Ẩn/Hiện trang">👁️</button>
+              <button onclick="pageAction(&#39;products&#39;,&#39;edit&#39;)" title="Chỉnh sửa">✏️</button>
+              <button onclick="pageAction(&#39;products&#39;,&#39;up&#39;)">↑</button>
+              <button onclick="pageAction(&#39;products&#39;,&#39;down&#39;)">↓</button>
+            </div>
+          </div>
+          
+          <div class="pg-item" data-page="about">
+            <span class="pg-ico">📄</span>
+            <span class="pg-name">Giới thiệu</span>
+            <span class="pg-tag draft">Draft</span>
+            <div class="pg-acts">
+              <button onclick="pageAction(&#39;about&#39;,&#39;toggleVis&#39;)" title="Ẩn/Hiện trang">👁️</button>
+              <button onclick="pageAction(&#39;about&#39;,&#39;edit&#39;)" title="Chỉnh sửa">✏️</button>
+              <button onclick="pageAction(&#39;about&#39;,&#39;up&#39;)">↑</button>
+              <button onclick="pageAction(&#39;about&#39;,&#39;down&#39;)">↓</button>
+            </div>
+          </div><div class="pg-item" data-page="contact">
+            <span class="pg-ico">📞</span>
+            <span class="pg-name">Liên hệ</span>
+            <span class="pg-tag live">Live</span>
+            <div class="pg-acts">
+              <button onclick="pageAction(&#39;contact&#39;,&#39;toggleVis&#39;)" title="Ẩn/Hiện trang">👁️</button>
+              <button onclick="pageAction(&#39;contact&#39;,&#39;edit&#39;)" title="Chỉnh sửa">✏️</button>
+              <button onclick="pageAction(&#39;contact&#39;,&#39;up&#39;)">↑</button>
+              <button onclick="pageAction(&#39;contact&#39;,&#39;down&#39;)">↓</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Delete confirmation (hidden by default) -->
+        <div class="pg-confirm" id="pgConfirm">
+          <p>⚠️ Bạn chắc chắn muốn xoá trang "<span id="pgConfirmName">Liên hệ</span>"? Dữ liệu sẽ được giữ lại 5 giây
+            để hoàn tác.</p>
+          <div class="pg-confirm-acts">
+            <button class="btn-cancel" onclick="hidePgConfirm()">Huỷ</button>
+            <button class="btn-danger" onclick="confirmDeletePage()">Xoá</button>
+          </div>
+        </div>
+
+        <div class="pg-div"></div>
+
+        <!-- 404 system page -->
+        <div class="pg-item" data-page="404">
+          <span class="pg-ico">🚫</span>
+          <span class="pg-name">Trang 404</span>
+          <span class="pg-tag" style="background:rgba(156,163,175,.1);color:var(--muted);font-size:9px">System</span>
+          <div class="pg-acts">
+            <button onclick="pageAction(&#39;404&#39;,&#39;edit&#39;)" title="Chỉnh sửa nội dung 404">✏️</button>
+          </div>
+        </div>
+
+        <div class="pg-div"></div>
+
+        <!-- Add new page -->
+        <button class="pg-add" id="pgAddBtn" onclick="showAddPageForm()" style="">➕ Thêm trang mới</button>
+
+        <!-- Add page form (hidden by default) -->
+        <div class="pg-form" id="pgForm">
+          <label>Tên trang</label>
+          <input id="pgNameIn" placeholder="VD: Khuyến mãi" oninput="updateSlugPreview()">
+          <div class="slug-preview">Slug: <span id="slugPreview">/cs</span></div>
+          <div class="pg-form-actions">
+            <button class="btn-cancel" onclick="hideAddPageForm()">Huỷ</button>
+            <button class="btn-create" onclick="createNewPage()">Tạo trang</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PREVIEW AREA -->
+      <div class="preview" id="prevArea">
+        <div class="preview-inner">
+          <div class="m-nav blk" data-b="header" onclick="selBlock(this,&#39;header&#39;)">
+            <span class="m-logo">🌸 FloraShop</span>
+            <div class="m-links"><span>Home</span><span>SP</span><span>Liên hệ</span></div>
+            <div class="ai-badge">✨ AI</div>
+          </div>
+          <div class="m-hero blk" data-b="hero" onclick="selBlock(this,&#39;hero&#39;)">
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh trong 2 giờ — Tươi từ vườn đến tay bạn</p>
+            <span class="m-hero-btn">Mua ngay →</span>
+            <div class="ai-badge">✨ AI</div>
+          </div>
+
+          <!-- RICH TEXT BLOCK -->
+          <div class="blk" onclick="selBlock(this, &#39;text&#39;)" style="padding:30px 20px; text-align:center; background:#fff; border-bottom:1px solid #eee">
+            <div class="blk-overlay"></div>
+            <h2 style="color:#1f2937; margin-bottom:10px; font-size:18px">Câu chuyện của chúng tôi</h2>
+            <p style="color:#4b5563; font-size:13px; line-height:1.5">Chúng tôi tin rằng AI có thể giúp biến mọi ý tưởng
+              thành hiện thực một cách nhanh chóng và hiệu quả nhất.</p>
+            <div class="ai-badge">✨ AI</div>
+          </div>
+
+          <div class="m-products blk" data-b="products" onclick="selBlock(this,&#39;products&#39;)">
+            <h2>Sản phẩm nổi bật</h2>
+            <div class="p-grid">
+              <div class="p-card">
+                <div class="p-img">🌹</div>
+                <div class="p-info">
+                  <h3>Hoa Hồng Đỏ</h3>
+                  <div class="price">299.000₫</div>
+                </div>
+              </div>
+              <div class="p-card">
+                <div class="p-img">🌻</div>
+                <div class="p-info">
+                  <h3>Hoa Hướng Dương</h3>
+                  <div class="price">199.000₫</div>
+                </div>
+              </div>
+            </div>
+            <div class="ai-badge">✨ AI</div>
+          </div>
+
+          <!-- CTA BLOCK -->
+          <div class="blk" onclick="selBlock(this, &#39;cta&#39;)" style="padding:30px 20px; background:#3b82f6; color:#fff; text-align:center">
+            <div class="blk-overlay"></div>
+            <h3 style="margin-bottom:8px; font-size:18px">Sẵn sàng để bứt phá?</h3>
+            <p style="margin-bottom:15px; font-size:12px; opacity:0.9">Đăng ký ngay để nhận ưu đãi 20%.</p>
+            <button style="padding:10px 20px; border:none; border-radius:8px; background:#fff; color:#3b82f6; font-weight:700; font-size:13px">Mua
+              ngay</button>
+            <div class="ai-badge">✨ AI</div>
+          </div>
+
+          <div class="m-footer blk" data-b="footer" onclick="selBlock(this,&#39;footer&#39;)">
+            <p>© 2026 FloraShop — Hoa tươi giao nhanh toàn quốc</p>
+            <p style="margin-top:3px">📞 0909 123 456 · 📧 hello@florashop.vn</p>
+            <div class="ai-badge">✨ AI</div>
+          </div>
+        </div>
+        <div class="toast" id="toast1"><span class="t-ico">✅</span><span class="t-txt" id="toast1Txt">Đã đổi vị trí trang</span><span class="t-act" id="toast1Act"></span></div>
+      </div>
+
+      <!-- Undo/Redo -->
+      <div class="ur-float" id="urFloat">
+        <button class="has" onclick="showToast(&#39;Đã hoàn tác&#39;,&#39;&#39;)">↩️<span class="cnt">3</span></button>
+        <button onclick="showToast(&#39;Đã làm lại&#39;,&#39;&#39;)">↪️</button>
+      </div>
+
+      <!-- FAB -->
+      <button class="fab" id="fab" onclick="openSheet(&#39;chat&#39;)">🪄</button>
+
+      <!-- Bottom Bar -->
+      <div class="bot-bar" onclick="openSheet(&#39;chat&#39;)">
+        <div class="swipe-h"></div>
+        <div class="bot-bar-text">🪄 Mở Chat AI &amp; Công cụ <span style="font-size:10px;color:var(--muted)">▲</span></div>
+      </div>
+
+      <!-- Delete undo toast (floating) -->
+      <div class="undo-toast" id="undoToast">
+        <span class="t-ico">🗑️</span>
+        <span class="ut-txt">Đã xoá trang</span>
+        <button class="ut-btn" onclick="undoDeletePage()">Hoàn tác</button>
+        <span class="ut-timer" id="undoTimer">5s</span>
+      </div>
+
+      <!-- ═══ BOTTOM SHEET ═══ -->
+      <div class="bs-overlay" id="shOv" onclick="closeSheet()"></div>
+      <div class="bs h75" id="sheet">
+        <div class="bs-handle"></div>
+        <div class="bs-tabs" id="shTabs">
+          <button class="bs-tab on" data-t="chat" onclick="swTab(&#39;chat&#39;)">🤖 Chat</button>
+          <button class="bs-tab" data-t="blocks" onclick="swTab(&#39;blocks&#39;)">🧩 Components</button>
+          <button class="bs-tab" data-t="settings" onclick="swTab(&#39;settings&#39;)">⚙️ Settings</button>
+        </div>
+
+        <!-- CHAT -->
+        <div class="bs-panel on" data-p="chat">
+          <div class="chat-msgs" id="chatMsgs">
+            <div class="bubble ai fade">👋 Xin chào! Mình là AI Editor. Bạn muốn chỉnh sửa gì?</div>
+            <div class="bubble ai fade" style="animation-delay:.1s">💡 Gợi ý: "Đổi nền hero sang hồng", "Thêm đánh giá",
+              "Viết lại tiêu đề"</div>
+          </div>
+          <div class="chat-bar">
+            <input class="chat-in" id="chatIn" placeholder="Nhập lệnh cho AI...">
+            <button class="chat-send" onclick="sendChat()">▶</button>
+          </div>
+        </div>
+
+        <!-- BLOCKS -->
+        <div class="bs-panel" data-p="blocks">
+          <div class="blk-search"><span class="si">🔍</span><input placeholder="Tìm block..."></div>
+          <div class="blk-list">
+            <div class="blk-cat">
+              <div class="blk-cat-t">📐 Cơ bản</div>
+              <div class="blk-row">
+                <div class="ico">📝</div><span class="lbl">Rich Text</span><button class="add" onclick="addBlk(&#39;Rich Text&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">🖼️</div><span class="lbl">Hero Banner</span><button class="add" onclick="addBlk(&#39;Hero Banner&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">📊</div><span class="lbl">3 Cột Grid</span><button class="add" onclick="addBlk(&#39;3 Cột Grid&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">🎞️</div><span class="lbl">Gallery Ảnh</span><button class="add" onclick="addBlk(&#39;Gallery Ảnh&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">📢</div><span class="lbl">CTA Banner</span><button class="add" onclick="addBlk(&#39;CTA Banner&#39;)">+</button>
+              </div>
+            </div>
+            <div class="blk-cat">
+              <div class="blk-cat-t">🛒 Cửa hàng</div>
+              <div class="blk-row">
+                <div class="ico">🛍️</div><span class="lbl">Danh sách SP</span><button class="add" onclick="addBlk(&#39;Danh sách SP&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">🛒</div><span class="lbl">Giỏ hàng</span><button class="add" onclick="addBlk(&#39;Giỏ hàng&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">⭐</div><span class="lbl">Đánh giá KH</span><button class="add" onclick="addBlk(&#39;Đánh giá KH&#39;)">+</button>
+              </div>
+            </div>
+            <div class="blk-cat">
+              <div class="blk-cat-t">🧩 Widgets</div>
+              <div class="blk-row">
+                <div class="ico">💬</div><span class="lbl">Social Feed</span><button class="add" onclick="addBlk(&#39;Social Feed&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">📋</div><span class="lbl">Form Liên hệ</span><button class="add" onclick="addBlk(&#39;Form Liên hệ&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">🗺️</div><span class="lbl">Google Maps</span><button class="add" onclick="addBlk(&#39;Google Maps&#39;)">+</button>
+              </div>
+              <div class="blk-row">
+                <div class="ico">📰</div><span class="lbl">Blog Mới nhất</span><button class="add" onclick="addBlk(&#39;Blog Mới nhất&#39;)">+</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="bs-panel" data-p="settings">
+          <div class="stg-list" id="stgList">
+            <!-- GLOBAL SETTINGS -->
+            <div id="gStg" style="">
+              <div class="stg-grp">
+                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🎨 Brand
+                  Identity</button>
+                <div class="stg-body open">
+                  <div class="stg-row"><span class="stg-lbl">Logo</span><button style="font-size:11px;color:var(--primary-blue);font-weight:600">📤 Tải lên</button></div>
+                  <div class="stg-row"><span class="stg-lbl">Tên thương hiệu</span><input class="stg-in" value="FloraShop"></div>
+                  <div class="stg-row"><span class="stg-lbl">Màu chính</span>
+                    <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#764ba2" style="width:72px">
+                      <div class="swatch" style="background:#764ba2"></div>
+                    </div>
+                  </div>
+                  <div class="stg-row"><span class="stg-lbl">Màu phụ</span>
+                    <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#667eea" style="width:72px">
+                      <div class="swatch" style="background:#667eea"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="stg-grp">
+                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 📞 Liên hệ</button>
+                <div class="stg-body">
+                  <div class="stg-row"><span class="stg-lbl">SĐT</span><input class="stg-in" value="0909 123 456">
+                  </div>
+                  <div class="stg-row"><span class="stg-lbl">Email</span><input class="stg-in" value="hello@flora.vn" style="width:130px"></div>
+                  <div class="stg-row"><span class="stg-lbl">Địa chỉ</span><input class="stg-in" value="123 Nguyễn Huệ, Q1" style="width:130px"></div>
+                </div>
+              </div>
+              <div class="stg-grp">
+                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🔗 Social Links</button>
+                <div class="stg-body">
+                  <div class="stg-row"><span class="stg-lbl">Facebook</span><input class="stg-in" placeholder="URL..." style="width:130px"></div>
+                  <div class="stg-row"><span class="stg-lbl">Instagram</span><input class="stg-in" placeholder="URL..." style="width:130px"></div>
+                  <div class="stg-row"><span class="stg-lbl">TikTok</span><input class="stg-in" placeholder="URL..." style="width:130px"></div>
+                </div>
+              </div>
+              <div class="stg-grp">
+                <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 🔍 SEO Settings</button>
+                <div class="stg-body">
+                  <div style="padding:6px 0">
+                    <div class="stg-lbl" style="margin-bottom:4px">Meta Title <span style="color:var(--muted)">(60 ký
+                        tự)</span></div><input class="stg-in" value="Cửa hàng Hoa Tươi - Giao Trong Ngày" style="width:100%">
+                  </div>
+                  <div style="padding:6px 0">
+                    <div class="stg-lbl" style="margin-bottom:4px">Meta Description <span style="color:var(--muted)">(160 ký tự)</span></div><textarea class="stg-in" style="width:100%;height:50px;resize:none">Mua hoa tươi giao ngay trong 2h!</textarea>
+                  </div>
+                  <button style="width:100%;padding:8px;border-radius:var(--radius-md);background:var(--gradient-primary);color:#fff;font-size:11px;font-weight:600;margin-top:4px">✨
+                    Tối ưu SEO bằng AI</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- BLOCK SETTINGS (shown when block selected) -->
+            <div id="bStg" style="display: none;">
+              <div class="bs-blk-hdr">
+                <span class="btype" id="bTypeL">PRODUCTS</span>
+                <span class="bname" id="bNameL">Sản phẩm</span>
+                <button class="bdel" onclick="showS(8)">🗑️</button>
+              </div>
+              <div class="mv-bar">
+                <button class="mv-btn" onclick="showToast(&#39;Đã di chuyển lên&#39;,&#39;&#39;)">↑ Lên</button>
+                <button class="mv-btn" onclick="showToast(&#39;Đã di chuyển xuống&#39;,&#39;&#39;)">↓ Xuống</button>
+              </div>
+              <div id="bStgFields" style="padding:4px 14px"><div class="stg-grp"><button class="stg-hdr"><span class="arr open">▶</span> 📦 Hiển thị</button><div class="stg-body open"><div class="stg-row"><span class="stg-lbl">Số cột (Mobile)</span><div style="flex: 1 1 0%; display: flex; justify-content: flex-end;"><select class="stg-sel"><option>1 Cột</option><option>2 Cột</option></select></div></div><div class="stg-row"><span class="stg-lbl">Số lượng SP</span><div style="flex: 1 1 0%; display: flex; justify-content: flex-end;"><input class="stg-in" style="width: 60px; text-align: center;"></div></div><div class="stg-row"><span class="stg-lbl">Hiện giá</span><div style="flex: 1 1 0%; display: flex; justify-content: flex-end;"><select class="stg-sel"><option>Có</option><option>Không</option></select></div></div></div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 2: AI PROCESSING
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen" id="s2">
+      <div class="ed-header">
+        <button class="hbtn">☰</button>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><span class="h-status pulse" style="color:var(--primary-blue)">Đang xử lý...</span></div>
+      </div>
+      <div class="preview" style="position:relative">
+        <div class="preview-inner" style="filter:blur(1px);opacity:.5">
+          <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
+          <div class="m-hero">
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh trong 2 giờ</p><span class="m-hero-btn">Mua ngay →</span>
+          </div>
+          <div class="m-products">
+            <h2>Sản phẩm nổi bật</h2>
+          </div>
+        </div>
+        <div class="proc-ov">
+          <div class="spinner"></div>
+          <div style="font-size:12px;color:#fff;font-weight:500;text-align:center">AI đang chỉnh sửa giao diện...</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">Đổi màu nền hero sang hồng</div>
+        </div>
+      </div>
+      <div class="bot-bar" style="flex-direction:column;gap:0;padding:6px 16px">
+        <div class="swipe-h" style="margin-bottom:4px"></div>
+        <button class="stop-btn" onclick="showS(1)">■ Dừng tạo AI</button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 3: TOKEN EXHAUSTED — Chat disabled + upsell
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen" id="s3">
+      <div class="ed-header">
+        <button class="hbtn" onclick="showS(1)">←</button>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><button class="btn-pub">🚀</button></div>
+      </div>
+      <div class="preview">
+        <div class="preview-inner">
+          <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
+          <div class="m-hero" style="background:linear-gradient(135deg,#f472b6,#ec4899)">
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh trong 2 giờ</p>
+          </div>
+        </div>
+      </div>
+      <div class="bs-overlay on" onclick="showS(1)"></div>
+      <div class="bs open h60">
+        <div class="bs-handle"></div>
+        <div class="bs-tabs"><button class="bs-tab on">🤖 Chat</button><button class="bs-tab">🧩 Blocks</button><button class="bs-tab">⚙️ Cài đặt</button></div>
+        <div class="bs-panel on" style="flex:1;display:flex;flex-direction:column">
+          <div class="chat-msgs" style="flex:1">
+            <div class="bubble ai">Xin chào! Bạn muốn chỉnh sửa gì?</div>
+            <div class="bubble user">Đổi nền hero sang hồng</div>
+            <div class="bubble ai">Đã đổi nền hero sang hồng rồi nhé! 🌸</div>
+            <div class="bubble user">Thêm section đánh giá KH</div>
+            <div class="bubble sys">⚠️ Bạn đã hết lượt dùng AI tháng này!</div>
+            <div class="tok-banner">
+              <div class="ico">💎</div>
+              <div class="title">Hết AI Token</div>
+              <div class="desc">Bạn vẫn có thể thêm block và chỉnh sửa thủ công. Nâng cấp để tiếp tục dùng AI.</div>
+              <button class="up-btn">💎 Nâng cấp gói ngay</button>
+            </div>
+          </div>
+          <div class="chat-bar">
+            <input class="chat-in off" placeholder="🚫 Đã hết Token" disabled="">
+            <button class="chat-send off">▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 4: BLOCK SELECTED + INLINE EDIT + Block Settings
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen" id="s4">
+      <div class="ed-header">
+        <button class="hbtn" onclick="showS(1)">←</button>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><span class="h-status" style="color:var(--success)">✓ Lưu</span><button class="btn-pub">🚀</button></div>
+      </div>
+      <div class="preview">
+        <div class="preview-inner">
+          <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
+          <div class="m-hero blk sel" style="position:relative">
+            <div class="ai-badge" style="opacity:1">✨ AI</div>
+            <div class="il-toolbar" style="position:absolute;top:8px;left:50%;opacity:1;pointer-events:auto">
+              <button class="on">B</button><button>I</button><button>U</button>
+              <div class="sep"></div>
+              <button>H1</button><button>H2</button>
+              <div class="sep"></div>
+              <button>≡</button>
+            </div>
+            <h1 style="margin-top:36px">Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh trong 2 giờ</p>
+            <span class="m-hero-btn">Mua ngay →</span>
+          </div>
+          <div class="m-products">
+            <h2>Sản phẩm nổi bật</h2>
+            <div class="p-grid">
+              <div class="p-card">
+                <div class="p-img">🌹</div>
+                <div class="p-info">
+                  <h3>Hoa Hồng</h3>
+                  <div class="price">299.000₫</div>
+                </div>
+              </div>
+              <div class="p-card">
+                <div class="p-img">🌻</div>
+                <div class="p-info">
+                  <h3>Hướng Dương</h3>
+                  <div class="price">199.000₫</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Auto-opened Block Settings sheet -->
+      <div class="bs-overlay on" style="background:transparent" onclick="showS(1)"></div>
+      <div class="bs open h50">
+        <div class="bs-handle"></div>
+        <div class="bs-blk-hdr"><span class="btype">BLOCK</span><span class="bname">Hero Section</span><button class="bdel">🗑️</button></div>
+        <div class="mv-bar">
+          <button class="mv-btn">↑ Di chuyển lên</button>
+          <button class="mv-btn">↓ Di chuyển xuống</button>
+        </div>
+        <div style="padding:6px 14px;overflow-y:auto;flex:1">
+          <div class="stg-grp">
+            <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🎨 Background</button>
+            <div class="stg-body open">
+              <div class="stg-row"><span class="stg-lbl">Kiểu</span><select class="stg-sel">
+                  <option>Gradient</option>
+                  <option>Ảnh</option>
+                </select></div>
+              <div class="stg-row"><span class="stg-lbl">Màu 1</span>
+                <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#667eea" style="width:72px">
+                  <div class="swatch" style="background:#667eea"></div>
+                </div>
+              </div>
+              <div class="stg-row"><span class="stg-lbl">Màu 2</span>
+                <div style="display:flex;gap:5px;align-items:center"><input class="stg-in" value="#764ba2" style="width:72px">
+                  <div class="swatch" style="background:#764ba2"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="stg-grp">
+            <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> 📐 Padding</button>
+            <div class="stg-body">
+              <div class="stg-row"><span class="stg-lbl">Trên</span><input class="stg-in" value="40px" style="width:60px"></div>
+              <div class="stg-row"><span class="stg-lbl">Dưới</span><input class="stg-in" value="40px" style="width:60px"></div>
+            </div>
+          </div>
+          <div class="stg-grp">
+            <button class="stg-hdr" onclick="tglStg(this)"><span class="arr">▶</span> ✨ Animation</button>
+            <div class="stg-body">
+              <div class="stg-row"><span class="stg-lbl">Hiệu ứng</span><select class="stg-sel">
+                  <option>Fade In</option>
+                  <option>Slide Up</option>
+                </select></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 5: IMAGE EDIT — Upload works, AI-gen disabled
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen" id="s5">
+      <div class="ed-header">
+        <button class="hbtn" onclick="showS(1)">←</button>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><button class="btn-pub">🚀</button></div>
+      </div>
+      <div class="preview">
+        <div class="preview-inner">
+          <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
+          <div class="m-hero">
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh</p>
+          </div>
+          <div class="m-products">
+            <h2>Sản phẩm nổi bật</h2>
+            <div class="p-grid">
+              <div class="p-card">
+                <div class="p-img blk sel" style="position:relative;outline-offset:-2px">
+                  🌹
+                  <div class="img-toolbar">
+                    <button class="btn-up">📤 Đổi ảnh</button>
+                    <button class="btn-aig">✨ AI ảnh 🚫</button>
+                  </div>
+                </div>
+                <div class="p-info">
+                  <h3>Hoa Hồng</h3>
+                  <div class="price">299.000₫</div>
+                </div>
+              </div>
+              <div class="p-card">
+                <div class="p-img">🌻</div>
+                <div class="p-info">
+                  <h3>Hướng Dương</h3>
+                  <div class="price">199.000₫</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bot-bar" onclick="openSheet(&#39;chat&#39;)">
+        <div class="swipe-h"></div>
+        <div class="bot-bar-text">🪄 Mở Chat AI &amp; Công cụ ▲</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 6: OUT-OF-SCOPE AI + REGENERATE
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen" id="s6">
+      <div class="ed-header">
+        <button class="hbtn" onclick="showS(1)">←</button>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><button class="btn-pub">🚀</button></div>
+      </div>
+      <div class="preview">
+        <div class="preview-inner">
+          <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
+          <div class="m-hero" style="background:linear-gradient(135deg,#f472b6,#ec4899)">
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh</p><span class="m-hero-btn">Mua ngay →</span>
+          </div>
+        </div>
+      </div>
+      <div class="bs-overlay on" onclick="showS(1)"></div>
+      <div class="bs open h60">
+        <div class="bs-handle"></div>
+        <div class="bs-tabs"><button class="bs-tab on">🤖 Chat</button><button class="bs-tab">🧩 Blocks</button><button class="bs-tab">⚙️ Cài đặt</button></div>
+        <div class="bs-panel on" style="flex:1;display:flex;flex-direction:column">
+          <div class="chat-msgs" style="flex:1">
+            <div class="bubble ai">Xin chào! Bạn muốn chỉnh sửa gì?</div>
+            <div class="bubble user">Đổi nền hero sang hồng</div>
+            <div class="bubble ai">Đã hoàn tất! 🌸 <button class="act">🔄 Thử phương án khác</button></div>
+            <div class="bubble user">Thời tiết hôm nay?</div>
+            <div class="bubble sys">⚠️ Mình chỉ hỗ trợ thiết kế web. Thử: "Đổi font", "Thêm section", "Viết lại nội
+              dung"</div>
+          </div>
+          <div class="chat-bar">
+            <input class="chat-in" placeholder="Nhập lệnh cho AI...">
+            <button class="chat-send">▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 7: PRE-PUBLISH CHECKLIST
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen" id="s7">
+      <div class="ed-header">
+        <button class="hbtn" onclick="showS(1)">←</button>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><span class="h-status">Draft</span></div>
+      </div>
+      <div class="preview" style="filter:blur(2px);opacity:.35">
+        <div class="preview-inner">
+          <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
+          <div class="m-hero">
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+          </div>
+        </div>
+      </div>
+      <div class="pub-sheet slide-up">
+        <div class="pub-hdr"><span style="font-size:20px">🚀</span>
+          <h3>Xuất bản Website</h3><button class="x" onclick="showS(1)">✕</button>
+        </div>
+        <div class="checklist">
+          <div class="chk-item"><span class="chk-ico">✅</span>
+            <div class="chk-c">
+              <h4>Trang chủ sẵn sàng</h4>
+              <p>Homepage có nội dung và đã được lưu</p>
+            </div>
+          </div>
+          <div class="chk-item"><span class="chk-ico">✅</span>
+            <div class="chk-c">
+              <h4>Cấu hình thanh toán</h4>
+              <p>Stripe đã kết nối, giỏ hàng hoạt động</p>
+            </div>
+          </div>
+          <div class="chk-item"><span class="chk-ico">⚠️</span>
+            <div class="chk-c">
+              <h4>SEO chưa đầy đủ</h4>
+              <p>Trang "Giới thiệu" thiếu Meta Description</p>
+            </div>
+          </div>
+          <div class="chk-item"><span class="chk-ico">✅</span>
+            <div class="chk-c">
+              <h4>Responsive OK</h4>
+              <p>Giao diện hiển thị tốt trên mobile và desktop</p>
+            </div>
+          </div>
+          <div class="chk-item"><span class="chk-ico">✅</span>
+            <div class="chk-c">
+              <h4>Navigation hoàn chỉnh</h4>
+              <p>Menu chính đã liên kết tất cả trang Live</p>
+            </div>
+          </div>
+        </div>
+        <div class="pub-foot">
+          <button class="btn-back" onclick="showS(1)">← Quay lại</button>
+          <button class="btn-gopub" onclick="pubDone()">👉 Publish ngay</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 8: UNPUBLISH / DELETE WARNING
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen" id="s8">
+      <div class="ed-header">
+        <button class="hbtn">☰</button>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><button class="btn-pub" style="opacity:.5">🚀</button></div>
+      </div>
+      <div class="preview" style="filter:blur(3px);opacity:.25">
+        <div class="preview-inner">
+          <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
+          <div class="m-hero">
+            <h1>Hoa Tươi</h1>
+          </div>
+        </div>
+      </div>
+      <div class="alert-ov">
+        <div class="alert-box fade">
+          <div style="font-size:28px">⚠️</div>
+          <h3>Tạm ẩn Website?</h3>
+          <p>Bạn đang chuẩn bị đưa trang web về chế độ Bảo trì:</p>
+          <ul>
+            <li>Khách hàng sẽ <strong>không thể truy cập</strong> trang web</li>
+            <li>SEO Bot nhận mã lỗi <strong>503 HTTP</strong></li>
+            <li>Dữ liệu và nội dung vẫn được giữ nguyên</li>
+          </ul>
+          <div class="alert-acts">
+            <button class="btn-cancel" onclick="showS(1)">Huỷ bỏ</button>
+            <button class="btn-danger" onclick="pubDone2()">Có, Ẩn ngay</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 9: NAVIGATION / MENU EDITOR
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen" id="s9">
+      <div class="ed-header">
+        <button class="hbtn" onclick="showS(1)">←</button>
+        <span style="font-size:13px;font-weight:600;flex:1">Quản lý Menu</span>
+        <button style="color:var(--primary-blue);font-size:12px;font-weight:600" onclick="showS(1)">Xong</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;background:var(--bg)">
+        <div class="nav-list">
+          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">🏠 Trang chủ</span>
+            <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button></div>
+          </div>
+          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">🛍️ Sản phẩm</span>
+            <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button></div>
+          </div>
+          <div class="nv-item sub"><span class="nv-grip" style="opacity:.4">⠿</span><span class="nv-label" style="color:var(--muted)">↳ Áo dài</span>
+            <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button><button style="color:var(--error)">✕</button></div>
+          </div>
+          <div class="nv-item sub"><span class="nv-grip" style="opacity:.4">⠿</span><span class="nv-label" style="color:var(--muted)">↳ Váy cưới</span>
+            <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button><button style="color:var(--error)">✕</button></div>
+          </div>
+          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">📄 Giới thiệu</span>
+            <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button></div>
+          </div>
+          <div class="nv-item"><span class="nv-grip">⠿</span><span class="nv-label">📞 Liên hệ</span>
+            <div class="nv-acts"><button>↑</button><button>↓</button><button>✏️</button></div>
+          </div>
+          <button class="nv-add">➕ Thêm link mới</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 10: SEO DISABLED (Token Exhausted) — in Settings tab
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen" id="s10">
+      <div class="ed-header">
+        <button class="hbtn" onclick="showS(1)">←</button>
+        <button class="page-sel"><span>🏠 Trang chủ</span></button>
+        <div class="h-actions"><button class="btn-pub">🚀</button></div>
+      </div>
+      <div class="preview">
+        <div class="preview-inner">
+          <div class="m-nav"><span class="m-logo">🌸 FloraShop</span></div>
+          <div class="m-hero">
+            <h1>Hoa Tươi Mỗi Ngày</h1>
+            <p>Giao hàng nhanh</p>
+          </div>
+        </div>
+      </div>
+      <div class="bs-overlay on" onclick="showS(1)"></div>
+      <div class="bs open h75">
+        <div class="bs-handle"></div>
+        <div class="bs-tabs"><button class="bs-tab">🤖 Chat</button><button class="bs-tab">🧩 Blocks</button><button class="bs-tab on">⚙️ Cài đặt</button></div>
+        <div class="bs-panel on" style="flex:1;display:flex;flex-direction:column">
+          <div class="stg-list" style="flex:1;overflow-y:auto">
+            <div class="stg-grp">
+              <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🔍 SEO Settings</button>
+              <div class="stg-body open">
+                <div style="padding:6px 0">
+                  <div class="stg-lbl" style="margin-bottom:4px">Meta Title <span style="color:var(--muted)">(60 ký
+                      tự)</span></div><input class="stg-in" value="Cửa hàng Hoa Tươi" style="width:100%">
+                </div>
+                <div style="padding:6px 0">
+                  <div class="stg-lbl" style="margin-bottom:4px">Meta Description <span style="color:var(--muted)">(160
+                      ký tự)</span></div><textarea class="stg-in" style="width:100%;height:50px;resize:none">Mua hoa tươi giao ngay trong 2h!</textarea>
+                </div>
+                <button style="width:100%;padding:8px;border-radius:var(--radius-md);background:var(--secondary-bg);color:var(--muted);font-size:11px;font-weight:600;margin-top:4px;opacity:.5" disabled="">✨ Tự động Tối ưu SEO</button>
+                <p style="font-size:10px;color:var(--warning);margin-top:5px;text-align:center">🔒 Đã hết AI Token — bạn
+                  vẫn có thể chỉnh sửa thủ công</p>
+                <div style="text-align:center;margin-top:8px"><button style="padding:6px 16px;background:var(--gradient-primary);color:#fff;border-radius:16px;font-size:11px;font-weight:600">💎
+                    Nâng cấp</button></div>
+              </div>
+            </div>
+            <div class="stg-grp">
+              <button class="stg-hdr" onclick="tglStg(this)"><span class="arr open">▶</span> 🎨 Brand Identity</button>
+              <div class="stg-body open">
+                <div class="stg-row"><span class="stg-lbl">Tên</span><input class="stg-in" value="FloraShop"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+     SCREEN 11: ADD NEW PAGE FLOW (full screen variant)
+     Shows what happens after user creates a new page
+     ══════════════════════════════════════════════════════════════ -->
+    <div class="screen" id="s11">
+      <div class="ed-header">
+        <button class="hbtn" onclick="showS(1)">←</button>
+        <button class="page-sel"><span>🎉 Khuyến mãi</span><span class="chevron">▼</span></button>
+        <div class="h-actions"><span class="h-status" style="color:var(--warning)">Draft</span><button class="btn-pub">🚀</button></div>
+      </div>
+      <div class="preview">
+        <div class="preview-inner" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:500px;background:#fff;">
+          <div style="text-align:center;padding:40px 20px">
+            <div style="font-size:40px;margin-bottom:12px">📄</div>
+            <div style="font-size:16px;font-weight:700;color:#1f2937;margin-bottom:6px">Trang mới đã tạo!</div>
+            <div style="font-size:12px;color:#6b7280;margin-bottom:20px;line-height:1.5">Trang "Khuyến mãi" đang trống.
+              Bắt đầu thêm nội dung bằng AI hoặc kéo thả block.</div>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+              <button style="padding:10px 18px;background:linear-gradient(135deg,#3b82f6,#2dd4bf);color:#fff;border-radius:10px;font-size:12px;font-weight:700" onclick="showS(1)">🪄 Dùng AI tạo nội dung</button>
+              <button style="padding:10px 18px;background:#f1f5f9;color:#1f2937;border-radius:10px;font-size:12px;font-weight:700;border:1px solid #e2e8f0" onclick="showS(1)">🧩 Thêm Block</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fab" onclick="openSheet(&#39;chat&#39;)">🪄</div>
+      <div class="bot-bar">
+        <div class="swipe-h"></div>
+        <div class="bot-bar-text">🪄 Mở Chat AI &amp; Công cụ ▲</div>
+      </div>
+    </div>
+
+  </div><!-- /phone-frame -->
+
+  <!-- SCREEN NAV -->
+  <div class="screen-nav" id="sNav">
+    <button class="active" onclick="showS(1)" title="1. Default Preview">1</button>
+    <button onclick="showS(2)" title="2. AI Processing" class="">2</button>
+    <button onclick="showS(3)" title="3. Token Exhausted" class="">3</button>
+    <button onclick="showS(4)" title="4. Block Selected" class="">4</button>
+    <button onclick="showS(5)" title="5. Image Edit" class="">5</button>
+    <button onclick="showS(6)" title="6. Chat Edge Cases" class="">6</button>
+    <button onclick="showS(7)" title="7. Pre-Publish" class="">7</button>
+    <button onclick="showS(8)" title="8. Unpublish Alert" class="">8</button>
+    <button onclick="showS(9)" title="9. Nav Editor" class="">9</button>
+    <button onclick="showS(10)" title="10. SEO Disabled" class="">10</button>
+    <button onclick="showS(11)" title="11. New Page Created" class="">11</button>
+  </div>
+
+  <script>
+    /* ═══════ SCREEN NAV ═══════ */
+    function showS(n) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('s' + n).classList.add('active');
+      document.querySelectorAll('.screen-nav button').forEach((b, i) => b.classList.toggle('active', i === n - 1));
+      if (n === 1) { closeSheet(); closeDrawer(); document.getElementById('pgDrop').classList.remove('on'); hideAddPageForm(); hidePgConfirm(); }
+    }
+
+    /* ═══════ CMS DRAWER ═══════ */
+    function openDrawer() { document.getElementById('drawer').classList.add('on'); document.getElementById('drawerOv').classList.add('on'); }
+    function closeDrawer() { document.getElementById('drawer').classList.remove('on'); document.getElementById('drawerOv').classList.remove('on'); }
+
+    /* ═══════ PAGE DROPDOWN ═══════ */
+    function togglePages() {
+      const d = document.getElementById('pgDrop');
+      d.classList.toggle('on');
+      hideAddPageForm(); hidePgConfirm();
+    }
+
+    /* Page actions */
+    function pageAction(page, action) {
+      if (action === 'toggleVis') {
+        const item = document.querySelector(`.pg-item[data-page="${page}"]`);
+        const tag = item.querySelector('.pg-tag');
+        if (tag.classList.contains('hidden')) {
+          tag.classList.remove('hidden'); tag.classList.add('live'); tag.textContent = 'Live';
+          showToast('Trang đã hiển thị trở lại', '');
+        } else {
+          tag.classList.remove('live', 'draft'); tag.classList.add('hidden'); tag.textContent = 'Ẩn';
+          showToast('Đã ẩn trang — khách sẽ thấy 404', '');
+        }
+      }
+      if (action === 'up' || action === 'down') {
+        const list = document.getElementById('pageList');
+        const items = [...list.querySelectorAll('.pg-item')];
+        const idx = items.findIndex(i => i.dataset.page === page);
+        if (action === 'up' && idx > 0) { list.insertBefore(items[idx], items[idx - 1]); showToast('Đã đổi vị trí trang', ''); }
+        if (action === 'down' && idx < items.length - 1) { items[idx].nextElementSibling.after(items[idx]);/* swap */list.insertBefore(items[idx], items[idx].nextElementSibling?.nextElementSibling || null); showToast('Đã đổi vị trí trang', ''); }
+      }
+      if (action === 'edit') {
+        document.getElementById('currentPageName').textContent = { home: '🏠 Trang chủ', products: '🛍️ Sản phẩm', about: '📄 Giới thiệu', contact: '📞 Liên hệ', '404': '🚫 Trang 404' }[page] || page;
+        togglePages();
+      }
+      if (action === 'delete') {
+        document.getElementById('pgConfirmName').textContent = document.querySelector(`.pg-item[data-page="${page}"] .pg-name`).textContent;
+        document.getElementById('pgConfirm').classList.add('on');
+        document.getElementById('pgConfirm').dataset.page = page;
+      }
+    }
+    function hidePgConfirm() { document.getElementById('pgConfirm').classList.remove('on'); }
+    function confirmDeletePage() {
+      const page = document.getElementById('pgConfirm').dataset.page;
+      const item = document.querySelector(`.pg-item[data-page="${page}"]`);
+      if (item) item.style.display = 'none';
+      hidePgConfirm(); togglePages();
+      // Show undo toast
+      const ut = document.getElementById('undoToast');
+      ut.classList.add('on');
+      let sec = 5; document.getElementById('undoTimer').textContent = sec + 's';
+      const iv = setInterval(() => { sec--; document.getElementById('undoTimer').textContent = sec + 's'; if (sec <= 0) { clearInterval(iv); ut.classList.remove('on'); } }, 1000);
+      ut._iv = iv; ut._page = page;
+    }
+    function undoDeletePage() {
+      const ut = document.getElementById('undoToast'); clearInterval(ut._iv); ut.classList.remove('on');
+      const item = document.querySelector(`.pg-item[data-page="${ut._page}"]`);
+      if (item) item.style.display = '';
+      showToast('Đã hoàn tác xoá trang', '');
+    }
+
+    /* Add new page */
+    function showAddPageForm() {
+      document.getElementById('pgAddBtn').style.display = 'none';
+      document.getElementById('pgForm').classList.add('on');
+      document.getElementById('pgNameIn').value = '';
+      document.getElementById('slugPreview').textContent = '/ten-trang';
+      setTimeout(() => document.getElementById('pgNameIn').focus(), 100);
+    }
+    function hideAddPageForm() {
+      document.getElementById('pgAddBtn').style.display = '';
+      document.getElementById('pgForm').classList.remove('on');
+    }
+    function updateSlugPreview() {
+      const v = document.getElementById('pgNameIn').value;
+      const slug = v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').replace(/[^a-zA-Z0-9\s-]/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'ten-trang';
+      document.getElementById('slugPreview').textContent = '/' + slug;
+    }
+    function createNewPage() {
+      const name = document.getElementById('pgNameIn').value.trim();
+      if (!name) { document.getElementById('pgNameIn').style.borderColor = 'var(--error)'; return; }
+      hideAddPageForm(); togglePages();
+      showToast('Đã tạo trang "' + name + '"', '');
+      setTimeout(() => showS(11), 800);
+    }
+
+    /* ═══════ BOTTOM SHEET ═══════ */
+    function openSheet(tab) {
+      document.getElementById('sheet').classList.add('open');
+      document.getElementById('shOv').classList.add('on');
+      document.getElementById('fab').classList.add('hide');
+      if (tab) swTab(tab);
+    }
+    function closeSheet() {
+      document.getElementById('sheet').classList.remove('open');
+      document.getElementById('shOv').classList.remove('on');
+      document.getElementById('fab').classList.remove('hide');
+      // Clear block selection
+      document.querySelectorAll('#s1 .blk').forEach(b => b.classList.remove('sel'));
+      document.getElementById('gStg').style.display = '';
+      document.getElementById('bStg').style.display = 'none';
+    }
+    function swTab(t) {
+      document.querySelectorAll('#shTabs .bs-tab').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+      document.querySelectorAll('#sheet .bs-panel').forEach(p => p.classList.toggle('on', p.dataset.p === t));
+    }
+
+    /* ═══════ BLOCK SELECT ═══════ */
+    function selBlock(el, type) {
+      document.querySelectorAll('#s1 .blk').forEach(b => b.classList.remove('sel'));
+      el.classList.add('sel');
+      const map = {
+        header: ['HEADER', 'Header / Nav'],
+        hero: ['HERO', 'Hero Section'],
+        products: ['PRODUCTS', 'Sản phẩm'],
+        footer: ['FOOTER', 'Footer'],
+        text: ['TEXT', 'Rich Text'],
+        cta: ['CTA', 'Call to Action']
+      };
+      if (map[type]) {
+        document.getElementById('bTypeL').textContent = map[type][0];
+        document.getElementById('bNameL').textContent = map[type][1];
+        renderBlockSettings(type);
+      }
+      document.getElementById('gStg').style.display = 'none';
+      document.getElementById('bStg').style.display = 'block';
+      openSheet('settings');
+    }
+
+    /* ═══════ DYNAMIC BLOCK SETTINGS RENDERER ═══════ */
+    const BLOCK_CONFIGS = {
+      header: {
+        name: 'Header / Điều hướng',
+        groups: [
+          {
+            title: '🎨 Giao diện',
+            fields: [
+              { label: 'Chiều cao (px)', type: 'number', key: 'h', val: '60' },
+              { label: 'Màu chữ', type: 'color', key: 'c', val: '#1f2937' },
+              { label: 'Nền dính (Sticky)', type: 'select', key: 'sticky', options: ['Có', 'Không'], val: 'Có' }
+            ]
+          }
+        ]
+      },
+      hero: {
+        name: 'Hero Section',
+        groups: [
+          {
+            title: '🎨 Background',
+            fields: [
+              { label: 'Kiểu nền', type: 'select', key: 'bgType', options: ['Gradient', 'Ảnh', 'Màu đơn'], val: 'Gradient' },
+              { label: 'Màu 1', type: 'color', key: 'color1', val: '#667eea' },
+              { label: 'Màu 2', type: 'color', key: 'color2', val: '#764ba2' }
+            ]
+          },
+          {
+            title: '📐 Padding',
+            fields: [
+              { label: 'Trên', type: 'number', key: 'pt', val: '40' },
+              { label: 'Dưới', type: 'number', key: 'pb', val: '40' }
+            ]
+          }
+        ]
+      },
+      products: {
+        name: 'Danh sách sản phẩm',
+        groups: [
+          {
+            title: '📦 Hiển thị',
+            fields: [
+              { label: 'Số cột (Mobile)', type: 'select', key: 'cols', options: ['1 Cột', '2 Cột'], val: '2 Cột' },
+              { label: 'Số lượng SP', type: 'number', key: 'limit', val: '4' },
+              { label: 'Hiện giá', type: 'select', key: 'showPrice', options: ['Có', 'Không'], val: 'Có' }
+            ]
+          }
+        ]
+      },
+      footer: {
+        name: 'Chân trang',
+        groups: [
+          {
+            title: '🎨 Giao diện',
+            fields: [
+              { label: 'Màu nền', type: 'color', key: 'bgFooter', val: '#1f2937' },
+              { label: 'Màu chữ', type: 'color', key: 'fgFooter', val: '#9ca3af' }
+            ]
+          }
+        ]
+      },
+      text: {
+        name: 'Rich Text',
+        groups: [
+          {
+            title: '📝 Nội dung',
+            fields: [
+              { label: 'Căn lề', type: 'select', key: 'align', options: ['Trái', 'Giữa', 'Phải'], val: 'Giữa' },
+              { label: 'Cỡ chữ', type: 'number', key: 'fs', val: '14' },
+              { label: 'Màu chữ', type: 'color', key: 'color', val: '#1f2937' }
+            ]
+          }
+        ]
+      },
+      cta: {
+        name: 'CTA Banner',
+        groups: [
+          {
+            title: '📢 Hành động',
+            fields: [
+              { label: 'Text nút', type: 'text', key: 'btnText', val: 'Mua ngay' },
+              { label: 'Màu nút', type: 'color', key: 'btnColor', val: '#3b82f6' },
+              { label: 'Góc bo', type: 'number', key: 'radius', val: '8' }
+            ]
+          }
+        ]
+      }
+    };
+
+    function renderBlockSettings(type) {
+      const config = BLOCK_CONFIGS[type];
+      const container = document.getElementById('bStgFields');
+      if (!config || !container) return;
+
+      container.innerHTML = ''; // Clear existing
+
+      config.groups.forEach(grp => {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'stg-grp';
+
+        const hdr = document.createElement('button');
+        hdr.className = 'stg-hdr';
+        hdr.onclick = function () { tglStg(this); };
+        hdr.innerHTML = `<span class="arr open">▶</span> ${grp.title}`;
+        groupEl.appendChild(hdr);
+
+        const body = document.createElement('div');
+        body.className = 'stg-body open';
+
+        grp.fields.forEach(f => {
+          const row = document.createElement('div');
+          row.className = 'stg-row';
+          row.innerHTML = `<span class="stg-lbl">${f.label}</span>`;
+
+          let inputContainer = document.createElement('div');
+          inputContainer.style.flex = '1';
+          inputContainer.style.display = 'flex';
+          inputContainer.style.justifyContent = 'flex-end';
+
+          if (f.type === 'select') {
+            const input = document.createElement('select');
+            input.className = 'stg-sel';
+            f.options.forEach(opt => {
+              const o = document.createElement('option');
+              o.textContent = opt;
+              if (opt === f.val) o.selected = true;
+              input.appendChild(o);
+            });
+            inputContainer.appendChild(input);
+          } else if (f.type === 'color') {
+            const wrap = document.createElement('div');
+            wrap.style.display = 'flex'; wrap.style.gap = '8px'; wrap.style.alignItems = 'center';
+            const input = document.createElement('input');
+            input.className = 'stg-in'; input.value = f.val; input.style.width = '75px';
+            input.style.textAlign = 'center';
+            const swatch = document.createElement('div');
+            swatch.className = 'swatch';
+            swatch.style.background = f.val;
+            swatch.style.border = '1px solid rgba(0,0,0,0.1)';
+            wrap.appendChild(input); wrap.appendChild(swatch);
+            inputContainer.appendChild(wrap);
+          } else if (f.type === 'text') {
+            const input = document.createElement('input');
+            input.className = 'stg-in'; input.value = f.val;
+            input.style.width = '100%';
+            input.style.textAlign = 'right';
+            inputContainer.appendChild(input);
+          } else {
+            const input = document.createElement('input');
+            input.className = 'stg-in'; input.value = f.val;
+            if (f.type === 'number') {
+              input.style.width = '60px';
+              input.style.textAlign = 'center';
+            }
+            inputContainer.appendChild(input);
+          }
+
+          row.appendChild(inputContainer);
+          body.appendChild(row);
+        });
+
+        groupEl.appendChild(body);
+        container.appendChild(groupEl);
+      });
+    }
+
+    /* ═══════ SETTINGS TOGGLE ═══════ */
+    function tglStg(btn) { const c = btn.nextElementSibling; const a = btn.querySelector('.arr'); c.classList.toggle('open'); a.classList.toggle('open'); }
+
+    /* ═══════ ADD BLOCK ═══════ */
+    function addBlk(name) {
+      showToast('Đã thêm "' + name + '" vào trang', '');
+      if (navigator.vibrate) navigator.vibrate(50);
+      setTimeout(() => closeSheet(), 500);
+    }
+
+    /* ═══════ CHAT ═══════ */
+    function sendChat() {
+      const inp = document.getElementById('chatIn'); const msg = inp.value.trim(); if (!msg) return;
+      const box = document.getElementById('chatMsgs');
+      const ub = document.createElement('div'); ub.className = 'bubble user fade'; ub.textContent = msg; box.appendChild(ub);
+      inp.value = '';
+      const tp = document.createElement('div'); tp.className = 'typing'; tp.innerHTML = '<span></span><span></span><span></span>'; box.appendChild(tp);
+      box.scrollTop = box.scrollHeight;
+      setTimeout(() => { tp.remove(); const ab = document.createElement('div'); ab.className = 'bubble ai fade'; ab.innerHTML = 'Đã thực hiện: "' + msg + '" ✨<br><button class="act">🔄 Thử phương án khác</button>'; box.appendChild(ab); box.scrollTop = box.scrollHeight; }, 1200);
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Enter' && document.activeElement.id === 'chatIn') sendChat(); });
+
+    /* ═══════ TOAST ═══════ */
+    function showToast(msg, act) {
+      const t = document.getElementById('toast1');
+      document.getElementById('toast1Txt').textContent = msg;
+      document.getElementById('toast1Act').textContent = act;
+      t.classList.add('on'); if (navigator.vibrate) navigator.vibrate(30);
+      setTimeout(() => t.classList.remove('on'), 2500);
+    }
+    function pubDone() { showS(1); setTimeout(() => showToast('🎉 Website đã được xuất bản!', ''), 400); }
+    function pubDone2() { showS(1); setTimeout(() => showToast('Website đã tạm ẩn', ''), 400); }
+
+    /* ═══════ THEME ═══════ */
+    function toggleTheme() {
+      const h = document.documentElement; const b = document.querySelector('.theme-btn');
+      if (h.dataset.theme === 'dark') { h.dataset.theme = 'light'; b.textContent = '☀️'; }
+      else { h.dataset.theme = 'dark'; b.textContent = '🌙'; }
+    }
+
+    /* ═══════ SWIPE ═══════ */
+    let ty = 0;
+    document.querySelector('#s1 .bot-bar').addEventListener('touchstart', e => { ty = e.touches[0].clientY; });
+    document.querySelector('#s1 .bot-bar').addEventListener('touchend', e => { if (ty - e.changedTouches[0].clientY > 30) openSheet('chat'); });
+    document.getElementById('prevArea').addEventListener('click', e => {
+      if (document.getElementById('sheet').classList.contains('open') && !e.target.closest('.blk')) { closeSheet(); }
+    });
+  </script>
+
+
+
+</body></html>
