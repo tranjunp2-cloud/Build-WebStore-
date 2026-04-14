@@ -186,8 +186,8 @@ describe('EditorStore — Header/Footer Block Operations', () => {
             links: [{ label: 'About', url: '/about' }],
         })
 
-        expect((useEditorStore.getState().headerBlock as any).links).toEqual([{ label: 'About', url: '/about' }])
-        expect((useEditorStore.getState().blocks[0] as any).links).toEqual([{ label: 'About', url: '/about' }])
+        expect((useEditorStore.getState().headerBlock as Record<string, unknown>).links).toEqual([{ label: 'About', url: '/about' }])
+        expect((useEditorStore.getState().blocks[0] as Record<string, unknown>).links).toEqual([{ label: 'About', url: '/about' }])
     })
 
     // ── TC-F05.17 — updateFooterBlock ───────────────────────────────────

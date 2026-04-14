@@ -237,9 +237,7 @@ function SettingsPanelInner({
 
     // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
-        console.log('[SettingsPanel] effect fired:', { requestedTab, hasBlock: !!block, blockType: block?.blockType })
         if (requestedTab) {
-            console.log('[SettingsPanel] → setActiveTab:', requestedTab.tab)
             setActiveTab(requestedTab.tab)
             return
         }
@@ -247,11 +245,7 @@ function SettingsPanelInner({
             setActiveTab('block')
             return
         }
-        setActiveTab(prev => {
-            const next = prev === 'block' ? 'global' : prev
-            console.log('[SettingsPanel] → fallback:', prev, '→', next)
-            return next
-        })
+        setActiveTab(prev => (prev === 'block' ? 'global' : prev))
     }, [block, requestedTab])
 
     const siteContactInfo = site?.contactInfo || {}

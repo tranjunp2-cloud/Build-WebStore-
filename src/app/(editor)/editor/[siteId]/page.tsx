@@ -758,10 +758,7 @@ export default function EditorPage() {
 
     // BUG-F05-032/046: context-sensitive tab switching when blocks are clicked
     const handleBlockSelectWithContext = useCallback((blockIndex: number | null, blockType?: string) => {
-        console.log('[Editor] blockSelect:', { blockIndex, blockType })
         if (blockType === 'navigation' || blockType === 'footer') {
-            // Header/footer clicked → deselect block, show menu tab in SettingsPanel
-            console.log('[Editor] → switching to menu tab')
             setSelectedBlock(null)
             // Use unique key to force re-trigger even on repeated clicks
             setSettingsRequestedTab({ tab: 'menu', key: Date.now() })
