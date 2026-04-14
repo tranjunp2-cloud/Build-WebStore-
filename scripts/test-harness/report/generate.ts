@@ -201,8 +201,8 @@ function renderReport(report: CombinedReport): string {
   .fixture[data-status="warn"] { border-left: 3px solid var(--warn); }
   .fixture[data-status="fail"] { border-left: 3px solid var(--fail); }
   .fixture[data-status="hole"] { border-left: 3px solid var(--hole); }
-  .thumb { width: 100%; aspect-ratio: 16/10; object-fit: cover; object-position: top; background: #050505; display: block; }
-  .thumb.placeholder { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; padding: 20px; text-align: center; }
+  .thumb { width: 100%; aspect-ratio: 4/5; object-fit: cover; object-position: top; background: #050505; display: block; }
+  .thumb.placeholder { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; padding: 40px 20px; text-align: center; aspect-ratio: 4/5; }
   figcaption { padding: 12px 14px 14px; }
   .caption-line { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; word-break: break-all; line-height: 1.3; }
@@ -216,16 +216,24 @@ function renderReport(report: CombinedReport): string {
   .hidden { display: none !important; }
 
   /* modal */
-  #modal { position: fixed; inset: 0; background: rgba(0,0,0,0.92); display: none; z-index: 100; overflow: auto; padding: 32px; }
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,0.92); display: none; z-index: 100; overflow-y: auto; padding: 32px 16px 80px; }
   #modal.open { display: block; }
-  #modal .close { position: fixed; top: 16px; right: 24px; background: var(--card-bg); border: 1px solid var(--border); color: var(--fg); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; }
-  #modal .modal-content { max-width: 1600px; margin: 0 auto; }
-  #modal h2 { font-family: ui-monospace, monospace; font-size: 14px; word-break: break-all; }
-  #modal .shots { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
-  #modal .shot { flex: 1; min-width: 320px; }
-  #modal .shot label { color: var(--muted); font-size: 11px; text-transform: uppercase; }
-  #modal .shot img { width: 100%; max-width: 100%; border: 1px solid var(--border); margin-top: 6px; }
-  #modal .empty-shot { padding: 40px; background: var(--card-bg); border: 1px dashed var(--border); color: var(--muted); text-align: center; }
+  #modal .close { position: fixed; top: 16px; right: 24px; background: var(--card-bg); border: 1px solid var(--border); color: var(--fg); width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 20px; z-index: 101; }
+  #modal .modal-content { max-width: 1500px; margin: 0 auto; }
+  #modal h2 { font-family: ui-monospace, monospace; font-size: 14px; word-break: break-all; margin: 0 0 4px; }
+  #modal .modal-meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  #modal .guards { color: #fca5a5; font-size: 12px; margin-bottom: 16px; }
+  /* Stack shots vertically — each takes full modal width so screenshots
+   * render at native pixel ratio for the desktop project, no shrinking. */
+  #modal .shots { display: flex; flex-direction: column; gap: 24px; align-items: stretch; }
+  #modal .shot { width: 100%; }
+  #modal .shot-header { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 12px; background: var(--card-bg); border: 1px solid var(--border); border-bottom: none; border-radius: 6px 6px 0 0; }
+  #modal .shot-header label { color: var(--fg); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  #modal .shot-header a { color: var(--muted); font-size: 11px; text-decoration: none; }
+  #modal .shot-header a:hover { color: var(--fg); text-decoration: underline; }
+  #modal .shot-frame { background: #050505; border: 1px solid var(--border); border-radius: 0 0 6px 6px; overflow: auto; max-height: 80vh; }
+  #modal .shot-frame img { display: block; width: 100%; height: auto; }
+  #modal .empty-shot { padding: 60px 40px; background: var(--card-bg); border: 1px dashed var(--border); border-top: none; border-radius: 0 0 6px 6px; color: var(--muted); text-align: center; }
 </style>
 </head>
 <body>
@@ -264,16 +272,22 @@ ${cards}
   <button class="close" aria-label="close">&times;</button>
   <div class="modal-content">
     <h2 id="modal-id"></h2>
-    <div class="meta" id="modal-meta"></div>
+    <div class="modal-meta" id="modal-meta"></div>
     <div class="guards" id="modal-guards"></div>
     <div class="shots">
       <div class="shot">
-        <label>desktop 1440×900</label>
-        <div id="modal-desktop"></div>
+        <div class="shot-header">
+          <label>desktop · 1440×900 viewport · full-page</label>
+          <a id="modal-desktop-link" href="#" target="_blank" rel="noopener">open original ↗</a>
+        </div>
+        <div class="shot-frame" id="modal-desktop"></div>
       </div>
       <div class="shot">
-        <label>mobile 375×812</label>
-        <div id="modal-mobile"></div>
+        <div class="shot-header">
+          <label>mobile · 375×812 viewport · full-page</label>
+          <a id="modal-mobile-link" href="#" target="_blank" rel="noopener">open original ↗</a>
+        </div>
+        <div class="shot-frame" id="modal-mobile"></div>
       </div>
     </div>
   </div>
@@ -314,6 +328,8 @@ ${cards}
   var modalGuards = document.getElementById('modal-guards');
   var modalDesktop = document.getElementById('modal-desktop');
   var modalMobile = document.getElementById('modal-mobile');
+  var modalDesktopLink = document.getElementById('modal-desktop-link');
+  var modalMobileLink = document.getElementById('modal-mobile-link');
 
   function openModal(el) {
     modalId.textContent = el.getAttribute('data-id') || '';
@@ -322,8 +338,23 @@ ${cards}
     modalGuards.textContent = guards ? 'failed guards: ' + guards : '';
     var d = el.getAttribute('data-desktop');
     var m = el.getAttribute('data-mobile');
-    modalDesktop.innerHTML = d ? '<img src="' + d + '" alt="desktop" />' : '<div class="empty-shot">no desktop screenshot</div>';
-    modalMobile.innerHTML = m ? '<img src="' + m + '" alt="mobile" />' : '<div class="empty-shot">no mobile screenshot</div>';
+    if (d) {
+      modalDesktop.innerHTML = '<img src="' + d + '" alt="desktop" />';
+      modalDesktopLink.href = d;
+      modalDesktopLink.style.display = '';
+    } else {
+      modalDesktop.innerHTML = '<div class="empty-shot">no desktop screenshot — render not run</div>';
+      modalDesktopLink.style.display = 'none';
+    }
+    if (m) {
+      modalMobile.innerHTML = '<img src="' + m + '" alt="mobile" />';
+      modalMobileLink.href = m;
+      modalMobileLink.style.display = '';
+    } else {
+      modalMobile.innerHTML = '<div class="empty-shot">no mobile screenshot — render not run</div>';
+      modalMobileLink.style.display = 'none';
+    }
+    modal.scrollTop = 0;
     modal.classList.add('open');
   }
 
