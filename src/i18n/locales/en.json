@@ -1520,6 +1520,7 @@
             "errorEmailInvalid": "Invalid email address",
             "errorEmailTooLong": "Email must not exceed 254 characters",
             "errorSelfInvite": "You cannot invite yourself",
+            "errorGeneric": "Something went wrong. Please try again.",
             "roles": {
                 "label": "Access Level",
                 "admin": "Manager",

@@ -1520,6 +1520,7 @@
             "errorEmailInvalid": "Alamat e-mel tidak sah",
             "errorEmailTooLong": "E-mel tidak boleh melebihi 254 aksara",
             "errorSelfInvite": "Anda tidak boleh menjemput diri sendiri",
+            "errorGeneric": "Sesuatu telah berlaku. Sila cuba lagi.",
             "roles": {
                 "label": "Tahap Akses",
                 "admin": "Pengurus",
