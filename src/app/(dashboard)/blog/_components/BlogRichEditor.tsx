@@ -172,11 +172,11 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                     className="absolute z-50 flex flex-col gap-1 p-2 bg-[#1E293B] border border-white/10 rounded-xl shadow-2xl min-w-[180px]"
                     style={{ top: improveMenuPos.top, left: improveMenuPos.left }}
                 >
-                    <span className="text-[10px] uppercase tracking-wider text-gray-500 px-2 py-1">AI Improve</span>
+                    <span className="text-[10px] uppercase tracking-wider text-gray-500 px-2 py-1">{t.dashboard.blog.editor.aiImproveLabel}</span>
                     {[
-                        { label: 'Make Professional', instruction: 'Rewrite this text to sound more professional and polished' },
-                        { label: 'Make Shorter', instruction: 'Make this text shorter and more concise while keeping the meaning' },
-                        { label: 'Improve Writing', instruction: 'Improve the grammar, clarity, and readability of this text' },
+                        { label: t.dashboard.blog.editor.aiMakeProfessional, instruction: 'Rewrite this text to sound more professional and polished' },
+                        { label: t.dashboard.blog.editor.aiMakeShorter, instruction: 'Make this text shorter and more concise while keeping the meaning' },
+                        { label: t.dashboard.blog.editor.aiImproveWriting, instruction: 'Improve the grammar, clarity, and readability of this text' },
                     ].map((action) => (
                         <button
                             key={action.label}
@@ -190,7 +190,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                         onClick={() => setShowImproveMenu(false)}
                         className="text-left px-3 py-1 text-xs text-gray-500 hover:text-gray-300 transition-colors"
                     >
-                        Cancel
+                        {t.dashboard.blog.editor.cancel}
                     </button>
                 </div>
             )}
@@ -198,7 +198,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30 backdrop-blur-sm rounded-[16px]">
                     <div className="flex items-center gap-2 text-sm text-white bg-[#1E293B] px-4 py-2 rounded-lg border border-white/10">
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Rewriting...
+                        {t.dashboard.blog.editor.aiRewriting}
                     </div>
                 </div>
             )}

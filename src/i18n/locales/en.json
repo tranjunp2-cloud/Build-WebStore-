@@ -1219,7 +1219,13 @@
                 "seoGenerated": "SEO metadata generated!",
                 "aiUnavailableFallback": "AI unavailable — filled from content",
                 "aiGenerated": "Post generated successfully!",
-                "aiGenerationFailed": "Generation failed"
+                "aiGenerationFailed": "Generation failed",
+                "aiImproveLabel": "AI Improve",
+                "aiMakeProfessional": "Make Professional",
+                "aiMakeShorter": "Make Shorter",
+                "aiImproveWriting": "Improve Writing",
+                "aiRewriting": "Rewriting...",
+                "cancel": "Cancel"
             },
             "categoryModal": {
                 "title": "Manage Category",
@@ -1243,6 +1249,28 @@
                 "toastUpdateFail": "Failed to update category",
                 "toastDeleteSuccess": "Category \"{name}\" deleted",
                 "toastDeleteFail": "Failed to delete category"
+            },
+            "categoryPage": {
+                "title": "Manage Category",
+                "existingTitle": "Existing Category",
+                "itemsCount": "{count} items",
+                "noCategories": "No categories yet",
+                "addNew": "Add new Category",
+                "namePlaceholder": "Category name",
+                "close": "Close",
+                "deleteTitle": "Delete Category",
+                "deleteConfirm": "Are you sure you want to delete",
+                "deleteWarning": "Posts assigned to this category will become uncategorized. This cannot be undone.",
+                "cancel": "Cancel",
+                "delete": "Delete",
+                "deleting": "Deleting...",
+                "toastCreated": "Category \"{name}\" created",
+                "toastCreateFail": "Failed to create category",
+                "toastUpdated": "Category updated",
+                "toastUpdateFail": "Failed to update category",
+                "toastDeleted": "Category \"{name}\" deleted",
+                "toastDeleteFail": "Failed to delete category",
+                "toastLoadFail": "Failed to load categories"
             },
             "pagination": {
                 "previous": "Previous",
@@ -1737,9 +1765,32 @@
         "toast": {
             "removed": "User removed from workspace",
             "removedBulk": "Selected staff removed successfully",
+            "removeFailed": "Failed to remove user",
             "updated": "User marked as {status}",
-            "resent": "Invitation email resent successfully"
-        }
+            "updateFailed": "Failed to update status",
+            "resent": "Invitation email resent successfully",
+            "resendFailed": "Failed to resend invite",
+            "staffUpdated": "Staff updated successfully!",
+            "staffUpdateFailed": "Failed to update staff",
+            "inviteSent": "Invitation sent successfully!",
+            "inviteFailed": "Failed to send invitation",
+            "bulkRemoveFailed": "Failed to remove staff",
+            "permissionRequired": "Please select at least one custom permission"
+        },
+        "emptyState": {
+            "noMatch": "No staff members match your search.",
+            "noStaff": "No staff members found."
+        },
+        "pagination": {
+            "showing": "Showing {from} to {to} of {total} results",
+            "previous": "Previous",
+            "next": "Next"
+        },
+        "tooltip": {
+            "edit": "Edit Details",
+            "remove": "Remove User"
+        },
+        "bulkConfirm": "Are you sure you want to remove {count} staff members?"
     },
     "Domains": {
         "title": "Domain Management",

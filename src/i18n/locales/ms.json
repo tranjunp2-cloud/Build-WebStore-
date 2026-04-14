@@ -1219,7 +1219,13 @@
                 "seoGenerated": "Metadata SEO berjaya dijana!",
                 "aiUnavailableFallback": "AI tidak tersedia — diisi daripada kandungan",
                 "aiGenerated": "Catatan berjaya dijana!",
-                "aiGenerationFailed": "Penjanaan gagal"
+                "aiGenerationFailed": "Penjanaan gagal",
+                "aiImproveLabel": "Penambahbaikan AI",
+                "aiMakeProfessional": "Jadikan Profesional",
+                "aiMakeShorter": "Jadikan Lebih Pendek",
+                "aiImproveWriting": "Perbaiki Penulisan",
+                "aiRewriting": "Menulis semula...",
+                "cancel": "Batal"
             },
             "categoryModal": {
                 "title": "Urus Kategori",
@@ -1243,6 +1249,28 @@
                 "toastUpdateFail": "Gagal mengemas kini kategori",
                 "toastDeleteSuccess": "Kategori \"{name}\" telah dipadam",
                 "toastDeleteFail": "Gagal memadam kategori"
+            },
+            "categoryPage": {
+                "title": "Urus Kategori",
+                "existingTitle": "Kategori Sedia Ada",
+                "itemsCount": "{count} item",
+                "noCategories": "Belum ada kategori",
+                "addNew": "Tambah Kategori Baru",
+                "namePlaceholder": "Nama kategori",
+                "close": "Tutup",
+                "deleteTitle": "Padam Kategori",
+                "deleteConfirm": "Adakah anda pasti ingin memadam",
+                "deleteWarning": "Kiriman yang ditetapkan kepada kategori ini akan menjadi tanpa kategori. Tindakan ini tidak boleh dibatalkan.",
+                "cancel": "Batal",
+                "delete": "Padam",
+                "deleting": "Memadam...",
+                "toastCreated": "Kategori \"{name}\" dicipta",
+                "toastCreateFail": "Gagal mencipta kategori",
+                "toastUpdated": "Kategori dikemas kini",
+                "toastUpdateFail": "Gagal mengemas kini kategori",
+                "toastDeleted": "Kategori \"{name}\" telah dipadam",
+                "toastDeleteFail": "Gagal memadam kategori",
+                "toastLoadFail": "Gagal memuatkan kategori"
             },
             "pagination": {
                 "previous": "Sebelumnya",
@@ -1737,9 +1765,32 @@
         "toast": {
             "removed": "Pengguna dikeluarkan",
             "removedBulk": "Staf yang dipilih telah dibuang",
+            "removeFailed": "Gagal mengeluarkan pengguna",
             "updated": "Pengguna ditandakan sebagai {status}",
-            "resent": "E-mel jemputan berjaya dihantar semula"
-        }
+            "updateFailed": "Gagal mengemas kini status",
+            "resent": "E-mel jemputan berjaya dihantar semula",
+            "resendFailed": "Gagal menghantar semula jemputan",
+            "staffUpdated": "Staf berjaya dikemas kini!",
+            "staffUpdateFailed": "Gagal mengemas kini staf",
+            "inviteSent": "Jemputan berjaya dihantar!",
+            "inviteFailed": "Gagal menghantar jemputan",
+            "bulkRemoveFailed": "Gagal mengeluarkan staf",
+            "permissionRequired": "Sila pilih sekurang-kurangnya satu kebenaran"
+        },
+        "emptyState": {
+            "noMatch": "Tiada staf sepadan dengan carian anda.",
+            "noStaff": "Tiada staf ditemui."
+        },
+        "pagination": {
+            "showing": "Menunjukkan {from} hingga {to} daripada {total} keputusan",
+            "previous": "Sebelumnya",
+            "next": "Seterusnya"
+        },
+        "tooltip": {
+            "edit": "Sunting Butiran",
+            "remove": "Keluarkan Pengguna"
+        },
+        "bulkConfirm": "Adakah anda pasti ingin mengeluarkan {count} ahli staf?"
     },
     "Domains": {
         "title": "Pengurusan Domain",
