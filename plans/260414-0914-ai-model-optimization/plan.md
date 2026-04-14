@@ -18,8 +18,10 @@ created: 2026-04-14
 | 03a Flip site-gen default | ✅ done | `56adabe0` |
 | 03b Strict json_schema + max_tokens tuning | ⏸ deferred | — |
 | 04 Fix cost leaks edit-block + bulk-parse | ✅ done | `9ccea6b7` |
-| 05a Cost logging (ai_usage_logs + helper) | ✅ done | (this commit) |
-| 05b Vercel AI Gateway migration + admin page | ⏸ deferred | — |
+| 05a Cost logging (ai_usage_logs + helper) | ✅ done | `8f4cd4b3` |
+| [05b Admin dashboard /dashboard/ai-usage](./phase-05b-admin-dashboard.md) | 📋 planned | — |
+| 05c Vercel AI Gateway migration | ⏸ not-yet-scoped | — |
+| 05d OpenAI bill reconciliation | ⏸ not-yet-scoped | — |
 
 ## Câu hỏi gốc của a
 
