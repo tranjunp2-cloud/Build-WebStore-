@@ -1,5 +1,8 @@
 # Phase 02 — Structural Assertions (The Ben-Ben Guard)
 
+> **Status**: ✅ **DONE** (2026-04-14) | Commit `735fa85` | Effort actual: ~60 min
+> Result: 6 guards + `check.ts` CLI. First run caught **185 real bugs** across legacy + blueprint paths. After 5 rounds of fixes (commit `8598e64` in template-composer.ts), final state: **pass=200, warn=190, fail=0**.
+
 ## Context links
 - Phase 01: `plans/260414-0837-ai-gen-test-harness/phase-01-harness-foundation.md`
 - PRD AC-01/02/03/08: `docs/prd/F01-ai-builder-variety.md`

@@ -5,20 +5,38 @@
 - Depends on: Phase 01-04 (all tokens + validation)
 - Priority: P1
 - Status: pending
+- Scout ref: `scout/scout-design-quality-scan.md` section 3
 
 ## Mục tiêu
-Apply design tokens + typography + color system vào tất cả 47 block components. Đây là phase lớn nhất.
+Apply design tokens + typography + color system vào tất cả 47 block components. Đây là phase lớn nhất. Chạy parallel 3 subagents.
+
+## Architecture Note (scout findings)
+
+**Hai patterns khác nhau trong codebase:**
+
+1. **Hero** (unique) — 11 variants tách file riêng ở `src/blocks/hero/variants/` (centered.tsx, split.tsx, fullscreen.tsx, ...)
+2. **46 blocks khác** — variants inline trong `index.tsx` (switch/conditional rendering)
+
+→ Phase 05 refactor cần 2 approach:
+- **Hero**: Edit từng file variant riêng (11 files), dễ parallel
+- **Blocks khác**: Edit `index.tsx` với switch logic, cẩn thận không break variants khác
+
+**Hardcoded patterns hiện tại:**
+- `container mx-auto px-6` → **131 occurrences** (Phase 01 SectionWrapper thay thế)
+- `var(--brand-primary)` + RGB → **496 occurrences** (Phase 03 codemod)
+- `#000000` / `text-gray-*` / `bg-gray-*` → 0 (✅ clean)
+- Inline `style={{}}` props → 473 (mostly CSS var bindings — Phase 03 codemod cover)
 
 ## Approach
 
 ### Chia thành 3 batches
 
 **Batch A: Core blocks (5 blocks — highest impact)**
-- hero (12 variants) — display heading, CTA buttons, spacing
-- features (8 variants) — icon sizes, grid consistency
-- testimonials (8 variants) — quote length, avatar, rating
-- navigation (6 variants) — sticky, CTA, mobile
-- footer (6 variants) — columns, socials, copyright
+- hero (11 variants tách file) — display heading, CTA buttons, spacing
+- features (4 inline variants) — icon sizes, grid consistency
+- testimonials (6 inline variants) — quote length, avatar, rating
+- navigation (6 inline variants) — sticky, CTA, mobile
+- footer (6 inline variants) — columns, socials, copyright
 
 **Batch B: Secondary blocks (9 blocks)**
 - contact, pricing, gallery, cta, stats, faq, team, newsletter, about
@@ -51,6 +69,17 @@ Agent Batch A: hero, features, testimonials, navigation, footer
 Agent Batch B: contact, pricing, gallery, cta, stats, faq, team, newsletter, about
 Agent Batch C: 33 remaining blocks
 ```
+
+### Shared checklist file (MANDATORY)
+
+Trước khi spawn parallel agents, tạo `phase-05-checklist.md` có:
+1. **Refactor rules** — semantic var names, token imports, SectionWrapper usage
+2. **BEFORE/AFTER template code** — 1 canonical example
+3. **Acceptance gate** — per-block checklist 10 items (ở dưới)
+4. **Gotchas** — hero pattern vs inline pattern, framer-motion wrappers giữ nguyên
+5. **Forbidden changes** — không đổi variant logic, không đổi schema, không đổi block meta
+
+3 agents PHẢI đọc file này trước khi bắt đầu. Main agent cross-review sau khi 3 batch xong để fix inconsistency.
 
 ## Implementation per block (template)
 
@@ -89,9 +118,11 @@ Agent Batch C: 33 remaining blocks
 ```
 
 ## Todo
-- [ ] Batch A: Audit + apply tokens to 5 core blocks
+- [ ] Viết `phase-05-checklist.md` shared cho 3 agents
+- [ ] Batch A: Audit + apply tokens to 5 core blocks (hero + 4 inline)
 - [ ] Batch B: Audit + apply tokens to 9 secondary blocks
 - [ ] Batch C: Audit + apply tokens to 33 remaining blocks
+- [ ] Cross-review pass: main agent check 3 batches có consistent không
 - [ ] Run visual regression: screenshot all 142 variants before/after
 - [ ] Fix any visual regressions
 

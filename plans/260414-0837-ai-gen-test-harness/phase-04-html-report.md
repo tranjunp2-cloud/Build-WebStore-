@@ -1,5 +1,9 @@
 # Phase 04 — HTML Gallery Report Generator
 
+> **Status**: ⏳ **PENDING** — Sprint B2 (runs right after Phase 03)
+> **Why Sprint B2**: Consumes Phase 03 screenshots. Standalone generator (template.html + generate.ts), no framework. ~0.5d.
+> **Dependency**: Phase 03 screenshots available in `.harness-out/screenshots/`
+
 ## Context links
 - Phase 02 output: structural-report.json
 - Phase 03 output: visual-report.json, screenshots/

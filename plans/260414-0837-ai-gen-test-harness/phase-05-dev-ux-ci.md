@@ -1,12 +1,16 @@
 # Phase 05 — Dev UX + CI Wiring
 
+> **Status**: 👉 **NEXT UP** (prioritised over Phase 03/04 for Sprint B1)
+> **Why first**: 30-60 phút, cho anh + team dùng `pnpm harness:*` hằng ngày thay vì nhớ path dài. Zero new logic — chỉ là package.json scripts + GH workflow + README.
+> **Dependency**: Phase 01 + 02 done (both ✅ committed `735fa85` + `8598e64`)
+
 ## Context links
 - All previous phases output
 - CI workflow dir: `.github/workflows/`
 - package.json scripts section
 
 ## Overview
-Biến harness thành tool dev dùng hằng ngày: `pnpm harness:*` commands gọn, quick mode fast-iteration, optional GitHub Actions workflow trigger nightly + label-based + post Lark summary.
+Biến harness thành tool dev dùng hằng ngày: `pnpm harness:*` commands gọn, quick mode fast-iteration, optional GitHub Actions workflow trigger label-based + post Lark summary.
 
 ## Key Insights
 - `pnpm harness:quick` phải <1 min để dev chạy thường xuyên

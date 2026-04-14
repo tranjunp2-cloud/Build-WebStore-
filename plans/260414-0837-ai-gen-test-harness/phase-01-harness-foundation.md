@@ -1,5 +1,8 @@
 # Phase 01 — Harness Foundation & Fixture Matrix
 
+> **Status**: ✅ **DONE** (2026-04-14) | Commit `735fa85` | Effort actual: ~45 min
+> Result: 390 fixtures composed in ~90ms, 0 composer errors. `.harness-out/matrix.json` written.
+
 ## Context links
 - Parent plan: `plans/260414-0837-ai-gen-test-harness/plan.md`
 - Research gen pipeline: `plans/260414-0837-ai-gen-test-harness/research/researcher-02-gen-and-render-pipeline.md`

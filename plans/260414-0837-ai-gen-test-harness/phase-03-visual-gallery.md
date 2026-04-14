@@ -1,5 +1,9 @@
 # Phase 03 — Visual Gallery (Playwright Render + Empty-Hole Detector)
 
+> **Status**: ⏳ **PENDING** — Sprint B2 (after Phase 05 + 06 done)
+> **Why Sprint B2**: Needs harness route + Playwright config + pngjs dep install. Higher effort (1-2d). Structural guards from Phase 02 already catch 185 bugs — visual only adds the render-time layer on top.
+> **Dependency**: Phase 01 + 02 done + Phase 05 scripts ready (so visual uses `pnpm harness:render`)
+
 ## Context links
 - Phase 01-02: harness foundation & structural assertions
 - Existing playwright config: `playwright.config.ts`

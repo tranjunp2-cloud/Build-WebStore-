@@ -1,5 +1,9 @@
 # Phase 06 — QA TC Mapping & Gap Closure
 
+> **Status**: ⏳ **PENDING** — runs after Phase 05 in Sprint B1
+> **Why Sprint B1**: Pure documentation work, no code. Unblocks QA acceptance of PR #555 by adding traceability TC-39..50 for the new harness coverage.
+> **Dependency**: Phase 01 + 02 done
+
 ## Context links
 - QA Plan: `docs/qa/F01-ai-builder-variety.md` (38 TCs)
 - PRD: `docs/prd/F01-ai-builder-variety.md` (14 ACs)

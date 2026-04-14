@@ -3,7 +3,7 @@
 ## Context
 - Parent: [plan.md](plan.md)
 - Priority: P0 — foundation cho tất cả phases sau
-- Status: pending
+- Status: **done** (2026-04-13, commit `5a1a699`)
 
 ## Mục tiêu
 Tạo closed token layer — tất cả spacing, radius, shadow values đi qua tokens. Block components không hardcode pixel values.
@@ -105,12 +105,41 @@ type SectionWrapperProps = {
 - Apply responsive padding
 
 ## Todo
-- [ ] Tạo `src/lib/design-tokens.ts` với all token constants
-- [ ] Tạo `src/blocks/shared/SectionWrapper.tsx`
-- [ ] Update `tailwind.config.ts` extend spacing
-- [ ] Document tokens trong `docs/standards/DESIGN_TOKENS.md`
+- [x] Tạo `src/lib/design-tokens.ts` với all token constants
+- [x] Tạo `src/blocks/shared/SectionWrapper.tsx`
+- [ ] ~~Update `tailwind.config.ts` extend spacing~~ — **SKIPPED**, SectionWrapper dùng existing Tailwind classes đủ cho Phase 05 refactor. Có thể add sau nếu cần.
+- [x] Document tokens trong `docs/standards/DESIGN_TOKENS.md`
+- [x] Unit tests (25 tests pass, vượt kế hoạch 4 TCs)
 
 ## Success Criteria
-- [ ] Tất cả spacing values có token constant
-- [ ] SectionWrapper available cho block components
-- [ ] Token file exportable cho cả code và docs
+- [x] Tất cả spacing values có token constant
+- [x] SectionWrapper available cho block components
+- [x] Token file exportable cho cả code và docs
+
+## Implementation Notes (2026-04-13)
+
+**Commit:** `5a1a699` — `feat(f01): add design tokens and section wrapper (plan b phase 01)`
+
+**Extras vượt kế hoạch gốc:**
+- `TOUCH_TARGET` token — WCAG 2.5.5 minimum (44/48/56px) cho CTA buttons
+- `INNER_PADDING` — responsive horizontal gutter `px-6 md:px-8 lg:px-12` (fix self-review: px-6 hardcoded không responsive)
+- `SECTION_BACKGROUND.transparent` — cho hero blocks với decorative backgrounds
+- TypeScript types: `SpacingToken`, `RadiusToken`, `ShadowToken`, etc. cho autocomplete
+- `id` prop forward qua HTML attrs spread — hỗ trợ anchor links
+- `as` polymorphic prop — hỗ trợ `<header>`/`<footer>` wrapper
+
+**Self-review fixes (pre-commit):**
+1. `SECTION_BACKGROUND` fallback chain đơn giản hóa (dùng legacy `--surface-1/2/3`, Phase 03 rename sau)
+2. `SHADOW` convert từ raw CSS string → Tailwind arbitrary value classes (`shadow-[0_1px_3px_rgba(0,0,0,0.08)]`) — consistent với `ICON_SIZE`
+3. `px-6` hardcoded → `INNER_PADDING` responsive token
+4. Test coverage: 15 → 25 tests (thêm accent/transparent bg, innerClassName, hero padding, as=header, id forward, token invariants)
+
+**Không thay đổi:**
+- 47 block components (Phase 05 refactor)
+- `tailwind.config.js` (không cần vì dùng Tailwind classes có sẵn)
+- Existing `globals.css` (Phase 03 rename sau)
+
+**Test results:**
+- Unit: 25/25 pass
+- Plan A regression: 41/41 pass
+- TypeScript: 0 errors
