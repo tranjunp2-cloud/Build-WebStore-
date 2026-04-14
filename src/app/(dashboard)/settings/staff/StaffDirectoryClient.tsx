@@ -281,7 +281,7 @@ export function StaffDirectoryClient({
                                             ) : (
                                                 <div className="flex items-center gap-[8px]">
                                                     <div className="w-[8px] h-[8px] rounded-full bg-[rgba(248,250,252,0.3)]"></div>
-                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.pending || 'Pending Inv.'}</span>
+                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.pending || 'Pending'}</span>
                                                 </div>
                                             )}
                                         </td>
