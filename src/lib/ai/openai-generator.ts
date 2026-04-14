@@ -58,7 +58,7 @@ export async function generateSiteWithAI(
     const openai = getOpenAI()
     if (!openai) {
         console.warn('[AI] No OPENAI_API_KEY — using rule-based fallback')
-        return generateWithFallback(promptText, events)
+        return generateWithFallback(promptText, events, 'en', businessInfo)
     }
 
     try {
@@ -332,7 +332,7 @@ export async function generateSiteWithAI(
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
         events.push({ event: 'error', data: { code: 'ai_fallback', message: 'Using smart templates', retryable: false } })
         const fallbackLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
-        return generateWithFallback(promptText, events, fallbackLang, businessInfo.businessName)
+        return generateWithFallback(promptText, events, fallbackLang, businessInfo)
     }
 }
 
@@ -340,12 +340,15 @@ export async function generateSiteWithAI(
  * Fallback path — runs when OpenAI errors out or no API key.
  * Tier 1: call `composeFallbackResult` (rich composer path, 14 industries, Phase 04 validation).
  * Tier 2 (legacy safety net): fall through to `generateBlocks` skeleton if composer throws.
+ *
+ * Plan 260414-2249 phase-01: accept full BusinessInfoInput (not just name) so
+ * user-supplied phone/email/address/products flow into composer block builders.
  */
 function generateWithFallback(
     prompt: string,
     events: SSEEvent[],
     language: 'en' | 'ms' | 'vi' = 'en',
-    extractedName?: string,
+    businessInfo?: BusinessInfoInput,
 ): { result: GenerationResult; events: SSEEvent[] } {
     events.push({ event: 'step', data: { step: 'fallback_analyzing', label: 'Analysing template library...', progress: 50 } })
     events.push({ event: 'step', data: { step: 'fallback_composing', label: 'Composing from smart templates...', progress: 60 } })
@@ -353,7 +356,7 @@ function generateWithFallback(
     const seed = Date.now()
 
     try {
-        const result = composeFallbackResult(prompt, seed, language, extractedName)
+        const result = composeFallbackResult(prompt, seed, language, businessInfo)
 
         events.push({ event: 'step', data: { step: 'fallback_validating', label: 'Validating content...', progress: 75 } })
         events.push({ event: 'theme_set', data: { theme: result.theme } })

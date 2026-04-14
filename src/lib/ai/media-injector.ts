@@ -203,6 +203,7 @@ export async function fulfillImageNeeds(
             businessName: ctx.businessName,
             industry: ctx.category,
             language: ctx.language,
+            products: ctx.products,
         })
 
         try {

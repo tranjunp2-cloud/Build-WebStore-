@@ -1,4 +1,10 @@
 export const dynamic = 'force-dynamic'
+// Override vercel.json's 60s default — AI site generation runs:
+//   OpenAI GPT-4.1-mini → Unsplash pipeline (5-10 images) → Payload create
+// Real-world timing sits around 60-120s, previous 60s cap produced 504
+// Gateway Timeout (staging run 00:42:15 2026-04-14 `[Theme] Using category…`).
+// Vercel Pro / Fluid Compute allows up to 800s; 300s leaves comfortable headroom.
+export const maxDuration = 300
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -14,6 +20,7 @@ import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { blockRegistry } from '@/blocks/registry'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
+import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { resolveTheme } from '@/lib/theme/resolve'
 
 
@@ -300,6 +307,10 @@ export async function POST(req: NextRequest) {
                 const needs = planImageNeeds(mutableBlocks)
                 if (needs.length > 0) {
                     const resolvedLang = (result.language || language) as 'en' | 'ms' | 'vi' | 'auto'
+                    // Plan 260414-2249 phase-01: pass parsed user products into
+                    // media pipeline so deriveKeywords can drive Unsplash queries
+                    // from what the user actually sells (translated vi/ms → en).
+                    const parsedProducts = parseProductsString(businessInfo.products)
                     await fulfillImageNeeds(
                         needs,
                         {
@@ -307,6 +318,7 @@ export async function POST(req: NextRequest) {
                             tenantId: String(resolvedTenantId),
                             category: businessInfo.industry,
                             language: resolvedLang,
+                            products: parsedProducts.length > 0 ? parsedProducts : undefined,
                         },
                         payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                     )

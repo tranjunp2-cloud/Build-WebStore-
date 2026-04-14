@@ -996,3 +996,51 @@ import { sanitizeBlockData } from '@/lib/ai/openai-generator'
 - TC-F01-V.38 (diversity test sẽ fail vì deterministic)
 
 Đây là **test-first approach**: các test này FAIL xác nhận feature chưa có, sau khi implement feature thì test sẽ PASS.
+
+---
+
+## 10. Phase 01 — User Data Threading (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-01-user-data-threading.md`
+> PR: `feat(F01): [US-F01-07] thread user data into ai gen pipeline`
+
+### Mục tiêu
+
+Thread user-supplied `phone`, `email`, `address`, `products`, `shortDescription`, `tagline` từ `BusinessInfoInput` xuyên suốt pipeline — cả composer fallback path lẫn AI happy path. Trước phase này: `composeFallbackResult` chỉ nhận `extractedName` → composer block builders (`buildFeatures`, `buildContact`, `buildServiceCards`, `buildProductQuickView`) dùng canned content bất kể user type gì.
+
+### Test Cases
+
+| TC ID | Test File | Mô tả | Status |
+|-------|-----------|-------|--------|
+| **TC-F01-W.01** | `business-info-mapper.test.ts` | Mapper parse + dedupe products string, normalize phone/email, derive tagline | ✅ |
+| **TC-F01-W.02** | `contact-override.test.ts` | Contact block dùng user phone/email/address verbatim khi provided; fallback canned khi empty; bizOverride deep-clone không pollute cache | ✅ |
+| **TC-F01-W.03** | `features-from-products.test.ts` | Features block emit cards từ user products khi ≥2; icons rotate từ `PRODUCT_FEATURE_ICONS[category]`; description dùng `FEATURE_BODY_TEMPLATES[category]`; fallback canned khi <2 | ✅ |
+| **TC-F01-W.04** | `service-cards-from-products.test.ts` | Service-cards emit user products khi provided; fallback canned khi empty | ✅ |
+| **TC-F01-W.05** | `service-cards-from-products.test.ts` | Product-quick-view emit user products, pad từ canned khi <3 | ✅ |
+| **TC-F01-W.06** | `image-keywords-products.test.ts` | `deriveKeywords` primary-inject English product vào Unsplash query | ✅ |
+| **TC-F01-W.06b** | `product-translator.test.ts` + `image-keywords-products.test.ts` | `nasi lemak` → `malaysian coconut rice`; `phở` → `vietnamese pho noodle soup`; unknown vi/ms pass-through | ✅ |
+| **TC-F01-W.07** | `build-user-prompt.test.ts` | `buildUserPrompt` serialize phone/email/address/tagline khi provided; omit khi empty | ✅ |
+| **TC-F01-W.08** | `user-data-e2e-fixture.test.ts` | End-to-end: ramen shop + nasi lemak shop fixtures — composer + keywords + prompt đồng bộ | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/content/types.ts` — extend `BusinessSample` với optional `products?: string[]` (runtime-only, NO DB migration)
+- `src/lib/ai/system-prompt.ts` — extend `BusinessInfoInput` type; `buildUserPrompt` serialize optional fields
+- `src/lib/ai/business-info-mapper.ts` — NEW: pure mapper `BusinessInfoInput → Partial<BusinessSample>`
+- `src/lib/ai/product-translator.ts` — NEW: vi/ms → en dict (60+ terms) + `franc-min` language detection
+- `src/lib/ai/fallback-adapter.ts` — `composeFallbackResult` signature nhận full `BusinessInfoInput` (backward compat với string overload)
+- `src/lib/ai/openai-generator.ts` — forward full `businessInfo` vào `generateWithFallback`
+- `src/lib/ai/template-composer.ts` — `featuresFromProducts` helper + `PRODUCT_FEATURE_ICONS` + `FEATURE_BODY_TEMPLATES`; `buildFeatures`/`buildServiceCards`/`buildProductQuickView` prefer user products
+- `src/lib/ai/image-keywords.ts` — `KeywordContext.products`; `deriveKeywords` primary-inject translated product term
+- `src/lib/ai/media-injector.ts` — forward `ctx.products` to `deriveKeywords`
+- `src/lib/ai/media-pipeline.ts` — `MediaPipelineContext.products` optional
+- `src/lib/validations/ai.ts` — Zod schema `generateSiteSchema` optional `tagline/phone/email/address`
+- `src/app/api/ai/generate-site/route.ts` — parse products string, pass into media pipeline
+- `package.json` — add `franc-min ^6.2.0`, `dompurify` (fix pre-existing vitest resolver issue)
+
+### Acceptance Criteria
+
+- Restaurant gen với `{ products: ["ramen", "sushi"], phone: "+60..." }` → features block reference ramen/sushi, contact block có phone verbatim, first Unsplash query contains `"ramen"`.
+- Malay restaurant với `products: ["nasi lemak"]` → first Unsplash query contains `"malaysian coconut rice"`.
+- Empty `BusinessInfoInput` → fallback canned content, no crash.
+- All 69 new unit tests pass; existing `fallback-adapter.test.ts` (22 tests) still green.
