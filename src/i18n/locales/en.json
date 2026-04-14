@@ -1773,6 +1773,69 @@
             "emptyTitle": "No pages yet",
             "emptyDesc": "Create your first page to get started.",
             "slugLocked": "Slug is locked after publishing to protect SEO and external links."
+        },
+        "aiChat": {
+            "welcomeMessage": "Hello! What would you like to edit?",
+            "drafting": "AI is drafting...",
+            "thinking": "AI is thinking...",
+            "appliedChanges": "Applied changes to website.",
+            "editFailed": "AI editing failed",
+            "failedToEdit": "Failed to edit website",
+            "outOfScope": "I can only help with editing your website.",
+            "undo": "Undo",
+            "changeColorPrompt": "Change color",
+            "addSectionPrompt": "+ Add section",
+            "inputPlaceholder": "Tell AI what to change...",
+            "send": "send",
+            "newLine": "new line"
+        },
+        "menu": {
+            "dashboard": "Dashboard",
+            "myWebsite": "My Website",
+            "editor": "Editor",
+            "blog": "Blog",
+            "siteSettings": "Site Settings",
+            "domains": "Domains",
+            "staff": "Staff",
+            "helpCenter": "Help Center",
+            "logout": "Logout"
+        },
+        "blockLibrary": {
+            "searchPlaceholder": "Search blocks...",
+            "dragHint": "click or drag",
+            "footerHint": "Click to add or drag blocks into preview"
+        },
+        "inlineEdit": {
+            "title": "Inline AI Edit",
+            "currentText": "Current Text",
+            "instruction": "How would you like to change this?",
+            "placeholder": "For example: Make this more concise and premium.",
+            "cancel": "Cancel",
+            "applying": "Applying",
+            "apply": "Apply"
+        },
+        "logoEditor": {
+            "success": "Logo updated",
+            "faviconGenerated": " & Favicon generated",
+            "error": "Failed to update logo",
+            "uploading": "Uploading...",
+            "clickToUpload": "Click to upload"
+        },
+        "navigation": {
+            "title": "Navigation Links",
+            "noLinks": "No links yet. Add one below.",
+            "addLink": "+ Add Link",
+            "newLink": "New Link",
+            "internalPage": "Internal Page",
+            "externalUrl": "External URL",
+            "email": "Email",
+            "phone": "Phone",
+            "selectPage": "Select page",
+            "addSubLink": "Add sub-link",
+            "moveUp": "Move up",
+            "moveDown": "Move down",
+            "moveLeft": "Move left",
+            "makeSubItem": "Make sub-item"
         }
     }
 }

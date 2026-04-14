@@ -39,7 +39,8 @@ type EditorMenuDrawerProps = {
 
 export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial }: EditorMenuDrawerProps) {
     const pathname = usePathname()
-    const { locale, toggleLocale } = useI18n()
+    const { t, locale, toggleLocale } = useI18n()
+    const menu = t.editor.menu
     const [expandedGroups, setExpandedGroups] = useState<string[]>(['/editor'])
 
     useEffect(() => {
@@ -258,7 +259,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                         className="flex h-[44px] items-center gap-3 rounded-[16px] border border-white/[0.08] pl-4 text-[14px] font-medium text-[#F8FAFC] transition-colors hover:bg-white/5"
                     >
                         <LogOut className="h-4 w-4 shrink-0" />
-                        <span>Logout</span>
+                        <span>{menu.logout}</span>
                     </button>
                 </div>
             </aside>

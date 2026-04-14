@@ -1773,6 +1773,69 @@
             "emptyTitle": "Tiada halaman lagi",
             "emptyDesc": "Cipta halaman pertama anda untuk bermula.",
             "slugLocked": "Slug dikunci selepas diterbitkan untuk melindungi SEO dan pautan luaran."
+        },
+        "aiChat": {
+            "welcomeMessage": "Hai! Apa yang anda ingin ubah?",
+            "drafting": "AI sedang merangka...",
+            "thinking": "AI sedang berfikir...",
+            "appliedChanges": "Perubahan telah digunakan pada laman web.",
+            "editFailed": "Pengeditan AI gagal",
+            "failedToEdit": "Gagal mengedit laman web",
+            "outOfScope": "Saya hanya boleh membantu mengedit laman web anda.",
+            "undo": "Buat Asal",
+            "changeColorPrompt": "Tukar warna",
+            "addSectionPrompt": "+ Tambah bahagian",
+            "inputPlaceholder": "Beritahu AI apa yang perlu diubah...",
+            "send": "hantar",
+            "newLine": "baris baru"
+        },
+        "menu": {
+            "dashboard": "Papan Pemuka",
+            "myWebsite": "Laman Web Saya",
+            "editor": "Editor",
+            "blog": "Blog",
+            "siteSettings": "Tetapan Laman",
+            "domains": "Domain",
+            "staff": "Kakitangan",
+            "helpCenter": "Pusat Bantuan",
+            "logout": "Log Keluar"
+        },
+        "blockLibrary": {
+            "searchPlaceholder": "Cari blok...",
+            "dragHint": "klik atau seret",
+            "footerHint": "Klik untuk tambah atau seret blok ke pratonton"
+        },
+        "inlineEdit": {
+            "title": "Suntingan AI Sebaris",
+            "currentText": "Teks Semasa",
+            "instruction": "Bagaimana anda mahu mengubah ini?",
+            "placeholder": "Contoh: Jadikan lebih ringkas dan premium.",
+            "cancel": "Batal",
+            "applying": "Menggunakan",
+            "apply": "Guna"
+        },
+        "logoEditor": {
+            "success": "Logo dikemas kini",
+            "faviconGenerated": " & Favicon dijana",
+            "error": "Gagal mengemas kini logo",
+            "uploading": "Memuat naik...",
+            "clickToUpload": "Klik untuk muat naik"
+        },
+        "navigation": {
+            "title": "Pautan Navigasi",
+            "noLinks": "Tiada pautan lagi. Tambah di bawah.",
+            "addLink": "+ Tambah Pautan",
+            "newLink": "Pautan Baru",
+            "internalPage": "Halaman Dalaman",
+            "externalUrl": "URL Luaran",
+            "email": "E-mel",
+            "phone": "Telefon",
+            "selectPage": "Pilih halaman",
+            "addSubLink": "Tambah sub-pautan",
+            "moveUp": "Alih ke atas",
+            "moveDown": "Alih ke bawah",
+            "moveLeft": "Alih ke kiri",
+            "makeSubItem": "Jadikan sub-item"
         }
     }
 }
