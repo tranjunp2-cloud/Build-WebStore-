@@ -1174,3 +1174,56 @@ Replace single `CATEGORY_SIGNATURE_BLOCKS[category]` với **3 hand-curated reci
 | Phase 04 tests | 407 + 22 = 429 | ✅ |
 | Legacy regression | 22 | ✅ |
 | **Total** | **790+** | ✅ |
+
+---
+
+## 14. Phase 05 — Multi-page Completeness (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-05-multipage-completeness.md`
+> PR: `feat(f01): [US-F01-11] multi-page completeness — blog seeds + contact enrich + about hero`
+
+### Mục tiêu
+
+Kill sub-page stubs. Every site ships ≥5 pages: Home / About / Contact / Blog (+ Services/Menu per blueprint). Each core page ≥4 blocks. Blog renders 3-5 curated posts per category. About hero weaves user description. Contact page has Google Maps + opening-hours FAQ.
+
+### Test Cases
+
+| TC ID | Test File | Status |
+|-------|-----------|--------|
+| **TC-F01-W.20** blog shape | `blog-seeds-coverage.test.ts` | ✅ |
+| **TC-F01-W.21** 14 cats × ≥3 posts | `blog-seeds-coverage.test.ts` | ✅ |
+| **TC-F01-W.22** About weaves description | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.23** Contact user fields + map + FAQ | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.24** Blog renders seeded posts | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.25** Core 5 pages ≥4 blocks | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.26** Empty-input regression | `multipage-completeness.test.ts` | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/content/blog-seeds.ts` — **NEW** 180 lines: 14 categories × 4 posts = 56 curated blog stubs + helpers
+- `src/lib/ai/content/types.ts` — new `BlogPost` type + optional `blogSeeds` on CategoryContent
+- `src/lib/ai/template-composer.ts`:
+  - `buildAboutPage` / `buildContactPage` / `buildBlogPage` rewritten to emit ≥5 blocks with meaningful content
+  - **NEW `enrichSubPages(pages, biz, category)` post-processor** runs inside `composeFromBlueprint` — overrides About hero with description excerpt, injects google-maps + FAQ into Contact, appends Blog page with seeded posts when blueprint lacks it, fills empty blog-list items from seeds
+- `src/lib/ai/system-prompt.ts` STRUCTURE RULES — `Generate 5 pages` (adds Blog), `every page ≥4 blocks`, `Blog page MUST include blog-list with ≥3 seeded posts`
+
+### Acceptance Criteria
+
+- Every gen has Home / About / Contact / Blog minimum (blueprint extras preserved).
+- Blog page renders ≥3 real posts from seeds — no empty "Latest Articles".
+- About hero subheadline = user description excerpt when provided.
+- Contact page has Google Maps block with user address + FAQ with opening-hours items.
+- Empty input regression: canned fills gaps, blog still has ≥3 seeds.
+- 14 categories × ≥3 seeds = ≥42 total (currently 56).
+
+### Test Summary (cumulative Phase 01 + 02 + 03 + 04 + 05)
+
+| Suite | Count | Status |
+|---|---|---|
+| Phase 01 tests | 69 | ✅ |
+| Phase 02 tests | 235+ | ✅ |
+| Phase 03 tests | 23 (image-pool) + 14 (media-injector regression) | ✅ |
+| Phase 04 tests | 407 + 22 = 429 | ✅ |
+| Phase 05 tests | 50 (blog seeds + multipage) | ✅ |
+| Legacy regression | 22 | ✅ |
+| **Total** | **840+** | ✅ |
