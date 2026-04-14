@@ -44,6 +44,9 @@ vi.mock('@/i18n', () => ({
                         statusGood: 'Healthy',
                         statusWarning: 'Needs Attention',
                         fixAll: 'AI Fix All Issues',
+                        fix: 'Fix',
+                        issue: 'Issue',
+                        issues: 'Issues',
                         warnings: {
                             issueScoreLow: 'SEO score is low',
                         },
@@ -89,6 +92,7 @@ vi.mock('@/i18n', () => ({
                     topReferrers: 'Top Referrers',
                     views: 'Views',
                     clicks: 'Clicks',
+                    noData: 'No data available for this period.',
                     empty: { description: 'No data available for this period.' },
                 },
                 seo: {
@@ -150,6 +154,11 @@ vi.mock('@dnd-kit/utilities', () => ({
     CSS: { Transform: { toString: vi.fn(() => '') } },
 }))
 
+// ── Mock DashboardTabContent (useTabContext used by SEOHealthWidget) ─────────
+vi.mock('@/components/dashboard/DashboardTabContent', () => ({
+    useTabContext: () => ({ activeTab: 'overview', setActiveTab: vi.fn() }),
+}))
+
 // ── Mock next/navigation (used by PeriodSelector / DashboardActionList) ──────
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(() => ({ push: vi.fn() })),
@@ -191,12 +200,12 @@ describe('DashboardStats', () => {
         currency: 'MYR'
     }
 
-    it('[TC-F03.07] renders all 4 default stat cards', () => {
+    it('[TC-F03.07] renders all 3 default stat cards (revenue disabled for F10)', () => {
         render(<DashboardStats {...defaultProps} />)
         expect(screen.getByText('Views')).toBeInTheDocument()
         expect(screen.getByText('Leads')).toBeInTheDocument()
         expect(screen.getByText('Engagement')).toBeInTheDocument()
-        expect(screen.getByText('Revenue')).toBeInTheDocument()
+        expect(screen.queryByText('Revenue')).not.toBeInTheDocument()
     })
 
     it('[TC-F03.18] hides "views" card when excluded from preferences', () => {
@@ -266,15 +275,16 @@ describe('SEOHealthWidget', () => {
         expect(screen.getByText('75')).toBeInTheDocument()
     })
 
-    it('[TC-F03.12] renders "AI Fix All Issues" CTA button', () => {
+    it('[TC-F03.12] renders "Fix" CTA button', () => {
         render(<SEOHealthWidget score={60} />)
-        const button = screen.getByRole('button', { name: /ai fix all issues/i })
+        const button = screen.getByRole('button', { name: /fix/i })
         expect(button).toBeInTheDocument()
     })
 
-    it('[TC-F03.34] shows "warning" status for score < 90 (e.g. 75)', () => {
+    it('[TC-F03.34] shows issue count for score < 90 (e.g. 75)', () => {
         render(<SEOHealthWidget score={75} />)
-        expect(screen.getByText(/Warning/)).toBeInTheDocument()
+        // Score-based warning generates 1 issue
+        expect(screen.getByText(/1 Issue/)).toBeInTheDocument()
     })
 
     it('[TC-F03.34] shows "good" status for score >= 90', () => {

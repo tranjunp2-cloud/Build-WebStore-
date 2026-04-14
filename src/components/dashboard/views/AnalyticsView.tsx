@@ -4,6 +4,8 @@ import { getCurrentTenantId } from '@/lib/auth'
 import { AnalyticsChart, ChartData } from '@/components/dashboard/AnalyticsChart'
 import { TopPerformingList, PerformingItem } from '@/components/dashboard/TopPerformingList'
 import { AnalyticsEmptyState } from '@/components/dashboard/AnalyticsEmptyState'
+import { sql } from 'drizzle-orm'
+import { subDays, startOfDay } from 'date-fns'
 export const dynamic = 'force-dynamic'
 
 interface Props {
@@ -18,29 +20,22 @@ export async function AnalyticsView({ searchParams }: Props) {
     const period = typeof resolvedParams.period === 'string' ? resolvedParams.period : '7d'
     const days = period === 'today' ? 1 : period === '30d' ? 30 : 7
     
-    // Current period
-    const since = new Date()
-    since.setDate(since.getDate() - days)
-    since.setHours(0, 0, 0, 0)
+    // Current period — match OverviewView date range pattern
+    const since = period === 'today' ? startOfDay(new Date()) : subDays(startOfDay(new Date()), days)
 
     // Previous period (for comparison)
-    const prevSince = new Date(since)
-    prevSince.setDate(prevSince.getDate() - days)
+    const prevSince = subDays(since, days)
 
     const payload = await getPayload({ config })
 
-    const clickEvents = ['click', 'add_to_cart', 'checkout']
+    // Match Overview's "leads" metric — only 'click' events
+    const clickEvents = ['click']
 
-    // Use count() for accurate summary metrics (no limit issue)
+    // Raw SQL: Payload API doesn't support COUNT(DISTINCT). Tenant isolation is manual
+    // via tenant_id filter — safe because tenantId is from getCurrentTenantId() (JWT auth).
     const [currentViewsRes, prevViewsRes, currentClicksRes, prevClicksRes] = await Promise.all([
-        payload.count({
-            collection: 'analytics',
-            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { not_in: clickEvents } }
-        }),
-        payload.count({
-            collection: 'analytics',
-            where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevSince.toISOString(), less_than: since.toISOString() }, event: { not_in: clickEvents } }
-        }),
+        payload.db.drizzle.execute(sql`SELECT COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${since.toISOString()}`),
+        payload.db.drizzle.execute(sql`SELECT COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${prevSince.toISOString()} AND created_at < ${since.toISOString()}`),
         payload.count({
             collection: 'analytics',
             where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() }, event: { in: clickEvents } }
@@ -51,8 +46,8 @@ export async function AnalyticsView({ searchParams }: Props) {
         }),
     ])
 
-    const currentMetrics = { views: currentViewsRes.totalDocs, clicks: currentClicksRes.totalDocs }
-    const prevMetrics = { views: prevViewsRes.totalDocs, clicks: prevClicksRes.totalDocs }
+    const currentMetrics = { views: Number(currentViewsRes.rows[0]?.count || 0), clicks: currentClicksRes.totalDocs }
+    const prevMetrics = { views: Number(prevViewsRes.rows[0]?.count || 0), clicks: prevClicksRes.totalDocs }
 
     // If completely empty in current
     if (currentMetrics.views === 0 && currentMetrics.clicks === 0) {
@@ -63,7 +58,9 @@ export async function AnalyticsView({ searchParams }: Props) {
         )
     }
 
-    // Fetch current period docs for chart/list aggregation (capped at 5000, most recent first)
+    // NOTE: Capped at 5000 docs for chart/list aggregation. Summary totals above use
+    // SQL COUNT (no limit) and are accurate. For high-traffic tenants, chart bars may
+    // under-count vs summary — acceptable: chart is illustrative, summary is authoritative.
     const { docs: currentDocs } = await payload.find({
         collection: 'analytics',
         where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: since.toISOString() } },
@@ -72,7 +69,8 @@ export async function AnalyticsView({ searchParams }: Props) {
     })
 
     // Aggregation for lists and charts (only for current period)
-    const dailyCounts: Record<string, { views: number, clicks: number }> = {}
+    // Use Sets for unique session counting to match Overview's COUNT(DISTINCT session_id)
+    const dailySessions: Record<string, { viewSessions: Set<string>, clickSessions: Set<string> }> = {}
     const pageViews: Record<string, number> = {}
     const productClicks: Record<string, number> = {}
     const blogViews: Record<string, number> = {}
@@ -80,13 +78,17 @@ export async function AnalyticsView({ searchParams }: Props) {
 
     for (const doc of currentDocs) {
         const date = new Date(doc.createdAt).toISOString().split('T')[0]
-        if (!dailyCounts[date]) dailyCounts[date] = { views: 0, clicks: 0 }
+        if (!dailySessions[date]) dailySessions[date] = { viewSessions: new Set(), clickSessions: new Set() }
 
-        const isClick = doc.event === 'click' || doc.event === 'add_to_cart' || doc.event === 'checkout' || doc.event === 'purchase'
-        if (isClick) {
-            dailyCounts[date].clicks += 1
-        } else {
-            dailyCounts[date].views += 1
+        const sessionId = (doc as { sessionId?: string }).sessionId
+
+        // Only count sessions with valid sessionId — matches SQL COUNT(DISTINCT session_id)
+        if (sessionId) {
+            if (doc.event === 'pageview') {
+                dailySessions[date].viewSessions.add(sessionId)
+            } else if (doc.event === 'click') {
+                dailySessions[date].clickSessions.add(sessionId)
+            }
         }
 
         // Top Pages
@@ -99,7 +101,7 @@ export async function AnalyticsView({ searchParams }: Props) {
         }
 
         // Top Products
-        if (url.startsWith('/product/') || isClick) {
+        if (url.startsWith('/product/') || doc.event === 'click') {
             productClicks[url] = (productClicks[url] || 0) + 1
         }
 
@@ -133,8 +135,8 @@ export async function AnalyticsView({ searchParams }: Props) {
 
         chartData.push({
             date: displayDate,
-            views: dailyCounts[key]?.views || 0,
-            clicks: dailyCounts[key]?.clicks || 0
+            views: dailySessions[key]?.viewSessions.size || 0,
+            clicks: dailySessions[key]?.clickSessions.size || 0
         })
     }
 
@@ -161,7 +163,8 @@ export async function AnalyticsView({ searchParams }: Props) {
 
             <TopPerformingList 
                 pages={topPages}
-                products={topProducts}
+                // TODO: Re-enable when F10 Commerce is ready
+                // products={topProducts}
                 blogs={topBlogs}
                 referrers={topReferrers}
             />

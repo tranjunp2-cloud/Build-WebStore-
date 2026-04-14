@@ -2,8 +2,7 @@
 
 import { Eye, MousePointerClick, ShoppingBag, DollarSign, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { ResponsiveContainer, LineChart, Line } from 'recharts'
-
+import { ResponsiveContainer, LineChart, Line, YAxis } from 'recharts'
 export type TimeSeriesPoint = {
     date: string
     value: number
@@ -55,23 +54,20 @@ const TrendBadge = ({ change = 0 }: { change?: number }) => {
 // Sparkline Components mapped to exactly match Figma mockups
 const Sparkline = ({ data, color }: { data: TimeSeriesPoint[], color: string }) => {
     // If no data, render a fast empty path to preserve layout
-    if (!data || data.length === 0) {
-        return (
-            <svg className="stat-sparkline w-full h-[40px] opacity-30 mt-1 block" viewBox="0 0 100 30" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M0 25 L 100 25" stroke={color} strokeWidth="2" fill="none" vectorEffect="non-scaling-stroke" />
-            </svg>
-        )
+    if (!data || data.length <= 1) {
+        return null
     }
 
     return (
-        <div className="w-full h-[40px] opacity-30 mt-1">
+        <div className="w-full h-[40px] opacity-60 mt-1">
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data}>
+                    <YAxis domain={['dataMin', 'dataMax']} hide />
                     <Line 
-                        type="monotone" 
+                        type="linear" 
                         dataKey="value" 
                         stroke={color} 
-                        strokeWidth={2} 
+                        strokeWidth={4.5} 
                         dot={false}
                         isAnimationActive={false}
                     />
@@ -83,11 +79,12 @@ const Sparkline = ({ data, color }: { data: TimeSeriesPoint[], color: string }) 
 
 export function DashboardStats(props: DashboardStatsProps) {
     const { t } = useI18n()
-    const defaultOrder = ['views', 'leads', 'engagement', 'revenue']
-    const order = props.preferences || defaultOrder
+    // TODO: Add 'revenue' back to defaultOrder when F10 is ready
+    const defaultOrder = ['views', 'leads', 'engagement']
+    const order = (props.preferences || defaultOrder).filter(key => key !== 'revenue')
     
     // Custom container styles matching the Figma UI exactly
-    const cardClassName = "relative flex-1 min-w-[200px] flex flex-col justify-between rounded-[16px] border border-solid border-white/10 bg-[#1E293B] p-5 shadow-sm transition-colors duration-200 hover:border-blue-500 cursor-pointer overflow-hidden"
+    const cardClassName = "relative flex-1 min-w-0 flex flex-col justify-between rounded-[16px] border border-solid border-white/10 bg-[#1E293B] p-5 shadow-sm transition-colors duration-200 hover:border-blue-500 cursor-pointer overflow-hidden min-h-[260px]"
 
     const STAT_CARDS = {
       views: (
@@ -101,9 +98,9 @@ export function DashboardStats(props: DashboardStatsProps) {
             </div>
 
             {/* Middle Row: Text and Value */}
-            <div className="flex flex-col gap-1 mb-4 relative z-10">
-                <span className="text-[14px] text-slate-50/60 font-normal">{t.dashboard.overview.stats.views}</span>
-                <span className="text-[24px] font-bold text-[#F8FAFC] tracking-tight leading-none">{props.views.toLocaleString()}</span>
+            <div className="flex flex-col gap-2 mb-4 relative z-10">
+                <span className="text-[18px] text-slate-50/60 font-medium">{t.dashboard.overview.stats.views}</span>
+                <span className="text-[48px] font-bold text-[#F8FAFC] tracking-tight leading-none">{props.views.toLocaleString()}</span>
             </div>
             
             {/* Bottom Row: Sparkline */}
@@ -123,9 +120,9 @@ export function DashboardStats(props: DashboardStatsProps) {
             </div>
 
             {/* Middle Row: Text and Value */}
-            <div className="flex flex-col gap-1 mb-4 relative z-10">
-                <span className="text-[14px] text-slate-50/60 font-normal">{t.dashboard.overview.stats.leads}</span>
-                <span className="text-[24px] font-bold text-[#F8FAFC] tracking-tight leading-none">{props.leads.toLocaleString()}</span>
+            <div className="flex flex-col gap-2 mb-4 relative z-10">
+                <span className="text-[18px] text-slate-50/60 font-medium">{t.dashboard.overview.stats.leads}</span>
+                <span className="text-[48px] font-bold text-[#F8FAFC] tracking-tight leading-none">{props.leads.toLocaleString()}</span>
             </div>
             
             {/* Bottom Row: Sparkline */}
@@ -145,9 +142,9 @@ export function DashboardStats(props: DashboardStatsProps) {
             </div>
 
             {/* Middle Row: Text and Value */}
-            <div className="flex flex-col gap-1 mb-4 relative z-10">
-                <span className="text-[14px] text-slate-50/60 font-normal">{t.dashboard.overview.stats.engagement}</span>
-                <span className="text-[24px] font-bold text-[#F8FAFC] tracking-tight leading-none">{props.engagement.toLocaleString()}</span>
+            <div className="flex flex-col gap-2 mb-4 relative z-10">
+                <span className="text-[18px] text-slate-50/60 font-medium">{t.dashboard.overview.stats.engagement}</span>
+                <span className="text-[48px] font-bold text-[#F8FAFC] tracking-tight leading-none">{props.engagement.toLocaleString()}</span>
             </div>
             
             {/* Bottom Row: Sparkline */}
@@ -168,9 +165,9 @@ export function DashboardStats(props: DashboardStatsProps) {
             </div>
 
             {/* Middle Row: Text and Value */}
-            <div className="flex flex-col gap-1 mb-4 relative z-10">
-                <span className="text-[14px] text-slate-50/60 font-normal">{t.dashboard.overview.stats.revenue}</span>
-                <span className="text-[24px] font-bold text-[#F8FAFC] tracking-tight leading-none">
+            <div className="flex flex-col gap-2 mb-4 relative z-10">
+                <span className="text-[18px] text-slate-50/60 font-medium">{t.dashboard.overview.stats.revenue}</span>
+                <span className="text-[48px] font-bold text-[#F8FAFC] tracking-tight leading-none">
                     {new Intl.NumberFormat('ms-MY', { style: 'currency', currency: props.currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(props.revenue || 0)}
                 </span>
             </div>
@@ -184,7 +181,7 @@ export function DashboardStats(props: DashboardStatsProps) {
     }
 
     return (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+        <div className="contents">
             {order.map(key => STAT_CARDS[key as keyof typeof STAT_CARDS] || null)}
         </div>
     )
