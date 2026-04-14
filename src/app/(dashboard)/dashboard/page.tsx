@@ -43,15 +43,22 @@ export default async function DashboardRoot({ searchParams }: Props) {
         const tenantResult = await payload.findByID({ collection: 'tenants', id: tenantId })
         dashboardPreferences = (tenantResult as { settings?: { dashboardPreferences?: string[] } })?.settings?.dashboardPreferences
 
-        const allSites = await payload.find({
+        const usableSiteCount = await payload.count({
             collection: 'sites',
-            where: { tenant: { equals: tenantId } },
-            limit: 5,
+            where: {
+                and: [
+                    { tenant: { equals: tenantId } },
+                    {
+                        or: [
+                            { generationStatus: { equals: 'completed' } },
+                            { generationStatus: { equals: 'none' } },
+                            { generationStatus: { exists: false } },
+                        ],
+                    },
+                ],
+            },
         })
-        hasUsableSites = allSites.docs.some((s) => {
-            const gs = (s as Record<string, unknown>).generationStatus
-            return !gs || gs === 'none' || gs === 'completed'
-        })
+        hasUsableSites = usableSiteCount.totalDocs > 0
     }
 
     // Force overview tab when no usable sites — prevents empty analytics/seo views via direct URL
