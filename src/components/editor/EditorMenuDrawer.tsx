@@ -216,7 +216,9 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                             </div>
                             <span className="text-[14px] font-medium text-[#F8FAFC]">{userName || 'User'}</span>
                         </div>
-                        <NotificationBell />
+                        <div className="notification-bell-sidebar">
+                            <NotificationBell />
+                        </div>
                     </div>
 
                     {/* Language toggle */}
