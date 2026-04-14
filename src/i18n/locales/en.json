@@ -296,7 +296,16 @@
             "morning": "morning",
             "afternoon": "afternoon",
             "evening": "evening",
+            "welcomeTitle": "Welcome to PrimeWeb Dashboard",
+            "welcomeSubtitle": "Monitor your store performance and manage your online business from one place.",
+            "pendingLabel": "Pending",
+            "itemsLabel": "items",
             "customize": "Customize",
+            "tabs": {
+                "overview": "Overview",
+                "analytics": "Analytics",
+                "seo": "SEO Health"
+            },
             "stats": {
                 "views": "Views (Traffic)",
                 "leads": "Clicks (Leads)",
@@ -315,7 +324,10 @@
                 "score": "Score:",
                 "statusGood": "Good",
                 "statusWarning": "Needs Improvement",
-                "fixAll": "✨ AI Fix All Issues"
+                "fixAll": "✨ AI Fix All Issues",
+                "fix": "Fix",
+                "issue": "Issue",
+                "issues": "Issues"
             },
             "periods": {
                 "today": "Today",
@@ -372,7 +384,8 @@
             "topBlogs": "Top Blogs",
             "topReferrers": "Top Referrers",
             "views": "Views",
-            "clicks": "Clicks"
+            "clicks": "Clicks",
+            "noData": "No data available for this period."
         },
         "seo": {
             "title": "SEO Dashboard",
@@ -437,6 +450,9 @@
                 "description": "Create a site first to use the SEO Dashboard",
                 "cta": "Go to Dashboard"
             },
+            "issuesList": "SEO Issues",
+            "missingTitle": "Missing title",
+            "missingDesc": "Missing description",
             "healthOverview": "SEO Health Overview",
             "scoreLabel": "Score: {score}/100",
             "fixAllButton": "✨ AI Fix All Issues",
