@@ -1044,3 +1044,53 @@ Thread user-supplied `phone`, `email`, `address`, `products`, `shortDescription`
 - Malay restaurant với `products: ["nasi lemak"]` → first Unsplash query contains `"malaysian coconut rice"`.
 - Empty `BusinessInfoInput` → fallback canned content, no crash.
 - All 69 new unit tests pass; existing `fallback-adapter.test.ts` (22 tests) still green.
+
+---
+
+## 11. Phase 02 — Theme Moods System (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-02-theme-moods-system.md`
+> PR: `feat(f01): [US-F01-08] theme moods system — imagery, voice, cta bundle`
+
+### Mục tiêu
+
+Bundle imagery mood, copy voice, photography filter, và category-tuned CTAs vào 6 **ThemeMood archetypes** (Playful, Elegant, Bold, Serene, Editorial, Tech-Minimal). Mỗi trong 70 `ThemePreset` được gán 1 mood duy nhất qua field `moodId`. Mood wire xuyên suốt 3 consumer: (a) `buildUserPrompt` voice block, (b) `deriveKeywords` imagery adjective append, (c) composer `getCategoryCTA` helper thay thế hardcoded `"Get Started"/"Learn More"`.
+
+### Test Cases
+
+| TC ID | Test File | Mô tả | Status |
+|-------|-----------|-------|--------|
+| **TC-F01-W.09** | `mood-cta-coverage.test.ts` | ThemeMood shape: 6 moods, 14 cats, voiceStyle 4-6 rules, imageryKeywords 3-6, copyTone enum, every field non-empty | ✅ |
+| **TC-F01-W.09b** | `preset-mood-assignment.test.ts` | Every preset có moodId hợp lệ; mỗi mood dùng bởi ≥3 presets; không có mood chiếm >30%; mỗi category có ≥2 distinct moods | ✅ |
+| **TC-F01-W.10** | `voice-prompt-mood.test.ts` | `buildUserPrompt` inject COPY VOICE block với mood label, copyTone, bulleted rules, imagery hint; backward compat với legacy personality path | ✅ |
+| **TC-F01-W.11** | `image-keywords-mood.test.ts` | `deriveKeywords` append mood imagery adjectives; total cap ≤5; no duplicates; tương tác với Phase 01 products | ✅ |
+| **TC-F01-W.12** | `mood-cta-coverage.test.ts` | **168-cell CTA coverage** — 6 moods × 14 cats × 2 roles: non-empty, ≤25 chars, primary ≠ secondary, no TODO markers, không mood nào fall back generic >2 cells | ✅ |
+| **TC-F01-W.12b** | `mood-cta-composer.test.ts` | End-to-end: hero/nav/CTA block dùng mood-resolved labels qua `composeFallbackResult`; seed variety produces distinct CTAs; no "Get Started" dominance | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/theme-moods.ts` — **NEW** 350 lines: MoodId/MoodCategory/PhotographyFilter/CopyTone types, ThemeMood interface, 6 hand-curated mood records với 168 CTA cells, getMood + getCategoryCTA helpers
+- `src/lib/ai/theme-presets.ts` — extended `ThemePreset` type với `moodId: MoodId` field, assigned mood cho tất cả 70 presets (distribution: elegant 16, playful 13, bold 11, tech-minimal 11, editorial 10, serene 9)
+- `src/lib/ai/category-theme-picker.ts` — new `CategoryTheme` interface + `pickCategoryThemeWithMood()` entry point, legacy `pickCategoryTheme` preserved
+- `src/lib/ai/system-prompt.ts` — `buildUserPrompt` nhận `BuildUserPromptOptions.mood`, inject COPY VOICE bulleted block khi có mood
+- `src/lib/ai/image-keywords.ts` — `KeywordContext.mood` optional, append top 1-2 imagery adjectives, cap 5 total, no dupes
+- `src/lib/ai/template-composer.ts` — `resolveCTA(mood, category, role)` helper; `buildNavigation`/`buildHero`/`buildCTA` prefer mood CTAs; `composeFromBlueprint` resolve mood từ `preset.themePreset.moodId`; `buildBlockFromSpec` thread mood xuống
+- **6 new test files**: `theme-moods` helpers + 168 coverage, preset assignment, voice injection, imagery append, end-to-end composer CTAs
+
+### Acceptance Criteria
+
+- `pickCategoryThemeWithMood("restaurant", hashBusinessName("Rose Garden"))` trả về theme có `mood.copyTone === 'aspirational'` (Heritage Gold preset → elegant mood).
+- 5 generations restaurant × 5 different names produce CTAs từ ≥3 distinct mood-driven phrasings (verified by seed variety test).
+- GPT prompt cho beauty × playful run chứa voice rules "texting a close friend", "one exclamation per section max", "skip corporate buzzwords".
+- Unsplash query cho `{ products: ["nasi lemak"], mood: serene }` = `"malaysian coconut rice restaurant minimalist ..."` — verified via `deriveKeywords` test.
+- 168 non-empty CTA strings, all ≤25 chars, coverage test xanh.
+- 6 new test files + 202 new assertions (W.09/W.09b/W.10/W.11/W.12/W.12b). Phase 01 regression tests vẫn xanh 170/170.
+
+### Test Summary (cumulative Phase 01 + 02)
+
+| Suite | Count | Status |
+|---|---|---|
+| Phase 01 tests (7 files) | 69 | ✅ |
+| Phase 02 tests (6 files) | 235+ | ✅ |
+| Legacy regression (`fallback-adapter.test.ts`) | 22 | ✅ |
+| **Total new since pre-Phase-01** | **330+** | ✅ |
