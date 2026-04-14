@@ -15,9 +15,12 @@ describe('generateBlocks — output structure [TC-F01.08]', () => {
         expect(['business', 'ecommerce', 'restaurant', 'portfolio', 'blog']).toContain(result.siteType)
     })
 
-    it('returns 6-10 blocks (dynamic pool)', () => {
+    it('returns 6-12 blocks (dynamic pool + industry blocks)', () => {
+        // Restaurant gets 3 industry blocks (menu-display, booking-widget,
+        // review-cards) prepended before the 3-4 generic middle blocks.
+        // Range: nav + hero + 0-3 industry + 3-4 middle + contact + footer = 7-12
         expect(result.blocks.length).toBeGreaterThanOrEqual(6)
-        expect(result.blocks.length).toBeLessThanOrEqual(10)
+        expect(result.blocks.length).toBeLessThanOrEqual(12)
     })
 
     it('always has navigation first and footer last', () => {
@@ -178,5 +181,99 @@ describe('generateBlocks — footer block', () => {
         const result = generateBlocks('Create a website called "TestBrand"')
         const footer = result.blocks.find(b => b.blockType === 'footer')
         expect(footer?.copyrightText).toContain('TestBrand')
+    })
+})
+
+// ─── Regression: Payload field name mismatches that caused empty blocks ──
+// Bug history: 2026-04-14
+// User reported huge empty space in generated restaurant site (page 179).
+// Root cause: faq builder used `items` field, but Payload schema requires
+// `faqs` → silently dropped on save → empty section rendered.
+// Same class of bug for `gallery` (upload field, can't accept URLs) and
+// `about.body` (textarea, was passed as Lexical richtext object).
+
+describe('generateBlocks — Payload field name compliance', () => {
+    it('faq block uses `faqs` field (not `items`) to match Payload schema', () => {
+        // Force faq into the pool by generating many seeds — pool shuffles.
+        let foundFaq: Record<string, unknown> | undefined
+        for (let seed = 0; seed < 50 && !foundFaq; seed++) {
+            const result = generateBlocks('Create a website for a company', seed * 31)
+            const faq = result.blocks.find(b => b.blockType === 'faq') as Record<string, unknown> | undefined
+            if (faq) foundFaq = faq
+        }
+        expect(foundFaq).toBeDefined()
+        expect(foundFaq).toHaveProperty('faqs')
+        expect(Array.isArray(foundFaq!.faqs)).toBe(true)
+        expect((foundFaq!.faqs as unknown[]).length).toBeGreaterThan(0)
+        // Should NOT have legacy `items` field
+        expect(foundFaq).not.toHaveProperty('items')
+    })
+
+    it('about block body is plain string (not Lexical richtext object)', () => {
+        let foundAbout: Record<string, unknown> | undefined
+        for (let seed = 0; seed < 50 && !foundAbout; seed++) {
+            const result = generateBlocks('Create a website for a company', seed * 47)
+            const about = result.blocks.find(b => b.blockType === 'about') as Record<string, unknown> | undefined
+            if (about) foundAbout = about
+        }
+        expect(foundAbout).toBeDefined()
+        expect(typeof foundAbout!.body).toBe('string')
+        expect((foundAbout!.body as string).length).toBeGreaterThan(0)
+    })
+
+    it('gallery block is excluded from middle pool (requires media uploads)', () => {
+        // Gallery requires upload field IDs that the fallback cannot generate.
+        // Verify gallery never appears in 100 generations.
+        for (let seed = 0; seed < 100; seed++) {
+            const result = generateBlocks('Create a website for a company', seed * 17)
+            const gallery = result.blocks.find(b => b.blockType === 'gallery')
+            expect(gallery, `seed ${seed} should not produce gallery`).toBeUndefined()
+        }
+    })
+})
+
+// ─── Industry-aware fallback: category-specific blocks ──────────────────
+describe('generateBlocks — industry-aware block selection', () => {
+    it('restaurant fallback includes menu-display + booking-widget', () => {
+        const result = generateBlocks('Create a website for "Ben Ben" restaurant', 12345)
+        const blockTypes = result.blocks.map(b => b.blockType)
+        expect(blockTypes).toContain('menu-display')
+        expect(blockTypes).toContain('booking-widget')
+    })
+
+    it('restaurant menu-display has non-empty categories with items', () => {
+        const result = generateBlocks('Create a website for a restaurant', 12345)
+        const menu = result.blocks.find(b => b.blockType === 'menu-display') as Record<string, unknown> | undefined
+        expect(menu).toBeDefined()
+        const categories = menu!.categories as Array<{ items: unknown[] }>
+        expect(Array.isArray(categories)).toBe(true)
+        expect(categories.length).toBeGreaterThan(0)
+        expect(categories[0]!.items.length).toBeGreaterThan(0)
+    })
+
+    it('restaurant review-cards has non-empty reviews array', () => {
+        const result = generateBlocks('Create a website for a restaurant', 12345)
+        const reviews = result.blocks.find(b => b.blockType === 'review-cards') as Record<string, unknown> | undefined
+        expect(reviews).toBeDefined()
+        expect(Array.isArray(reviews!.reviews)).toBe(true)
+        expect((reviews!.reviews as unknown[]).length).toBeGreaterThan(0)
+    })
+
+    it('ecommerce fallback includes products-grid + review-cards', () => {
+        const result = generateBlocks('Create a website for an online store', 12345)
+        const blockTypes = result.blocks.map(b => b.blockType)
+        expect(blockTypes).toContain('products-grid')
+        expect(blockTypes).toContain('review-cards')
+    })
+
+    it('business fallback works without industry blocks', () => {
+        const result = generateBlocks('Create a consulting company website', 12345)
+        // Should still have nav, hero, contact, footer + middle blocks
+        expect(result.blocks.length).toBeGreaterThanOrEqual(6)
+        const blockTypes = result.blocks.map(b => b.blockType)
+        expect(blockTypes).toContain('navigation')
+        expect(blockTypes).toContain('hero')
+        expect(blockTypes).toContain('contact')
+        expect(blockTypes).toContain('footer')
     })
 })

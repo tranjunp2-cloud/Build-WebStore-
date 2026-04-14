@@ -7,6 +7,7 @@
  */
 
 import { enforceMinContent } from './openai-generator'
+import { applyContentValidation } from './content-rules'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -444,8 +445,23 @@ const CONTENT_VARIATIONS: Record<BusinessIntent['type'], ContentSet[]> = {
 }
 
 // ─── Middle Block Pool ─────────────────────────────────────────────────
+// Note: 'gallery' excluded — Payload schema requires upload (media relation),
+// fallback cannot generate media records. Use industry blocks (review-cards,
+// menu-display, etc.) for visual content instead.
 
-const MIDDLE_BLOCK_POOL = ['about', 'features', 'stats', 'gallery', 'testimonials', 'faq', 'cta', 'newsletter', 'team'] as const
+const MIDDLE_BLOCK_POOL = ['about', 'features', 'stats', 'testimonials', 'faq', 'cta', 'newsletter', 'team'] as const
+
+// ─── Industry-aware block injection (per category) ─────────────────────
+// Each category gets 1-2 industry-specific blocks injected before the generic
+// middle pool. Keeps fallback restaurant-aware, fitness-aware, etc.
+
+const INDUSTRY_BLOCKS_FALLBACK: Record<BusinessIntent['type'], string[]> = {
+    business: [],
+    ecommerce: ['products-grid', 'review-cards'],
+    restaurant: ['menu-display', 'booking-widget', 'review-cards'],
+    portfolio: ['portfolio-grid'],
+    blog: ['blog-list'],
+}
 
 // ─── Block Builders ────────────────────────────────────────────────────
 
@@ -489,12 +505,15 @@ function buildMiddleBlock(
 ): GeneratedBlock | null {
     switch (blockType) {
         case 'about':
+            // Payload `about.body` is `textarea` (plain string), NOT richtext.
+            // Passing a Lexical object here causes Payload to silently drop the
+            // field and the about block renders empty. Always pass a string.
             return {
                 blockType: 'about',
                 variant,
                 sectionLabel: 'About',
                 headline: 'Our Story',
-                body: { root: { children: [{ type: 'paragraph', children: [{ text: content.aboutBody }] }] } },
+                body: content.aboutBody,
             }
         case 'features':
             return {
@@ -518,12 +537,12 @@ function buildMiddleBlock(
                 ],
             }
         case 'gallery':
-            return {
-                blockType: 'gallery',
-                variant,
-                headline: 'Our Gallery',
-                images: [],
-            }
+            // Excluded from MIDDLE_BLOCK_POOL — kept here for callers that pass
+            // 'gallery' explicitly. Returns null so the fallback never injects
+            // an empty gallery section that renders as decorative dead space.
+            // To enable gallery in fallback, generate media records first via
+            // Unsplash + Payload media upload, then pass `image: { id }` refs.
+            return null
         case 'testimonials': {
             const finalVariant = enforceMinContent('testimonials', variant, content.testimonials.length)
             return {
@@ -534,11 +553,14 @@ function buildMiddleBlock(
             }
         }
         case 'faq':
+            // Payload `faq.faqs` (NOT `items`). Field name mismatch causes
+            // Payload to silently drop the array and the faq block renders
+            // an empty section. Always use the Payload field name `faqs`.
             return {
                 blockType: 'faq',
                 variant,
                 headline: 'Frequently Asked Questions',
-                items: [
+                faqs: [
                     { question: 'How do I get started?', answer: 'Simply contact us through the form below or give us a call. We\'ll guide you through everything.' },
                     { question: 'What are your operating hours?', answer: 'We are open Monday to Saturday, 9am to 6pm. Online support is available 24/7.' },
                     { question: 'Do you offer custom solutions?', answer: 'Yes! Every client gets a tailored solution designed specifically for their needs.' },
@@ -573,6 +595,96 @@ function buildMiddleBlock(
                     { name: 'Raj Patel', role: 'Head of Operations', bio: 'Keeps everything running smoothly behind the scenes.' },
                 ],
             }
+
+        // ── Industry-aware blocks ────────────────────────────────────────
+        case 'menu-display':
+            return {
+                blockType: 'menu-display',
+                variant: variant === 'simple' ? 'tabs' : variant,
+                headline: 'Our Menu',
+                subheadline: 'Crafted with the freshest ingredients',
+                currency: 'RM',
+                showDietaryIcons: true,
+                categories: [
+                    {
+                        name: 'Starters',
+                        items: [
+                            { name: 'Crispy Spring Rolls', description: 'Hand-rolled with vegetables and glass noodles', price: 12, dietaryTags: ['vegetarian'] },
+                            { name: 'Tom Yum Soup', description: 'Spicy and sour with prawns and lemongrass', price: 18, dietaryTags: ['spicy'] },
+                            { name: 'Satay Skewers', description: 'Grilled marinated chicken with peanut sauce', price: 22, dietaryTags: ['halal'] },
+                        ],
+                    },
+                    {
+                        name: 'Mains',
+                        items: [
+                            { name: 'Nasi Lemak Special', description: 'Coconut rice with rendang, sambal, and crispy anchovies', price: 28, dietaryTags: ['halal', 'spicy'], isPopular: true },
+                            { name: 'Pad Thai', description: 'Stir-fried rice noodles with prawns and peanuts', price: 24 },
+                            { name: 'Vegetable Curry', description: 'Mixed vegetables in fragrant coconut curry', price: 22, dietaryTags: ['vegan', 'gluten-free'] },
+                        ],
+                    },
+                    {
+                        name: 'Desserts',
+                        items: [
+                            { name: 'Mango Sticky Rice', description: 'Sweet glutinous rice with fresh mango', price: 14, dietaryTags: ['vegetarian', 'gluten-free'] },
+                            { name: 'Cendol', description: 'Pandan jelly with coconut milk and palm sugar', price: 12, dietaryTags: ['vegetarian'] },
+                        ],
+                    },
+                ],
+            }
+        case 'booking-widget':
+            return {
+                blockType: 'booking-widget',
+                variant: variant === 'simple' ? 'inline' : variant,
+                headline: 'Book Your Visit',
+                subheadline: 'Reserve your spot in just a few clicks',
+                buttonLabel: 'Reserve Now',
+                services: [
+                    { name: 'Lunch Reservation', duration: '90 mins', price: '' },
+                    { name: 'Dinner Reservation', duration: '120 mins', price: '' },
+                    { name: 'Private Event', duration: '3 hours', price: 'On request' },
+                ],
+                showCalendar: true,
+                showTimeSlots: true,
+            }
+        case 'review-cards':
+            return {
+                blockType: 'review-cards',
+                variant: variant === 'simple' ? 'grid' : variant,
+                headline: 'Loved by Our Customers',
+                subheadline: 'Hear what they have to say',
+                showAverage: true,
+                totalReviewCount: 248,
+                reviews: [
+                    { name: 'Sarah M.', rating: 5, text: 'Absolutely incredible experience. The attention to detail blew us away — definitely coming back!', source: 'Google', date: '2 weeks ago', verified: true },
+                    { name: 'Daniel L.', rating: 5, text: 'Best in town, hands down. Service was warm, food was fresh, atmosphere was perfect.', source: 'Tripadvisor', date: '1 month ago', verified: true },
+                    { name: 'Aishah K.', rating: 4, text: 'Great food and lovely staff. Will definitely recommend to friends and family.', source: 'Google', date: '3 weeks ago', verified: true },
+                    { name: 'Marcus T.', rating: 5, text: 'A hidden gem! Everything from starters to dessert was on point. 10/10 would visit again.', source: 'Facebook', date: '1 week ago', verified: true },
+                ],
+            }
+        case 'products-grid':
+            return {
+                blockType: 'products-grid',
+                variant: variant === 'simple' ? 'grid-3' : variant,
+                headline: 'Featured Products',
+                subheadline: 'Handpicked just for you',
+                limit: 6,
+            }
+        case 'portfolio-grid':
+            return {
+                blockType: 'portfolio-grid',
+                variant: variant === 'simple' ? 'masonry' : variant,
+                headline: 'Recent Work',
+                subheadline: 'A selection of projects we\'re proud of',
+            }
+        case 'blog-list':
+            return {
+                blockType: 'blog-list',
+                variant: variant === 'simple' ? 'cards' : variant,
+                headline: 'Latest Insights',
+                subheadline: 'Tips, stories, and updates from our team',
+                limit: 3,
+            }
+
         default:
             return null
     }
@@ -682,8 +794,20 @@ export function generateBlocks(prompt: string, seed?: number): GenerationResult 
     // 2. Hero (always second)
     blocks.push(buildHero(intent.name, content, getVariant('hero')))
 
-    // 3. Middle blocks — pick 4-6 from pool, shuffle
-    const middleCount = 4 + Math.floor(rand() * 3) // 4-6 blocks
+    // 3. Industry blocks — inject category-specific blocks BEFORE generic pool
+    // For restaurant → menu-display, booking-widget, review-cards
+    // For ecommerce → products-grid, review-cards, etc.
+    const industryBlockTypes = INDUSTRY_BLOCKS_FALLBACK[intent.type] ?? []
+    const industryBlocks: GeneratedBlock[] = []
+    for (const blockType of industryBlockTypes) {
+        const variant = getVariant(blockType)
+        const block = buildMiddleBlock(blockType, intent.name, content, variant)
+        if (block) industryBlocks.push(block)
+    }
+
+    // 4. Generic middle blocks — pick 3-4 from pool, shuffle
+    // (Reduced from 4-6 since industry blocks already fill some slots)
+    const middleCount = 3 + Math.floor(rand() * 2) // 3-4 blocks
     const selectedMiddle = shuffleArray([...MIDDLE_BLOCK_POOL], rand).slice(0, middleCount)
 
     const middleBlocks: GeneratedBlock[] = []
@@ -693,20 +817,30 @@ export function generateBlocks(prompt: string, seed?: number): GenerationResult 
         if (block) middleBlocks.push(block)
     }
 
+    // Combine: industry blocks first, then generic middle
+    const allMiddle = [...industryBlocks, ...middleBlocks]
+
     // Enforce ordering constraints (features before stats, about before team)
-    const orderedMiddle = enforceOrdering(middleBlocks)
+    const orderedMiddle = enforceOrdering(allMiddle)
     blocks.push(...orderedMiddle)
 
-    // 4. Contact (always second-to-last)
+    // 5. Contact (always second-to-last)
     blocks.push(buildContact(intent.name, content, getVariant('contact')))
 
-    // 5. Footer (always last)
+    // 6. Footer (always last)
     blocks.push(buildFooter(intent.name, content.heroSub, getVariant('footer')))
+
+    // Phase 04 content validation — apply same rules as AI/composer paths.
+    // Catches blocked CTA labels, oversized headlines, generic filler copy.
+    // Auto-fixes are merged; warnings logged via console.warn.
+    const validatedBlocks = blocks.map((b) =>
+        applyContentValidation(b as Record<string, unknown>, 'en') as GeneratedBlock,
+    )
 
     return {
         siteName: intent.name,
         siteType: intent.type,
-        blocks,
+        blocks: validatedBlocks,
         seo: {
             title: `${intent.name} — ${content.heroHeadline}`,
             description: content.heroSub,
