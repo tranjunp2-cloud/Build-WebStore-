@@ -14,7 +14,12 @@ export type ResolvedFontPairing = {
 
 const DEFAULT_PAIRING: ResolvedFontPairing = { fontHeading: 'Inter', fontBody: 'Inter' }
 
+// Plan 2253 Phase 02 — font pairing dedupe (fixes R6).
+// Legacy IDs retained with original values (backward compat for existing
+// sites in DB). New IDs below introduce unique (heading, body) tuples so
+// that new preset assignments can diversify typography within a category.
 const FONT_PAIRINGS: Record<string, ResolvedFontPairing> = {
+    // ── Legacy (unchanged — some duplicate values kept for backward compat) ──
     'warm-friendly':   { fontHeading: 'Poppins',          fontBody: 'Nunito' },
     'modern-clean':    { fontHeading: 'DM Sans',          fontBody: 'Inter' },
     'elegant-serif':   { fontHeading: 'Playfair Display', fontBody: 'Lato' },
@@ -34,6 +39,13 @@ const FONT_PAIRINGS: Record<string, ResolvedFontPairing> = {
     'creative-studio': { fontHeading: 'Raleway',          fontBody: 'Inter' },
     'retro-modern':    { fontHeading: 'Raleway',          fontBody: 'Nunito' },
     'bold-geometric':  { fontHeading: 'Outfit',           fontBody: 'DM Sans' },
+    // ── New unique pairs (Plan 2253 Phase 02) ─────────────────────────────
+    'magazine-cover':  { fontHeading: 'Playfair Display', fontBody: 'Open Sans' },
+    'boutique-serif':  { fontHeading: 'Playfair Display', fontBody: 'Inter' },
+    'warm-editorial':  { fontHeading: 'Poppins',          fontBody: 'Lato' },
+    'contemporary':    { fontHeading: 'Raleway',          fontBody: 'DM Sans' },
+    'classical':       { fontHeading: 'Inter',            fontBody: 'Lato' },
+    'hospitality':     { fontHeading: 'Poppins',          fontBody: 'Open Sans' },
 }
 
 /**
