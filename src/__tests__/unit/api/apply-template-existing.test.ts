@@ -372,7 +372,7 @@ describe('POST /api/ai/apply-template', () => {
 
             // Assert — sites.update called with the template theme
             const siteUpdateCall = mockPayloadInstance.update.mock.calls.find(
-                (c: any[]) => c[0].collection === 'sites' && c[0].data.theme
+                (c: [{ collection: string; data?: { theme?: unknown }; id?: number | string }]) => c[0].collection === 'sites' && c[0].data?.theme
             )
             expect(siteUpdateCall).toBeDefined()
             expect(siteUpdateCall[0].id).toBe(101)
@@ -608,7 +608,7 @@ describe('POST /api/ai/apply-template', () => {
 
             // Assert — site theme must contain hardcoded fallback values
             const siteUpdateCall = mockPayloadInstance.update.mock.calls.find(
-                (c: any[]) => c[0].collection === 'sites' && c[0].data.theme
+                (c: [{ collection: string; data?: { theme?: unknown }; id?: number | string }]) => c[0].collection === 'sites' && c[0].data?.theme
             )
             expect(siteUpdateCall).toBeDefined()
             expect(siteUpdateCall[0].data.theme).toMatchObject({
