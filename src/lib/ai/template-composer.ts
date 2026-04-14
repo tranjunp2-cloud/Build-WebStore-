@@ -2,7 +2,7 @@ import { getCategoryContent } from '@/lib/ai/content'
 import type { CategoryContent, BusinessSample } from '@/lib/ai/content/types'
 import type { ThemePreset } from '@/lib/ai/theme-presets'
 import { blockRegistry } from '@/blocks/registry'
-import { enforceMinContent } from './openai-generator'
+import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -1298,17 +1298,29 @@ function buildBlockFromSpec(
  * Compose a template from a TemplatePreset blueprint.
  * Reads pages[].blocks[] and builds each block — no algorithmic guessing.
  * When BlockSpec.variant is undefined, uses selectVariant() for seed-based variety.
+ *
+ * Optional `bizOverride`: shallow-merged over the content.businesses[preset.businessIndex]
+ * AFTER a deep clone, so the fallback path can inject user-extracted business name / tagline
+ * without polluting the cached content pack (same pattern as researcher-03 Q3).
  */
-export function composeFromBlueprint(preset: TemplatePreset, compositionSeed?: number): TemplateSeed {
+export function composeFromBlueprint(
+  preset: TemplatePreset,
+  compositionSeed?: number,
+  bizOverride?: Partial<BusinessSample>,
+): TemplateSeed {
   const content = getCategoryContent(preset.category)
   if (!content) {
     throw new Error(`[composeFromBlueprint] Content not found for category: ${preset.category}`)
   }
 
-  const biz = content.businesses[preset.businessIndex]
-  if (!biz) {
+  const baseBiz = content.businesses[preset.businessIndex]
+  if (!baseBiz) {
     throw new Error(`[composeFromBlueprint] businessIndex ${preset.businessIndex} out of range for ${preset.category} (has ${content.businesses.length})`)
   }
+
+  const biz: BusinessSample = bizOverride
+    ? { ...structuredClone(baseBiz), ...bizOverride }
+    : baseBiz
 
   // Use businessIndex as seed if not provided — each template gets deterministic but different variants
   const seed = compositionSeed ?? preset.businessIndex * 7919

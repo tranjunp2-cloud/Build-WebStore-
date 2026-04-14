@@ -55,7 +55,12 @@ describe('generateSiteWithAI — fallback path (no API key) [TC-F01.08]', () => 
     it('emits fallback step event', async () => {
         const { events } = await generateSiteWithAI(businessInfo)
 
-        const fallbackEvent = events.find(e => e.data.step === 'fallback')
+        // Phase-06 rewire: fallback now emits granular step events
+        // ('fallback_analyzing', 'fallback_composing', 'fallback_validating', ...)
+        // or 'fallback_legacy' if composer path throws.
+        const fallbackEvent = events.find(e =>
+            typeof e.data.step === 'string' && (e.data.step as string).startsWith('fallback')
+        )
         expect(fallbackEvent).toBeDefined()
     })
 

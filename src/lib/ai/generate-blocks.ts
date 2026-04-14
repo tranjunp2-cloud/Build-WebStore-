@@ -1,29 +1,33 @@
 /**
+ * @deprecated Second-tier safety net only. Primary fallback path is
+ * `composeFallbackResult()` in ./fallback-adapter.ts, which uses the richer
+ * template-composer pipeline (14 industry categories, Phase-04 content validation).
+ * This file runs ONLY if the composer path throws. Do not extend — new industry
+ * content belongs in `src/lib/ai/content/*.ts`.
+ *
  * Rule-based AI Block Generator with Seeded Variety
  * Parses user prompt → generates blocks JSON matching Pages collection schema.
- * Uses seeded PRNG for reproducible but varied output.
- *
  * Target Market: Malaysia (EN / MS)
  */
 
-import { enforceMinContent } from './openai-generator'
+import { enforceMinContent } from './variant-validation'
 import { applyContentValidation } from './content-rules'
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
-type BusinessIntent = {
+export type BusinessIntent = {
     name: string
     type: 'business' | 'ecommerce' | 'restaurant' | 'portfolio' | 'blog'
     description: string
     style: 'modern' | 'classic' | 'minimal' | 'bold'
 }
 
-type GeneratedBlock = {
+export type GeneratedBlock = {
     blockType: string
     [key: string]: unknown
 }
 
-type GeneratedPage = {
+export type GeneratedPage = {
     title: string
     slug: string
     isHomepage: boolean
@@ -31,7 +35,7 @@ type GeneratedPage = {
     seo: { title: string; description: string }
 }
 
-type GenerationResult = {
+export type GenerationResult = {
     siteName: string
     siteType: BusinessIntent['type']
     blocks: GeneratedBlock[]
@@ -849,4 +853,4 @@ export function generateBlocks(prompt: string, seed?: number): GenerationResult 
     }
 }
 
-export type { GenerationResult, GeneratedPage, BusinessIntent, GeneratedBlock }
+// Types already exported at their declaration — line above is intentional noop.

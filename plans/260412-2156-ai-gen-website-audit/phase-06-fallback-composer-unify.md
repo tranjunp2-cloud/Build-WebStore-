@@ -1,8 +1,15 @@
 # Phase 06 — Fallback Path → Composer Unify
 
 > Parent: [plan.md](./plan.md) (Plan A — AI Variety Audit)
-> Status: **pending** | Priority: P1 | Effort: 8-11h | Created: 2026-04-14
-> 7 sub-steps: [06-1](./phase-06-step-1-break-circular-dep.md) · [06-2](./phase-06-step-2-font-pairing-resolver.md) · [06-3](./phase-06-step-3-category-translator.md) · [06-4](./phase-06-step-4-shape-adapter.md) · [06-5](./phase-06-step-5-fallback-rewire.md) · [06-6](./phase-06-step-6-test-e2e-verify.md) · [06-7](./phase-06-step-7-cleanup-deprecation.md)
+> Status: **done** (2026-04-14) | Priority: P1 | Effort: 8-11h | Created: 2026-04-14
+> 7 sub-steps: [06-1](./phase-06-step-1-break-circular-dep.md) ✅ · [06-2](./phase-06-step-2-font-pairing-resolver.md) ✅ · [06-3](./phase-06-step-3-category-translator.md) ✅ · [06-4](./phase-06-step-4-shape-adapter.md) ✅ · [06-5](./phase-06-step-5-fallback-rewire.md) ✅ · [06-6](./phase-06-step-6-test-e2e-verify.md) ✅ · [06-7](./phase-06-step-7-cleanup-deprecation.md) ✅
+
+## Known follow-ups (not in scope)
+- **Double `done` SSE event**: route.ts:478 emits its own `done` after generator `done`. Pre-existing, frontend tolerates it.
+- **Multi-page fallback**: currently `variant='starter'` (home only). Bump to `professional` once downstream actually consumes `GenerationResult.pages[]`.
+- **Restaurant preset richness**: TEMPLATE_PRESETS for restaurant don't always include `menu-display`/`booking-widget`. Addressed by plan-2156 phase-07 (dynamic content from form input).
+- **Vietnamese keyword expansion** in `composer-category-resolver.ts` — baseline included, but can be expanded after real-world user prompts.
+- **Pre-existing test failures**: `sanitize-block-data.test.ts` stats suffix stripping (2 tests) — not rewire-related.
 
 ## Goal
 

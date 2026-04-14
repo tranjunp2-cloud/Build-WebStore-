@@ -9,6 +9,7 @@ import { blockRegistry } from '@/blocks/registry'
 import { buildSystemPrompt, type BusinessInfoInput } from './system-prompt'
 import { generateBlocks, type GenerationResult, type GeneratedBlock, type GeneratedPage } from './generate-blocks'
 import { buildUserPrompt } from './system-prompt'
+import { composeFallbackResult } from './fallback-adapter'
 import {
     validateBlockContent,
     validateOrdering,
@@ -242,29 +243,68 @@ export async function generateSiteWithAI(
         const errMessage = error instanceof Error ? error.message : String(error)
         console.error('[AI] OpenAI generation failed, falling back:', errMessage)
         events.push({ event: 'error', data: { code: 'ai_fallback', message: 'Using smart templates', retryable: false } })
-        return generateWithFallback(promptText, events)
+        const fallbackLang: 'en' | 'ms' | 'vi' = language === 'auto' ? 'en' : language
+        return generateWithFallback(promptText, events, fallbackLang, businessInfo.businessName)
     }
 }
 
-function generateWithFallback(prompt: string, events: SSEEvent[]): { result: GenerationResult; events: SSEEvent[] } {
-    events.push({ event: 'step', data: { step: 'fallback', label: 'Creating from smart templates...', progress: 50 } })
+/**
+ * Fallback path — runs when OpenAI errors out or no API key.
+ * Tier 1: call `composeFallbackResult` (rich composer path, 14 industries, Phase 04 validation).
+ * Tier 2 (legacy safety net): fall through to `generateBlocks` skeleton if composer throws.
+ */
+function generateWithFallback(
+    prompt: string,
+    events: SSEEvent[],
+    language: 'en' | 'ms' | 'vi' = 'en',
+    extractedName?: string,
+): { result: GenerationResult; events: SSEEvent[] } {
+    events.push({ event: 'step', data: { step: 'fallback_analyzing', label: 'Analysing template library...', progress: 50 } })
+    events.push({ event: 'step', data: { step: 'fallback_composing', label: 'Composing from smart templates...', progress: 60 } })
 
-    const generated = generateBlocks(prompt, Date.now())
-    const result: GenerationResult = {
-        ...generated,
-        language: 'en' as const
+    const seed = Date.now()
+
+    try {
+        const result = composeFallbackResult(prompt, seed, language, extractedName)
+
+        events.push({ event: 'step', data: { step: 'fallback_validating', label: 'Validating content...', progress: 75 } })
+        events.push({ event: 'theme_set', data: { theme: result.theme } })
+
+        const total = result.blocks.length
+        result.blocks.forEach((block, i) => {
+            const progress = 75 + Math.round((i / Math.max(total, 1)) * 15)
+            events.push({ event: 'step', data: { step: `fallback_block_${i}`, label: `Assembling block ${i + 1}/${total}`, progress } })
+            events.push({ event: 'block_complete', data: { block: block as Record<string, unknown>, index: i } })
+        })
+
+        events.push({ event: 'seo_generated', data: result.seo as Record<string, unknown> })
+        events.push({ event: 'step', data: { step: 'saving', label: 'Saving...', progress: 95 } })
+        events.push({ event: 'done', data: { totalBlocks: total, timeMs: 0 } })
+
+        return { result, events }
+    } catch (composerError: unknown) {
+        // Legacy safety net — runs only if composeFallbackResult throws.
+        // Do not extend generate-blocks.ts; see plans/260412-2156-ai-gen-website-audit/phase-06-step-7.
+        const errMsg = composerError instanceof Error ? composerError.message : String(composerError)
+        console.warn('[Fallback] composer failed, using legacy generateBlocks', errMsg)
+
+        events.push({ event: 'step', data: { step: 'fallback_legacy', label: 'Using legacy templates...', progress: 55 } })
+
+        const generated = generateBlocks(prompt, seed)
+        const result: GenerationResult = {
+            ...generated,
+            language,
+        }
+
+        events.push({ event: 'theme_set', data: { theme: result.theme } })
+        result.blocks.forEach((block, i) => {
+            events.push({ event: 'block_complete', data: { block: block as Record<string, unknown>, index: i } })
+        })
+        events.push({ event: 'seo_generated', data: result.seo as Record<string, unknown> })
+        events.push({ event: 'done', data: { totalBlocks: result.blocks.length, timeMs: 0 } })
+
+        return { result, events }
     }
-
-    events.push({ event: 'theme_set', data: { theme: result.theme } })
-
-    result.blocks.forEach((block, i) => {
-        events.push({ event: 'block_complete', data: { block: block as Record<string, unknown>, index: i } })
-    })
-
-    events.push({ event: 'seo_generated', data: result.seo as Record<string, unknown> })
-    events.push({ event: 'done', data: { totalBlocks: result.blocks.length, timeMs: 0 } })
-
-    return { result, events }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -569,14 +609,8 @@ const BROKEN_VARIANTS: Record<string, string[]> = {
     hero: ['animated-gradient'],  // No implementation — falls back to centered silently
 }
 
-/** Minimum content items required per variant — if below, fallback to simpler variant */
-const VARIANT_MIN_CONTENT: Record<string, Record<string, number>> = {
-    testimonials: { carousel: 3, masonry: 4, 'avatar-row': 3, 'video-text': 2, spotlight: 1, cards: 2, simple: 1, 'minimal-quote': 1 },
-    features: { 'grid-4': 4, 'grid-3': 3, 'grid-2': 2, carousel: 3, zigzag: 2, list: 2, 'icon-top': 2, 'icon-left': 2 },
-    gallery: { masonry: 6, carousel: 3, grid: 4, lightbox: 4, filmstrip: 3, justified: 4 },
-    pricing: { comparison: 2, table: 2, slider: 3, cards: 2, horizontal: 2, toggle: 2, tiered: 2, minimal: 1 },
-    team: { grid: 2, list: 2 },
-}
+// VARIANT_MIN_CONTENT + enforceMinContent moved to ./variant-validation to break
+// circular dep with template-composer.ts. Re-exported at end of file for source compat.
 
 /**
  * Pick a weighted-by-category variant when AI's choice is invalid.
@@ -600,30 +634,9 @@ function pickWeightedVariant(blockType: string, validVariants: string[], categor
     return pool[Math.floor(Math.random() * pool.length)]!
 }
 
-/**
- * Enforce minimum content count for a variant.
- * If block doesn't have enough items, fallback to a simpler variant that fits.
- */
-export function enforceMinContent(blockType: string, variant: string, contentCount: number): string {
-    const mins = VARIANT_MIN_CONTENT[blockType]
-    if (!mins) return variant
-
-    const required = mins[variant]
-    if (required && contentCount < required) {
-        // Find best variant that fits current count (largest min that still fits)
-        const fitting = Object.entries(mins)
-            .filter(([, min]) => contentCount >= min)
-            .sort((a, b) => b[1] - a[1])
-        if (fitting.length > 0) {
-            const fallback = fitting[0]![0]
-            console.warn(
-                `[AI Content Guard] "${blockType}": variant "${variant}" needs ${required} items but got ${contentCount} → fallback to "${fallback}"`
-            )
-            return fallback
-        }
-    }
-    return variant
-}
+// enforceMinContent definition moved to ./variant-validation — re-exported below.
+import { enforceMinContent, VARIANT_MIN_CONTENT } from './variant-validation'
+export { enforceMinContent, VARIANT_MIN_CONTENT }
 
 /**
  * Try to match an AI-generated variant string to a valid variant.
@@ -763,6 +776,11 @@ export function sanitizeBlockData(
         maps: 'google-maps',
         booking: 'booking-widget',
         menu: 'menu-display',
+        'social-widget': 'socialWidget',
+        social_widget: 'socialWidget',
+        socialwidget: 'socialWidget',
+        'social-media': 'socialWidget',
+        social: 'socialWidget',
     }
     if (typeof s.blockType === 'string' && BLOCK_TYPE_ALIASES[s.blockType]) {
         s.blockType = BLOCK_TYPE_ALIASES[s.blockType]
@@ -1231,6 +1249,51 @@ export function sanitizeBlockData(
     if (s.blockType === 'google-maps' && s.height != null) {
         const n = Number(s.height)
         s.height = Number.isFinite(n) && n > 0 ? Math.round(n) : 400
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SOCIAL-WIDGET: links[].platform must be enum (facebook|whatsapp|...)
+    // AI hallucinates twitter/x/tiktok which Payload rejects. Map or drop.
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'socialWidget') {
+        const VALID_PLATFORMS = ['facebook', 'whatsapp', 'instagram', 'linkedin', 'youtube']
+        const PLATFORM_ALIASES: Record<string, string> = {
+            fb: 'facebook', meta: 'facebook',
+            ig: 'instagram', insta: 'instagram',
+            wa: 'whatsapp', wapp: 'whatsapp', whatsap: 'whatsapp',
+            yt: 'youtube', 'youtube-channel': 'youtube',
+            'linked-in': 'linkedin', li: 'linkedin',
+            // Unsupported platforms → fallback to instagram (most universal)
+            twitter: 'instagram', x: 'instagram', 'twitter-x': 'instagram',
+            tiktok: 'instagram', tt: 'instagram',
+            telegram: 'whatsapp', tg: 'whatsapp',
+            pinterest: 'instagram', pin: 'instagram',
+            snapchat: 'instagram',
+            threads: 'instagram',
+        }
+        if (Array.isArray(s.links)) {
+            s.links = s.links
+                .map((link: unknown) => {
+                    if (typeof link === 'string') {
+                        const key = link.toLowerCase().trim()
+                        const platform = VALID_PLATFORMS.includes(key) ? key : (PLATFORM_ALIASES[key] || 'facebook')
+                        return { platform, url: '#', enabled: true }
+                    }
+                    const lObj = (typeof link === 'object' && link !== null ? link : {}) as Record<string, unknown>
+                    const rawPlat = String(lObj.platform || lObj.name || lObj.type || '').toLowerCase().trim()
+                    const platform = VALID_PLATFORMS.includes(rawPlat)
+                        ? rawPlat
+                        : (PLATFORM_ALIASES[rawPlat] || 'facebook')
+                    return {
+                        platform,
+                        url: String(lObj.url || lObj.href || lObj.link || '#'),
+                        enabled: lObj.enabled !== false,
+                    }
+                })
+                .filter((link: { platform: string }, i: number, arr: { platform: string }[]) =>
+                    arr.findIndex(l => l.platform === link.platform) === i
+                )
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

@@ -37,14 +37,14 @@ describe('[TC-S3-010] composeTemplate — starter tier', () => {
     expect(template.pages).toHaveLength(1)
   })
 
-  it('home page has 5-7 blocks', () => {
+  it('home page has at least 5 blocks', () => {
     // Act
     const template = composeTemplate(starterInput)
     const homePage = template.pages[0]!
 
-    // Assert
+    // Assert — composer was enriched in 8598e64 to emit signature blocks
+    // (menu-display, booking-widget) for richer starters; upper bound removed.
     expect(homePage.layout.length).toBeGreaterThanOrEqual(5)
-    expect(homePage.layout.length).toBeLessThanOrEqual(7)
   })
 
   it('isPremium is false', () => {
