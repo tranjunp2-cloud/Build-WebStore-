@@ -490,6 +490,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             }
 
             let buffer = ''
+            let currentEvent = ''
 
             while (true) {
                 const { done, value } = await reader.read()
@@ -499,8 +500,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
                 const lines = buffer.split('\n')
                 buffer = lines.pop() || ''
-
-                let currentEvent = ''
 
                 for (const line of lines) {
                     if (line.startsWith('event: ')) {
@@ -516,7 +515,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                         const data = JSON.parse(line.slice(6))
                         handleSSEEvent(currentEvent, data)
                     } catch {
-                        // Malformed SSE payload — log for diagnostics but do not crash stream.
                         console.warn('[SSE] malformed payload, skipping event:', currentEvent)
                     }
 

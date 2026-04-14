@@ -629,6 +629,86 @@ export function enforceMinContent(blockType: string, variant: string, contentCou
  * Try to match an AI-generated variant string to a valid variant.
  * Steps: exact match → case-insensitive → alias lookup → null (not found)
  */
+// Map AI-hallucinated icon names → emoji. Renderer dumps `feature.icon` as text node,
+// so plain words like "coffee" appear literally in the UI. Convert to emoji or default.
+const ICON_NAME_TO_EMOJI: Record<string, string> = {
+    coffee: '☕', espresso: '☕', latte: '☕', cappuccino: '☕', tea: '🍵', drink: '🥤', juice: '🧃',
+    cake: '🍰', cupcake: '🧁', pastry: '🥐', croissant: '🥐', bread: '🍞', donut: '🍩', cookie: '🍪',
+    'ice-cream': '🍦', icecream: '🍦', icescream: '🍦', dessert: '🍨', chocolate: '🍫',
+    pizza: '🍕', burger: '🍔', salad: '🥗', sandwich: '🥪', sushi: '🍣', noodle: '🍜', noodles: '🍜',
+    rice: '🍚', soup: '🍲', meat: '🥩', fish: '🐟', seafood: '🦐', vegetable: '🥦', fruit: '🍎',
+    laptop: '💻', computer: '💻', desktop: '🖥️', phone: '📱', mobile: '📱', tablet: '📱',
+    star: '⭐', heart: '❤️', love: '❤️', check: '✅', verified: '✔️', shield: '🛡️', lock: '🔒',
+    home: '🏠', house: '🏠', building: '🏢', shop: '🏪', store: '🏪', cart: '🛒', bag: '🛍️',
+    book: '📚', pencil: '✏️', edit: '✏️', tool: '🛠️', gear: '⚙️', settings: '⚙️',
+    rocket: '🚀', fire: '🔥', sparkle: '✨', sparkles: '✨', diamond: '💎', crown: '👑',
+    clock: '⏰', time: '⏱️', calendar: '📅', target: '🎯', trophy: '🏆', medal: '🏅',
+    chart: '📊', graph: '📈', money: '💰', coin: '🪙', card: '💳', gift: '🎁',
+    user: '👤', users: '👥', team: '👥', people: '👥', person: '👤', smile: '😊',
+    map: '🗺️', pin: '📍', location: '📍', globe: '🌐', plane: '✈️', car: '🚗',
+    leaf: '🌿', plant: '🌱', flower: '🌸', sun: '☀️', moon: '🌙', cloud: '☁️',
+    music: '🎵', headphones: '🎧', camera: '📷', video: '🎥', mic: '🎤',
+    paint: '🎨', brush: '🖌️', palette: '🎨', design: '🎨', code: '💻', bug: '🐛',
+    mail: '✉️', email: '📧', message: '💬', chat: '💬', bell: '🔔', notification: '🔔',
+    wifi: '📶', signal: '📡', bolt: '⚡', lightning: '⚡', battery: '🔋', plug: '🔌',
+    workspace: '🪑', chair: '🪑', desk: '🖥️', wifi2: '📶',
+}
+
+// Parse "RM 12.50" / "$15" / "12,500" → number. Returns null if unparsable.
+function parsePrice(raw: unknown): number | null {
+    if (raw == null) return null
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+    const cleaned = String(raw).replace(/[^\d.]/g, '')
+    if (!cleaned) return null
+    const n = Number(cleaned)
+    return Number.isFinite(n) ? n : null
+}
+
+// Clamp absurd stat values + format with commas.
+// AI hallucinates "50,000,000+ Cups Served" for a small cafe → cap at 100K.
+function clampStatValue(raw: string): string {
+    const trimmed = raw.trim()
+    if (!trimmed) return '0'
+    // Extract numeric part (handles "50,000,000+", "RM 1.5M", "2000000 kg")
+    const match = trimmed.match(/^([^\d-]*)([\d.,]+)\s*([A-Za-z+%]*)\s*(.*)$/)
+    if (!match) return trimmed
+    const [, prefix, numStr, suffix, rest] = match
+    const cleanNum = numStr.replace(/,/g, '')
+    let n = Number(cleanNum)
+    if (!Number.isFinite(n)) return trimmed
+    // Apply suffix multiplier (k, m, b, kg → keep as-is)
+    const suffixLower = suffix.toLowerCase()
+    if (suffixLower === 'k') n *= 1000
+    else if (suffixLower === 'm') n *= 1000000
+    else if (suffixLower === 'b') n *= 1000000000
+    // Clamp: nothing for a small business should exceed 100K
+    if (n > 100000) n = 100000
+    // Format: <1000 raw, <10K → "5K+", <100K → "50K+"
+    let formatted: string
+    if (n < 1000) formatted = String(Math.round(n))
+    else if (n < 10000) formatted = `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
+    else formatted = `${Math.round(n / 1000)}K+`
+    // Preserve trailing unit (kg, etc.) but drop K/M/B from suffix since we re-applied
+    const unit = ['k', 'm', 'b', '+', '%'].includes(suffixLower) ? '' : suffix
+    return `${prefix}${formatted}${unit ? ' ' + unit : ''}${rest ? ' ' + rest : ''}`.trim()
+}
+
+function normalizeIcon(raw: unknown): string {
+    if (raw == null) return '⭐'
+    const str = String(raw).trim()
+    if (!str) return '⭐'
+    // Already an emoji (short, contains non-ASCII or Variation Selector)
+    if (str.length <= 4 && /[^\x20-\x7E]/.test(str)) return str
+    // Looks like a word/name — try map (lowercase + strip non-letters)
+    const key = str.toLowerCase().replace(/[^a-z-]/g, '')
+    if (ICON_NAME_TO_EMOJI[key]) return ICON_NAME_TO_EMOJI[key]
+    // Try keyword inside multi-word name (e.g. "coffee cup" → coffee)
+    for (const k of Object.keys(ICON_NAME_TO_EMOJI)) {
+        if (key.includes(k)) return ICON_NAME_TO_EMOJI[k]
+    }
+    return '⭐'
+}
+
 function fuzzyMatchVariant(requested: string, validVariants: string[]): string | null {
     // 1. Exact match
     if (validVariants.includes(requested)) return requested
@@ -660,6 +740,33 @@ export function sanitizeBlockData(
     // Helper: normalize array where strings should be objects
     const norm = (arr: unknown[], toObj: (v: string) => Record<string, unknown>): unknown[] =>
         arr.map((item: unknown) => typeof item === 'string' ? toObj(item) : item)
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BLOCK TYPE ALIASES: AI often uses singular/alt names not in registry
+    // ═══════════════════════════════════════════════════════════════════════
+    const BLOCK_TYPE_ALIASES: Record<string, string> = {
+        testimonial: 'testimonials',
+        review: 'social-proof',
+        reviews: 'social-proof',
+        feature: 'features',
+        service: 'service-cards',
+        services: 'service-cards',
+        team_member: 'team',
+        members: 'team',
+        product: 'products-grid',
+        products: 'products-grid',
+        portfolio: 'portfolio-grid',
+        gallery_grid: 'gallery',
+        contactform: 'contact',
+        'contact-form': 'contact',
+        map: 'google-maps',
+        maps: 'google-maps',
+        booking: 'booking-widget',
+        menu: 'menu-display',
+    }
+    if (typeof s.blockType === 'string' && BLOCK_TYPE_ALIASES[s.blockType]) {
+        s.blockType = BLOCK_TYPE_ALIASES[s.blockType]
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // CRITICAL: Strip ALL upload/image fields that are strings
@@ -895,7 +1002,7 @@ export function sanitizeBlockData(
                 if (typeof f === 'string') return { title: f, description: '', icon: '⭐' }
                 const fObj = (typeof f === 'object' && f !== null ? f : {}) as Record<string, unknown>
                 return {
-                    icon: String(fObj.icon || fObj.emoji || '⭐'),
+                    icon: normalizeIcon(fObj.icon ?? fObj.emoji),
                     title: String(fObj.title || fObj.name || fObj.heading || 'Feature'),
                     description: String(fObj.description || fObj.text || fObj.body || ''),
                 }
@@ -977,6 +1084,34 @@ export function sanitizeBlockData(
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // SOCIAL-PROOF: reviews array requires { author, content } (Payload required)
+    // AI hallucinates name/customer/text/quote — remap to schema.
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'social-proof' && Array.isArray(s.reviews)) {
+        s.reviews = s.reviews.map((review: unknown) => {
+            if (typeof review === 'string') {
+                return { author: 'Customer', content: review, rating: 5 }
+            }
+            const rObj = (typeof review === 'object' && review !== null ? review : {}) as Record<string, unknown>
+            const author = String(
+                rObj.author || rObj.name || rObj.customer || rObj.customerName || rObj.reviewer || rObj.user || rObj.fullName || 'Customer'
+            )
+            const content = String(
+                rObj.content || rObj.text || rObj.quote || rObj.comment || rObj.review || rObj.message || rObj.body || 'Great experience!'
+            )
+            const out: Record<string, unknown> = { author, content }
+            if (rObj.role || rObj.title || rObj.position || rObj.jobTitle) {
+                out.role = String(rObj.role || rObj.title || rObj.position || rObj.jobTitle)
+            }
+            const rawRating = rObj.rating ?? rObj.stars ?? rObj.score
+            const rating = Number(rawRating)
+            out.rating = Number.isFinite(rating) ? Math.min(5, Math.max(1, Math.round(rating))) : 5
+            // Strip avatar string (Payload upload expects Media ID)
+            return out
+        })
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // GALLERY: Strip URL strings from image fields but keep alt/caption metadata
     // ═══════════════════════════════════════════════════════════════════════
     if (s.blockType === 'gallery' && Array.isArray(s.images)) {
@@ -1006,14 +1141,96 @@ export function sanitizeBlockData(
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // ABOUT: stats array
+    // ABOUT/STATS: clamp absurd numbers + format with commas (50000000 → 50K+)
+    // AI hallucinates "50,000,000+ Cups Served" for a small cafe. Cap and reformat.
     // ═══════════════════════════════════════════════════════════════════════
     if (Array.isArray(s.stats)) {
         s.stats = s.stats.map((stat: unknown) => {
             if (typeof stat === 'string') return { value: stat, label: stat }
             const sObj = (typeof stat === 'object' && stat !== null ? stat : {}) as Record<string, unknown>
-            return { value: String(sObj.value || sObj.number || '0'), label: String(sObj.label || sObj.text || 'Stat') }
+            const rawValue = String(sObj.value || sObj.number || '0')
+            return {
+                value: clampStatValue(rawValue),
+                label: String(sObj.label || sObj.text || 'Stat'),
+            }
         })
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MENU-DISPLAY: rename categories[].name + coerce price string→number
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'menu-display' && Array.isArray(s.categories)) {
+        s.categories = s.categories.map((cat: unknown) => {
+            const cObj = (typeof cat === 'object' && cat !== null ? cat : {}) as Record<string, unknown>
+            const name = String(cObj.name || cObj.title || cObj.category || cObj.heading || 'Menu')
+            const items = Array.isArray(cObj.items) ? cObj.items.map((item: unknown) => {
+                const iObj = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>
+                const price = parsePrice(iObj.price)
+                const out: Record<string, unknown> = {
+                    name: String(iObj.name || iObj.title || 'Item'),
+                    price: price ?? 0,
+                    dietaryTags: Array.isArray(iObj.dietaryTags) ? iObj.dietaryTags : [],
+                }
+                if (iObj.description) out.description = String(iObj.description)
+                if (iObj.originalPrice != null) {
+                    const op = parsePrice(iObj.originalPrice)
+                    if (op != null) out.originalPrice = op
+                }
+                if (typeof iObj.isPopular === 'boolean') out.isPopular = iObj.isPopular
+                if (typeof iObj.isNew === 'boolean') out.isNew = iObj.isNew
+                return out
+            }) : []
+            const out: Record<string, unknown> = { name, items }
+            if (cObj.description) out.description = String(cObj.description)
+            if (cObj.icon) out.icon = String(cObj.icon)
+            return out
+        })
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BOOKING-WIDGET: services[] string→object, availableDays + timeSlot to number
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'booking-widget') {
+        if (Array.isArray(s.services)) {
+            s.services = s.services.map((sv: unknown) => {
+                if (typeof sv === 'string') {
+                    return { name: sv, duration: 60, price: 0 }
+                }
+                const svObj = (typeof sv === 'object' && sv !== null ? sv : {}) as Record<string, unknown>
+                const out: Record<string, unknown> = {
+                    name: String(svObj.name || svObj.title || 'Service'),
+                    duration: Number(svObj.duration) || 60,
+                    price: parsePrice(svObj.price) ?? 0,
+                }
+                if (svObj.description) out.description = String(svObj.description)
+                return out
+            })
+        }
+        if (Array.isArray(s.availableDays)) {
+            const DAY_MAP: Record<string, number> = {
+                sun: 0, sunday: 0, mon: 1, monday: 1, tue: 2, tuesday: 2, wed: 3, wednesday: 3,
+                thu: 4, thursday: 4, fri: 5, friday: 5, sat: 6, saturday: 6,
+            }
+            s.availableDays = s.availableDays.map((d: unknown) => {
+                if (typeof d === 'number') return Math.min(6, Math.max(0, Math.round(d)))
+                const key = String(d).toLowerCase().trim()
+                if (DAY_MAP[key] != null) return DAY_MAP[key]
+                const n = Number(key)
+                return Number.isFinite(n) ? Math.min(6, Math.max(0, Math.round(n))) : 1
+            }).filter((d: unknown, i: number, arr: unknown[]) => arr.indexOf(d) === i)
+        }
+        if (s.timeSlotInterval != null) {
+            const n = Number(s.timeSlotInterval)
+            s.timeSlotInterval = Number.isFinite(n) && n > 0 ? Math.round(n) : 30
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GOOGLE-MAPS: height string→number
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'google-maps' && s.height != null) {
+        const n = Number(s.height)
+        s.height = Number.isFinite(n) && n > 0 ? Math.round(n) : 400
     }
 
     // ═══════════════════════════════════════════════════════════════════════
