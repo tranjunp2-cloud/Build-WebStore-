@@ -330,6 +330,17 @@
                 "save": "Simpan Perubahan"
             }
         },
+        "empty": {
+            "title": "Tiada data laman web",
+            "description": "Cipta laman web pertama anda untuk mula menjejak prestasi perniagaan.",
+            "cta": "+ Cipta Laman Web Baharu"
+        },
+        "generationFailed": {
+            "title": "Pembinaan laman web tidak selesai",
+            "description": "Jangan risau — anda boleh cuba bina semula dengan AI atau pilih daripada templat sedia ada.",
+            "retryAi": "Cuba semula dengan AI",
+            "chooseTemplate": "Pilih templat"
+        },
         "sites": {
             "title": "Laman Web Saya",
             "viewAll": "Lihat Semua →",
@@ -338,7 +349,13 @@
             "draft": "Draf",
             "lastEdited": "Akhir disunting: ",
             "edit": "Sunting",
-            "preview": "Pratonton"
+            "preview": "Pratonton",
+            "noSites": "Tiada laman web lagi",
+            "noSitesDesc": "Cipta laman web pertama anda untuk bermula",
+            "createWebsite": "Cipta Laman Web",
+            "incomplete": "Tidak lengkap",
+            "retryAi": "Cuba semula dengan AI",
+            "template": "Templat"
         },
         "analytics": {
             "title": "Analitis",

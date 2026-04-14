@@ -211,6 +211,48 @@ describe('AI Streaming APIs', () => {
              expect(mockSiteDB).toHaveLength(0)
              expect(mockPageDB).toHaveLength(0)
         })
+
+        it('sets generationStatus to completed on success path', async () => {
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                 })
+             })
+             const res = await GenerateSitePOST(req)
+             expect(res.status).toBe(200)
+
+             // Site should have generationStatus set to completed
+             const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+             const resolvedPayload = await mockPayload
+             const updateCalls = vi.mocked(resolvedPayload.update).mock.calls
+             const completedCall = updateCalls.find(
+                 (c: [{ collection: string; data?: { generationStatus?: string } }]) =>
+                     c[0].collection === 'sites' && c[0].data?.generationStatus === 'completed'
+             )
+             expect(completedCall).toBeDefined()
+        })
+
+        it('sets generationStatus to generating before creating pages', async () => {
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                 })
+             })
+             await GenerateSitePOST(req)
+
+             // Site should have been created with generationStatus = 'generating'
+             const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+             const resolvedPayload = await mockPayload
+             const createCalls = vi.mocked(resolvedPayload.create).mock.calls
+             const siteCreateCall = createCalls.find(
+                 (c: [{ collection: string; data?: { generationStatus?: string } }]) =>
+                     c[0].collection === 'sites'
+             )
+             expect(siteCreateCall).toBeDefined()
+             expect(siteCreateCall![0].data.generationStatus).toBe('generating')
+        })
     })
 
     describe('POST /api/ai/edit-block', () => {
