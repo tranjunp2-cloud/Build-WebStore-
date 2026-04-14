@@ -261,7 +261,7 @@ export const FONT_PAIRINGS: FontPairing[] = [
     name: 'Classical',
     category: 'classic',
     headingFont: 'Inter',
-    bodyFont: 'Lora',
+    bodyFont: 'Open Sans',
     headingWeight: 700,
     bodyWeight: 400,
     description: 'Refined neutral pairing for classical, timeless brands',

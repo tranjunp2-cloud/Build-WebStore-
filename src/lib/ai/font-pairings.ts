@@ -44,7 +44,7 @@ const FONT_PAIRINGS: Record<string, ResolvedFontPairing> = {
     'boutique-serif':  { fontHeading: 'Playfair Display', fontBody: 'Inter' },
     'warm-editorial':  { fontHeading: 'Poppins',          fontBody: 'Nunito' },
     'contemporary':    { fontHeading: 'Raleway',          fontBody: 'DM Sans' },
-    'classical':       { fontHeading: 'Inter',            fontBody: 'Lora' },
+    'classical':       { fontHeading: 'Inter',            fontBody: 'Open Sans' },
     'hospitality':     { fontHeading: 'Poppins',          fontBody: 'Open Sans' },
 }
 
