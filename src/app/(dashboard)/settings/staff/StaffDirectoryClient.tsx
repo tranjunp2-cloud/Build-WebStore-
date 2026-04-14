@@ -144,7 +144,7 @@ export function StaffDirectoryClient({
     const getRoleLabel = (role: string) => {
         switch (role) {
             case 'owner': return t?.Staff?.table?.owner || 'Workspace Owner';
-            case 'admin': return t?.Staff?.drawer?.roles?.admin || 'Manager';
+            case 'admin': return t?.Staff?.drawer?.roles?.admin || 'Full Access';
             case 'viewer': return t?.Staff?.table?.viewer || 'Viewer';
             case 'custom': return t?.Staff?.table?.custom || 'Crew (Custom)';
             default: return role;
@@ -243,7 +243,7 @@ export function StaffDirectoryClient({
                                                 )}
                                                 <div className="flex flex-col h-[40px] justify-center gap-[0px]">
                                                     <span className="text-[14px] font-medium text-[#F8FAFC] leading-[1.428em] font-['Inter']">{displayName}</span>
-                                                    <span className="text-[12px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.333em] font-['Inter']">{user.email}</span>
+                                                    <span className="text-[12px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.333em] font-['Inter'] max-w-[200px] truncate block" title={user.email}>{user.email}</span>
                                                 </div>
                                             </div>
                                         </td>
@@ -364,6 +364,7 @@ export function StaffDirectoryClient({
                 onClose={() => { setIsDrawerOpen(false); setEditingStaff(null); }}
                 editData={editingStaff}
                 currentUserId={currentUserId}
+                currentUserEmail={staff.find(s => s.id === currentUserId)?.email || ''}
                 tenantId={tenantId}
             />
 
