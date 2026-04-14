@@ -17,6 +17,10 @@ import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
 import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
 import { pickRecipe } from './category-recipes'
 import { resolveComposerCategory } from './composer-category-resolver'
+import { generateAllPageSeo, type PageForSeo } from './seo-generator'
+import { mapBusinessInfo } from './business-info-mapper'
+import type { BusinessSample } from './content/types'
+import { runConsistencyCheck, logConsistencyReport, emitConsistencyEvents } from './consistency-validator'
 import { resolveFontPairing } from './font-pairings'
 import { seededShufflePick, hashString } from './seeded-random'
 import {
@@ -35,7 +39,15 @@ function getOpenAI(): OpenAI | null {
 }
 
 export type SSEEvent = {
-    event: 'step' | 'theme_set' | 'block_complete' | 'seo_generated' | 'error' | 'done'
+    event:
+        | 'step'
+        | 'theme_set'
+        | 'block_complete'
+        | 'seo_generated'
+        | 'error'
+        | 'done'
+        /** Phase 06 — post-gen consistency check findings (warn-only). */
+        | 'consistency_warning'
     data: Record<string, unknown>
 }
 
@@ -267,6 +279,42 @@ export async function generateSiteWithAI(
 
             validBlocks = allBlocks
 
+            // Phase 06 — override per-page SEO with deterministic unique values
+            // mined from page content, and attach ogImage + JSON-LD. AI-returned
+            // descriptions are frequently duplicated across pages; this step
+            // guarantees each page ships a distinct meta description plus a
+            // LocalBusiness schema (and FAQPage where an FAQ block exists).
+            const seoBizOverride = mapBusinessInfo(businessInfo)
+            const seoBiz: BusinessSample = {
+                name: seoBizOverride.name ?? businessInfo.businessName,
+                tagline: seoBizOverride.tagline ?? '',
+                description: seoBizOverride.description ?? '',
+                phone: seoBizOverride.phone ?? '',
+                email: seoBizOverride.email ?? '',
+                address: seoBizOverride.address ?? '',
+                heroHeadline: '',
+                heroSubheadline: '',
+                products: seoBizOverride.products,
+            }
+            const seoPages: PageForSeo[] = generatedPages.map((gp) => ({
+                title: gp.title,
+                slug: gp.slug,
+                isHomepage: gp.isHomepage,
+                blocks: gp.blocks as unknown as Array<Record<string, unknown>>,
+            }))
+            const seoList = generateAllPageSeo(seoPages, {
+                biz: seoBiz,
+                category: detectedCategory ?? businessInfo.industry ?? 'business',
+            })
+            for (let i = 0; i < generatedPages.length; i++) {
+                generatedPages[i]!.seo = {
+                    title: seoList[i]!.title,
+                    description: seoList[i]!.description,
+                    ogImage: seoList[i]!.ogImage,
+                    jsonLd: seoList[i]!.jsonLd as unknown as Array<Record<string, unknown>>,
+                }
+            }
+
             // Phase 04 — page-level guards: min block count + AIDA ordering.
             // Both log warnings only; they do not mutate pages or throw.
             for (const genPage of generatedPages) {
@@ -349,7 +397,22 @@ export async function generateSiteWithAI(
             theme,
         }
 
-        events.push({ event: 'done', data: { totalBlocks: validBlocks.length, timeMs: 0 } })
+        // Phase 06 — warn-only consistency check on the final AI happy-path
+        // result. Emits one `consistency_warning` SSE event per finding,
+        // logs to server console, and bundles `warnings[]` into the `done`
+        // event payload. Never blocks save; auto-retry is out of scope.
+        const report = runConsistencyCheck(result)
+        emitConsistencyEvents(report, 'ai', events)
+        logConsistencyReport(report, 'ai')
+
+        events.push({
+            event: 'done',
+            data: {
+                totalBlocks: validBlocks.length,
+                timeMs: 0,
+                warnings: report.warnings,
+            },
+        })
 
         return { result, events }
     } catch (error: unknown) {
@@ -395,7 +458,17 @@ function generateWithFallback(
 
         events.push({ event: 'seo_generated', data: result.seo as Record<string, unknown> })
         events.push({ event: 'step', data: { step: 'saving', label: 'Saving...', progress: 95 } })
-        events.push({ event: 'done', data: { totalBlocks: total, timeMs: 0 } })
+
+        // Phase 06 — fallback-path consistency check + SSE event emission.
+        // Kept in sync with the AI happy path; never blocks save.
+        const report = runConsistencyCheck(result)
+        emitConsistencyEvents(report, 'fallback', events)
+        logConsistencyReport(report, 'fallback')
+
+        events.push({
+            event: 'done',
+            data: { totalBlocks: total, timeMs: 0, warnings: report.warnings },
+        })
 
         return { result, events }
     } catch (composerError: unknown) {
@@ -417,7 +490,21 @@ function generateWithFallback(
             events.push({ event: 'block_complete', data: { block: block as Record<string, unknown>, index: i } })
         })
         events.push({ event: 'seo_generated', data: result.seo as Record<string, unknown> })
-        events.push({ event: 'done', data: { totalBlocks: result.blocks.length, timeMs: 0 } })
+
+        // Phase 06 — legacy safety-net path also runs consistency check so
+        // the event stream shape stays consistent across all 3 gen paths.
+        const legacyReport = runConsistencyCheck(result)
+        emitConsistencyEvents(legacyReport, 'fallback', events)
+        logConsistencyReport(legacyReport, 'fallback')
+
+        events.push({
+            event: 'done',
+            data: {
+                totalBlocks: result.blocks.length,
+                timeMs: 0,
+                warnings: legacyReport.warnings,
+            },
+        })
 
         return { result, events }
     }

@@ -266,12 +266,14 @@ NOTE: For backward compatibility, "blocks" at the root level is also accepted (t
 ${blockList}
 
 ## STRUCTURE RULES
-1. Generate 4 pages: Homepage (8-14 blocks), About (4-6 blocks), Services/Products (4-6 blocks), Contact (4-5 blocks)
-2. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
-3. Each block MUST have "blockType" and "variant" fields
-4. blockType MUST be one of the listed types — no custom types
-5. variant MUST be one of the listed variants for that block type
-6. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
+1. Generate 5 pages: Homepage (8-14 blocks), About (4-6 blocks), Services/Products (4-6 blocks), Contact (4-6 blocks), Blog (4-6 blocks with 3-5 seeded posts)
+2. Every page MUST have at least 4 blocks with non-empty body copy — no stub pages
+3. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
+4. Each block MUST have "blockType" and "variant" fields
+5. blockType MUST be one of the listed types — no custom types
+6. variant MUST be one of the listed variants for that block type
+7. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
+8. Blog page MUST include blog-list block with ≥3 posts (title + excerpt + slug + readTime)
 
 ## LANGUAGE DETECTION
 - Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)
