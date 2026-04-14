@@ -1771,7 +1771,8 @@
             "confirmDelete": "Padam",
             "customPage": "Halaman 404 Tersuai",
             "emptyTitle": "Tiada halaman lagi",
-            "emptyDesc": "Cipta halaman pertama anda untuk bermula."
+            "emptyDesc": "Cipta halaman pertama anda untuk bermula.",
+            "slugLocked": "Slug dikunci selepas diterbitkan untuk melindungi SEO dan pautan luaran."
         }
     }
 }

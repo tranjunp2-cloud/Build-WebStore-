@@ -72,19 +72,19 @@ Import từ [Figma Community — shadcn/ui](https://www.figma.com/community/sear
 | **Tabs** | Navigation trong page |
 | **Skeleton** | Loading states — KHÔNG dùng spinner |
 
-### Color Tokens
+### Color Tokens (Dark Mode Default)
 
 ```
-Primary:     hsl(222, 47%, 31%)     ← Brand color
-Background:  hsl(0, 0%, 100%)       ← Main bg
-Card:        hsl(0, 0%, 100%)       ← Card bg
-Foreground:  hsl(222, 47%, 11%)     ← Text chính
-Muted:       hsl(210, 40%, 96%)     ← Text phụ bg
-Border:      hsl(214, 32%, 91%)     ← Borders
-Destructive: hsl(0, 84%, 60%)       ← Errors, delete
-Success:     hsl(142, 71%, 45%)     ← Success, Halal badge
-Warning:     hsl(38, 92%, 50%)      ← Warnings, stock low
-WhatsApp:    hsl(142, 70%, 49%)     ← WhatsApp button (#25D366)
+Primary:     hsl(217, 91%, 60%)     ← Brand blue (#3B82F6)
+Background:  hsl(222, 47%, 9%)      ← Main bg (#0B1120)
+Card:        hsl(217, 33%, 14%)     ← Card bg (#161E2E)
+Foreground:  hsl(210, 40%, 98%)     ← Text foreground
+Muted:       hsl(215, 20%, 65%)     ← Muted text
+Border:      hsl(217, 19%, 27%)     ← Borders (#1F2937)
+Destructive: hsl(0, 84%, 60%)       ← Errors
+Success:     hsl(161, 84%, 39%)     ← Success / Halal (#10B981)
+Warning:     hsl(38, 92%, 50%)      ← Warnings
+WhatsApp:    hsl(142, 70%, 49%)     ← WhatsApp (#25D366)
 ```
 
 ### Typography

@@ -207,3 +207,109 @@
 ### 6. DraftBadge
 - **Usage:** Positioned top-right in the preview panel.
 - **UI:** `Badge variant="secondary"` indicating the site is continuously auto-saved.
+
+---
+
+## 🛠️ 6. Technical Implementation (Dev-Ready)
+
+*This section provides the implementation details for Frontend Developers using Tailwind CSS and shadcn/ui.*
+
+### CSS Variables (`globals.css`)
+Copy và paste đoạn mã sau vào file `src/app/globals.css`. Các giá trị đã được convert từ HEX sang HSL chuẩn (số nguyên) để tương thích với Tailwind.
+
+```css
+@layer base {
+  :root {
+    /* Light Mode */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 173 80% 40%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Dark Mode (Default) */
+    --background: 222 47% 9%;
+    --foreground: 210 40% 98%;
+    --card: 217 33% 17%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 28% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 173 65% 50%;
+    --accent-foreground: 222 47% 9%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 25%;
+    --input: 217 33% 25%;
+    --ring: 217 91% 60%;
+  }
+}
+```
+
+### Tailwind Configuration (`tailwind.config.js`)
+Cấu hình bảng màu để hỗ trợ switching tự động.
+
+```javascript
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  darkMode: ["class"],
+  content: ["src/**/*.{ts,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+          ai: "linear-gradient(90deg, #3B82F6 0%, #2DD4BF 100%)", // Custom Gradient
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+          teal: "#2DD4BF",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+    },
+  },
+}
+```
+
+### Implementation Note
+- **Dark Mode Default:** Sử dụng gói `next-themes` và set `defaultTheme="dark"`.
+- **Font:** Đảm bảo Inter đã được import qua `next/font/google` và áp dụng cho `body`.
+- **Gradient Text/Buttons:** Sử dụng class `bg-primary-ai bg-clip-text text-transparent` cho text hoặc `bg-primary-ai` cho button nền gradient.

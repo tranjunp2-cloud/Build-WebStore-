@@ -1,300 +1,389 @@
-# PRD: CMS Core Layout & Navigation (F18)
-> **Version:** 1.0 | **Updated:** 2026-03-18 | **Agent:** `Antigravity-BA-Copilot`
-> **Priority:** P0 🌟 | **Sprint:** Wave 1 | **Size:** M
-> **Depends on:** F02 Auth, F16 Notification Center
-> **Figma Design:** [UI Design Link](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30675-275&t=ImhpbJ1K0aBFikqf-1) | **Prototype:** [Interactive Demo](https://www.figma.com/make/Y48xuOh2gMCid2UmqOAFys/F01-ai-chat-builder-demo?fullscreen=1&t=DLqQPtpTDgA4lMa9-1&preview-route=%2Fdashboard)
+# F18 CMS Core Layout & Navigation — Design & Wireframes
+
+> **Epic:** Core Infrastructure
+> **Feature Code:** F18
+> **Figma Design:** [UI Design](https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30675-275&t=ImhpbJ1K0aBFikqf-1)
+> **Prototype:** [Interactive Demo](https://www.figma.com/make/Y48xuOh2gMCid2UmqOAFys/F01-ai-chat-builder-demo?fullscreen=1&t=DLqQPtpTDgA4lMa9-1&preview-route=%2Fdashboard)
+> **Ref PRD:** [F18-cms-layout.md](../prd/F18-cms-layout.md)
+> **Ref Stories:** [F18-cms-layout-stories.md](../stories/F18-cms-layout-stories.md)
+
+Tài liệu này cung cấp luồng người dùng (User Flow) và bản vẽ Wireframe chi tiết cho bộ khung CMS Core Layout (F18). Đây là **Root Layout** — mọi module tính năng khác (F03, F05, F08, F10, F17, F19, F20) đều phải render bên trong `Main Content Area` của khung giao diện này.
 
 ---
 
-> [!IMPORTANT]
-> **Stories-First Rule:** PRD này được xây dựng từ các User Stories đã approve.
-> Mọi FR phải có Story Ref. AC được copy từ story file. Không tự mở rộng scope.
+## 1. User Flow (Luồng Người Dùng)
 
----
+### 1.1. Luồng chính — Navigation & Layout
 
-## 0. Story Traceability
-
-| Story ID | Title | File | Status |
-|----------|-------|------|--------|
-| US-F18-01 | CMS Global Sidebar Navigation | [F18-cms-layout-stories.md](../stories/F18-cms-layout-stories.md) | Ready |
-| US-F18-02 | CMS Global Top Header | [F18-cms-layout-stories.md](../stories/F18-cms-layout-stories.md) | Ready |
-| US-F18-03 | Main Content Area Display | [F18-cms-layout-stories.md](../stories/F18-cms-layout-stories.md) | Ready |
-
----
-
-## 1. Problem Statement
-
-CMS cần một khung bố cục (layout) nhất quán và thân thiện cho tất cả các module quản lý (Dashboard, Products, Orders, Blog, ...). Đây là nền tảng trải nghiệm người dùng — nếu navigation bị confusing, người dùng Malaysian SME (kỹ năng tech thấp, dùng mobile) sẽ không sử dụng được hệ thống. Hiện tại, layout CMS chưa được chuẩn hóa, thiếu mobile support và thiếu các yếu tố phù hợp thị trường Malaysia (WhatsApp support, BM/EN toggle).
-
----
-
-## 2. Target User
-
-- **SME Owner (Persona A)**: Tech level thấp, dùng mobile nhiều, cần navigation đơn giản, rõ ràng.
-- **Dropshipper (Persona B)**: Kiểm tra Orders thường xuyên trên điện thoại — sidebar mobile phải hoạt động tốt.
-
----
-
-## 3. Solution Overview
-
-Thiết kế layout CMS 3-phần chuẩn:
-1. **Top Header**: Fixed — Logo, Notification Bell, Avatar (Language + Profile).
-2. **Side Menu**: Fixed trái — Navigation với Icon + Text. Mobile → Slide-in Drawer.
-3. **Main Content Area**: Scroll độc lập, Spacing mobile-friendly.
-
----
-
-## 4. Scope
-
-### In Scope
-- Global Sidebar Navigation với icon + text, active states, WhatsApp support link (US-F18-01).
-- Top Header: Logo, Notification Bell (tích hợp F16), Avatar dropdown (Profile, Language, Workspace, Logout) (US-F18-02).
-- Main Content Area: Independent scrolling (US-F18-03).
-- Mobile responsive: Hamburger → Slide-in drawer.
-- Language toggle: BM / EN trong Avatar dropdown.
-
-### Out of Scope
-- Thiết kế nội dung của từng module riêng lẻ (Products, Orders...).
-- Dark mode / Theme customization.
-
----
-
-## 5. Success Metrics
-
-| Metric | Target | Measured By |
-|--------|--------|-------------|
-| Navigation error rate | < 5% (user lost/confused) | Session replay |
-| Mobile usability score | > 90 (Lighthouse) | Lighthouse CI |
-| Language toggle adoption | > 30% of MY users | PostHog event |
-
----
-
-## 6. User Story Summary
-
-> AC đầy đủ nằm trong Section 11. Đây là bản tóm tắt để dễ đọc.
-
-```
-AS A  SME Owner / Dropshipper trên Malaysia
-I WANT TO có một giao diện CMS với sidebar navigation rõ ràng (icon + text), header cố định và content area mobile-friendly
-SO THAT tôi có thể quản lý cửa hàng dễ dàng từ bất kỳ thiết bị nào mà không bị lạc
+```text
+[ User Login thành công (F02 Auth) ]
+                │
+                ▼
+    [ Redirect → /dashboard ]
+                │
+                ▼
+    ┌───────────┴───────────────────────────┐
+    │  CMS Layout load hoàn tất:            │
+    │  • Top Header: Logo + Bell + Avatar   │
+    │  • Sidebar: Menu items                │
+    │  • Main Content: Dashboard (F03)      │
+    └───────────┬───────────────────────────┘
+                │
+    ┌───────────┴───────────────────────────┐
+    │                                       │
+  [Desktop ≥ 768px]                    [Mobile < 768px]
+    │                                       │
+    ▼                                       ▼
+[ Sidebar Expanded ]              [ Sidebar Hidden, ☰ visible ]
+[ Icon + Text hiển thị ]          [ Click ☰ → Drawer slide-in ]
+    │                                       │
+    └───────────┬───────────────────────────┘
+                │
+                ▼
+    [ User click Menu Item trên Sidebar ]
+                │
+        ┌───────┴────────────────────┐
+        │                            │
+  [Menu Đơn: Dashboard,       [Menu Nhóm: My Webstore]
+   Products, Orders,                 │
+   Store Config]                     ▼
+        │               [ Expand → hiện sub-menu ]
+        │               [ Editor, Blog ]
+        │                            │
+        └───────────┬────────────────┘
+                    │
+                    ▼
+         [ Main Content area load module tương ứng ]
+         [ Header + Sidebar vẫn fixed ]
+                    │
+                    ▼ [Mobile only]
+         [ Drawer tự đóng nếu click Leaf-route ]
+         [ Drawer KHÔNG đóng nếu click Menu Nhóm ]
 ```
 
-> Source Stories: [US-F18-01](../stories/F18-cms-layout-stories.md) | [US-F18-02](../stories/F18-cms-layout-stories.md) | [US-F18-03](../stories/F18-cms-layout-stories.md)
+### 1.2. Luồng Header Interactions
 
----
-
-## 7. Functional Requirements
-
-| FR-ID | Requirement | Story Ref | Priority | Notes |
-|-------|-------------|-----------|----------|-------|
-| FR-01 | Sidebar expanded với icon + text trên desktop | US-F18-01 | P0 | Active state highlight |
-| FR-02 | Mobile: Sidebar ẩn mặc định, Hamburger → Slide-in drawer + overlay | US-F18-01 | P0 | z-index > main content |
-| FR-03 | Sidebar footer: WhatsApp Support link, mở tab mới | US-F18-01 | P0 | Malaysia-specific |
-| FR-04 | Top Header: Logo PrimeWeb → click → /dashboard | US-F18-02 | P0 | Fixed, always visible |
-| FR-05 | Top Header: Notification Bell + Red dot badge + số lượng | US-F18-02 | P0 | Link đến F16 |
-| FR-06 | Top Header: Avatar dropdown (Profile, Language BM/EN, Workspace switch, Logout) | US-F18-02 | P0 | |
-| FR-07 | Main Content: Scroll độc lập, Header + Sidebar fixed | US-F18-03 | P0 | |
-
----
-
-## 7. Business Rules
-
-- **BR-01:** Sidebar menu items đều có Icon + Text — không dùng icon đơn thuần (phù hợp SME thị trường MY).
-- **BR-02:** WhatsApp link mở tab mới, không điều hướng trong app.
-- **BR-03:** Language switch (BM/EN) phải được lưu persistent theo user preference.
-- **BR-04:** Notification bell connect với real-time data từ F16 Notification Center.
-- **BR-05:** Các nhóm menu chính (Dashboard, My Webstore) có thể được mở rộng (expand/collapse) để chứa sub-menu tương ứng.
-
----
-
-## 8. Navigation Menu Structure
-
-| # | Menu Item | Icon | Route | Feature |
-|---|-----------|------|-------|---------|
-| 1 | Dashboard | 📊 | /dashboard | F03 |
-|   | ↳ Analytics | | /dashboard/analytics | F03 |
-|   | ↳ SEO | | /dashboard/seo | F03 |
-| 2 | My Webstore | 🌐 | /editor | F05 |
-|   | ↳ Editor | | /editor | F05 |
-|   | ↳ Blog | | /blog | F17 |
-| 3 | Products | 📦 | /products | F08 |
-| 4 | Orders | 🛒 | /orders | F10 |
-| 5 | Store Config| ⚙️ | /settings | F19 |
-| — | Help Support| 🎧 | WhatsApp URL | F18 |
-
----
-
-## 9. User Flow
-
+```text
+[ User đang ở bất kỳ trang CMS nào ]
+                │
+    ┌───────────┼───────────────────┐
+    │           │                   │
+    ▼           ▼                   ▼
+[ Click Logo ] [ Click 🔔 Bell ]  [ Click Avatar ]
+    │           │                   │
+    ▼           ▼                   ▼
+[ → /dashboard ] [ Mở F16        ] [ Mở Dropdown:    ]
+                 [ Notification   ] [  • Profile       ]
+                 [ Dropdown/      ] [  • Language BM/EN]
+                 [ Drawer         ] [  • Workspace     ]
+                                   [  • Logout         ]
+                                        │
+                              ┌─────────┼──────────┐
+                              │         │          │
+                              ▼         ▼          ▼
+                     [ Profile ]  [ Language ] [ Logout ]
+                     [ → route ] [ Toggle    ] [ → /login ]
+                                 [ BM ↔ EN   ]
+                                 [ Lưu vào   ]
+                                 [ localStorage]
+                                 [ Không reload]
 ```
-User Login → /dashboard
-   ↓
-Header: Logo (PrimeWeb) + Bell icon + Avatar visible
-   ↓
-Sidebar: Expanded (Desktop) / Hamburger (Mobile)
-   ↓
-Click Menu Item → Main Content area loads feature
-   ↓ [Mobile only]
-Click ☰ → Sidebar Drawer slides in → Click item → Drawer closes
-   ↓
-Click Bell → F16 Notification Dropdown
-   ↓
-Click Avatar → Dropdown: Profile | Language BM/EN | Workspace | Logout
+
+### 1.3. Luồng Mobile Drawer
+
+```text
+[ Mobile User ở trang CMS ]
+            │
+            ▼
+[ Click ☰ Hamburger ở Header trái ]
+            │
+            ▼
+[ Sidebar Drawer slide-in từ trái ]
+[ Overlay mờ che Main Content ]
+            │
+    ┌───────┴────────────────────────────┐
+    │               │                    │
+    ▼               ▼                    ▼
+[ Click Leaf ]  [ Click Menu Nhóm ] [ Click Overlay ]
+[ VD: Orders ]  [ VD: My Webstore ] [ hoặc Swipe ← ]
+    │               │                    │
+    ▼               ▼                    ▼
+[ Drawer đóng ] [ Expand sub-menu ] [ Drawer đóng ]
+[ Navigate    ] [ Drawer vẫn mở  ] [ Giữ nguyên   ]
+[ đến route   ] [ để chọn tiếp   ] [ trang hiện tại]
 ```
 
 ---
 
-## 10. Screen Layout
+## 2. Navigation Menu Structure
 
-```
-┌─ CMS Layout ──────────────────────────────────────────────┐
-│ ┌─ Top Header ───────────────────────────────────────────┐ │
-│ │ [☰] [Logo PrimeWeb]                [🔔 3] [Avatar ▼]  │ │
-│ └────────────────────────────────────────────────────────┘ │
-│ ┌─────────────────┐ ┌───────────────────────────────────┐ │
-│ │ SIDEBAR         │ │ MAIN CONTENT (scrollable)         │ │
-│ │                 │ │                                   │ │
-│ │ 📊 Dashboard ▼  │ │  [Feature Content Here]           │ │
-│ │   ├ Analytics   │ │                                   │ │
-│ │   └ SEO         │ │                                   │ │
-│ │ 🌐 My Webstore ▼│ │                                   │ │
-│ │   ├ Editor      │ │                                   │ │
-│ │   └ Blog        │ │                                   │ │
-│ │ 📦 Products     │ │                                   │ │
-│ │ 🛒 Orders       │ │                                   │ │
-│ │ ⚙️  Config      │ │                                   │ │
-│ │─────────────────│ │                                   │ │
-│ │ 🎧 Help(WA)     │ │                                   │ │
-│ └─────────────────┘ └───────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────┘
-Mobile: Sidebar hides → ☰ at Header top-left
-```
+| # | Menu Item | Icon | Route | Feature | Loại |
+|---|-----------|------|-------|---------|------|
+| 1 | Dashboard | 📊 | `/dashboard` | F03 | Đơn (Single) |
+| 2 | My Webstore | 🌐 | — | — | Nhóm (Group) |
+|   | ↳ Editor | | `/editor` | F05 | Sub-item |
+|   | ↳ Blog | | `/blog` | F17 | Sub-item |
+| 3 | Products | 📦 | `/products` | F08 | Đơn |
+| 4 | Orders | 🛒 | `/orders` | F10 | Đơn |
+| 5 | Store Config | ⚙️ | `/settings` | F19 | Đơn |
+| — | Help Center | 🎧 | `/help` | F20 | Footer (cố định dưới cùng) |
 
 ---
 
-## 11. Acceptance Criteria
+## 3. Wireframes
 
-### AC-1: Desktop Sidebar
-> 📌 Source: [US-F18-01](../stories/F18-cms-layout-stories.md) — AC-1
+### 3.1. CMS Framework Layout — Desktop View (≥ 768px)
 
-```gherkin
-GIVEN user đang login vào CMS trên Desktop
-WHEN  giao diện load
-THEN  Side Menu hiển thị ở trái, mở rộng mặc định
-  AND mỗi item hiển thị icon + text rõ ràng
-  AND Active item được highlight theo Design System
-```
+> **[Global CMS Constraint]** Đây là Root Layout của toàn bộ CMS Admin. Mọi module tính năng khác đều render vào phần Main Content Area.
 
-### AC-2: Mobile Hamburger Menu
-> 📌 Source: [US-F18-01](../stories/F18-cms-layout-stories.md) — AC-2
-
-```gherkin
-GIVEN user dùng CMS trên điện thoại
-WHEN  giao diện load
-THEN  Side Menu ẩn, chỉ hiện ☰ ở Header trái
-WHEN  click ☰
-THEN  Sidebar slide-in từ trái + overlay mờ
-```
-
-### AC-3: Notification Bell
-> 📌 Source: [US-F18-02](../stories/F18-cms-layout-stories.md) — AC-2
-
-```gherkin
-GIVEN user có thông báo mới
-WHEN  nhìn vào Header phải
-THEN  icon Bell hiển thị Red dot badge + số
-WHEN  click Bell
-THEN  mở F16 Notification Dropdown
+```text
+┌── CMS Layout ─────────────────────────────────────────────────────┐
+│ ┌─ Top Header (Fixed, z-index cao nhất) ─────────────────────────┐│
+│ │ [☰/Logo]  PrimeWeb    [BM|EN]              [🔔 3]  [👤 ▼]     ││
+│ │           ↑ Click →                          ↑        ↑        ││
+│ │         /dashboard                     F16 Badge  Avatar       ││
+│ │                                                   Dropdown     ││
+│ └────────────────────────────────────────────────────────────────┘│
+│ ┌── Sidebar (Fixed Left, overflow-y: auto) ─┐ ┌── Main Content ─┐│
+│ │                                           │ │ (overflow-y:auto)││
+│ │  [Tên Webstore hiện tại]                  │ │                  ││
+│ │  ─────────────────────────                │ │  ┌────────────┐  ││
+│ │  📊  Dashboard                            │ │  │            │  ││
+│ │                                           │ │  │  Feature   │  ││
+│ │  🌐  My Webstore           ▼              │ │  │  Content   │  ││
+│ │       ├─ Editor                           │ │  │  (F03,     │  ││
+│ │       └─ Blog                             │ │  │   F05,     │  ││
+│ │                                           │ │  │   F08...) │  ││
+│ │  📦  Products                             │ │  │            │  ││
+│ │                                           │ │  │            │  ││
+│ │  🛒  Orders                               │ │  └────────────┘  ││
+│ │                                           │ │                  ││
+│ │  ⚙️  Store Config                         │ │                  ││
+│ │                                           │ │                  ││
+│ │  ─────────────────────────                │ │                  ││
+│ │  🎧  Help Center                          │ │                  ││
+│ └───────────────────────────────────────────┘ └──────────────────┘│
+└───────────────────────────────────────────────────────────────────┘
 ```
 
-### AC-4: Avatar Dropdown
-> 📌 Source: [US-F18-02](../stories/F18-cms-layout-stories.md) — AC-3
+**Chi tiết Sidebar:**
+- Width cố định ~240px
+- Active item: highlight background + font bold theo Design System
+- Menu Nhóm (My Webstore): click → expand/collapse accordion, icon mũi tên xoay
+- Help Center: cố định ở cuối sidebar, phân tách bởi divider
 
-```gherkin
-GIVEN user click Avatar ở Header phải
-THEN  dropdown hiển thị: Profile | Language (BM/EN) | Workspace | Logout
+---
+
+### 3.2. CMS Framework Layout — Mobile View (< 768px)
+
+```text
+📱 Mobile View
+┌──────────────────────────────┐
+│ ☰  PrimeWeb     [🔔 3] [👤]  │ ◄── Top Header (Fixed)
+├──────────────────────────────┤
+│                              │
+│    ┌────────────────────┐    │
+│    │                    │    │
+│    │   Feature Content  │    │
+│    │   (Full width)     │    │
+│    │                    │    │
+│    │   Scrollable       │    │
+│    │                    │    │
+│    └────────────────────┘    │
+│                              │
+└──────────────────────────────┘
+
+Khi click ☰ → Sidebar Drawer:
+┌──────────────────────────────┐
+│ ☰  PrimeWeb     [🔔 3] [👤]  │
+├──────────┬───────────────────┤
+│ SIDEBAR  │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+│ DRAWER   │▒▒▒ Overlay mờ ▒▒▒│
+│          │▒▒▒ (Click để  ▒▒▒│
+│ 📊 Dash. │▒▒▒  đóng)     ▒▒▒│
+│ 🌐 Web ▼ │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+│  ├ Edit  │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+│  └ Blog  │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+│ 📦 Prod. │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+│ 🛒 Ord.  │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+│ ⚙️ Conf. │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+│ ──────── │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+│ 🎧 Help  │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+└──────────┴───────────────────┘
 ```
 
-### AC-5: Main Content Independent Scroll
-> 📌 Source: [US-F18-03](../stories/F18-cms-layout-stories.md) — AC-1
+**Hành vi đóng Drawer:**
+- Click vào Overlay mờ → Drawer slide-out
+- Swipe từ phải sang trái → Drawer slide-out
+- Click vào Leaf-route (VD: Orders) → Drawer đóng + Navigate
+- Click vào Menu Nhóm (VD: My Webstore) → Drawer **vẫn mở**, expand sub-menu
 
-```gherkin
-GIVEN user scroll xuống danh sách dài
-THEN  chỉ Main Content scroll
-  AND Header + Sidebar vẫn fixed
+---
+
+### 3.3. Top Header — Chi tiết Components
+
+```text
+Desktop Header:
+┌────────────────────────────────────────────────────────────────┐
+│  [Logo PrimeWeb]     [Tên Webstore]     [BM|EN]  [🔔 3] [👤▼] │
+│   ↑ Click → /dash     ↑ Context          ↑ Lang   ↑ F16  ↑    │
+│                        display            Switch  Badge  Avatar│
+│                                                         Menu   │
+└────────────────────────────────────────────────────────────────┘
+
+Mobile Header:
+┌────────────────────────────────────────┐
+│  [☰]  [Logo]                [🔔 3] [👤]│
+│   ↑ Toggle                             │
+│   Drawer                               │
+└────────────────────────────────────────┘
 ```
 
 ---
 
-## 12. Non-Functional Requirements
+### 3.4. Avatar Dropdown Popover
 
-| Category | Requirement | Notes |
-|----------|-------------|-------|
-| **Performance** | Layout render < 1s (Above the fold) | CLS < 0.1 |
-| **Mobile** | 375px full support, fat-finger friendly (min touch 44px) | |
-| **Accessibility** | ARIA labels cho Sidebar + Bell + Avatar | |
-| **i18n** | Language BM/EN persistent via localStorage | |
+Khi click vào Avatar ở Header:
 
----
+```text
+Desktop:
+                              ┌─────────────────────┐
+                              │ 👤 Nguyễn Văn A      │
+                              │    owner@email.com   │
+                              ├─────────────────────┤
+                              │ 🧑 Profile Settings  │
+                              ├─────────────────────┤
+                              │ 🌐 Language          │
+                              │    (•) English       │
+                              │    ( ) Bahasa Melayu │
+                              ├─────────────────────┤
+                              │ 🔀 Switch Workspace  │
+                              │    ✓ MyStore-01      │
+                              │      MyStore-02      │
+                              ├─────────────────────┤
+                              │ 🚪 Logout            │
+                              └─────────────────────┘
+```
 
-## 13. Dependencies
-
-| Dependency | Status | Action Needed |
-|-----------|--------|---------------|
-| F02 Auth | ✅ Done | Session + Avatar data |
-| F16 Notification Center | ⬜ | Bell badge API |
-
----
-
-## 14. 9-Point Done Checklist
-
-- [ ] Loading State — Skeleton layout khi chưa fetch session
-- [ ] Empty State — N/A (Layout luôn có content)
-- [ ] Error State — Session expired → redirect /login
-- [ ] Form Validation — N/A
-- [ ] Button States — Active states cho Sidebar items
-- [ ] Toast Feedback — Logout success toast
-- [ ] Auth Redirect — 401 → /login
-- [ ] Mobile 375px — Hamburger + Drawer tested
-- [ ] TypeScript Clean — `tsc --noEmit` pass
+**Hành vi:**
+- Click outside / nhấn ESC → Dropdown đóng
+- Chọn Language → lưu localStorage, đổi text tĩnh ngay, KHÔNG reload trang
+- Chọn Workspace → chuyển context store, reload data
 
 ---
 
-## 15. API Contract
+### 3.5. Notification Bell — Badge & Dropdown
 
-> F18 là layout/shell component — không có API endpoint riêng. Phụ thuộc vào:
-> - F16 Bell Badge API: `GET /api/notifications?limit=1` để lấy unread count
-> - F02 Auth session để lấy Avatar, display name
+```text
+Không có thông báo mới:           Có thông báo mới:
+    [🔔]                              [🔔(3)]
+     ↑ Màu nhạt/xám                   ↑ Red dot badge + số (max 99+)
 
----
-
-## 16. Open Questions
-
-| # | Question | Owner | Status |
-|---|----------|-------|--------|
-| 1 | Sidebar có cần hỗ trợ mini mode (icon-only) trên tablet không, hay chỉ Expanded / Hidden? | Design | ⬜ Open |
-| 2 | Switch Workspace (multi-site) có trong Phase 1 không hay defer sang Wave 2+? | PO | ⬜ Open |
-| 3 | WhatsApp Business số điện thoại sẽ do team nào cung cấp/maintain? | Ops | ⬜ Open |
+Click Bell → Mở F16 Notification Dropdown/Drawer
+(Xem chi tiết tại: docs/design/F16-notification-center-design.md)
+```
 
 ---
 
-## 17. Definition of Ready
+### 3.6. Sidebar — Expand/Collapse Menu Nhóm (Accordion)
 
-- [x] User Stories approved và linked ở Section 0
-- [x] F02 Auth done ✅
-- [ ] F16 Notification Center badge API defined
-- [ ] Design System tokens confirmed (colors, spacing, typography)
+```text
+Trạng thái Collapsed:              Trạng thái Expanded:
+┌─────────────────────┐            ┌─────────────────────┐
+│ 🌐 My Webstore   ▶  │            │ 🌐 My Webstore   ▼  │
+└─────────────────────┘            │    ├─ Editor         │
+                                   │    └─ Blog           │
+                                   └─────────────────────┘
+```
+
+- Click vào Menu Nhóm lần 1 → Expand, icon mũi tên xoay xuống (▼)
+- Click vào Menu Nhóm lần 2 → Collapse, icon mũi tên xoay phải (▶)
+- Animation expand/collapse mượt (< 200ms)
 
 ---
 
-## 18. Definition of Done
+## 4. UI States (Các trạng thái UI)
 
-- [ ] All FR implemented
-- [ ] All AC pass
-- [ ] Mobile 375px tested trên real device
-- [ ] WhatsApp link active và đúng número
-- [ ] Language toggle persist qua sessions
-- [ ] ARIA labels implemented cho Sidebar, Bell, Avatar
-- [ ] Non-Functional Requirements validated (Lighthouse ≥ 90 mobile)
+### 4.1. Sidebar States
 
+| State | Điều kiện | Mô tả |
+|-------|-----------|-------|
+| **Expanded** | Desktop mặc định | Icon + Text đầy đủ, width ~240px |
+| **Collapsed (Icon-only)** | Tablet / User thu gọn (nếu hỗ trợ) | Chỉ hiện Icon, width ~60px, hover → tooltip text |
+| **Drawer** | Mobile < 768px | Ẩn mặc định, slide-in từ trái khi click ☰ |
 
+### 4.2. Loading State — Route Transition
+
+```text
+┌─ Top Header ──────────────────────────────────────┐
+│ [Logo]                               [🔔] [👤]    │
+│ ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │ ◄── Progress bar 2px
+└───────────────────────────────────────────────────┘
+```
+- Khi navigate giữa các module, progress bar xuất hiện ở mép dưới Header
+- Hoàn tất → bar chạy đến 100% rồi ẩn
+
+### 4.3. Loading State — Initial Layout Skeleton
+
+Khi chưa fetch xong session data (F02 Auth):
+
+```text
+┌─ Top Header ──────────────────────────────────────┐
+│ [Logo]                           [▒▒▒] [▒▒▒]     │
+└───────────────────────────────────────────────────┘
+┌── Sidebar ──────┐ ┌── Main Content ───────────────┐
+│ ▒▒▒▒▒▒▒▒▒▒▒▒▒  │ │                               │
+│ ▒▒▒▒▒▒▒▒▒▒▒▒▒  │ │  ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  │
+│ ▒▒▒▒▒▒▒▒▒▒▒    │ │  ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  │
+│ ▒▒▒▒▒▒▒▒▒▒▒▒▒  │ │                               │
+│ ▒▒▒▒▒▒▒▒▒▒▒    │ │  ▒▒▒▒▒▒▒▒▒▒▒▒               │
+│                 │ │  ▒▒▒▒▒▒▒▒▒▒▒▒               │
+└─────────────────┘ └───────────────────────────────┘
+```
+
+### 4.4. Error State — Session Expired
+
+```text
+┌── Toàn màn hình ──────────────────────┐
+│                                       │
+│        ⚠️ Session đã hết hạn           │
+│                                       │
+│   Vui lòng đăng nhập lại để tiếp tục │
+│                                       │
+│         [ Đăng nhập lại ]             │
+│           → redirect /login           │
+│                                       │
+└───────────────────────────────────────┘
+```
+
+### 4.5. Toast Notifications
+
+| Tình huống | Loại Toast | Nội dung |
+|------------|-----------|----------|
+| Logout thành công | ✅ Success (xanh) | "Đăng xuất thành công" |
+| Session expired (401) | ⚠️ Warning (vàng) | "Phiên đăng nhập đã hết hạn. Đang chuyển hướng..." |
+| Language switch | ✅ Info (xanh dương) | "Ngôn ngữ đã chuyển sang English / Bahasa Melayu" |
+
+---
+
+## 5. Responsive Breakpoints
+
+| Breakpoint | Layout | Sidebar | Header | Content |
+|-----------|--------|---------|--------|---------|
+| **Desktop** ≥ 1024px | 3 cột | Expanded (Icon + Text, ~240px) | Full | width = 100% - 240px |
+| **Tablet** 768–1023px | 3 cột | Collapsed (Icon-only, ~60px) hoặc Expanded | Full | width = 100% - sidebar |
+| **Mobile** < 768px | 1 cột | Hidden → Drawer | Compact (☰ + Logo + Icons) | Full width |
+
+---
+
+## 6. Accessibility & Interaction Notes
+
+- **ARIA labels**: Sidebar (`nav[aria-label="Main navigation"]`), Bell (`button[aria-label="Notifications"]`), Avatar (`button[aria-label="User menu"]`)
+- **Keyboard**: ESC đóng Dropdown/Drawer, Tab navigation qua menu items
+- **Touch target**: Min 44×44px cho tất cả interactive elements (fat-finger friendly)
+- **Animation**: Sidebar drawer slide < 200ms, smooth easing
+- **Scroll**: Main Content `overflow-y: auto`, `height: calc(100vh - header-height)`, scroll position reset khi navigate route mới
+
+---
+
+*(End of Design & Wireframe Document)*

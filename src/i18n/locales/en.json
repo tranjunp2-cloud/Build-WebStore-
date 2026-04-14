@@ -1771,7 +1771,8 @@
             "confirmDelete": "Delete",
             "customPage": "Custom 404 Page",
             "emptyTitle": "No pages yet",
-            "emptyDesc": "Create your first page to get started."
+            "emptyDesc": "Create your first page to get started.",
+            "slugLocked": "Slug is locked after publishing to protect SEO and external links."
         }
     }
 }
