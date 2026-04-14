@@ -311,6 +311,7 @@ export default function EditorPage() {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             if (hasUnsavedChanges) {
                 e.preventDefault()
+                e.returnValue = ''
             }
         }
         window.addEventListener('beforeunload', handleBeforeUnload)
