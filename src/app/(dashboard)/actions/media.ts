@@ -19,43 +19,24 @@ export async function uploadMediaAction(formData: FormData) {
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // Server-side magic byte validation (BUG-F17.30 / TC-F17-02-13)
-    // Prevents upload of renamed malicious files (.exe → .jpg) that bypass client accept attribute
-    const ALLOWED_SIGNATURES = [
-        { bytes: [0xFF, 0xD8, 0xFF], type: 'image/jpeg' },       // JPEG
-        { bytes: [0x89, 0x50, 0x4E, 0x47], type: 'image/png' },  // PNG
-    ]
-    const fileBytes = new Uint8Array(buffer.slice(0, 4))
-    const isValidImage = ALLOWED_SIGNATURES.some(sig =>
-        sig.bytes.every((b, i) => fileBytes[i] === b)
-    )
-    if (!isValidImage) {
-        throw new Error('Invalid file type. Only JPEG and PNG images are accepted.')
-    }
-
     const payload = await getPayload({ config: configPromise })
 
-    // Create the media document in Payload
-    try {
-        const res = await payload.create({
-            collection: 'media',
-            data: {
-                alt,
-            },
-            file: {
-                data: buffer,
-                name: file.name,
-                mimetype: file.type,
-                size: file.size,
-            },
-            user: user as Parameters<typeof payload.create>[0]['user'],
-        })
+    // Magic byte validation handled by Media.ts beforeChange hook
+    const res = await payload.create({
+        collection: 'media',
+        data: {
+            alt,
+        },
+        file: {
+            data: buffer,
+            name: file.name,
+            mimetype: file.type,
+            size: file.size,
+        },
+        user: user as any,
+    })
 
-        return JSON.parse(JSON.stringify(res))
-    } catch (err) {
-        console.error('[uploadMediaAction] Upload failed:', err)
-        throw err
-    }
+    return JSON.parse(JSON.stringify(res))
 }
 
 export async function getOrCreateCrateCartonIdAction() {
