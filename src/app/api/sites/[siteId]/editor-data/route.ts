@@ -147,6 +147,7 @@ export const GET = withAuth<{ params: Promise<{ siteId: string }> }>(async (user
             user: {
                 firstName: (user as Record<string, unknown>).firstName as string || null,
                 email: user.email || null,
+                role: (rawTenants.find((t: { tenant: TenantRef; role?: string }) => resolveTenantId(t.tenant) === siteTenantId) as { role?: string })?.role || 'viewer',
             },
         })
 
