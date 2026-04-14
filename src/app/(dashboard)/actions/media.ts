@@ -12,7 +12,8 @@ export async function uploadMediaAction(formData: FormData) {
 
     const file = formData.get('file') as File
     if (!file) throw new Error('No file provided')
-    const alt = (formData.get('alt') as string) || file.name
+    const altRaw = formData.get('alt')
+    const alt = typeof altRaw === 'string' && altRaw.trim() ? altRaw.trim() : file.name
 
     // Convert File to ArrayBuffer to Buffer for Payload
     const arrayBuffer = await file.arrayBuffer()

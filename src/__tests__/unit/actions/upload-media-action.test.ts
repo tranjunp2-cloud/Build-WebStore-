@@ -37,7 +37,7 @@ describe('uploadMediaAction', () => {
 
         await uploadMediaAction(formData)
 
-        const payload = await getPayload({ config: {} as any })
+        const payload = await getPayload({ config: {} as never })
         expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({
             data: { alt: 'Site Logo' },
         }))
@@ -50,7 +50,7 @@ describe('uploadMediaAction', () => {
 
         await uploadMediaAction(formData)
 
-        const payload = await getPayload({ config: {} as any })
+        const payload = await getPayload({ config: {} as never })
         expect(payload.create).toHaveBeenCalledWith(expect.objectContaining({
             data: { alt: 'my-image.jpg' },
         }))
