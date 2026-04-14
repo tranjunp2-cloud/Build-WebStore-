@@ -22,7 +22,6 @@ import { filterUnsupportedBlocks } from './unsupported-blocks'
 import { mapBusinessInfo } from './business-info-mapper'
 import type { BusinessInfoInput } from './system-prompt'
 import { generateAllPageSeo, type PageForSeo } from './seo-generator'
-import { runConsistencyCheck, logConsistencyReport } from './consistency-validator'
 
 type Language = 'en' | 'ms' | 'vi'
 
@@ -208,12 +207,9 @@ export function composeFallbackResult(
         ? { ...baseBiz, ...bizOverride }
         : baseBiz
 
-    const result = adaptTemplateSeedToGenerationResult(templateSeed, biz, category, language)
-
-    // Phase 06 — warn-only consistency check. Findings are logged but never
-    // block the return; auto-retry is out of scope for this phase.
-    const report = runConsistencyCheck(result)
-    logConsistencyReport(report, 'fallback')
-
-    return result
+    // Phase 06 — the consistency check runs ONE level up in
+    // `generateWithFallback` (see openai-generator.ts) so it can push
+    // `consistency_warning` SSE events into the gen event stream.
+    // `composeFallbackResult` stays pure / side-effect-free for tests.
+    return adaptTemplateSeedToGenerationResult(templateSeed, biz, category, language)
 }

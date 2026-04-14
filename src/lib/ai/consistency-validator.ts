@@ -28,6 +28,8 @@ export interface ConsistencyWarning {
   message: string
   /** Page title (when applicable) for quick triage. */
   page?: string
+  /** Block type (when applicable) for pinpointing the offender. */
+  block?: string
 }
 
 export interface ConsistencyReport {
@@ -174,6 +176,7 @@ function checkHeadlineLength(result: GenerationResult): ConsistencyWarning[] {
           rule: 'C3',
           message: `${block.blockType} headline has ${words} words (>${MAX_HEADLINE_WORDS}): "${headline.slice(0, 60)}"`,
           page: page.title,
+          block: block.blockType,
         })
       }
     }
@@ -213,13 +216,13 @@ function checkRecipeAdherence(result: GenerationResult): ConsistencyWarning[] {
     if (!page.isHomepage) continue
     const types = new Set(blocksOf(page).map((b) => b.blockType))
     if (!types.has('nav')) {
-      warnings.push({ rule: 'C5', message: 'homepage missing nav block', page: page.title })
+      warnings.push({ rule: 'C5', message: 'homepage missing nav block', page: page.title, block: 'nav' })
     }
     if (!types.has('hero')) {
-      warnings.push({ rule: 'C5', message: 'homepage missing hero block', page: page.title })
+      warnings.push({ rule: 'C5', message: 'homepage missing hero block', page: page.title, block: 'hero' })
     }
     if (!types.has('footer')) {
-      warnings.push({ rule: 'C5', message: 'homepage missing footer block', page: page.title })
+      warnings.push({ rule: 'C5', message: 'homepage missing footer block', page: page.title, block: 'footer' })
     }
   }
   return warnings
@@ -253,5 +256,39 @@ export function logConsistencyReport(report: ConsistencyReport, source: 'fallbac
     const prefix = `[consistency:${source}:${w.rule}]`
     const suffix = w.page ? ` (page: ${w.page})` : ''
     console.warn(`${prefix} ${w.message}${suffix}`)
+  }
+}
+
+/**
+ * Structural SSE event shape. We intentionally do NOT import the
+ * `SSEEvent` type from `openai-generator` to avoid a circular dep —
+ * this helper only needs the `event` + `data` keys, matching the
+ * caller's concrete type via structural subtyping.
+ */
+type ConsistencyEventSink = Array<{ event: string; data: Record<string, unknown> }>
+
+/**
+ * Phase 06 FR-12 — emit one `consistency_warning` SSE event per finding
+ * so the client sees every rule violation in real time. Caller owns the
+ * event array; this helper only pushes. Safe to call with passed=true
+ * (becomes a no-op).
+ */
+export function emitConsistencyEvents(
+  report: ConsistencyReport,
+  source: 'fallback' | 'ai',
+  events: ConsistencyEventSink,
+): void {
+  if (report.passed) return
+  for (const w of report.warnings) {
+    events.push({
+      event: 'consistency_warning',
+      data: {
+        rule: w.rule,
+        message: w.message,
+        source,
+        ...(w.page ? { page: w.page } : {}),
+        ...(w.block ? { block: w.block } : {}),
+      },
+    })
   }
 }

@@ -14,7 +14,11 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { runConsistencyCheck, logConsistencyReport } from '@/lib/ai/consistency-validator'
+import {
+  runConsistencyCheck,
+  logConsistencyReport,
+  emitConsistencyEvents,
+} from '@/lib/ai/consistency-validator'
 import type { GenerationResult, GeneratedBlock, GeneratedPage } from '@/lib/ai/generate-blocks'
 
 function baseTheme(): GenerationResult['theme'] {
@@ -186,5 +190,92 @@ describe('TC-F01-W.42 — degenerate input safety', () => {
   it('logConsistencyReport is a no-op when passed=true', () => {
     const report = runConsistencyCheck(cleanResult())
     expect(() => logConsistencyReport(report, 'fallback')).not.toThrow()
+  })
+})
+
+describe('TC-F01-W.43 — emitConsistencyEvents SSE plumbing', () => {
+  it('pushes one consistency_warning event per warning', () => {
+    // Break C4 (only 1 CTA) + C5 (no nav/footer) to trigger multiple warnings
+    const r: GenerationResult = {
+      siteName: 'X',
+      siteType: 'business',
+      blocks: [],
+      pages: [
+        {
+          title: 'Home',
+          slug: '/',
+          isHomepage: true,
+          blocks: [
+            { blockType: 'hero', headline: 'Hi', subheadline: 'sub', image: 'https://x/1' } as GeneratedBlock,
+          ],
+          seo: { title: 'X', description: 'y' },
+        },
+      ],
+      seo: { title: 'X', description: 'y' },
+      theme: baseTheme(),
+    }
+    const report = runConsistencyCheck(r)
+    expect(report.warnings.length).toBeGreaterThanOrEqual(2)
+
+    const events: Array<{ event: string; data: Record<string, unknown> }> = []
+    emitConsistencyEvents(report, 'fallback', events)
+
+    expect(events.length).toBe(report.warnings.length)
+    for (const e of events) {
+      expect(e.event).toBe('consistency_warning')
+      expect(typeof e.data.rule).toBe('string')
+      expect(typeof e.data.message).toBe('string')
+      expect(e.data.source).toBe('fallback')
+    }
+  })
+
+  it('is a no-op when report.passed=true', () => {
+    const report = runConsistencyCheck(cleanResult())
+    const events: Array<{ event: string; data: Record<string, unknown> }> = []
+    emitConsistencyEvents(report, 'ai', events)
+    expect(events.length).toBe(0)
+  })
+
+  it('attaches block field to C5 warnings that identify a specific block type', () => {
+    const r = cleanResult()
+    r.pages![0]!.blocks = [heroBlock(), featuresBlock(), ctaBlock()] // missing nav + footer
+    const report = runConsistencyCheck(r)
+    const c5Nav = report.warnings.find((w) => w.rule === 'C5' && /nav/.test(w.message))
+    expect(c5Nav?.block).toBe('nav')
+    const c5Footer = report.warnings.find((w) => w.rule === 'C5' && /footer/.test(w.message))
+    expect(c5Footer?.block).toBe('footer')
+  })
+
+  it('attaches block field to C3 headline warnings', () => {
+    const r = cleanResult()
+    const longHeadline = 'This is a very long hero headline that absolutely exceeds the ten word cap'
+    r.pages![0]!.blocks = [
+      navBlock(),
+      heroBlock(longHeadline),
+      featuresBlock(),
+      ctaBlock(),
+      footerBlock(),
+    ]
+    const report = runConsistencyCheck(r)
+    const c3 = report.warnings.find((w) => w.rule === 'C3')
+    expect(c3?.block).toBe('hero')
+  })
+
+  it('emitted event data forwards page + block when present', () => {
+    const r = cleanResult()
+    const longHeadline = 'This is a very long hero headline that absolutely exceeds the ten word cap'
+    r.pages![0]!.blocks = [
+      navBlock(),
+      heroBlock(longHeadline),
+      featuresBlock(),
+      ctaBlock(),
+      footerBlock(),
+    ]
+    const report = runConsistencyCheck(r)
+    const events: Array<{ event: string; data: Record<string, unknown> }> = []
+    emitConsistencyEvents(report, 'ai', events)
+    const c3Event = events.find((e) => e.data.rule === 'C3')
+    expect(c3Event?.data.page).toBe('Home')
+    expect(c3Event?.data.block).toBe('hero')
   })
 })
