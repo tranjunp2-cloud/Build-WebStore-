@@ -14,6 +14,30 @@ interface BuilderGenerationViewProps {
     showTimeoutWarning?: boolean
 }
 
+/**
+ * Blend discrete SSE step progress (10→20→60→95→100) with a time-based
+ * asymptotic curve so the bar keeps advancing during the long silent
+ * OpenAI call phase. Without this the bar visibly stalls at ~20% for
+ * the 40–90s it takes gpt-4.1-mini to return.
+ *
+ * Curve: 10 + 82·(1 − e^(−t/45))
+ *   t=0s  →10%   t=15s→33%   t=30s→52%   t=45s→66%
+ *   t=60s →78%   t=90s→89%   t=120s→92%  asymptote→92%
+ *
+ * We cap time-based output at 92 so the bar never fills without a real
+ * signal. Once an event reports ≥92 (parsing/saving/done) we honour it
+ * verbatim so the final snap to 100% happens on the `done` event.
+ */
+function computeEffectiveProgress(eventProgress: number, elapsedSeconds?: number): number {
+    const rawEvent = Number.isFinite(eventProgress) ? eventProgress : 0
+    const clampedEvent = Math.max(10, Math.min(100, rawEvent))
+    if (clampedEvent >= 92) return clampedEvent
+
+    const t = typeof elapsedSeconds === 'number' && elapsedSeconds > 0 ? elapsedSeconds : 0
+    const timeBased = 10 + 82 * (1 - Math.exp(-t / 45))
+    return Math.max(clampedEvent, Math.min(92, timeBased))
+}
+
 function BuilderGenerationCard({
     progress,
     elapsedSeconds,
@@ -76,8 +100,8 @@ function BuilderGenerationCard({
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.05)]">
                             <div
-                                className="h-full rounded-full bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] transition-all duration-300"
-                                style={{ width: `${Math.max(10, progress)}%` }}
+                                className="h-full rounded-full bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] transition-[width] duration-700 ease-out"
+                                style={{ width: `${computeEffectiveProgress(progress, elapsedSeconds)}%` }}
                             />
                         </div>
                         {typeof elapsedSeconds === 'number' && elapsedSeconds > 0 && (

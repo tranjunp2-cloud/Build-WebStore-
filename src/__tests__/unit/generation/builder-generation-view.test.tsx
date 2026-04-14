@@ -136,4 +136,54 @@ describe('[TC-S4-004] BuilderGenerationView', () => {
         const alerts = screen.getAllByRole('alert')
         expect(alerts.length).toBeGreaterThan(0)
     })
+
+    // ── TC-F01-PROG — time-based progress interpolation ──
+    // Prevents bar from stalling at an early event (e.g. 20%) during the long
+    // silent OpenAI call phase. See plans/260414-1630-phase-08-audit progress bug.
+    describe('progress interpolation [TC-F01-PROG]', () => {
+        function readBarWidth(container: HTMLElement): number {
+            const bar = container.querySelector('[style*="width"]') as HTMLElement | null
+            if (!bar) return 0
+            const match = bar.getAttribute('style')?.match(/width:\s*([\d.]+)%/)
+            return match ? parseFloat(match[1]!) : 0
+        }
+
+        it('TC-F01-PROG.01 — stalls bar at least 55% when event stuck at 20% and elapsed=39s', () => {
+            // At 39s elapsed the asymptotic curve sits around 57-58%,
+            // so the bar must advance well past the 20% event snapshot.
+            const { container } = render(
+                <BuilderGenerationView progress={20} elapsedSeconds={39} />,
+            )
+            const width = readBarWidth(container)
+            expect(width).toBeGreaterThanOrEqual(55)
+            expect(width).toBeLessThanOrEqual(65)
+        })
+
+        it('TC-F01-PROG.02 — honours high event progress (>=92) verbatim', () => {
+            // Once a late SSE step fires (parsing/saving), we trust it completely.
+            const { container } = render(
+                <BuilderGenerationView progress={95} elapsedSeconds={10} />,
+            )
+            expect(readBarWidth(container)).toBe(95)
+        })
+
+        it('TC-F01-PROG.03 — never exceeds 92% from time-based interpolation alone', () => {
+            // Even at a huge elapsed time, the curve caps at 92 so the bar
+            // does not fill without a real "done" signal.
+            const { container } = render(
+                <BuilderGenerationView progress={10} elapsedSeconds={600} />,
+            )
+            expect(readBarWidth(container)).toBeLessThanOrEqual(92)
+        })
+
+        it('TC-F01-PROG.04 — monotonic: later elapsed never regresses the bar', () => {
+            const first = render(<BuilderGenerationView progress={20} elapsedSeconds={10} />)
+            const firstWidth = readBarWidth(first.container)
+            first.unmount()
+
+            const second = render(<BuilderGenerationView progress={20} elapsedSeconds={30} />)
+            const secondWidth = readBarWidth(second.container)
+            expect(secondWidth).toBeGreaterThan(firstWidth)
+        })
+    })
 })
