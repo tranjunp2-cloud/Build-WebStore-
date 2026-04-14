@@ -73,7 +73,9 @@ export async function PATCH(
                 for (const link of hb.links) {
                     const l = link as Record<string, unknown>
                     const url = typeof l.url === 'string' ? l.url.trim() : ''
-                    if (!url || url === '#' || url.startsWith('/')) continue
+                    if (!url || url === '#') continue
+                    if (url.startsWith('/') && !url.startsWith('//')) continue
+                    if (url.startsWith('//')) return NextResponse.json({ error: `Invalid URL: protocol-relative URLs not allowed` }, { status: 400 })
                     try { const u = new URL(url); if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error() }
                     catch { return NextResponse.json({ error: `Invalid URL: "${url}"` }, { status: 400 }) }
                 }
