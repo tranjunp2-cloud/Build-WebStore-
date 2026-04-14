@@ -17,8 +17,23 @@ import {
     BUSINESS_PRESETS,
     type ThemePreset,
 } from './theme-presets'
+import { THEME_MOODS, type ThemeMood } from './theme-moods'
 
 export type { ThemePreset } from './theme-presets'
+export type { ThemeMood } from './theme-moods'
+
+/**
+ * Composite theme — preset + resolved mood record. Single object passed
+ * downstream to system-prompt, media pipeline, and composer CTAs.
+ *
+ * Plan 260414-2249 phase-02: mood bundles imagery/voice/CTA properties that
+ * must stay synchronized across all three consumers (GPT prompt, Unsplash
+ * keywords, composer block builders).
+ */
+export interface CategoryTheme {
+    preset: ThemePreset
+    mood: ThemeMood
+}
 
 /**
  * Canonicalize a raw category string to the key used by CATEGORY_PRESETS.
@@ -37,7 +52,9 @@ export function canonicalizeCategory(raw: string | undefined | null): string {
  *
  * @param category - category key (e.g. "restaurant", "tech"); unknown → business fallback
  * @param seed     - any number; typically `hashBusinessName(name)` for per-business stability
- * @returns        - a ThemePreset with primary/secondary/accent colors + fontPairingId + mode + spacing + radius + shadow
+ * @returns        - a ThemePreset with primary/secondary/accent colors + fontPairingId + mode + spacing + radius + shadow + moodId
+ *
+ * Legacy signature — returns preset only. New code should call `pickCategoryThemeWithMood`.
  */
 export function pickCategoryTheme(category: string, seed: number): ThemePreset {
     const key = canonicalizeCategory(category)
@@ -45,6 +62,22 @@ export function pickCategoryTheme(category: string, seed: number): ThemePreset {
     if (presets.length === 0) return BUSINESS_PRESETS[0]!
     const index = Math.abs(Math.floor(seed)) % presets.length
     return presets[index]!
+}
+
+/**
+ * Pick a deterministic preset AND resolve its associated ThemeMood.
+ *
+ * Plan 260414-2249 phase-02: preferred entry point for downstream consumers
+ * that need voice/imagery/CTA data. Same determinism as `pickCategoryTheme`
+ * — same `(category, seed)` returns the same composite.
+ */
+export function pickCategoryThemeWithMood(category: string, seed: number): CategoryTheme {
+    const preset = pickCategoryTheme(category, seed)
+    const mood = THEME_MOODS[preset.moodId]
+    if (!mood) {
+        throw new Error(`[category-theme-picker] Preset "${preset.name}" has unknown moodId "${preset.moodId}"`)
+    }
+    return { preset, mood }
 }
 
 /**

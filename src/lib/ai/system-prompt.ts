@@ -428,12 +428,34 @@ export type BusinessInfoInput = {
   address?: string
 }
 
+import type { ThemeMood } from './theme-moods'
+
+export type BuildUserPromptOptions = {
+  extraInstructions?: string
+  language?: 'en' | 'ms' | 'vi' | 'auto'
+  referencePrompt?: string
+  /** Plan 260414-2249 phase-02: bundled voice/imagery/CTA archetype. */
+  mood?: ThemeMood
+}
+
 export function buildUserPrompt(
   info: BusinessInfoInput,
-  extraInstructions?: string,
+  extraInstructionsOrOptions?: string | BuildUserPromptOptions,
   language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
   referencePrompt?: string,
 ): string {
+  // Backward-compat: legacy positional args (string, lang, referencePrompt)
+  // OR new options object. Normalize.
+  let extraInstructions: string | undefined
+  let mood: ThemeMood | undefined
+  if (typeof extraInstructionsOrOptions === 'string' || extraInstructionsOrOptions === undefined) {
+    extraInstructions = extraInstructionsOrOptions
+  } else {
+    extraInstructions = extraInstructionsOrOptions.extraInstructions
+    mood = extraInstructionsOrOptions.mood
+    if (extraInstructionsOrOptions.language) language = extraInstructionsOrOptions.language
+    if (extraInstructionsOrOptions.referencePrompt) referencePrompt = extraInstructionsOrOptions.referencePrompt
+  }
   const parts = [
     `Create a complete website for: "${info.businessName}"`,
     `Industry: ${info.industry}`,
@@ -458,8 +480,16 @@ export function buildUserPrompt(
     parts.push(`Additional instructions: ${extraInstructions}`)
   }
 
-  // Inject context-aware style personality for variety (skip for reference/recreation mode)
-  if (!referencePrompt && STYLE_PERSONALITIES.length > 0) {
+  // Plan 260414-2249 phase-02: inject mood-driven COPY VOICE block.
+  // When a mood is provided, it replaces the legacy one-sentence personality
+  // with 4-5 bulleted voice rules + imagery adjectives + copy tone label.
+  if (!referencePrompt && mood) {
+    const voiceBullets = mood.voiceStyle.map((rule) => `  - ${rule}`).join('\n')
+    parts.push(
+      `\nCOPY VOICE (${mood.label} / ${mood.copyTone}):\n${voiceBullets}\n  - Imagery mood: ${mood.imageryKeywords.slice(0, 3).join(', ')}.`,
+    )
+  } else if (!referencePrompt && STYLE_PERSONALITIES.length > 0) {
+    // Legacy path when no mood supplied (backward compat).
     const personality = selectPersonality(info)
     parts.push(`\nDesign personality: ${personality}`)
   }
