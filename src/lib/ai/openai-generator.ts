@@ -231,6 +231,11 @@ export async function generateSiteWithAI(
         let validBlocks: Record<string, unknown>[]
         let generatedPages: GeneratedPage[] | undefined
 
+        // Plan 07 — derive the user-facing BusinessSample override once so both
+        // the enforcer padding path and the SEO mining step thread identical
+        // user data into library-built blocks. Done before both branches.
+        const enforcerBizOverride = mapBusinessInfo(businessInfo)
+
         if (rawPages && rawPages.length > 0) {
             // Multi-page format
             generatedPages = []
@@ -240,6 +245,11 @@ export async function generateSiteWithAI(
                 businessName: businessInfo.businessName,
                 industry: businessInfo.industry,
                 seed: themeSeed,
+                // Plan 07 — thread user data + mood into the enforcer so
+                // buildBlockFromLibrary emits biz-aware hero/features/about
+                // when GPT output is thin and needs padding.
+                userBiz: enforcerBizOverride,
+                mood: themeMood,
             }
 
             for (let p = 0; p < rawPages.length; p++) {
@@ -284,17 +294,16 @@ export async function generateSiteWithAI(
             // descriptions are frequently duplicated across pages; this step
             // guarantees each page ships a distinct meta description plus a
             // LocalBusiness schema (and FAQPage where an FAQ block exists).
-            const seoBizOverride = mapBusinessInfo(businessInfo)
             const seoBiz: BusinessSample = {
-                name: seoBizOverride.name ?? businessInfo.businessName,
-                tagline: seoBizOverride.tagline ?? '',
-                description: seoBizOverride.description ?? '',
-                phone: seoBizOverride.phone ?? '',
-                email: seoBizOverride.email ?? '',
-                address: seoBizOverride.address ?? '',
+                name: enforcerBizOverride.name ?? businessInfo.businessName,
+                tagline: enforcerBizOverride.tagline ?? '',
+                description: enforcerBizOverride.description ?? '',
+                phone: enforcerBizOverride.phone ?? '',
+                email: enforcerBizOverride.email ?? '',
+                address: enforcerBizOverride.address ?? '',
                 heroHeadline: '',
                 heroSubheadline: '',
-                products: seoBizOverride.products,
+                products: enforcerBizOverride.products,
             }
             const seoPages: PageForSeo[] = generatedPages.map((gp) => ({
                 title: gp.title,
@@ -344,6 +353,9 @@ export async function generateSiteWithAI(
                     businessName: businessInfo.businessName,
                     industry: businessInfo.industry,
                     seed: themeSeed,
+                    // Plan 07 — same userBiz + mood threading as the multi-page branch.
+                    userBiz: enforcerBizOverride,
+                    mood: themeMood,
                 }
                 validBlocks = enforceMinimumStructure(
                     validBlocks as Record<string, unknown>[],

@@ -15,11 +15,103 @@ import { getCategoryContent } from './content'
 import type { BusinessSample, TestimonialSample, FAQSample } from './content'
 import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
 import { hashString, seededShuffle, seededShufflePick } from './seeded-random'
+import type { ThemeMood } from './theme-moods'
+import { getCategoryCTA } from './theme-moods'
 
 export interface InjectionContext {
     businessName?: string
     industry?: string
     seed?: number
+    /**
+     * Plan 260414-2249 phase-07: optional user-supplied business fields
+     * merged over canned content. When provided, library blocks weave in
+     * user data (name / description / products / contact) instead of the
+     * canned strings. Backward-compatible: if absent, behaves as today.
+     */
+    userBiz?: Partial<BusinessSample>
+    /**
+     * Plan 260414-2249 phase-07: optional resolved theme mood. When
+     * provided, hero + cta blocks emit mood-derived CTA labels via
+     * `getCategoryCTA`. Backward-compatible — legacy "Get Started" /
+     * "Contact Us" labels remain when mood is absent.
+     */
+    mood?: ThemeMood
+}
+
+// ── Plan 07 helpers — threading user data into canned library blocks ─────
+
+/** Truncate a string on a word boundary so the tail is never mid-word. */
+function truncateOnWord(str: string, maxChars: number): string {
+    if (!str) return ''
+    if (str.length <= maxChars) return str
+    const sliced = str.slice(0, maxChars - 1)
+    const lastSpace = sliced.lastIndexOf(' ')
+    if (lastSpace > maxChars * 0.6) return sliced.slice(0, lastSpace).trimEnd() + '…'
+    return sliced.trimEnd() + '…'
+}
+
+/** Cap a string at `maxWords`; keeps words intact. */
+function capWords(str: string, maxWords: number): string {
+    if (!str) return ''
+    const words = str.split(/\s+/).filter(Boolean)
+    if (words.length <= maxWords) return words.join(' ')
+    return words.slice(0, maxWords).join(' ')
+}
+
+function capitalizeFirstLetter(s: string): string {
+    if (!s) return s
+    return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/** Resolve mood CTA with defensive fallback to the legacy labels. */
+function resolveLibraryCTA(
+    mood: ThemeMood | undefined,
+    category: string,
+    role: 'primary' | 'secondary',
+): string {
+    if (mood) return getCategoryCTA(mood, category, role)
+    return role === 'primary' ? 'Get Started' : 'Learn More'
+}
+
+/**
+ * Weave user biz into a hero block. Builds headline from user name + first
+ * product / first words of description, subheadline from user description.
+ * When userBiz is empty, returns null so caller keeps the canned hero.
+ */
+function threadHeroBiz(
+    userBiz: Partial<BusinessSample> | undefined,
+    mood: ThemeMood | undefined,
+    category: string,
+): { headline: string; subheadline: string; ctaPrimary: string; ctaSecondary: string } | null {
+    if (!userBiz) return null
+    const name = (userBiz.name ?? '').trim()
+    const description = (userBiz.description ?? '').trim()
+    const topProduct = userBiz.products?.[0]?.trim() || undefined
+    if (!name && !description && !topProduct) return null
+
+    // Headline: "{name} — {tail}" where tail is a topProduct or the first 5 words of description.
+    const descWords = description.split(/\s+/).filter(Boolean)
+    const tail = topProduct
+        ? capitalizeFirstLetter(topProduct)
+        : descWords.length >= 3
+            ? descWords.slice(0, 5).join(' ')
+            : ''
+    const anchor = name || 'Welcome'
+    const headlineRaw = tail ? `${anchor} — ${tail}` : anchor
+    // Consistency rule C3 — cap hero headline at 10 words.
+    const headline = capWords(headlineRaw, 10)
+
+    // Subheadline: first 140 chars of description on word boundary.
+    const subheadline = description
+        ? truncateOnWord(description, 140)
+        : `Discover ${name || 'our services'} — quality you can count on.`
+
+    return {
+        headline,
+        subheadline,
+        ctaPrimary: resolveLibraryCTA(mood, category, 'primary'),
+        ctaSecondary: resolveLibraryCTA(mood, category, 'secondary'),
+    }
 }
 
 type Block = Record<string, unknown>
@@ -92,7 +184,15 @@ export function buildBlockFromLibrary(
     const bizSeed = ctx.seed ?? 0
     const biz: BusinessSample | undefined =
         pickSeeded(content.businesses, bizSeed) ?? content.businesses[0]
-    const name = ctx.businessName ?? biz?.name ?? 'Our Business'
+    // Plan 07 — user-supplied fields override canned samples.
+    const userBiz = ctx.userBiz
+    const name = userBiz?.name ?? ctx.businessName ?? biz?.name ?? 'Our Business'
+    const userDescription = userBiz?.description?.trim() || undefined
+    const userTagline = userBiz?.tagline?.trim() || undefined
+    const userProducts = (userBiz?.products ?? []).filter((p) => p && p.trim().length > 0)
+    const userPhone = userBiz?.phone?.trim() || undefined
+    const userEmail = userBiz?.email?.trim() || undefined
+    const userAddress = userBiz?.address?.trim() || undefined
 
     // Seed-rotated content pool slices for testimonials / faqs / features so
     // within-category businesses pull different subsets of the library.
@@ -114,27 +214,39 @@ export function buildBlockFromLibrary(
                 ctaButton: { show: true, label: 'Get Started', url: '/contact' },
             }
 
-        case 'hero':
+        case 'hero': {
+            // Plan 07 — prefer user-threaded hero when any user field is present.
+            const userHero = threadHeroBiz(userBiz, ctx.mood, category)
+            const headline = userHero?.headline
+                ?? substituteBusinessName(biz?.heroHeadline ?? `Welcome to ${name}`, name)
+            const subheadline = userHero?.subheadline
+                ?? substituteBusinessName(
+                    biz?.heroSubheadline ?? biz?.description ?? 'Quality service for every customer.',
+                    name,
+                )
+            const primaryLabel = userHero?.ctaPrimary ?? resolveLibraryCTA(ctx.mood, category, 'primary')
+            const secondaryLabel = userHero?.ctaSecondary ?? resolveLibraryCTA(ctx.mood, category, 'secondary')
             return {
                 blockType: 'hero',
                 variant: 'gradient',
-                headline: substituteBusinessName(biz?.heroHeadline ?? `Welcome to ${name}`, name),
-                subheadline: substituteBusinessName(
-                    biz?.heroSubheadline ?? biz?.description ?? 'Quality service for every customer.',
-                    name,
-                ),
+                headline,
+                subheadline,
                 ctaButtons: [
-                    { label: 'Get Started', url: '/contact', style: 'primary' },
-                    { label: 'About Us', url: '/about', style: 'secondary' },
+                    { label: primaryLabel, url: '/contact', style: 'primary' },
+                    { label: secondaryLabel, url: '/about', style: 'secondary' },
                 ],
             }
+        }
 
         case 'about':
             return {
                 blockType: 'about',
                 variant: 'simple',
                 headline: `About ${name}`,
-                body: biz?.description ?? `${name} is dedicated to delivering exceptional experiences to every customer.`,
+                // Plan 07 — prefer user description, fall back to canned pool.
+                body: userDescription
+                    ?? biz?.description
+                    ?? `${name} is dedicated to delivering exceptional experiences to every customer.`,
             }
 
         case 'testimonials':
@@ -158,8 +270,17 @@ export function buildBlockFromLibrary(
                 blockType: 'cta',
                 variant: 'banner',
                 headline: `Ready to experience ${name}?`,
-                subheadline: biz?.tagline ?? 'Get in touch today and let us exceed your expectations.',
-                ctaButton: { label: 'Contact Us', url: '/contact', style: 'primary' },
+                // Plan 07 — user tagline > canned tagline > generic.
+                subheadline:
+                    userTagline
+                    ?? (userDescription ? truncateOnWord(userDescription, 140) : undefined)
+                    ?? biz?.tagline
+                    ?? 'Get in touch today and let us exceed your expectations.',
+                ctaButton: {
+                    label: resolveLibraryCTA(ctx.mood, category, 'primary'),
+                    url: '/contact',
+                    style: 'primary',
+                },
             }
 
         case 'contact':
@@ -168,9 +289,10 @@ export function buildBlockFromLibrary(
                 variant: 'form',
                 headline: 'Get in Touch',
                 subheadline: 'We would love to hear from you. Send us a message.',
-                address: biz?.address ?? '',
-                phone: biz?.phone ?? '',
-                email: biz?.email ?? '',
+                // Plan 07 — user-supplied contact fields win over canned pool.
+                address: userAddress ?? biz?.address ?? '',
+                phone: userPhone ?? biz?.phone ?? '',
+                email: userEmail ?? biz?.email ?? '',
                 formFields: [
                     { fieldName: 'name', label: 'Name', fieldType: 'text', required: true },
                     { fieldName: 'email', label: 'Email', fieldType: 'email', required: true },
@@ -183,7 +305,8 @@ export function buildBlockFromLibrary(
                 blockType: 'footer',
                 variant: 'simple',
                 logoText: name,
-                tagline: biz?.tagline ?? '',
+                // Plan 07 — user tagline/description wins over canned.
+                tagline: userTagline ?? (userDescription ? truncateOnWord(userDescription, 90) : biz?.tagline ?? ''),
                 copyrightText: `© ${new Date().getFullYear()} ${name}. All rights reserved.`,
                 columns: [
                     { title: 'Explore', links: [{ label: 'Home', url: '/' }, { label: 'About', url: '/about' }] },
@@ -207,11 +330,32 @@ export function buildBlockFromLibrary(
                 { icon: '📈', title: 'Proven Track Record', description: 'Trusted by hundreds of satisfied clients.' },
             ]
             const shuffled = seededShuffle(pool, bizSeed ^ hashString('features'))
+
+            // Plan 07 — when the user supplied ≥2 products, replace the first
+            // cards with product-derived titles so same-category businesses
+            // emit different features on the enforcer-padded path.
+            let features = shuffled.slice(0, 4)
+            if (userProducts.length >= 2) {
+                const productCards = userProducts.slice(0, 4).map((product, idx) => {
+                    const base = shuffled[idx] ?? shuffled[0]!
+                    const capitalized = capitalizeFirstLetter(product)
+                    return {
+                        icon: base.icon,
+                        title: `${capitalized}`,
+                        description: `Our signature ${product} — a favourite with every ${name} guest.`,
+                    }
+                })
+                // Pad to 4 cards from the shuffled canned pool when user has < 4 products.
+                const needed = Math.max(0, 4 - productCards.length)
+                features = productCards.concat(shuffled.slice(4, 4 + needed))
+            }
+
             return {
                 blockType: 'features',
                 variant: 'grid-3',
-                headline: 'Why Choose Us',
-                features: shuffled.slice(0, 4),
+                // Plan 07 — headline references biz name so same-category variants diverge.
+                headline: `Why Choose ${name}`,
+                features,
             }
         }
 
@@ -287,7 +431,10 @@ export function buildBlockFromLibrary(
                 blockType: 'newsletter',
                 variant: 'banner',
                 headline: `Stay Updated with ${name}`,
-                subheadline: 'Subscribe for exclusive news and offers.',
+                subheadline:
+                    userTagline
+                    ?? (userDescription ? truncateOnWord(userDescription, 140) : undefined)
+                    ?? 'Subscribe for exclusive news and offers.',
                 buttonLabel: 'Subscribe',
                 placeholder: 'your@email.com',
             }
