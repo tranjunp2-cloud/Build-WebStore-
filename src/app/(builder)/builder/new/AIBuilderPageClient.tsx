@@ -440,11 +440,14 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         const elapsedInterval = setInterval(() => setElapsedSeconds((s) => s + 1), 1000)
         elapsedIntervalRef.current = elapsedInterval
 
-        // 60s warning timeout (v2: increased from 30s — larger prompts take longer)
+        // 60s warning timeout — shows "still working..." hint (non-blocking)
         const warningTimeout = setTimeout(() => setShowTimeoutWarning(true), 60_000)
         warningTimeoutRef.current = warningTimeout
 
-        // 120s hard timeout — auto-abort (v2: increased from 60s for richer extraction prompts)
+        // 300s (5 min) hard timeout — auto-abort.
+        // v3 (2026-04-14): 120s → 300s. site-generation flipped to gpt-4.1-mini
+        // (commit 56adabe0) with p95 ~99s, p99 can exceed 120s. Bumped to 5 min
+        // to absorb long-tail OpenAI latency until phase-03b tuning ships.
         const hardTimeout = setTimeout(() => {
             controller.abort()
             clearGenerationTimers()
@@ -453,7 +456,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             setError({ code: 'timeout', message, retryable: true })
             setStep('info')
             toast.error(message)
-        }, 120_000)
+        }, 300_000)
         hardTimeoutRef.current = hardTimeout
 
         try {
