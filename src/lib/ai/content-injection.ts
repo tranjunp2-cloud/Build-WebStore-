@@ -189,6 +189,8 @@ export function buildBlockFromLibrary(
                 variant: 'grid',
                 headline: 'Meet Our Team',
                 members: [
+                    // Note: Payload schema uses `image` field (not `avatar`) for member photos.
+                    // Media pipeline fills this via BLOCK_IMAGE_SPEC.team.
                     { name: 'Team Lead', role: 'Founder', bio: 'Passionate about delivering great experiences.' },
                     { name: 'Senior Specialist', role: 'Expert', bio: 'Years of experience in the field.' },
                     { name: 'Customer Success', role: 'Support Lead', bio: 'Dedicated to your satisfaction.' },
@@ -326,15 +328,27 @@ export function padItems(
             i++
         }
     } else {
-        // Generic padding: duplicate existing items with modified labels OR inject from library block
+        // Generic padding — inject from library block, dedup by `title` field
+        // (features, service-cards have title). Avoids "Quality Service" appearing twice.
         const libBlock = buildBlockFromLibrary(blockType, category)
         if (libBlock) {
             const field = ITEM_FIELD_BY_BLOCK[blockType]
             if (field && Array.isArray(libBlock[field])) {
                 const libItems = libBlock[field] as unknown[]
+                const existingTitles = new Set(
+                    result
+                        .filter((r): r is Block => typeof r === 'object' && r !== null)
+                        .map((r) => String((r as Block).title ?? (r as Block).name ?? '').toLowerCase())
+                        .filter(Boolean),
+                )
                 for (const item of libItems) {
                     if (result.length >= minCount) break
+                    const itemTitle = String(
+                        (item as Block).title ?? (item as Block).name ?? '',
+                    ).toLowerCase()
+                    if (itemTitle && existingTitles.has(itemTitle)) continue
                     result.push(item)
+                    if (itemTitle) existingTitles.add(itemTitle)
                 }
             }
         }

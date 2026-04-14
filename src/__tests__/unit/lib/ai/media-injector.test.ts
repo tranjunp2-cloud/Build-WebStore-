@@ -16,10 +16,21 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(needs[0]!.count).toBe(1)
         })
 
-        it('skips hero.backgroundImage when already a number (Media ID)', () => {
-            const blocks = [{ blockType: 'hero', backgroundImage: 42 }]
+        it('skips hero when all top-level image fields are already numbers', () => {
+            // Hero now has 2 top-level fields (image + backgroundImage). Both must
+            // be filled with Media IDs to skip the need.
+            const blocks = [{ blockType: 'hero', image: 42, backgroundImage: 43 }]
             const needs = planImageNeeds(blocks)
             expect(needs.length).toBe(0)
+        })
+
+        it('shares ONE Media ID across all hero top-level image fields', () => {
+            const blocks = [{ blockType: 'hero', headline: 'Test' }]
+            const needs = planImageNeeds(blocks)
+            expect(needs.length).toBe(1) // ONE need, not 2
+            needs[0]!.assign([99])
+            expect(blocks[0]!.image).toBe(99)
+            expect(blocks[0]!.backgroundImage).toBe(99)
         })
 
         it('pads gallery array to minCount when below', () => {
@@ -43,7 +54,7 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect((blocks[0]!.images as unknown[]).length).toBe(6)
         })
 
-        it('creates need for team members[].avatar', () => {
+        it('creates need for team members[].image (Payload schema)', () => {
             const blocks = [
                 {
                     blockType: 'team',
@@ -57,6 +68,12 @@ describe('media-injector [plan-260414-unsplash]', () => {
             const needs = planImageNeeds(blocks)
             expect(needs.length).toBe(1)
             expect(needs[0]!.count).toBe(3)
+            // Assign should set image field (not avatar)
+            needs[0]!.assign([10, 20, 30])
+            const members = blocks[0]!.members as Record<string, unknown>[]
+            expect(members[0]!.image).toBe(10)
+            expect(members[1]!.image).toBe(20)
+            expect(members[2]!.image).toBe(30)
         })
 
         it('assign closure mutates block in place', () => {
@@ -116,20 +133,20 @@ describe('media-injector [plan-260414-unsplash]', () => {
             expect(items[0]!.caption).toBe('a') // Other fields untouched
         })
 
-        it('deletes team member avatar if string', () => {
+        it('deletes team member image if string (nested cleanup)', () => {
             const blocks = [
                 {
                     blockType: 'team',
                     members: [
-                        { name: 'Alice', avatar: 'https://x.com/a.jpg' },
-                        { name: 'Bob', avatar: 55 },
+                        { name: 'Alice', image: 'https://x.com/a.jpg' },
+                        { name: 'Bob', image: 55 },
                     ],
                 },
             ]
             cleanupNonNumericImageFields(blocks)
             const members = blocks[0]!.members as Record<string, unknown>[]
-            expect(members[0]!.avatar).toBeUndefined()
-            expect(members[1]!.avatar).toBe(55)
+            expect(members[0]!.image).toBeUndefined()
+            expect(members[1]!.image).toBe(55)
         })
 
         it('handles blocks without image spec gracefully', () => {

@@ -27,17 +27,22 @@ export interface BlockImageSpec {
  * Image-field mapping for each supported block type. Drives planImageNeeds walker.
  * Keys MUST match registered block types in Payload Pages.ts.
  */
+// Field names MUST match Payload Pages.ts block schemas — not Zod block schemas
+// (there's intentional drift where Zod is AI-facing and Payload is DB-facing).
+// See plan 260414-1400-ai-gen-unsplash-pipeline phase-04 route-integration.
 export const BLOCK_IMAGE_SPEC: Record<string, BlockImageSpec> = {
-    hero: { topLevel: ['backgroundImage'] },
+    hero: { topLevel: ['image', 'backgroundImage'] },
     about: { topLevel: ['image'] },
     gallery: {
         nestedArray: [{ arrayField: 'images', itemField: 'image', minCount: 6 }],
     },
     'portfolio-grid': {
-        nestedArray: [{ arrayField: 'items', itemField: 'image', minCount: 6 }],
+        // Pages.ts: projects[].image (NOT items[].image)
+        nestedArray: [{ arrayField: 'projects', itemField: 'image', minCount: 6 }],
     },
     team: {
-        nestedArray: [{ arrayField: 'members', itemField: 'avatar', minCount: 3 }],
+        // Pages.ts: members[].image (NOT members[].avatar — Zod has avatar, drift)
+        nestedArray: [{ arrayField: 'members', itemField: 'image', minCount: 3 }],
     },
     testimonials: {
         nestedArray: [{ arrayField: 'testimonials', itemField: 'avatar' }],
@@ -71,16 +76,19 @@ export function planImageNeeds(blocks: AIBlock[]): ImageNeed[] {
         const spec = BLOCK_IMAGE_SPEC[blockType]
         if (!spec) continue
 
-        // Top-level image fields (hero.backgroundImage, about.image)
-        if (spec.topLevel) {
-            for (const field of spec.topLevel) {
-                // Skip if already a number (Media ID — already filled)
-                if (typeof block[field] === 'number') continue
+        // Top-level image fields — one need per block (shared Media ID across all
+        // top-level fields). Avoids burning 2 API calls for hero.image + hero.backgroundImage.
+        if (spec.topLevel && spec.topLevel.length > 0) {
+            const unfilled = spec.topLevel.filter((f) => typeof block[f] !== 'number')
+            if (unfilled.length > 0) {
                 needs.push({
                     blockType,
                     count: 1,
                     assign: (ids) => {
-                        if (ids[0] != null) block[field] = ids[0]
+                        if (ids[0] == null) return
+                        for (const field of unfilled) {
+                            block[field] = ids[0]
+                        }
                     },
                 })
             }
@@ -137,16 +145,22 @@ export function planImageNeeds(blocks: AIBlock[]): ImageNeed[] {
  * which this step cleans to undefined (Payload upload fields are optional).
  */
 export function cleanupNonNumericImageFields(blocks: AIBlock[]): void {
+    // Also strip common legacy upload fields that exist in any block
+    // (Payload rejects non-numeric values for upload relationship fields).
+    const UNIVERSAL_UPLOAD_FIELDS = ['image', 'backgroundImage', 'logo', 'avatar', 'ogImage']
+
     for (const block of blocks) {
         const blockType = typeof block.blockType === 'string' ? block.blockType : ''
         const spec = BLOCK_IMAGE_SPEC[blockType]
-        if (!spec) continue
 
-        if (spec.topLevel) {
-            for (const field of spec.topLevel) {
-                if (typeof block[field] !== 'number') delete block[field]
+        // Strip universal upload fields at top-level (hero.image, about.image, etc)
+        for (const field of UNIVERSAL_UPLOAD_FIELDS) {
+            if (field in block && typeof block[field] !== 'number' && block[field] != null) {
+                delete block[field]
             }
         }
+
+        if (!spec) continue
 
         if (spec.nestedArray) {
             for (const { arrayField, itemField } of spec.nestedArray) {
