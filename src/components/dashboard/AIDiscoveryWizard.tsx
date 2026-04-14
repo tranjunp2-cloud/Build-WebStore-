@@ -192,6 +192,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
                   alt={stepData.title}
                   fill
                   unoptimized
+                  sizes="(max-width: 640px) 260px, 672px"
                   className={`object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                   onLoad={() => setImageLoaded(true)}
                   onError={() => setImageError(true)}
@@ -298,6 +299,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
               alt={lightboxSrc.title}
               fill
               unoptimized
+              sizes="90vw"
               className="object-contain"
             />
           </div>
