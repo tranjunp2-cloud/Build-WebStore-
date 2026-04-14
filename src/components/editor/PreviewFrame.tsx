@@ -17,7 +17,7 @@ interface PreviewFrameProps {
     isLoading: boolean
     viewport: 'desktop' | 'mobile'
     selectedBlock: number | null
-    onBlockSelect?: (blockIndex: number | null) => void
+    onBlockSelect?: (blockIndex: number | null, blockType?: string) => void
     onInlineEditApplied?: (content: string, blockIndex: number) => void
     onReorderBlocks?: (fromIndex: number, toIndex: number) => void
     onBlockDrop?: (index: number, blockData: { blockType: string, variant: string }) => void
@@ -362,7 +362,7 @@ function PreviewFrameInner({
                         setHoverData(null)
                         setBlockHover(null)
                         clearHoverTimerRef.current = null
-                    }, 120)
+                    }, 250)
                 }
             } else if (e.data?.type === 'PREVIEW_POINTER_DOWN') {
                 if (isEditingRef.current) {
@@ -370,8 +370,9 @@ function PreviewFrameInner({
                 }
             } else if (e.data?.type === 'BLOCK_CONTAINER_CLICKED') {
                 const blockIndex = Number(e.data.blockIndex)
+                const blockType = e.data.layout?.blockType as string | undefined
                 if (!Number.isNaN(blockIndex)) {
-                    onBlockSelect?.(blockIndex)
+                    onBlockSelect?.(blockIndex, blockType)
                     setHoverData(null)
                     setBlockHover(e.data.layout as BlockLayoutRect)
                     setIsEditing(false)
@@ -422,7 +423,7 @@ function PreviewFrameInner({
                         setWysiwygState({})
                     }
                 }, 100)
-            } else if (e.data?.type === 'IMAGE_CLICKED') {
+            } else if (e.data?.type === 'IMAGE_EDITING_STARTED') {
                 setImageClickData({ rect: e.data.rect, src: e.data.src, blockIndex: e.data.blockIndex, blockType: e.data.blockType })
                 setTextEditingData(null)
             } else if (e.data?.type === 'SELECTION_STATE') {
@@ -777,7 +778,7 @@ function PreviewFrameInner({
                 <div
                     className="relative h-full overflow-hidden rounded-[24px] border border-white/10 bg-transparent shadow-2xl transition-all"
                     style={{
-                        width: viewport === 'mobile' ? 390 : '100%',
+                        width: viewport === 'mobile' ? 'min(390px, 100%)' : '100%',
                         maxWidth: viewport === 'mobile' ? 390 : 1280,
                     }}
                 >
@@ -826,7 +827,7 @@ function PreviewFrameInner({
                         <button
                             type="button"
                             title="Drag to reorder section"
-                            className="group/drag absolute inline-flex items-center gap-2 rounded-full border border-white/20 bg-white px-3 py-2 text-slate-700 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)] active:scale-95 cursor-grab active:cursor-grabbing"
+                            className="group/drag absolute inline-flex items-center gap-2 rounded-full border border-white/20 bg-white px-3 py-2 text-slate-700 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all duration-150 hover:shadow-[0_4px_20px_rgba(0,0,0,0.2)] active:scale-95 cursor-grab active:cursor-grabbing animate-in fade-in"
                             style={{
                                 top: overlayOffset.top + activeLayout.top + 10,
                                 left: overlayOffset.left + activeLayout.left - 24,

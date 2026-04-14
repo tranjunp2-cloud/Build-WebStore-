@@ -7,6 +7,26 @@ import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 
+/** Only persist theme fields defined in the Sites collection schema.
+ *  Extra keys (from AI or stale client state) are stripped so Payload
+ *  does not throw a validation error (BUG-F05-025). */
+const ALLOWED_THEME_KEYS = new Set([
+    'primaryColor', 'secondaryColor', 'backgroundColor',
+    'fontHeading', 'fontBody', 'borderRadius', 'colorMode',
+    'accentColor', 'surfaceColor', 'textColor', 'mutedColor',
+    'spacingPreset', 'shadowPreset',
+])
+
+function sanitizeTheme(raw: Record<string, unknown>): Record<string, unknown> {
+    const clean: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(raw)) {
+        if (ALLOWED_THEME_KEYS.has(key) && value !== undefined && value !== null && value !== '') {
+            clean[key] = value
+        }
+    }
+    return clean
+}
+
 /**
  * PATCH /api/sites/[siteId]/save
  * Saves updated blocks (layout) and/or theme for a site.
@@ -60,7 +80,7 @@ export async function PATCH(
             seo: unknown;
         }>;
         const siteUpdateData: SiteUpdateData = {}
-        if (theme) siteUpdateData.theme = theme
+        if (theme) siteUpdateData.theme = sanitizeTheme(theme as Record<string, unknown>)
         if (siteName) siteUpdateData.name = siteName as string
         if (locale) siteUpdateData.locale = locale
         if (shippingConfig) siteUpdateData.shippingConfig = shippingConfig

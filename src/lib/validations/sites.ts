@@ -12,6 +12,15 @@ const sanitizedString = z.string()
     .transform(v => stripHtml(v).trim())
     .nullable().optional()
 
+/** BUG-F05-045: Validate phone format — allows +, digits, spaces, hyphens, parens, dots */
+const phoneString = z.string()
+    .transform(v => stripHtml(v).trim())
+    .pipe(
+        z.string().regex(/^\+?[\d\s\-().]*$/, 'Invalid phone number format')
+            .or(z.literal(''))
+    )
+    .nullable().optional()
+
 /** Validate URL format — only allow https:// or http:// */
 const socialUrlString = z.string()
     .transform(v => stripHtml(v).trim())
@@ -33,7 +42,7 @@ export const saveSiteSchema = z.object({
     siteName: z.string().min(1).max(200).transform(v => stripHtml(v).trim()).optional(),
     locale: z.enum(['en', 'ms']).optional(),
     contactInfo: z.object({
-        phone: sanitizedString,
+        phone: phoneString,
         email: sanitizedString,
         address: sanitizedString,
     }).optional(),

@@ -433,6 +433,30 @@ export async function POST(req: NextRequest) {
             createdPages.push(createdPage)
         }
 
+        // BUG-F05-005: Auto-create 404 page for every new site
+        try {
+            await payload.create({
+                collection: 'pages',
+                data: {
+                    title: '404 Not Found',
+                    slug: '404',
+                    site: site.id,
+                    tenant: resolvedTenantId,
+                    isHomepage: false,
+                    _status: 'published',
+                    layout: [],
+                    seo: {
+                        title: '404 - Page Not Found',
+                        description: 'The page you are looking for does not exist.',
+                        noIndex: true,
+                    },
+                },
+            })
+        } catch (err404) {
+            // Non-fatal: 404 page may already exist (e.g. re-generation)
+            console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
+        }
+
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
 
         // FR-15: Increment AI generation count
