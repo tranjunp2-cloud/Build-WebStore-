@@ -171,8 +171,8 @@ export async function DELETE(
         try {
             revalidateTag(`site-${siteId}`)
             revalidateTag('tenants')
-        } catch {
-            // revalidateTag requires Next.js request context — skip in tests
+        } catch (err) {
+            console.warn('[Unpublish] revalidateTag failed:', err instanceof Error ? err.message : String(err))
         }
 
         return NextResponse.json({

@@ -143,6 +143,46 @@ describe('saveSiteSchema', () => {
         })
         expect(result.success).toBe(true)
     })
+
+    // BUG-F05-045: phone format validation
+    describe('contactInfo.phone validation [BUG-F05-045]', () => {
+        const parse = (phone: string | null) =>
+            saveSiteSchema.safeParse({ contactInfo: { phone } })
+
+        it('accepts valid international phone +60 12-345-6789', () => {
+            expect(parse('+60 12-345-6789').success).toBe(true)
+        })
+
+        it('accepts digits only 0123456789', () => {
+            expect(parse('0123456789').success).toBe(true)
+        })
+
+        it('accepts phone with parens and dots +84 (28) 3823.4567', () => {
+            expect(parse('+84 (28) 3823.4567').success).toBe(true)
+        })
+
+        it('accepts empty string', () => {
+            expect(parse('').success).toBe(true)
+        })
+
+        it('accepts null', () => {
+            expect(parse(null).success).toBe(true)
+        })
+
+        it('rejects alphabetic characters "abc"', () => {
+            expect(parse('abc').success).toBe(false)
+        })
+
+        it('rejects mixed alphanumeric "12-34 abc"', () => {
+            expect(parse('12-34 abc').success).toBe(false)
+        })
+
+        it('strips HTML tags from phone input', () => {
+            const result = parse('<script>alert(1)</script>')
+            // After stripping HTML → "alert(1)" which contains letters → rejected
+            expect(result.success).toBe(false)
+        })
+    })
 })
 
 describe('generateDescriptionSchema', () => {
