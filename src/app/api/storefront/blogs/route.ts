@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
+import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
 
 /**
@@ -23,17 +23,37 @@ export async function GET(req: Request) {
 
         const payload = await getPayload({ config })
 
-        const where: Record<string, any> = {
-            tenant: { equals: tenantId },
-            status: { equals: 'published' },
-        }
+        const conditions: Where[] = [
+            { tenant: { equals: tenantId } },
+            { status: { equals: 'published' } },
+        ]
 
         if (category) {
-            where['category.slug'] = { equals: category }
+            // Payload does not support dot-notation on relationship fields.
+            // Two-step lookup: find the category doc by slug, then filter blogs by category ID.
+            const catResult = await payload.find({
+                collection: 'blog_categories',
+                where: {
+                    and: [
+                        { slug: { equals: category } },
+                        { tenant: { equals: tenantId } },
+                    ],
+                },
+                limit: 1,
+                overrideAccess: true,
+            })
+            const catId = catResult.docs[0]?.id
+            if (catId) {
+                conditions.push({ category: { equals: catId } })
+            } else {
+                // Category slug not found — return empty (no match)
+                return NextResponse.json({ docs: [], totalDocs: 0, page: 1, totalPages: 0 })
+            }
         }
         if (search) {
-            where.title = { contains: search }
+            conditions.push({ title: { contains: search } })
         }
+        const where: Where = { and: conditions }
 
         const result = await payload.find({
             collection: 'blogs',

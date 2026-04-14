@@ -18,14 +18,16 @@ import {
     Indent,
     Undo,
     FileRepository,
+    Code,
     type UploadAdapter,
     type FileLoader,
     type Editor,
     Plugin,
 } from 'ckeditor5'
 import 'ckeditor5/ckeditor5.css'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
+import { useI18n } from '@/i18n'
 
 // Custom Upload Adapter — uses server action to upload to Payload CMS
 class PayloadUploadAdapter implements UploadAdapter {
@@ -97,13 +99,34 @@ interface BlogRichEditorProps {
     placeholder?: string
 }
 
-export function BlogRichEditor({ content, onChange, placeholder = 'Start writing...' }: BlogRichEditorProps) {
+export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEditorProps) {
+    const { t } = useI18n()
+    const resolvedPlaceholder = placeholder ?? t.dashboard.blog.editor.startWriting
     const [charCount, setCharCount] = useState(0)
     const [editorInstance, setEditorInstance] = useState<Editor | null>(null)
     const [selectedText, setSelectedText] = useState('')
     const [showImproveMenu, setShowImproveMenu] = useState(false)
     const [improveMenuPos, setImproveMenuPos] = useState({ top: 0, left: 0 })
     const [isRewriting, setIsRewriting] = useState(false)
+
+    // Sync placeholder text when locale changes (CKEditor config only applies on mount)
+    useEffect(() => {
+        if (!editorInstance) return
+        const root = editorInstance.editing.view.document.getRoot()
+        if (root) {
+            editorInstance.editing.view.change(writer => {
+                writer.setAttribute('data-placeholder', resolvedPlaceholder, root)
+            })
+        }
+    }, [editorInstance, resolvedPlaceholder])
+
+    // Sync character count to the custom DOM element injected in toolbar
+    useEffect(() => {
+        const charCountDiv = document.getElementById('ck-char-count')
+        if (charCountDiv) {
+            charCountDiv.textContent = `${charCount} ${t.dashboard.blog.editor.characters}`
+        }
+    }, [charCount, t.dashboard.blog.editor.characters])
 
     const handleImproveText = async (instruction: string) => {
         if (!editorInstance || !selectedText.trim()) return
@@ -198,22 +221,20 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                         Heading,
                         Indent,
                         Undo,
+                        Code,
                         PayloadUploadAdapterPlugin,
                     ],
                     toolbar: {
                         items: [
                             'bold', 'italic', 'underline',
                             '|',
-                            'link', 'insertImage',
-                            '|',
                             'bulletedList', 'numberedList',
                             '|',
-                            'blockQuote',
-                            '|',
-                            'undo', 'redo',
+                            'link', 'blockQuote',
+                            'code'
                         ],
                     },
-                    placeholder,
+                    placeholder: resolvedPlaceholder,
                     link: {
                         addTargetToExternalLinks: true,
                         defaultProtocol: 'https://',
@@ -239,6 +260,36 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                     const div = document.createElement('div')
                     div.innerHTML = html
                     setCharCount(div.textContent?.length || 0)
+
+                    // DOM manipulation to match Figma toolbar
+                    const toolbar = editor.ui.view.toolbar.element
+                    if (toolbar) {
+                        const itemsContainer = toolbar.querySelector('.ck-toolbar__items') as HTMLElement
+                        if (itemsContainer) {
+                            itemsContainer.style.flexWrap = 'wrap'
+                            
+                            // Add a flex-grow spacer to push character count to the right
+                            const spacerDiv = document.createElement('div')
+                            spacerDiv.style.flexGrow = '1'
+                            itemsContainer.appendChild(spacerDiv)
+
+                            // Inject character count to the right side (inline styles — Tailwind classes unreliable on DOM-created elements)
+                            const charCountDiv = document.createElement('div')
+                            charCountDiv.id = 'ck-char-count'
+                            Object.assign(charCountDiv.style, {
+                                fontFamily: "'Inter', sans-serif",
+                                fontWeight: '400',
+                                fontSize: '12px',
+                                lineHeight: '1.333',
+                                color: 'rgba(248, 250, 252, 0.5)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                paddingRight: '8px',
+                            })
+                            charCountDiv.textContent = `${div.textContent?.length || 0} ${t.dashboard.blog.editor.characters}`
+                            itemsContainer.appendChild(charCountDiv)
+                        }
+                    }
 
                     // Listen for selection changes to show "Improve Text" menu
                     editor.editing.view.document.on('selectionChange', () => {
@@ -276,11 +327,6 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                     })
                 }}
             />
-            <div className="flex items-center justify-end px-[16px] py-[8px] border-t border-[rgba(255,255,255,0.08)]">
-                <span className="font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] text-[rgba(248,250,252,0.5)]">
-                    {charCount} characters
-                </span>
-            </div>
 
             {/* Complete dark theme CSS overrides */}
             <style jsx global>{`
@@ -291,41 +337,34 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                 .blog-ckeditor-wrapper .ck.ck-editor {
                     width: 100%;
                     border: none !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__top,
                 .blog-ckeditor-wrapper .ck.ck-editor__top .ck-sticky-panel,
                 .blog-ckeditor-wrapper .ck.ck-editor__top .ck-sticky-panel__content {
                     border: none !important;
                     box-shadow: none !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
                 }
-                .blog-ckeditor-wrapper .ck.ck-editor__top {
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+                .blog-ckeditor-wrapper .ck.ck-editor__top .ck-sticky-panel__placeholder {
+                    display: none !important;
+                    height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
                 }
-
-                /* ===== TOOLBAR ===== */
-                .blog-ckeditor-wrapper .ck.ck-toolbar {
-                    background: rgba(11, 17, 32, 0.5) !important;
-                    border: none !important;
+                /* ===== DISABLE STICKY TOOLBAR TO FIX GAP AND OVERLAP ISSUES ===== */
+                .blog-ckeditor-wrapper .ck.ck-sticky-panel .ck-sticky-panel__content_sticky {
+                    position: static !important;
+                    top: auto !important;
+                    width: auto !important;
                     box-shadow: none !important;
-                    padding: 8px 12px !important;
-                    border-radius: 0 !important;
-                    flex-wrap: wrap !important;
                 }
-
-                /* ===== AC-1: STICKY TOOLBAR ON MOBILE ===== */
+                
                 @media (max-width: 1279px) {
-                    .blog-ckeditor-wrapper .ck.ck-editor__top {
-                        position: sticky !important;
-                        bottom: 0 !important;
-                        z-index: 50 !important;
-                        order: 2 !important;
-                        border-bottom: none !important;
-                        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-                        background: rgba(11, 17, 32, 0.95) !important;
-                        backdrop-filter: blur(8px) !important;
-                    }
                     .blog-ckeditor-wrapper .ck.ck-editor__main {
-                        order: 1 !important;
+                        order: 2 !important;
                     }
                     .blog-ckeditor-wrapper .ck.ck-editor {
                         display: flex !important;
@@ -335,13 +374,38 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                         min-height: 300px !important;
                     }
                     .blog-ckeditor-wrapper .ck.ck-toolbar {
-                        padding: 6px 8px !important;
+                        padding: 0 8px 8px 8px !important;
                     }
                     .blog-ckeditor-wrapper .ck.ck-button {
                         min-width: 44px !important;
                         min-height: 44px !important;
                         padding: 8px !important;
                     }
+                }
+                .blog-ckeditor-wrapper .ck.ck-editor__top {
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+                }
+
+                /* ===== TOOLBAR ===== */
+                .blog-ckeditor-wrapper .ck.ck-toolbar {
+                    background: rgba(11, 17, 32, 0.5) !important;
+                    border: none !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    min-height: unset !important;
+                }
+                .blog-ckeditor-wrapper .ck.ck-toolbar__items {
+                    padding: 12px !important;
+                    margin: 0 !important;
+                    gap: 8px !important;
+                    align-items: center !important;
+                    align-content: flex-start !important;
+                }
+                .blog-ckeditor-wrapper .ck.ck-toolbar__separator {
+                    background: rgba(255, 255, 255, 0.08) !important;
+                    width: 1px !important;
+                    height: 24px !important;
+                    margin: 0 8px !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-toolbar .ck-toolbar__separator {
                     background: rgba(255, 255, 255, 0.08) !important;
@@ -357,8 +421,14 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                     color: rgba(248, 250, 252, 0.6) !important;
                     background: transparent !important;
                     border: none !important;
-                    border-radius: 8px !important;
+                    border-radius: 12px !important;
                     cursor: pointer !important;
+                    margin: 0 !important;
+                    width: 32px !important;
+                    height: 32px !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-button:hover,
                 .blog-ckeditor-wrapper .ck.ck-button.ck-off:hover {
@@ -369,7 +439,7 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                     background: rgba(59, 130, 246, 0.15) !important;
                     color: #3B82F6 !important;
                     border: none !important;
-                    border-radius: 8px !important;
+                    border-radius: 12px !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-button .ck-icon {
                     color: inherit !important;
@@ -411,6 +481,10 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                 .blog-ckeditor-wrapper .ck.ck-editor__editable a {
                     color: #2DD4BF !important;
                     text-decoration: underline !important;
+                }
+                .blog-ckeditor-wrapper .ck.ck-editor__editable .ck-link_selected {
+                    color: #2DD4BF !important;
+                    background: rgba(45, 212, 191, 0.15) !important;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable blockquote {
                     border-left: 3px solid #3B82F6 !important;
@@ -808,6 +882,9 @@ export function BlogRichEditor({ content, onChange, placeholder = 'Start writing
                 }
 
                 /* ===== CK BODY WRAPPER (global panel container) ===== */
+                .ck-body-wrapper {
+                    z-index: 35 !important;
+                }
                 .ck-body-wrapper .ck.ck-balloon-panel,
                 .ck-body-wrapper .ck.ck-balloon-panel_visible {
                     background: #1E293B !important;

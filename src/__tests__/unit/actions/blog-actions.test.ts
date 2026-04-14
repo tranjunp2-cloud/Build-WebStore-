@@ -68,7 +68,12 @@ describe('getBlogCategoriesAction [TC-F17.01]', () => {
         expect(mockFind).toHaveBeenCalledWith(
             expect.objectContaining({
                 collection: 'blog_categories',
-                where: { tenant: { equals: 'tenant-1' } },
+                where: {
+                    and: [
+                        { status: { not_equals: 'deleted' } },
+                        { tenant: { equals: 'tenant-1' } },
+                    ],
+                },
             }),
         )
         expect(result).toEqual([{ id: 'cat-1', name: 'Tech' }])
@@ -215,7 +220,9 @@ describe('listBlogsAction [TC-F17.05]', () => {
             expect.objectContaining({
                 collection: 'blogs',
                 where: expect.objectContaining({
-                    tenant: { equals: 'tenant-1' },
+                    and: expect.arrayContaining([
+                        { tenant: { equals: 'tenant-1' } },
+                    ]),
                 }),
             }),
         )
