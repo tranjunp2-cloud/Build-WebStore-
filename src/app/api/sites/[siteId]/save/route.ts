@@ -7,6 +7,7 @@ import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 
+
 /** Only persist theme fields defined in the Sites collection schema.
  *  Extra keys (from AI or stale client state) are stripped so Payload
  *  does not throw a validation error (BUG-F05-025). */
@@ -65,6 +66,21 @@ export async function PATCH(
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
         const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
+        // Navigation: allow draft links (empty/#) but reject malformed external URLs
+        if (headerBlock && typeof headerBlock === 'object') {
+            const hb = headerBlock as Record<string, unknown>
+            if (Array.isArray(hb.links)) {
+                for (const link of hb.links) {
+                    const l = link as Record<string, unknown>
+                    const url = typeof l.url === 'string' ? l.url.trim() : ''
+                    if (!url || url === '#') continue
+                    if (url.startsWith('/') && !url.startsWith('//')) continue
+                    if (url.startsWith('//')) return NextResponse.json({ error: `Invalid URL: protocol-relative URLs not allowed` }, { status: 400 })
+                    try { const u = new URL(url); if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error() }
+                    catch { return NextResponse.json({ error: `Invalid URL: "${url}"` }, { status: 400 }) }
+                }
+            }
+        }
         const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
 
         type SiteUpdateData = Partial<{

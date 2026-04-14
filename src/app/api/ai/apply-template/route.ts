@@ -14,6 +14,10 @@ import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
  * Body: { templateId: string }
  */
 export const POST = withAuth(async (user, req) => {
+    let _siteId: string | number | null = null
+    let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
+    let _createdPagesCount = 0
+
     try {
         // Rate Limit: 20 template applications per hour
         const rateLimit = await checkRateLimit(String(user.id), 20)
@@ -25,6 +29,7 @@ export const POST = withAuth(async (user, req) => {
         }
 
         const payload = await getPayload({ config })
+        _payload = payload
 
         const { data, errorResponse } = await parseRequest(req, applyTemplateSchema)
         if (errorResponse) return errorResponse
@@ -271,6 +276,15 @@ export const POST = withAuth(async (user, req) => {
             const pagesToCreate = rawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
             injectNavLinks(pagesToCreate)
 
+            _siteId = Number(siteId)
+
+            // Mark as generating before destructive operations
+            await payload.update({
+                collection: 'sites',
+                id: Number(siteId),
+                data: { generationStatus: 'generating' },
+            })
+
             // Delete old pages → update theme → create new pages (sequential)
             // 1. Delete all existing pages for this site
             const existingPages = await payload.find({
@@ -303,9 +317,17 @@ export const POST = withAuth(async (user, req) => {
                         layout: page.layout,
                     },
                 })
+                _createdPagesCount++
             }
 
-            // 4. Increment template usage count
+            // 4. Mark generation completed
+            await payload.update({
+                collection: 'sites',
+                id: Number(siteId),
+                data: { generationStatus: 'completed' },
+            })
+
+            // 5. Increment template usage count
             await payload.update({
                 collection: 'templates',
                 id: templateId,
@@ -336,6 +358,7 @@ export const POST = withAuth(async (user, req) => {
                 name: String(template.name || 'Untitled'),
                 tenant: tenantId,
                 status: 'draft',
+                generationStatus: 'generating',
                 siteType: (() => {
                     const VALID_SITE_TYPES = new Set(['business', 'ecommerce', 'restaurant', 'tech', 'health', 'education', 'realestate', 'fitness', 'creative', 'beauty', 'blog'])
                     const raw = Array.isArray(template.category) ? String(template.category[0]) : String(template.category || 'business')
@@ -344,6 +367,7 @@ export const POST = withAuth(async (user, req) => {
                 theme: templateTheme,
             },
         })
+        _siteId = site.id as string | number
 
         // Create all template pages
         for (const [idx, page] of pagesToCreate.entries()) {
@@ -359,6 +383,7 @@ export const POST = withAuth(async (user, req) => {
                     layout: page.layout,
                 },
             })
+            _createdPagesCount++
         }
 
         // 404 Page (always created)
@@ -379,6 +404,14 @@ export const POST = withAuth(async (user, req) => {
                 },
             },
         })
+        _createdPagesCount++
+
+        // Mark generation completed
+        await payload.update({
+            collection: 'sites',
+            id: site.id as string | number,
+            data: { generationStatus: 'completed' },
+        })
 
         // Increment template usage count
         await payload.update({
@@ -396,6 +429,16 @@ export const POST = withAuth(async (user, req) => {
         })
 
     } catch (error: unknown) {
+        // Smart status: partial success (≥1 page created) = completed, 0 pages = failed
+        if (_siteId && _payload) {
+            const status = _createdPagesCount > 0 ? 'completed' : 'failed'
+            await _payload.update({
+                collection: 'sites',
+                id: _siteId,
+                data: { generationStatus: status },
+            }).catch((_e: unknown) => console.error('[Apply Template] Failed to update generation status:', _e))
+        }
+
         const errMessage = error instanceof Error ? error.message : 'Unknown error'
         console.error('[Apply Template Error]', errMessage, error)
         return NextResponse.json(

@@ -119,6 +119,36 @@ describe('Sites APIs', () => {
                 })
             }))
         })
+
+        it('allows saving header navigation with empty destination (draft link)', async () => {
+            const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    headerBlock: {
+                        blockType: 'navigation',
+                        links: [{ label: 'About', url: '' }],
+                    },
+                })
+            })
+
+            const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
+            expect(res.status).toBe(200)
+        })
+
+        it('returns 400 when header navigation contains a protocol-relative URL', async () => {
+            const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    headerBlock: {
+                        blockType: 'navigation',
+                        links: [{ label: 'Evil', url: '//evil.com', type: 'external' }],
+                    },
+                })
+            })
+
+            const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
+            expect(res.status).toBe(400)
+        })
     })
 
     describe('PATCH & DELETE /api/sites/[siteId]/publish', () => {

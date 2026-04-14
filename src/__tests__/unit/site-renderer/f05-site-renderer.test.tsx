@@ -116,6 +116,76 @@ describe('[TC-F04-SR-01] SiteRenderer renders blocks from page.layout using bloc
         expect(screen.getByTestId('block-hero')).toBeInTheDocument()
         expect(screen.getByTestId('block-footer')).toBeInTheDocument()
     })
+
+    it('prefers site.headerBlock over navigation block in page.layout', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'block-navigation' })
+        }
+
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlock : null
+        )
+
+        render(
+            <SiteRenderer
+                site={{
+                    ...defaultSite,
+                    headerBlock: {
+                        blockType: 'navigation',
+                        links: [
+                            {
+                                label: 'Services',
+                                url: '/services',
+                                children: [{ label: 'Consulting', url: '/services/consulting' }],
+                            },
+                        ],
+                    },
+                }}
+                page={{
+                    layout: [
+                        { blockType: 'navigation', links: [{ label: 'Old Menu', url: '/old' }] },
+                    ],
+                }}
+            />
+        )
+
+        expect(capturedBlocks[0].links).toEqual([
+            {
+                label: 'Services',
+                url: '/services',
+                children: [{ label: 'Consulting', url: '/services/consulting' }],
+            },
+        ])
+    })
+
+    it('injects site.headerBlock when page.layout does not contain navigation', () => {
+        const NavBlock = makeTestBlock('navigation')
+        const HeroBlock = makeTestBlock('hero')
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'navigation') return NavBlock
+            if (type === 'hero') return HeroBlock
+            return null
+        })
+
+        render(
+            <SiteRenderer
+                site={{
+                    ...defaultSite,
+                    headerBlock: {
+                        blockType: 'navigation',
+                        links: [{ label: 'Services', url: '/services' }],
+                    },
+                }}
+                page={{ layout: [{ blockType: 'hero' }] }}
+            />
+        )
+
+        expect(mockGetComponent).toHaveBeenNthCalledWith(1, 'navigation')
+        expect(mockGetComponent).toHaveBeenNthCalledWith(2, 'hero')
+        expect(screen.getByTestId('block-navigation')).toBeInTheDocument()
+    })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════

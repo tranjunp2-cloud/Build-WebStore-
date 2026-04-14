@@ -95,7 +95,7 @@ export default function EditorPage() {
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
-    const [settingsRequestedTab, setSettingsRequestedTab] = useState<SettingsTab | null>(null)
+    const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number } | null>(null)
 
     const blocks = useEditorStore(state => state.blocks)
     const theme = useEditorStore(state => state.theme)
@@ -281,7 +281,14 @@ export default function EditorPage() {
             })
 
             if (!res.ok) {
-                throw new Error(`Server returned ${res.status}`)
+                const payload = await res.json().catch(() => null)
+                const message = typeof payload?.error === 'string'
+                    ? payload.error
+                    : payload?.error?.details?.formErrors?.[0]
+                        || payload?.error?.details?.fieldErrors?.headerBlock?.[0]
+                        || payload?.error?.details?.fieldErrors?.blocks?.[0]
+                        || `Server returned ${res.status}`
+                throw new Error(message)
             }
 
             markSaved()
@@ -752,12 +759,11 @@ export default function EditorPage() {
     // BUG-F05-032/046: context-sensitive tab switching when blocks are clicked
     const handleBlockSelectWithContext = useCallback((blockIndex: number | null, blockType?: string) => {
         if (blockType === 'navigation' || blockType === 'footer') {
-            // Header/footer clicked → deselect block, show menu tab in SettingsPanel
             setSelectedBlock(null)
-            setSettingsRequestedTab('menu')
+            // Use unique key to force re-trigger even on repeated clicks
+            setSettingsRequestedTab({ tab: 'menu', key: Date.now() })
         } else {
             setSelectedBlock(blockIndex)
-            // Clear any previous requested tab override so SettingsPanel's own logic takes over
             setSettingsRequestedTab(null)
         }
     }, [])
@@ -985,6 +991,7 @@ export default function EditorPage() {
                         onFooterUpdate={(changes) => updateFooterBlock(changes)}
                         onSiteSettingsChange={handleSiteSettingsChange}
                         onPageUpdate={handlePageUpdate}
+                        requestedTab={settingsRequestedTab}
                     />
                 </div>
             )}

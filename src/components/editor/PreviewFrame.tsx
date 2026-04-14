@@ -776,7 +776,7 @@ function PreviewFrameInner({
                 className="flex h-full items-start justify-center overflow-auto rounded-[28px] border border-white/10 bg-[#0F172A] p-4"
             >
                 <div
-                    className="relative h-full overflow-hidden rounded-[24px] border border-white/10 bg-transparent shadow-2xl transition-all"
+                    className="relative h-full overflow-hidden border border-white/10 bg-transparent shadow-2xl transition-all"
                     style={{
                         width: viewport === 'mobile' ? 'min(390px, 100%)' : '100%',
                         maxWidth: viewport === 'mobile' ? 390 : 1280,
