@@ -1,10 +1,11 @@
 ---
 title: "AI Gen Variety Root-Cause Fix (tactical)"
 description: "Fix 7/13 root causes making AI-gen sites collapse to same variant/preset/content. Designed to ship in parallel with sibling plan 260414-2249 Wix-parity."
-status: pending
+status: code-complete
 priority: P1
 effort: 8h (4 phases)
-branch: feat/F01-ai-gen-variety-fix
+branch: feat/F01-ai-gen-variety-tactical
+pr: '#603'
 tags: [ai-gen, variety, templates, f01, root-cause, parallel]
 created: 2026-04-14
 ---
@@ -55,10 +56,12 @@ Plan này ship **song song** với `plans/260414-2249-ai-gen-wix-level-optimize/
 
 | # | Phase | Effort | Status | Fixes |
 |---|-------|--------|--------|-------|
-| [01](./phase-01-variant-pool-randomization.md) | Variant pool randomization | 2h | pending | R2, R9, R10 |
-| [02](./phase-02-theme-preset-expansion.md) | Theme preset + font pair expansion | 2h | pending | R3, R6 |
-| [03](./phase-03-content-library-rotation.md) | Content library rotation + gap-fill seed | 2h | pending | R4, R5 |
-| [04](./phase-04-variety-measurement.md) | E2E variety measurement harness | 1.5h | pending | — (verification) |
+| [01](./phase-01-variant-pool-randomization.md) | Variant pool randomization | 2h | ✅ shipped (`269d1248`) | R2, R9 (R10 deferred per non-goals) |
+| [02](./phase-02-theme-preset-expansion.md) | Theme preset + font pair expansion | 2h | ✅ shipped (`b20dd88d`) | R3, R6 |
+| [03](./phase-03-content-library-rotation.md) | Content library rotation + gap-fill seed | 2h | ✅ shipped (`339e96f2`) | R4, R5 |
+| [04](./phase-04-variety-measurement.md) | E2E variety measurement harness | 1.5h | ✅ shipped (`980d3906`) | — (verification) |
+
+All 4 phases shipped in PR #603. 533/533 AI unit tests pass (+78 new). Baseline + post-fix measurement in progress.
 
 **Execution order**: Phase 04 baseline → 01 → 02 → 03 → Phase 04 re-run (measure delta). Phases 01/02/03 độc lập với nhau — có thể ship random order.
 

@@ -32,7 +32,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const BASE = process.env.MEASURE_BASE ?? `http://localhost:${process.env.PORT ?? 3000}`
-const BEARER = process.env.E2E_TEST_BEARER ?? 'local-test-secret-12345'
+const BEARER = process.env.E2E_SETUP_SECRET ?? ''
 const REPORT_DIR = 'plans/260414-2253-ai-gen-variety-root-cause/reports'
 const FIXTURES_PATH = 'scripts/fixtures/variety-business-names.json'
 const DEFAULT_RUNS_PER_CAT = 20
@@ -353,10 +353,14 @@ async function main() {
     console.log(`  ${mdPath}`)
 }
 
-// Only run main when invoked as a script (not on import from tests).
+// Only run main when invoked as a script (not on import from tests or the
+// sibling offline runner). Match the exact basename, not substrings.
 const isDirectRun =
     typeof process !== 'undefined' &&
-    process.argv[1]?.includes('measure-variety')
+    (() => {
+        const arg = process.argv[1] ?? ''
+        return arg.endsWith('/measure-variety.ts') || arg.endsWith('/measure-variety.js')
+    })()
 if (isDirectRun) {
     main().catch((e) => die(String(e)))
 }

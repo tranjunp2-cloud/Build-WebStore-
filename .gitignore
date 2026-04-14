@@ -66,3 +66,4 @@ coverage/
 
 ## Test harness output (Phase F01V test coverage)
 .harness-out/
+.env*.local

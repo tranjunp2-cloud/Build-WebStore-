@@ -14,7 +14,7 @@
 import { getCategoryContent } from './content'
 import type { BusinessSample, TestimonialSample, FAQSample } from './content'
 import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
-import { hashString } from './seeded-random'
+import { hashString, seededShuffle } from './seeded-random'
 
 export interface InjectionContext {
     businessName?: string
@@ -36,16 +36,21 @@ function pickSeeded<T>(arr: readonly T[], seed: number): T | undefined {
 }
 
 /**
- * Slice a pool of items starting from a seed-derived offset so that different
- * businesses in the same category pull different subsets.
+ * Shuffle a pool of items by seed so different businesses in the same category
+ * pull different subsets / orderings.
  *
- * Plan 2253 Phase 03 — fixes R5 (padItems reuse) by rotating the pool start
- * index instead of always iterating from 0.
+ * Plan 2253 Phase 03 — fixes R5 (padItems reuse). Originally used modulo
+ * rotation which re-introduced the R3 clustering bug (common business names
+ * collide on `seed % pool.length`). Now uses Fisher-Yates seeded shuffle via
+ * `seededShuffle` — same helper Phase 02 uses for theme preset distribution.
+ *
+ * Plan 2253 Phase 03 amendment (2026-04-15) after variety-delta measurement
+ * showed testimonial collision regressed on 4/5 categories due to the modulo
+ * variant of this helper.
  */
 function rotateSlice<T>(pool: readonly T[], seed: number): T[] {
     if (pool.length === 0) return []
-    const offset = Math.abs(Math.floor(seed)) % pool.length
-    return [...pool.slice(offset), ...pool.slice(0, offset)]
+    return seededShuffle(pool, seed)
 }
 
 /** Normalized testimonial for Zod schema shape. */
