@@ -1216,7 +1216,60 @@ Kill sub-page stubs. Every site ships ≥5 pages: Home / About / Contact / Blog 
 - Empty input regression: canned fills gaps, blog still has ≥3 seeds.
 - 14 categories × ≥3 seeds = ≥42 total (currently 56).
 
-### Test Summary (cumulative Phase 01 + 02 + 03 + 04 + 05)
+---
+
+## 15. Phase 06 — SEO + Consistency Guard
+
+**Problem**: Fallback path writes the SAME truncated site tagline as the meta description for every page (home/about/contact/blog share identical `seo.description`). Google flags these as duplicate meta descriptions. No page carries JSON-LD structured data → zero rich-results eligibility. No post-gen quality checks → silent quality drift.
+
+**Fix**: Three bundled additions —
+
+1. **Per-page SEO generator** (`src/lib/ai/seo-generator.ts`): mines unique title + description + og:image from each page's first text/image block. Home title `{biz.name} · {tagline}`, sub-pages `{page.title} · {biz.name}`. Defensive dedupe step forces uniqueness.
+2. **JSON-LD templates** (`src/lib/ai/json-ld-templates.ts`): category → schema.org `@type` mapping (`restaurant`→`Restaurant`, `health`→`MedicalClinic`, `education`→`EducationalOrganization`, `ecommerce`→`Store`, `beauty`→`BeautySalon`). LocalBusiness schema embeds user phone/email/address verbatim. FAQPage schema attached only to pages with an FAQ block.
+3. **Consistency validator** (`src/lib/ai/consistency-validator.ts`): warn-only post-gen check. Rules C1 palette, C2 image mood, C3 headline length (>10 words), C4 CTA rhythm (<3 CTAs/page), C5 recipe adherence (nav/hero/footer on homepage). Logged via `console.warn`; never blocks save.
+
+### Test Cases (TC-F01-W.27 .. W.42)
+
+| TC | Scenario | Expected |
+|---|---|---|
+| W.27 | Home + About + Contact gen from ramen fixture | 3 distinct meta descriptions |
+| W.28 | Homepage SEO title format | `{biz.name} · {tagline}`, truncated ≤ 60 chars |
+| W.28b | Sub-page SEO title format | `{page.title} · {biz.name}` |
+| W.29 | Title + description length caps | ≤ 60 chars title, ≤ 155 chars description |
+| W.30 | LocalBusiness JSON-LD contact fields | phone/email/address from user input |
+| W.31 | Category → schema @type | restaurant→Restaurant, health→MedicalClinic, etc. |
+| W.31b | Restaurant `servesCuisine` | populated from `biz.products[]` |
+| W.32 | FAQPage schema | attached only to pages with `faq` block |
+| W.33 | ogImage fallback | page image → site hero fallback |
+| W.34 | Duplicate description dedupe | appends page title to disambiguate |
+| W.35 | Fallback-adapter integration | every page has unique desc + jsonLd[] |
+| W.36 | C1 palette missing color | warning emitted |
+| W.37 | C2 homepage w/o image | warning emitted |
+| W.37b | C2 mixed http/local sources | warning emitted |
+| W.38 | C3 headline > 10 words | warning emitted |
+| W.39 | C4 page < 3 CTAs | warning emitted |
+| W.40 | C5 homepage missing nav/footer | warning emitted |
+| W.41 | Clean site | `passed=true`, zero warnings |
+| W.42 | Degenerate single-page shape | runConsistencyCheck does not throw |
+
+### Files touched
+
+- `src/lib/ai/seo-generator.ts` — **NEW** 200 lines: `generatePageSeo`, `generateAllPageSeo`, `minePageText`, `minePageImage`, `truncateOnWord`, dedupe
+- `src/lib/ai/json-ld-templates.ts` — **NEW** 193 lines: `LocalBusinessSchema` / `FaqPageSchema` types, `schemaTypeFor`, `parseAddress`, `defaultPriceRange`, `buildLocalBusinessJsonLd`, `buildFaqJsonLd`
+- `src/lib/ai/consistency-validator.ts` — **NEW** 220 lines: `runConsistencyCheck`, `logConsistencyReport`, rules C1-C5
+- `src/lib/ai/fallback-adapter.ts` — uses `generateAllPageSeo` per-page in `adaptTemplateSeedToGenerationResult`; runs consistency check in `composeFallbackResult`
+- `src/lib/ai/openai-generator.ts` — overrides AI-returned per-page SEO with deterministic `generateAllPageSeo`; runs consistency check before `done` event
+- `src/lib/ai/generate-blocks.ts` — `GeneratedPage['seo']` gains optional `ogImage` + `jsonLd`
+
+### Acceptance Criteria
+
+- Fallback gen: every page in `result.pages[].seo.description` is unique (no more shared tagline).
+- Every page ships `seo.jsonLd[]` with at least a `LocalBusiness`-family schema; FAQ blocks attach an additional `FAQPage` schema.
+- Consistency validator runs on both fallback + AI paths, logs warnings via `console.warn`, never blocks save.
+- Title ≤ 60 chars, description ≤ 155 chars — enforced by `truncateOnWord`.
+- `buildLocalBusinessJsonLd` embeds user phone/email/address verbatim when supplied.
+
+### Test Summary (cumulative Phase 01 + 02 + 03 + 04 + 05 + 06)
 
 | Suite | Count | Status |
 |---|---|---|
@@ -1225,5 +1278,6 @@ Kill sub-page stubs. Every site ships ≥5 pages: Home / About / Contact / Blog 
 | Phase 03 tests | 23 (image-pool) + 14 (media-injector regression) | ✅ |
 | Phase 04 tests | 407 + 22 = 429 | ✅ |
 | Phase 05 tests | 50 (blog seeds + multipage) | ✅ |
+| Phase 06 tests | 39 (seo-generator + consistency-validator) | ✅ |
 | Legacy regression | 22 | ✅ |
-| **Total** | **840+** | ✅ |
+| **Total** | **880+** | ✅ |
