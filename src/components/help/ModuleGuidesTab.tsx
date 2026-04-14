@@ -46,11 +46,15 @@ export function ModuleGuidesTab() {
   const { t } = useI18n()
 
   const raw = t.help.modules.data as unknown as Partial<HelpModulesData> | undefined
+  const safeModule = (m?: Partial<LocaleModule>): LocaleModule => ({
+    label: m?.label ?? '',
+    steps: m?.steps ?? [],
+  })
   const d: HelpModulesData = {
-    dashboard: raw?.dashboard ?? { label: '', steps: [] },
-    builder: raw?.builder ?? { label: '', steps: [] },
-    blog: raw?.blog ?? { label: '', steps: [] },
-    settings: raw?.settings ?? { label: '', steps: [] },
+    dashboard: safeModule(raw?.dashboard),
+    builder: safeModule(raw?.builder),
+    blog: safeModule(raw?.blog),
+    settings: safeModule(raw?.settings),
   }
 
   const MODULES_DATA: ModuleData[] = [
