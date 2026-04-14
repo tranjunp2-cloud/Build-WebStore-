@@ -17,7 +17,6 @@ import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
 import { pickCategoryTheme, hashBusinessName } from './category-theme-picker'
 import { resolveComposerCategory } from './composer-category-resolver'
 import { resolveFontPairing } from './font-pairings'
-import { seededShufflePick, hashString } from './seeded-random'
 import {
     validateBlockContent,
     validateOrdering,
@@ -170,7 +169,7 @@ export async function generateSiteWithAI(
         function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
             const valid: Record<string, unknown>[] = []
             for (const block of rawBlocks) {
-                const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang, themeSeed)
+                const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang)
                 const blockType = typeof sanitized.blockType === 'string' ? sanitized.blockType : ''
                 if (!blockType) continue
 
@@ -207,7 +206,6 @@ export async function generateSiteWithAI(
             const enforcerCtx = {
                 businessName: businessInfo.businessName,
                 industry: businessInfo.industry,
-                seed: themeSeed,
             }
 
             for (let p = 0; p < rawPages.length; p++) {
@@ -274,7 +272,6 @@ export async function generateSiteWithAI(
                 const enforcerCtx = {
                     businessName: businessInfo.businessName,
                     industry: businessInfo.industry,
-                    seed: themeSeed,
                 }
                 validBlocks = enforceMinimumStructure(
                     validBlocks as Record<string, unknown>[],
@@ -709,19 +706,8 @@ const BROKEN_VARIANTS: Record<string, string[]> = {
 /**
  * Pick a weighted-by-category variant when AI's choice is invalid.
  * Excludes broken variants. Uses category preferences if available, otherwise random.
- *
- * When `seed` provided, uses `seededShuffle` to distribute picks deterministically
- * across the preferred pool — different seeds land on different variants, same seed
- * always reproduces. Without a seed, falls back to `Math.random()` (legacy path).
- *
- * Plan 2253 Phase 01 — fixes R2 (pool collapse to 1-2 dominant variants).
  */
-function pickWeightedVariant(
-    blockType: string,
-    validVariants: string[],
-    category?: string,
-    seed?: number,
-): string {
+function pickWeightedVariant(blockType: string, validVariants: string[], category?: string): string {
     // Filter out broken variants
     const broken = BROKEN_VARIANTS[blockType] ?? []
     const safeVariants = validVariants.filter(v => !broken.includes(v))
@@ -732,20 +718,9 @@ function pickWeightedVariant(
         if (catWeights) {
             const preferred = catWeights.filter(v => pool.includes(v))
             if (preferred.length > 0) {
-                if (typeof seed === 'number') {
-                    // Compound seed with blockType + category so (seed, blockType) tuples
-                    // distribute evenly — otherwise same seed would pick same pool index
-                    // across every blockType for the same category.
-                    const compound = seed ^ hashString(blockType + category)
-                    return seededShufflePick(preferred, compound) ?? preferred[0]!
-                }
                 return preferred[Math.floor(Math.random() * preferred.length)]!
             }
         }
-    }
-    if (typeof seed === 'number') {
-        const compound = seed ^ hashString(blockType + (category ?? ''))
-        return seededShufflePick(pool, compound) ?? pool[0]!
     }
     return pool[Math.floor(Math.random() * pool.length)]!
 }
@@ -886,7 +861,6 @@ export function sanitizeBlockData(
     block: Record<string, unknown>,
     siteCategory?: string,
     language: 'en' | 'vi' | 'ms' = 'en',
-    seed?: number,
 ): Record<string, unknown> {
     const s = { ...block }
 
@@ -954,7 +928,7 @@ export function sanitizeBlockData(
                     s.variant = matched
                 } else {
                     // No match — pick weighted-by-category variant instead of always-default
-                    const replacement = pickWeightedVariant(s.blockType, meta.variants, siteCategory, seed)
+                    const replacement = pickWeightedVariant(s.blockType, meta.variants, siteCategory)
                     console.warn(
                         `[AI Sanitizer] "${s.blockType}": variant "${rawVariant}" → "${replacement}" (not in [${meta.variants.join(', ')}])`
                     )
@@ -962,7 +936,7 @@ export function sanitizeBlockData(
                 }
             } else {
                 // Empty/null variant — pick weighted variant
-                s.variant = pickWeightedVariant(s.blockType, meta.variants, siteCategory, seed)
+                s.variant = pickWeightedVariant(s.blockType, meta.variants, siteCategory)
             }
 
             // Content-count guard: ensure variant has enough items to render properly
