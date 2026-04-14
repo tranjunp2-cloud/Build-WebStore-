@@ -118,21 +118,42 @@ export async function generateSiteWithAI(
         // normalizeLang handles 'auto' → 'en' internally.
         const contentLang: ContentLang = normalizeLang(language)
 
+        // Blocks that REQUIRE Payload Media IDs but have no image pipeline yet.
+        // AI can only provide URL strings, which Payload upload fields reject → empty
+        // placeholders in UI. Drop until a download-and-upload pipeline lands.
+        const BLOCKS_REQUIRE_MEDIA_PIPELINE = new Set([
+            'gallery', 'before-after', 'portfolio-grid', 'menu-display',
+            'review-cards', 'booking-widget',
+        ])
+        // Blocks NOT registered in Payload Pages.ts layout.blocks — silently dropped on save.
+        // Better to drop early so SSE event count matches what user actually sees.
+        const BLOCKS_NOT_IN_PAYLOAD = new Set([
+            'before-after', 'menu-display', 'review-cards', 'booking-widget',
+        ])
+
         // Helper: validate and sanitize an array of raw blocks
         function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
             const valid: Record<string, unknown>[] = []
             for (const block of rawBlocks) {
                 const sanitized = sanitizeBlockData(block as Record<string, unknown>, detectedCategory, contentLang)
-                if (typeof sanitized.blockType === 'string' && blockRegistry.has(sanitized.blockType)) {
-                    const validation = blockRegistry.validate(sanitized.blockType, sanitized)
+                const blockType = typeof sanitized.blockType === 'string' ? sanitized.blockType : ''
+                if (!blockType) continue
+
+                if (BLOCKS_REQUIRE_MEDIA_PIPELINE.has(blockType) || BLOCKS_NOT_IN_PAYLOAD.has(blockType)) {
+                    console.warn(`[AI] Dropping "${blockType}" block — needs media pipeline or not in Payload schema`)
+                    continue
+                }
+
+                if (blockRegistry.has(blockType)) {
+                    const validation = blockRegistry.validate(blockType, sanitized)
                     if (validation.success) {
                         valid.push(validation.data as Record<string, unknown>)
                     } else {
-                        console.warn(`[AI] Block "${sanitized.blockType}" validation warning:`, validation.error)
+                        console.warn(`[AI] Block "${blockType}" validation warning:`, validation.error)
                         valid.push(sanitized)
                     }
-                } else if (sanitized.blockType) {
-                    console.warn(`[AI] Unknown block type: ${sanitized.blockType}, skipping`)
+                } else {
+                    console.warn(`[AI] Unknown block type: ${blockType}, skipping`)
                 }
             }
             return valid
@@ -916,6 +937,21 @@ export function sanitizeBlockData(
             const badgeObj = s.badge as Record<string, unknown>
             s.badge = { show: typeof badgeObj.show === 'boolean' ? badgeObj.show : false, text: String(badgeObj.text || '') }
         }
+        // Normalize gradientPreset enum: aurora|sunset|ocean|forest
+        if (s.gradientPreset != null) {
+            const VALID_GRADIENTS = ['aurora', 'sunset', 'ocean', 'forest']
+            const GRADIENT_ALIASES: Record<string, string> = {
+                'dark-to-light': 'sunset', 'light-to-dark': 'sunset',
+                sunrise: 'sunset', twilight: 'sunset', dusk: 'sunset', dawn: 'sunset', warm: 'sunset',
+                sea: 'ocean', water: 'ocean', blue: 'ocean', teal: 'ocean', cool: 'ocean',
+                green: 'forest', nature: 'forest', earth: 'forest', mint: 'forest',
+                rainbow: 'aurora', purple: 'aurora', cosmic: 'aurora', galaxy: 'aurora', neon: 'aurora',
+            }
+            const raw = String(s.gradientPreset).toLowerCase().trim()
+            if (!VALID_GRADIENTS.includes(raw)) {
+                s.gradientPreset = GRADIENT_ALIASES[raw] || 'aurora'
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1130,18 +1166,42 @@ export function sanitizeBlockData(
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // GALLERY: Strip URL strings from image fields but keep alt/caption metadata
+    // GALLERY: schema is { image: { url, alt? }, caption? } — wrap URL strings.
+    // Falls back to Unsplash placeholder if no URL provided.
     // ═══════════════════════════════════════════════════════════════════════
     if (s.blockType === 'gallery' && Array.isArray(s.images)) {
-        s.images = s.images.map((img: unknown) => {
-            if (typeof img === 'string') return { alt: img } // URL string → keep as alt text
+        s.images = s.images.map((img: unknown, idx: number): Record<string, unknown> => {
+            if (typeof img === 'string') {
+                return { image: { url: img, alt: '' }, caption: '' }
+            }
             const iObj = (typeof img === 'object' && img !== null ? img : {}) as Record<string, unknown>
-            const cleaned: Record<string, unknown> = {}
-            if (iObj.alt) cleaned.alt = String(iObj.alt)
-            if (iObj.caption) cleaned.caption = String(iObj.caption)
-            // Strip image/url fields (Payload expects Media IDs, not URLs)
-            return cleaned
-        }).filter((img: Record<string, unknown>) => Object.keys(img).length > 0)
+            // AI may put url at root, in image.url, imageUrl, or src
+            let url = ''
+            let alt = ''
+            if (iObj.image && typeof iObj.image === 'object') {
+                const imgObj = iObj.image as Record<string, unknown>
+                url = String(imgObj.url || imgObj.src || '')
+                alt = String(imgObj.alt || iObj.alt || '')
+            } else if (typeof iObj.image === 'string') {
+                url = iObj.image
+                alt = String(iObj.alt || '')
+            } else {
+                url = String(iObj.url || iObj.imageUrl || iObj.src || '')
+                alt = String(iObj.alt || '')
+            }
+            // Fallback: use Unsplash random nature/spa stock based on index
+            if (!url) {
+                const seeds = ['spa', 'nature', 'wellness', 'serene', 'calm', 'zen']
+                url = `https://source.unsplash.com/800x600/?${seeds[idx % seeds.length]}`
+            }
+            return {
+                image: { url, alt },
+                caption: String(iObj.caption || ''),
+            }
+        }).filter((img: Record<string, unknown>) => {
+            const imgRef = img.image as Record<string, unknown> | undefined
+            return imgRef != null && typeof imgRef.url === 'string' && imgRef.url.length > 0
+        })
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -1252,6 +1312,28 @@ export function sanitizeBlockData(
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // BEFORE-AFTER: beforeImage|afterImage are { url, alt?, label? } objects.
+    // AI sends raw URL string → wrap. Fallback Unsplash if missing.
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'before-after') {
+        const wrapBeforeAfter = (val: unknown, fallbackSeed: string): Record<string, unknown> => {
+            if (typeof val === 'string') {
+                return { url: val || `https://source.unsplash.com/800x600/?${fallbackSeed}`, alt: '' }
+            }
+            const v = (typeof val === 'object' && val !== null ? val : {}) as Record<string, unknown>
+            const url = String(v.url || v.imageUrl || v.src || v.image || '') || `https://source.unsplash.com/800x600/?${fallbackSeed}`
+            const result: Record<string, unknown> = {
+                url,
+                alt: String(v.alt || ''),
+            }
+            if (v.label) result.label = String(v.label)
+            return result
+        }
+        s.beforeImage = wrapBeforeAfter(s.beforeImage, 'before')
+        s.afterImage = wrapBeforeAfter(s.afterImage, 'after')
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // SOCIAL-WIDGET: links[].platform must be enum (facebook|whatsapp|...)
     // AI hallucinates twitter/x/tiktok which Payload rejects. Map or drop.
     // ═══════════════════════════════════════════════════════════════════════
@@ -1297,9 +1379,11 @@ export function sanitizeBlockData(
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Generic links array cleanup
+    // Generic links array cleanup — skip blocks with custom links shape
+    // (navigation handled above; socialWidget needs platform field preserved)
     // ═══════════════════════════════════════════════════════════════════════
-    if (Array.isArray(s.links) && s.blockType !== 'navigation') {
+    const BLOCKS_WITH_CUSTOM_LINKS = new Set(['navigation', 'socialWidget', 'footer'])
+    if (Array.isArray(s.links) && !BLOCKS_WITH_CUSTOM_LINKS.has(String(s.blockType))) {
         const rawLinks = norm(s.links, (v) => ({ label: v, url: '#' }))
         s.links = rawLinks.map((link: unknown) => {
             if (typeof link === 'string') return { label: link, url: '#' }
