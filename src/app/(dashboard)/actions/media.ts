@@ -12,18 +12,20 @@ export async function uploadMediaAction(formData: FormData) {
 
     const file = formData.get('file') as File
     if (!file) throw new Error('No file provided')
+    const altRaw = formData.get('alt')
+    const alt = typeof altRaw === 'string' && altRaw.trim() ? altRaw.trim() : file.name
 
     // Convert File to ArrayBuffer to Buffer for Payload
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
     const payload = await getPayload({ config: configPromise })
-    
+
     // Create the media document in Payload
     const res = await payload.create({
         collection: 'media',
         data: {
-            alt: file.name,
+            alt,
         },
         file: {
             data: buffer,
