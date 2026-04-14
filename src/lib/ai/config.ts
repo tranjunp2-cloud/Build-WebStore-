@@ -11,27 +11,30 @@
  */
 
 // ─── Model Routing ──────────────────────────────────────────────────────
-export type AIModel = 'gpt-4o' | 'gpt-4o-mini'
-
 /**
- * Strategy #1: Route to the correct model based on task complexity
- * GPT-4o: Only for first-time site generation (higher quality needed)
- * GPT-4o-mini: Everything else (15x cheaper)
+ * AI models available via OpenAI API (April 2026).
+ * See plan 260414-0914-ai-model-optimization/research/researcher-01-openai-models-2026.md
+ * for pricing + capability comparison.
  */
-export function selectModel(task: AITask): AIModel {
-    switch (task) {
-        case 'site-generation':
-            return 'gpt-4o'
-        case 'chat-edit':
-        case 'inline-edit':
-        case 'seo-generation':
-        case 'content-rewrite':
-        case 'product-description':
-        case 'url-extraction':
-            return 'gpt-4o-mini'
-        default:
-            return 'gpt-4o-mini'
-    }
+export type AIModel =
+    | 'gpt-4o'
+    | 'gpt-4o-mini'
+    | 'gpt-4.1'
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1-nano'
+    | 'gpt-5.4-mini'
+
+const VALID_MODELS: ReadonlySet<AIModel> = new Set<AIModel>([
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-4.1-nano',
+    'gpt-5.4-mini',
+])
+
+function isValidModel(value: string): value is AIModel {
+    return VALID_MODELS.has(value as AIModel)
 }
 
 export type AITask =
@@ -42,6 +45,64 @@ export type AITask =
     | 'content-rewrite'
     | 'product-description'
     | 'url-extraction'
+    | 'bulk-parse'
+
+/**
+ * Default model per task. Phase-02 keeps production defaults unchanged
+ * (site-generation still on gpt-4o, chat-edit still on gpt-4o-mini) so
+ * this phase is a no-op for production behavior. Phase-03 + 04 flip
+ * defaults to gpt-4.1-mini / gpt-4.1-nano after eval validation.
+ */
+const DEFAULT_MODELS: Record<AITask, AIModel> = {
+    'site-generation':    'gpt-4o',
+    'chat-edit':          'gpt-4o-mini',
+    'inline-edit':        'gpt-4o-mini',
+    'seo-generation':     'gpt-4o-mini',
+    'content-rewrite':    'gpt-4o-mini',
+    'product-description': 'gpt-4o-mini',
+    'url-extraction':     'gpt-4o-mini',
+    'bulk-parse':         'gpt-4o-mini',
+}
+
+/**
+ * Env var name per task for override. Allows per-task model swap without
+ * code change — e.g. `AI_MODEL_SITEGEN=gpt-4.1-mini` in .env.local flips
+ * site-gen to gpt-4.1-mini for that environment only. Canary rollout via
+ * env override is the recommended path (see plan.md Q5 decision).
+ */
+const ENV_KEY: Record<AITask, string> = {
+    'site-generation':    'AI_MODEL_SITEGEN',
+    'chat-edit':          'AI_MODEL_EDIT',
+    'inline-edit':        'AI_MODEL_INLINE_EDIT',
+    'seo-generation':     'AI_MODEL_SEO',
+    'content-rewrite':    'AI_MODEL_REWRITE',
+    'product-description': 'AI_MODEL_PRODUCT_DESC',
+    'url-extraction':     'AI_MODEL_URL_EXTRACT',
+    'bulk-parse':         'AI_MODEL_BULK_PARSE',
+}
+
+/**
+ * Strategy #1: Route to the correct model based on task complexity.
+ * Priority:
+ *   1. Env var override (per-task, e.g. AI_MODEL_SITEGEN)
+ *   2. DEFAULT_MODELS table
+ *
+ * Invalid override strings fall back to default with a console.warn so
+ * typos don't silently downgrade production.
+ */
+export function selectModel(task: AITask): AIModel {
+    const envKey = ENV_KEY[task]
+    const override = process.env[envKey]
+    if (override) {
+        if (isValidModel(override)) return override
+        console.warn(`[ai-config] ${envKey}="${override}" is not a valid AIModel — falling back to default "${DEFAULT_MODELS[task]}"`)
+    }
+    return DEFAULT_MODELS[task]
+}
+
+/** Exported for tests. Do not mutate. */
+export const __DEFAULT_MODELS_FOR_TEST = DEFAULT_MODELS
+export const __ENV_KEY_FOR_TEST = ENV_KEY
 
 // ─── Rate Limiting ──────────────────────────────────────────────────────
 export type SubscriptionPlan = 'free' | 'starter' | 'pro' | 'business'
@@ -58,6 +119,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'content-rewrite': 5,        // per day
         'product-description': 5,    // per day
         'url-extraction': 10,        // per day
+        'bulk-parse': 5,             // per day
     },
     starter: {
         'site-generation': 5,        // per month
@@ -67,6 +129,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'content-rewrite': 20,       // per day
         'product-description': 20,   // per day
         'url-extraction': 30,        // per day
+        'bulk-parse': 20,            // per day
     },
     pro: {
         'site-generation': 20,       // per month
@@ -76,6 +139,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'content-rewrite': 100,      // per day
         'product-description': 100,  // per day
         'url-extraction': 100,       // per day
+        'bulk-parse': 100,           // per day
     },
     business: {
         'site-generation': 999999,   // unlimited
@@ -85,6 +149,7 @@ export const RATE_LIMITS: Record<SubscriptionPlan, Record<AITask, number>> = {
         'content-rewrite': 999999,
         'product-description': 999999,
         'url-extraction': 999999,
+        'bulk-parse': 999999,
     },
 }
 
@@ -142,11 +207,12 @@ Output: product description (plain text).`,
  * Used for internal tracking and billing decisions
  */
 export const ESTIMATED_COSTS: Record<AITask, number> = {
-    'site-generation': 0.04,      // GPT-4o, ~4K in + 3K out
+    'site-generation': 0.04,      // GPT-4o, ~4K in + 3K out (phase-03 flips to 4.1-mini → ~$0.004)
     'chat-edit': 0.0005,          // GPT-4o-mini, ~1.5K in + 500 out
     'inline-edit': 0.0002,        // GPT-4o-mini, ~500 in + 200 out
     'seo-generation': 0.0004,     // GPT-4o-mini, ~800 in + 400 out
     'content-rewrite': 0.0003,    // GPT-4o-mini, ~600 in + 300 out
     'product-description': 0.0003,
-    'url-extraction': 0.001,         // GPT-4o-mini, ~2.3K in + 500 out
+    'url-extraction': 0.001,      // GPT-4o-mini, ~2.3K in + 500 out
+    'bulk-parse': 0.001,          // GPT-4o-mini, ~2K in + 1K out
 }

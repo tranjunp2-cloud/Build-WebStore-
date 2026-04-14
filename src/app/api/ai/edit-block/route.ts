@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
+import { selectModel } from '@/lib/ai/config'
 import {
     createAddSectionBlock,
     getAddSectionLabel,
@@ -169,7 +170,7 @@ For undoing the previous action:
     }
 
     const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: selectModel('chat-edit'),
         messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: instruction },
