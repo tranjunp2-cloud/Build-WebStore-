@@ -304,10 +304,40 @@ export async function POST(req: NextRequest) {
         // Fetches 5-10 real stock images (hero, gallery, team, testimonials, about)
         // and injects Media IDs into block fields before sanitizer runs.
         // Partial failure tolerated: blocks without images degrade gracefully.
+        //
+        // IMPORTANT — collect ALL block arrays, not just `result.blocks`.
+        // When the generator returns multi-page format (`result.pages[]`),
+        // buildGeneratedPages reads `result.pages[].blocks` directly (see
+        // route.ts:755-766). Previously cleanup only ran on `result.blocks`,
+        // so a subpage hero/about with `image: { url: "..." }` object would
+        // survive into payload.create and crash with:
+        //   "The following field is invalid: Page Blocks > Block N (…) > Image"
+        // Staging log 2026-04-14 21:06:15 confirmed this path after the
+        // Unsplash fallback chain failed to upgrade the object to a numeric
+        // Media ID (UNSPLASH_ACCESS_KEY missing on staging env + mkdir
+        // 'public' ENOENT on Vercel read-only fs).
+        const collectAllBlockBuckets = (): Record<string, unknown>[][] => {
+            const buckets: Record<string, unknown>[][] = []
+            if (Array.isArray(result.blocks)) {
+                buckets.push(result.blocks as Record<string, unknown>[])
+            }
+            const pagesArr = (result as { pages?: Array<{ blocks?: unknown[] }> }).pages
+            if (Array.isArray(pagesArr)) {
+                for (const page of pagesArr) {
+                    if (Array.isArray(page?.blocks)) {
+                        buckets.push(page.blocks as Record<string, unknown>[])
+                    }
+                }
+            }
+            return buckets
+        }
+
         if (!ENABLE_DALLE_HERO) {
             try {
-                const mutableBlocks = result.blocks as Record<string, unknown>[]
-                const needs = planImageNeeds(mutableBlocks)
+                const allBuckets = collectAllBlockBuckets()
+                // Flatten image needs across homepage + every subpage so a
+                // single fulfillImageNeeds call covers the whole site.
+                const needs = allBuckets.flatMap((bucket) => planImageNeeds(bucket))
                 if (needs.length > 0) {
                     const resolvedLang = (result.language || language) as 'en' | 'ms' | 'vi' | 'auto'
                     // Plan 260414-2249 phase-01: pass parsed user products into
@@ -353,12 +383,19 @@ export async function POST(req: NextRequest) {
                 }
                 // Strip any slot still holding a URL/object (Unsplash failed or missing) —
                 // Payload upload fields are optional; better empty than reject.
-                cleanupNonNumericImageFields(mutableBlocks)
+                // Run over every bucket so multi-page subpages get cleaned too.
+                for (const bucket of allBuckets) {
+                    cleanupNonNumericImageFields(bucket)
+                }
             } catch (unsplashErr) {
                 console.error('[AI Generate] Unsplash pipeline error (non-fatal):', unsplashErr)
-                // Best-effort cleanup on any unexpected throw
+                // Best-effort cleanup on any unexpected throw — still run
+                // cleanup on every bucket so a partial failure can't leak
+                // raw image objects into payload.create.
                 try {
-                    cleanupNonNumericImageFields(result.blocks as Record<string, unknown>[])
+                    for (const bucket of collectAllBlockBuckets()) {
+                        cleanupNonNumericImageFields(bucket)
+                    }
                 } catch { /* ignore */ }
             }
         }
