@@ -1131,12 +1131,46 @@ Replace per-block Unsplash searches với ONE per-site **image pool**. Một gen
 - Full gen: hero + features + gallery + team blocks ALL receive Media IDs sourced from the same pool — verified by `[Image Pool] query="..." landscape=N square=M` log line.
 - Legacy path preserved: `ctx.pool === undefined` falls through to `getMediaForBlock` per-block search (no regression).
 
-### Test Summary (cumulative Phase 01 + 02 + 03)
+---
+
+## 13. Phase 04 — Layout Recipes A/B/C (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-04-layout-recipes.md`
+> PR: `feat(f01): [US-F01-10] layout recipes a/b/c per category`
+
+### Mục tiêu
+
+Replace single `CATEGORY_SIGNATURE_BLOCKS[category]` với **3 hand-curated recipes per category** (14 × 3 = 42 total). Mỗi recipe có rhythm archetype (story/menu/gallery/services/portfolio/team/features/social-proof/demo-first) + ordered block sequence + required subset. Composer picks via `seed % 3` deterministic. GPT happy path receives RHYTHM section as hard sequence constraint.
+
+### Test Cases
+
+| TC ID | Test File | Mô tả | Status |
+|-------|-----------|-------|--------|
+| **TC-F01-W.18** | `category-recipes.test.ts` | **407 assertions** — 42 recipes × 10 checks each: shape, rhythm enum, id format, hero+footer locked, blocks ≥5, every blockId in SUPPORTED_BLOCK_IDS, required ⊆ blocks, middleShuffleRange bounds, id uniqueness, ≥2 distinct rhythms per category, distribution ≤40% | ✅ |
+| **TC-F01-W.18a** | `category-recipes.test.ts` | `pickRecipe` determinism + rotation across 30 seeds + unknown category fallback + negative seed | ✅ |
+| **TC-F01-W.19** | `recipe-rhythm-prompt.test.ts` | **22 assertions** — `buildUserPrompt` RHYTHM section: header, label, rhythm enum, block sequence with arrow separators, required list, rationale, hard-order instruction, 14 cats × 3 recipes coverage, recipe + mood coexistence, pickRecipe → prompt end-to-end, seed variety | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/category-recipes.ts` — **NEW** 380 lines: `RecipeRhythm` / `RecipeCategory` / `CategoryRecipe` types, `SUPPORTED_BLOCK_IDS` whitelist (34 block types), 42 hand-curated recipes, `pickRecipe(category, seed)` selector, `getRecipesForCategory`, `isSupportedBlockId`
+- `src/lib/ai/system-prompt.ts` — `BuildUserPromptOptions.recipe?: CategoryRecipe`. When recipe provided, injects RHYTHM section with label + block sequence + required + rationale + hard-order instruction. Legacy `generateCompositionHint` path kept as fallback when no recipe passed.
+- `src/lib/ai/openai-generator.ts` — picks `layoutRecipe = pickRecipe(category, themeSeed)` at same point as mood resolution, passes into `buildUserPrompt` options, logs `recipe=<id>` in theme line
+
+### Acceptance Criteria
+
+- `pickRecipe('restaurant', seed)` rotates across `rest-story` / `rest-menu` / `rest-gallery` — verified by 30-seed distribution test.
+- GPT prompt contains `RHYTHM: Story-first (story-first)\nBlock sequence: hero → about → menu-display → ...` instead of shuffled `CATEGORY_SIGNATURE_BLOCKS` hint.
+- Different business names at same category → 3 distinct recipes observed in prod logs `[Theme] ... recipe=<id>`.
+- Composer path (no recipe passed) backward compat — legacy `generateCompositionHint` still fires for non-AI callers.
+- 42 recipes non-empty + all block IDs valid + rhythm distribution sanity (no rhythm > 40%).
+
+### Test Summary (cumulative Phase 01 + 02 + 03 + 04)
 
 | Suite | Count | Status |
 |---|---|---|
 | Phase 01 tests | 69 | ✅ |
 | Phase 02 tests | 235+ | ✅ |
 | Phase 03 tests | 23 (image-pool) + 14 (media-injector regression) | ✅ |
+| Phase 04 tests | 407 + 22 = 429 | ✅ |
 | Legacy regression | 22 | ✅ |
-| **Total** | **360+** | ✅ |
+| **Total** | **790+** | ✅ |
