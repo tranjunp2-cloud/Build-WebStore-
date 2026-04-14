@@ -69,14 +69,95 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
     type PreviewBlock = { blockType: string; links?: NavLinkItem[]; ctaButton?: { url?: string; [key: string]: unknown }; ctaButtons?: Array<{ url?: string; [key: string]: unknown }>; [key: string]: unknown }
     const rawBlocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
 
-    // In editor preview, rewrite internal nav/CTA links to '#' to prevent iframe navigation to 404
+    // In editor preview, rewrite internal nav/CTA links so subpages are navigable.
+    // - Internal paths ("/about") → /preview/{siteId}?pageId={matchedPageId} (keeps iframe in preview scope)
+    // - Unmatched internal paths → '#' (prevent 404)
+    // - External URLs (http*) → preserved as-is
+    const previewSiteId = String(
+        (site as { id?: string | number })?.id ?? '',
+    )
+
+    // Build slug → pageId map from pages[] prop. Both '/' and 'home' resolve to homepage.
+    const slugToPageId = new Map<string, string>()
+    for (const p of pages) {
+        const pid = String(p.id)
+        const rawSlug = (p.slug ?? '').trim()
+        if (!rawSlug) continue
+        // Normalize: ensure leading slash, also store no-slash variant
+        const withSlash = rawSlug.startsWith('/') ? rawSlug : `/${rawSlug}`
+        slugToPageId.set(withSlash, pid)
+        slugToPageId.set(withSlash.toLowerCase(), pid)
+        // Also map bare slug (e.g. 'about' → page)
+        if (rawSlug !== '/') {
+            slugToPageId.set(rawSlug.replace(/^\//, ''), pid)
+        }
+    }
+    // Always map '/' to homepage (first isHomepage page, or first page)
+    const homepage = pages.find((p) => (p as NavPage & { isHomepage?: boolean }).isHomepage) ?? pages[0]
+    if (homepage) slugToPageId.set('/', String(homepage.id))
+
+    const rewritePreviewUrl = (url: string | undefined): string => {
+        if (!url) return '#'
+        if (/^https?:\/\//i.test(url)) return url
+        if (url.startsWith('#')) return url
+        // Anchor links like "/#features" → preserve
+        if (url.includes('#') && !url.startsWith('/')) return url
+        if (!previewSiteId) return '#'
+        // Normalize the path portion (strip query/hash)
+        const path = url.split(/[?#]/)[0] ?? url
+        const hit =
+            slugToPageId.get(path) ??
+            slugToPageId.get(path.toLowerCase()) ??
+            slugToPageId.get(path.replace(/^\//, ''))
+        if (hit) return `/preview/${previewSiteId}?pageId=${hit}`
+        return '#'
+    }
+
+    const rewriteFooterColumns = (columns: unknown): unknown => {
+        if (!Array.isArray(columns)) return columns
+        return columns.map((col) => {
+            if (!col || typeof col !== 'object') return col
+            const c = col as { links?: Array<{ url?: string; [k: string]: unknown }>; [k: string]: unknown }
+            return {
+                ...c,
+                links: Array.isArray(c.links)
+                    ? c.links.map((l) => ({ ...l, url: rewritePreviewUrl(l?.url) }))
+                    : c.links,
+            }
+        })
+    }
+
     const blocks = isEditor
-        ? rawBlocks.map(b => {
+        ? rawBlocks.map((b) => {
             if (b.blockType === 'navigation') {
                 return {
                     ...b,
-                    links: b.links?.map(l => ({ ...l, url: l.url?.startsWith('http') ? l.url : '#' })),
-                    ctaButton: b.ctaButton ? { ...b.ctaButton, url: '#' } : b.ctaButton,
+                    links: b.links?.map((l) => ({ ...l, url: rewritePreviewUrl(l.url) })),
+                    ctaButton: b.ctaButton
+                        ? { ...b.ctaButton, url: rewritePreviewUrl(b.ctaButton.url) }
+                        : b.ctaButton,
+                }
+            }
+            if (b.blockType === 'hero' && Array.isArray(b.ctaButtons)) {
+                return {
+                    ...b,
+                    ctaButtons: b.ctaButtons.map((btn) => ({
+                        ...btn,
+                        url: rewritePreviewUrl(btn?.url),
+                    })),
+                }
+            }
+            if (b.blockType === 'footer') {
+                return {
+                    ...b,
+                    columns: rewriteFooterColumns(b.columns),
+                }
+            }
+            if (b.blockType === 'cta' && b.ctaButton && typeof b.ctaButton === 'object') {
+                const ctaBtn = b.ctaButton as { url?: string; [k: string]: unknown }
+                return {
+                    ...b,
+                    ctaButton: { ...ctaBtn, url: rewritePreviewUrl(ctaBtn.url) },
                 }
             }
             return b

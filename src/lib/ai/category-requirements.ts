@@ -121,6 +121,28 @@ export function getCategoryRequirement(category: string | undefined): CategoryRe
     return CATEGORY_REQUIREMENTS[category] ?? DEFAULT_REQUIREMENT
 }
 
+/**
+ * Recommended navigation variant per category. Overrides AI's default choice
+ * (which often picks bland "simple" or "transparent"). Applied in sanitizer.
+ * All variants: simple | centered | mega-menu | transparent | sidebar | pill
+ */
+export const NAV_VARIANT_BY_CATEGORY: Readonly<Record<string, string>> = {
+    beauty: 'pill',
+    restaurant: 'centered',
+    fnb: 'pill',
+    tech: 'centered',
+    health: 'centered',
+    education: 'centered',
+    realestate: 'centered',
+    fitness: 'pill',
+    creative: 'pill',
+    business: 'centered',
+    ecommerce: 'mega-menu',
+    events: 'centered',
+    blog: 'centered',
+    travel: 'pill',
+}
+
 /** Maps block type → the array field where items live (for padding). */
 export const ITEM_FIELD_BY_BLOCK: Readonly<Record<string, string>> = {
     features: 'features',

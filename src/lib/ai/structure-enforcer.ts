@@ -15,6 +15,7 @@
 import {
     getCategoryRequirement,
     ITEM_FIELD_BY_BLOCK,
+    NAV_VARIANT_BY_CATEGORY,
     type CategoryRequirement,
 } from './category-requirements'
 import { buildBlockFromLibrary, padItems, type InjectionContext } from './content-injection'
@@ -79,6 +80,18 @@ export function enforceMinimumStructure(
     const presentTypes = new Set(
         out.map((b) => (typeof b.blockType === 'string' ? b.blockType : '')).filter(Boolean),
     )
+
+    // Upgrade navigation variant per category (before any other enforcement).
+    // AI often picks bland "simple" or "transparent" — override with category-appropriate.
+    const preferredNav = NAV_VARIANT_BY_CATEGORY[category]
+    if (preferredNav) {
+        for (const block of out) {
+            if (block.blockType === 'navigation') {
+                block.variant = preferredNav
+                break
+            }
+        }
+    }
 
     // 1. Inject missing mandatory blocks
     for (const blockType of req.mandatoryBlocks) {
