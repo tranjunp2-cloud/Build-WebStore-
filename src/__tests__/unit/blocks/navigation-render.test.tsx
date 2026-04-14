@@ -6,9 +6,12 @@ import { NavigationBlock } from '@/blocks/navigation'
 vi.mock('framer-motion', () => {
     const React = require('react')
 
-    const createPrimitive = (tag: keyof JSX.IntrinsicElements) =>
-        React.forwardRef(({ children, ...props }: React.HTMLAttributes<HTMLElement>, ref: React.Ref<HTMLElement>) =>
+    const createPrimitive = (tag: keyof JSX.IntrinsicElements) => {
+        const Component = React.forwardRef(({ children, ...props }: React.HTMLAttributes<HTMLElement>, ref: React.Ref<HTMLElement>) =>
             React.createElement(tag, { ...props, ref }, children))
+        Component.displayName = `Motion${tag}`
+        return Component
+    }
 
     return {
         motion: {
