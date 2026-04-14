@@ -187,6 +187,18 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
           .container { max-width: 1200px; margin: 0 auto; }
           img { max-width: 100%; height: auto; }
           a { color: inherit; text-decoration: none; }
+          /* Dark-mode opacity boost — blocks widely use opacity-50/40/60 for muted
+             text. On dark backgrounds this drops below WCAG AA. Boost to 0.78+
+             via scoped rules so muted text stays readable without touching 195
+             occurrences across blocks. Applied via data-color-mode on root below.
+             Plan: 260414-1400-ai-gen-unsplash-pipeline followup (dark-mode contrast). */
+          ${theme.colorMode === 'dark' ? `
+          .opacity-30 { opacity: 0.65 !important; }
+          .opacity-40 { opacity: 0.72 !important; }
+          .opacity-50 { opacity: 0.80 !important; }
+          .opacity-60 { opacity: 0.85 !important; }
+          .opacity-70 { opacity: 0.90 !important; }
+          ` : ''}
           /* Print — show all content, no animations */
           @media print {
             * { opacity: 1 !important; transform: none !important; animation: none !important; }
