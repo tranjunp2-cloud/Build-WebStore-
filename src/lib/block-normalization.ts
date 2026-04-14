@@ -131,6 +131,26 @@ export function normalizeBlocksForPersistence(blocks: Record<string, unknown>[])
             })
         }
 
+        // Defensively sanitize menu-food categories — AI may use 'title' instead of 'name'
+        if (b.blockType === 'menu-food' && Array.isArray(b.categories)) {
+            b.categories = (b.categories as Record<string, unknown>[]).map(cat => {
+                if (!cat || typeof cat !== 'object') return cat
+                const c = { ...cat }
+                c.name = String(c.name || c.title || c.label || c.category || 'Category')
+                if (Array.isArray(c.items)) {
+                    c.items = (c.items as Record<string, unknown>[]).map(item => {
+                        if (!item || typeof item !== 'object') return item
+                        return {
+                            ...item,
+                            name: String((item as Record<string, unknown>).name || (item as Record<string, unknown>).title || (item as Record<string, unknown>).label || 'Item'),
+                            price: String((item as Record<string, unknown>).price || '0'),
+                        }
+                    })
+                }
+                return c
+            })
+        }
+
         // Defensively sanitize footer links
         if (b.blockType === 'footer' && Array.isArray(b.columns)) {
             b.columns = b.columns.map((col: Record<string, unknown>) => {

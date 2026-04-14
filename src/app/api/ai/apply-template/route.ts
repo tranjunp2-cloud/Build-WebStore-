@@ -7,6 +7,7 @@ import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
+import { mergeUserContent } from '@/lib/ai/merge-user-content'
 
 /**
  * POST /api/ai/apply-template
@@ -239,13 +240,19 @@ export const POST = withAuth(async (user, req) => {
         }
 
         const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
-        // Pick only valid theme fields — Payload groups may have extra metadata
+        // Pick only valid theme fields — Payload select fields reject unknown values
+        const VALID_HEADING_FONTS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
+        const VALID_BODY_FONTS = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
+        const VALID_COLOR_MODES = ['light', 'dark']
+        const rawHeading = String(rawTheme.fontHeading || '')
+        const rawBody = String(rawTheme.fontBody || '')
+        const rawColorMode = String(rawTheme.colorMode || '')
         const templateTheme = {
             primaryColor: String(rawTheme.primaryColor || '#0ea5e9'),
             secondaryColor: String(rawTheme.secondaryColor || '#d946ef'),
-            fontHeading: String(rawTheme.fontHeading || 'Outfit'),
-            fontBody: String(rawTheme.fontBody || 'Inter'),
-            colorMode: String(rawTheme.colorMode || 'dark'),
+            fontHeading: VALID_HEADING_FONTS.includes(rawHeading) ? rawHeading : 'Outfit',
+            fontBody: VALID_BODY_FONTS.includes(rawBody) ? rawBody : 'Inter',
+            colorMode: VALID_COLOR_MODES.includes(rawColorMode) ? rawColorMode : 'dark',
         }
 
         // === APPLY TO EXISTING SITE (multi-page + transaction) ===
@@ -285,26 +292,47 @@ export const POST = withAuth(async (user, req) => {
                 data: { generationStatus: 'generating' },
             })
 
-            // Delete old pages → update theme → create new pages (sequential)
-            // 1. Delete all existing pages for this site
+            // 1. Collect existing pages + their blocks (to preserve user content)
             const existingPages = await payload.find({
                 collection: 'pages',
                 where: { site: { equals: Number(siteId) } },
                 limit: 100,
             })
+
+            // Build lookup: homepage blocks + slug-matched blocks for content merging
+            const existingPageMap: Record<string, Record<string, unknown>[]> = {}
+            let homepageBlocks: Record<string, unknown>[] = []
+            for (const page of existingPages.docs) {
+                const pageData = page as Record<string, unknown>
+                const blocks = (pageData.layout as Record<string, unknown>[]) || []
+                const slug = pageData.slug as string
+                if (pageData.isHomepage) homepageBlocks = blocks
+                if (slug) existingPageMap[slug] = blocks
+            }
+
+            // 2. Delete old pages
             for (const page of existingPages.docs) {
                 await payload.delete({ collection: 'pages', id: page.id })
             }
 
-            // 2. Update site theme
+            // 3. Update site theme
             await payload.update({
                 collection: 'sites',
                 id: Number(siteId),
                 data: { theme: templateTheme },
             })
 
-            // 3. Create new pages from template
+            // 4. Create new pages from template, merging user content where possible
             for (const [idx, page] of pagesToCreate.entries()) {
+                // Find matching existing blocks: homepage→homepage, then slug match
+                const matchingBlocks = page.isHomepage
+                    ? homepageBlocks
+                    : (existingPageMap[page.slug] || [])
+
+                const mergedLayout = matchingBlocks.length > 0
+                    ? mergeUserContent(page.layout, matchingBlocks)
+                    : page.layout
+
                 await payload.create({
                     collection: 'pages',
                     data: {
@@ -314,7 +342,7 @@ export const POST = withAuth(async (user, req) => {
                         tenant: tenantId,
                         isHomepage: page.isHomepage ?? idx === 0,
                         _status: 'published',
-                        layout: page.layout,
+                        layout: mergedLayout,
                     },
                 })
                 _createdPagesCount++
