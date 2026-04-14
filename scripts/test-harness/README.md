@@ -23,7 +23,7 @@ Output lands in `.harness-out/` (gitignored).
 | `npm run harness:check` | run structural guards on matrix | <1s   | `.harness-out/structural-report.json` |
 | `npm run harness:render`| Playwright screenshots + empty-hole detect | ~10m  | `.harness-out/screenshots/` + `visual-report.<project>.w<N>.json` |
 | `npm run harness:merge` | merge structural + visual → combined-report.json | <1s | `.harness-out/combined-report.json` |
-| `npm run harness:report`| HTML gallery                    | ~5s   | `.harness-out/report.html` *(Phase 04)* |
+| `npm run harness:report`| HTML gallery (open in browser)  | <2s   | `.harness-out/report.html` |
 | `npm run harness:all`   | gen → check → render → merge → report | ~12m  | full pipeline |
 
 `pnpm` users: replace `npm run` with `pnpm`.
@@ -45,6 +45,19 @@ npm run harness:merge
 ```
 
 The harness route lives at `src/app/test-harness/[fixtureId]/page.harness.tsx` and is excluded from `pageExtensions` unless `ENABLE_HARNESS=1` — production / staging builds never see it.
+
+### Reading the HTML report
+
+`report.html` is a self-contained file with summary cards, status filter chips, category filter chips, and a click-to-zoom modal showing desktop + mobile screenshots side-by-side. Open it directly:
+
+```bash
+open .harness-out/report.html      # macOS
+xdg-open .harness-out/report.html  # Linux
+```
+
+Default view shows all fixtures; click `fail` or `hole` chip to narrow to broken ones. Click any card to zoom screenshots full-size.
+
+If render hasn't been run, the report still works — cards show "no screenshot — render not run" placeholders and structural-only badges.
 
 ## Daily dev loop
 
@@ -109,7 +122,7 @@ Render and report steps are `continue-on-error` until Phase 03 + 04 land — the
 | `render/harness.spec.ts` | Phase 03 — render loop, screenshots, detector wiring |
 | `render/empty-hole-detector.ts` | Phase 03 — pure PNG analyser, sliding window variance + brightness |
 | `render/visual-report.ts` | Phase 03 — merger structural + visual → combined-report.json |
-| `report/` | Phase 04 — HTML gallery generator *(pending)* |
+| `report/generate.ts` | Phase 04 — single-file HTML gallery generator (inline CSS + vanilla JS, lazy-loaded screenshots) |
 
 ## Background
 

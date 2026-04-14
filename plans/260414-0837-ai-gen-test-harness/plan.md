@@ -4,7 +4,7 @@ description: "Matrix runner + visual gallery + structural assertions to catch em
 status: in_progress
 priority: P1
 effort: 4-6d
-progress: "5/6 phases + bug-fix round done (Sprint B2 in progress — Phase 03 done)"
+progress: "6/6 phases + bug-fix round done (Sprint B1 + B2 complete)"
 branch: feat/F01-ai-gen-variety-fix
 tags: [testing, ai, variety, visual-regression, f01]
 created: 2026-04-14
@@ -27,7 +27,7 @@ Thêm một test harness riêng (additive, không sửa source) chạy composer 
 | 02 | [Structural Assertions (Ben-Ben Guard)](phase-02-structural-assertions.md) | ✅ **done** | 1d | `735fa85` — 6 guards + check.ts, caught 185 bugs |
 | ⭐ | Bug-fix round *(unplanned, triggered by Phase 02)* | ✅ **done** | 0.5d | `8598e64` — 185 → 0 fails in template-composer.ts |
 | 03 | [Visual Gallery (Playwright Render)](phase-03-visual-gallery.md) | ✅ **done** | 1-2d | Harness route + Playwright config + spec + empty-hole detector + visual-report merger + 9 unit tests + adversarial review (2 P0 + 5 P1/P2 fixed) |
-| 04 | [HTML Gallery Report](phase-04-html-report.md) | 👉 **next** | 0.5d | `.harness-out/report.html` self-contained |
+| 04 | [HTML Gallery Report](phase-04-html-report.md) | ✅ **done** | 0.5d | `.harness-out/report.html` self-contained, 14.5 KB skeleton + lazy screenshots |
 | 05 | [Dev UX + CI Wiring](phase-05-dev-ux-ci.md) | ✅ **done** | 0.5d | `npm run harness:*` scripts + `ai-harness.yml` workflow + README |
 | 06 | [QA TC Mapping & Gap Closure](phase-06-qa-mapping.md) | ✅ **done** | 0.5d | TC-F01-V.39..50 in QA §4.8 + PRD §17 DoD ticked |
 
@@ -47,7 +47,7 @@ Sprint B3 (optional stretch, 1d)
   └─ Phase 08 (future): LLM-as-judge visual scoring
 ```
 
-**Next up when `/cook` runs: Phase 04 — HTML Gallery Report** (xem `phase-04-html-report.md`)
+**Plan complete.** Optional Sprint B3 next: Phase 07 stretch (mocked OpenAI path), Phase 08 stretch (LLM-as-judge visual scoring). Otherwise close PR #555.
 
 ## Progress log
 - **2026-04-14 morning**: Plan created, 5 decisions locked (pageExtensions, 5 seeds, label-only CI, forward-only, 30% threshold)
@@ -58,6 +58,7 @@ Sprint B3 (optional stretch, 1d)
 - **2026-04-14 evening**: Execution order reshuffled — Phase 05 + 06 prioritised over 03 + 04
 - **2026-04-14 night**: Sprint B1 complete — Phase 05 (`npm run harness:*` + `ai-harness.yml` + README) + Phase 06 (TC-V.39..50 + PRD DoD ticked + parent plan sync). `harness:quick` 1.88s, `harness:check` 1.54s, both well under 60s gate
 - **2026-04-14 night**: Phase 03 shipped — harness route (gated `page.harness.tsx`) + Playwright config (desktop + mobile projects) + spec + empty-hole detector (185 lines, Welford variance + brightness, skips hero zone) + visual-report merger + 9 detector unit tests pass first try. Adversarial code review caught 2 P0 (worker race + chain breakage) + 3 P1 + 2 P2 — all fixed. Re-smoked clean.
+- **2026-04-14 night**: Phase 04 shipped — single-file HTML gallery generator (inline CSS + vanilla JS, ~14.5 KB), summary cards (pass/warn/fail/hole), 2 filter groups (status + category), click-to-zoom modal with desktop+mobile shots. Fixed upstream typecheck regression in `openai-generator.ts:948` (1-line cast courtesy fix from concurrent commit `0ffd0eae`). All 6 phases done.
 
 ## Success Metrics (reuse PRD F01V §5)
 - **Ben-Ben guard**: 0 fixture trong matrix có rendered viewport empty-region >30% height
