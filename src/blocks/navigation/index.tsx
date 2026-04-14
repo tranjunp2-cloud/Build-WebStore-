@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { BlockProps } from '../types'
-import type { NavigationConfig } from './config'
+import type { NavigationConfig, NavLink } from './config'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
 import { mergeNavigationBrandingWithSite } from '@/lib/site-settings'
@@ -23,6 +23,63 @@ function NavLogo({ logo, logoText, className }: { logo?: { url: string; alt?: st
         }}>
             {logoText}
         </span>
+    )
+}
+
+// ── BUG-F05-033: Dropdown link with hover submenu ─────────────────────────────
+
+function DropdownLink({ link, i }: { link: NavLink; i: number }) {
+    const [open, setOpen] = useState(false)
+    const hasChildren = link.children && link.children.length > 0
+
+    if (!hasChildren) {
+        return (
+            <motion.a
+                key={i}
+                href={link?.url}
+                whileHover={{ y: -1 }}
+                className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04]"
+            >
+                {link.label}
+            </motion.a>
+        )
+    }
+
+    return (
+        <div
+            className="relative"
+            onMouseEnter={() => setOpen(true)}
+            onMouseLeave={() => setOpen(false)}
+        >
+            <button
+                type="button"
+                className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04] inline-flex items-center gap-1"
+            >
+                {link.label}
+                <svg className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            <AnimatePresence>
+                {open && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-xl border border-white/10 bg-[#0F172A]/95 p-1.5 shadow-xl backdrop-blur-lg"
+                    >
+                        {link.children!.map((child, ci) => (
+                            <a
+                                key={ci}
+                                href={child.url}
+                                className="block rounded-lg px-3 py-2 text-sm font-medium opacity-70 hover:opacity-100 hover:bg-white/[0.06] transition-all"
+                            >
+                                {child.label}
+                            </a>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
     )
 }
 
@@ -84,14 +141,7 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                 {/* Desktop Links */}
                 <div className="hidden md:flex items-center gap-1">
                     {links.map((link, i) => (
-                        <motion.a
-                            key={i}
-                            href={link?.url}
-                            whileHover={{ y: -1 }}
-                            className="relative px-4 py-2 text-sm font-medium opacity-60 hover:opacity-100 transition-all duration-200 rounded-lg hover:bg-white/[0.04]"
-                        >
-                            {link.label}
-                        </motion.a>
+                        <DropdownLink key={i} link={link} i={i} />
                     ))}
                 </div>
 
@@ -140,14 +190,29 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
                     >
                         <div className="container mx-auto px-6 py-4 flex flex-col gap-1">
                             {links.map((link, i) => (
-                                <a
-                                    key={i}
-                                    href={link?.url}
-                                    className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    {link.label}
-                                </a>
+                                <div key={i}>
+                                    <a
+                                        href={link?.url}
+                                        className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200 block"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                    >
+                                        {link.label}
+                                    </a>
+                                    {(link as NavLink).children && (link as NavLink).children!.length > 0 && (
+                                        <div className="ml-4 flex flex-col gap-0.5">
+                                            {(link as NavLink).children!.map((child: NavLink, ci: number) => (
+                                                <a
+                                                    key={ci}
+                                                    href={child.url}
+                                                    className="px-4 py-2 text-sm opacity-50 hover:opacity-90 rounded-lg hover:bg-white/[0.04] transition-all block"
+                                                    onClick={() => setMobileMenuOpen(false)}
+                                                >
+                                                    {child.label}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             ))}
                             {ctaButton?.show && (
                                 <a
@@ -220,17 +285,7 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
                 {/* Desktop Links */}
                 <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
                     {links.map((link, i) => (
-                        <motion.a
-                            key={i}
-                            href={link?.url}
-                            whileHover={{ y: -1 }}
-                            className="px-4 py-2 text-sm font-medium opacity-70 hover:opacity-100 transition-all duration-200 rounded-lg"
-                            style={{
-                                color: 'inherit',
-                            }}
-                        >
-                            {link.label}
-                        </motion.a>
+                        <DropdownLink key={i} link={link} i={i} />
                     ))}
                 </div>
 
@@ -520,14 +575,29 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
                     >
                         <div className="container mx-auto px-6 py-4 flex flex-col gap-1">
                             {links.map((link, i) => (
-                                <a
-                                    key={i}
-                                    href={link?.url}
-                                    className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    {link.label}
-                                </a>
+                                <div key={i}>
+                                    <a
+                                        href={link?.url}
+                                        className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200 block"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                    >
+                                        {link.label}
+                                    </a>
+                                    {(link as NavLink).children && (link as NavLink).children!.length > 0 && (
+                                        <div className="ml-4 flex flex-col gap-0.5">
+                                            {(link as NavLink).children!.map((child: NavLink, ci: number) => (
+                                                <a
+                                                    key={ci}
+                                                    href={child.url}
+                                                    className="px-4 py-2 text-sm opacity-50 hover:opacity-90 rounded-lg hover:bg-white/[0.04] transition-all block"
+                                                    onClick={() => setMobileMenuOpen(false)}
+                                                >
+                                                    {child.label}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             ))}
                             {ctaButton?.show && (
                                 <a
@@ -705,14 +775,29 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
                     >
                         <div className="container mx-auto px-6 py-4 flex flex-col gap-1">
                             {links.map((link, i) => (
-                                <a
-                                    key={i}
-                                    href={link?.url}
-                                    className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200"
-                                    onClick={() => setMobileMenuOpen(false)}
-                                >
-                                    {link.label}
-                                </a>
+                                <div key={i}>
+                                    <a
+                                        href={link?.url}
+                                        className="px-4 py-3 text-sm font-medium opacity-70 hover:opacity-100 rounded-lg hover:bg-white/[0.06] transition-all duration-200 block"
+                                        onClick={() => setMobileMenuOpen(false)}
+                                    >
+                                        {link.label}
+                                    </a>
+                                    {(link as NavLink).children && (link as NavLink).children!.length > 0 && (
+                                        <div className="ml-4 flex flex-col gap-0.5">
+                                            {(link as NavLink).children!.map((child: NavLink, ci: number) => (
+                                                <a
+                                                    key={ci}
+                                                    href={child.url}
+                                                    className="px-4 py-2 text-sm opacity-50 hover:opacity-90 rounded-lg hover:bg-white/[0.04] transition-all block"
+                                                    onClick={() => setMobileMenuOpen(false)}
+                                                >
+                                                    {child.label}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             ))}
                             {ctaButton?.show && (
                                 <a
@@ -780,13 +865,7 @@ function PillNav({ mergedBlock, logoText, links, ctaButton }: {
                 {/* Desktop Links */}
                 <div className="hidden md:flex items-center gap-0.5">
                     {links.map((link, i) => (
-                        <a
-                            key={i}
-                            href={link?.url}
-                            className="px-3 py-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 transition-colors duration-200 rounded-full hover:bg-black/[0.04]"
-                        >
-                            {link.label}
-                        </a>
+                        <DropdownLink key={i} link={link} i={i} />
                     ))}
                 </div>
 

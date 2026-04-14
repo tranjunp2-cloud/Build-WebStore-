@@ -129,10 +129,24 @@ export async function middleware(req: NextRequest) {
             try {
                 const checkRes = await fetch(checkUrl, { cache: 'no-store', signal: controller.signal })
                 if (checkRes.ok) {
-                    const { redirect, newSlug } = await checkRes.json()
-                    if (redirect && newSlug && newSlug !== tenantSlug) {
-                        const redirectUrl = `https://${newSlug}.${PLATFORM_DOMAIN}${pathname}`
+                    const data = await checkRes.json()
+                    if (data.redirect && data.newSlug && data.newSlug !== tenantSlug) {
+                        const redirectUrl = `https://${data.newSlug}.${PLATFORM_DOMAIN}${pathname}`
                         return NextResponse.redirect(redirectUrl, { status: 301 })
+                    }
+                    // BUG-F05-006: Return 503 for maintenance mode (draft + was published)
+                    if (data.maintenance && !pathname.startsWith('/api')) {
+                        return new NextResponse(
+                            `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Maintenance</title><style>*{margin:0;padding:0;box-sizing:border-box}body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0B1120;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif}.c{text-align:center;padding:2rem}.icon{font-size:3rem;margin-bottom:1rem}h1{font-size:1.5rem;font-weight:700;margin-bottom:.5rem}p{opacity:.7;font-size:.875rem;max-width:28rem}</style></head><body><div class="c"><div class="icon">🔧</div><h1>${data.siteName || 'Website'} đang bảo trì</h1><p>Chúng tôi đang cập nhật website. Vui lòng quay lại sau.</p></div></body></html>`,
+                            {
+                                status: 503,
+                                headers: {
+                                    'Content-Type': 'text/html; charset=utf-8',
+                                    'Retry-After': '3600',
+                                    'Cache-Control': 'no-store',
+                                },
+                            },
+                        )
                     }
                 }
             } finally {
