@@ -6,10 +6,24 @@
  * for the same business yields a stable theme, while different businesses
  * within the same category rotate through the 5 variants.
  *
+ * ## Canonical API (post phase-02)
+ *
+ *   `pickCategoryThemeWithMood(category, seed) → { preset, mood }`
+ *
+ * Returns the composite theme — use this in all new code. The resolved
+ * `mood` (`ThemeMood` record) bundles imagery keywords, voice style rules,
+ * and category-tuned CTAs that downstream consumers (system prompt, media
+ * pipeline, composer block builders) need together.
+ *
+ * Legacy `pickCategoryTheme(category, seed) → ThemePreset` is kept for the
+ * existing test suite and other backward-compat consumers, but it is
+ * `@deprecated` — new code should prefer `pickCategoryThemeWithMood`.
+ *
  * Consumed by:
- *   - openai-generator.ts (happy path) to override AI theme output
- *   - system-prompt.ts     to inject exact hex values as soft guidance
- *   - fallback-adapter.ts  (optional) for composer consistency
+ *   - openai-generator.ts (happy path) — uses `pickCategoryThemeWithMood`
+ *   - generate-site/route.ts (image pipeline) — uses `pickCategoryThemeWithMood`
+ *   - system-prompt.ts — receives preset via ThemePromptContext (mood via preset.moodId)
+ *   - fallback-adapter.ts (optional) — composer reads preset.moodId directly
  */
 
 import {
@@ -54,7 +68,13 @@ export function canonicalizeCategory(raw: string | undefined | null): string {
  * @param seed     - any number; typically `hashBusinessName(name)` for per-business stability
  * @returns        - a ThemePreset with primary/secondary/accent colors + fontPairingId + mode + spacing + radius + shadow + moodId
  *
- * Legacy signature — returns preset only. New code should call `pickCategoryThemeWithMood`.
+ * @deprecated Plan 260414-2249 phase-02 — use `pickCategoryThemeWithMood(category, seed)`
+ * which returns `{ preset, mood }`. The composite `mood` record bundles
+ * imagery keywords, voice rules, and category-tuned CTAs that downstream
+ * consumers need together. This legacy function is retained for the
+ * existing `category-theme-picker.test.ts` suite and any caller that
+ * strictly needs `ThemePreset` only — but all production paths
+ * (openai-generator, route.ts) now call `pickCategoryThemeWithMood`.
  */
 export function pickCategoryTheme(category: string, seed: number): ThemePreset {
     const key = canonicalizeCategory(category)
