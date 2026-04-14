@@ -52,6 +52,7 @@ export default async function DashboardRoot({ searchParams }: Props) {
                         or: [
                             { generationStatus: { equals: 'completed' } },
                             { generationStatus: { equals: 'none' } },
+                            { generationStatus: { equals: null } },
                             { generationStatus: { exists: false } },
                         ],
                     },
