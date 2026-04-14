@@ -379,6 +379,7 @@ export type BusinessInfoInput = {
 }
 
 import type { ThemeMood } from './theme-moods'
+import type { CategoryRecipe } from './category-recipes'
 
 export type BuildUserPromptOptions = {
   extraInstructions?: string
@@ -386,6 +387,13 @@ export type BuildUserPromptOptions = {
   referencePrompt?: string
   /** Plan 260414-2249 phase-02: bundled voice/imagery/CTA archetype. */
   mood?: ThemeMood
+  /**
+   * Plan 260414-2249 phase-04: ordered block sequence hard constraint.
+   * When provided, replaces the legacy `generateCompositionHint`
+   * category signature with an explicit RHYTHM section in the user
+   * prompt — tells GPT the exact order of blocks to emit.
+   */
+  recipe?: CategoryRecipe
 }
 
 export function buildUserPrompt(
@@ -398,11 +406,13 @@ export function buildUserPrompt(
   // OR new options object. Normalize.
   let extraInstructions: string | undefined
   let mood: ThemeMood | undefined
+  let recipe: CategoryRecipe | undefined
   if (typeof extraInstructionsOrOptions === 'string' || extraInstructionsOrOptions === undefined) {
     extraInstructions = extraInstructionsOrOptions
   } else {
     extraInstructions = extraInstructionsOrOptions.extraInstructions
     mood = extraInstructionsOrOptions.mood
+    recipe = extraInstructionsOrOptions.recipe
     if (extraInstructionsOrOptions.language) language = extraInstructionsOrOptions.language
     if (extraInstructionsOrOptions.referencePrompt) referencePrompt = extraInstructionsOrOptions.referencePrompt
   }
@@ -444,8 +454,19 @@ export function buildUserPrompt(
     )
   }
 
-  // Inject dynamically generated block composition hint
-  if (!referencePrompt) {
+  // Plan 260414-2249 phase-04: inject ordered RHYTHM section when a recipe
+  // is provided. This is a HARD constraint (not "feel free to modify") —
+  // GPT should produce blocks in this exact order. Replaces the legacy
+  // generateCompositionHint which used a shuffled CATEGORY_SIGNATURE_BLOCKS
+  // lookup.
+  if (!referencePrompt && recipe) {
+    const sequence = recipe.blocks.join(' → ')
+    const required = recipe.required.join(', ')
+    parts.push(
+      `\nRHYTHM: ${recipe.label} (${recipe.rhythm})\nBlock sequence: ${sequence}\nRequired blocks (must be present): ${required}\nRationale: ${recipe.description}\nIMPORTANT: Emit blocks in this exact order. You may omit optional blocks but do not reorder them.`,
+    )
+  } else if (!referencePrompt) {
+    // Legacy path: category signature hint when no recipe provided.
     const categoryLower = info.industry.toLowerCase()
     const matchedCategory = Object.keys(CATEGORY_SIGNATURE_BLOCKS).find(
       cat => categoryLower.includes(cat) || (CATEGORY_HINTS[cat] && CATEGORY_HINTS[cat].split(', ').some(kw => categoryLower.includes(kw)))
