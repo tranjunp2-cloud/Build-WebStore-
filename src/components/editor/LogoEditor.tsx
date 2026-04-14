@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from 'react'
 import { Loader2, Upload } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { toast } from 'sonner'
+import { useI18n } from '@/i18n'
 
 interface LogoEditorProps {
     currentLogo?: string | null
@@ -37,6 +38,8 @@ async function generateFavicon(imageUrl: string): Promise<Blob | null> {
 }
 
 export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
+    const { t } = useI18n()
+    const le = t.editor.logoEditor
     const fileInputRef = useRef<HTMLInputElement>(null)
     const previewUrlRef = useRef<string | null>(null)
     const [isUploading, setIsUploading] = useState(false)
@@ -90,10 +93,10 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             }
 
             onLogoChange(logoUrl, faviconUrl)
-            toast.success('Logo updated' + (faviconUrl ? ' & Favicon generated' : ''))
+            toast.success(le.success + (faviconUrl ? le.faviconGenerated : ''))
         } catch (error) {
             console.error('Logo upload error:', error)
-            toast.error('Failed to update logo')
+            toast.error(le.error)
         } finally {
             setIsUploading(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
@@ -133,7 +136,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
                 )}
 
                 <span className="text-xs font-medium leading-4 text-[#94A3B8]">
-                    {isUploading ? 'Uploading...' : 'Click to upload'}
+                    {isUploading ? le.uploading : le.clickToUpload}
                 </span>
             </button>
 

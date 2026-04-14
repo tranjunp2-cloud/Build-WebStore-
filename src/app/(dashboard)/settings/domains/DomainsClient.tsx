@@ -3,6 +3,7 @@
 import React, { useState, useTransition, useCallback, useRef, useEffect } from 'react';
 import { Globe, Plus, AlertCircle, Copy, Check, ChevronRight, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { useI18n } from '@/i18n';
 import { addCustomDomain, verifyCustomDomain, removeCustomDomain, setPrimaryDomain, clearPrimaryDomain } from './actions';
 
 // Đọc từ env vars — deploy production chỉ cần set các biến này, không sửa code
@@ -136,6 +137,7 @@ export function DomainsClient({
     tenantSlug: string;
     customDomains: DomainEntry[];
 }) {
+    const { t } = useI18n();
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isSelectPrimaryOpen, setIsSelectPrimaryOpen] = useState(false);
     const [newDomainInput, setNewDomainInput] = useState('');
@@ -144,6 +146,7 @@ export function DomainsClient({
     const [verifyErrors, setVerifyErrors] = useState<Record<string, string>>({});
     const [verifyingDomain, setVerifyingDomain] = useState<string | null>(null);
     const [removingDomain, setRemovingDomain] = useState<string | null>(null);
+    const [domainError, setDomainError] = useState('');
 
     // F23: Slug editor state
     const [currentSlug, setCurrentSlug] = useState(tenantSlug);
@@ -202,11 +205,41 @@ export function DomainsClient({
     };
 
     const handleAddDomain = () => {
-        const domainValue = newDomainInput.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
-        const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+        const raw = newDomainInput.trim();
 
+        // BUG-F19.01: Block http/https prefix with warning
+        if (/^https?:\/\//i.test(raw)) {
+            setDomainError(t?.Domains?.errorHttpPrefix || 'Do not include http/https, enter the domain name only');
+            return;
+        }
+
+        const domainValue = raw.toLowerCase().replace(/\/$/, '');
+
+        // BUG-F19.04: Specific validation messages
+        if (!domainValue) {
+            setDomainError(t?.Domains?.errorRequired || 'Please enter a domain name');
+            return;
+        }
+        if (/\s/.test(domainValue)) {
+            setDomainError(t?.Domains?.errorSpaces || 'Domain name cannot contain spaces');
+            return;
+        }
+        if (domainValue.length > 253) {
+            setDomainError(t?.Domains?.errorTooLong || 'Domain name must not exceed 253 characters');
+            return;
+        }
+        if (!/\./.test(domainValue)) {
+            setDomainError(t?.Domains?.errorNoTld || 'Domain must include an extension (e.g., .com, .my)');
+            return;
+        }
+        if (/[^a-zA-Z0-9.-]/.test(domainValue)) {
+            setDomainError(t?.Domains?.errorInvalidChars || 'Domain contains invalid characters');
+            return;
+        }
+
+        const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
         if (!domainRegex.test(domainValue)) {
-            toast.error('Invalid domain format. Please enter a valid domain (e.g., store.example.com)');
+            setDomainError(t?.Domains?.errorInvalidFormat || 'Invalid domain format');
             return;
         }
         startTransition(async () => {
@@ -227,6 +260,7 @@ export function DomainsClient({
     };
 
     const handleVerify = (domain: string) => {
+        if (verifyingDomain) return; // BUG-F19.05: Prevent double-click
         setVerifyErrors(prev => { const next = { ...prev }; delete next[domain]; return next; });
         setVerifyingDomain(domain);
         startTransition(async () => {
@@ -322,7 +356,7 @@ export function DomainsClient({
                         </button>
                         <button
                             type="button"
-                            onClick={() => setIsAddModalOpen(true)}
+                            onClick={() => { setIsAddModalOpen(true); setDomainError(''); setNewDomainInput(''); }}
                             style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
                             className="flex items-center justify-center gap-2 h-[48px] px-6 rounded-[16px] text-white text-[14px] sm:text-[16px] font-semibold shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
                         >
@@ -515,7 +549,7 @@ export function DomainsClient({
                                     <button
                                         type="button"
                                         onClick={() => handleVerify(domain)}
-                                        disabled={verifyingDomain === domain}
+                                        disabled={isPending || !!verifyingDomain}
                                         className="w-full sm:flex-1 flex items-center justify-center h-[50px] rounded-[16px] hover:opacity-90 text-white text-[16px] font-semibold font-['Inter'] transition-opacity gap-[8px] shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] disabled:opacity-70"
                                         style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
                                     >
@@ -592,12 +626,15 @@ export function DomainsClient({
                         <input
                             type="text"
                             value={newDomainInput}
-                            onChange={(e) => setNewDomainInput(e.target.value.replace(/https?:\/\//i, ''))}
+                            onChange={(e) => { setNewDomainInput(e.target.value); setDomainError(''); }}
                             onKeyDown={(e) => e.key === 'Enter' && !isPending && handleAddDomain()}
                             placeholder="example.com"
                             autoFocus
-                            className="mt-[24px] w-full h-[50px] py-[12px] px-[16px] rounded-[16px] bg-[#0B1120] border border-white/[0.08] text-[16px] font-normal text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.4)] focus:outline-none transition-all font-['Inter']"
+                            className={`mt-[24px] w-full h-[50px] py-[12px] px-[16px] rounded-[16px] bg-[#0B1120] text-[16px] font-normal text-[#F8FAFC] placeholder:text-[rgba(248,250,252,0.4)] focus:outline-none transition-all font-['Inter'] ${domainError ? 'border border-red-500' : 'border border-white/[0.08]'}`}
                         />
+                        {domainError && (
+                            <p className="text-red-400 text-[13px] mt-[8px]">{domainError}</p>
+                        )}
                         {/* Buttons — Figma: y=179, input bottom=155 → gap=24px */}
                         <div className="mt-[24px] flex items-center gap-[12px]">
                             <button

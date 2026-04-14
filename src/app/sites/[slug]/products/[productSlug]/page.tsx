@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Metadata } from 'next'
@@ -66,13 +67,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const description = (product as any).seo?.description || (product as any).shortDescription || `Buy ${product.name} from ${site.name}`
     const ogImage = (product as any).images?.[0]?.image?.url
 
+    // BUG-F05-020: Resolve canonical URL for product pages
+    const reqHeaders = await headers()
+    const tenantHostname = reqHeaders.get('x-tenant-hostname')
+    const tenantSlug = reqHeaders.get('x-tenant-slug')
+    const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+
+    let baseUrl: string
+    if (tenantHostname) {
+        baseUrl = `https://${tenantHostname}`
+    } else if (tenantSlug) {
+        baseUrl = `https://${tenantSlug}.${PLATFORM_DOMAIN}`
+    } else if (slug !== 'custom') {
+        baseUrl = `https://${slug}.${PLATFORM_DOMAIN}`
+    } else {
+        baseUrl = ''
+    }
+    const canonical = baseUrl ? `${baseUrl}/products/${productSlug}` : undefined
+
     return {
         title,
         description,
+        alternates: canonical ? { canonical } : undefined,
         openGraph: {
             title,
             description,
             type: 'website',
+            ...(canonical ? { url: canonical } : {}),
             ...(ogImage && { images: [{ url: ogImage }] }),
         },
     }

@@ -167,12 +167,21 @@ export async function DELETE(
             },
         })
 
+        // Invalidate cached site data so storefront shows maintenance page
+        try {
+            revalidateTag(`site-${siteId}`)
+            revalidateTag('tenants')
+        } catch (err) {
+            console.warn('[Unpublish] revalidateTag failed:', err instanceof Error ? err.message : String(err))
+        }
+
         return NextResponse.json({
             success: true,
             data: {
                 id: site.id,
                 name: site.name,
                 status: 'draft',
+                unpublishedAt: new Date().toISOString(),
             },
         })
 

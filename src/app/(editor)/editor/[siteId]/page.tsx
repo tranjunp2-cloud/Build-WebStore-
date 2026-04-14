@@ -11,7 +11,7 @@ import { EditorSidebar, type EditorSidebarTabId } from '@/components/editor/Edit
 import { EditorToolbar } from '@/components/editor/EditorToolbar'
 import { PageManagerPanel } from '@/components/editor/PageManagerPanel'
 import { PreviewFrame } from '@/components/editor/PreviewFrame'
-import { SettingsPanel } from '@/components/editor/SettingsPanel'
+import { SettingsPanel, type SettingsTab } from '@/components/editor/SettingsPanel'
 import { useEditorStore } from '@/store/editorStore'
 import type { AIAction } from '@/types/editor'
 import { useI18n } from '@/i18n'
@@ -88,12 +88,14 @@ export default function EditorPage() {
     const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop')
     const [activeSidebarTab, setActiveSidebarTab] = useState<EditorSidebarTabId>('chat')
     const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [userData, setUserData] = useState<{ name: string; initial: string } | null>(null)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
     const [isCompactLayout, setIsCompactLayout] = useState(false)
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
     const [isUnpublishModalOpen, setIsUnpublishModalOpen] = useState(false)
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
+    const [settingsRequestedTab, setSettingsRequestedTab] = useState<SettingsTab | null>(null)
 
     const blocks = useEditorStore(state => state.blocks)
     const theme = useEditorStore(state => state.theme)
@@ -209,6 +211,12 @@ export default function EditorPage() {
                     setSite(data.site)
                 }
 
+                // Extract user info for menu drawer
+                if (data.user) {
+                    const name = data.user.firstName || data.user.email?.split('@')[0] || 'User'
+                    setUserData({ name, initial: name.charAt(0).toUpperCase() })
+                }
+
                 if (data.page) {
                     const loadedPage = { id: data.page.id, title: data.page.title }
                     setPage(loadedPage)
@@ -236,6 +244,8 @@ export default function EditorPage() {
 
         void loadData()
     }, [init, selectedPageId, setCurrentPageId, setPages, siteId])
+
+    // User data is loaded from editor-data API in loadData useEffect above
 
     const handleSave = useCallback(async (options: SaveOptions = {}) => {
         if (!siteId) return false
@@ -739,6 +749,19 @@ export default function EditorPage() {
         }
     }, [siteId, updatePageInState])
 
+    // BUG-F05-032/046: context-sensitive tab switching when blocks are clicked
+    const handleBlockSelectWithContext = useCallback((blockIndex: number | null, blockType?: string) => {
+        if (blockType === 'navigation' || blockType === 'footer') {
+            // Header/footer clicked → deselect block, show menu tab in SettingsPanel
+            setSelectedBlock(null)
+            setSettingsRequestedTab('menu')
+        } else {
+            setSelectedBlock(blockIndex)
+            // Clear any previous requested tab override so SettingsPanel's own logic takes over
+            setSettingsRequestedTab(null)
+        }
+    }, [])
+
     const handleMobileBlockSelect = useCallback((blockIndex: number | null) => {
         setSelectedBlock(blockIndex)
         if (isCompactLayout && blockIndex !== null) {
@@ -794,6 +817,8 @@ export default function EditorPage() {
                 siteId={siteId}
                 open={isMenuOpen}
                 onClose={() => setIsMenuOpen(false)}
+                userName={userData?.name}
+                userInitial={userData?.initial}
             />
 
             <EditorToolbar
@@ -899,6 +924,7 @@ export default function EditorPage() {
                                     onFooterUpdate={(changes) => updateFooterBlock(changes)}
                                     onSiteSettingsChange={handleSiteSettingsChange}
                                     onPageUpdate={handlePageUpdate}
+                                    requestedTab={settingsRequestedTab}
                                 />
                             </div>
                         </div>
@@ -922,7 +948,7 @@ export default function EditorPage() {
                             isLoading={isLoading}
                             viewport={viewport}
                             selectedBlock={selectedBlock}
-                            onBlockSelect={setSelectedBlock}
+                            onBlockSelect={handleBlockSelectWithContext}
                             onInlineEditApplied={(content, blockIndex) => {
                                 setSelectedBlock(blockIndex)
                                 setActiveSidebarTab('chat')

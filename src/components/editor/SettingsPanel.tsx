@@ -85,7 +85,7 @@ const labelCls = "text-[11px] font-medium text-slate-400"
 const sectionCls = "border-t border-white/10 pt-4"
 
 type FieldBlurEvent = React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
-type SettingsTab = 'global' | 'seo' | 'menu' | 'block'
+export type SettingsTab = 'global' | 'seo' | 'menu' | 'block'
 
 function getBlockInfo(blockType: string) {
     const meta = blockRegistry.getBlockMeta(blockType)
@@ -150,16 +150,20 @@ interface SettingsPanelProps {
     }) => void | Promise<void>
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
+    /** External tab request — set to 'menu' when navigation/footer block is clicked (BUG-F05-032/046) */
+    requestedTab?: SettingsTab | null
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
 function SettingsPanelInner({
     block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages, currentPageId,
     onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
-    onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate
+    onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
+    requestedTab,
 }: SettingsPanelProps) {
     const { t } = useI18n()
     const pm = t.editor.pageManager
+    const s = t.editor.settings
     // Version key: changes when block data changes (from inline editing or AI) → forces input re-mount
     const blockDataVersion = useMemo(() => {
         if (!block) return ''
@@ -188,6 +192,13 @@ function SettingsPanelInner({
 
         setActiveTab(prev => (prev === 'block' ? 'global' : prev))
     }, [block])
+
+    // BUG-F05-032/046: respond to external tab requests (e.g. clicking header → 'menu')
+    useEffect(() => {
+        if (requestedTab) {
+            setActiveTab(requestedTab)
+        }
+    }, [requestedTab])
 
     const siteContactInfo = site?.contactInfo || {}
     const siteSocialLinks = site?.socialLinks || {}
@@ -233,7 +244,7 @@ function SettingsPanelInner({
     const renderThemeContent = () => theme ? (
         <div className="space-y-3">
             <div>
-                <label className="text-xs text-gray-400">Primary Color</label>
+                <label className="text-xs text-gray-400">{s.primaryColor}</label>
                 <div className="mt-1 flex items-center gap-2">
                     <input type="color" value={(theme.primaryColor as string) || '#0ea5e9'}
                         onChange={e => onThemeChange('primaryColor', e.target.value)}
@@ -245,27 +256,27 @@ function SettingsPanelInner({
                 </div>
             </div>
             <div>
-                <label className="text-xs text-gray-400">Heading Font</label>
+                <label className="text-xs text-gray-400">{s.headingFont}</label>
                 <select value={(theme.fontHeading as string) || 'Outfit'} onChange={e => onThemeChange('fontHeading', e.target.value)}
                     className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
                     {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
             </div>
             <div>
-                <label className="text-xs text-gray-400">Body Font</label>
+                <label className="text-xs text-gray-400">{s.bodyFont}</label>
                 <select value={(theme.fontBody as string) || 'Inter'} onChange={e => onThemeChange('fontBody', e.target.value)}
                     className="mt-1 w-full rounded-lg border border-white/10 bg-[#1E293B] px-3 py-1.5 text-xs text-white outline-none">
                     {FONT_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
             </div>
             <div>
-                <label className="text-xs text-gray-400">Color Mode</label>
+                <label className="text-xs text-gray-400">{s.colorMode}</label>
                 <div className="mt-1 flex gap-2">
                     {(['dark', 'light'] as const).map(mode => (
                         <button key={mode} onClick={() => onThemeChange('colorMode', mode)}
                             className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors',
                                 theme.colorMode === mode ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10')}>
-                            {mode === 'dark' ? 'Dark' : 'Light'}
+                            {mode === 'dark' ? s.dark : s.light}
                         </button>
                     ))}
                 </div>
@@ -275,10 +286,10 @@ function SettingsPanelInner({
 
     const renderGlobalContent = () => (
         <div className="space-y-4">
-            {renderGlobalAccordion('brand', 'Brand Identity', (
+            {renderGlobalAccordion('brand', s.brandIdentity, (
                 <div className="space-y-4">
                     <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Business Name</label>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.businessName}</label>
                         <Input
                             defaultValue={siteName || site?.name || ''}
                             key={`business-name-${siteName || site?.name || ''}`}
@@ -290,11 +301,11 @@ function SettingsPanelInner({
                             maxLength={200}
                             variant="editor"
                             className={editorInputClassName}
-                            placeholder="Your Company"
+                            placeholder={s.businessNamePlaceholder}
                         />
                     </div>
                     <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Upload Logo</label>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.uploadLogo}</label>
                         <div className="mt-2">
                             <LogoEditor
                                 currentLogo={(siteBranding.logo as string) || ((headerBlock as Record<string, unknown>)?.logo as string) || null}
@@ -312,21 +323,28 @@ function SettingsPanelInner({
                 </div>
             ))}
 
-            {renderGlobalAccordion('contact', 'Contact Info', (
+            {renderGlobalAccordion('contact', s.contactInfo, (
                 <div className="space-y-4">
                     <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Phone</label>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.phone}</label>
                         <Input
                             defaultValue={siteContactInfo.phone || ''}
                             key={`contact-phone-${siteContactInfo.phone || ''}`}
-                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: e.target.value } })}
+                            onBlur={(e: FieldBlurEvent) => {
+                                const v = e.target.value.trim()
+                                if (!v || /^\+?[\d\s\-().]*$/.test(v)) {
+                                    void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: v } })
+                                } else {
+                                    toast.error('Please enter a valid phone number (digits, +, -, spaces)')
+                                }
+                            }}
                             variant="editor"
                             className={editorInputClassName}
-                            placeholder="+60 12-345-6789"
+                            placeholder={s.phonePlaceholder}
                         />
                     </div>
                     <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Email</label>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.email}</label>
                         <Input
                             type="email"
                             defaultValue={siteContactInfo.email || ''}
@@ -335,29 +353,29 @@ function SettingsPanelInner({
                                 if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
                                     void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, email: e.target.value } })
                                 } else {
-                                    toast.error('Please enter a valid email address')
+                                    toast.error(s.invalidEmail)
                                 }
                             }}
                             variant="editor"
                             className={editorInputClassName}
-                            placeholder="hello@company.com"
+                            placeholder={s.emailPlaceholder}
                         />
                     </div>
                     <div>
-                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Address</label>
+                        <label className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{s.address}</label>
                         <Textarea
                             defaultValue={siteContactInfo.address || ''}
                             key={`contact-address-${siteContactInfo.address || ''}`}
                             onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, address: e.target.value } })}
                             variant="editor"
                             className={editorTextareaClassName}
-                            placeholder="12 Jalan Ampang, Kuala Lumpur"
+                            placeholder={s.addressPlaceholder}
                         />
                     </div>
                 </div>
             ))}
 
-            {renderGlobalAccordion('social', 'Social Links', (
+            {renderGlobalAccordion('social', s.socialLinks, (
                 <div className="space-y-3">
                     {(['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok'] as const).map(platform => (
                         <Input
@@ -370,12 +388,12 @@ function SettingsPanelInner({
                                     return
                                 }
                                 if (containsHtml(raw)) {
-                                    toast.error(`Invalid input for ${platform} — HTML is not allowed`)
+                                    toast.error(s.invalidSocialHtml)
                                     e.target.value = ''
                                     return
                                 }
                                 if (!isValidUrl(raw)) {
-                                    toast.error(`Please enter a valid URL for ${platform} (https://...)`)
+                                    toast.error(s.invalidSocialUrl)
                                     e.target.value = ''
                                     return
                                 }
@@ -389,7 +407,7 @@ function SettingsPanelInner({
                 </div>
             ))}
 
-            {renderGlobalAccordion('theme', 'Theme & Colors', renderThemeContent())}
+            {renderGlobalAccordion('theme', s.themeColors, renderThemeContent())}
         </div>
     )
 
@@ -442,14 +460,14 @@ function SettingsPanelInner({
     const normalizedPreviewPath = isHomepage ? '' : seoSlugValue.replace(/^\//, '')
     const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
     const previewDomain = (site?.primaryDomain || site?.domain || `${(siteName || site?.name || 'site').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}.${platformDomain}`).replace(/^https?:\/\//, '')
-    const metaTitleWarning = seoTitleValue.length > 60 ? 'Title may be truncated on Google Search.' : null
-    const metaDescriptionWarning = seoDescriptionValue.length > 160 ? 'Description may be truncated on Google Search.' : null
+    const metaTitleWarning = seoTitleValue.length > 60 ? s.titleTruncated : null
+    const metaDescriptionWarning = seoDescriptionValue.length > 160 ? s.descTruncated : null
 
     const renderSeoContent = () => {
         if (!activePage) {
             return (
                 <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-400">
-                    Select a page to configure SEO settings.
+                    {s.selectPageSeo}
                 </div>
             )
         }
@@ -457,7 +475,7 @@ function SettingsPanelInner({
         return (
             <div className="space-y-5">
                 <div>
-                    <label className={labelCls}>URL Slug</label>
+                    <label className={labelCls}>{s.urlSlug}</label>
                     <Input
                         value={isHomepage ? '/' : seoSlugValue}
                         disabled={isHomepage || siteStatus === 'published'}
@@ -481,7 +499,7 @@ function SettingsPanelInner({
                     ) : null}
                 </div>
                 <div>
-                    <label className={labelCls}>Meta Title</label>
+                    <label className={labelCls}>{s.metaTitle}</label>
                     <Input
                         value={seoTitleValue}
                         onChange={(e) => setSeoTitleInput(e.target.value)}
@@ -493,11 +511,11 @@ function SettingsPanelInner({
                         <span className={cn('text-[10px] text-slate-500', metaTitleWarning && 'text-amber-400')}>
                             {metaTitleWarning || ' '}
                         </span>
-                        <span className={cn('text-[10px] text-slate-500', metaTitleWarning && 'text-amber-400')}>{seoTitleValue.length}/60 characters</span>
+                        <span className={cn('text-[10px] text-slate-500', metaTitleWarning && 'text-amber-400')}>{seoTitleValue.length}/60 {s.characters}</span>
                     </div>
                 </div>
                 <div>
-                    <label className={labelCls}>Meta Description</label>
+                    <label className={labelCls}>{s.metaDescription}</label>
                     <Textarea
                         rows={4}
                         value={seoDescriptionValue}
@@ -505,18 +523,18 @@ function SettingsPanelInner({
                         onBlur={(e: FieldBlurEvent) => void handleSeoUpdate('seoDescription', e.target.value)}
                         variant="editor"
                         className={cn(editorTextareaClassName, metaDescriptionWarning && 'border-amber-500/40 focus-visible:border-amber-400')}
-                        placeholder="Tell search engines and social platforms what this page is about."
+                        placeholder={s.metaDescPlaceholder}
                     />
                     <div className="mt-1 flex items-center justify-between gap-3">
                         <span className={cn('text-[10px] text-slate-500', metaDescriptionWarning && 'text-amber-400')}>
                             {metaDescriptionWarning || ' '}
                         </span>
-                        <span className={cn('text-[10px] text-slate-500', metaDescriptionWarning && 'text-amber-400')}>{seoDescriptionValue.length}/160 characters</span>
+                        <span className={cn('text-[10px] text-slate-500', metaDescriptionWarning && 'text-amber-400')}>{seoDescriptionValue.length}/160 {s.characters}</span>
                     </div>
                 </div>
                 
                 <div className={sectionCls}>
-                    <label className="text-xs font-medium uppercase text-gray-500">Google Preview</label>
+                    <label className="text-xs font-medium uppercase text-gray-500">{s.googlePreview}</label>
                     <div className="mt-3 rounded-[8px] border border-[#25324A] bg-white p-4">
                         <div className="text-[14px] text-[#202124] truncate" style={{fontFamily: 'arial,sans-serif'}}>
                             <span className="text-[12px] text-[#202124] flex items-center gap-2">
@@ -543,7 +561,7 @@ function SettingsPanelInner({
                         onClick={async () => {
                             if (!currentPageId || !site?.id) return
                             setIsGeneratingSEO(true)
-                            const loadingToastId = toast.loading('Generating SEO optimization using AI...')
+                            const loadingToastId = toast.loading(s.generatingSeo)
                             try {
                                 const res = await fetch(`/api/sites/${site.id}/pages/${currentPageId}/generate-seo`, {
                                     method: 'POST'
@@ -566,17 +584,17 @@ function SettingsPanelInner({
                                             `Existing meta will be replaced:\n\nTitle: "${data.existing?.title || '(empty)'}"\n→ "${proposed.title}"\n\nDescription: "${data.existing?.description || '(empty)'}"\n→ "${proposed.description}"\n\nApply changes?`
                                         )
                                         if (!confirmed) {
-                                            toast.info('SEO changes cancelled')
+                                            toast.info(s.seoCancelled)
                                             return
                                         }
                                     }
                                     await applyChanges()
-                                    toast.success('SEO optimization successfully generated!', { id: loadingToastId })
+                                    toast.success(s.seoGenerated, { id: loadingToastId })
                                 } else {
-                                    toast.error('Failed to generate SEO', { id: loadingToastId })
+                                    toast.error(s.seoFailed, { id: loadingToastId })
                                 }
                             } catch (error) {
-                                toast.error('Error generating SEO', { id: loadingToastId })
+                                toast.error(s.seoError, { id: loadingToastId })
                             } finally {
                                 setIsGeneratingSEO(false)
                             }
@@ -588,7 +606,7 @@ function SettingsPanelInner({
                         ) : (
                             <span>✨</span>
                         )}
-                        {isGeneratingSEO ? 'Generating...' : 'Automatic SEO Optimization'}
+                        {isGeneratingSEO ? s.generating : s.autoSeo}
                     </button>
                 </div>
             </div>
@@ -609,7 +627,7 @@ function SettingsPanelInner({
             />
 
             <div className={sectionCls}>
-                <label className={labelCls}>Navigation Style</label>
+                <label className={labelCls}>{s.navStyle}</label>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                     {['standard', 'centered'].map(style => (
                         <button
@@ -641,20 +659,20 @@ function SettingsPanelInner({
     )
 
     const panelTitle = activeTab === 'global'
-        ? 'Global Site Settings'
+        ? s.globalSettings
         : activeTab === 'seo'
-            ? 'SEO Settings'
+            ? s.seoSettings
             : activeTab === 'menu'
-                ? 'Menu Settings'
-                : 'Block Settings'
+                ? s.menuSettings
+                : s.blockSettings
 
     const panelDescription = activeTab === 'block'
-        ? 'Adjust spacing, content, and presentation for the selected block.'
+        ? s.blockDesc
         : activeTab === 'seo'
-            ? 'Control metadata and social preview content.'
+            ? s.seoDesc
         : activeTab === 'menu'
-            ? 'Configure navigation structure and menu presentation.'
-            : 'Manage business identity, contact info, and social channels.'
+            ? s.menuDesc
+            : s.globalDesc
 
     const info = block ? getBlockInfo(block.blockType) : null
     const bt = block?.blockType
@@ -680,10 +698,10 @@ function SettingsPanelInner({
     }
 
     const tabs: Array<{ id: SettingsTab; label: string; icon: React.ReactNode; disabled?: boolean }> = [
-        { id: 'global', label: 'Global', icon: <span aria-hidden="true" className="text-[15px] leading-none">⚙️</span> },
-        { id: 'seo', label: 'SEO', icon: <span aria-hidden="true" className="text-[15px] leading-none">🔍</span> },
-        { id: 'menu', label: 'Menu', icon: <span aria-hidden="true" className="text-[15px] leading-none">🧭</span> },
-        { id: 'block', label: 'Block', icon: <span aria-hidden="true" className="text-[15px] leading-none">🎨</span>, disabled: !block },
+        { id: 'global', label: s.tabGlobal, icon: <span aria-hidden="true" className="text-[15px] leading-none">⚙️</span> },
+        { id: 'seo', label: s.tabSeo, icon: <span aria-hidden="true" className="text-[15px] leading-none">🔍</span> },
+        { id: 'menu', label: s.tabMenu, icon: <span aria-hidden="true" className="text-[15px] leading-none">🧭</span> },
+        { id: 'block', label: s.tabBlock, icon: <span aria-hidden="true" className="text-[15px] leading-none">🎨</span>, disabled: !block },
     ]
 
     return (
@@ -720,7 +738,7 @@ function SettingsPanelInner({
                                             className="z-50 rounded-md border border-white/10 bg-[#0B1120] px-3 py-2 text-xs text-slate-100 shadow-xl"
                                             style={{ fontFamily: 'var(--font-inter), system-ui, sans-serif' }}
                                         >
-                                            Please select a block first
+                                            {s.selectBlock}
                                             <Tooltip.Arrow className="fill-[#0B1120]" />
                                         </Tooltip.Content>
                                     </Tooltip.Portal>
@@ -754,7 +772,7 @@ function SettingsPanelInner({
                 {activeTab === 'menu' ? renderMenuContent() : null}
                 {activeTab === 'block' && !block ? (
                     <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-5 text-sm text-slate-400">
-                        Select a block in preview to unlock block-specific settings.
+                        {s.selectBlockMsg}
                     </div>
                 ) : null}
 
@@ -769,7 +787,7 @@ function SettingsPanelInner({
                 {/* Variant Switcher */}
                 {(info?.variants?.length || 0) > 1 && (
                     <div>
-                        <label className="text-xs font-medium uppercase text-gray-500">Variant</label>
+                        <label className="text-xs font-medium uppercase text-gray-500">{s.variant}</label>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                             {info?.variants.map(v => (
                                 <button key={v}
@@ -786,7 +804,7 @@ function SettingsPanelInner({
                 {/* ─── Common Text Fields ──────────────────────── */}
                 {block.logoText !== undefined && (
                     <div>
-                        <label className={labelCls}>Logo Text</label>
+                        <label className={labelCls}>{s.logoText}</label>
                         <Input defaultValue={stripHtmlForDisplay(block.logoText)} key={`logo-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'logoText', e.target.value)}
                             variant="editor"
@@ -796,7 +814,7 @@ function SettingsPanelInner({
 
                 {block.headline !== undefined && (
                     <div>
-                        <label className={labelCls}>Headline</label>
+                        <label className={labelCls}>{s.headline}</label>
                         <Input defaultValue={stripHtmlForDisplay(block.headline)} key={`hl-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
                             variant="editor"
@@ -806,7 +824,7 @@ function SettingsPanelInner({
 
                 {block.subheadline !== undefined && (
                     <div>
-                        <label className={labelCls}>Subheadline</label>
+                        <label className={labelCls}>{s.subheadline}</label>
                         <Textarea defaultValue={stripHtmlForDisplay(block.subheadline)} rows={2} key={`sub-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subheadline', e.target.value)}
                             variant="editor"
@@ -816,7 +834,7 @@ function SettingsPanelInner({
 
                 {block.sectionLabel !== undefined && (
                     <div>
-                        <label className={labelCls}>Section Label</label>
+                        <label className={labelCls}>{s.sectionLabel}</label>
                         <Input defaultValue={stripHtmlForDisplay(block.sectionLabel)} key={`sl-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'sectionLabel', e.target.value)}
                             variant="editor"
@@ -826,7 +844,7 @@ function SettingsPanelInner({
 
                 {block.body !== undefined && (
                     <div>
-                        <label className={labelCls}>Body Text</label>
+                        <label className={labelCls}>{s.bodyText}</label>
                         <Textarea defaultValue={stripHtmlForDisplay(block.body)} rows={4} key={`body-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'body', e.target.value)}
                             variant="editor"
@@ -836,7 +854,7 @@ function SettingsPanelInner({
 
                 {block.subtext !== undefined && (
                     <div>
-                        <label className={labelCls}>Description</label>
+                        <label className={labelCls}>{s.description}</label>
                         <Textarea defaultValue={stripHtmlForDisplay(block.subtext)} rows={3} key={`subtext-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'subtext', e.target.value)}
                             variant="editor"
@@ -846,7 +864,7 @@ function SettingsPanelInner({
 
                 {block.tagline !== undefined && (
                     <div>
-                        <label className={labelCls}>Tagline</label>
+                        <label className={labelCls}>{s.tagline}</label>
                         <Textarea defaultValue={stripHtmlForDisplay(block.tagline)} rows={2} key={`tag-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'tagline', e.target.value)}
                             variant="editor"
@@ -857,34 +875,34 @@ function SettingsPanelInner({
                 {/* ─── Contact Fields ─────────────────────────── */}
                 {(bt === 'contact') && (
                     <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">Contact Info</label>
+                        <label className="text-xs font-medium uppercase text-gray-500">{s.contactInfo}</label>
                         <div className="mt-3 space-y-3">
                             <div>
-                                <label className={labelCls}>Email</label>
+                                <label className={labelCls}>{s.email}</label>
                                 <Input type="email" defaultValue={(block.email as string) || ''} key={`email-${bk}`}
                                     onBlur={(e: FieldBlurEvent) => {
                                         if (!e.target.value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.target.value)) {
                                             onBlockFieldChange(currentBlockIndex, 'email', e.target.value)
                                         } else {
-                                            toast.error('Please enter a valid email address')
+                                            toast.error(s.invalidEmail)
                                         }
                                     }}
                                     variant="editor"
-                                    className={editorInputClassName} placeholder="contact@example.com" />
+                                    className={editorInputClassName} placeholder={s.emailPlaceholder} />
                             </div>
                             <div>
-                                <label className={labelCls}>Phone</label>
+                                <label className={labelCls}>{s.phone}</label>
                                 <Input defaultValue={(block.phone as string) || ''} key={`phone-${bk}`}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'phone', e.target.value)}
                                     variant="editor"
-                                    className={editorInputClassName} placeholder="+84 xxx xxx xxx" />
+                                    className={editorInputClassName} placeholder={s.phonePlaceholder} />
                             </div>
                             <div>
-                                <label className={labelCls}>Address</label>
+                                <label className={labelCls}>{s.address}</label>
                                 <Textarea defaultValue={(block.address as string) || ''} rows={2} key={`addr-${bk}`}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'address', e.target.value)}
                                     variant="editor"
-                                    className={editorTextareaClassName} placeholder="123 Street, City" />
+                                    className={editorTextareaClassName} placeholder={s.addressPlaceholder} />
                             </div>
                         </div>
                     </div>
@@ -893,23 +911,23 @@ function SettingsPanelInner({
                 {/* ─── CTA Fields ─────────────────────────────── */}
                 {(block.ctaLabel !== undefined || block.ctaUrl !== undefined) && (
                     <div>
-                        <label className={labelCls}>CTA Button</label>
+                        <label className={labelCls}>{s.ctaButton}</label>
                         <div className="mt-1.5 space-y-2">
                             <Input defaultValue={stripHtmlForDisplay(block.ctaLabel)} key={`ctalbl-${bk}`}
                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaLabel', e.target.value)}
                                 variant="editor"
-                                className={editorInputClassName} placeholder="Button text" />
+                                className={editorInputClassName} placeholder={s.buttonText} />
                             <Input defaultValue={(block.ctaUrl as string) || ''} key={`ctaurl-${bk}`}
                                 onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'ctaUrl', e.target.value)}
                                 variant="editor"
-                                className={editorInputClassName} placeholder="Button URL" />
+                                className={editorInputClassName} placeholder={s.buttonUrl} />
                         </div>
                     </div>
                 )}
 
                 {block.copyrightText !== undefined && (
                     <div>
-                        <label className={labelCls}>Copyright</label>
+                        <label className={labelCls}>{s.copyright}</label>
                         <Input defaultValue={block.copyrightText as string} key={`copy-${bk}`}
                             onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'copyrightText', e.target.value)}
                             variant="editor"
@@ -920,25 +938,25 @@ function SettingsPanelInner({
                 {/* ─── Hero CTA Buttons ───────────────────────── */}
                 {bt === 'hero' && ((block.ctaButtons || []) as CtaButton[]).length > 0 && (
                     <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">CTA Buttons</label>
+                        <label className="text-xs font-medium uppercase text-gray-500">{s.ctaButtons}</label>
                         {((block.ctaButtons || []) as CtaButton[]).map((btn, i) => (
                             <div key={`cta-${btn.label}-${btn.url}-${i}`} className="mt-3 rounded-lg bg-white/5 p-3 space-y-2">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] text-gray-500">Button {i + 1}</span>
                                     <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
-                                <Input defaultValue={stripHtmlForDisplay(btn.label)} placeholder="Label"
+                                <Input defaultValue={stripHtmlForDisplay(btn.label)} placeholder={s.label}
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'label', e.target.value)}
                                     variant="editor"
                                     className={editorInputClassName} />
-                                <Input defaultValue={btn.url || ''} placeholder="URL"
+                                <Input defaultValue={btn.url || ''} placeholder={s.url}
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('ctaButtons', i, 'url', e.target.value)}
                                     variant="editor"
                                     className={editorInputClassName} />
                             </div>
                         ))}
                         <button onClick={() => addArrayItem('ctaButtons', { label: 'New Button', url: '#' })}
-                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">+ Add Button</button>
+                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addButton}</button>
                     </div>
                 )}
 
@@ -959,12 +977,12 @@ function SettingsPanelInner({
                         {/* Nav CTA */}
                         {!!block.ctaButton && (
                             <div className="mt-3">
-                                <label className={labelCls}>CTA Button</label>
-                                <Input defaultValue={stripHtmlForDisplay((block.ctaButton as CtaButton)?.label)} placeholder="CTA Label"
+                                <label className={labelCls}>{s.ctaButton}</label>
+                                <Input defaultValue={stripHtmlForDisplay((block.ctaButton as CtaButton)?.label)} placeholder={s.buttonText}
                                     onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), label: e.target.value } })}
                                     variant="editor"
                                     className={editorInputClassName} />
-                                <Input defaultValue={(block.ctaButton as CtaButton)?.url || ''} placeholder="CTA URL"
+                                <Input defaultValue={(block.ctaButton as CtaButton)?.url || ''} placeholder={s.buttonUrl}
                                     onBlur={(e: FieldBlurEvent) => onBlockUpdate(currentBlockIndex, { ctaButton: { ...(block.ctaButton as CtaButton), url: e.target.value } })}
                                     variant="editor"
                                     className={editorInputClassName} />
@@ -976,72 +994,72 @@ function SettingsPanelInner({
                 {/* ─── Features Items ─────────────────────────── */}
                 {bt === 'features' && (
                     <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">Features ({((block.features || []) as FeatureItem[]).length})</label>
+                        <label className="text-xs font-medium uppercase text-gray-500">{s.features} ({((block.features || []) as FeatureItem[]).length})</label>
                         {((block.features || []) as FeatureItem[]).map((feat, i) => (
                             <div key={`feat-${feat.title}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] text-gray-500">{feat.icon || '✦'} Feature {i + 1}</span>
                                     <button onClick={() => removeArrayItem('features', i)} aria-label={`Remove feature ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
-                                <Input defaultValue={feat.title || ''} placeholder="Title"
+                                <Input defaultValue={feat.title || ''} placeholder={s.title}
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'title', e.target.value)}
                                     variant="editor"
                                     className={editorInputClassName} />
-                                <Textarea defaultValue={feat.description || ''} rows={2} placeholder="Description"
+                                <Textarea defaultValue={feat.description || ''} rows={2} placeholder={s.description}
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'description', e.target.value)}
                                     variant="editor"
                                     className={editorTextareaClassName} />
-                                <Input defaultValue={feat.icon || ''} placeholder="Icon (emoji)"
+                                <Input defaultValue={feat.icon || ''} placeholder={s.icon}
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('features', i, 'icon', e.target.value)}
                                     variant="editor"
                                     className={editorInputClassName} />
                             </div>
                         ))}
                         <button onClick={() => addArrayItem('features', { title: 'New Feature', description: '', icon: '✦' })}
-                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">+ Add Feature</button>
+                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addFeature}</button>
                     </div>
                 )}
 
                 {/* ─── Testimonials ───────────────────────────── */}
                 {bt === 'testimonials' && (
                     <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">Testimonials ({((block.testimonials || []) as TestimonialItem[]).length})</label>
+                        <label className="text-xs font-medium uppercase text-gray-500">{s.testimonials} ({((block.testimonials || []) as TestimonialItem[]).length})</label>
                         {((block.testimonials || []) as TestimonialItem[]).map((item, i) => (
                             <div key={`test-${item.name}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] text-gray-500">Review {i + 1}</span>
                                     <button onClick={() => removeArrayItem('testimonials', i)} aria-label={`Remove testimonial ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
-                                <Input defaultValue={item.name || ''} placeholder="Name"
+                                <Input defaultValue={item.name || ''} placeholder={s.name}
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'name', e.target.value)}
                                     variant="editor"
                                     className={editorInputClassName} />
-                                <Input defaultValue={item.title || ''} placeholder="Title / Role"
+                                <Input defaultValue={item.title || ''} placeholder={s.titleRole}
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'title', e.target.value)}
                                     variant="editor"
                                     className={editorInputClassName} />
-                                <Textarea defaultValue={item.quote || ''} rows={2} placeholder="Quote"
+                                <Textarea defaultValue={item.quote || ''} rows={2} placeholder={s.quote}
                                     onBlur={(e: FieldBlurEvent) => updateArrayItem('testimonials', i, 'quote', e.target.value)}
                                     variant="editor"
                                     className={editorTextareaClassName} />
                             </div>
                         ))}
                         <button onClick={() => addArrayItem('testimonials', { name: 'Customer', title: '', quote: 'Great experience!', rating: 5 })}
-                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">+ Add Testimonial</button>
+                            className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addTestimonial}</button>
                     </div>
                 )}
 
                 {/* ─── Footer Columns ─────────────────────────── */}
                 {bt === 'footer' && (
                     <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">Footer Columns ({((block.columns || []) as FooterColumn[]).length})</label>
+                        <label className="text-xs font-medium uppercase text-gray-500">{s.footerColumns} ({((block.columns || []) as FooterColumn[]).length})</label>
                         {((block.columns || []) as FooterColumn[]).map((col, i) => (
                             <div key={`col-${(col as FooterColumn).title}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] text-gray-500">Column {i + 1}</span>
                                     <button onClick={() => removeArrayItem('columns', i)} aria-label={`Remove column ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
-                                <Input defaultValue={col.title || ''} placeholder="Column Title"
+                                <Input defaultValue={col.title || ''} placeholder={s.columnTitle}
                                     onBlur={(e: FieldBlurEvent) => {
                                         const cols = [...((block.columns || []) as FooterColumn[])]
                                         cols[i] = { ...cols[i], title: e.target.value }
@@ -1049,7 +1067,7 @@ function SettingsPanelInner({
                                     }}
                                     variant="editor"
                                     className={editorInputClassName} />
-                                <div className="text-[10px] text-gray-500 mt-1">{(col.links || []).length} links</div>
+                                <div className="text-[10px] text-gray-500 mt-1">{(col.links || []).length} {s.links}</div>
                             </div>
                         ))}
                     </div>
@@ -1062,20 +1080,20 @@ function SettingsPanelInner({
 
                             return (
                                 <>
-                        <label className="text-xs font-medium uppercase text-gray-500">Social Widget</label>
+                        <label className="text-xs font-medium uppercase text-gray-500">{s.socialWidget}</label>
                         <div className="mt-3 space-y-3">
                             <div>
-                                <label className={labelCls}>Headline</label>
+                                <label className={labelCls}>{s.headline}</label>
                                 <Input
                                     defaultValue={(normalizedSocialBlock.headline as string) || ''}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'headline', e.target.value)}
                                     variant="editor"
                                     className={editorInputClassName}
-                                    placeholder="Stay connected"
+                                    placeholder={s.stayConnected}
                                 />
                             </div>
                             <div>
-                                <label className={labelCls}>Display Style</label>
+                                <label className={labelCls}>{s.displayStyle}</label>
                                 <div className="mt-2 grid grid-cols-2 gap-2">
                                     {['floating', 'inline'].map(variant => (
                                         <button
@@ -1096,10 +1114,10 @@ function SettingsPanelInner({
                             </div>
                             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
-                                    Platforms
+                                    {s.platforms}
                                 </p>
                                 <p className="mt-2 text-xs text-slate-400">
-                                    Published site should open each enabled platform in a new tab.
+                                    {s.platformsDesc}
                                 </p>
                             </div>
                             {(normalizedSocialBlock.links as SocialWidgetLink[]).map((link, i) => (
@@ -1134,7 +1152,7 @@ function SettingsPanelInner({
                                                     : 'bg-green-500/15 text-green-300',
                                             )}
                                         >
-                                            {link.enabled === false ? 'Hidden' : 'Visible'}
+                                            {link.enabled === false ? s.hidden : s.visible}
                                         </button>
                                     </div>
                                     <Input
@@ -1155,18 +1173,18 @@ function SettingsPanelInner({
 
                 {bt === 'cartWidget' && (
                     <div className={sectionCls}>
-                        <label className="text-xs font-medium uppercase text-gray-500">Cart Widget</label>
+                        <label className="text-xs font-medium uppercase text-gray-500">{s.cartWidget}</label>
                         <div className="mt-3 space-y-3">
                             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
                                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
-                                    Checkout Behavior
+                                    {s.checkoutBehavior}
                                 </p>
                                 <p className="mt-2 text-xs text-slate-400">
-                                    In preview, checkout falls back to a toast when storefront checkout is unavailable.
+                                    {s.checkoutDesc}
                                 </p>
                             </div>
                             <div>
-                                <label className={labelCls}>Display Style</label>
+                                <label className={labelCls}>{s.displayStyle}</label>
                                 <div className="mt-2 grid grid-cols-2 gap-2">
                                     {['floating', 'inline'].map(variant => (
                                         <button
@@ -1186,17 +1204,17 @@ function SettingsPanelInner({
                                 </div>
                             </div>
                             <div>
-                                <label className={labelCls}>Button Label</label>
+                                <label className={labelCls}>{s.buttonLabel}</label>
                                 <Input
-                                    defaultValue={(block.label as string) || 'Cart'}
+                                    defaultValue={(block.label as string) || s.cart}
                                     onBlur={(e: FieldBlurEvent) => onBlockFieldChange(currentBlockIndex, 'label', e.target.value)}
                                     variant="editor"
                                     className={editorInputClassName}
-                                    placeholder="Cart"
+                                    placeholder={s.cart}
                                 />
                             </div>
                             <div>
-                                <label className={labelCls}>Show Text Label</label>
+                                <label className={labelCls}>{s.showTextLabel}</label>
                                 <div className="mt-2 flex items-center gap-2">
                                     <button
                                         type="button"
@@ -1208,10 +1226,10 @@ function SettingsPanelInner({
                                                 : 'bg-white/5 text-slate-400 hover:bg-white/10',
                                         )}
                                     >
-                                        {block.showLabel ? 'Label visible' : 'Icon only'}
+                                        {block.showLabel ? s.labelVisible : s.iconOnly}
                                     </button>
                                     <span className="text-[11px] text-slate-500">
-                                        Badge count always stays visible
+                                        {s.badgeDesc}
                                     </span>
                                 </div>
                             </div>
@@ -1221,15 +1239,15 @@ function SettingsPanelInner({
 
                 {/* Block actions */}
                 <div className="border-t border-white/10 pt-4">
-                    <label className="text-xs font-medium uppercase text-gray-500">Actions</label>
+                    <label className="text-xs font-medium uppercase text-gray-500">{s.actions}</label>
                     <div className="mt-2 flex gap-2">
                         <button onClick={() => onDuplicateBlock(currentBlockIndex)}
                             className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
-                            <Copy className="h-3 w-3" /> Duplicate
+                            <Copy className="h-3 w-3" /> {s.duplicate}
                         </button>
                         <button onClick={() => onDeleteBlock(currentBlockIndex)}
                             className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors">
-                            <Trash2 className="h-3 w-3" /> Delete
+                            <Trash2 className="h-3 w-3" /> {s.delete}
                         </button>
                     </div>
                 </div>

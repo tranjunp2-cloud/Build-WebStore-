@@ -194,7 +194,7 @@ describe('PreviewFrame — disableDragDrop prop', () => {
         // The inner container div has style width: 390 for mobile
         const styledDiv = container.querySelector('[style*="width"]') as HTMLElement
         expect(styledDiv).toBeTruthy()
-        expect(styledDiv.style.width).toBe('390px')
+        expect(styledDiv.style.width).toBe('min(390px, 100%)')
     })
 })
 
