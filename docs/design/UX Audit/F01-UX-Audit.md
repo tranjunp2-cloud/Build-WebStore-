@@ -30,6 +30,7 @@ Cross-reference giữa Wireframe (`F01-wireframe-lowfi.md`), PRD (`F01-ai-builde
 | **GAP-03** | :orange_circle: High | Draft Recovery Dialog — Wireframe có vẽ nhưng không có state machine & trigger conditions | :warning: Chỉ có 1 wireframe tĩnh | FR-07, AC-4 (US-F01-01) | Zustand localStorage có, dialog UI thiếu |
 | **GAP-04** | :orange_circle: High | Rate Limit Paywall — Wireframe có vẽ nhưng không có entry point rõ ràng trong flow | :warning: Wireframe rời | FR-15, BR-03 | HTTP 402 mapped nhưng UI chưa integrate |
 | **GAP-05** | :yellow_circle: Medium | Mobile Immersive Preview transition — Floating Pill + Form slide-away chưa có chi tiết animation | :warning: Concept wireframe | FR-24, FR-25, AC-7 (US-F01-09) | Chưa implement |
+| **GAP-06** | :red_circle: Blocker | Post-failure Dashboard Recovery — AI fail → user kẹt, Dashboard không detect site incomplete, không có fallback Template CMS | :x: Không có | Không có | `DashboardOnboarding.tsx` chỉ check `!hasWebsite` |
 
 ### Nguồn tham chiếu đã đọc
 
@@ -156,6 +157,57 @@ Wireframe Section 4.2 vẽ màn hình Paywall đẹp nhưng:
 
 ---
 
+### GAP-06 · :red_circle: Blocker — Post-failure Dashboard Recovery: AI fail → User Dead-end
+
+**Vấn đề cốt lõi:**
+
+Khi AI generation fail, toàn bộ error handling hiện tại chỉ xử lý **tại chỗ trong builder** (retry, reconnect). Không có flow nào xử lý trường hợp **user rời builder về Dashboard sau khi fail**. Hậu quả:
+
+1. **Builder không redirect:** Khi lỗi nghiêm trọng (server crash, network die), user bị kẹt trong builder không có đường thoát rõ ràng.
+2. **Dashboard không detect site incomplete:** Nếu site đã tạo trong DB nhưng generation chưa xong (SSE stream bị ngắt giữa chừng), Dashboard vẫn hiện site như bình thường → user nghĩ đã tạo xong.
+3. **Không có fallback:** AI là con đường duy nhất — không có CTA chuyển sang Template CMS khi AI liên tục fail.
+
+```text
+  Luồng lỗi hiện tại (Dead-end):
+  
+  AI Builder fail
+       |
+       v
+  User navigate về Dashboard
+       |
+       +-- Site CHƯA tạo trong DB:
+       |      Dashboard hiện "Chưa có website" + CTA tạo mới → OK (nhưng chỉ có AI option)
+       |
+       +-- Site ĐÃ tạo trong DB (incomplete):
+              Dashboard thấy hasWebsite = true
+              → Quick Actions "Build with AI" BỊ ẨN (vì !hasWebsite = false)
+              → Setup Checklist hiện ✅ "Create website" (sai trạng thái)
+              → User bấm Edit → Editor load site trống/lỗi
+              → DEAD-END: Không có cách tạo lại ❌
+```
+
+**Tác động:**
+
+| Scenario | Dashboard hiện tại | Vấn đề |
+|----------|-------------------|--------|
+| AI fail sớm (trước khi tạo DB) | CTA "Build with AI" | :warning: Chỉ có AI option, thiếu Template fallback |
+| AI fail giữa (site tạo xong, pages chưa) | Site card draft + Setup done | :red_circle: **DEAD-END** — user không thể tạo lại |
+| AI fail cuối (SSE ngắt, client không nhận siteId) | Site card draft + Setup done | :red_circle: **DEAD-END** — user không thể tạo lại |
+| User thoát builder giữa chừng (đóng tab, back) | Tùy timing | :red_circle: Không có recovery path |
+
+**Code liên quan:**
+
+| File | Logic lỗi |
+|------|-----------|
+| `DashboardOnboarding.tsx:67` | `{!hasWebsite && (... Quick Actions ...)}` — CTA chỉ hiện khi CHƯA có site |
+| `onboarding/page.tsx:31` | `sites.docs.length > 0` → redirect dashboard dù site incomplete |
+| `dashboard/page.tsx:42-59` | `hasWebsite = totalSites > 0` — không phân biệt complete vs incomplete |
+| `AIBuilderPageClient.tsx` | Error → `setStep('info')` — giữ user trong builder, không có option về Dashboard |
+
+**Tham chiếu:** [User Flow F01 — Section 4: Error Flow](../user-flows/F01-website-creation-flow.md#4-error-flow--xử-lý-khi-ai-generate-lỗi)
+
+---
+
 ## 3. Giải pháp đề xuất
 
 ### 3.1 GAP-01: Cleanup & Scope Sync
@@ -238,6 +290,63 @@ Wireframe Section 4.2 vẽ màn hình Paywall đẹp nhưng:
   +-----------+                     |   "0 lượt còn"   |
                                     +------------------+
 ```
+
+### 3.5 GAP-06: Post-failure Dashboard Recovery — Redirect + Banner + Fallback
+
+**Nguyên tắc UX:**
+
+> AI chỉ là 1 option, không phải con đường duy nhất. Luôn có fallback = Template CMS.
+> Không bao giờ để user dead-end. Mọi màn hình đều phải có "next action".
+
+**Giải pháp gồm 3 phần:**
+
+#### Phần A: Builder fail → Redirect về Dashboard
+
+Khi error không thể retry tại chỗ (3 lần retry fail, server error nghiêm trọng):
+- **KHÔNG** để user kẹt trong builder
+- Redirect về `/dashboard` với query param `?ai_status=failed`
+- Toast thông báo ngắn gọn trước khi redirect
+
+```text
+  Error xảy ra trong Builder:
+       |
+       +-- Retryable? (timeout, disconnect)
+       |      |
+       |      +-- Retry ≤ 3 lần → Xử lý tại chỗ (GAP-02)
+       |      +-- Retry > 3 lần → Redirect Dashboard
+       |
+       +-- Non-retryable? (server crash, unknown)
+              |
+              v
+         Redirect → /dashboard?ai_status=failed
+```
+
+#### Phần B: Dashboard detect trạng thái + Banner cảnh báo
+
+Dashboard cần phân biệt **4 states** thay vì chỉ 2 (có/chưa có site):
+
+| State | Điều kiện detect | UI hiển thị |
+|-------|-----------------|-------------|
+| **Empty** | `totalSites = 0` | CTA: Build with AI + Choose Template |
+| **AI Incomplete** | Site có nhưng incomplete + `?ai_status=failed` | ⚠️ Banner + CTA Retry/Template |
+| **Draft** | Site draft hoàn chỉnh (có pages) | Site card + Edit/Publish |
+| **Published** | Site đã publish | Site card + Analytics |
+
+Detect "AI Incomplete":
+- **Cách 1 (đơn giản):** Query param `?ai_status=failed` từ builder redirect
+- **Cách 2 (bền vững):** Check site có pages hay không: `totalSites > 0 && pagesCount = 0`
+- **Cách 3 (tối ưu):** Thêm field `generationStatus` vào sites collection (`complete` / `failed` / `partial`)
+
+#### Phần C: CTA Fallback — Template CMS luôn có mặt
+
+Dashboard **LUÔN** hiện CTA Template CMS khi site chưa publish, bất kể AI status:
+
+| State | CTA "Build with AI" | CTA "Chọn Template CMS" |
+|-------|:---:|:---:|
+| Empty | ✅ Chính | ✅ Phụ |
+| AI Incomplete | ✅ Retry (optional) | ✅ **Chính** (ưu tiên) |
+| Draft (chưa publish) | ✅ (tạo lại) | ✅ Phụ |
+| Published | — | — |
 
 ---
 
@@ -435,6 +544,104 @@ Wireframe Section 4.2 vẽ màn hình Paywall đẹp nhưng:
   +---------------------------+
 ```
 
+### Screen B.7: Dashboard — AI Incomplete State (Banner + Fallback CTA)
+
+```text
+  +------------------------------------------------------------------+
+  | [Logo PrimeWeb]              Dashboard              [User Menu]   |
+  +------------------------------------------------------------------+
+  |                                                                   |
+  | +---------------------------------------------------------------+ |
+  | | ⚠️ Website tạo bằng AI chưa hoàn tất                          | |
+  | |                                                                | |
+  | | Quá trình tạo website bị gián đoạn. Bạn có thể thử lại        | |
+  | | hoặc chọn template có sẵn để bắt đầu nhanh hơn.               | |
+  | |                                                                | |
+  | | [🔄 Thử lại với AI]  (outline)    [📄 Chọn template]  (primary)| |
+  | +---------------------------------------------------------------+ |
+  |                                                                   |
+  | --- Hướng dẫn bắt đầu ---                                        |
+  |                                                                   |
+  | +-----------------------------+  +------------------------------+ |
+  | | 🤖 Build with AI            |  | 📄 Chọn từ thư viện CMS     | |
+  | | Tạo website bằng AI chỉ với |  | Chọn template có sẵn và     | |
+  | | vài dòng mô tả.             |  | tùy chỉnh theo ý bạn.       | |
+  | |                             |  |                              | |
+  | | [Bắt đầu →]                 |  | [Xem template →]             | |
+  | +-----------------------------+  +------------------------------+ |
+  |                                                                   |
+  | --- Các bước tiếp theo ---                                        |
+  |                                                                   |
+  | ○ Tạo website                                                     |
+  | ○ Thêm sản phẩm                                                  |
+  | ○ Thiết lập thanh toán                                            |
+  | ○ Xuất bản website                                                |
+  |                                                                   |
+  +------------------------------------------------------------------+
+```
+
+**Ghi chú:**
+- Banner vàng hiện **trên cùng** dashboard, trước Setup Checklist
+- CTA "Chọn template" là **primary** (nổi bật hơn) — vì AI đã fail, nên ưu tiên template ổn định
+- CTA "Thử lại với AI" là **outline** (phụ) — vẫn cho phép retry nhưng không push quá mạnh
+- Nếu user bấm "Thử lại với AI" → navigate `/builder/new` (API sẽ UPDATE site cũ, không tạo duplicate)
+- Nếu user bấm "Chọn template" → navigate template gallery → apply template → Editor
+- Banner **tự ẩn** khi site có ít nhất 1 page hoàn chỉnh (generation thành công)
+
+### Screen B.8: Builder — Error với nút "Về Dashboard" (Mobile + Desktop)
+
+```text
+  Desktop (sau 3 retry fail):
+  +--------------------------------------++------------------------------+
+  | [Logo PrimeWeb]              [X]     ||                              |
+  |                                      ||    [Illustration: Error]     |
+  | --- Không thể tạo website ---        ||                              |
+  |                                      ||    "Đã xảy ra lỗi trong      |
+  | (!) Đã thử 3 lần nhưng không         ||     quá trình tạo. Vui lòng  |
+  | thành công. Vui lòng thử lại         ||     thử lại sau."            |
+  | sau hoặc chọn template có sẵn.       ||                              |
+  |                                      ||                              |
+  | +----------------------------------+ ||                              |
+  | | [🔄] Thử lại lần nữa            | || <-- Secondary                |
+  | +----------------------------------+ ||                              |
+  | +----------------------------------+ ||                              |
+  | | [🏠] Về Dashboard                | || <-- Primary                  |
+  | +----------------------------------+ ||                              |
+  |                                      ||                              |
+  | Hoặc: Chọn template có sẵn →        || <-- Text link                |
+  +--------------------------------------++------------------------------+
+
+  Mobile:
+  +---------------------------+
+  | [Logo]            [X]     |
+  +---------------------------+
+  |                           |
+  | [Illustration: Error]     |
+  |                           |
+  | Không thể tạo website     |
+  |                           |
+  | Đã thử 3 lần nhưng không |
+  | thành công. Bạn có thể    |
+  | chọn template có sẵn để   |
+  | bắt đầu nhanh hơn.        |
+  |                           |
+  | +-------------------------+
+  | | [🏠] Về Dashboard       | <-- Primary (full width)
+  | +-------------------------+
+  | +-------------------------+
+  | | [🔄] Thử lại            | <-- Secondary
+  | +-------------------------+
+  |                           |
+  | Chọn template có sẵn →    | <-- Text link
+  +---------------------------+
+```
+
+**Ghi chú:**
+- Nút "Về Dashboard" là **primary** — ưu tiên đưa user ra khỏi builder
+- Nút "Thử lại" là **secondary** — vẫn cho retry nhưng không push
+- Link "Chọn template" — cung cấp alternative path ngay tại builder
+- Bấm "Về Dashboard" → redirect `/dashboard?ai_status=failed` → Dashboard hiện Banner (Screen B.7)
+
 ---
 
 ## 5. Business Rules bổ sung
@@ -471,6 +678,18 @@ Wireframe Section 4.2 vẽ màn hình Paywall đẹp nhưng:
 | **BR-PAY-02** | Khi quota = 0 → Replace form panel bằng Paywall card (Screen B.5). Giữ preview panel hiện trạng thái cũ |
 | **BR-PAY-03** | Sau khi upgrade thành công → redirect về /builder/new với form data giữ nguyên |
 | **BR-PAY-04** | Hiện quota còn lại ở form panel header: "Còn N lượt tạo" (informative, không chặn) |
+
+### 5.5 Post-failure Dashboard Recovery Rules
+
+| Rule ID | Mô tả |
+|---------|-------|
+| **BR-FAIL-01** | Builder error sau 3 retry → redirect `/dashboard?ai_status=failed`. Toast thông báo trước redirect (2 giây delay) |
+| **BR-FAIL-02** | Dashboard LUÔN hiện CTA "Chọn template CMS" khi site chưa publish — AI chỉ là 1 option, không phải duy nhất |
+| **BR-FAIL-03** | Dashboard detect AI incomplete: site tồn tại nhưng pages = 0 HOẶC query param `ai_status=failed` → hiện Banner cảnh báo |
+| **BR-FAIL-04** | Banner "AI chưa hoàn tất" tự ẩn khi site có ≥ 1 page hoàn chỉnh (user retry thành công hoặc apply template) |
+| **BR-FAIL-05** | CTA "Retry AI" từ dashboard → navigate `/builder/new` — API generate-site sẽ UPDATE site cũ (không tạo duplicate) |
+| **BR-FAIL-06** | CTA "Chọn template" từ dashboard → navigate template gallery → apply → Editor. Template overwrite site incomplete |
+| **BR-FAIL-07** | `DashboardOnboarding` Quick Actions phải hiện khi `!hasWebsite || !hasPublishedSite` (không chỉ `!hasWebsite`) |
 
 ---
 
@@ -549,6 +768,56 @@ THEN   Paywall vẫn hiện (không tự động reset)
   AND  Chỉ reset khi user upgrade thành công
 ```
 
+### AC-FAIL-01: Builder Error → Redirect Dashboard
+
+```gherkin
+GIVEN  đang ở Step 2 (Generating) và error xảy ra
+  AND  đã retry 3 lần đều thất bại (hoặc error non-retryable)
+WHEN   retry cuối cùng thất bại
+THEN   hiện UI error với 3 option:
+       - "Về Dashboard" (primary button)
+       - "Thử lại lần nữa" (secondary button)
+       - "Chọn template có sẵn" (text link)
+  AND  KHÔNG để user kẹt trong builder không có next action
+WHEN   user click "Về Dashboard"
+THEN   redirect → /dashboard?ai_status=failed
+  AND  toast: "Không thể tạo website bằng AI. Bạn có thể chọn template có sẵn."
+```
+
+### AC-FAIL-02: Dashboard Banner khi AI fail
+
+```gherkin
+GIVEN  user vào Dashboard
+  AND  có query param ai_status=failed HOẶC site tồn tại nhưng pages = 0
+WHEN   Dashboard load xong
+THEN   hiện Banner vàng trên cùng:
+       - Text: "Website tạo bằng AI chưa hoàn tất"
+       - Mô tả: "Quá trình tạo bị gián đoạn. Bạn có thể thử lại hoặc chọn template."
+       - CTA: "Thử lại với AI" (outline) + "Chọn template" (primary)
+  AND  Quick Actions vẫn hiện dù hasWebsite = true (vì chưa publish)
+  AND  Setup Checklist hiện ○ "Tạo website" (chưa done, không tick)
+WHEN   user click "Chọn template"
+THEN   navigate → Template gallery
+WHEN   user click "Thử lại với AI"
+THEN   navigate → /builder/new
+  AND  API generate-site sẽ UPDATE site cũ (không tạo duplicate)
+```
+
+### AC-FAIL-03: Fallback Flow hoàn chỉnh
+
+```gherkin
+GIVEN  AI generation fail
+  AND  user đã redirect về Dashboard
+WHEN   user click "Chọn template" trên Banner
+THEN   navigate → Template gallery
+WHEN   user chọn 1 template và apply
+THEN   site incomplete được overwrite bằng template content
+  AND  redirect → Editor với site đã có content từ template
+  AND  Banner "AI chưa hoàn tất" tự ẩn
+THEN   user có thể edit và publish bình thường
+  AND  flow hoàn tất: AI fail → Template → Editor → Publish ✅
+```
+
 ### AC-MOBILE-01: Immersive Preview Transition
 
 ```gherkin
@@ -591,5 +860,7 @@ Các bug hiện tại ảnh hưởng trực tiếp đến UX Audit này:
 > **Next Steps:**
 > 1. Cập nhật PRD và Stories để chính thức loại bỏ tính năng Reorder khỏi F01
 > 2. Fix 8 P0 blockers (Security & Stability)
-> 3. Implement theo thứ tự: GAP-02 (Error Recovery) → GAP-03 (Draft Recovery) → GAP-04 (Paywall)
-> 4. Update QA test cases (`F01-ai-chat-builder.md`) với các AC mới
+> 3. **[HIGH PRIORITY] Fix GAP-06 — BUG-FAIL-01:** Sửa condition `DashboardOnboarding.tsx` từ `!hasWebsite` → `!hasWebsite || !hasPublishedSite`
+> 4. Implement theo thứ tự: GAP-06 (Dashboard Recovery) → GAP-02 (Error Recovery) → GAP-03 (Draft Recovery) → GAP-04 (Paywall)
+> 5. Update QA test cases (`F01-ai-chat-builder.md`) với các AC mới (AC-FAIL-01 ~ AC-FAIL-03)
+> 6. Cross-reference với [User Flow F01](../user-flows/F01-website-creation-flow.md) để đảm bảo tất cả flows đều có next action
