@@ -2350,6 +2350,15 @@ const MIGRATIONS = [
     name: 'blogs.published_at',
     sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS published_at timestamp(3) with time zone;`,
   },
+  // ── Sites: AI generation status tracking ──
+  {
+    name: 'sites.generation_status',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS generation_status varchar DEFAULT 'none';`,
+  },
+  {
+    name: 'sites.generation_status_backfill',
+    sql: `UPDATE sites SET generation_status = 'completed' WHERE generation_status IS NULL;`,
+  },
 ];
 
 async function runMigrations(pool) {

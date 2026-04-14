@@ -18,6 +18,7 @@ import { calculateContentQualityScore } from '@/lib/seo/content-score'
 import type { MissingSeoItem } from './SEOView'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
+import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
 import { PendingOrder } from '@/components/dashboard/DashboardActionList'
 
 interface MetricRow {
@@ -61,17 +62,31 @@ export async function OverviewView({ searchParams }: Props) {
     const resolvedParams = await searchParams
     const period = typeof resolvedParams.period === 'string' ? resolvedParams.period : '7d'
 
-    let totalSites = 0
+    // Check site existence and generation status
     if (tenantId) {
-        const sitesResult = await payload.find({ 
-            collection: 'sites', 
-            where: { tenant: { equals: tenantId } }, 
-            limit: 1
+        const allSites = await payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: tenantId } },
+            limit: 5, // 1 site/tenant expected, extra for safety
         })
-        totalSites = sitesResult.totalDocs
-    }
 
-    if (totalSites === 0) {
+        const usable = allSites.docs.filter((s) => {
+            const gs = (s as Record<string, unknown>).generationStatus
+            return !gs || gs === 'none' || gs === 'completed'
+        })
+
+        if (usable.length === 0) {
+            const hasFailed = allSites.docs.some(
+                (s) => (s as Record<string, unknown>).generationStatus === 'failed',
+            )
+
+            return (
+                <div className="space-y-8">
+                    {hasFailed ? <DashboardGenerationFailed /> : <DashboardEmptyState />}
+                </div>
+            )
+        }
+    } else {
         return (
             <div className="space-y-8">
                 <DashboardEmptyState />

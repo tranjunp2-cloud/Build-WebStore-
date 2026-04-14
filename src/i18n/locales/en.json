@@ -330,6 +330,17 @@
                 "save": "Save Changes"
             }
         },
+        "empty": {
+            "title": "No website data available",
+            "description": "Create your first website to start tracking business performance.",
+            "cta": "+ Create New Website"
+        },
+        "generationFailed": {
+            "title": "Website creation didn't complete",
+            "description": "No worries — you can try building with AI or pick from our ready-made templates.",
+            "retryAi": "Try again with AI",
+            "chooseTemplate": "Choose a template"
+        },
         "sites": {
             "title": "My Websites",
             "viewAll": "View All →",
@@ -338,7 +349,13 @@
             "draft": "Draft",
             "lastEdited": "Last edited: ",
             "edit": "Edit",
-            "preview": "Preview"
+            "preview": "Preview",
+            "noSites": "No sites yet",
+            "noSitesDesc": "Create your first website to get started",
+            "createWebsite": "Create Website",
+            "incomplete": "Incomplete",
+            "retryAi": "Retry with AI",
+            "template": "Template"
         },
         "analytics": {
             "title": "Analytics",
