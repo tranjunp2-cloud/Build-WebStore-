@@ -266,12 +266,14 @@ NOTE: For backward compatibility, "blocks" at the root level is also accepted (t
 ${blockList}
 
 ## STRUCTURE RULES
-1. Generate 4 pages: Homepage (8-14 blocks), About (4-6 blocks), Services/Products (4-6 blocks), Contact (4-5 blocks)
-2. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
-3. Each block MUST have "blockType" and "variant" fields
-4. blockType MUST be one of the listed types — no custom types
-5. variant MUST be one of the listed variants for that block type
-6. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
+1. Generate 5 pages: Homepage (8-14 blocks), About (4-6 blocks), Services/Products (4-6 blocks), Contact (4-6 blocks), Blog (4-6 blocks with 3-5 seeded posts)
+2. Every page MUST have at least 4 blocks with non-empty body copy — no stub pages
+3. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
+4. Each block MUST have "blockType" and "variant" fields
+5. blockType MUST be one of the listed types — no custom types
+6. variant MUST be one of the listed variants for that block type
+7. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
+8. Blog page MUST include blog-list block with ≥3 posts (title + excerpt + slug + readTime)
 
 ## LANGUAGE DETECTION
 - Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)
@@ -377,6 +379,7 @@ export type BusinessInfoInput = {
 }
 
 import type { ThemeMood } from './theme-moods'
+import type { CategoryRecipe } from './category-recipes'
 
 export type BuildUserPromptOptions = {
   extraInstructions?: string
@@ -384,6 +387,13 @@ export type BuildUserPromptOptions = {
   referencePrompt?: string
   /** Plan 260414-2249 phase-02: bundled voice/imagery/CTA archetype. */
   mood?: ThemeMood
+  /**
+   * Plan 260414-2249 phase-04: ordered block sequence hard constraint.
+   * When provided, replaces the legacy `generateCompositionHint`
+   * category signature with an explicit RHYTHM section in the user
+   * prompt — tells GPT the exact order of blocks to emit.
+   */
+  recipe?: CategoryRecipe
 }
 
 export function buildUserPrompt(
@@ -396,11 +406,13 @@ export function buildUserPrompt(
   // OR new options object. Normalize.
   let extraInstructions: string | undefined
   let mood: ThemeMood | undefined
+  let recipe: CategoryRecipe | undefined
   if (typeof extraInstructionsOrOptions === 'string' || extraInstructionsOrOptions === undefined) {
     extraInstructions = extraInstructionsOrOptions
   } else {
     extraInstructions = extraInstructionsOrOptions.extraInstructions
     mood = extraInstructionsOrOptions.mood
+    recipe = extraInstructionsOrOptions.recipe
     if (extraInstructionsOrOptions.language) language = extraInstructionsOrOptions.language
     if (extraInstructionsOrOptions.referencePrompt) referencePrompt = extraInstructionsOrOptions.referencePrompt
   }
@@ -442,8 +454,19 @@ export function buildUserPrompt(
     )
   }
 
-  // Inject dynamically generated block composition hint
-  if (!referencePrompt) {
+  // Plan 260414-2249 phase-04: inject ordered RHYTHM section when a recipe
+  // is provided. This is a HARD constraint (not "feel free to modify") —
+  // GPT should produce blocks in this exact order. Replaces the legacy
+  // generateCompositionHint which used a shuffled CATEGORY_SIGNATURE_BLOCKS
+  // lookup.
+  if (!referencePrompt && recipe) {
+    const sequence = recipe.blocks.join(' → ')
+    const required = recipe.required.join(', ')
+    parts.push(
+      `\nRHYTHM: ${recipe.label} (${recipe.rhythm})\nBlock sequence: ${sequence}\nRequired blocks (must be present): ${required}\nRationale: ${recipe.description}\nIMPORTANT: Emit blocks in this exact order. You may omit optional blocks but do not reorder them.`,
+    )
+  } else if (!referencePrompt) {
+    // Legacy path: category signature hint when no recipe provided.
     const categoryLower = info.industry.toLowerCase()
     const matchedCategory = Object.keys(CATEGORY_SIGNATURE_BLOCKS).find(
       cat => categoryLower.includes(cat) || (CATEGORY_HINTS[cat] && CATEGORY_HINTS[cat].split(', ').some(kw => categoryLower.includes(kw)))

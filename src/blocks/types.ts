@@ -124,13 +124,20 @@ export type BlockMeta = {
 export type CTAButton = {
     label: string
     url: string
-    style?: 'primary' | 'outline' | 'ghost'
+    style?: 'primary' | 'secondary' | 'outline' | 'ghost'
 }
 
+// Keep enum in sync with Pages.ts hero.ctaButtons.style Payload select options
+// (['primary','secondary','outline','ghost']). The previous 3-value enum
+// caused AI-generated blocks with `style: 'secondary'` to fail
+// blockRegistry.validate() and push invalid data into payload.create
+// downstream — observed as staging 500s after the sanitizer emits
+// 'secondary' as the default style for the 2nd CTA in hero blocks
+// (openai-generator.ts:1023,1032).
 export const CTAButtonSchema = z.object({
     label: z.string(),
     url: z.string(),
-    style: z.enum(['primary', 'outline', 'ghost']).default('primary'),
+    style: z.enum(['primary', 'secondary', 'outline', 'ghost']).default('primary'),
 })
 
 // ── Image Reference (shared) ─────────────────────────────────────────────────

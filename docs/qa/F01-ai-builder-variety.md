@@ -1131,15 +1131,90 @@ Replace per-block Unsplash searches với ONE per-site **image pool**. Một gen
 - Full gen: hero + features + gallery + team blocks ALL receive Media IDs sourced from the same pool — verified by `[Image Pool] query="..." landscape=N square=M` log line.
 - Legacy path preserved: `ctx.pool === undefined` falls through to `getMediaForBlock` per-block search (no regression).
 
-### Test Summary (cumulative Phase 01 + 02 + 03)
+---
+
+## 13. Phase 04 — Layout Recipes A/B/C (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-04-layout-recipes.md`
+> PR: `feat(f01): [US-F01-10] layout recipes a/b/c per category`
+
+### Mục tiêu
+
+Replace single `CATEGORY_SIGNATURE_BLOCKS[category]` với **3 hand-curated recipes per category** (14 × 3 = 42 total). Mỗi recipe có rhythm archetype (story/menu/gallery/services/portfolio/team/features/social-proof/demo-first) + ordered block sequence + required subset. Composer picks via `seed % 3` deterministic. GPT happy path receives RHYTHM section as hard sequence constraint.
+
+### Test Cases
+
+| TC ID | Test File | Mô tả | Status |
+|-------|-----------|-------|--------|
+| **TC-F01-W.18** | `category-recipes.test.ts` | **407 assertions** — 42 recipes × 10 checks each: shape, rhythm enum, id format, hero+footer locked, blocks ≥5, every blockId in SUPPORTED_BLOCK_IDS, required ⊆ blocks, middleShuffleRange bounds, id uniqueness, ≥2 distinct rhythms per category, distribution ≤40% | ✅ |
+| **TC-F01-W.18a** | `category-recipes.test.ts` | `pickRecipe` determinism + rotation across 30 seeds + unknown category fallback + negative seed | ✅ |
+| **TC-F01-W.19** | `recipe-rhythm-prompt.test.ts` | **22 assertions** — `buildUserPrompt` RHYTHM section: header, label, rhythm enum, block sequence with arrow separators, required list, rationale, hard-order instruction, 14 cats × 3 recipes coverage, recipe + mood coexistence, pickRecipe → prompt end-to-end, seed variety | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/category-recipes.ts` — **NEW** 380 lines: `RecipeRhythm` / `RecipeCategory` / `CategoryRecipe` types, `SUPPORTED_BLOCK_IDS` whitelist (34 block types), 42 hand-curated recipes, `pickRecipe(category, seed)` selector, `getRecipesForCategory`, `isSupportedBlockId`
+- `src/lib/ai/system-prompt.ts` — `BuildUserPromptOptions.recipe?: CategoryRecipe`. When recipe provided, injects RHYTHM section with label + block sequence + required + rationale + hard-order instruction. Legacy `generateCompositionHint` path kept as fallback when no recipe passed.
+- `src/lib/ai/openai-generator.ts` — picks `layoutRecipe = pickRecipe(category, themeSeed)` at same point as mood resolution, passes into `buildUserPrompt` options, logs `recipe=<id>` in theme line
+
+### Acceptance Criteria
+
+- `pickRecipe('restaurant', seed)` rotates across `rest-story` / `rest-menu` / `rest-gallery` — verified by 30-seed distribution test.
+- GPT prompt contains `RHYTHM: Story-first (story-first)\nBlock sequence: hero → about → menu-display → ...` instead of shuffled `CATEGORY_SIGNATURE_BLOCKS` hint.
+- Different business names at same category → 3 distinct recipes observed in prod logs `[Theme] ... recipe=<id>`.
+- Composer path (no recipe passed) backward compat — legacy `generateCompositionHint` still fires for non-AI callers.
+- 42 recipes non-empty + all block IDs valid + rhythm distribution sanity (no rhythm > 40%).
+
+### Test Summary (cumulative Phase 01 + 02 + 03 + 04)
 
 | Suite | Count | Status |
 |---|---|---|
 | Phase 01 tests | 69 | ✅ |
 | Phase 02 tests | 235+ | ✅ |
 | Phase 03 tests | 23 (image-pool) + 14 (media-injector regression) | ✅ |
+| Phase 04 tests | 407 + 22 = 429 | ✅ |
 | Legacy regression | 22 | ✅ |
-| **Total** | **360+** | ✅ |
+| **Total** | **790+** | ✅ |
+
+---
+
+## 14. Phase 05 — Multi-page Completeness (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-05-multipage-completeness.md`
+> PR: `feat(f01): [US-F01-11] multi-page completeness — blog seeds + contact enrich + about hero`
+
+### Mục tiêu
+
+Kill sub-page stubs. Every site ships ≥5 pages: Home / About / Contact / Blog (+ Services/Menu per blueprint). Each core page ≥4 blocks. Blog renders 3-5 curated posts per category. About hero weaves user description. Contact page has Google Maps + opening-hours FAQ.
+
+### Test Cases
+
+| TC ID | Test File | Status |
+|-------|-----------|--------|
+| **TC-F01-W.20** blog shape | `blog-seeds-coverage.test.ts` | ✅ |
+| **TC-F01-W.21** 14 cats × ≥3 posts | `blog-seeds-coverage.test.ts` | ✅ |
+| **TC-F01-W.22** About weaves description | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.23** Contact user fields + map + FAQ | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.24** Blog renders seeded posts | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.25** Core 5 pages ≥4 blocks | `multipage-completeness.test.ts` | ✅ |
+| **TC-F01-W.26** Empty-input regression | `multipage-completeness.test.ts` | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/content/blog-seeds.ts` — **NEW** 180 lines: 14 categories × 4 posts = 56 curated blog stubs + helpers
+- `src/lib/ai/content/types.ts` — new `BlogPost` type + optional `blogSeeds` on CategoryContent
+- `src/lib/ai/template-composer.ts`:
+  - `buildAboutPage` / `buildContactPage` / `buildBlogPage` rewritten to emit ≥5 blocks with meaningful content
+  - **NEW `enrichSubPages(pages, biz, category)` post-processor** runs inside `composeFromBlueprint` — overrides About hero with description excerpt, injects google-maps + FAQ into Contact, appends Blog page with seeded posts when blueprint lacks it, fills empty blog-list items from seeds
+- `src/lib/ai/system-prompt.ts` STRUCTURE RULES — `Generate 5 pages` (adds Blog), `every page ≥4 blocks`, `Blog page MUST include blog-list with ≥3 seeded posts`
+
+### Acceptance Criteria
+
+- Every gen has Home / About / Contact / Blog minimum (blueprint extras preserved).
+- Blog page renders ≥3 real posts from seeds — no empty "Latest Articles".
+- About hero subheadline = user description excerpt when provided.
+- Contact page has Google Maps block with user address + FAQ with opening-hours items.
+- Empty input regression: canned fills gaps, blog still has ≥3 seeds.
+- 14 categories × ≥3 seeds = ≥42 total (currently 56).
 
 ---
 
@@ -1198,5 +1273,11 @@ Replace per-block Unsplash searches với ONE per-site **image pool**. Một gen
 
 | Suite | Count | Status |
 |---|---|---|
-| All AI unit tests | 452 | ✅ |
-| Phase 06 new tests (seo-generator + consistency-validator) | 39 | ✅ |
+| Phase 01 tests | 69 | ✅ |
+| Phase 02 tests | 235+ | ✅ |
+| Phase 03 tests | 23 (image-pool) + 14 (media-injector regression) | ✅ |
+| Phase 04 tests | 407 + 22 = 429 | ✅ |
+| Phase 05 tests | 50 (blog seeds + multipage) | ✅ |
+| Phase 06 tests | 39 (seo-generator + consistency-validator) | ✅ |
+| Legacy regression | 22 | ✅ |
+| **Total** | **880+** | ✅ |

@@ -5,6 +5,7 @@ import { blockRegistry } from '@/blocks/registry'
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
 import { THEME_MOODS, getCategoryCTA as getMoodCTA, type ThemeMood } from './theme-moods'
+import { getBlogSeeds } from './content/blog-seeds'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -1211,29 +1212,56 @@ function enforceBlockOrdering(blocks: Record<string, unknown>[]): Record<string,
 }
 
 function buildAboutPage(biz: BusinessSample, content: CategoryContent, category: string, pages: string[]): TemplatePage {
+  // Plan 260414-2249 phase-05: mini-hero with user description excerpt,
+  // story block reads biz.description (woven by Phase 01 mapper when user
+  // supplies shortDescription), values → team → testimonials → CTA.
+  const storyExcerpt = biz.description
+    ? biz.description.length > 140
+      ? biz.description.slice(0, 137) + '...'
+      : biz.description
+    : `Learn more about what makes ${biz.name} special.`
   return {
     title: 'About',
     slug: '/about',
     layout: [
-      buildNavigation(biz, pages),
+      buildNavigation(biz, pages, category),
+      { blockType: 'hero', variant: 'minimal', headline: `Our Story`, subheadline: storyExcerpt, height: '45vh' },
       buildAbout(biz),
       buildStats(category),
       buildTeam(category),
       buildTestimonials(content),
-      buildCTA(biz),
+      buildCTA(biz, category),
       buildFooter(biz, pages),
     ],
   }
 }
 
-function buildContactPage(biz: BusinessSample, pages: string[]): TemplatePage {
+function buildContactPage(biz: BusinessSample, category: string, pages: string[]): TemplatePage {
+  // Plan 260414-2249 phase-05: mini-hero + contact (user phone/email/address
+  // already wired via Phase 01 bizOverride) + Google Maps + FAQ for hours.
   return {
     title: 'Contact',
     slug: '/contact',
     layout: [
-      buildNavigation(biz, pages),
+      buildNavigation(biz, pages, category),
       { blockType: 'hero', variant: 'minimal', headline: `Contact ${biz.name}`, subheadline: 'We\'d love to hear from you.', height: '40vh' },
       buildContact(biz),
+      {
+        blockType: 'google-maps',
+        variant: 'embed',
+        address: biz.address || '',
+        zoom: 15,
+      },
+      {
+        blockType: 'faq',
+        variant: 'accordion',
+        headline: 'Visit Us',
+        items: [
+          { question: 'What are your opening hours?', answer: 'We are open 9:00 AM to 9:00 PM daily. See our Google Maps listing for real-time updates.' },
+          { question: 'Do you offer walk-ins or is booking required?', answer: 'Walk-ins welcome for most services. For peak hours and specific requests, booking is recommended.' },
+          { question: 'Is parking available?', answer: 'Yes — street parking and nearby covered parking are both within a 2-minute walk.' },
+        ],
+      },
       buildFooter(biz, pages),
     ],
   }
@@ -1263,20 +1291,35 @@ function buildServicesPage(biz: BusinessSample, content: CategoryContent, catego
   return { title: 'Services', slug: '/services', layout: blocks }
 }
 
-function buildBlogPage(biz: BusinessSample, pages: string[]): TemplatePage {
+function buildBlogPage(biz: BusinessSample, category: string, pages: string[]): TemplatePage {
+  // Plan 260414-2249 phase-05: seed blog-list with category-appropriate
+  // posts so the Blog sub-page never renders with a single empty heading.
+  const seeds = getBlogSeeds(category)
+  const items = seeds.slice(0, 6).map((post) => ({
+    title: post.title,
+    excerpt: post.excerpt,
+    slug: post.slug,
+    category: post.category ?? 'Latest',
+    readTime: post.readTime ?? '4 min',
+    // Placeholder image — media pipeline (Phase 03) replaces with pool photo
+    imageUrl: '',
+  }))
+
   return {
     title: 'Blog',
     slug: '/blog',
     layout: [
-      buildNavigation(biz, pages),
+      buildNavigation(biz, pages, category),
       { blockType: 'hero', variant: 'minimal', headline: 'Blog & Updates', subheadline: `Latest news from ${biz.name}`, height: '40vh' },
       {
         blockType: 'blog-list',
         headline: 'Latest Articles',
         subheadline: 'Stay up to date with our latest news and insights.',
-        limit: 6,
+        limit: items.length > 0 ? items.length : 6,
+        items,
       },
       buildNewsletter(biz),
+      buildCTA(biz, category),
       buildFooter(biz, pages),
     ],
   }
@@ -1486,6 +1529,118 @@ function buildBlockFromSpec(
 }
 
 /**
+ * Plan 260414-2249 phase-05: enrich sub-pages in place so every composed
+ * site ships the 5-page completeness standard:
+ *
+ *  - Home (from blueprint — untouched)
+ *  - About — override hero subheadline with biz.description excerpt
+ *  - Contact — ensure google-maps + opening-hours FAQ blocks
+ *  - Blog — append a new page with seeded posts if missing
+ *
+ * Mutates the `pages` array in place. Safe to call when pages already
+ * contain these — existing content is preserved, only missing blocks/pages
+ * are added.
+ */
+function enrichSubPages(
+  pages: TemplatePage[],
+  biz: BusinessSample,
+  category: string,
+): void {
+  const getPage = (title: string): TemplatePage | undefined =>
+    pages.find((p) => p.title?.toLowerCase() === title.toLowerCase())
+
+  const pageNames = pages.map((p) => p.title)
+
+  // ── About: weave user description into hero subheadline ─────────────
+  const aboutPage = getPage('About')
+  if (aboutPage && biz.description && biz.description.length > 0) {
+    const heroIdx = aboutPage.layout.findIndex(
+      (b) => (b as Record<string, unknown>).blockType === 'hero',
+    )
+    if (heroIdx >= 0) {
+      const hero = aboutPage.layout[heroIdx] as Record<string, unknown>
+      const excerpt =
+        biz.description.length > 140
+          ? biz.description.slice(0, 137) + '...'
+          : biz.description
+      aboutPage.layout[heroIdx] = { ...hero, subheadline: excerpt }
+    }
+  }
+
+  // ── Contact: ensure google-maps + hours FAQ ─────────────────────────
+  const contactPage = getPage('Contact')
+  if (contactPage) {
+    const hasMaps = contactPage.layout.some(
+      (b) => (b as Record<string, unknown>).blockType === 'google-maps',
+    )
+    const hasFaq = contactPage.layout.some(
+      (b) => (b as Record<string, unknown>).blockType === 'faq',
+    )
+    // Insert before footer (last block)
+    const footerIdx = contactPage.layout.findIndex(
+      (b) => (b as Record<string, unknown>).blockType === 'footer',
+    )
+    const insertAt = footerIdx >= 0 ? footerIdx : contactPage.layout.length
+
+    if (!hasMaps) {
+      contactPage.layout.splice(insertAt, 0, {
+        blockType: 'google-maps',
+        variant: 'embed',
+        address: biz.address || '',
+        zoom: 15,
+      } as unknown as Record<string, unknown>)
+    }
+    if (!hasFaq) {
+      const insertIdx = contactPage.layout.findIndex(
+        (b) => (b as Record<string, unknown>).blockType === 'footer',
+      )
+      const beforeFooter = insertIdx >= 0 ? insertIdx : contactPage.layout.length
+      contactPage.layout.splice(beforeFooter, 0, {
+        blockType: 'faq',
+        variant: 'accordion',
+        headline: 'Visit Us',
+        items: [
+          { question: 'What are your opening hours?', answer: 'We are open 9:00 AM to 9:00 PM daily. See our Google Maps listing for real-time updates.' },
+          { question: 'Do you offer walk-ins or is booking required?', answer: 'Walk-ins welcome for most services. For peak hours and specific requests, booking is recommended.' },
+          { question: 'Is parking available?', answer: 'Yes — street parking and nearby covered parking are both within a 2-minute walk.' },
+        ],
+      } as unknown as Record<string, unknown>)
+    }
+  }
+
+  // ── Blog: append if missing, with seeded posts ─────────────────────
+  const blogPage = getPage('Blog')
+  if (!blogPage) {
+    const blogTemplate = buildBlogPage(biz, category, pageNames)
+    pages.push(blogTemplate)
+  } else {
+    // Existing Blog page — ensure blog-list has seeded items if empty
+    const blogListIdx = blogPage.layout.findIndex(
+      (b) => (b as Record<string, unknown>).blockType === 'blog-list',
+    )
+    if (blogListIdx >= 0) {
+      const blogList = blogPage.layout[blogListIdx] as Record<string, unknown>
+      const existingItems = (blogList.items as unknown[] | undefined) ?? []
+      if (existingItems.length === 0) {
+        const seeds = getBlogSeeds(category).slice(0, 6).map((post) => ({
+          title: post.title,
+          excerpt: post.excerpt,
+          slug: post.slug,
+          category: post.category ?? 'Latest',
+          readTime: post.readTime ?? '4 min',
+          imageUrl: '',
+        }))
+        blogPage.layout[blogListIdx] = {
+          ...blogList,
+          items: seeds,
+          limit: seeds.length,
+        }
+      }
+    }
+  }
+}
+
+/**
  * Compose a template from a TemplatePreset blueprint.
  * Reads pages[].blocks[] and builds each block — no algorithmic guessing.
  * When BlockSpec.variant is undefined, uses selectVariant() for seed-based variety.
@@ -1539,6 +1694,13 @@ export function composeFromBlueprint(
     }),
   }))
 
+  // Plan 260414-2249 phase-05: enrich sub-pages to 5-page completeness standard.
+  // - Ensure Blog page exists with seeded posts from content/blog-seeds.ts
+  // - Ensure About page hero subheadline weaves user biz.description when present
+  // - Ensure Contact page has google-maps + opening-hours FAQ when user provides address
+  // Mutates `pages` in place via helper — adds missing pages, updates existing.
+  enrichSubPages(pages, biz, preset.category)
+
   return {
     name: preset.name,
     description: preset.description,
@@ -1573,12 +1735,12 @@ export function composeTemplate(input: ComposerInput): TemplateSeed {
   // Additional pages for professional/premium
   if (input.variant === 'professional' || input.variant === 'premium') {
     templatePages.push(buildAboutPage(biz, content, input.category, pages))
-    templatePages.push(buildContactPage(biz, pages))
+    templatePages.push(buildContactPage(biz, input.category, pages))
   }
 
   if (input.variant === 'premium') {
     templatePages.push(buildServicesPage(biz, content, input.category, pages))
-    templatePages.push(buildBlogPage(biz, pages))
+    templatePages.push(buildBlogPage(biz, input.category, pages))
   }
 
   // Build the template name
