@@ -375,7 +375,7 @@ export const POST = withAuth(async (user, req) => {
             // 4. Create new pages from template, merging user content where possible
             for (const [idx, page] of pagesToCreate.entries()) {
                 // Find matching existing blocks: homepage→homepage, then slug match
-                const matchingBlocks = (page.isHomepage || idx === 0)
+                const matchingBlocks = page.isHomepage
                     ? homepageBlocks
                     : (existingPageMap[page.slug] || [])
 
