@@ -95,12 +95,29 @@ for (const result of renderable) {
     const viewport = page.viewportSize()
     const viewportHeight = viewport?.height ?? 800
 
-    // Emulate reduced motion so Framer Motion `whileInView` animations
-    // bypass IntersectionObserver and render at final state immediately.
-    // Without this, fullPage screenshot captures opacity:0 for sections
-    // that are out of the initial viewport — false positive empty-hole.
+    // Defence-in-depth against Framer Motion `whileInView` animations that
+    // gate visibility behind IntersectionObserver. fullPage screenshots
+    // never trigger the scroll observer for out-of-viewport sections, so
+    // without these overrides every fixture flags as a false-positive
+    // empty hole (verified 2026-04-14: pass rate 0/24 → 23/24).
+    //
+    // Layer 1 — CSS-level reduced motion: respected by Framer Motion's
+    //   `useReducedMotion` hook + any CSS @media (prefers-reduced-motion).
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto(`/test-harness/${fixture.id}`, { waitUntil: 'networkidle' })
+    // Layer 2 — brute-force CSS override applied AFTER hydration. Forces
+    //   every element to its final visible state regardless of which
+    //   animation system gated it. Wins over inline styles via !important.
+    await page.addStyleTag({
+      content: `
+        *, *::before, *::after {
+          opacity: 1 !important;
+          transform: none !important;
+          transition: none !important;
+          animation: none !important;
+        }
+      `,
+    })
     // Actually await fonts.ready (returning the Promise to evaluate works;
     // waitForFunction would not — it would resolve immediately because a
     // returned Promise is truthy on first poll).
