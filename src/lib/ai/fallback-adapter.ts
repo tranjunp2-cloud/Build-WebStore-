@@ -19,6 +19,8 @@ import { getCategoryContent } from './content'
 import type { BusinessSample } from './content/types'
 import type { GenerationResult, GeneratedBlock, GeneratedPage, BusinessIntent } from './generate-blocks'
 import { filterUnsupportedBlocks } from './unsupported-blocks'
+import { mapBusinessInfo } from './business-info-mapper'
+import type { BusinessInfoInput } from './system-prompt'
 
 type Language = 'en' | 'ms' | 'vi'
 
@@ -120,23 +122,32 @@ export function adaptTemplateSeedToGenerationResult(
  * Pipeline:
  *   1. resolveComposerCategory(prompt) → one of 14 categories
  *   2. pickPreset(category, seed) → deterministic TemplatePreset
- *   3. bizOverride = extractedName ? {name: extractedName} : undefined
+ *   3. bizOverride = info ? mapBusinessInfo(info) : { name: extractedName } (legacy)
  *   4. composeFromBlueprint(preset, seed, bizOverride) → TemplateSeed
  *   5. Look up canonical biz from content to populate siteName/SEO
  *   6. adaptTemplateSeedToGenerationResult(...) → GenerationResult
+ *
+ * Plan 260414-2249 phase-01: accept full BusinessInfoInput so user-supplied
+ * phone/email/address/products flow into composer block builders instead of
+ * being dropped. Legacy `extractedName` signature preserved via optional param.
  */
 export function composeFallbackResult(
     prompt: string,
     seed: number,
     language: Language = 'en',
-    extractedName?: string,
+    info?: BusinessInfoInput | string,
 ): GenerationResult {
     const category = resolveComposerCategory(prompt)
     const preset = pickPreset(category, seed)
 
-    const bizOverride: Partial<BusinessSample> | undefined = extractedName
-        ? { name: extractedName }
-        : undefined
+    // Legacy string overload = extracted name only. New object overload = full wire info.
+    let bizOverride: Partial<BusinessSample> | undefined
+    if (typeof info === 'string') {
+        bizOverride = info ? { name: info } : undefined
+    } else if (info) {
+        const mapped = mapBusinessInfo(info)
+        bizOverride = Object.keys(mapped).length > 0 ? mapped : undefined
+    }
 
     const templateSeed = composeFromBlueprint(preset, seed, bizOverride)
 

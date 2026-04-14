@@ -7,6 +7,9 @@ export type BusinessSample = {
   email: string
   heroHeadline: string
   heroSubheadline: string
+  // Ephemeral from BusinessInfoInput wire payload, NOT persisted to Payload.
+  // Populated via bizOverride in composeFromBlueprint when user supplies products.
+  products?: string[]
 }
 
 export type TestimonialSample = {
