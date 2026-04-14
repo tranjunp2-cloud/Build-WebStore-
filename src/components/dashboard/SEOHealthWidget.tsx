@@ -59,6 +59,7 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
             aria-label={t.dashboard.overview.seo.title || 'SEO Health'}
             onClick={handleNavigate}
             onKeyDown={(e) => {
+                if (e.currentTarget !== e.target) return
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
                     handleNavigate(e)
