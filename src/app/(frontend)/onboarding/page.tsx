@@ -14,6 +14,11 @@ export default async function OnboardingPage() {
         redirect('/login')
     }
 
+    // If user already completed the wizard, redirect to dashboard
+    if (user.has_seen_ai_wizard) {
+        redirect('/dashboard')
+    }
+
     // Extract tenantIds from user directly — no extra getCurrentUser call needed
     const tenantIds = (user.tenants || [])
         .map((t: { tenant: string | { id: string } }) => typeof t.tenant === 'object' ? t.tenant?.id : t.tenant)
