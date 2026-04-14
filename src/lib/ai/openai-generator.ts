@@ -12,6 +12,7 @@ import { buildUserPrompt } from './system-prompt'
 import { composeFallbackResult } from './fallback-adapter'
 import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
+import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
 import {
     validateBlockContent,
@@ -65,15 +66,40 @@ export async function generateSiteWithAI(
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
 
-        const completion = await openai.chat.completions.create({
-            model: selectModel('site-generation'),
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPromptText },
-            ],
-            temperature: 0.7,
-            max_tokens: 8000,
-            response_format: { type: 'json_object' },
+        const callStart = Date.now()
+        const modelName = selectModel('site-generation')
+        let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>
+        try {
+            completion = await openai.chat.completions.create({
+                model: modelName,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPromptText },
+                ],
+                temperature: 0.7,
+                max_tokens: 8000,
+                response_format: { type: 'json_object' },
+            })
+        } catch (err) {
+            logAiUsage({
+                endpoint: 'site-generation',
+                model: modelName,
+                tokensIn: 0,
+                tokensOut: 0,
+                durationMs: Date.now() - callStart,
+                success: false,
+                errorCode: err instanceof Error ? err.name : 'unknown',
+            })
+            throw err
+        }
+
+        logAiUsage({
+            endpoint: 'site-generation',
+            model: completion.model,
+            tokensIn: completion.usage?.prompt_tokens ?? 0,
+            tokensOut: completion.usage?.completion_tokens ?? 0,
+            durationMs: Date.now() - callStart,
+            success: true,
         })
 
         const content = completion.choices[0]?.message?.content

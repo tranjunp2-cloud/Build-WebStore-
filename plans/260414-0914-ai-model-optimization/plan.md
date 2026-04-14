@@ -1,13 +1,25 @@
 ---
 title: "AI Model Optimization — replace gpt-4o with gpt-4.1-mini"
 description: "Swap hardcoded gpt-4o on site-gen + edit-block to gpt-4.1-mini via Vercel AI Gateway — ~85% cost cut with equal/better JSON fidelity."
-status: pending
+status: in-progress
 priority: P1
 effort: 9h
 branch: feat/F01-ai-gen-variety-fix
 tags: [ai, cost-optimization, site-generation, edit-block, vercel-ai-gateway]
 created: 2026-04-14
 ---
+
+## Progress (2026-04-14)
+
+| Phase | Status | Commit |
+|---|---|---|
+| 01 Eval harness | ✅ done | `e08a937a` |
+| 02 Activate selectModel | ✅ done | `e08a937a` |
+| 03a Flip site-gen default | ✅ done | `56adabe0` |
+| 03b Strict json_schema + max_tokens tuning | ⏸ deferred | — |
+| 04 Fix cost leaks edit-block + bulk-parse | ✅ done | `9ccea6b7` |
+| 05a Cost logging (ai_usage_logs + helper) | ✅ done | (this commit) |
+| 05b Vercel AI Gateway migration + admin page | ⏸ deferred | — |
 
 ## Câu hỏi gốc của a
 
