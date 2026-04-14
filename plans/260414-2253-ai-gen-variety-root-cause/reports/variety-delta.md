@@ -3,9 +3,34 @@
 **Date**: 2026-04-15
 **Baseline commit**: `d621bf70` (staging post-#555, pre Plan 2253)
 **Post-fix (v1)**: `980d3906` (Phase 01-04 initial)
-**Post-fix (v2)**: `feat/F01-ai-gen-variety-tactical` HEAD (v1 + rotateSlice Fisher-Yates fix)
+**Post-fix (v2)**: `2a49541f` (v1 + rotateSlice Fisher-Yates fix)
+**Post-fix (v3)**: `feat/F01-ai-gen-variety-tactical` HEAD (v2 + R4 amendment — library block shuffle)
 **Runs**: 10 per category × 5 categories = **50 gens per side** (offline, direct `generateSiteWithAI` call)
 **Mode**: Offline (no media pipeline — image uniqueness metric skipped)
+
+---
+
+## V3 results — R4 audit fix landed
+
+Self-audit (audit-root-causes.md) found R4 partial fix: `service-cards`/`features`/
+`stats`/`team` cases in `buildBlockFromLibrary` returned hardcoded object literals
+that ignored `biz` entirely. V2 measurement missed because harness only tracked
+testimonial collision. V3 amendment:
+1. `pickSeeded` local helper → `seededShufflePick` (Fisher-Yates)
+2. 4 hardcoded cases expanded to 6-8 item pools + seeded shuffle by compound seed
+3. New metric `libraryBlockFirstItem` counts distinct first-item title per block
+
+### Library block diversity (first-item title distinct/runs)
+
+| Category | v2 service-cards | v3 | v2 features | v3 |
+|---|---|---|---|---|
+| beauty | 1/10 | **7/10** | 4/10 | **9/10** |
+| restaurant | — (no svc gen) | — | 5/5 | **4/4** |
+| tech | 1/10 | **4/10** | 5/10 | **9/10** |
+| realestate | 1/10 | **6/10** | 5/10 | **10/10** |
+| fitness | 1/10 | **6/10** | 4/10 | **7/10** |
+
+**Result**: 4/5 categories flipped from single-variant to majority-distinct on service-cards. Features block diversity near-perfect (9-10/10 across 4 cats). R4 fix validated by the same metric type the audit surfaced.
 
 ---
 

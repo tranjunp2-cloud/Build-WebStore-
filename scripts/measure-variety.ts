@@ -60,7 +60,14 @@ export interface CategoryMetrics {
     runs: number
     variantShare: Record<string, { top: string; share: number; distinct: number }>
     skeletonEntropy: { distinct: number; sequences: string[] }
-    contentCollision: { testimonialOverlapPct: number }
+    contentCollision: {
+        testimonialOverlapPct: number
+        /** Plan 2253 Phase 03 v3 — adds coverage for R4 oversight: hardcoded
+         * library blocks (service-cards/features/stats/team) previously
+         * returned identical [0] items across all gens. Metric measures
+         * distinct count of first-item title per block type. */
+        libraryBlockFirstItem?: Record<string, { distinct: number; runs: number }>
+    }
     themeDistribution: { distinctCombos: number; combos: string[] }
     imageUniqueness: { distinctHeroImages: number }
 }
@@ -197,11 +204,44 @@ export function computeContentCollision(
             }
         }
     }
-    if (allQuotes.length === 0) return { testimonialOverlapPct: 0 }
-    const counts = new Map<string, number>()
-    for (const q of allQuotes) counts.set(q, (counts.get(q) ?? 0) + 1)
-    const duplicates = [...counts.values()].filter((c) => c > 1).reduce((a, b) => a + b, 0)
-    return { testimonialOverlapPct: Math.round((duplicates / allQuotes.length) * 100) }
+    const testimonialOverlapPct = (() => {
+        if (allQuotes.length === 0) return 0
+        const counts = new Map<string, number>()
+        for (const q of allQuotes) counts.set(q, (counts.get(q) ?? 0) + 1)
+        const duplicates = [...counts.values()].filter((c) => c > 1).reduce((a, b) => a + b, 0)
+        return Math.round((duplicates / allQuotes.length) * 100)
+    })()
+
+    // Plan 2253 Phase 03 v3 — library block first-item diversity
+    // Catches the R4 oversight on hardcoded service-cards/features/stats/team.
+    const BLOCK_FIELD: Record<string, string> = {
+        'service-cards': 'services',
+        features: 'features',
+        stats: 'stats',
+        team: 'members',
+    }
+    const libraryBlockFirstItem: Record<string, { distinct: number; runs: number }> = {}
+    for (const [blockType, field] of Object.entries(BLOCK_FIELD)) {
+        const firstTitles: string[] = []
+        for (const r of results) {
+            const block = r.blocks.find((b) => b.blockType === blockType) as Record<string, unknown> | undefined
+            if (!block) continue
+            const arr = block[field]
+            if (!Array.isArray(arr) || arr.length === 0) continue
+            const first = arr[0] as Record<string, unknown>
+            const title = String(
+                first?.title ?? first?.name ?? first?.label ?? '',
+            ).toLowerCase().trim()
+            if (title) firstTitles.push(title)
+        }
+        if (firstTitles.length > 0) {
+            libraryBlockFirstItem[blockType] = {
+                distinct: new Set(firstTitles).size,
+                runs: firstTitles.length,
+            }
+        }
+    }
+    return { testimonialOverlapPct, libraryBlockFirstItem }
 }
 
 export function computeThemeDistribution(

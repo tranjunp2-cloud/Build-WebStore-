@@ -78,15 +78,19 @@ function renderMarkdown(metrics: CategoryMetrics[], label: string): string {
     lines.push('')
     lines.push('## Summary')
     lines.push('')
-    lines.push('| Category | Runs | Errors | Top Variant Share | Skeletons | Testimonial Collision | Theme Combos |')
-    lines.push('|---|---|---|---|---|---|---|')
+    lines.push('| Category | Runs | Errors | Top Variant Share | Skeletons | Testim. Collision | Theme Combos | Lib Block Diversity |')
+    lines.push('|---|---|---|---|---|---|---|---|')
     for (const m of metrics) {
         const topShare = Object.values(m.variantShare)
             .map((v) => v.share)
             .reduce((a, b) => Math.max(a, b), 0)
         const errs = (m as CategoryMetrics & { errors?: number }).errors ?? 0
+        const libBlocks = m.contentCollision.libraryBlockFirstItem ?? {}
+        const libSummary = Object.entries(libBlocks)
+            .map(([k, v]) => `${k.slice(0, 3)}=${v.distinct}/${v.runs}`)
+            .join(' ')
         lines.push(
-            `| ${m.category} | ${m.runs} | ${errs} | ${(topShare * 100).toFixed(0)}% | ${m.skeletonEntropy.distinct} | ${m.contentCollision.testimonialOverlapPct}% | ${m.themeDistribution.distinctCombos} |`,
+            `| ${m.category} | ${m.runs} | ${errs} | ${(topShare * 100).toFixed(0)}% | ${m.skeletonEntropy.distinct} | ${m.contentCollision.testimonialOverlapPct}% | ${m.themeDistribution.distinctCombos} | ${libSummary || '—'} |`,
         )
     }
     lines.push('')
