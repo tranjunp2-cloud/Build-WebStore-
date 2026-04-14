@@ -296,7 +296,16 @@
             "morning": "pagi",
             "afternoon": "petang",
             "evening": "malam",
+            "welcomeTitle": "Selamat datang ke Papan Pemuka PrimeWeb",
+            "welcomeSubtitle": "Pantau prestasi kedai anda dan urus perniagaan dalam talian anda dari satu tempat.",
+            "pendingLabel": "Tertangguh",
+            "itemsLabel": "item",
             "customize": "Sesuaikan",
+            "tabs": {
+                "overview": "Gambaran",
+                "analytics": "Analitis",
+                "seo": "Kesihatan SEO"
+            },
             "stats": {
                 "views": "Paparan (Trafik)",
                 "leads": "Klik (Prospek)",
@@ -315,7 +324,10 @@
                 "score": "Skor:",
                 "statusGood": "Baik",
                 "statusWarning": "Perlu Pembaikan",
-                "fixAll": "✨ AI Baiki Semua Isu"
+                "fixAll": "✨ AI Baiki Semua Isu",
+                "fix": "Baiki",
+                "issue": "Isu",
+                "issues": "Isu"
             },
             "periods": {
                 "today": "Hari ini",
@@ -372,7 +384,8 @@
             "topBlogs": "Blog Teratas",
             "topReferrers": "Sumber Utama",
             "views": "Paparan",
-            "clicks": "Klik"
+            "clicks": "Klik",
+            "noData": "Tiada data tersedia untuk tempoh ini."
         },
         "seo": {
             "title": "Papan Pemuka SEO",
@@ -437,6 +450,9 @@
                 "description": "Cipta laman terlebih dahulu untuk menggunakan Papan Pemuka SEO",
                 "cta": "Pergi ke Papan Pemuka"
             },
+            "issuesList": "Isu SEO",
+            "missingTitle": "Tiada tajuk",
+            "missingDesc": "Tiada penerangan",
             "healthOverview": "Gambaran Kesihatan SEO",
             "scoreLabel": "Skor: {score}/100",
             "fixAllButton": "✨ Baiki Semua Isu",

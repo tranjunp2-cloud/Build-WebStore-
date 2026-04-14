@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   Rectangle
 } from 'recharts'
+import { useI18n } from '@/i18n'
 
 export type ChartData = {
   date: string
@@ -24,11 +25,12 @@ interface ActiveBarProps {
     height?: number
     payload?: { date?: string; views?: number }
     tooltipRef: React.RefObject<HTMLDivElement | null>
+    viewsLabel: string
 }
 
 const CustomActiveBar = (props: ActiveBarProps) => {
-    const { x = 0, y = 0, width = 0, height = 0, payload, tooltipRef } = props
-    
+    const { x = 0, y = 0, width = 0, height = 0, payload, tooltipRef, viewsLabel } = props
+
     // Direct DOM manipulation to avoid infinite React state loops
     useEffect(() => {
         if (tooltipRef?.current) {
@@ -42,14 +44,15 @@ const CustomActiveBar = (props: ActiveBarProps) => {
             el.style.display = 'block'
             el.style.left = `${left}px`
             el.style.top = `${y + 16}px`
-            el.innerHTML = `${payload?.date} — ${Number(payload?.views || 0).toLocaleString()} views`
+            el.innerHTML = `${payload?.date} — ${Number(payload?.views || 0).toLocaleString()} ${viewsLabel}`
         }
-    }, [x, y, width, payload?.date, payload?.views, tooltipRef])
+    }, [x, y, width, payload?.date, payload?.views, tooltipRef, viewsLabel])
 
     return <Rectangle x={x} y={y} width={width} height={height} fill="url(#primaryGradient)" radius={[2, 2, 0, 0]} stroke="none" />
 }
 
 export function AnalyticsChart({ data }: { data: ChartData[] }) {
+    const { t } = useI18n()
     const tooltipRef = useRef<HTMLDivElement>(null)
 
     if (!data || data.length === 0) return null
@@ -58,7 +61,7 @@ export function AnalyticsChart({ data }: { data: ChartData[] }) {
     return (
         <div className="bg-[#161E2E] border border-[#1F2937] rounded-xl p-6 shadow-sm mb-6 w-full">
             <div className="text-base font-bold text-white mb-4 flex items-center gap-2">
-                📊 Daily Traffic
+                📊 {t.dashboard.analytics.chart}
             </div>
             
             <div className="h-[280px] w-full pt-4 relative">
@@ -122,7 +125,7 @@ export function AnalyticsChart({ data }: { data: ChartData[] }) {
                             fill="url(#primaryGradient)" 
                             radius={[2, 2, 0, 0]} 
                             isAnimationActive={false}
-                            activeBar={<CustomActiveBar tooltipRef={tooltipRef} />}
+                            activeBar={<CustomActiveBar tooltipRef={tooltipRef} viewsLabel={t.dashboard.analytics.views} />}
                         />
                     </BarChart>
                 </ResponsiveContainer>

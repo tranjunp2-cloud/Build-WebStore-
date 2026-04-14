@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
-import { SEOKeywordTracker, AutoMetaToggle } from './SEOKeywordTracker'
+import { AutoMetaToggle } from './SEOKeywordTracker'
 import { GenerateSitemapButton } from './GenerateSitemapButton'
 import { AIFixModal } from '@/components/dashboard/AIFixModal'
 import type { TrackedKeyword } from './SEOKeywordTracker'
@@ -146,7 +146,36 @@ export function SEOViewContent({
                 </div>
             </div>
 
-            <SEOKeywordTracker initialKeywords={keywords} />
+            {/* TODO: Re-enable SEOKeywordTracker when Google Search Console integration is ready */}
+            {/* <SEOKeywordTracker initialKeywords={keywords} /> */}
+
+            {/* SEO Issues List — replaces Keyword Tracker temporarily */}
+            {missingSeoItems.length > 0 && (
+                <div className="bg-[#161E2E] border border-[#1F2937] rounded-xl p-6 shadow-sm">
+                    <div className="text-base font-bold text-white mb-4 flex items-center gap-2">
+                        ⚠️ {seo.issuesList || 'SEO Issues'}
+                    </div>
+                    <div className="flex flex-col">
+                        {missingSeoItems.slice(0, 10).map((item, idx) => (
+                            <div key={`${item.collection}-${item.id}`} className="flex items-center gap-3 py-2.5 px-3.5 border-b border-[#1F2937] last:border-0">
+                                <div className={`min-w-[28px] h-[28px] rounded-full flex items-center justify-center text-[12px] font-bold ${idx < 3 ? 'bg-amber-500/15 text-amber-500' : 'bg-[#1F2937] text-slate-400'}`}>
+                                    {idx + 1}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-[13px] font-medium text-white truncate">{item.title}</div>
+                                    <div className="text-[11px] text-[#9CA3AF] truncate">
+                                        {item.missingFields.map(f => {
+                                            if (f === 'title') return seo.missingTitle
+                                            return seo.missingDesc
+                                        }).join(', ')}
+                                    </div>
+                                </div>
+                                <span className="text-[11px] text-[#6B7280] shrink-0 uppercase">{item.collection}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <AIFixModal
                 isOpen={isFixModalOpen}
