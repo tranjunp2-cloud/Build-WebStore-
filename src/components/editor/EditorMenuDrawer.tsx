@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+    Bell,
     ChevronDown,
     Globe,
     Headphones,
@@ -32,9 +33,12 @@ type EditorMenuDrawerProps = {
     open: boolean
     onClose: () => void
     currentUserRole?: string
+    userName?: string
+    userInitial?: string
+    notificationCount?: number
 }
 
-export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer' }: EditorMenuDrawerProps) {
+export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial, notificationCount = 0 }: EditorMenuDrawerProps) {
     const pathname = usePathname()
     const { locale, toggleLocale } = useI18n()
     const [expandedGroups, setExpandedGroups] = useState<string[]>(['/editor'])
@@ -204,7 +208,29 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                     })}
                 </nav>
 
-                <div className="flex flex-col gap-3 border-t border-white/[0.08] px-3 pt-[17px]" style={{ height: 125 }}>
+                <div className="flex flex-col gap-3 border-t border-white/[0.08] px-3 pt-[17px]" style={{ height: 182 }}>
+                    {/* User info + Notification bell */}
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-[42px] flex-1 items-center gap-3 rounded-[16px] border border-white/[0.08] pl-[17px] pr-px py-px">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0)] shadow-[0_0_0_2px_rgba(59,130,246,0.3)] text-[12px] font-bold text-white overflow-hidden">
+                                {userInitial || '?'}
+                            </div>
+                            <span className="text-[14px] font-medium text-[#F8FAFC]">{userName || 'User'}</span>
+                        </div>
+                        <button
+                            type="button"
+                            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] transition-colors hover:bg-white/5"
+                        >
+                            <Bell className="h-5 w-5 text-[rgba(248,250,252,0.7)]" />
+                            {notificationCount > 0 ? (
+                                <span className="absolute -top-1 left-5 flex h-5 min-w-[24px] items-center justify-center rounded-full border-2 border-[#1E293B] bg-gradient-to-r from-[#FB2C36] to-[#E7000B] px-2 py-1 text-[12px] font-semibold text-white">
+                                    {notificationCount}
+                                </span>
+                            ) : null}
+                        </button>
+                    </div>
+
+                    {/* Language toggle */}
                     <div className="flex items-center gap-2">
                         <Globe className="h-4 w-4 shrink-0 text-[rgba(248,250,252,0.5)]" />
                         <div className="flex h-[38px] flex-1 items-center rounded-[16px] border border-white/[0.08] bg-[#1E293B] px-1">
