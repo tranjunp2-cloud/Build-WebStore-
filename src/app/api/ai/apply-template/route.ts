@@ -176,6 +176,63 @@ export const POST = withAuth(async (user, req) => {
             cartWidget: ['variant', 'label', 'showLabel'],
         }
 
+        // Fields that define template structure (variant/layout) — NOT user content
+        const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
+
+        // Content fields per block type = PAGES_FIELDS minus structural fields
+        // These are preserved from user's existing blocks when switching templates
+        const CONTENT_FIELDS: Record<string, string[]> = {}
+        for (const [bt, fields] of Object.entries(PAGES_FIELDS)) {
+            CONTENT_FIELDS[bt] = fields.filter(f => !STRUCTURAL_FIELDS.has(f))
+        }
+
+        /**
+         * Merge user content into template blocks.
+         * Strategy: match blocks by blockType (first-match per type),
+         * take structural fields (variant/layout) from template,
+         * take content fields (headline, body, etc.) from user's existing block.
+         */
+        function mergeUserContent(
+            templateBlocks: Record<string, unknown>[],
+            existingBlocks: Record<string, unknown>[],
+        ): Record<string, unknown>[] {
+            // Group existing blocks by blockType (preserve order for multiple same-type blocks)
+            const existingByType: Record<string, Record<string, unknown>[]> = {}
+            for (const block of existingBlocks) {
+                const bt = block.blockType as string
+                if (!bt) continue
+                if (!existingByType[bt]) existingByType[bt] = []
+                existingByType[bt].push(block)
+            }
+            // Track usage index per blockType to handle multiple blocks of same type
+            const usageIndex: Record<string, number> = {}
+
+            return templateBlocks.map(templateBlock => {
+                const bt = templateBlock.blockType as string
+                if (!bt) return templateBlock
+
+                const contentFields = CONTENT_FIELDS[bt]
+                if (!contentFields || contentFields.length === 0) return templateBlock
+
+                // Find matching existing block (by type, ordered)
+                const idx = usageIndex[bt] || 0
+                usageIndex[bt] = idx + 1
+                const existingBlock = existingByType[bt]?.[idx]
+                if (!existingBlock) return templateBlock
+
+                // Merge: template structure + user content
+                const merged = { ...templateBlock }
+                for (const field of contentFields) {
+                    const userValue = existingBlock[field]
+                    // Only preserve user content if it's non-empty
+                    if (userValue !== undefined && userValue !== null && userValue !== '') {
+                        merged[field] = userValue
+                    }
+                }
+                return merged
+            })
+        }
+
         function sanitizeBlocks(blockList: Record<string, unknown>[]): Record<string, unknown>[] {
             return blockList
                 .filter(b => PAGES_BLOCK_WHITELIST.has(b.blockType as string))
@@ -285,26 +342,47 @@ export const POST = withAuth(async (user, req) => {
                 data: { generationStatus: 'generating' },
             })
 
-            // Delete old pages → update theme → create new pages (sequential)
-            // 1. Delete all existing pages for this site
+            // 1. Collect existing pages + their blocks (to preserve user content)
             const existingPages = await payload.find({
                 collection: 'pages',
                 where: { site: { equals: Number(siteId) } },
                 limit: 100,
             })
+
+            // Build lookup: homepage blocks + slug-matched blocks for content merging
+            const existingPageMap: Record<string, Record<string, unknown>[]> = {}
+            let homepageBlocks: Record<string, unknown>[] = []
+            for (const page of existingPages.docs) {
+                const pageData = page as Record<string, unknown>
+                const blocks = (pageData.layout as Record<string, unknown>[]) || []
+                const slug = pageData.slug as string
+                if (pageData.isHomepage) homepageBlocks = blocks
+                if (slug) existingPageMap[slug] = blocks
+            }
+
+            // 2. Delete old pages
             for (const page of existingPages.docs) {
                 await payload.delete({ collection: 'pages', id: page.id })
             }
 
-            // 2. Update site theme
+            // 3. Update site theme
             await payload.update({
                 collection: 'sites',
                 id: Number(siteId),
                 data: { theme: templateTheme },
             })
 
-            // 3. Create new pages from template
+            // 4. Create new pages from template, merging user content where possible
             for (const [idx, page] of pagesToCreate.entries()) {
+                // Find matching existing blocks: homepage→homepage, then slug match
+                const matchingBlocks = (page.isHomepage || idx === 0)
+                    ? homepageBlocks
+                    : (existingPageMap[page.slug] || [])
+
+                const mergedLayout = matchingBlocks.length > 0
+                    ? mergeUserContent(page.layout, matchingBlocks)
+                    : page.layout
+
                 await payload.create({
                     collection: 'pages',
                     data: {
@@ -314,7 +392,7 @@ export const POST = withAuth(async (user, req) => {
                         tenant: tenantId,
                         isHomepage: page.isHomepage ?? idx === 0,
                         _status: 'published',
-                        layout: page.layout,
+                        layout: mergedLayout,
                     },
                 })
                 _createdPagesCount++
