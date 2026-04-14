@@ -211,6 +211,71 @@ export const FONT_PAIRINGS: FontPairing[] = [
     bodyWeight: 400,
     description: 'Bold geometric for strong visual impact',
   },
+  // ── Plan 2253 Phase 02 — new unique pairs for variety (R6 fix) ──────────
+  // Mirrors src/lib/ai/font-pairings.ts resolver additions so that
+  // `theme-presets.ts` preset.fontPairingId references stay referentially
+  // intact against the authoritative FONT_PAIRINGS array consumed by
+  // `src/__tests__/unit/templates/theme-presets.test.ts`.
+  {
+    id: 'magazine-cover',
+    name: 'Magazine Cover',
+    category: 'classic',
+    headingFont: 'Playfair Display',
+    bodyFont: 'Open Sans',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Editorial magazine cover — serif headline + neutral body',
+  },
+  {
+    id: 'boutique-serif',
+    name: 'Boutique Serif',
+    category: 'classic',
+    headingFont: 'Playfair Display',
+    bodyFont: 'Inter',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Boutique luxury — classic serif headlines with modern body',
+  },
+  {
+    id: 'warm-editorial',
+    name: 'Warm Editorial',
+    category: 'playful',
+    headingFont: 'Poppins',
+    bodyFont: 'Lato',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Warm rounded headlines with friendly editorial body',
+  },
+  {
+    id: 'contemporary',
+    name: 'Contemporary',
+    category: 'modern',
+    headingFont: 'Raleway',
+    bodyFont: 'DM Sans',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Contemporary clean — Raleway headlines with geometric body',
+  },
+  {
+    id: 'classical',
+    name: 'Classical',
+    category: 'classic',
+    headingFont: 'Inter',
+    bodyFont: 'Lato',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Refined neutral pairing for classical, timeless brands',
+  },
+  {
+    id: 'hospitality',
+    name: 'Hospitality',
+    category: 'playful',
+    headingFont: 'Poppins',
+    bodyFont: 'Open Sans',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Welcoming hospitality — rounded headlines with clean body',
+  },
 ]
 
 /** System fonts that should not be loaded from Google Fonts */
