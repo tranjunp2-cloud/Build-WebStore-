@@ -15,6 +15,7 @@ import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
 import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
+import { pickRecipe } from './category-recipes'
 import { resolveComposerCategory } from './composer-category-resolver'
 import { resolveFontPairing } from './font-pairings'
 import { seededShufflePick, hashString } from './seeded-random'
@@ -73,10 +74,18 @@ export async function generateSiteWithAI(
         // prompt receives the COPY VOICE bulleted block (4-5 voice rules +
         // imagery hint + mood label). Without this, the happy path generates
         // generic copy even though the preset dictates elegant/bold/etc.
+        //
+        // Plan 260414-2249 phase-04: pick a layout recipe so GPT gets an
+        // explicit RHYTHM section — hard-constrained block sequence drawn
+        // from 3 curated recipes per category (story-first/menu-first/...).
+        // Without this, GPT reverts to its prior and every site rhymes.
         const presetCategory = resolveComposerCategory(promptText)
         const themeSeed = hashBusinessName(businessInfo.businessName)
         const { preset: themePreset, mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
-        console.log(`[Theme] Using category preset "${themePreset.name}" (mood=${themeMood.id}) for category=${presetCategory} (seed=${themeSeed})`)
+        const layoutRecipe = pickRecipe(presetCategory, themeSeed)
+        console.log(
+            `[Theme] Using category preset "${themePreset.name}" (mood=${themeMood.id}, recipe=${layoutRecipe.id}) for category=${presetCategory} (seed=${themeSeed})`,
+        )
 
         const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory })
         const userPromptText = buildUserPrompt(businessInfo, {
@@ -84,6 +93,7 @@ export async function generateSiteWithAI(
             language,
             referencePrompt,
             mood: themeMood,
+            recipe: layoutRecipe,
         })
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
