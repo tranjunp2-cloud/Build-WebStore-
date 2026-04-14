@@ -2,7 +2,10 @@
 
 import type { BlockProps } from '../types'
 import type { WhatsappButtonConfig } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+
+void _CSS_VARS
 
 const WhatsAppIcon = () => (
     <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -10,7 +13,8 @@ const WhatsAppIcon = () => (
     </svg>
 )
 
-export function WhatsappButtonBlock({ block, theme }: BlockProps<WhatsappButtonConfig>) {
+export function WhatsappButtonBlock({ block, theme: _theme }: BlockProps<WhatsappButtonConfig>) {
+    void _theme
     const { variant = 'floating', phoneNumber, message, label = 'Chat with us', position = 'bottom-right' } = block
 
     const cleanPhone = phoneNumber?.replace(/[^0-9]/g, '') || ''
@@ -19,13 +23,13 @@ export function WhatsappButtonBlock({ block, theme }: BlockProps<WhatsappButtonC
     // ── Inline variant ─────────────────────────────────────────────────
     if (variant === 'inline') {
         return (
-            <section className="py-24">
-                <div className="container mx-auto px-6 text-center">
+            <section className={SECTION_PADDING.default}>
+                <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING} text-center`}>
                     <a
                         href={whatsappUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white text-lg transition-all duration-200 hover:opacity-90 hover:scale-105 shadow-lg"
+                        className={`inline-flex items-center gap-3 px-8 py-4 rounded-2xl font-semibold text-white text-lg transition-all duration-200 hover:opacity-90 hover:scale-105 shadow-lg ${TOUCH_TARGET.min}`}
                         style={{ backgroundColor: '#25D366' }}
                     >
                         <WhatsAppIcon />

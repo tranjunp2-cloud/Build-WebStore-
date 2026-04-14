@@ -81,14 +81,15 @@ describe('[TC-S1-011] getFontPairing() lookup', () => {
         expect(result!.category).toBe('classic')
     })
 
-    it('returns correct pairing for "modern-clean"', () => {
+    it('returns correct pairing for "modern-clean" (post-F01D fix: contrast axis)', () => {
         // Act
         const result = getFontPairing('modern-clean')
 
-        // Assert
+        // Assert — Phase 02 fix: Inter+Inter violated contrast rule, now Inter+Lora
         expect(result).toBeDefined()
         expect(result!.headingFont).toBe('Inter')
-        expect(result!.bodyFont).toBe('Inter')
+        expect(result!.bodyFont).toBe('Lora')
+        expect(result!.headingFont).not.toBe(result!.bodyFont)
     })
 
     it('returns undefined for nonexistent pairing ID', () => {
@@ -226,8 +227,18 @@ describe('[TC-S1-011] getFontFamilies()', () => {
     })
 
     it('returns 1 family when heading and body are the same font', () => {
-        // Arrange — 'modern-clean': Inter / Inter
-        const pairing = getFontPairing('modern-clean')!
+        // Arrange — construct a synthetic same-font pairing since FONT_PAIRINGS
+        // no longer contains any (Phase 02 fix blocked same-font pairs).
+        const pairing: FontPairing = {
+            id: 'synthetic-same',
+            name: 'Synthetic Same',
+            category: 'modern',
+            headingFont: 'Inter',
+            bodyFont: 'Inter',
+            headingWeight: 700,
+            bodyWeight: 400,
+            description: 'Test fixture for dedupe behavior',
+        }
 
         // Act
         const families = getFontFamilies(pairing)

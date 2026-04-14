@@ -2,11 +2,16 @@
 
 import type { BlockProps } from '../types'
 import type { VideoBackgroundConfig } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 
-export function VideoBackgroundBlock({ block, theme }: BlockProps<VideoBackgroundConfig>) {
+void _CSS_VARS
+
+export function VideoBackgroundBlock({ block, theme: _theme }: BlockProps<VideoBackgroundConfig>) {
+    void _theme
     const {
         variant = 'full',
         headline,
@@ -21,15 +26,19 @@ export function VideoBackgroundBlock({ block, theme }: BlockProps<VideoBackgroun
     const content = (
         <div className="relative z-10 flex flex-col items-center justify-center text-center px-6 py-32 md:py-48 min-h-[60vh]">
             {headline && (
-                <RichText text={headline} as="h2" className="text-4xl md:text-6xl lg:text-7xl font-bold font-heading mb-6 text-white leading-tight max-w-4xl" />
+                <Heading level={1} className="mb-6 text-white leading-tight max-w-4xl">
+                    <RichText text={headline} as="span" />
+                </Heading>
             )}
             {subheadline && (
-                <RichText text={subheadline} as="p" className="text-lg md:text-xl text-white/70 mb-10 max-w-2xl leading-relaxed" />
+                <Body size="lg" className="text-white/70 mb-10 max-w-2xl leading-relaxed">
+                    <RichText text={subheadline} as="span" />
+                </Body>
             )}
             {cta && (
                 <a
                     href={cta?.url}
-                    className="inline-flex items-center gap-2 px-10 py-4 rounded-xl font-semibold text-sm text-white transition-all duration-300 hover:opacity-90"
+                    className={`inline-flex items-center gap-2 px-10 py-4 rounded-xl font-semibold text-sm text-white transition-all duration-300 hover:opacity-90 ${TOUCH_TARGET.min}`}
                     style={{ background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`, boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)` }}
                 >
                     {cta.label}
@@ -56,8 +65,8 @@ export function VideoBackgroundBlock({ block, theme }: BlockProps<VideoBackgroun
 
     if (variant === 'contained') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6">
+            <AnimatedSection className={SECTION_PADDING.default}>
+                <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                     <div className="relative rounded-3xl overflow-hidden" style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}>
                         {videoEl}
                         {overlay}

@@ -5,6 +5,213 @@
  */
 
 import { blockRegistry } from '@/blocks/registry'
+import type { ThemePreset } from './theme-presets'
+import { resolveFontPairing } from './font-pairings'
+
+// ── Theme context for soft guidance injection ─────────────────────────────
+
+export type ThemePromptContext = {
+  preset: ThemePreset
+  category: string
+}
+
+/**
+ * Describe the mood a preset should set so AI copy (CTAs, taglines, headings)
+ * matches the palette. Keeps the prompt readable without dumping every variant.
+ */
+function moodHint(preset: ThemePreset, category: string): string {
+  const dark = preset.colorMode === 'dark'
+  const warmCategories = new Set(['restaurant', 'fnb', 'fitness', 'beauty', 'events', 'creative'])
+  const trustCategories = new Set(['health', 'realestate', 'business', 'education'])
+  const edgeCategories = new Set(['tech', 'ecommerce', 'blog', 'travel'])
+
+  if (warmCategories.has(category)) {
+    return dark
+      ? 'warm appetite / intimate nightlife — evocative copy, sensory language, urgency'
+      : 'warm, inviting, appetite-driving — sensory adjectives, human touch, scarcity CTAs'
+  }
+  if (trustCategories.has(category)) {
+    return dark
+      ? 'calm authority — understated confidence, credentials, proof points'
+      : 'calm, trustworthy, stable — reassurance, credentials, clinical clarity'
+  }
+  if (edgeCategories.has(category)) {
+    return dark
+      ? 'sharp, modern, confident — benefit-led, outcome-focused copy'
+      : 'clean, efficient, outcome-driven — benefit-led CTAs, specific metrics'
+  }
+  return dark
+    ? 'premium, confident, focused — concise copy, strong verbs'
+    : 'polished, professional, approachable — benefit-led, specific'
+}
+
+// ── Style Personalities ────────────────────────────────────────────────────
+// Each personality has keywords that match user input for context-aware selection.
+
+interface StylePersonality {
+  name: string
+  prompt: string
+  keywords: string[]
+}
+
+const STYLE_PERSONALITIES: StylePersonality[] = [
+  {
+    name: 'bold',
+    prompt: 'Bold and energetic — use vibrant colors, large typography, and dynamic layouts',
+    keywords: ['startup', 'gym', 'fitness', 'sports', 'energy', 'bold', 'vibrant', 'young', 'dynamic'],
+  },
+  {
+    name: 'minimal',
+    prompt: 'Minimal and sophisticated — clean whitespace, muted tones, simple elegance',
+    keywords: ['minimal', 'clean', 'simple', 'zen', 'modern', 'scandinavian', 'architect', 'gallery'],
+  },
+  {
+    name: 'warm',
+    prompt: 'Warm and inviting — soft gradients, rounded shapes, friendly tone',
+    keywords: ['family', 'home', 'bakery', 'cafe', 'cozy', 'friendly', 'community', 'traditional', 'handmade', 'organic'],
+  },
+  {
+    name: 'professional',
+    prompt: 'Professional and authoritative — structured grid, corporate feel, data-driven',
+    keywords: ['consulting', 'law', 'finance', 'corporate', 'enterprise', 'b2b', 'agency', 'professional'],
+  },
+  {
+    name: 'creative',
+    prompt: 'Creative and playful — asymmetric layouts, bright accents, unexpected block ordering',
+    keywords: ['creative', 'design', 'art', 'photographer', 'portfolio', 'studio', 'boutique', 'unique'],
+  },
+  {
+    name: 'luxurious',
+    prompt: 'Luxurious and premium — dark backgrounds, gold accents, serif headings',
+    keywords: ['luxury', 'premium', 'spa', 'jewelry', 'high-end', 'exclusive', 'vip', 'cao cấp', 'sang trọng'],
+  },
+  {
+    name: 'tech',
+    prompt: 'Modern tech — glassmorphism vibes, cool blues/purples, sharp geometry',
+    keywords: ['tech', 'saas', 'software', 'ai', 'digital', 'app', 'platform', 'cloud', 'api', 'startup'],
+  },
+  {
+    name: 'editorial',
+    prompt: 'Editorial and storytelling — magazine-style hero, rich typography, long-form sections',
+    keywords: ['blog', 'magazine', 'news', 'story', 'content', 'media', 'publishing', 'journalist'],
+  },
+]
+
+/**
+ * Select a style personality based on user input context.
+ * Scores each personality by keyword matches, then randomly picks from top candidates.
+ * Falls back to pure random if no keywords match.
+ */
+function selectPersonality(info: BusinessInfoInput): string {
+  const input = `${info.businessName} ${info.industry} ${info.products} ${info.shortDescription}`.toLowerCase()
+
+  // Score each personality by keyword matches
+  const scored = STYLE_PERSONALITIES.map(p => ({
+    ...p,
+    score: p.keywords.filter(kw => input.includes(kw)).length,
+  }))
+
+  // Find candidates: all with score > 0, sorted descending
+  const candidates = scored.filter(p => p.score > 0).sort((a, b) => b.score - a.score)
+
+  if (candidates.length > 0) {
+    // Pick randomly from top 3 candidates (or fewer if less matched)
+    const topN = candidates.slice(0, Math.min(3, candidates.length))
+    return topN[Math.floor(Math.random() * topN.length)]!.prompt
+  }
+
+  // No keyword match → pure random from all personalities
+  return STYLE_PERSONALITIES[Math.floor(Math.random() * STYLE_PERSONALITIES.length)]!.prompt
+}
+
+// ── Dynamic Block Composition Generator ────────────────────────────────────
+// Generates unique block composition hints on-the-fly instead of hardcoded arrays.
+
+/** Category-specific signature blocks that make each industry unique */
+const CATEGORY_SIGNATURE_BLOCKS: Record<string, string[]> = {
+  restaurant: ['menu-display', 'booking-widget', 'gallery'],
+  ecommerce: ['products-grid', 'product-quick-view', 'social-proof'],
+  beauty: ['before-after', 'booking-widget', 'gallery'],
+  tech: ['feature-comparison', 'video-showcase', 'pricing'],
+  health: ['doctor-profile', 'booking-widget', 'review-cards'],
+  education: ['class-schedule', 'video-showcase', 'step-process'],
+  realestate: ['property-card', 'gallery', 'stats'],
+  fitness: ['class-schedule', 'booking-widget', 'gallery'],
+  creative: ['portfolio-grid', 'gallery', 'video-showcase'],
+  business: ['service-cards', 'client-logos', 'stats'],
+  fnb: ['menu-display', 'gallery', 'review-cards'],
+  events: ['countdown-timer', 'booking-widget', 'step-process'],
+  blog: ['blog-list', 'social-proof', 'newsletter'],
+  travel: ['booking-widget', 'gallery', 'video-showcase'],
+}
+
+/** Common blocks shared across all categories */
+const COMMON_BLOCKS = ['features', 'testimonials', 'about', 'stats', 'faq', 'cta', 'newsletter', 'team']
+
+/** Hero variants per category mood */
+const HERO_VARIANTS_BY_CATEGORY: Record<string, string[]> = {
+  restaurant: ['split-left', 'magazine', 'gradient', 'parallax', 'fullscreen'],
+  ecommerce: ['slideshow', 'cards-overlay', 'gradient', 'split-right', 'magazine'],
+  beauty: ['gradient', 'minimal', 'parallax', 'split-left', 'magazine'],
+  tech: ['gradient', 'split-video', 'minimal', 'parallax', 'cards-overlay'],
+  health: ['centered', 'split-left', 'minimal', 'gradient', 'parallax'],
+  education: ['centered', 'split-right', 'gradient', 'magazine', 'parallax'],
+  realestate: ['fullscreen', 'parallax', 'slideshow', 'split-left', 'magazine'],
+  fitness: ['fullscreen', 'parallax', 'split-video', 'gradient', 'cards-overlay'],
+  creative: ['magazine', 'parallax', 'cards-overlay', 'minimal', 'gradient'],
+  business: ['centered', 'split-left', 'gradient', 'minimal', 'parallax'],
+  fnb: ['split-left', 'gradient', 'magazine', 'parallax', 'fullscreen'],
+  events: ['fullscreen', 'gradient', 'split-left', 'centered', 'parallax'],
+  blog: ['minimal', 'split-left', 'fullscreen', 'centered', 'magazine'],
+  travel: ['fullscreen', 'parallax', 'split-left', 'gradient', 'slideshow'],
+}
+
+/** Footer variants pool */
+const FOOTER_VARIANTS = ['simple', 'expanded', 'minimal', 'centered-stack', 'mega-footer', 'dark-gradient']
+
+/** Random pick helper */
+function pickFrom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]!
+}
+
+/** Shuffle array (Fisher-Yates) */
+function shuffle<T>(arr: T[]): T[] {
+  const copy = [...arr]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j]!, copy[i]!]
+  }
+  return copy
+}
+
+/**
+ * Generate a unique block composition hint dynamically.
+ * Each call produces a different combination — never repeats.
+ */
+function generateCompositionHint(category: string): string {
+  const heroVariants = HERO_VARIANTS_BY_CATEGORY[category] ?? ['centered', 'gradient', 'minimal']
+  const signatureBlocks = CATEGORY_SIGNATURE_BLOCKS[category] ?? []
+
+  // 1. Hero with random category-appropriate variant
+  const hero = `hero(${pickFrom(heroVariants)})`
+
+  // 2. Pick 1-2 signature blocks for this category
+  const sigCount = Math.min(signatureBlocks.length, 1 + Math.floor(Math.random() * 2))
+  const selectedSig = shuffle(signatureBlocks).slice(0, sigCount)
+
+  // 3. Pick 3-4 common blocks (excluding duplicates with signature)
+  const availableCommon = COMMON_BLOCKS.filter(b => !selectedSig.includes(b))
+  const commonCount = 3 + Math.floor(Math.random() * 2)
+  const selectedCommon = shuffle(availableCommon).slice(0, commonCount)
+
+  // 4. Combine and shuffle middle section
+  const middleBlocks = shuffle([...selectedSig, ...selectedCommon])
+
+  // 5. Footer with random variant
+  const footer = `footer(${pickFrom(FOOTER_VARIANTS)})`
+
+  return [hero, ...middleBlocks, footer].join(' → ')
+}
 
 const CATEGORY_HINTS: Record<string, string> = {
   restaurant: 'F&B, eatery, cafe, restaurant',
@@ -14,14 +221,43 @@ const CATEGORY_HINTS: Record<string, string> = {
   business: 'services, company, agency, startup',
 }
 
-export function buildSystemPrompt(language: 'en' | 'ms' | 'vi' | 'auto' = 'auto'): string {
+export function buildSystemPrompt(
+  language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
+  themeContext?: ThemePromptContext,
+): string {
   const blockMetas = blockRegistry.getAllMeta()
 
   const blockList = blockMetas.map(m =>
     `- **${m.type}** (${m.name}): ${m.description}. Variants: [${m.variants.join(', ')}]. Fields: ${m.editableFields.join(', ')}`
   ).join('\n')
 
-  return `You are an expert website designer AI. Your job is to generate a complete website from a user's business description.
+  // Unused locale parameter placeholder — suppress TS lint without affecting runtime.
+  void language
+
+  const themeSection = themeContext
+    ? (() => {
+        const { preset, category } = themeContext
+        const fontPair = resolveFontPairing(preset.fontPairingId)
+        return `
+
+## REQUIRED THEME (use these EXACT values in your \`theme\` object — do NOT invent different colors)
+\`\`\`json
+{
+  "primaryColor": "${preset.primaryColor}",
+  "secondaryColor": "${preset.secondaryColor}",
+  "fontHeading": "${fontPair.fontHeading}",
+  "fontBody": "${fontPair.fontBody}",
+  "colorMode": "${preset.colorMode}"
+}
+\`\`\`
+Preset name: "${preset.name}" — curated for ${category} businesses.
+Mood: ${moodHint(preset, category)}.
+Write hero headlines, section titles, and CTA copy that reinforces this mood. Do NOT default to generic blue/purple.
+`
+      })()
+    : ''
+
+  return `You are an expert website designer AI. Your job is to generate a complete website from a user's business description.${themeSection}
 
 ## OUTPUT FORMAT
 You MUST respond with a valid JSON object in this exact format:
@@ -81,49 +317,90 @@ NOTE: For backward compatibility, "blocks" at the root level is also accepted (t
 ## AVAILABLE BLOCK TYPES (${blockMetas.length} total)
 ${blockList}
 
-## RULES
+## STRUCTURE RULES
 1. Generate 4 pages: Homepage (8-14 blocks), About (4-6 blocks), Services/Products (4-6 blocks), Contact (4-5 blocks)
 2. Each page MUST share navigation and footer blocks but have UNIQUE content blocks
 3. Each block MUST have "blockType" and "variant" fields
 4. blockType MUST be one of the listed types — no custom types
 5. variant MUST be one of the listed variants for that block type
-5. **LANGUAGE DETECTION & OUTPUT**: 
-   - If user input is in Bahasa Melayu, output ALL text in formal Bahasa Melayu (\`"language": "ms"\`).
-   - If user input is in Vietnamese, output ALL text in professional Vietnamese (\`"language": "vi"\`).
-   - If user input is in English or Manglish, output ALL text in English (\`"language": "en"\`).
-   - If the input language is unsupported (e.g. Tamil, Mandarin), fallback to generating the site in English (\`"language": "en"\`).
-6. Choose theme colors that match the business category and feel premium
-7. Generate realistic, professional content — not placeholder text
-8. Include at least one CTA block or CTA in hero
-9. Navigation should have relevant links matching other sections
-10. Footer should reference the business name
-11. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
+6. For 'socials' field in footer/team, use array of objects: [{"platform": "facebook", "url": "..."}]
 
-## VIETNAMESE INPUT HANDLING
-- If user input contains Vietnamese slang, abbreviations, or informal language,
-  interpret the meaning and generate professional Vietnamese content.
-  Example: "ban banh mi ship tan noi" → Bakery/restaurant selling bánh mì with delivery service
-- Preserve the business intent even when input is poorly formatted or uses shorthand
+## LANGUAGE DETECTION
+- Bahasa Melayu input → ALL text in formal Bahasa Melayu (\`"language": "ms"\`)
+- Vietnamese input → ALL text in professional Vietnamese (\`"language": "vi"\`)
+- English/Manglish input → ALL text in English (\`"language": "en"\`)
+- Unsupported language (Tamil, Mandarin) → fallback to English
+- Vietnamese slang/abbreviations → interpret and generate professional Vietnamese
+  Example: "ban banh mi ship tan noi" → Bakery/restaurant selling bánh mì with delivery
 
-## CONTENT QUALITY RULES
-11. Hero headline must mention the ACTUAL business name
-12. About section must describe the REAL products/services given
-13. Features/Services section must list ACTUAL products/services, not generic ones
-14. Testimonials must sound realistic for the SPECIFIC industry
-15. Contact section should include realistic placeholder content matching the industry
-16. CTA text should be action-oriented and relevant (e.g., "Book a Table" for restaurants)
+## PROFESSIONAL DESIGN RULES (CRITICAL — these make websites look hand-designed, not AI-generated)
 
-## CATEGORY PALETTES (suggestions)
-- Restaurant/F&B: warm tones (amber, orange), Playfair Display
-- E-commerce: cool tones (sky blue, indigo), DM Sans
-- Portfolio: bold accent (rose, violet), Outfit
-- Business: professional blue, Outfit/Inter
-- Blog: green/teal, clean typography
+### Hero Section
+- Headline: 5-8 words max. Benefit-focused, mentions business name or core value.
+- Subheadline: 12-20 words max. Expands with specifics.
+- 1 primary CTA button (action verb + benefit: "Book a Table", "Get Started Free"). 1 optional secondary CTA (outlined/ghost).
+- NEVER use "Submit", "Click Here", or "Welcome to our website" as CTA text.
+- Match hero variant to design personality: dramatic → fullscreen/parallax, professional → centered/gradient, creative → magazine/cards-overlay, warm → split-left/split-right.
+
+### Color System (60-30-10 Rule)
+- 60% dominant: backgrounds, large surfaces (light neutral or subtle brand tint)
+- 30% secondary: nav, cards, section backgrounds
+- 10% accent: CTA buttons, links, highlights — draws eye via SCARCITY
+- Maximum 3 core colors + neutrals. CTA MUST use accent color.
+- NEVER use pure black (#000000) for text — use #1a1a2e or brand-tinted dark
+- Dark mode: invert surface/text, desaturate accent slightly
+
+### Typography
+- Exactly 2 fonts: 1 heading (display/personality), 1 body (readability)
+- Create CONTRAST between heading/body: serif+sans, geometric+humanist, condensed+wide
+- Heading weight: 600-800. Body weight: 400.
+- AVOID overused AI defaults: Inter for both, DM Sans for both, Poppins everywhere
+- Good pairings: Playfair Display + Lato, Outfit + Inter, Raleway + Open Sans, DM Sans + Nunito
+
+### Section Ordering (AIDA Conversion Funnel)
+Follow this general flow but VARY the middle sections:
+1. Navigation — sticky, logo left, CTA button right
+2. Hero — value proposition, primary CTA (ABOVE THE FOLD)
+3. Trust bar (logo-cloud/social-proof) or Features — immediately establish credibility
+4-9. MIDDLE SECTION (vary order): features, industry-specific blocks, stats, testimonials, gallery, pricing, FAQ, newsletter, team
+10. Contact + Footer
+
+ORDERING RULES:
+- Social proof (testimonials, stats, logos) AFTER explaining value (features), BEFORE asking for money (pricing/CTA)
+- Place a CTA block every 3-4 sections. First in hero, mid-page, and before footer.
+- NEVER place two text-heavy sections back-to-back. Alternate: text-heavy → visual-heavy → text-heavy
+- Features MUST come before stats (stats need context)
+
+### Content Quality
+- Hero headline must mention the ACTUAL business name — never generic
+- Features must list ACTUAL products/services from user input — never generic "Quality Service"
+- Testimonials must sound realistic for the SPECIFIC industry with name, role, company
+- Section titles: 3-7 words, paired with 1-sentence subtitle
+- Short paragraphs: 2-3 sentences max. Use bullet points for 3+ items.
+- CTA text: action verb + benefit ("Book a Table", "View Our Menu", "Get Free Consultation")
+
+### Anti-Patterns (DO NOT generate these)
+- Purple/indigo gradients as default (the #1 sign of AI-generated sites)
+- Three identical icon-grid cards as the only features section
+- Cards nested inside cards
+- Same font for heading AND body (e.g., Inter + Inter)
+- Generic stock photo descriptions ("professional team working together")
+- "Welcome to our website" or "We are the best" headlines
+- All sections centered with same padding — create RHYTHM by varying alignment and spacing
+
+## VARIETY RULES
+1. NEVER default to the first variant in the list. Deliberately choose from the FULL range.
+2. Hero has 12 variants — use them ALL across generations. Do NOT always use "centered".
+3. Features has 8 variants — do NOT always use "grid-3". Try zigzag, carousel, icon-left, list.
+4. Testimonials has 8 variants — try spotlight, masonry, avatar-row, not just "cards".
+5. Footer has 6 variants — vary between simple, expanded, mega-footer, dark-gradient.
+6. Include at least ONE uncommon block on homepage: step-process, before-after, countdown-timer, social-proof, or video-showcase.
+7. Block ORDER must vary — do NOT always put features directly after hero.
 
 ## IMPORTANT
 - Respond ONLY with the JSON object, no markdown, no explanation
-- Content must feel real and professional, not generic placeholder
-- Theme should feel premium and modern
+- Content must feel SPECIFIC to this business — not template filler
+- Theme should match the business personality, not default to blue/purple
 
 ## REFERENCE MODE (when reference content is provided)
 When the user prompt includes a "REFERENCE CONTENT" section:
@@ -158,6 +435,24 @@ export function buildUserPrompt(
   ]
   if (extraInstructions) {
     parts.push(`Additional instructions: ${extraInstructions}`)
+  }
+
+  // Inject context-aware style personality for variety (skip for reference/recreation mode)
+  if (!referencePrompt && STYLE_PERSONALITIES.length > 0) {
+    const personality = selectPersonality(info)
+    parts.push(`\nDesign personality: ${personality}`)
+  }
+
+  // Inject dynamically generated block composition hint
+  if (!referencePrompt) {
+    const categoryLower = info.industry.toLowerCase()
+    const matchedCategory = Object.keys(CATEGORY_SIGNATURE_BLOCKS).find(
+      cat => categoryLower.includes(cat) || (CATEGORY_HINTS[cat] && CATEGORY_HINTS[cat].split(', ').some(kw => categoryLower.includes(kw)))
+    )
+    if (matchedCategory) {
+      const hint = generateCompositionHint(matchedCategory)
+      parts.push(`\nSuggested block composition (feel free to modify): ${hint}`)
+    }
   }
 
   // Append reference content from ContentBrief (URL/Image extraction)

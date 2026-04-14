@@ -440,11 +440,14 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
         const elapsedInterval = setInterval(() => setElapsedSeconds((s) => s + 1), 1000)
         elapsedIntervalRef.current = elapsedInterval
 
-        // 60s warning timeout (v2: increased from 30s — larger prompts take longer)
+        // 60s warning timeout — shows "still working..." hint (non-blocking)
         const warningTimeout = setTimeout(() => setShowTimeoutWarning(true), 60_000)
         warningTimeoutRef.current = warningTimeout
 
-        // 120s hard timeout — auto-abort (v2: increased from 60s for richer extraction prompts)
+        // 300s (5 min) hard timeout — auto-abort.
+        // v3 (2026-04-14): 120s → 300s. site-generation flipped to gpt-4.1-mini
+        // (commit 56adabe0) with p95 ~99s, p99 can exceed 120s. Bumped to 5 min
+        // to absorb long-tail OpenAI latency until phase-03b tuning ships.
         const hardTimeout = setTimeout(() => {
             controller.abort()
             clearGenerationTimers()
@@ -453,7 +456,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             setError({ code: 'timeout', message, retryable: true })
             setStep('info')
             toast.error(message)
-        }, 120_000)
+        }, 300_000)
         hardTimeoutRef.current = hardTimeout
 
         try {
@@ -490,6 +493,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             }
 
             let buffer = ''
+            let currentEvent = ''
 
             while (true) {
                 const { done, value } = await reader.read()
@@ -499,8 +503,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
 
                 const lines = buffer.split('\n')
                 buffer = lines.pop() || ''
-
-                let currentEvent = ''
 
                 for (const line of lines) {
                     if (line.startsWith('event: ')) {
@@ -516,7 +518,6 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                         const data = JSON.parse(line.slice(6))
                         handleSSEEvent(currentEvent, data)
                     } catch {
-                        // Malformed SSE payload — log for diagnostics but do not crash stream.
                         console.warn('[SSE] malformed payload, skipping event:', currentEvent)
                     }
 
@@ -743,11 +744,19 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     totalBlocks={blocks.length || 7}
                 />
                 <CongratsModal
-                    dashboardHref="/admin"
-                    dashboardLabel="Go to Admin Dashboard"
+                    dashboardHref="/dashboard"
+                    dashboardLabel="Go to Dashboard"
                     isOpen={!!publishedSiteUrl}
                     onOpenChange={(open) => {
-                        if (!open) setPublishedSiteUrl(null)
+                        if (!open) {
+                            // Dismissing success modal → land users on their dashboard
+                            // (X, backdrop click, Esc all route here). Reset builder state first
+                            // so navigating back to /builder/new starts clean.
+                            setPublishedSiteUrl(null)
+                            reset()
+                            clearBuilderSessionStorage()
+                            router.push('/dashboard')
+                        }
                     }}
                     onNavigate={() => {
                         reset()

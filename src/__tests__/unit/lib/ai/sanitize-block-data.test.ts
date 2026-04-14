@@ -415,7 +415,7 @@ describe('sanitizeBlockData — pricing plans extended [TC-F01.08]', () => {
 // ─── Gallery + logo-cloud cleanup (lines 480-489) ────────────────────────────
 
 describe('sanitizeBlockData — gallery and logo-cloud cleanup [TC-F01.08]', () => {
-    it('clears gallery images array (AI generates URLs that Payload cannot use)', () => {
+    it('wraps gallery URL strings to { image: { url, alt }, caption } per Zod schema', () => {
         // Arrange
         const input = {
             blockType: 'gallery',
@@ -425,11 +425,15 @@ describe('sanitizeBlockData — gallery and logo-cloud cleanup [TC-F01.08]', () 
         // Act
         const output = sanitizeBlockData(input)
 
-        // Assert — images cleared, no string URLs passed to Payload
-        expect(output.images).toEqual([])
+        // Assert — URL strings wrapped into ImageRef shape, not stripped
+        const images = output.images as Array<{ image: { url: string; alt: string }; caption: string }>
+        expect(images).toHaveLength(2)
+        expect(images[0]).toHaveProperty('image')
+        expect(images[0]!.image.url).toBe('https://example.com/img1.jpg')
+        expect(images[1]!.image.url).toBe('https://example.com/img2.jpg')
     })
 
-    it('clears logo-cloud logos array (same reason)', () => {
+    it('converts logo-cloud URL strings to name objects', () => {
         // Arrange
         const input = {
             blockType: 'logo-cloud',
@@ -439,7 +443,9 @@ describe('sanitizeBlockData — gallery and logo-cloud cleanup [TC-F01.08]', () 
         // Act
         const output = sanitizeBlockData(input)
 
-        // Assert
-        expect(output.logos).toEqual([])
+        // Assert — strings converted to name metadata
+        const logos = output.logos as Array<Record<string, unknown>>
+        expect(logos).toHaveLength(2)
+        expect(logos[0]).toHaveProperty('name')
     })
 })

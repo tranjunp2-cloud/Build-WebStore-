@@ -90,8 +90,28 @@ export async function PATCH(
             // revalidateTag requires Next.js request context — skip in tests/non-Next environments
         }
 
+        // Build public URL. Subdomain routing ({slug}.primeweb.app) only works
+        // when DNS wildcards resolve — fine on staging/prod. On localhost there's
+        // no wildcard DNS, so fall back to path-based routing which the middleware
+        // already handles via `/sites/{slug}/...` (see src/middleware.ts:94-108).
         const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
-        const domainUrl = primaryDomain || `${tenantSlug}.${platformDomain}`
+        const isLocalPlatform = /^(localhost|127\.)/.test(platformDomain)
+
+        let publicUrl: string
+        let displayDomain: string
+        if (primaryDomain) {
+            // Custom domain always wins — HTTPS + apex as configured
+            publicUrl = `https://${primaryDomain}`
+            displayDomain = primaryDomain
+        } else if (isLocalPlatform) {
+            // Local dev → path-based http URL that middleware rewrites
+            publicUrl = `http://${platformDomain}/sites/${tenantSlug}`
+            displayDomain = `${platformDomain}/sites/${tenantSlug}`
+        } else {
+            // Staging / prod → subdomain routing
+            publicUrl = `https://${tenantSlug}.${platformDomain}`
+            displayDomain = `${tenantSlug}.${platformDomain}`
+        }
 
         return NextResponse.json({
             success: true,
@@ -100,8 +120,8 @@ export async function PATCH(
                 name: site.name,
                 status: 'published',
                 publishedAt: site.publishedAt,
-                url: `https://${domainUrl}`,
-                domain: domainUrl,
+                url: publicUrl,
+                domain: displayDomain,
             },
         })
 

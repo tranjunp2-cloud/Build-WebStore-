@@ -6,7 +6,7 @@ import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
-import { CTAButtons } from '../shared'
+import { CTAButtons, HERO_CONTAINER, VideoControlButton } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 
@@ -33,7 +33,7 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
             <GradientBlob color={primaryColor} className="bottom-[-15%] left-[-8%]" size={500} opacity={0.08} />
             <DotGrid color={primaryColor} />
 
-            <div className="container mx-auto px-6 relative z-10">
+            <div className={`${HERO_CONTAINER} relative z-10`}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
                     {/* Left — Content */}
                     <motion.div
@@ -76,28 +76,11 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
                                     className="w-full h-auto aspect-video object-cover"
                                 />
                                 {/* Play/Pause toggle */}
-                                <button
+                                <VideoControlButton
+                                    isPlaying={isPlaying}
                                     onClick={togglePlayback}
-                                    className="absolute bottom-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-all"
-                                    style={{
-                                        background: 'rgba(0,0,0,0.5)',
-                                        backdropFilter: 'blur(8px)',
-                                        color: '#fff',
-                                        border: '1px solid rgba(255,255,255,0.2)',
-                                    }}
-                                    aria-label={isPlaying ? 'Pause video' : 'Play video'}
-                                >
-                                    {isPlaying ? (
-                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                                            <rect x="2" y="1" width="3.5" height="12" rx="1" />
-                                            <rect x="8.5" y="1" width="3.5" height="12" rx="1" />
-                                        </svg>
-                                    ) : (
-                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-                                            <path d="M3 1.5v11l9-5.5L3 1.5z" />
-                                        </svg>
-                                    )}
-                                </button>
+                                    className="absolute bottom-4 right-4"
+                                />
                             </div>
                         ) : (
                             <div

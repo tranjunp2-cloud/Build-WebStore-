@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { CheckCircle2, Copy, ExternalLink, Globe, LayoutDashboard, PartyPopper, X } from 'lucide-react'
+import { CheckCircle2, Copy, ExternalLink, LayoutDashboard, PartyPopper, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -37,7 +37,7 @@ export function CongratsModal({
             setCopied(true)
             toast.success('Link copied! 🎉')
             setTimeout(() => setCopied(false), 2000)
-        } catch (err) {
+        } catch {
             toast.error('Failed to copy link')
         }
     }
@@ -57,54 +57,62 @@ export function CongratsModal({
                         </Dialog.Overlay>
                         <Dialog.Content asChild>
                             <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/10 bg-[#0B1120] p-6 shadow-2xl focus:outline-none"
+                                initial={{ opacity: 0, scale: 0.96 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.96 }}
+                                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                                // Centering via motion's own transform so it composes with `scale` without
+                                // clashing with Tailwind -translate classes (framer-motion writes inline
+                                // `transform` which would otherwise drop the centering offset).
+                                style={{ x: '-50%', y: '-50%' }}
+                                className="fixed left-1/2 top-1/2 z-50 w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1120] p-8 shadow-2xl focus:outline-none"
                             >
-                                {/* Close button */}
-                                <Dialog.Close className="absolute right-4 top-4 rounded-full p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
-                                    <X className="h-5 w-5" />
+                                {/* Close button — subtle, top-right */}
+                                <Dialog.Close
+                                    aria-label="Close"
+                                    className="absolute right-4 top-4 rounded-full p-1.5 text-gray-500 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                                >
+                                    <X className="h-4 w-4" />
                                 </Dialog.Close>
 
                                 <div className="flex flex-col items-center text-center">
-                                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-tr from-green-500/20 to-emerald-500/20 border border-green-500/30">
-                                        <PartyPopper className="h-8 w-8 text-green-400" />
+                                    {/* Celebration icon */}
+                                    <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-tr from-emerald-500/25 to-teal-500/25 border border-emerald-400/40 shadow-[0_0_24px_rgba(16,185,129,0.25)]">
+                                        <PartyPopper className="h-8 w-8 text-emerald-400" />
                                     </div>
-                                    
-                                    <Dialog.Title className="mb-2 text-2xl font-bold tracking-tight text-white">
-                                        Congratulations! 🎉
+
+                                    <Dialog.Title className="mb-3 text-2xl font-bold tracking-tight text-white">
+                                        Congratulations!
                                     </Dialog.Title>
-                                    
-                                    <Dialog.Description className="mb-6 text-sm text-gray-400">
-                                        Your website <strong>{siteName}</strong> is now live and published to the internet.
+
+                                    <Dialog.Description className="mb-6 text-sm leading-relaxed text-gray-400">
+                                        Your website <span className="font-semibold text-white">{siteName}</span> is now live and published to the internet.
                                     </Dialog.Description>
 
                                     {/* Domain Display & Copy */}
-                                    <div className="mb-8 w-full">
-                                        <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
-                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                <Globe className="h-5 w-5 shrink-0 text-blue-400" />
-                                                <span className="truncate text-sm font-medium text-white">{siteUrl}</span>
-                                            </div>
+                                    <div className="mb-6 w-full">
+                                        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] p-2 pl-4">
+                                            <span className="flex-1 truncate text-left text-sm font-medium text-gray-300" title={siteUrl}>
+                                                {siteUrl}
+                                            </span>
                                             <button
                                                 onClick={handleCopy}
                                                 className={cn(
-                                                    "ml-3 flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all min-w-[100px]",
-                                                    copied 
-                                                        ? "bg-green-500/20 text-green-400 border border-green-500/30" 
-                                                        : "bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white"
+                                                    'flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-all',
+                                                    copied
+                                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                                                        : 'bg-white/10 text-gray-200 hover:bg-white/20 hover:text-white',
                                                 )}
                                                 title="Copy Link"
                                             >
                                                 {copied ? (
                                                     <>
-                                                        <CheckCircle2 className="h-4 w-4" />
-                                                        <span>Copied ✓</span>
+                                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                                        <span>Copied</span>
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <Copy className="h-4 w-4" />
+                                                        <Copy className="h-3.5 w-3.5" />
                                                         <span>Copy Link</span>
                                                     </>
                                                 )}
@@ -112,32 +120,24 @@ export function CongratsModal({
                                         </div>
                                     </div>
 
-                                    {/* Actions */}
+                                    {/* Actions — primary (Open Editor) + secondary (Dashboard) */}
                                     <div className="flex w-full flex-col gap-3">
-                                        <a
-                                            href={siteUrl}
-                                            onClick={onNavigate}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-sm font-medium text-white hover:from-blue-500 hover:to-purple-500 transition-all shadow-lg shadow-purple-500/25"
-                                        >
-                                            <ExternalLink className="h-4 w-4" /> View Live Site
-                                        </a>
-                                        
-                                        <Link
-                                            href={dashboardHref}
-                                            onClick={onNavigate}
-                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-white hover:bg-white/10 transition-colors"
-                                        >
-                                            <LayoutDashboard className="h-4 w-4" /> {dashboardLabel}
-                                        </Link>
-
                                         <Link
                                             href={`/editor/${siteId}`}
                                             onClick={onNavigate}
-                                            className="mt-2 text-xs font-medium text-gray-400 hover:text-white transition-colors"
+                                            className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-400 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-cyan-500/30 transition-all hover:shadow-cyan-400/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
                                         >
-                                            Continue Editing
+                                            <ExternalLink className="h-4 w-4" />
+                                            <span>Open Editor</span>
+                                        </Link>
+
+                                        <Link
+                                            href={dashboardHref}
+                                            onClick={onNavigate}
+                                            className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3.5 text-sm font-medium text-gray-200 hover:bg-white/10 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                                        >
+                                            <LayoutDashboard className="h-4 w-4" />
+                                            <span>{dashboardLabel}</span>
                                         </Link>
                                     </div>
                                 </div>

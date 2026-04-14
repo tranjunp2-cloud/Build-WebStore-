@@ -5,6 +5,8 @@ import type { SocialProofConfig, SocialProofReview } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body, Caption } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING } from '@/lib/design-tokens'
 
 function StarRating({ rating, color }: { rating: number; color: string }) {
     return (
@@ -44,49 +46,52 @@ function Avatar({ src, name, color }: { src?: string; name: string; color: strin
 }
 
 function ReviewCard({ review, color, variant }: { review: SocialProofReview; color: string; variant: string }) {
+    const authorBlock = (
+        <div className="flex items-center gap-3">
+            <Avatar src={review.avatar} name={review.author} color={color} />
+            <div>
+                <Body size="small" className="font-semibold">{review.author}</Body>
+                {review.role && <Caption className="opacity-50 block">{review.role}</Caption>}
+            </div>
+        </div>
+    )
+
     if (variant === 'minimal') {
         return (
             <div className="py-6 border-b last:border-b-0" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.082)` }}>
                 <StarRating rating={review.rating} color={color} />
-                <p className="mt-3 text-sm leading-relaxed opacity-80">{review.content}</p>
-                <div className="flex items-center gap-3 mt-4">
-                    <Avatar src={review.avatar} name={review.author} color={color} />
-                    <div>
-                        <p className="text-sm font-semibold">{review.author}</p>
-                        {review.role && <p className="text-xs opacity-50">{review.role}</p>}
-                    </div>
-                </div>
+                <Body size="small" className="mt-3 leading-relaxed opacity-80">{review.content}</Body>
+                <div className="mt-4">{authorBlock}</div>
             </div>
         )
     }
 
     return (
         <div
-            className="p-6 rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200"
+            className={`${CARD_PADDING.md} rounded-2xl border shadow-sm hover:shadow-md transition-shadow duration-200`}
             style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.125)` }}
         >
             <StarRating rating={review.rating} color={color} />
-            <p className="mt-4 text-sm leading-relaxed opacity-80">{review.content}</p>
-            <div className="flex items-center gap-3 mt-6 pt-4 border-t" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.063)` }}>
-                <Avatar src={review.avatar} name={review.author} color={color} />
-                <div>
-                    <p className="text-sm font-semibold">{review.author}</p>
-                    {review.role && <p className="text-xs opacity-50">{review.role}</p>}
-                </div>
+            <Body size="small" className="mt-4 leading-relaxed opacity-80">{review.content}</Body>
+            <div className="mt-6 pt-4 border-t" style={{ borderColor: `rgba(var(--brand-primary-rgb), 0.063)` }}>
+                {authorBlock}
             </div>
         </div>
     )
 }
 
-export function SocialProofBlock({ block, theme }: BlockProps<SocialProofConfig>) {
+export function SocialProofBlock({ block, theme: _theme }: BlockProps<SocialProofConfig>) {
+    void _theme
     const { variant = 'cards', headline, reviews = [] } = block
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 {headline && (
                     <div className="text-center mb-14">
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
+                        <Heading level={2}>
+                            <RichText text={headline} as="span" />
+                        </Heading>
                     </div>
                 )}
 

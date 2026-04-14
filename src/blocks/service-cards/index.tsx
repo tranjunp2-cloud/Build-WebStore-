@@ -2,11 +2,16 @@
 
 import type { BlockProps } from '../types'
 import type { ServiceCardsConfig, ServiceItem } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
 
-export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfig>) {
+void _CSS_VARS
+
+export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCardsConfig>) {
+    void _theme
     const { headline, subheadline, services = [], variant = 'grid' } = block
 
     const ServiceCTA = ({ cta }: { cta: ServiceItem['cta'] }) => {
@@ -14,11 +19,11 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
         return (
             <a
                 href={cta?.url}
-                className="inline-flex items-center gap-1 text-sm font-semibold mt-4 transition-opacity hover:opacity-80"
+                className={`inline-flex items-center gap-1 text-sm font-semibold mt-4 transition-opacity hover:opacity-80 ${TOUCH_TARGET.min}`}
                 style={{ color: 'var(--brand-primary)' }}
             >
                 {cta.label}
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
             </a>
@@ -28,7 +33,7 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
     const renderGridCard = (service: ServiceItem, i: number) => (
         <div
             key={i}
-            className="p-8 rounded-2xl transition-all duration-300 hover:shadow-lg group"
+            className={`${CARD_PADDING.lg} rounded-2xl transition-all duration-300 hover:shadow-lg group`}
             style={{ background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.071)` }}
         >
             <div
@@ -37,8 +42,8 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
             >
                 {service.icon}
             </div>
-            <h3 className="text-xl font-bold font-heading mb-3">{service.title}</h3>
-            <p className="text-sm opacity-50 leading-relaxed mb-4">{service.description}</p>
+            <Heading level={3} className="mb-3">{service.title}</Heading>
+            <Body size="small" className="opacity-50 leading-relaxed mb-4">{service.description}</Body>
             {service.price && (
                 <p className="text-2xl font-bold mb-1" style={{ color: 'var(--brand-primary)' }}>
                     {service.price}
@@ -52,7 +57,7 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
     const renderListCard = (service: ServiceItem, i: number) => (
         <div
             key={i}
-            className="flex flex-col md:flex-row items-start gap-6 p-6 rounded-2xl transition-all duration-300 hover:shadow-lg"
+            className={`flex flex-col md:flex-row items-start gap-6 ${CARD_PADDING.md} rounded-2xl transition-all duration-300 hover:shadow-lg`}
             style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.071)` }}
         >
             <div
@@ -62,14 +67,14 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
                 {service.icon}
             </div>
             <div className="flex-1">
-                <h3 className="text-xl font-bold font-heading mb-2">{service.title}</h3>
-                <p className="text-sm opacity-50 leading-relaxed">{service.description}</p>
+                <Heading level={3} className="mb-2">{service.title}</Heading>
+                <Body size="small" className="opacity-50 leading-relaxed">{service.description}</Body>
                 <ServiceCTA cta={service.cta} />
             </div>
             {service.price && (
                 <div className="shrink-0 text-right">
                     <p className="text-2xl font-bold" style={{ color: 'var(--brand-primary)' }}>{service.price}</p>
-                    {service.priceUnit && <p className="text-sm opacity-50">{service.priceUnit}</p>}
+                    {service.priceUnit && <Body size="small" className="opacity-50">{service.priceUnit}</Body>}
                 </div>
             )}
         </div>
@@ -91,8 +96,8 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
                     >
                         {featured.icon}
                     </div>
-                    <h3 className="text-2xl md:text-3xl font-bold font-heading mb-4">{featured.title}</h3>
-                    <p className="text-base opacity-60 leading-relaxed max-w-xl mb-4">{featured.description}</p>
+                    <Heading level={2} className="mb-4">{featured.title}</Heading>
+                    <Body size="lg" className="opacity-60 leading-relaxed max-w-xl mb-4">{featured.description}</Body>
                     {featured.price && (
                         <p className="text-3xl font-bold mb-2" style={{ color: 'var(--brand-primary)' }}>
                             {featured.price}
@@ -102,7 +107,7 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
                     {featured.cta && (
                         <a
                             href={featured.cta?.url}
-                            className="inline-block mt-4 px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
+                            className={`inline-flex items-center justify-center mt-4 px-6 py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                             style={{ background: 'var(--brand-primary)' }}
                         >
                             {featured.cta.label}
@@ -118,12 +123,18 @@ export function ServiceCardsBlock({ block, theme }: BlockProps<ServiceCardsConfi
     }
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-16">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
+                    <Heading level={2} className="mb-5 leading-tight">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-50 leading-relaxed">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 {/* Content */}

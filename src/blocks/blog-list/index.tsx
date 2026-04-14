@@ -7,6 +7,8 @@ import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection, StaggerGrid, StaggerItem, HoverCard } from '../shared/animations'
 import { SectionLabel, GradientBlob } from '../shared/decorative'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, CARD_PADDING } from '@/lib/design-tokens'
 
 interface BlogPost {
     id: string
@@ -93,14 +95,20 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
     }
 
     return (
-        <AnimatedSection className="py-24 relative overflow-hidden">
+        <AnimatedSection className={`${SECTION_PADDING.default} relative overflow-hidden`}>
             <GradientBlob color={CSS_VARS.primary} className="bottom-0 left-1/4" size={400} opacity={0.05} />
 
-            <div className="container mx-auto px-6 relative z-10">
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING} relative z-10`}>
                 <div className="text-center max-w-2xl mx-auto mb-16">
                     {block.sectionLabel && <SectionLabel color={CSS_VARS.primary}>{block.sectionLabel}</SectionLabel>}
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-4" />
-                    {subheadline && <RichText text={subheadline} as="p" className="opacity-60 text-lg" />}
+                    <Heading level={2} className="mb-4">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-60">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 {variant === 'list' ? (
@@ -120,13 +128,14 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                         <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--brand-primary)' }}>{post.category}</span>
                                         <span className="text-xs opacity-40">{post.date}</span>
                                     </div>
-                                    <h3 className="text-2xl md:text-3xl font-heading font-bold mb-3 transition-colors"
+                                    <Heading level={2}
+                                        className="mb-3 transition-colors"
                                         style={{ color: 'inherit' }}
                                         onMouseEnter={(e) => { e.currentTarget.style.color = CSS_VARS.primary }}
                                         onMouseLeave={(e) => { e.currentTarget.style.color = 'inherit' }}>
                                         {post.title}
-                                    </h3>
-                                    <p className="opacity-60 leading-relaxed">{post.excerpt}</p>
+                                    </Heading>
+                                    <Body className="opacity-60 leading-relaxed">{post.excerpt}</Body>
                                 </div>
                             </a>
                         ))}
@@ -152,10 +161,10 @@ export function BlogListBlock({ block, theme, site }: BlockProps<BlogListConfig>
                                                 {post.category}
                                             </div>
                                         </div>
-                                        <div className="p-8 flex flex-col flex-1">
-                                            <span className="text-sm opacity-50 mb-3">{post.date}</span>
-                                            <h3 className="text-xl font-heading font-bold mb-4">{post.title}</h3>
-                                            <p className="opacity-60 mb-6 flex-1 text-sm leading-relaxed">{post.excerpt}</p>
+                                        <div className={`${CARD_PADDING.lg} flex flex-col flex-1`}>
+                                            <Body size="small" className="opacity-50 mb-3">{post.date}</Body>
+                                            <Heading level={3} className="mb-4">{post.title}</Heading>
+                                            <Body size="small" className="opacity-60 mb-6 flex-1 leading-relaxed">{post.excerpt}</Body>
 
                                             <div className="mt-auto flex items-center text-sm font-semibold tracking-wide" style={{ color: 'var(--brand-primary)' }}>
                                                 Read Article

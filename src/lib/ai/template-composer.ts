@@ -1,6 +1,9 @@
 import { getCategoryContent } from '@/lib/ai/content'
 import type { CategoryContent, BusinessSample } from '@/lib/ai/content/types'
 import type { ThemePreset } from '@/lib/ai/theme-presets'
+import { blockRegistry } from '@/blocks/registry'
+import { enforceMinContent } from './variant-validation'
+import { applyContentValidation, type ContentLang } from './content-rules'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -9,6 +12,56 @@ export type ComposerInput = {
   businessIndex: number
   variant: 'starter' | 'professional' | 'premium'
   themePreset: ThemePreset
+  compositionSeed?: number  // Seed for variety — undefined = backward-compatible (no shuffle)
+}
+
+// ── Seeded PRNG Utilities ─────────────────────────────────────────────────
+
+function createSeededRandom(seed: number): () => number {
+  let s = seed
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xFFFFFFFF
+    return (s >>> 0) / 0xFFFFFFFF
+  }
+}
+
+function shuffleArray<T>(arr: T[], rand: () => number): T[] {
+  const copy = [...arr]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [copy[i], copy[j]] = [copy[j]!, copy[i]!]
+  }
+  return copy
+}
+
+// ── Seed-Based Variant Selection ──────────────────────────────────────────
+
+const BROKEN_VARIANTS: Record<string, string[]> = {
+  hero: ['animated-gradient'],
+}
+
+function simpleHash(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0
+  }
+  return Math.abs(hash)
+}
+
+/**
+ * Select a variant deterministically based on seed.
+ * Same seed + blockType + category = always same variant.
+ */
+function selectVariant(blockType: string, seed: number, category: string): string {
+  const meta = blockRegistry.has(blockType) ? blockRegistry.getBlockMeta(blockType) : null
+  if (!meta || meta.variants.length <= 1) return meta?.defaultVariant ?? 'default'
+
+  const broken = BROKEN_VARIANTS[blockType] ?? []
+  const safe = meta.variants.filter(v => !broken.includes(v))
+  if (safe.length === 0) return meta.defaultVariant ?? meta.variants[0]!
+
+  const hash = simpleHash(blockType + category + seed)
+  return safe[hash % safe.length]!
 }
 
 export type TemplateSeed = {
@@ -185,11 +238,12 @@ function buildFeatures(biz: BusinessSample, category: string): Record<string, un
 }
 
 function buildTestimonials(content: CategoryContent): Record<string, unknown> {
+  // Emit up to 6 so masonry/grid-4 variants have enough data (was slicing to 3 → masonry empty).
   return {
     blockType: 'testimonials',
     variant: 'cards',
     headline: 'What Our Customers Say',
-    testimonials: content.testimonials.slice(0, 3).map((t) => ({
+    testimonials: content.testimonials.slice(0, 6).map((t) => ({
       quote: t.quote,
       name: t.name,
       title: t.title,
@@ -784,14 +838,42 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
       return buildReviewCards(content)
     case 'video-showcase':
       return buildVideoShowcase()
-    case 'doctor-profile':
-      return buildDoctorProfile(content)
+    case 'doctor-profile': {
+      const items = Array.from({ length: 4 }, (_, i) => ({
+        name: `Dr. ${['Aisha', 'Rahman', 'Mei Ling', 'Kumar', 'Siti', 'Jonathan'][i % 6]} ${['Tan', 'Lee', 'Wong', 'Patel', 'Ismail', 'Lim'][i % 6]}`,
+        title: ['Consultant Physician', 'Senior Specialist', 'Chief Medical Officer', 'Head of Department'][i % 4],
+        specialty: ['Cardiology', 'Pediatrics', 'General Practice', 'Dermatology'][i % 4],
+        image: `https://placehold.co/400x400/0ea5e9/ffffff?text=Dr.+${i + 1}`,
+        bio: `Experienced medical professional at ${biz.name}.`,
+        experience: `${10 + i} years`,
+      }))
+      return {
+        blockType: 'doctor-profile',
+        variant: 'cards',
+        headline: 'Meet Our Specialists',
+        subheadline: `Expert care at ${biz.name}`,
+        items,
+      }
+    }
     case 'property-card':
       return buildPropertyCard()
     case 'product-quick-view':
       return buildProductQuickView()
-    case 'portfolio-grid':
-      return buildPortfolioGrid()
+    case 'portfolio-grid': {
+      const items = Array.from({ length: 6 }, (_, i) => ({
+        title: `${biz.name} Project ${i + 1}`,
+        category: ['Branding', 'Web Design', 'Photography', 'Illustration'][i % 4],
+        image: `https://placehold.co/600x800/1e293b/ffffff?text=Portfolio+${i + 1}`,
+        description: `Creative project showcasing ${biz.tagline ?? 'our craft'}.`,
+      }))
+      return {
+        blockType: 'portfolio-grid',
+        variant: 'masonry',
+        headline: 'Our Work',
+        subheadline: biz.tagline ?? 'Selected projects',
+        items,
+      }
+    }
     case 'service-cards':
       return buildServiceCards(biz, category)
     case 'client-logos':
@@ -820,62 +902,122 @@ function buildHomePage(
   variant: 'starter' | 'professional' | 'premium',
   themePresetIndex: number,
   pages: string[],
+  compositionSeed?: number,
 ): TemplatePage {
+  // Helper: get variant for a block type — seed-based if available, else hardcoded default
+  const getVariant = (blockType: string, fallback: string): string => {
+    if (compositionSeed != null) {
+      return selectVariant(blockType, compositionSeed, category)
+    }
+    // Legacy: use themePresetIndex for hero only, hardcoded for rest
+    if (blockType === 'hero') {
+      const heroVariants = CATEGORY_HERO_VARIANTS[category] ?? ['centered']
+      return heroVariants[themePresetIndex % heroVariants.length]!
+    }
+    return fallback
+  }
+
   const blocks: Record<string, unknown>[] = []
 
   // Navigation always first
-  blocks.push(buildNavigation(biz, pages))
+  blocks.push({ ...buildNavigation(biz, pages), variant: getVariant('navigation', 'simple') })
 
-  // Hero
-  blocks.push(buildHero(biz, category, themePresetIndex))
+  // Hero always second
+  blocks.push({ ...buildHero(biz, category, themePresetIndex), variant: getVariant('hero', 'centered') })
 
-  // Features / Services
-  blocks.push(buildFeatures(biz, category))
+  // Middle blocks — collect all, then optionally shuffle
+  const middleBlocks: Record<string, unknown>[] = []
+
+  // Features / Services (always included) — enforce min content so grid-4 doesn't render partial
+  const featuresBlock = buildFeatures(biz, category) as Record<string, unknown>
+  const featuresCount = Array.isArray(featuresBlock.features) ? featuresBlock.features.length : 3
+  const featuresVariant = enforceMinContent('features', getVariant('features', 'grid-3'), featuresCount)
+  middleBlocks.push({ ...featuresBlock, variant: featuresVariant })
+
+  // Ben-Ben guard: starter tier must also include signature blocks + stats + gallery
+  // to avoid the hero → generic → footer empty-hole symptom.
+  // Inject up to 2 category-specific industry blocks + universal stats + gallery.
+  if (variant === 'starter') {
+    const industryBlockTypes = CATEGORY_INDUSTRY_BLOCKS[category] ?? []
+    const maxIndustry = Math.min(2, industryBlockTypes.length)
+    for (let i = 0; i < maxIndustry; i++) {
+      const block = buildIndustryBlock(industryBlockTypes[i]!, content, biz, category)
+      if (block) middleBlocks.push(block)
+    }
+    // Universal trust blocks — also cover business category signature (stats, team)
+    middleBlocks.push({ ...buildStats(category), variant: getVariant('stats', 'row') })
+    middleBlocks.push({ ...buildGallery(biz), variant: getVariant('gallery', 'grid') })
+  }
 
   if (variant === 'professional' || variant === 'premium') {
-    // Stats
-    blocks.push(buildStats(category))
+    middleBlocks.push({ ...buildStats(category), variant: getVariant('stats', 'row') })
+    middleBlocks.push({ ...buildGallery(biz), variant: getVariant('gallery', 'grid') })
 
-    // Gallery
-    blocks.push(buildGallery(biz))
-
-    // 1-2 industry blocks for professional
+    // Industry blocks
     const industryBlockTypes = CATEGORY_INDUSTRY_BLOCKS[category] ?? []
     const maxIndustry = variant === 'premium' ? industryBlockTypes.length : Math.min(2, industryBlockTypes.length)
     for (let i = 0; i < maxIndustry; i++) {
       const block = buildIndustryBlock(industryBlockTypes[i]!, content, biz, category)
-      if (block) blocks.push(block)
+      if (block) middleBlocks.push(block)
     }
   }
 
   // Testimonials
-  blocks.push(buildTestimonials(content))
+  const testimonialsVariant = getVariant('testimonials', 'cards')
+  const finalTestimonialsVariant = enforceMinContent('testimonials', testimonialsVariant, content.testimonials.length)
+  middleBlocks.push({ ...buildTestimonials(content), variant: finalTestimonialsVariant })
 
   if (variant === 'professional' || variant === 'premium') {
-    // FAQ
-    blocks.push(buildFAQ(content))
-    // CTA
-    blocks.push(buildCTA(biz))
+    middleBlocks.push({ ...buildFAQ(content), variant: getVariant('faq', 'accordion') })
+    middleBlocks.push({ ...buildCTA(biz), variant: getVariant('cta', 'banner') })
   }
 
   if (variant === 'premium') {
-    // Pricing
-    blocks.push(buildPricing(category))
-    // Team
-    blocks.push(buildTeam(category))
-    // Newsletter
-    blocks.push(buildNewsletter(biz))
+    middleBlocks.push({ ...buildPricing(category), variant: getVariant('pricing', 'cards') })
+    middleBlocks.push({ ...buildTeam(category), variant: getVariant('team', 'grid') })
+    middleBlocks.push({ ...buildNewsletter(biz), variant: getVariant('newsletter', 'inline') })
+  }
+
+  // Shuffle middle blocks if seed provided (backward-compatible: no seed = no shuffle)
+  if (compositionSeed != null) {
+    const rand = createSeededRandom(compositionSeed)
+    // Ordering constraints: features must be before stats
+    const shuffled = shuffleArray(middleBlocks, rand)
+    // Enforce: features before stats, features before testimonials
+    const enforced = enforceBlockOrdering(shuffled)
+    blocks.push(...enforced)
+  } else {
+    blocks.push(...middleBlocks)
   }
 
   // Contact (starter only puts it on home page)
   if (variant === 'starter') {
-    blocks.push(buildContact(biz))
+    blocks.push({ ...buildContact(biz), variant: getVariant('contact', 'split') })
   }
 
   // Footer always last
-  blocks.push(buildFooter(biz, pages))
+  blocks.push({ ...buildFooter(biz, pages), variant: getVariant('footer', 'expanded') })
 
   return { title: 'Home', slug: '/', layout: blocks }
+}
+
+/** Enforce ordering: features before stats, about before team */
+function enforceBlockOrdering(blocks: Record<string, unknown>[]): Record<string, unknown>[] {
+  const result = [...blocks]
+  const deps: [string, string][] = [
+    ['features', 'stats'],
+    ['features', 'testimonials'],
+  ]
+  for (const [before, after] of deps) {
+    const beforeIdx = result.findIndex(b => b.blockType === before)
+    const afterIdx = result.findIndex(b => b.blockType === after)
+    if (beforeIdx >= 0 && afterIdx >= 0 && beforeIdx > afterIdx) {
+      const [moved] = result.splice(beforeIdx, 1)
+      const newAfterIdx = result.findIndex(b => b.blockType === after)
+      result.splice(newAfterIdx, 0, moved!)
+    }
+  }
+  return result
 }
 
 function buildAboutPage(biz: BusinessSample, content: CategoryContent, category: string, pages: string[]): TemplatePage {
@@ -959,6 +1101,7 @@ import type { TemplatePreset, BlockSpec } from './template-definitions'
 /**
  * Build a single block from a BlockSpec blueprint.
  * Dispatches to existing block builders, passing optional variant/count overrides.
+ * When spec.variant is undefined and compositionSeed is provided, auto-selects via selectVariant().
  */
 function buildBlockFromSpec(
   spec: BlockSpec,
@@ -966,44 +1109,47 @@ function buildBlockFromSpec(
   biz: BusinessSample,
   category: string,
   pageNames: string[],
+  compositionSeed?: number,
 ): Record<string, unknown> {
+  // Auto-select variant if not specified in blueprint and seed is available
+  const resolvedVariant = spec.variant ?? (compositionSeed != null ? selectVariant(spec.blockType, compositionSeed, category) : undefined)
   switch (spec.blockType) {
     case 'navigation':
-      return { ...buildNavigation(biz, pageNames), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildNavigation(biz, pageNames), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'hero':
       return {
         ...buildHero(biz, category, 0),
-        ...(spec.variant ? { variant: spec.variant } : {}),
+        ...(resolvedVariant ? { variant: resolvedVariant } : {}),
         ...(spec.overrides ?? {}),
       }
     case 'features':
-      return { ...buildFeatures(biz, category), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildFeatures(biz, category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'testimonials':
-      return { ...buildTestimonials(content), ...(spec.variant ? { variant: spec.variant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
+      return { ...buildTestimonials(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}), ...(spec.count ? { items: content.testimonials.slice(0, spec.count) } : {}) }
     case 'contact':
-      return { ...buildContact(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildContact(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'footer':
-      return { ...buildFooter(biz, pageNames), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildFooter(biz, pageNames), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'stats':
-      return { ...buildStats(category), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildStats(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'gallery':
     case 'gallery-masonry':
-      return { ...buildGallery(biz), blockType: spec.blockType, ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildGallery(biz), blockType: spec.blockType, ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'faq':
-      return { ...buildFAQ(content), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildFAQ(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'cta':
-      return { ...buildCTA(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildCTA(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'about':
-      return { ...buildAbout(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildAbout(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'pricing':
-      return { ...buildPricing(category), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildPricing(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'team':
-      return { ...buildTeam(category), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildTeam(category), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'newsletter':
-      return { ...buildNewsletter(biz), ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildNewsletter(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'logo-cloud':
     case 'client-logos':
-      return { ...buildClientLogos(), blockType: spec.blockType, ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildClientLogos(), blockType: spec.blockType, ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     // Industry-specific blocks
     case 'menu-display':
       return buildMenuDisplay(content)
@@ -1015,40 +1161,127 @@ function buildBlockFromSpec(
       return buildReviewCards(content)
     case 'video-showcase':
       return buildVideoShowcase()
-    case 'doctor-profile':
-      return buildDoctorProfile(content)
+    // doctor-profile handled below (line ~1188) with items
     case 'property-card':
       return buildPropertyCard()
     case 'product-quick-view':
       return buildProductQuickView()
-    case 'portfolio-grid':
-      return buildPortfolioGrid()
+    case 'portfolio-grid': {
+      const count = spec.count ?? 6
+      const items = Array.from({ length: count }, (_, i) => ({
+        title: `${biz.name} Project ${i + 1}`,
+        category: ['Branding', 'Web Design', 'Photography', 'Illustration'][i % 4],
+        image: `https://placehold.co/600x800/1e293b/ffffff?text=Portfolio+${i + 1}`,
+        description: `Creative project showcasing ${biz.tagline ?? 'our craft'}.`,
+      }))
+      return {
+        blockType: 'portfolio-grid',
+        variant: resolvedVariant ?? 'masonry',
+        headline: 'Our Work',
+        subheadline: biz.tagline ?? 'Selected projects',
+        items,
+      }
+    }
     case 'service-cards':
       return buildServiceCards(biz, category)
     case 'feature-comparison':
       return buildFeatureComparison()
     case 'pricing-table':
       return buildPricingTable()
-    case 'before-after':
-      return { blockType: 'before-after', variant: spec.variant ?? 'slider' }
+    case 'doctor-profile': {
+      const count = spec.count ?? 4
+      const items = Array.from({ length: count }, (_, i) => ({
+        name: `Dr. ${['Aisha', 'Rahman', 'Mei Ling', 'Kumar', 'Siti', 'Jonathan'][i % 6]} ${['Tan', 'Lee', 'Wong', 'Patel', 'Ismail', 'Lim'][i % 6]}`,
+        title: ['Consultant Physician', 'Senior Specialist', 'Chief Medical Officer', 'Head of Department'][i % 4],
+        specialty: ['Cardiology', 'Pediatrics', 'General Practice', 'Dermatology'][i % 4],
+        image: `https://placehold.co/400x400/0ea5e9/ffffff?text=Dr.+${i + 1}`,
+        bio: `Experienced medical professional at ${biz.name}.`,
+        experience: `${10 + i} years`,
+      }))
+      return {
+        blockType: 'doctor-profile',
+        variant: resolvedVariant ?? 'cards',
+        headline: 'Meet Our Specialists',
+        subheadline: `Expert care at ${biz.name}`,
+        items,
+      }
+    }
+    case 'before-after': {
+      // Supply an items array (slider variant renders from items[] not single pair).
+      // Enforce minimum 3 so grid/slider variants don't render partial.
+      const count = Math.max(spec.count ?? 3, 3)
+      const items = Array.from({ length: count }, (_, i) => ({
+        label: `Transformation ${i + 1}`,
+        beforeImage: {
+          url: `https://placehold.co/600x400/e2e8f0/64748b?text=Before+${i + 1}`,
+          alt: `Before ${i + 1}`,
+        },
+        afterImage: {
+          url: `https://placehold.co/600x400/10b981/ffffff?text=After+${i + 1}`,
+          alt: `After ${i + 1}`,
+        },
+      }))
+      return {
+        blockType: 'before-after',
+        variant: resolvedVariant ?? 'slider',
+        headline: 'See the Transformation',
+        subheadline: `Real results from ${biz.name}`,
+        items,
+      }
+    }
     case 'countdown-timer':
-      return { blockType: 'countdown-timer', variant: spec.variant ?? 'elegant', targetDate: '2026-12-31T00:00:00' }
-    case 'blog-list':
-      return { blockType: 'blog-list', variant: spec.variant ?? 'grid', count: spec.count ?? 3 }
+      return { blockType: 'countdown-timer', variant: resolvedVariant ?? 'elegant', targetDate: '2026-12-31T00:00:00' }
+    case 'blog-list': {
+      // Enforce min 3 for hero-card/masonry variants
+      const count = Math.max(spec.count ?? 3, 4)
+      const items = Array.from({ length: count }, (_, i) => ({
+        title: [`Inside ${biz.name}`, 'Tips & Insights', 'Latest News', 'Case Study', 'Industry Update', 'Best Practices'][i % 6]!,
+        excerpt: `Stay up to date with the latest from ${biz.name}. Read our take on ${biz.tagline ?? 'the industry'}.`,
+        image: `https://placehold.co/800x500/6366f1/ffffff?text=Post+${i + 1}`,
+        author: ['Editorial Team', 'Lead Writer', 'Guest Contributor'][i % 3],
+        date: '2026-04-14',
+        category: ['News', 'Guides', 'Stories'][i % 3],
+        readTime: `${3 + (i % 5)} min`,
+      }))
+      return {
+        blockType: 'blog-list',
+        variant: resolvedVariant ?? 'grid',
+        headline: 'Latest Articles',
+        subheadline: `Fresh reads from ${biz.name}`,
+        count,
+        items,
+      }
+    }
     case 'social-proof':
-      return { blockType: 'social-proof', variant: spec.variant ?? 'counter' }
-    case 'products-grid':
-      return { blockType: 'products-grid', variant: spec.variant ?? 'grid-3', count: spec.count ?? 6 }
+      return { blockType: 'social-proof', variant: resolvedVariant ?? 'counter' }
+    case 'products-grid': {
+      // Generate placeholder items — previously this returned only {variant, count}
+      // with no items array, causing render to show empty grid (Ben-Ben class bug).
+      const count = spec.count ?? 6
+      const items = Array.from({ length: count }, (_, i) => ({
+        name: `${biz.name} Item ${i + 1}`,
+        price: `RM ${(25 + i * 15).toFixed(2)}`,
+        image: `https://placehold.co/400x400/e2e8f0/64748b?text=Product+${i + 1}`,
+        description: `Curated product from ${biz.name}`,
+        category: biz.tagline ?? 'Featured',
+      }))
+      return {
+        blockType: 'products-grid',
+        variant: resolvedVariant ?? 'grid-3',
+        count,
+        items,
+      }
+    }
     // ── Aliases: map preset blockType names to actual block builders ──
     case 'contact-form':
-      return { ...buildContact(biz), blockType: 'contact', ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildContact(biz), blockType: 'contact', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'map':
     case 'map-embed':
     case 'google-maps':
-      return { blockType: 'google-maps', variant: spec.variant ?? 'default', address: biz.address, height: '400px' }
+      return { blockType: 'google-maps', variant: resolvedVariant ?? 'default', address: biz.address, height: '400px' }
     case 'content':
     case 'content-block':
-      return { ...buildAbout(biz), blockType: 'about', ...(spec.variant ? { variant: spec.variant } : {}) }
+      return { ...buildAbout(biz), blockType: 'about', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'timeline':
       return { ...buildAbout(biz), blockType: 'about', variant: 'timeline' }
     default:
@@ -1057,33 +1290,56 @@ function buildBlockFromSpec(
       if (industryBlock) return industryBlock
       // Unknown block — return minimal spec to avoid silent skip
       console.warn(`[Composer] Unknown blockType: ${spec.blockType}`)
-      return { blockType: spec.blockType, variant: spec.variant ?? 'default' }
+      return { blockType: spec.blockType, variant: resolvedVariant ?? 'default' }
   }
 }
 
 /**
  * Compose a template from a TemplatePreset blueprint.
  * Reads pages[].blocks[] and builds each block — no algorithmic guessing.
+ * When BlockSpec.variant is undefined, uses selectVariant() for seed-based variety.
+ *
+ * Optional `bizOverride`: shallow-merged over the content.businesses[preset.businessIndex]
+ * AFTER a deep clone, so the fallback path can inject user-extracted business name / tagline
+ * without polluting the cached content pack (same pattern as researcher-03 Q3).
  */
-export function composeFromBlueprint(preset: TemplatePreset): TemplateSeed {
+export function composeFromBlueprint(
+  preset: TemplatePreset,
+  compositionSeed?: number,
+  bizOverride?: Partial<BusinessSample>,
+): TemplateSeed {
   const content = getCategoryContent(preset.category)
   if (!content) {
     throw new Error(`[composeFromBlueprint] Content not found for category: ${preset.category}`)
   }
 
-  const biz = content.businesses[preset.businessIndex]
-  if (!biz) {
+  const baseBiz = content.businesses[preset.businessIndex]
+  if (!baseBiz) {
     throw new Error(`[composeFromBlueprint] businessIndex ${preset.businessIndex} out of range for ${preset.category} (has ${content.businesses.length})`)
   }
 
+  const biz: BusinessSample = bizOverride
+    ? { ...structuredClone(baseBiz), ...bizOverride }
+    : baseBiz
+
+  // Use businessIndex as seed if not provided — each template gets deterministic but different variants
+  const seed = compositionSeed ?? preset.businessIndex * 7919
+
   const pageNames = preset.pages.map((p) => p.name)
+
+  // Template path content language — defaults to 'en' since template content
+  // in src/lib/ai/content/*.ts is pre-curated. Phase 04 wires the SAME
+  // content-rules validator used by the AI path, so any blocked CTA in the
+  // hand-authored template content is caught + fixed uniformly.
+  const templateLang: ContentLang = 'en'
 
   const pages: TemplatePage[] = preset.pages.map((page) => ({
     title: page.name,
     slug: page.slug,
-    layout: page.blocks.map((spec) =>
-      buildBlockFromSpec(spec, content, biz, preset.category, pageNames),
-    ),
+    layout: page.blocks.map((spec) => {
+      const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed)
+      return applyContentValidation(block, templateLang)
+    }),
   }))
 
   return {
@@ -1115,7 +1371,7 @@ export function composeTemplate(input: ComposerInput): TemplateSeed {
   const templatePages: TemplatePage[] = []
 
   // Home page (always present)
-  templatePages.push(buildHomePage(biz, content, input.category, input.variant, input.businessIndex, pages))
+  templatePages.push(buildHomePage(biz, content, input.category, input.variant, input.businessIndex, pages, input.compositionSeed))
 
   // Additional pages for professional/premium
   if (input.variant === 'professional' || input.variant === 'premium') {
@@ -1133,6 +1389,17 @@ export function composeTemplate(input: ComposerInput): TemplateSeed {
   const name = `${biz.name} — ${input.themePreset.name}`
   const description = `${tierLabel} template for ${input.category}: ${biz.tagline}`
 
+  // Phase 04 — apply content validation across every block built by the
+  // legacy path (same rules as AI path + blueprint path, single source of
+  // truth in content-rules.ts).
+  const legacyLang: ContentLang = 'en'
+  const validatedPages: TemplatePage[] = templatePages.map((page) => ({
+    ...page,
+    layout: page.layout.map((block) =>
+      applyContentValidation(block as Record<string, unknown>, legacyLang),
+    ),
+  }))
+
   return {
     name,
     description,
@@ -1140,7 +1407,7 @@ export function composeTemplate(input: ComposerInput): TemplateSeed {
     tier: input.variant,
     isPremium: input.variant === 'premium',
     theme: input.themePreset,
-    pages: templatePages,
+    pages: validatedPages,
   }
 }
 
