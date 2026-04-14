@@ -97,10 +97,10 @@ export const PATCH = withAuth<RouteContext>(async (user, request, ctx) => {
                 return NextResponse.json({ error: '404 page slug is read-only.' }, { status: 400 })
             }
 
-            // Lock slug after site is published to protect SEO/external links
+            // Lock slug only while site is currently published (allow when unpublished/draft)
             const site = sites[0] as { status?: string; publishedAt?: string }
-            if (site.publishedAt || site.status === 'published') {
-                return NextResponse.json({ error: 'Slug cannot be changed after site is published to protect SEO and external links.' }, { status: 400 })
+            if (site.status === 'published') {
+                return NextResponse.json({ error: 'Slug cannot be changed while site is published. Unpublish first to edit URLs.' }, { status: 400 })
             }
 
             let normalizedSlug = String(slug).trim()
