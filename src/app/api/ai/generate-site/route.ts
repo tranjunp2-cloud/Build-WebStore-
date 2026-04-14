@@ -21,6 +21,8 @@ import { blockRegistry } from '@/blocks/registry'
 import { contentBriefToReferencePrompt, type ContentBrief } from '@/lib/ai/content-brief'
 import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
+import { pickCategoryThemeWithMood, hashBusinessName } from '@/lib/ai/category-theme-picker'
+import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { resolveTheme } from '@/lib/theme/resolve'
 
 
@@ -311,6 +313,13 @@ export async function POST(req: NextRequest) {
                     // media pipeline so deriveKeywords can drive Unsplash queries
                     // from what the user actually sells (translated vi/ms → en).
                     const parsedProducts = parseProductsString(businessInfo.products)
+                    // Plan 260414-2249 phase-02: resolve theme mood and pass it
+                    // so deriveKeywords appends mood imagery adjectives (e.g.
+                    // 'candlelit' for elegant, 'minimalist' for serene). Keeps
+                    // Unsplash queries per-mood coherent across all blocks on a site.
+                    const presetCategory = resolveComposerCategory(businessInfo.industry)
+                    const themeSeed = hashBusinessName(businessInfo.businessName)
+                    const { mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
                     await fulfillImageNeeds(
                         needs,
                         {
@@ -319,6 +328,7 @@ export async function POST(req: NextRequest) {
                             category: businessInfo.industry,
                             language: resolvedLang,
                             products: parsedProducts.length > 0 ? parsedProducts : undefined,
+                            mood: themeMood,
                         },
                         payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                     )

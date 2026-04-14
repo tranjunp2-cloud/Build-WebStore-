@@ -7,6 +7,7 @@
 import { blockRegistry } from '@/blocks/registry'
 import type { ThemePreset } from './theme-presets'
 import { resolveFontPairing } from './font-pairings'
+import { THEME_MOODS } from './theme-moods'
 
 // ── Theme context for soft guidance injection ─────────────────────────────
 
@@ -17,111 +18,58 @@ export type ThemePromptContext = {
 
 /**
  * Describe the mood a preset should set so AI copy (CTAs, taglines, headings)
- * matches the palette. Keeps the prompt readable without dumping every variant.
+ * matches the palette.
+ *
+ * Plan 260414-2249 phase-02: delegates to `THEME_MOODS[preset.moodId]` which
+ * is the single source of truth for mood metadata (voiceStyle rules, imagery,
+ * CTAs). The old category×colorMode classification is gone — mood is now a
+ * FIRST-CLASS property of each preset, not derived at call time.
+ *
+ * `category` kept in signature for backward compat (some call sites still
+ * pass it) but unused — mood encodes everything needed.
  */
-function moodHint(preset: ThemePreset, category: string): string {
-  const dark = preset.colorMode === 'dark'
-  const warmCategories = new Set(['restaurant', 'fnb', 'fitness', 'beauty', 'events', 'creative'])
-  const trustCategories = new Set(['health', 'realestate', 'business', 'education'])
-  const edgeCategories = new Set(['tech', 'ecommerce', 'blog', 'travel'])
-
-  if (warmCategories.has(category)) {
-    return dark
-      ? 'warm appetite / intimate nightlife — evocative copy, sensory language, urgency'
-      : 'warm, inviting, appetite-driving — sensory adjectives, human touch, scarcity CTAs'
+function moodHint(preset: ThemePreset, _category: string): string {
+  const mood = THEME_MOODS[preset.moodId]
+  if (!mood) {
+    // Defensive fallback — preset missing moodId (shouldn't happen post-phase-02)
+    return 'polished, professional, approachable — benefit-led, specific'
   }
-  if (trustCategories.has(category)) {
-    return dark
-      ? 'calm authority — understated confidence, credentials, proof points'
-      : 'calm, trustworthy, stable — reassurance, credentials, clinical clarity'
-  }
-  if (edgeCategories.has(category)) {
-    return dark
-      ? 'sharp, modern, confident — benefit-led, outcome-focused copy'
-      : 'clean, efficient, outcome-driven — benefit-led CTAs, specific metrics'
-  }
-  return dark
-    ? 'premium, confident, focused — concise copy, strong verbs'
-    : 'polished, professional, approachable — benefit-led, specific'
+  return `${mood.label.toLowerCase()} — ${mood.description}`
 }
 
-// ── Style Personalities ────────────────────────────────────────────────────
-// Each personality has keywords that match user input for context-aware selection.
+// ── Style Personalities (DEPRECATED) ────────────────────────────────────────
+//
+// Plan 260414-2249 phase-02: replaced by `ThemeMood.voiceStyle` bullet rules
+// (see `./theme-moods.ts`). Consumers get richer, mood-specific voice rules
+// via `buildUserPrompt({ mood })` COPY VOICE block instead of a single line.
+//
+// Kept as a compatibility shim so any direct caller of `selectPersonality`
+// (none in current code) still returns a sensible string. The array is now
+// empty — previously it had 8 keyword-matched personalities, but those were
+// superseded by the 6 mood archetypes × 4-5 voice rules in THEME_MOODS.
 
+/** @deprecated Use `THEME_MOODS[moodId].voiceStyle` instead. */
 interface StylePersonality {
   name: string
   prompt: string
   keywords: string[]
 }
 
-const STYLE_PERSONALITIES: StylePersonality[] = [
-  {
-    name: 'bold',
-    prompt: 'Bold and energetic — use vibrant colors, large typography, and dynamic layouts',
-    keywords: ['startup', 'gym', 'fitness', 'sports', 'energy', 'bold', 'vibrant', 'young', 'dynamic'],
-  },
-  {
-    name: 'minimal',
-    prompt: 'Minimal and sophisticated — clean whitespace, muted tones, simple elegance',
-    keywords: ['minimal', 'clean', 'simple', 'zen', 'modern', 'scandinavian', 'architect', 'gallery'],
-  },
-  {
-    name: 'warm',
-    prompt: 'Warm and inviting — soft gradients, rounded shapes, friendly tone',
-    keywords: ['family', 'home', 'bakery', 'cafe', 'cozy', 'friendly', 'community', 'traditional', 'handmade', 'organic'],
-  },
-  {
-    name: 'professional',
-    prompt: 'Professional and authoritative — structured grid, corporate feel, data-driven',
-    keywords: ['consulting', 'law', 'finance', 'corporate', 'enterprise', 'b2b', 'agency', 'professional'],
-  },
-  {
-    name: 'creative',
-    prompt: 'Creative and playful — asymmetric layouts, bright accents, unexpected block ordering',
-    keywords: ['creative', 'design', 'art', 'photographer', 'portfolio', 'studio', 'boutique', 'unique'],
-  },
-  {
-    name: 'luxurious',
-    prompt: 'Luxurious and premium — dark backgrounds, gold accents, serif headings',
-    keywords: ['luxury', 'premium', 'spa', 'jewelry', 'high-end', 'exclusive', 'vip', 'cao cấp', 'sang trọng'],
-  },
-  {
-    name: 'tech',
-    prompt: 'Modern tech — glassmorphism vibes, cool blues/purples, sharp geometry',
-    keywords: ['tech', 'saas', 'software', 'ai', 'digital', 'app', 'platform', 'cloud', 'api', 'startup'],
-  },
-  {
-    name: 'editorial',
-    prompt: 'Editorial and storytelling — magazine-style hero, rich typography, long-form sections',
-    keywords: ['blog', 'magazine', 'news', 'story', 'content', 'media', 'publishing', 'journalist'],
-  },
-]
+/** @deprecated Use `THEME_MOODS` from `./theme-moods.ts`. */
+const STYLE_PERSONALITIES: StylePersonality[] = []
 
 /**
- * Select a style personality based on user input context.
- * Scores each personality by keyword matches, then randomly picks from top candidates.
- * Falls back to pure random if no keywords match.
+ * @deprecated Use `THEME_MOODS[preset.moodId].voiceStyle` for mood-aware
+ * voice rules. This shim returns a single safe default sentence so any
+ * legacy caller that still expects a one-line personality gets a value.
+ *
+ * New code should pass `mood` into `buildUserPrompt` options — it will
+ * inject the full 4-5 rule COPY VOICE block from the mood archetype.
  */
-function selectPersonality(info: BusinessInfoInput): string {
-  const input = `${info.businessName} ${info.industry} ${info.products} ${info.shortDescription}`.toLowerCase()
-
-  // Score each personality by keyword matches
-  const scored = STYLE_PERSONALITIES.map(p => ({
-    ...p,
-    score: p.keywords.filter(kw => input.includes(kw)).length,
-  }))
-
-  // Find candidates: all with score > 0, sorted descending
-  const candidates = scored.filter(p => p.score > 0).sort((a, b) => b.score - a.score)
-
-  if (candidates.length > 0) {
-    // Pick randomly from top 3 candidates (or fewer if less matched)
-    const topN = candidates.slice(0, Math.min(3, candidates.length))
-    return topN[Math.floor(Math.random() * topN.length)]!.prompt
-  }
-
-  // No keyword match → pure random from all personalities
-  return STYLE_PERSONALITIES[Math.floor(Math.random() * STYLE_PERSONALITIES.length)]!.prompt
+function selectPersonality(_info: BusinessInfoInput): string {
+  // Default to elegant mood as the safest cross-category personality hint.
+  const mood = THEME_MOODS.elegant
+  return mood.voiceStyle[0] ?? 'Polished, professional, approachable — benefit-led, specific.'
 }
 
 // ── Dynamic Block Composition Generator ────────────────────────────────────
@@ -428,12 +376,34 @@ export type BusinessInfoInput = {
   address?: string
 }
 
+import type { ThemeMood } from './theme-moods'
+
+export type BuildUserPromptOptions = {
+  extraInstructions?: string
+  language?: 'en' | 'ms' | 'vi' | 'auto'
+  referencePrompt?: string
+  /** Plan 260414-2249 phase-02: bundled voice/imagery/CTA archetype. */
+  mood?: ThemeMood
+}
+
 export function buildUserPrompt(
   info: BusinessInfoInput,
-  extraInstructions?: string,
+  extraInstructionsOrOptions?: string | BuildUserPromptOptions,
   language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
   referencePrompt?: string,
 ): string {
+  // Backward-compat: legacy positional args (string, lang, referencePrompt)
+  // OR new options object. Normalize.
+  let extraInstructions: string | undefined
+  let mood: ThemeMood | undefined
+  if (typeof extraInstructionsOrOptions === 'string' || extraInstructionsOrOptions === undefined) {
+    extraInstructions = extraInstructionsOrOptions
+  } else {
+    extraInstructions = extraInstructionsOrOptions.extraInstructions
+    mood = extraInstructionsOrOptions.mood
+    if (extraInstructionsOrOptions.language) language = extraInstructionsOrOptions.language
+    if (extraInstructionsOrOptions.referencePrompt) referencePrompt = extraInstructionsOrOptions.referencePrompt
+  }
   const parts = [
     `Create a complete website for: "${info.businessName}"`,
     `Industry: ${info.industry}`,
@@ -458,10 +428,18 @@ export function buildUserPrompt(
     parts.push(`Additional instructions: ${extraInstructions}`)
   }
 
-  // Inject context-aware style personality for variety (skip for reference/recreation mode)
-  if (!referencePrompt && STYLE_PERSONALITIES.length > 0) {
-    const personality = selectPersonality(info)
-    parts.push(`\nDesign personality: ${personality}`)
+  // Plan 260414-2249 phase-02: inject mood-driven COPY VOICE block.
+  // When a mood is provided, it replaces the legacy one-sentence personality
+  // with 4-5 bulleted voice rules + imagery adjectives + copy tone label.
+  //
+  // When no mood is supplied (legacy callers), no personality block is added
+  // at all — the previous STYLE_PERSONALITIES fallback is deprecated. Current
+  // openai-generator.ts always passes mood after the GAP 1 fix.
+  if (!referencePrompt && mood) {
+    const voiceBullets = mood.voiceStyle.map((rule) => `  - ${rule}`).join('\n')
+    parts.push(
+      `\nCOPY VOICE (${mood.label} / ${mood.copyTone}):\n${voiceBullets}\n  - Imagery mood: ${mood.imageryKeywords.slice(0, 3).join(', ')}.`,
+    )
   }
 
   // Inject dynamically generated block composition hint

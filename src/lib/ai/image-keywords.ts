@@ -9,6 +9,7 @@
  */
 
 import { translateProductTerm } from './product-translator'
+import type { ThemeMood } from './theme-moods'
 
 export type KeywordLanguage = 'en' | 'ms' | 'vi' | 'auto'
 
@@ -19,6 +20,9 @@ export interface KeywordContext {
     // Plan 260414-2249 phase-01: top product term drives the primary Unsplash
     // query when present (translated via product-translator for vi/ms input).
     products?: string[]
+    // Plan 260414-2249 phase-02: mood appends 1-2 imagery adjectives to the
+    // query for coherent visual style (warm/candlelit/minimalist/...).
+    mood?: ThemeMood
 }
 
 /** Category → 3-5 specific English base terms. Covers all 14 CATEGORY_SIGNATURE_BLOCKS keys. */
@@ -199,18 +203,35 @@ export function deriveKeywords(
     // Product-primary path: user's top product → translated term → primary
     // keyword. Fall back to category base for downstream variety.
     const topProduct = ctx.products && ctx.products.length > 0 ? ctx.products[0] : undefined
+    const keywords: string[] = []
+
     if (topProduct) {
         const productTerm = translateProductTerm(topProduct)
-        const keywords: string[] = [productTerm]
+        keywords.push(productTerm)
         if (modifier) keywords.push(modifier)
         if (industryBoost && industryBoost !== productTerm) keywords.push(industryBoost)
         else if (base && base !== productTerm) keywords.push(base)
-        return keywords.filter((k) => k && k.length > 0)
+    } else {
+        keywords.push(base)
+        if (modifier) keywords.push(modifier)
+        if (industryBoost && industryBoost !== base) keywords.push(industryBoost)
     }
 
-    const keywords: string[] = [base]
-    if (modifier) keywords.push(modifier)
-    if (industryBoost && industryBoost !== base) keywords.push(industryBoost)
+    // Plan 260414-2249 phase-02: append top 1-2 mood imagery adjectives.
+    // Capped at 5 total terms to keep Unsplash queries specific, not soup.
+    if (ctx.mood && ctx.mood.imageryKeywords.length > 0) {
+        const MAX_TERMS = 5
+        const existing = new Set(keywords.map((k) => k.toLowerCase()))
+        for (const adj of ctx.mood.imageryKeywords) {
+            if (keywords.length >= MAX_TERMS) break
+            if (!existing.has(adj.toLowerCase())) {
+                keywords.push(adj)
+                existing.add(adj.toLowerCase())
+            }
+        }
+        // Hard cap (defensive)
+        if (keywords.length > MAX_TERMS) keywords.length = MAX_TERMS
+    }
 
     return keywords.filter((k) => k && k.length > 0)
 }

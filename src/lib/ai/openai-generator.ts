@@ -14,7 +14,7 @@ import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
-import { pickCategoryTheme, hashBusinessName } from './category-theme-picker'
+import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
 import { resolveComposerCategory } from './composer-category-resolver'
 import { resolveFontPairing } from './font-pairings'
 import { seededShufflePick, hashString } from './seeded-random'
@@ -68,13 +68,23 @@ export async function generateSiteWithAI(
         // Resolve category + pick deterministic theme preset BEFORE prompt build
         // so phase-03 can inject the exact hex/font hint into the system prompt.
         // Precedence downstream: URL extraction visualStyle (route.ts) > this preset > AI output.
+        //
+        // Plan 260414-2249 phase-02: resolve mood from preset.moodId so GPT
+        // prompt receives the COPY VOICE bulleted block (4-5 voice rules +
+        // imagery hint + mood label). Without this, the happy path generates
+        // generic copy even though the preset dictates elegant/bold/etc.
         const presetCategory = resolveComposerCategory(promptText)
         const themeSeed = hashBusinessName(businessInfo.businessName)
-        const themePreset = pickCategoryTheme(presetCategory, themeSeed)
-        console.log(`[Theme] Using category preset "${themePreset.name}" for category=${presetCategory} (seed=${themeSeed})`)
+        const { preset: themePreset, mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
+        console.log(`[Theme] Using category preset "${themePreset.name}" (mood=${themeMood.id}) for category=${presetCategory} (seed=${themeSeed})`)
 
         const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory })
-        const userPromptText = buildUserPrompt(businessInfo, extraInstructions, language, referencePrompt)
+        const userPromptText = buildUserPrompt(businessInfo, {
+            extraInstructions,
+            language,
+            referencePrompt,
+            mood: themeMood,
+        })
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
 

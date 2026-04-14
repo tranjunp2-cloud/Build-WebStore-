@@ -4,6 +4,7 @@ import type { ThemePreset } from '@/lib/ai/theme-presets'
 import { blockRegistry } from '@/blocks/registry'
 import { enforceMinContent } from './variant-validation'
 import { applyContentValidation, type ContentLang } from './content-rules'
+import { THEME_MOODS, getCategoryCTA as getMoodCTA, type ThemeMood } from './theme-moods'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -121,7 +122,28 @@ const CATEGORY_INDUSTRY_BLOCKS: Record<string, string[]> = {
 
 // ── Block builders ──────────────────────────────────────────────────────────
 
-function buildNavigation(biz: BusinessSample, pages: string[]): Record<string, unknown> {
+/**
+ * Resolve the primary CTA label for a block given optional mood + category.
+ * Falls back to the legacy hardcoded labels when mood is absent so the
+ * composer keeps working on legacy paths that don't resolve mood.
+ *
+ * Plan 260414-2249 phase-02: centralizes CTA wording per mood archetype.
+ */
+function resolveCTA(
+  mood: ThemeMood | undefined,
+  category: string,
+  role: 'primary' | 'secondary',
+): string {
+  if (mood) return getMoodCTA(mood, category, role)
+  return role === 'primary' ? 'Get Started' : 'Learn More'
+}
+
+function buildNavigation(
+  biz: BusinessSample,
+  pages: string[],
+  category: string = 'business',
+  mood?: ThemeMood,
+): Record<string, unknown> {
   const links = pages.map((p) => ({
     label: p === '/' ? 'Home' : p.charAt(0).toUpperCase() + p.slice(1),
     url: p === '/' ? '/' : `/${p}`,
@@ -131,11 +153,16 @@ function buildNavigation(biz: BusinessSample, pages: string[]): Record<string, u
     variant: 'simple',
     logoText: biz.name,
     links,
-    ctaButton: { show: true, label: 'Get Started', url: '/contact' },
+    ctaButton: { show: true, label: resolveCTA(mood, category, 'primary'), url: '/contact' },
   }
 }
 
-function buildHero(biz: BusinessSample, category: string, variantIndex: number): Record<string, unknown> {
+function buildHero(
+  biz: BusinessSample,
+  category: string,
+  variantIndex: number,
+  mood?: ThemeMood,
+): Record<string, unknown> {
   const variants = CATEGORY_HERO_VARIANTS[category] ?? ['centered']
   const variant = variants[variantIndex % variants.length]
   return {
@@ -144,8 +171,8 @@ function buildHero(biz: BusinessSample, category: string, variantIndex: number):
     headline: biz.heroHeadline,
     subheadline: biz.heroSubheadline,
     ctaButtons: [
-      { label: 'Get Started', url: '/contact', style: 'primary' },
-      { label: 'Learn More', url: '/about', style: 'outline' },
+      { label: resolveCTA(mood, category, 'primary'), url: '/contact', style: 'primary' },
+      { label: resolveCTA(mood, category, 'secondary'), url: '/about', style: 'outline' },
     ],
     overlay: variant === 'fullscreen' || variant === 'parallax',
     overlayOpacity: 0.4,
@@ -507,13 +534,22 @@ function buildFAQ(content: CategoryContent): Record<string, unknown> {
   }
 }
 
-function buildCTA(biz: BusinessSample): Record<string, unknown> {
+function buildCTA(
+  biz: BusinessSample,
+  category: string = 'business',
+  mood?: ThemeMood,
+): Record<string, unknown> {
+  const primaryCTA = resolveCTA(mood, category, 'primary')
+  // Mood-aware headline when mood supplied — otherwise keep the legacy wording.
+  const headline = mood
+    ? `Discover ${biz.name}`
+    : `Ready to Get Started with ${biz.name}?`
   return {
     blockType: 'cta',
     variant: 'banner',
-    headline: `Ready to Get Started with ${biz.name}?`,
+    headline,
     subheadline: 'Contact us today and let us help you achieve your goals.',
-    ctaLabel: 'Contact Us Now',
+    ctaLabel: primaryCTA,
     ctaUrl: '/contact',
     ctaStyle: 'primary',
   }
@@ -1264,15 +1300,16 @@ function buildBlockFromSpec(
   category: string,
   pageNames: string[],
   compositionSeed?: number,
+  mood?: ThemeMood,
 ): Record<string, unknown> {
   // Auto-select variant if not specified in blueprint and seed is available
   const resolvedVariant = spec.variant ?? (compositionSeed != null ? selectVariant(spec.blockType, compositionSeed, category) : undefined)
   switch (spec.blockType) {
     case 'navigation':
-      return { ...buildNavigation(biz, pageNames), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildNavigation(biz, pageNames, category, mood), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'hero':
       return {
-        ...buildHero(biz, category, 0),
+        ...buildHero(biz, category, 0, mood),
         ...(resolvedVariant ? { variant: resolvedVariant } : {}),
         ...(spec.overrides ?? {}),
       }
@@ -1292,7 +1329,7 @@ function buildBlockFromSpec(
     case 'faq':
       return { ...buildFAQ(content), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'cta':
-      return { ...buildCTA(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
+      return { ...buildCTA(biz, category, mood), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'about':
       return { ...buildAbout(biz), ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
     case 'pricing':
@@ -1481,6 +1518,12 @@ export function composeFromBlueprint(
 
   const pageNames = preset.pages.map((p) => p.name)
 
+  // Plan 260414-2249 phase-02: resolve mood from themePreset.moodId. Every
+  // ThemePreset carries a moodId, so this is always defined for canonical
+  // presets. Defensive fallback to `serene` (safest neutral tone).
+  const mood: ThemeMood =
+    THEME_MOODS[preset.themePreset.moodId] ?? THEME_MOODS.serene
+
   // Template path content language — defaults to 'en' since template content
   // in src/lib/ai/content/*.ts is pre-curated. Phase 04 wires the SAME
   // content-rules validator used by the AI path, so any blocked CTA in the
@@ -1491,7 +1534,7 @@ export function composeFromBlueprint(
     title: page.name,
     slug: page.slug,
     layout: page.blocks.map((spec) => {
-      const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed)
+      const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood)
       return applyContentValidation(block, templateLang)
     }),
   }))

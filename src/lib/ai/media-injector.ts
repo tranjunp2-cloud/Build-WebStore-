@@ -204,6 +204,7 @@ export async function fulfillImageNeeds(
             industry: ctx.category,
             language: ctx.language,
             products: ctx.products,
+            mood: ctx.mood,
         })
 
         try {
