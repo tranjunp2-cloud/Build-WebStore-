@@ -19,6 +19,7 @@ import {
     type CategoryRequirement,
 } from './category-requirements'
 import { buildBlockFromLibrary, padItems, type InjectionContext } from './content-injection'
+import { seededShufflePick, hashString } from './seeded-random'
 
 type Block = Record<string, unknown>
 
@@ -82,9 +83,13 @@ export function enforceMinimumStructure(
     )
 
     // Upgrade navigation variant per category (before any other enforcement).
-    // AI often picks bland "simple" or "transparent" — override with category-appropriate.
-    const preferredNav = NAV_VARIANT_BY_CATEGORY[category]
-    if (preferredNav) {
+    // AI often picks bland "simple" or "transparent" — override with a seed-picked
+    // variant from the category pool so same-category businesses rotate through
+    // multiple nav styles instead of locking to one. (Plan 2253 Phase 01 — R9)
+    const navPool = NAV_VARIANT_BY_CATEGORY[category]
+    if (navPool && navPool.length > 0) {
+        const navSeed = (ctx.seed ?? 0) ^ hashString('navigation' + category)
+        const preferredNav = seededShufflePick(navPool, navSeed) ?? navPool[0]
         for (const block of out) {
             if (block.blockType === 'navigation') {
                 block.variant = preferredNav
