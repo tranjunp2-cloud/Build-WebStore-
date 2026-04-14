@@ -9,6 +9,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { resolveTheme, generateThemeCSS } from '@/lib/theme/resolve'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 
 interface PreviewFrameProps {
     siteId: string
@@ -508,15 +509,8 @@ function PreviewFrameInner({
             formData.append('file', file)
             formData.append('alt', 'Uploaded image')
 
-            const uploadRes = await fetch('/api/media', {
-                method: 'POST',
-                body: formData
-            })
-
-            if (!uploadRes.ok) throw new Error('Upload failed')
-            
-            const uploadedMedia = await uploadRes.json()
-            const newUrl = uploadedMedia.doc.url
+            const uploadedMedia = await uploadMediaAction(formData)
+            const newUrl = uploadedMedia.url
 
             const { blockIndex, src } = imageClickData
             const block = blocks[blockIndex]

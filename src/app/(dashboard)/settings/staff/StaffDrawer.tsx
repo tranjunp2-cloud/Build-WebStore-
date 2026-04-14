@@ -89,7 +89,7 @@ export function StaffDrawer({
         }
 
         if (role === 'custom' && selectedFeatures.length === 0) {
-            toast.error('Please select at least one custom permission');
+            toast.error(t?.Staff?.toast?.permissionRequired || 'Please select at least one custom permission');
             return;
         }
 
@@ -100,10 +100,10 @@ export function StaffDrawer({
                     const displayName = [editData.firstName, editData.lastName].filter(Boolean).join(' ') || '';
                     const res = await updateStaff(editData.id, displayName, role, role === 'custom' ? selectedFeatures : undefined);
                     if (res.success) {
-                        toast.success('Staff updated successfully!');
+                        toast.success(t?.Staff?.toast?.staffUpdated || 'Staff updated successfully!');
                         onClose();
                     } else {
-                        toast.error(res.error || 'Failed to update staff');
+                        toast.error(res.error || t?.Staff?.toast?.staffUpdateFailed || 'Failed to update staff');
                     }
                 } else {
                     const res = await inviteStaffAction({
@@ -113,11 +113,11 @@ export function StaffDrawer({
                         permissions: role === 'custom' ? selectedFeatures : undefined
                     });
                     if (res.success) {
-                        toast.success('Invitation sent successfully!');
+                        toast.success(t?.Staff?.toast?.inviteSent || 'Invitation sent successfully!');
                         onClose();
                     } else {
                         // BUG-F19.09 + F19.16: Show error toast for duplicate/invalid email
-                        toast.error(res.error || 'Failed to send invitation');
+                        toast.error(res.error || t?.Staff?.toast?.inviteFailed || 'Failed to send invitation');
                     }
                 }
             } catch (err: unknown) {

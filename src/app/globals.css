@@ -101,6 +101,9 @@
   ::selection {
     @apply bg-sky-500/30 text-sky-100;
   }
+  .blog-ckeditor-wrapper .ck-editor__editable ::selection {
+    color: inherit;
+  }
 
   /* Override Chrome/Safari autofill light backgrounds on dark theme */
   input:-webkit-autofill,

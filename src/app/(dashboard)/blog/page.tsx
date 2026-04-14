@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { FilterDropdown } from './_components/FilterDropdown'
@@ -33,9 +33,9 @@ type BlogPost = {
     title: string
     slug: string
     status: 'draft' | 'published'
-    author: { name?: string; email: string } | string
+    author: { name?: string; email?: string; firstName?: string; lastName?: string } | string
     category: { name: string; id: string } | string | null
-    thumbnail?: any
+    thumbnail?: { url?: string; id?: string } | string | null
     createdAt: string
     updatedAt: string
 }
@@ -81,6 +81,7 @@ export default function BlogListPage() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [search, setSearch] = useState('')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<'' | 'draft' | 'published'>('')
     const [page, setPage] = useState(1)
     const [sortBy, setSortBy] = useState('-updatedAt')
@@ -90,12 +91,20 @@ export default function BlogListPage() {
     const [bulkActionLoading, setBulkActionLoading] = useState(false)
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
+    // Debounce search input — wait 400ms after user stops typing before fetching
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    useEffect(() => {
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+        searchTimerRef.current = setTimeout(() => setDebouncedSearch(search), 400)
+        return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+    }, [search])
+
     const fetchPosts = useCallback(async () => {
         setLoading(true)
         setError(null)
         try {
             const res = await listBlogsAction({
-                search: search || undefined,
+                search: debouncedSearch || undefined,
                 status: statusFilter || undefined,
                 category: categoryFilter || undefined,
                 page: page,
@@ -104,12 +113,12 @@ export default function BlogListPage() {
 
             setPosts(res.data || [])
             setMeta(res.meta || null)
-        } catch (err: any) {
-            setError(err.message || 'Something went wrong')
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Something went wrong')
         } finally {
             setLoading(false)
         }
-    }, [search, statusFilter, categoryFilter, sortBy, page])
+    }, [debouncedSearch, statusFilter, categoryFilter, sortBy, page])
 
     useEffect(() => {
         fetchPosts()
@@ -489,7 +498,7 @@ export default function BlogListPage() {
                                 {/* Author & Date */}
                                 <div className="flex flex-row justify-between items-center">
                                     <span className="font-['Inter'] font-[400] text-[12px] leading-[16px] text-[rgba(248,250,252,0.6)] truncate max-w-[100px]">
-                                        {typeof post.author === 'object' && post.author ? ((post.author as any).firstName ? `${(post.author as any).firstName} ${(post.author as any).lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
+                                        {typeof post.author === 'object' && post.author ? (post.author.firstName ? `${post.author.firstName} ${post.author.lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
                                     </span>
                                     <span className="font-['Inter'] font-[400] text-[12px] leading-[16px] text-[rgba(248,250,252,0.6)]">
                                         {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(post.updatedAt))}
@@ -512,14 +521,14 @@ export default function BlogListPage() {
                                 className="flex items-center justify-center gap-1.5 bg-[rgba(59,130,246,0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
                             >
                                 <SquarePen className="w-4 h-4 text-[#3B82F6]" />
-                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#3B82F6]">Edit</span>
+                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#3B82F6]">{t.dashboard.blog.actions.edit}</span>
                             </button>
                             <button
                                 onClick={() => openDeleteConfirm(post)}
                                 className="flex items-center justify-center gap-1.5 bg-[rgba(251,44,54,0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
                             >
                                 <Trash2 className="w-4 h-4 text-[#FF6467]" />
-                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#FF6467]">Delete</span>
+                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#FF6467]">{t.dashboard.blog.actions.delete}</span>
                             </button>
                         </div>
                     </div>
@@ -635,7 +644,7 @@ export default function BlogListPage() {
 
                                     <div className="w-[157.33px] h-[80.5px] pl-[24px] flex items-center shrink-0">
                                         <span className="truncate font-['Inter'] text-[14px] font-[400] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">
-                                            {typeof post.author === 'object' && post.author ? ((post.author as any).firstName ? `${(post.author as any).firstName} ${(post.author as any).lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
+                                            {typeof post.author === 'object' && post.author ? (post.author.firstName ? `${post.author.firstName} ${post.author.lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
                                         </span>
                                     </div>
 
@@ -771,7 +780,7 @@ export default function BlogListPage() {
                                     className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {bulkActionLoading ? (
-                                        <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
+                                        <><Loader2 className="w-4 h-4 animate-spin" /> {t.dashboard.blog.actions.deleting || 'Deleting...'}</>
                                     ) : (
                                         <><Trash2 className="w-4 h-4" /> {t.dashboard.blog.actions.delete}</>
                                     )}
