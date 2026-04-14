@@ -676,6 +676,25 @@ const ICON_NAME_TO_EMOJI: Record<string, string> = {
     mail: '✉️', email: '📧', message: '💬', chat: '💬', bell: '🔔', notification: '🔔',
     wifi: '📶', signal: '📡', bolt: '⚡', lightning: '⚡', battery: '🔋', plug: '🔌',
     workspace: '🪑', chair: '🪑', desk: '🖥️', wifi2: '📶',
+    // Spa / beauty / wellness
+    massage: '💆', facial: '🧖', manicure: '💅', pedicure: '👣', nails: '💅',
+    aromatherapy: '🕯️', candle: '🕯️', stone: '🪨', 'hot-stone': '🪨',
+    scrub: '🧼', soap: '🧼', wellness: '🧘', yoga: '🧘', meditation: '🧘',
+    spa: '💆', skincare: '🧴', lotion: '🧴', cream: '🧴', serum: '💧',
+    haircut: '💇', hair: '💇', barber: '💈', salon: '💇', makeup: '💄',
+    relax: '😌', sleep: '😴', bath: '🛁', shower: '🚿',
+    // Health / fitness
+    fitness: '💪', gym: '🏋️', workout: '🏋️', dumbbell: '🏋️', muscle: '💪',
+    run: '🏃', running: '🏃', bike: '🚴', cycle: '🚴', swim: '🏊',
+    health: '🩺', doctor: '👨‍⚕️', medical: '⚕️', stethoscope: '🩺', pill: '💊',
+    dentist: '🦷', tooth: '🦷', eye: '👁️', glasses: '👓',
+    // Education / learning
+    school: '🏫', class: '📚', course: '📖', lesson: '📖', tutor: '👩‍🏫',
+    student: '🎓', graduate: '🎓', university: '🎓', diploma: '📜',
+    // Real estate / home
+    apartment: '🏢', condo: '🏢', villa: '🏡', land: '🌍', key: '🔑',
+    // Travel
+    travel: '🧳', luggage: '🧳', hotel: '🏨', resort: '🏖️', beach: '🏖️',
 }
 
 // Parse "RM 12.50" / "$15" / "12,500" → number. Returns null if unparsable.
@@ -712,18 +731,27 @@ function clampStatValue(raw: string): string {
     return `${prefix}100K+${rest}`.trim()
 }
 
-function normalizeIcon(raw: unknown): string {
-    if (raw == null) return '⭐'
-    const str = String(raw).trim()
-    if (!str) return '⭐'
-    // Already an emoji (short, contains non-ASCII or Variation Selector)
-    if (str.length <= 4 && /[^\x20-\x7E]/.test(str)) return str
-    // Looks like a word/name — try map (lowercase + strip non-letters)
+// Generic icon names that AI overuses for everything → trigger title-based inference
+const GENERIC_ICONS = new Set(['star', 'check', 'verified', 'sparkle', 'sparkles', 'circle', 'dot', 'box', 'square'])
+
+function normalizeIcon(raw: unknown, contextTitle?: string): string {
+    const str = raw == null ? '' : String(raw).trim()
+    // Already an emoji → return as-is (unless title context can do better)
+    if (str.length > 0 && str.length <= 4 && /[^\x20-\x7E]/.test(str)) return str
+    // Try direct map from icon name
     const key = str.toLowerCase().replace(/[^a-z-]/g, '')
-    if (ICON_NAME_TO_EMOJI[key]) return ICON_NAME_TO_EMOJI[key]
-    // Try keyword inside multi-word name (e.g. "coffee cup" → coffee)
-    for (const k of Object.keys(ICON_NAME_TO_EMOJI)) {
-        if (key.includes(k)) return ICON_NAME_TO_EMOJI[k]
+    if (str && !GENERIC_ICONS.has(key)) {
+        if (ICON_NAME_TO_EMOJI[key]) return ICON_NAME_TO_EMOJI[key]
+        for (const k of Object.keys(ICON_NAME_TO_EMOJI)) {
+            if (key.includes(k)) return ICON_NAME_TO_EMOJI[k]
+        }
+    }
+    // Title-based inference: AI sent generic "star" or empty → look at title for keywords
+    if (contextTitle) {
+        const titleKey = contextTitle.toLowerCase()
+        for (const k of Object.keys(ICON_NAME_TO_EMOJI)) {
+            if (titleKey.includes(k)) return ICON_NAME_TO_EMOJI[k]
+        }
     }
     return '⭐'
 }
@@ -905,15 +933,25 @@ export function sanitizeBlockData(
     if (s.blockType === 'hero') {
         if (Array.isArray(s.ctaButtons)) {
             const primaryBtns = norm(s.ctaButtons, (v) => ({ label: v, url: '#', style: 'primary' }))
-            s.ctaButtons = primaryBtns.map((btn: unknown) => {
+            s.ctaButtons = primaryBtns.map((btn: unknown, i: number) => {
                 const bObj = (typeof btn === 'object' && btn !== null ? btn : {}) as Record<string, unknown>
                 const style = String(bObj.style)
                 return {
                     label: String(bObj.label || bObj.text || 'Button'),
                     url: String(bObj.url || bObj.href || '#'),
-                    style: ['primary', 'secondary', 'outline', 'ghost'].includes(style) ? style : 'primary',
+                    // First button defaults primary, subsequent default secondary for visual contrast
+                    style: ['primary', 'secondary', 'outline', 'ghost'].includes(style) ? style : (i === 0 ? 'primary' : 'secondary'),
                 }
             })
+            // Enforce min 2 CTAs for visual richness — add secondary if only 1
+            // Note: avoid "Learn More" — blocked by design-quality content rules
+            if (s.ctaButtons.length === 1) {
+                (s.ctaButtons as Array<{ label: string; url: string; style: string }>).push({
+                    label: 'About Us',
+                    url: '#about',
+                    style: 'secondary',
+                })
+            }
         }
         // Normalize badge
         if (s.badge && typeof s.badge === 'string') {
@@ -1038,12 +1076,40 @@ export function sanitizeBlockData(
         }
         if (Array.isArray(s.features)) {
             s.features = s.features.map((f: unknown) => {
-                if (typeof f === 'string') return { title: f, description: '', icon: '⭐' }
+                if (typeof f === 'string') return { title: f, description: '', icon: normalizeIcon(undefined, f) }
                 const fObj = (typeof f === 'object' && f !== null ? f : {}) as Record<string, unknown>
+                const title = String(fObj.title || fObj.name || fObj.heading || 'Feature')
                 return {
-                    icon: normalizeIcon(fObj.icon ?? fObj.emoji),
-                    title: String(fObj.title || fObj.name || fObj.heading || 'Feature'),
+                    icon: normalizeIcon(fObj.icon ?? fObj.emoji, title),
+                    title,
                     description: String(fObj.description || fObj.text || fObj.body || ''),
+                }
+            })
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SERVICE-CARDS: same icon variety problem as features
+    // AI sends "star" for all 4 services → all render ⭐. Infer from title.
+    // ═══════════════════════════════════════════════════════════════════════
+    if (s.blockType === 'service-cards') {
+        // AI may use "items" instead of "services"
+        if (Array.isArray(s.items) && !Array.isArray(s.services)) {
+            s.services = s.items
+            delete s.items
+        }
+        if (Array.isArray(s.services)) {
+            s.services = s.services.map((sv: unknown) => {
+                if (typeof sv === 'string') {
+                    return { title: sv, description: '', icon: normalizeIcon(undefined, sv) }
+                }
+                const svObj = (typeof sv === 'object' && sv !== null ? sv : {}) as Record<string, unknown>
+                const title = String(svObj.title || svObj.name || svObj.heading || 'Service')
+                return {
+                    ...svObj,
+                    icon: normalizeIcon(svObj.icon ?? svObj.emoji, title),
+                    title,
+                    description: String(svObj.description || svObj.text || svObj.body || ''),
                 }
             })
         }
