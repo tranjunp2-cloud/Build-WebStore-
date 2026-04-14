@@ -1,15 +1,29 @@
+import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
 import { Suspense } from 'react'
-
-import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
+import { OverviewSkeleton, AnalyticsSkeleton, SEOSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { OverviewView } from '@/components/dashboard/views/OverviewView'
 import { AnalyticsView } from '@/components/dashboard/views/AnalyticsView'
 import { SEOView } from '@/components/dashboard/views/SEOView'
 import { DashboardTabs } from '@/components/dashboard/DashboardTabs'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
 import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
+import { DashboardTabContent } from '@/components/dashboard/DashboardTabContent'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentTenantId } from '@/lib/auth'
+
+export async function generateMetadata(): Promise<Metadata> {
+    const cookieStore = await cookies()
+    const locale = cookieStore.get('prefer_lang')?.value ?? 'en'
+    const isMs = locale === 'ms'
+    return {
+        title: isMs ? 'Papan Pemuka | PrimeWeb' : 'Dashboard | PrimeWeb',
+        description: isMs
+            ? 'Pantau prestasi kedai anda dan urus perniagaan dalam talian.'
+            : 'Monitor your store performance and manage your online business.',
+    }
+}
 
 export const dynamic = 'force-dynamic'
 interface Props {
@@ -31,22 +45,34 @@ export default async function DashboardRoot({ searchParams }: Props) {
 
     return (
         <div className="space-y-6">
-            {/* Universal Page Header / Toolbar */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <DashboardTabs />
+            <DashboardTabContent defaultTab={tab}>
+                {/* Universal Page Header / Toolbar */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <DashboardTabs />
 
-                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                    <PeriodSelector />
-                    <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                        <PeriodSelector />
+                        <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+                    </div>
                 </div>
-            </div>
 
-            {/* Suspend the individual view fetching */}
-            <Suspense fallback={<DashboardSkeleton />}>
-                {tab === 'overview' && <OverviewView searchParams={searchParams} />}
-                {tab === 'analytics' && <AnalyticsView searchParams={searchParams} />}
-                {tab === 'seo' && <SEOView />}
-            </Suspense>
+                {/* Only render the active tab — avoids 3x query cost */}
+                {tab === 'overview' && (
+                    <Suspense fallback={<OverviewSkeleton />}>
+                        <OverviewView searchParams={searchParams} />
+                    </Suspense>
+                )}
+                {tab === 'analytics' && (
+                    <Suspense fallback={<AnalyticsSkeleton />}>
+                        <AnalyticsView searchParams={searchParams} />
+                    </Suspense>
+                )}
+                {tab === 'seo' && (
+                    <Suspense fallback={<SEOSkeleton />}>
+                        <SEOView />
+                    </Suspense>
+                )}
+            </DashboardTabContent>
         </div>
     )
 }

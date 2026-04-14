@@ -121,11 +121,13 @@ export function DashboardCustomizeModal({ defaultPreferences }: { defaultPrefere
     { id: 'views', label: t.dashboard.overview.stats.views, value: '15,240' },
     { id: 'leads', label: t.dashboard.overview.stats.leads, value: '340' },
     { id: 'engagement', label: t.dashboard.overview.stats.engagement, value: '1,200' },
-    { id: 'revenue', label: t.dashboard.overview.stats.revenue, value: 'RM 15,000' },
+    // TODO: Re-enable when F10 Commerce is ready
+    // { id: 'revenue', label: t.dashboard.overview.stats.revenue, value: 'RM 15,000' },
   ], [t])
   
   // Initialize stat order
-  const initialShown = defaultPreferences || ['views', 'leads', 'engagement', 'revenue']
+  // TODO: Add 'revenue' back when F10 Commerce is ready
+  const initialShown = defaultPreferences || ['views', 'leads', 'engagement']
   const initialHidden = ALL_METRICS.map(m => m.id).filter(id => !initialShown.includes(id))
   
   const [items, setItems] = useState([...initialShown, ...initialHidden])

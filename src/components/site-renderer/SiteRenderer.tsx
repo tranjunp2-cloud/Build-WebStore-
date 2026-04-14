@@ -14,9 +14,12 @@ import { TrackingManager } from './TrackingManager'
 export type NavPage = { id: string | number; slug: string; isVisible?: boolean; deletedAt?: string | null }
 
 export type NavLinkItem = { label: string; url: string; newTab?: boolean; isReference?: boolean; reference?: { relationTo: string; value: string | number } | null };
+type PreviewBlock = { blockType: string; links?: NavLinkItem[]; ctaButton?: { url?: string; [key: string]: unknown }; ctaButtons?: Array<{ url?: string; [key: string]: unknown }>; [key: string]: unknown }
 
 export type SiteRendererProps = {
     site: {
+        headerBlock?: Record<string, unknown> | null
+        footerBlock?: Record<string, unknown> | null
         theme?: {
             primaryColor?: string
             secondaryColor?: string
@@ -46,6 +49,34 @@ export type SiteRendererProps = {
     isOwner?: boolean
 }
 
+function applyGlobalSystemBlocks(
+    blocks: PreviewBlock[],
+    site: SiteRendererProps['site'],
+): PreviewBlock[] {
+    const siteHeaderBlock = site.headerBlock as PreviewBlock | null | undefined
+    const siteFooterBlock = site.footerBlock as PreviewBlock | null | undefined
+
+    let nextBlocks = [...blocks]
+
+    if (siteHeaderBlock?.blockType === 'navigation') {
+        const navIndex = nextBlocks.findIndex(block => block.blockType === 'navigation')
+        const normalizedHeader = { ...siteHeaderBlock, blockType: 'navigation' }
+        nextBlocks = navIndex >= 0
+            ? nextBlocks.map((block, index) => index === navIndex ? normalizedHeader : block)
+            : [normalizedHeader, ...nextBlocks]
+    }
+
+    if (siteFooterBlock?.blockType === 'footer') {
+        const footerIndex = nextBlocks.findIndex(block => block.blockType === 'footer')
+        const normalizedFooter = { ...siteFooterBlock, blockType: 'footer' }
+        nextBlocks = footerIndex >= 0
+            ? nextBlocks.map((block, index) => index === footerIndex ? normalizedFooter : block)
+            : [...nextBlocks, normalizedFooter]
+    }
+
+    return nextBlocks
+}
+
 export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId, isOwner }: SiteRendererProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
@@ -66,8 +97,8 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId,
 
     const themeCSS = generateThemeCSS(theme)
 
-    type PreviewBlock = { blockType: string; links?: NavLinkItem[]; ctaButton?: { url?: string; [key: string]: unknown }; ctaButtons?: Array<{ url?: string; [key: string]: unknown }>; [key: string]: unknown }
-    const rawBlocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
+    const pageBlocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
+    const rawBlocks = applyGlobalSystemBlocks(pageBlocks, site)
 
     // In editor preview, rewrite internal nav/CTA links so subpages are navigable.
     // - Internal paths ("/about") → /preview/{siteId}?pageId={matchedPageId} (keeps iframe in preview scope)

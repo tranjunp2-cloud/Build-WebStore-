@@ -164,12 +164,12 @@ export default function BlogEditorPage() {
 
                     setPublishDate(new Date(data.publishedAt || data.createdAt))
                 } else {
-                    toast.error('Failed to load post')
-                    setError('Failed to load post')
+                    toast.error(t.dashboard.blog.editor.loadFailed)
+                    setError(t.dashboard.blog.editor.loadFailed)
                 }
             } catch {
-                toast.error('Network error')
-                setError('Network error')
+                toast.error(t.dashboard.blog.editor.networkError)
+                setError(t.dashboard.blog.editor.networkError)
             } finally {
                 setIsLoading(false)
             }
@@ -216,7 +216,7 @@ export default function BlogEditorPage() {
                     seoTitle: draft.seoTitle ?? prev.seoTitle,
                     seoDescription: draft.seoDescription ?? prev.seoDescription,
                 }))
-                toast.success('Draft restored')
+                toast.success(t.dashboard.blog.editor.draftRestored)
             }
         } catch (err) {
             console.error('[Draft] Failed to restore draft', err)
@@ -261,16 +261,28 @@ export default function BlogEditorPage() {
     }, [isNew])
 
     const validate = (): string | null => {
-        if (!form.title.trim()) return 'Title is required'
-        if (form.title.length > 100) return 'Title must be less than 100 characters'
+        if (!form.title.trim()) return 'title_required'
+        if (form.title.length > 255) return 'title_max_length'
+        if (form.slug && !/^[a-z0-9-]+$/.test(form.slug)) return 'slug_invalid'
         return null
     }
 
+    const isSubmittingRef = useRef(false)
+
     const handleSave = async (overrideStatus?: 'draft' | 'published') => {
+        if (isSubmittingRef.current) return
+        isSubmittingRef.current = true
+
         const validationError = validate()
         if (validationError) {
             setError(validationError)
-            toast.error(validationError)
+            const messages: Record<string, string> = {
+                title_required: t.dashboard.blog.editor.titleRequired,
+                title_max_length: t.dashboard.blog.editor.titleMaxLength,
+                slug_invalid: t.dashboard.blog.editor.slugInvalid,
+            }
+            toast.error(messages[validationError] || validationError)
+            isSubmittingRef.current = false
             return
         }
 
@@ -286,16 +298,18 @@ export default function BlogEditorPage() {
                     const uploadDoc = await uploadMediaAction(formData)
                     resolvedThumbnailId = uploadDoc?.id || null
                     if (resolvedThumbnailId) setThumbnailId(resolvedThumbnailId)
-                } catch {
-                    toast.error('Thumbnail upload error')
+                } catch (uploadErr) {
+                    console.error('[Blog] Thumbnail upload failed:', uploadErr)
+                    toast.error(t.dashboard.blog.editor.thumbnailUploadError)
                 }
             }
 
             // If publishing with a future date, warn and keep as draft
             const finalStatus = overrideStatus ?? form.status
             let effectiveStatus = finalStatus
-            if (finalStatus === 'published' && publishDate && publishDate > new Date()) {
-                toast.warning('Scheduled publish is not yet supported. Saving as draft.')
+            const effectivePublishDate = publishDate || new Date()
+            if (finalStatus === 'published' && effectivePublishDate > new Date()) {
+                toast.warning(t.dashboard.blog.editor.scheduledPublishWarning)
                 effectiveStatus = 'draft'
             }
 
@@ -307,7 +321,7 @@ export default function BlogEditorPage() {
                 status: effectiveStatus,
                 category: form.category || null,
                 thumbnail: resolvedThumbnailId || (thumbnailPreview ? undefined : null),
-                publishedAt: publishDate?.toISOString() || null,
+                publishedAt: effectivePublishDate.toISOString(),
                 seo: {
                     metaTitle: form.seoTitle,
                     metaDescription: form.seoDescription,
@@ -317,7 +331,7 @@ export default function BlogEditorPage() {
             if (result) {
                 setSuccess(true)
                 localStorage.removeItem(DRAFT_KEY)
-                toast.success(isNew ? 'Post created!' : 'Post saved!')
+                toast.success(isNew ? t.dashboard.blog.editor.postCreated : t.dashboard.blog.editor.postSaved)
                 if (overrideStatus) {
                     setForm(prev => ({ ...prev, status: effectiveStatus }))
                 }
@@ -326,19 +340,21 @@ export default function BlogEditorPage() {
                 }, 1000)
             }
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : 'Failed to save post'
-            setError(msg)
-            toast.error(msg)
+            console.error('[Blog] Save failed:', err)
+            setError(t.dashboard.blog.editor.saveFailed)
+            toast.error(t.dashboard.blog.editor.saveFailed)
         } finally {
             setIsSaving(false)
+            isSubmittingRef.current = false
         }
     }
 
-    const getContentText = (content: any): string => {
+    type RichTextNode = { text?: string; children?: RichTextNode[]; root?: RichTextNode }
+    const getContentText = (content: string | RichTextNode | null): string => {
         if (!content) return ''
         if (typeof content === 'string') return content.replace(/<[^>]*>/g, '')
         try {
-            const extractText = (node: any): string => {
+            const extractText = (node: RichTextNode): string => {
                 if (!node) return ''
                 if (node.text) return node.text
                 if (node.children) return node.children.map(extractText).join(' ')
@@ -353,7 +369,7 @@ export default function BlogEditorPage() {
     const handleGenerateSEO = async () => {
         const contentText = getContentText(form.content)
         if (!form.title.trim() && !contentText) {
-            toast.error('Enter title or content first')
+            toast.error(t.dashboard.blog.editor.enterTitleOrContent)
             return
         }
         setIsGeneratingSEO(true)
@@ -379,7 +395,7 @@ export default function BlogEditorPage() {
                         seoDescription: data.seoDescription || data.metaDescription || prev.seoDescription,
                     }))
                     setShowSEO(true)
-                    toast.success('SEO metadata generated!')
+                    toast.success(t.dashboard.blog.editor.seoGenerated)
                 } else {
                     setForm(prev => ({
                         ...prev,
@@ -387,7 +403,7 @@ export default function BlogEditorPage() {
                         seoDescription: contentText.substring(0, 155),
                     }))
                     setShowSEO(true)
-                    toast.warning('AI unavailable — filled from content')
+                    toast.warning(t.dashboard.blog.editor.aiUnavailableFallback)
                 }
             } else {
                 setForm(prev => ({
@@ -396,7 +412,7 @@ export default function BlogEditorPage() {
                     seoDescription: contentText.substring(0, 155),
                 }))
                 setShowSEO(true)
-                toast.warning('AI unavailable — filled from content')
+                toast.warning(t.dashboard.blog.editor.aiUnavailableFallback)
             }
         } catch {
             setForm(prev => ({
@@ -405,7 +421,7 @@ export default function BlogEditorPage() {
                 seoDescription: contentText.substring(0, 155),
             }))
             setShowSEO(true)
-            toast.warning('AI unavailable — filled from content')
+            toast.warning(t.dashboard.blog.editor.aiUnavailableFallback)
         } finally {
             setIsGeneratingSEO(false)
         }
@@ -457,9 +473,10 @@ export default function BlogEditorPage() {
             setGeneratedAiData({ title, content, seoTitle, seoDescription })
             setGeneratedAiContent(content || 'No content generated.')
 
-            toast.success('Post generated successfully!', { id: 'ai-blog' })
-        } catch (error: any) {
-            toast.error(error.message || 'Generation failed', { id: 'ai-blog' })
+            toast.success(t.dashboard.blog.editor.aiGenerated, { id: 'ai-blog' })
+        } catch (error: unknown) {
+            console.error('[Blog] AI generation failed:', error)
+            toast.error(t.dashboard.blog.editor.aiGenerationFailed, { id: 'ai-blog' })
         } finally {
             setIsGenerating(false)
         }
@@ -467,9 +484,9 @@ export default function BlogEditorPage() {
 
     return (
         <div className="w-full h-full space-y-6">
-            <div className="flex flex-col gap-[12px] w-full">
+            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-[12px] w-full">
                 {/* Row 1: Back + Breadcrumb + Title */}
-                <div className="flex flex-row items-center gap-[16px]">
+                <div className="flex flex-row items-center gap-[16px] min-w-0">
                     <button
                         onClick={() => router.push('/blog')}
                         aria-label="Back to blog list"
@@ -479,7 +496,7 @@ export default function BlogEditorPage() {
                     </button>
                     <div className="flex flex-col gap-[4px] min-w-0">
                         <div className="flex flex-row items-center gap-[8px] flex-wrap">
-                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)] cursor-pointer hover:underline" onClick={() => router.push('/')}>{t.dashboard.blog.editor.home}</span>
+                            <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)] cursor-pointer hover:underline" onClick={() => router.push('/dashboard')}>{t.dashboard.blog.editor.home}</span>
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)]">&gt;</span>
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)] cursor-pointer hover:underline" onClick={() => router.push('/blog')}>{t.dashboard.blog.editor.blog}</span>
                             <span className="font-['Inter'] font-[400] text-[14px] leading-[20px] text-[rgba(248,250,252,0.6)]">&gt;</span>
@@ -495,8 +512,8 @@ export default function BlogEditorPage() {
                     </div>
                 </div>
 
-                {/* Row 2: Action Buttons — stacks below header on mobile, inline on desktop */}
-                <div className="flex flex-row items-center gap-[12px]">
+                {/* Row 2: Action Buttons — below on mobile, right-aligned on desktop */}
+                <div className="flex flex-row items-center gap-[12px] shrink-0">
                     {/* AI Assistant Button — icon-only on mobile per Figma */}
                     <button
                         onClick={() => setShowAIGenerator(true)}
@@ -563,11 +580,7 @@ export default function BlogEditorPage() {
 
             <div className="flex flex-col xl:flex-row items-start gap-[24px] w-full mt-6">
                 <div className="flex-1 flex flex-col gap-[24px] min-w-0 w-full">
-                    {error && (
-                        <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-400">
-                            {error}
-                        </div>
-                    )}
+
 
                     {showDraftRecovery && (
                         <div className="flex items-center justify-between rounded-lg bg-yellow-500/10 border border-yellow-500/30 px-4 py-3">
@@ -601,8 +614,8 @@ export default function BlogEditorPage() {
                         <div className="flex flex-col gap-[8px]">
                             <div className="flex flex-row justify-between items-center h-[20px]">
                                 <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">{t.dashboard.blog.editor.postTitle}</label>
-                                <span className={"text-[10px] " + (form.title.length > 100 ? "text-red-400" : "text-gray-600")}>
-                                    {form.title.length}/100
+                                <span className={"font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] " + (form.title.length > 255 ? "text-red-400" : "text-[rgba(248,250,252,0.5)]")}>
+                                    {form.title.length}/255 {t.dashboard.blog.editor.characters}
                                 </span>
                             </div>
                             <div className="flex flex-row items-center gap-[10px] pl-[8px] pr-[12px] py-[4px] h-[48px] bg-[#0B1120] panel-outline rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] focus-within:border-cyan-500 focus-within:ring-1 focus-within:ring-cyan-500">
@@ -610,18 +623,15 @@ export default function BlogEditorPage() {
                                     type="text"
                                     value={form.title}
                                     onChange={(e) => updateField('title', e.target.value)}
-                                    maxLength={100}
+                                    maxLength={255}
                                     className="w-full bg-transparent border-none focus:outline-none font-['Inter'] font-[400] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA] placeholder:text-[#737373]"
                                     placeholder={t.dashboard.blog.editor.titlePlaceholder}
                                 />
                             </div>
-                            {!form.title.trim() && error === 'Title is required' && (
-                                <p className="text-xs text-red-400">{t.dashboard.blog.editor.titleRequired}</p>
-                            )}
                         </div>
                     </div>
 
-                    <div className="flex flex-col px-[25px] pt-[25px] pb-[1px] gap-[8px] h-[116px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px] flex-shrink-0">
+                    <div className="flex flex-col p-[25px] gap-[8px] min-h-[116px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px] flex-shrink-0">
                         <div className="h-[20px]">
                             <label className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">
                                 {t.dashboard.blog.editor.urlSlugLabel}
@@ -642,6 +652,9 @@ export default function BlogEditorPage() {
                                 />
                             </div>
                         </div>
+                        {error === 'slug_invalid' && (
+                            <p className="text-xs text-red-400">{t.dashboard.blog.editor.slugInvalid || 'Slug can only contain lowercase letters, numbers, and hyphens'}</p>
+                        )}
                     </div>
 
                     <div className="flex flex-col p-[25px] gap-[16px] h-[342px] bg-[rgba(30,41,59,0.6)] panel-outline rounded-[16px] flex-shrink-0">
@@ -670,8 +683,8 @@ export default function BlogEditorPage() {
                                 <div className="flex items-center justify-center w-[64px] h-[64px] rounded-[33554400px] bg-[rgba(59,130,246,0.1)]">
                                     <Upload className="w-[32px] h-[32px] text-[#3B82F6]" strokeWidth={1.5} />
                                 </div>
-                                <div className="flex flex-col items-center w-[169.84px] h-[40px] gap-[4px]">
-                                    <div className="flex items-center justify-center w-full h-[20px]">
+                                <div className="flex flex-col items-center w-full max-w-[250px] gap-[4px]">
+                                    <div className="flex items-center justify-center w-full min-h-[20px] text-center">
                                         <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">{t.dashboard.blog.editor.clickToUpload}</span>
                                     </div>
                                     <div className="flex flex-row justify-center w-full">

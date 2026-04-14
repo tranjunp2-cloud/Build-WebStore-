@@ -15,7 +15,7 @@ Chúng ta sử dụng bảng màu "Midnight Tech" để tối ưu hóa hiển th
 | Thành phần | Mã màu (HEX) | Vai trò trong thiết kế |
 | :--- | :--- | :--- |
 | **Main Background** | `#0B1120` | Nền chính, tạo chiều sâu và không gian công nghệ. |
-| **Surface/Card** | `#1E293B` | Lớp bề mặt cho các Widget, Dashboard cards. |
+| **Surface/Card** | `#161E2E` | Lớp bề mặt cho các Widget, Dashboard cards. |
 | **Primary AI** | `#3B82F6` | Xanh Electric - Nhận diện thương hiệu và hành động chính. |
 | **Cultural Teal** | `#2DD4BF` | Điểm nhấn tăng trưởng, sự an tâm (phù hợp văn hóa Mã). |
 | **AI Glow** | `#A29BFE` | Tím Lavender - Chỉ dẫn các tính năng xử lý bằng AI. |
@@ -28,7 +28,7 @@ Chúng ta sử dụng bảng màu "Midnight Tech" để tối ưu hóa hiển th
 - **Đường kẻ viền (Strokes):** Sử dụng màu trắng mờ `rgba(255, 255, 255, 0.08)` để định hình khối mà không gây phân tâm.
 
 ## 4. Cấu trúc chữ & Layout (Typography & Grid)
-- **Font chữ:** Plus Jakarta Sans (Hỗ trợ tốt ký tự tiếng Anh/Malay, mang nét hiện đại).
+- **Font chữ:** Inter (Google Fonts - Đảm bảo tính nhất quán và dễ đọc trên mọi thiết bị).
 - **Tỉ lệ vàng (Spacing):** Áp dụng hệ thống 8px (8, 16, 24, 32, 48) để đảm bảo sự chặt chẽ, logic trong quản lý dữ liệu.
 - **Bo góc (Corner Radius):** Đồng nhất 12px cho Cards để làm mềm giao diện Dark Mode, tạo cảm giác thân thiện với người dùng cuối.
 

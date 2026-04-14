@@ -24,7 +24,21 @@ export async function GET(req: NextRequest) {
             limit: 1,
         })
         if (currentTenant.docs.length > 0) {
-            return NextResponse.json({ redirect: false })
+            // BUG-F05-006: Also return site status for maintenance mode check
+            const tenantId = currentTenant.docs[0].id
+            const siteResult = await payload.find({
+                collection: 'sites',
+                where: { tenant: { equals: tenantId } },
+                limit: 1,
+                depth: 0,
+            })
+            const site = siteResult.docs[0]
+            const maintenance = site?.status === 'draft' && !!site?.publishedAt
+            return NextResponse.json({
+                redirect: false,
+                maintenance,
+                siteName: maintenance ? (site?.name || '') : undefined,
+            })
         }
 
         // Check previousSlugs across all tenants

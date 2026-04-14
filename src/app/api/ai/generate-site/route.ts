@@ -76,6 +76,9 @@ interface AIBlock {
  */
 export async function POST(req: NextRequest) {
     const startTime = Date.now()
+    let _site: Record<string, unknown> | null = null
+    let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
+    let _createdPagesCount = 0
 
     try {
         // Parse request body early so validation errors return before auth/db side effects.
@@ -100,6 +103,7 @@ export async function POST(req: NextRequest) {
         }
 
         const payload = await getPayload({ config })
+        _payload = payload
 
         // Rate Limit: 5 requests/min (burst) + 20 requests/hour (sustained)
         const rateLimit = await checkTwoTierRateLimit(String(user.id), 5, 20)
@@ -341,6 +345,7 @@ export async function POST(req: NextRequest) {
                 data: {
                     name: result.siteName,
                     status: 'draft',
+                    generationStatus: 'generating',
                     siteType: result.siteType,
                     locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
                     theme: resolvedTheme,
@@ -373,6 +378,7 @@ export async function POST(req: NextRequest) {
                     tenant: resolvedTenantId,
                     name: result.siteName,
                     status: 'draft',
+                    generationStatus: 'generating',
                     siteType: result.siteType,
                     locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
                     theme: resolvedTheme,
@@ -388,6 +394,7 @@ export async function POST(req: NextRequest) {
                 },
             })
         }
+        _site = site
 
         // Sanitize blocks for Payload CMS compatibility
         const sanitizedBlocks = applyGeneratedSiteNavigation(
@@ -475,6 +482,31 @@ export async function POST(req: NextRequest) {
             })
 
             createdPages.push(createdPage)
+            _createdPagesCount++
+        }
+
+        // BUG-F05-005: Auto-create 404 page for every new site
+        try {
+            await payload.create({
+                collection: 'pages',
+                data: {
+                    title: '404 Not Found',
+                    slug: '404',
+                    site: site.id,
+                    tenant: resolvedTenantId,
+                    isHomepage: false,
+                    _status: 'published',
+                    layout: [],
+                    seo: {
+                        title: '404 - Page Not Found',
+                        description: 'The page you are looking for does not exist.',
+                        noIndex: true,
+                    },
+                },
+            })
+        } catch (err404) {
+            // Non-fatal: 404 page may already exist (e.g. re-generation)
+            console.warn('[generate-site] 404 page creation skipped:', err404 instanceof Error ? err404.message : err404)
         }
 
         const homepagePage = createdPages.find((createdPage) => createdPage.isHomepage) || createdPages[0]
@@ -486,6 +518,13 @@ export async function POST(req: NextRequest) {
             data: {
                 aiGenerationsCount: (tenant.aiGenerationsCount || 0) + 1,
             },
+        })
+
+        // Mark generation completed
+        await payload.update({
+            collection: 'sites',
+            id: site.id as string | number,
+            data: { generationStatus: 'completed' },
         })
 
         const timeMs = Date.now() - startTime
@@ -547,6 +586,16 @@ export async function POST(req: NextRequest) {
         })
 
     } catch (error: unknown) {
+        // Smart status: partial success (≥1 page created) = completed, 0 pages = failed
+        if (_site?.id && _payload) {
+            const status = _createdPagesCount > 0 ? 'completed' : 'failed'
+            await _payload.update({
+                collection: 'sites',
+                id: _site.id as string | number,
+                data: { generationStatus: status },
+            }).catch((_e: unknown) => console.error('[AI Generate] Failed to update generation status:', _e))
+        }
+
         const errMsg = error instanceof Error ? error.message : String(error)
         const errStack = error instanceof Error ? error.stack : ''
         console.error('[AI Generate Site Error]', errMsg, errStack)

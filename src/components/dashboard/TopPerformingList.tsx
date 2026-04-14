@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useI18n } from '@/i18n'
 
 export type PerformingItem = {
     id: string
@@ -11,19 +12,22 @@ export type PerformingItem = {
 
 type Props = {
     pages: PerformingItem[]
-    products: PerformingItem[]
+    // TODO: Require products when F10 is ready and uncomment
+    products?: PerformingItem[]
     blogs: PerformingItem[]
     referrers?: PerformingItem[]
 }
 
 export function TopPerformingList({ pages, products, blogs }: Props) {
+    const { t } = useI18n()
     const [activeTab, setActiveTab] = useState<'pages' | 'products' | 'blogs'>('pages')
 
     const TABS = [
-        { id: 'pages', icon: '📄', prefix: 'Top', name: 'Pages', data: pages },
-        { id: 'products', icon: '📦', prefix: 'Top', name: 'Products', data: products },
-        { id: 'blogs', icon: '📝', prefix: 'Top', name: 'Blogs', data: blogs },
-    ] as const
+        { id: 'pages' as const, icon: '📄', name: t.dashboard.analytics.topPages, data: pages },
+        // TODO: Re-enable unconditionally when F10 is ready
+        ...(products ? [{ id: 'products' as const, icon: '📦', name: t.dashboard.analytics.topProducts, data: products }] : []),
+        { id: 'blogs' as const, icon: '📝', name: t.dashboard.analytics.topBlogs, data: blogs },
+    ]
 
     const activeData = TABS.find(t => t.id === activeTab)?.data || []
     
@@ -55,11 +59,10 @@ export function TopPerformingList({ pages, products, blogs }: Props) {
                                     : 'bg-transparent text-[#9CA3AF] border-[#1F2937] hover:border-[#3B82F6] hover:text-[#3B82F6]'
                             }`}
                         >
-                            <div className="flex items-center gap-1 font-semibold text-[13px] sm:text-xs">
+                            <span className="flex items-center gap-1 font-semibold text-[13px] sm:text-xs truncate">
                                 <span>{tab.icon}</span>
-                                <span>{tab.prefix}</span>
-                            </div>
-                            <span className="font-semibold text-[13px] sm:text-xs leading-[1.2] truncate w-full">{tab.name}</span>
+                                <span>{tab.name}</span>
+                            </span>
                         </button>
                     )
                 })}
@@ -69,7 +72,7 @@ export function TopPerformingList({ pages, products, blogs }: Props) {
             <div className="flex flex-col">
                 {activeData.length === 0 ? (
                     <div className="py-8 text-center text-sm text-gray-500 italic">
-                        No data available for this period.
+                        {t.dashboard.analytics.noData}
                     </div>
                 ) : (
                     activeData.map((item, index) => {
@@ -87,7 +90,7 @@ export function TopPerformingList({ pages, products, blogs }: Props) {
                                     {item.name}
                                 </div>
                                 <div className="text-[13px] font-semibold text-white mr-2 whitespace-nowrap">
-                                    {item.value.toLocaleString()} views
+                                    {item.value.toLocaleString()} {t.dashboard.analytics.views.toLowerCase()}
                                 </div>
                                 <div className="text-[12px] text-[#9CA3AF] w-12 text-right">
                                     ({percentage}%)

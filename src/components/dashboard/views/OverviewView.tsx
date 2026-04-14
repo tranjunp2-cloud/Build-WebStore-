@@ -18,6 +18,7 @@ import { calculateContentQualityScore } from '@/lib/seo/content-score'
 import type { MissingSeoItem } from './SEOView'
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeleton'
 import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
+import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
 import { PendingOrder } from '@/components/dashboard/DashboardActionList'
 
 interface MetricRow {
@@ -61,17 +62,31 @@ export async function OverviewView({ searchParams }: Props) {
     const resolvedParams = await searchParams
     const period = typeof resolvedParams.period === 'string' ? resolvedParams.period : '7d'
 
-    let totalSites = 0
+    // Check site existence and generation status
     if (tenantId) {
-        const sitesResult = await payload.find({ 
-            collection: 'sites', 
-            where: { tenant: { equals: tenantId } }, 
-            limit: 1
+        const allSites = await payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: tenantId } },
+            limit: 5, // 1 site/tenant expected, extra for safety
         })
-        totalSites = sitesResult.totalDocs
-    }
 
-    if (totalSites === 0) {
+        const usable = allSites.docs.filter((s) => {
+            const gs = (s as Record<string, unknown>).generationStatus
+            return !gs || gs === 'none' || gs === 'completed'
+        })
+
+        if (usable.length === 0) {
+            const hasFailed = allSites.docs.some(
+                (s) => (s as Record<string, unknown>).generationStatus === 'failed',
+            )
+
+            return (
+                <div className="space-y-8">
+                    {hasFailed ? <DashboardGenerationFailed /> : <DashboardEmptyState />}
+                </div>
+            )
+        }
+    } else {
         return (
             <div className="space-y-8">
                 <DashboardEmptyState />
@@ -129,6 +144,8 @@ export async function OverviewView({ searchParams }: Props) {
             ordersRes, prevOrdersRes, pendingOrdersRes,
             viewsSeriesRes, leadsSeriesRes, engagementSeriesRes, revenueSeriesRes
         ] = await Promise.all([
+            // Raw SQL: Payload API doesn't support COUNT(DISTINCT). Tenant isolation is manual
+            // via tenant_id filter — safe because tenantId is from getCurrentTenantId() (JWT auth).
             payload.db.drizzle.execute(sql`SELECT COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${startDate.toISOString()}`),
             payload.db.drizzle.execute(sql`SELECT COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${prevStartDate.toISOString()} AND created_at < ${startDate.toISOString()}`),
             payload.count({ 
@@ -331,28 +348,33 @@ export async function OverviewView({ searchParams }: Props) {
     return (
         <div className="space-y-6 mt-6">
             {/* Stats Cards */}
-                    <DashboardStats 
-                        views={views}
-                        leads={leads}
-                        engagement={engagement}
-                        revenue={revenue}
-                        pendingOrdersCount={pendingOrdersCount}
-                        currency="MYR"
-                        preferences={dashboardPreferences}
-                        viewsSeries={viewsSeries}
-                        leadsSeries={leadsSeries}
-                        engagementSeries={engagementSeries}
-                        revenueSeries={revenueSeries}
-                        viewsChange={viewsChange}
-                        leadsChange={leadsChange}
-                        engagementChange={engagementChange}
-                        revenueChange={revenueChange}
-                    />
-
-                    {/* Main Content Grid */}
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        <DashboardActionList pendingOrders={pendingOrders} />
-                        <SEOHealthWidget score={seoScore} issueCounts={seoIssueCounts} siteId={siteId} missingSeoItems={missingSeoItems} />
+                    {/* Main Content Grid: Combined Stats and SEO Health */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+                        <DashboardStats 
+                            views={views}
+                            leads={leads}
+                            engagement={engagement}
+                            // TODO: Re-enable when F10 e-commerce is ready
+                            // revenue={revenue}
+                            pendingOrdersCount={pendingOrdersCount}
+                            currency="MYR"
+                            preferences={dashboardPreferences}
+                            viewsSeries={viewsSeries}
+                            leadsSeries={leadsSeries}
+                            engagementSeries={engagementSeries}
+                            // TODO: Re-enable revenue stats when F10 is ready
+                            // revenueSeries={revenueSeries}
+                            viewsChange={viewsChange}
+                            leadsChange={leadsChange}
+                            engagementChange={engagementChange}
+                            // revenueChange={revenueChange}
+                        />
+                        
+                        {/* TODO: Re-enable ActionList when F10 Orders is ready */}
+                        {/* <DashboardActionList pendingOrders={pendingOrders} /> */}
+                        <div className="h-full">
+                            <SEOHealthWidget score={seoScore} issueCounts={seoIssueCounts} siteId={siteId} missingSeoItems={missingSeoItems} />
+                        </div>
                     </div>
         </div>
     )

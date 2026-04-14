@@ -1,13 +1,16 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
-import { GripVertical, Plus, Trash2, ChevronRight, ChevronDown, ExternalLink, FileText, Mail, Phone } from 'lucide-react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import { Plus, Trash2, ChevronRight, ChevronDown, ExternalLink, FileText } from 'lucide-react'
+import { useI18n } from '@/i18n'
+import { toast } from 'sonner'
+import { isValidExternalNavigationUrl } from '@/lib/navigation-url'
 
 export type NavLinkItem = {
     id: string
     label: string
     url: string
-    type: 'page' | 'external' | 'email' | 'phone'
+    type: 'page' | 'external'
     children: NavLinkItem[]
 }
 
@@ -18,14 +21,43 @@ interface NavigationEditorProps {
 }
 
 const LINK_TYPE_OPTIONS = [
-    { value: 'page', label: 'Internal Page', icon: FileText },
-    { value: 'external', label: 'External URL', icon: ExternalLink },
-    { value: 'email', label: 'Email', icon: Mail },
-    { value: 'phone', label: 'Phone', icon: Phone },
+    { value: 'page', icon: FileText },
+    { value: 'external', icon: ExternalLink },
 ] as const
 
 function generateId() {
     return `nav_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+}
+
+function normalizePageOptionUrl(slug: string) {
+    if (!slug || slug === '/') return '/'
+    return slug.startsWith('/') ? slug : `/${slug}`
+}
+
+function validateLinkLabel(value: string) {
+    return value.trim().length > 0
+}
+
+function validateLinkUrl(link: NavLinkItem, value: string) {
+    if (link.type === 'page') {
+        return value.trim().length > 0 && value !== '#'
+    }
+    return value.trim().length > 0 && isValidExternalNavigationUrl(value.trim())
+}
+
+type NavTranslations = {
+    internalPage: string
+    externalUrl: string
+    selectPage: string
+    addSubLink: string
+    moveUp: string
+    moveDown: string
+    moveLeft: string
+    makeSubItem: string
+    newLink: string
+    title: string
+    noLinks: string
+    addLink: string
 }
 
 function NavLinkRow({
@@ -41,6 +73,9 @@ function NavLinkRow({
     isFirst,
     isLast,
     pages,
+    nav,
+    openPanelId,
+    onSetOpenPanelId,
 }: {
     link: NavLinkItem
     depth: number
@@ -54,111 +89,186 @@ function NavLinkRow({
     isFirst: boolean
     isLast: boolean
     pages?: { id: string; title: string; slug: string }[]
+    nav: NavTranslations
+    openPanelId: string | null
+    onSetOpenPanelId: (id: string | null) => void
 }) {
     const [isExpanded, setIsExpanded] = useState(true)
-    const [isEditing, setIsEditing] = useState(false)
+    const [isRenaming, setIsRenaming] = useState(false)
+    const isPanelOpen = openPanelId === link.id
+    const setIsPanelOpen = useCallback((val: boolean) => onSetOpenPanelId(val ? link.id : null), [link.id, onSetOpenPanelId])
     const hasChildren = (link.children || []).length > 0
 
-    const typeIcon = LINK_TYPE_OPTIONS.find(o => o.value === link.type)?.icon || ExternalLink
+    const linkTypeOptions = useMemo(() => [
+        { value: 'page', label: nav.internalPage, icon: FileText },
+        { value: 'external', label: nav.externalUrl, icon: ExternalLink },
+    ], [nav])
+
+    const typeIcon = linkTypeOptions.find(o => o.value === link.type)?.icon || ExternalLink
     const TypeIcon = typeIcon
+
+    useEffect(() => {
+        if (!isPanelOpen && isRenaming) {
+            setIsRenaming(false)
+        }
+    }, [isPanelOpen, isRenaming])
+
+    const handleLabelCommit = useCallback((rawValue: string) => {
+        const value = rawValue.trim()
+        if (!validateLinkLabel(value)) {
+            toast.error('Link label is required')
+            return
+        }
+
+        onUpdate(link.id, { label: value })
+    }, [link.id, onUpdate])
+
+    const handleUrlCommit = useCallback((rawValue: string) => {
+        const value = rawValue.trim()
+        if (!validateLinkUrl(link, value)) {
+            if (link.type === 'page') {
+                toast.error('Please select a page')
+            } else if (!value) {
+                toast.error('Link URL is required')
+            } else {
+                toast.error('Please enter a valid URL starting with http:// or https://')
+            }
+            return
+        }
+
+        onUpdate(link.id, { url: value })
+    }, [link, onUpdate])
 
     return (
         <div className="select-none">
             <div
-                className="group flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-white/5 transition-colors"
-                style={{ paddingLeft: `${depth * 20 + 8}px` }}
+                className={`group flex items-center gap-2 rounded px-2 hover:bg-white/[0.03] transition-colors ${depth === 0 ? 'h-9' : 'h-8'}`}
             >
-                {/* Space for drag handle (hidden for now) */}
-                <div className="w-3.5 shrink-0" />
-
-                {/* Expand/collapse for parent items */}
+                {/* Expand/collapse chevron for parent items */}
                 {hasChildren ? (
-                    <button onClick={() => setIsExpanded(!isExpanded)} className="p-0.5 -ml-1 text-gray-500 hover:text-gray-300">
-                        {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    <button onClick={() => setIsExpanded(!isExpanded)} className="p-0.5 text-slate-500 hover:text-slate-300">
+                        {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                     </button>
-                ) : (
-                    <span className="w-4" />
-                )}
-
-                {/* Type icon */}
-                <TypeIcon className="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                ) : null}
 
                 {/* Label */}
-                {isEditing ? (
+                {isRenaming ? (
                     <input
                         autoFocus
                         defaultValue={link.label}
-                        onBlur={(e) => { onUpdate(link.id, { label: e.target.value }); setIsEditing(false) }}
-                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                        className="flex-1 min-w-0 bg-white/10 px-1.5 py-0.5 rounded text-xs text-white border border-cyan-500/30 outline-none"
+                        onBlur={(e) => {
+                            handleLabelCommit(e.target.value)
+                            setIsRenaming(false)
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                            if (e.key === 'Escape') setIsRenaming(false)
+                        }}
+                        className="flex-1 min-w-0 bg-white/10 px-1.5 py-0.5 rounded text-sm text-white border border-cyan-500/30 outline-none"
                     />
                 ) : (
                     <span
-                        className="flex-1 min-w-0 truncate text-xs text-gray-300 cursor-text"
-                        onDoubleClick={() => setIsEditing(true)}
+                        className={`flex-1 min-w-0 truncate cursor-text ${depth === 0 ? 'text-sm text-slate-50' : 'text-xs text-slate-400'}`}
+                        onDoubleClick={() => {
+                            setIsPanelOpen(true)
+                            setIsRenaming(true)
+                        }}
                     >
                         {link.label}
+                        {(!link.url || link.url === '#') && (
+                            <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" title="No destination set" />
+                        )}
                     </span>
                 )}
 
-                {/* Actions */}
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {depth < 2 && (
-                        <button onClick={(e) => { e.stopPropagation(); onAddChild(link.id) }} title="Add sub-link" className="p-1 text-gray-500 hover:text-cyan-400 rounded">
-                            <Plus className="w-3 h-3" />
-                        </button>
-                    )}
-                    {!isFirst && (
-                        <button onClick={(e) => { e.stopPropagation(); onMoveUp(link.id) }} title="Move up" className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">↑</button>
-                    )}
-                    {!isLast && (
-                        <button onClick={(e) => { e.stopPropagation(); onMoveDown(link.id) }} title="Move down" className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">↓</button>
-                    )}
-                    {depth > 0 && (
-                        <button onClick={(e) => { e.stopPropagation(); onOutdent(link.id) }} title="Move left" className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">←</button>
-                    )}
-                    {depth < 2 && !isFirst && (
-                        <button onClick={(e) => { e.stopPropagation(); onIndent(link.id) }} title="Make sub-item" className="p-1 text-gray-500 hover:text-gray-300 rounded text-[10px]">→</button>
-                    )}
-                    <button onClick={(e) => { e.stopPropagation(); onDelete(link.id) }} className="p-1 text-gray-500 hover:text-red-400 rounded">
-                        <Trash2 className="w-3 h-3" />
-                    </button>
-                </div>
+                {/* Edit button — always visible per Figma */}
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        setIsPanelOpen(!isPanelOpen)
+                    }}
+                    className="shrink-0 text-xs text-slate-500 hover:text-amber-400 transition-colors"
+                >
+                    ✏️
+                </button>
             </div>
 
-            {/* URL editor (inline below) */}
-            {isEditing && (
-                <div className="flex items-center gap-1.5 px-2 pb-1.5" style={{ paddingLeft: `${depth * 20 + 36}px` }}>
-                    <select
-                        value={link.type}
-                        onChange={(e) => onUpdate(link.id, { type: e.target.value as NavLinkItem['type'] })}
-                        className="h-6 text-[10px] bg-white/5 border border-white/10 rounded px-1 text-gray-400 outline-none"
-                    >
-                        {LINK_TYPE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                    </select>
+            {/* Expanded edit panel: URL + type + actions */}
+            {isPanelOpen && (
+                <div
+                    className="px-3 pb-2.5 pt-1 space-y-2"
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    <div className="flex items-center gap-1.5">
+                        <div className="relative flex-1 min-w-0">
+                            <TypeIcon className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-cyan-300" />
+                            <select
+                                value={link.type}
+                                onChange={(e) => {
+                                    const nextType = e.target.value as NavLinkItem['type']
+                                    onUpdate(link.id, {
+                                        type: nextType,
+                                        url: nextType === 'page' ? (link.url.startsWith('/') ? link.url : '#') : (link.url === '#' ? '' : link.url),
+                                    })
+                                }}
+                                className="h-7 w-full cursor-pointer appearance-none rounded-md border border-cyan-400/20 bg-slate-900/80 pl-6 pr-6 text-[11px] font-medium text-slate-200 transition-colors hover:border-cyan-300/40 focus:border-cyan-300 focus:outline-none"
+                                aria-label="Link type"
+                            >
+                                {linkTypeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-cyan-200/70" />
+                        </div>
+                    </div>
                     {link.type === 'page' && pages ? (
-                        <select
-                            value={link.url}
-                            onChange={(e) => onUpdate(link.id, { url: e.target.value })}
-                            className="flex-1 h-6 text-[10px] bg-white/5 border border-white/10 rounded px-1 text-gray-300 outline-none"
-                        >
-                            <option value="#">Select page</option>
-                            {pages.map(p => <option key={p.id} value={`/${p.slug}`}>{p.title}</option>)}
-                        </select>
+                        <div className="relative min-w-0">
+                            <select
+                                value={link.url}
+                                onChange={(e) => {
+                                    const value = e.target.value
+                                    if (!validateLinkUrl(link, value)) {
+                                        toast.error('Please select a page')
+                                        return
+                                    }
+                                    onUpdate(link.id, { url: value })
+                                }}
+                                className="h-7 w-full cursor-pointer appearance-none rounded-md border border-white/10 bg-white/[0.05] pl-2.5 pr-6 text-[11px] text-slate-200 transition-colors hover:border-white/20 focus:border-cyan-300 focus:outline-none"
+                                aria-label="Page destination"
+                            >
+                                <option value="#">{nav.selectPage}</option>
+                                {pages.map(p => <option key={p.id} value={normalizePageOptionUrl(p.slug)}>{p.title}</option>)}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-slate-400" />
+                        </div>
                     ) : (
                         <input
                             defaultValue={link.url}
-                            placeholder={link.type === 'email' ? 'mailto:...' : link.type === 'phone' ? 'tel:...' : 'https://...'}
-                            onBlur={(e) => onUpdate(link.id, { url: e.target.value })}
-                            className="flex-1 h-6 text-[10px] bg-white/5 border border-white/10 rounded px-1.5 text-gray-300 outline-none"
+                            placeholder="https://..."
+                            onBlur={(e) => handleUrlCommit(e.target.value)}
+                            className="h-7 w-full min-w-0 rounded-md border border-white/10 bg-white/[0.05] px-2.5 text-[11px] text-slate-200 outline-none transition-colors placeholder:text-slate-500 hover:border-white/20 focus:border-cyan-300"
                         />
                     )}
+                    <div className="flex items-center gap-0.5 pt-0.5">
+                        {depth < 2 && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); onAddChild(link.id) }} title={nav.addSubLink} className="p-1 text-slate-500 hover:text-cyan-400 rounded transition-colors">
+                                <Plus className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                        {!isFirst && <button type="button" onClick={() => onMoveUp(link.id)} title={nav.moveUp} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">↑</button>}
+                        {!isLast && <button type="button" onClick={() => onMoveDown(link.id)} title={nav.moveDown} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">↓</button>}
+                        {depth > 0 && <button type="button" onClick={() => onOutdent(link.id)} title={nav.moveLeft} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">←</button>}
+                        {depth < 2 && !isFirst && <button type="button" onClick={() => onIndent(link.id)} title={nav.makeSubItem} className="p-1 text-slate-500 hover:text-slate-200 rounded text-[11px] transition-colors">→</button>}
+                        <div className="flex-1" />
+                        <button type="button" onClick={() => onDelete(link.id)} className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                 </div>
             )}
 
-            {/* Children */}
+            {/* Children with tree connector (left border) per Figma */}
             {isExpanded && hasChildren && (
-                <div>
+                <div className="ml-6 border-l-2 border-blue-500/[0.04] pl-2.5">
                     {link.children.map((child, idx) => (
                         <NavLinkRow
                             key={child.id}
@@ -174,6 +284,9 @@ function NavLinkRow({
                             isFirst={idx === 0}
                             isLast={idx === link.children.length - 1}
                             pages={pages}
+                            nav={nav}
+                            openPanelId={openPanelId}
+                            onSetOpenPanelId={onSetOpenPanelId}
                         />
                     ))}
                 </div>
@@ -199,13 +312,13 @@ function deleteLinkInTree(links: NavLinkItem[], id: string): NavLinkItem[] {
         .map(link => ({ ...link, children: deleteLinkInTree(link.children || [], id) }))
 }
 
-function addChildInTree(links: NavLinkItem[], parentId: string): NavLinkItem[] {
+function addChildInTree(links: NavLinkItem[], parentId: string, newLinkLabel: string): NavLinkItem[] {
     if (!links) return []
     return links.map(link => {
         if (link.id === parentId) {
-            return { ...link, children: [...(link.children || []), { id: generateId(), label: 'New Link', url: '#', type: 'external' as const, children: [] }] }
+            return { ...link, children: [...(link.children || []), { id: generateId(), label: newLinkLabel, url: '#', type: 'page' as const, children: [] }] }
         }
-        if (link.children && link.children.length > 0) return { ...link, children: addChildInTree(link.children, parentId) }
+        if (link.children && link.children.length > 0) return { ...link, children: addChildInTree(link.children, parentId, newLinkLabel) }
         return link
     })
 }
@@ -270,6 +383,10 @@ function outdentLinkInTree(links: NavLinkItem[], id: string, parentArray: NavLin
 }
 
 export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorProps) {
+    const { t } = useI18n()
+    const nav = t.editor.navigation
+    const [openPanelId, setOpenPanelId] = useState<string | null>(null)
+
     const handleUpdate = useCallback((id: string, changes: Partial<NavLinkItem>) => {
         onUpdate(updateLinkInTree(links, id, changes))
     }, [links, onUpdate])
@@ -279,8 +396,8 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
     }, [links, onUpdate])
 
     const handleAddChild = useCallback((parentId: string) => {
-        onUpdate(addChildInTree(links, parentId))
-    }, [links, onUpdate])
+        onUpdate(addChildInTree(links, parentId, nav.newLink))
+    }, [links, onUpdate, nav.newLink])
 
     const handleMoveUp = useCallback((id: string) => {
         const found = findLinkAndParent(links, id)
@@ -328,15 +445,14 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
     }, [links, onUpdate])
 
     const handleAddRoot = useCallback(() => {
-        onUpdate([...links, { id: generateId(), label: 'New Link', url: '#', type: 'external', children: [] }])
-    }, [links, onUpdate])
+        onUpdate([...links, { id: generateId(), label: nav.newLink, url: '#', type: 'page', children: [] }])
+    }, [links, onUpdate, nav.newLink])
 
     return (
-        <div className="space-y-1">
-            <label className="text-xs font-medium uppercase text-gray-500">Navigation Links</label>
-            <div className="rounded-lg border border-white/5 bg-white/[0.02] py-1">
+        <div className="flex flex-col gap-2">
+            <div className="rounded-xl border border-blue-500/[0.04] bg-slate-800/30 px-3 pt-3 pb-px">
                 {links.length === 0 ? (
-                    <p className="px-3 py-4 text-center text-xs text-gray-600">No links yet. Add one below.</p>
+                    <p className="px-2 py-4 text-center text-xs text-slate-600">{nav.noLinks}</p>
                 ) : (
                     links.map((link, idx) => (
                         <NavLinkRow
@@ -353,15 +469,19 @@ export function NavigationEditor({ links, onUpdate, pages }: NavigationEditorPro
                             isFirst={idx === 0}
                             isLast={idx === links.length - 1}
                             pages={pages}
+                            nav={nav}
+                            openPanelId={openPanelId}
+                            onSetOpenPanelId={setOpenPanelId}
                         />
                     ))
                 )}
             </div>
             <button
+                type="button"
                 onClick={handleAddRoot}
-                className="w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors"
+                className="w-full h-9 rounded-[10px] border border-blue-500/[0.07] text-sm font-medium text-slate-50 hover:bg-white/[0.03] transition-colors"
             >
-                + Add Link
+                {nav.addLink}
             </button>
         </div>
     )

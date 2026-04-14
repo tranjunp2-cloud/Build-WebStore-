@@ -22,7 +22,12 @@ describe('GET /api/storefront/blogs [TC-F17-07]', () => {
         expect(body.totalDocs).toBe(1)
         expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
             collection: 'blogs',
-            where: expect.objectContaining({ status: { equals: 'published' }, tenant: { equals: '1' } }),
+            where: expect.objectContaining({
+                and: expect.arrayContaining([
+                    { tenant: { equals: '1' } },
+                    { status: { equals: 'published' } },
+                ]),
+            }),
             overrideAccess: true,
         }))
     })
@@ -41,16 +46,39 @@ describe('GET /api/storefront/blogs [TC-F17-07]', () => {
         const req = new Request('http://localhost/api/storefront/blogs?tenant=1')
         await GET(req)
         expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
-            where: expect.objectContaining({ status: { equals: 'published' } }),
+            where: expect.objectContaining({
+                and: expect.arrayContaining([
+                    { status: { equals: 'published' } },
+                ]),
+            }),
         }))
     })
 
-    it('[TC-04] filters by category slug', async () => {
-        mockFind.mockResolvedValue({ docs: [], totalDocs: 0, page: 1, totalPages: 0 })
+    it('[TC-04] filters by category slug via two-step lookup', async () => {
+        // First call: category lookup by slug
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'cat-1', slug: 'tech' }] })
+        // Second call: blogs filtered by category ID
+        mockFind.mockResolvedValueOnce({ docs: [], totalDocs: 0, page: 1, totalPages: 0 })
         const req = new Request('http://localhost/api/storefront/blogs?tenant=1&category=tech')
         await GET(req)
-        expect(mockFind).toHaveBeenCalledWith(expect.objectContaining({
-            where: expect.objectContaining({ 'category.slug': { equals: 'tech' } }),
+        // First call: lookup category by slug
+        expect(mockFind).toHaveBeenNthCalledWith(1, expect.objectContaining({
+            collection: 'blog_categories',
+            where: expect.objectContaining({
+                and: expect.arrayContaining([
+                    { slug: { equals: 'tech' } },
+                    { tenant: { equals: '1' } },
+                ]),
+            }),
+        }))
+        // Second call: blogs with category filter
+        expect(mockFind).toHaveBeenNthCalledWith(2, expect.objectContaining({
+            collection: 'blogs',
+            where: expect.objectContaining({
+                and: expect.arrayContaining([
+                    { category: { equals: 'cat-1' } },
+                ]),
+            }),
         }))
     })
 

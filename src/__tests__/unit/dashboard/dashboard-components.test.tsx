@@ -1,7 +1,10 @@
 /**
  * Component Render Tests — F03 Dashboard
  * Coverage Map (QA Doc Traceability):
- *   TC-F03.06  → DashboardEmptyState renders CTA button to /onboarding
+ *   TC-F03.01  → DashboardEmptyState renders CTA button to /builder/new
+ *   TC-F03.01b → DashboardGenerationFailed renders 2 CTAs (template + AI retry)
+ *   TC-F03.01c → SitesPageClient empty state renders CTA to /onboarding
+ *   TC-F03.01d → SitesPageClient failed site shows "Incomplete" badge + 2 actions
  *   TC-F03.07  → DashboardStats renders 4 default stat cards
  *   TC-F03.09  → DashboardActionList shows up to 5 pending orders
  *   TC-F03.10  → DashboardActionList links each order to /orders/:id
@@ -41,6 +44,9 @@ vi.mock('@/i18n', () => ({
                         statusGood: 'Healthy',
                         statusWarning: 'Needs Attention',
                         fixAll: 'AI Fix All Issues',
+                        fix: 'Fix',
+                        issue: 'Issue',
+                        issues: 'Issues',
                         warnings: {
                             issueScoreLow: 'SEO score is low',
                         },
@@ -55,6 +61,30 @@ vi.mock('@/i18n', () => ({
                         cancel: 'Cancel',
                     },
                 },
+                empty: {
+                    title: 'No website data available',
+                    description: 'Create your first website to start tracking business performance.',
+                    cta: '+ Create New Website',
+                },
+                generationFailed: {
+                    title: "Website creation didn't complete",
+                    description: 'No worries — you can try building with AI or pick from our ready-made templates.',
+                    retryAi: 'Try again with AI',
+                    chooseTemplate: 'Choose a template',
+                },
+                sites: {
+                    title: 'My Websites',
+                    published: 'Published',
+                    draft: 'Draft',
+                    edit: 'Edit',
+                    preview: 'Preview',
+                    noSites: 'No sites yet',
+                    noSitesDesc: 'Create your first website to get started',
+                    createWebsite: 'Create Website',
+                    incomplete: 'Incomplete',
+                    retryAi: 'Retry with AI',
+                    template: 'Template',
+                },
                 analytics: {
                     topPages: 'Top Pages',
                     topProducts: 'Top Products',
@@ -62,6 +92,7 @@ vi.mock('@/i18n', () => ({
                     topReferrers: 'Top Referrers',
                     views: 'Views',
                     clicks: 'Clicks',
+                    noData: 'No data available for this period.',
                     empty: { description: 'No data available for this period.' },
                 },
                 seo: {
@@ -123,6 +154,11 @@ vi.mock('@dnd-kit/utilities', () => ({
     CSS: { Transform: { toString: vi.fn(() => '') } },
 }))
 
+// ── Mock DashboardTabContent (useTabContext used by SEOHealthWidget) ─────────
+vi.mock('@/components/dashboard/DashboardTabContent', () => ({
+    useTabContext: () => ({ activeTab: 'overview', setActiveTab: vi.fn() }),
+}))
+
 // ── Mock next/navigation (used by PeriodSelector / DashboardActionList) ──────
 vi.mock('next/navigation', () => ({
     useRouter: vi.fn(() => ({ push: vi.fn() })),
@@ -164,12 +200,12 @@ describe('DashboardStats', () => {
         currency: 'MYR'
     }
 
-    it('[TC-F03.07] renders all 4 default stat cards', () => {
+    it('[TC-F03.07] renders all 3 default stat cards (revenue disabled for F10)', () => {
         render(<DashboardStats {...defaultProps} />)
         expect(screen.getByText('Views')).toBeInTheDocument()
         expect(screen.getByText('Leads')).toBeInTheDocument()
         expect(screen.getByText('Engagement')).toBeInTheDocument()
-        expect(screen.getByText('Revenue')).toBeInTheDocument()
+        expect(screen.queryByText('Revenue')).not.toBeInTheDocument()
     })
 
     it('[TC-F03.18] hides "views" card when excluded from preferences', () => {
@@ -239,15 +275,16 @@ describe('SEOHealthWidget', () => {
         expect(screen.getByText('75')).toBeInTheDocument()
     })
 
-    it('[TC-F03.12] renders "AI Fix All Issues" CTA button', () => {
+    it('[TC-F03.12] renders "Fix" CTA button', () => {
         render(<SEOHealthWidget score={60} />)
-        const button = screen.getByRole('button', { name: /ai fix all issues/i })
+        const button = screen.getByRole('button', { name: /fix/i })
         expect(button).toBeInTheDocument()
     })
 
-    it('[TC-F03.34] shows "warning" status for score < 90 (e.g. 75)', () => {
+    it('[TC-F03.34] shows issue count for score < 90 (e.g. 75)', () => {
         render(<SEOHealthWidget score={75} />)
-        expect(screen.getByText(/Warning/)).toBeInTheDocument()
+        // Score-based warning generates 1 issue
+        expect(screen.getByText(/1 Issue/)).toBeInTheDocument()
     })
 
     it('[TC-F03.34] shows "good" status for score >= 90', () => {
@@ -259,20 +296,83 @@ describe('SEOHealthWidget', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DashboardEmptyState
 // ─────────────────────────────────────────────────────────────────────────────
-describe('DashboardEmptyState', () => {
-    // Mock for DashboardEmptyState
-    vi.mock('@/components/dashboard/DashboardEmptyState', () => ({
-        DashboardEmptyState: () =>
-            React.createElement('div', null, [
-                React.createElement('p', { key: 'text' }, 'Tạo Website đầu tiên'),
-                React.createElement('a', { key: 'cta', href: '/onboarding' }, 'Get Started'),
-            ]),
-    }))
+import { DashboardEmptyState } from '@/components/dashboard/DashboardEmptyState'
 
-    it('[TC-F03.06] renders empty state with CTA directing to /onboarding', () => {
+describe('DashboardEmptyState', () => {
+    it('[TC-F03.01] renders empty state with CTA directing to /builder/new', () => {
         render(<DashboardEmptyState />)
-        const link = screen.getByRole('link', { name: /get started/i })
+        const link = screen.getByRole('link', { name: /create new website/i })
+        expect(link).toHaveAttribute('href', '/builder/new')
+    })
+
+    it('[TC-F03.01] renders i18n title and description', () => {
+        render(<DashboardEmptyState />)
+        expect(screen.getByText('No website data available')).toBeInTheDocument()
+        expect(screen.getByText(/Create your first website/)).toBeInTheDocument()
+    })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DashboardGenerationFailed
+// ─────────────────────────────────────────────────────────────────────────────
+import { DashboardGenerationFailed } from '@/components/dashboard/DashboardGenerationFailed'
+
+describe('DashboardGenerationFailed', () => {
+    it('[TC-F03.01b] renders 2 CTAs: template (primary) and AI retry (secondary)', () => {
+        render(<DashboardGenerationFailed />)
+        const templateLink = screen.getByRole('link', { name: /choose a template/i })
+        const retryLink = screen.getByRole('link', { name: /try again with ai/i })
+        expect(templateLink).toHaveAttribute('href', '/templates')
+        expect(retryLink).toHaveAttribute('href', '/builder/new')
+    })
+
+    it('[TC-F03.01b] renders soft-tone heading without error/warning language', () => {
+        render(<DashboardGenerationFailed />)
+        expect(screen.getByText(/didn.*t complete/i)).toBeInTheDocument()
+        expect(screen.getByText(/No worries/)).toBeInTheDocument()
+    })
+
+    it('[TC-F03.01b] renders illustration image', () => {
+        render(<DashboardGenerationFailed />)
+        const img = screen.getByAltText('Website creation incomplete')
+        expect(img).toBeInTheDocument()
+    })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SitesPageClient
+// ─────────────────────────────────────────────────────────────────────────────
+import { SitesPageClient } from '@/app/(dashboard)/sites/SitesPageClient'
+
+describe('SitesPageClient', () => {
+    it('[TC-F03.01c] empty state renders CTA to /onboarding when no sites', () => {
+        render(<SitesPageClient usableSites={[]} failedSites={[]} totalSites={0} />)
+        expect(screen.getByText('No sites yet')).toBeInTheDocument()
+        const link = screen.getByRole('link', { name: /create website/i })
         expect(link).toHaveAttribute('href', '/onboarding')
+    })
+
+    it('[TC-F03.01d] failed site shows "Incomplete" badge', () => {
+        const failedSite = { id: '1', name: 'My Site', generationStatus: 'failed' }
+        render(<SitesPageClient usableSites={[]} failedSites={[failedSite]} totalSites={1} />)
+        expect(screen.getByText('Incomplete')).toBeInTheDocument()
+    })
+
+    it('[TC-F03.01d] failed site shows "Retry with AI" and "Template" actions', () => {
+        const failedSite = { id: '1', name: 'My Site', generationStatus: 'failed' }
+        render(<SitesPageClient usableSites={[]} failedSites={[failedSite]} totalSites={1} />)
+        const retryLink = screen.getByRole('link', { name: /retry with ai/i })
+        const templateLink = screen.getByRole('link', { name: /template/i })
+        expect(retryLink).toHaveAttribute('href', '/builder/new')
+        expect(templateLink).toHaveAttribute('href', '/templates')
+    })
+
+    it('[TC-F03.01d] usable site shows Edit and Preview actions', () => {
+        const usableSite = { id: '42', name: 'Good Site', status: 'draft', generationStatus: 'completed' }
+        render(<SitesPageClient usableSites={[usableSite]} failedSites={[]} totalSites={1} />)
+        const editLink = screen.getByRole('link', { name: /edit/i })
+        const previewLink = screen.getByRole('link', { name: /preview/i })
+        expect(editLink).toHaveAttribute('href', '/editor/42')
     })
 })
 

@@ -132,9 +132,9 @@ describe('AI Streaming APIs', () => {
              expect(result.success).toBe(true)
              expect(result.siteName).toBe('AI Bakery')
              expect(mockSiteDB.length).toBe(1) // A site was created
-             expect(mockPageDB.length).toBe(4) // Homepage, About, Products, Contact
-             expect(result.totalPages).toBe(4)
-             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', 'about', 'products', 'contact'])
+             expect(mockPageDB.length).toBe(5) // Homepage, About, Products, Contact + 404
+             expect(result.totalPages).toBe(4) // totalPages excludes system 404 page
+             expect(mockPageDB.map((page) => page.slug)).toEqual(['/', 'about', 'products', 'contact', '404'])
         })
 
         it('returns text/event-stream response for SSE mode when stream=true', async () => {
@@ -210,6 +210,48 @@ describe('AI Streaming APIs', () => {
              expect(body.code).toBe('CONTENT_UNSAFE')
              expect(mockSiteDB).toHaveLength(0)
              expect(mockPageDB).toHaveLength(0)
+        })
+
+        it('sets generationStatus to completed on success path', async () => {
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                 })
+             })
+             const res = await GenerateSitePOST(req)
+             expect(res.status).toBe(200)
+
+             // Site should have generationStatus set to completed
+             const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+             const resolvedPayload = await mockPayload
+             const updateCalls = vi.mocked(resolvedPayload.update).mock.calls
+             const completedCall = updateCalls.find(
+                 (c: [{ collection: string; data?: { generationStatus?: string } }]) =>
+                     c[0].collection === 'sites' && c[0].data?.generationStatus === 'completed'
+             )
+             expect(completedCall).toBeDefined()
+        })
+
+        it('sets generationStatus to generating before creating pages', async () => {
+             const req = new NextRequest('http://localhost:3000/api/ai/generate-site', {
+                 method: 'POST',
+                 body: JSON.stringify({
+                     businessInfo: { businessName: 'Bakery', industry: 'Food', products: 'Bread', shortDescription: 'Fresh artisan bakery' }
+                 })
+             })
+             await GenerateSitePOST(req)
+
+             // Site should have been created with generationStatus = 'generating'
+             const mockPayload = vi.mocked(getPayload).mock.results[0]?.value
+             const resolvedPayload = await mockPayload
+             const createCalls = vi.mocked(resolvedPayload.create).mock.calls
+             const siteCreateCall = createCalls.find(
+                 (c: [{ collection: string; data?: { generationStatus?: string } }]) =>
+                     c[0].collection === 'sites'
+             )
+             expect(siteCreateCall).toBeDefined()
+             expect(siteCreateCall![0].data.generationStatus).toBe('generating')
         })
     })
 

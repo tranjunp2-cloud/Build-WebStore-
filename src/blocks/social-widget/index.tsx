@@ -3,20 +3,18 @@
 import type { BlockProps } from '../types'
 import { getDefaultSocialWidgetLinks, normalizeSocialWidgetConfig, type SocialLinkItem, type SocialPlatform, type SocialWidgetConfig } from './config'
 import { mergeSocialWidgetLinksWithSite } from '@/lib/site-settings'
-import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { Caption } from '../shared/Typography'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
-
-void _CSS_VARS
+import { Facebook, Instagram, Linkedin, Youtube, MessageCircle } from 'lucide-react'
 
 const SW_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
-const PLATFORM_META: Record<SocialPlatform, { label: string; mark: string; accent: string }> = {
-    facebook: { label: 'Facebook', mark: 'f', accent: '#2563eb' },
-    whatsapp: { label: 'WhatsApp', mark: 'wa', accent: '#16a34a' },
-    instagram: { label: 'Instagram', mark: 'ig', accent: '#db2777' },
-    linkedin: { label: 'LinkedIn', mark: 'in', accent: '#0284c7' },
-    youtube: { label: 'YouTube', mark: '▶', accent: '#dc2626' },
+const PLATFORM_META: Record<SocialPlatform, { label: string; icon: React.ComponentType<{ size?: number }>; accent: string }> = {
+    facebook: { label: 'Facebook', icon: Facebook, accent: '#2563eb' },
+    whatsapp: { label: 'WhatsApp', icon: MessageCircle, accent: '#16a34a' },
+    instagram: { label: 'Instagram', icon: Instagram, accent: '#db2777' },
+    linkedin: { label: 'LinkedIn', icon: Linkedin, accent: '#0284c7' },
+    youtube: { label: 'YouTube', icon: Youtube, accent: '#dc2626' },
 }
 
 function normalizeUrl(platform: SocialPlatform, value: string) {
@@ -44,13 +42,14 @@ function getPlatformStyles(platform: SocialPlatform) {
 
 function PlatformBadge({ platform }: { platform: SocialPlatform }) {
     const meta = PLATFORM_META[platform]
+    const Icon = meta.icon
 
     return (
         <span
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white/90 text-[11px] font-black uppercase tracking-[0.04em] shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-white/90 shadow-[0_10px_24px_rgba(15,23,42,0.12)]"
             style={{ color: meta.accent, borderColor: `${meta.accent}22` }}
         >
-            {meta.mark}
+            <Icon size={16} />
         </span>
     )
 }

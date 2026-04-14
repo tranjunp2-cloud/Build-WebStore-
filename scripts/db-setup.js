@@ -2381,6 +2381,15 @@ const MIGRATIONS = [
     name: 'ai_usage_logs.user_idx',
     sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_user_idx ON ai_usage_logs (user_id) WHERE user_id IS NOT NULL;`,
   },
+  // ── Sites: AI generation status tracking ──
+  {
+    name: 'sites.generation_status',
+    sql: `ALTER TABLE sites ADD COLUMN IF NOT EXISTS generation_status varchar DEFAULT 'none';`,
+  },
+  {
+    name: 'sites.generation_status_backfill',
+    sql: `UPDATE sites SET generation_status = 'completed' WHERE generation_status IS NULL;`,
+  },
 ];
 
 async function runMigrations(pool) {
