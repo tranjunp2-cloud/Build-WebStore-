@@ -181,7 +181,7 @@ export async function deleteBlogCategoryAction(id: string) {
                 data: {
                     name: 'Uncategorized',
                     slug: 'uncategorized',
-                    tenant: tenantId ? Number(tenantId) : undefined,
+                    tenant: tenantId || undefined,
                 } as Record<string, unknown>,
             })
             uncategorizedId = created.id

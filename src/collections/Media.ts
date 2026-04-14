@@ -13,18 +13,24 @@ export const Media: CollectionConfig = {
         beforeChange: [
             async ({ req }) => {
                 if (!req.file) return
-                const raw = req.file.data instanceof Buffer
-                    ? req.file.data.subarray(0, 8)
-                    : new Uint8Array(req.file.data as unknown as ArrayBufferLike).slice(0, 8)
-                const head = new Uint8Array(raw)
                 // Only validate image uploads — skip PDF/video
                 const mime = req.file.mimetype || ''
                 if (!mime.startsWith('image/')) return
-                const valid = IMAGE_SIGNATURES.some(sig =>
-                    sig.bytes.every((b, i) => head[i] === b),
-                )
-                if (!valid) {
-                    throw new APIError('Invalid image file — only JPEG and PNG are accepted', 400)
+                try {
+                    const raw = req.file.data instanceof Buffer
+                        ? req.file.data.subarray(0, 8)
+                        : new Uint8Array(req.file.data as unknown as ArrayBufferLike).slice(0, 8)
+                    const head = new Uint8Array(raw)
+                    const valid = IMAGE_SIGNATURES.some(sig =>
+                        sig.bytes.every((b, i) => head[i] === b),
+                    )
+                    if (!valid) {
+                        throw new APIError('Invalid image file — only JPEG and PNG are accepted', 400)
+                    }
+                } catch (e) {
+                    if (e instanceof APIError) throw e
+                    req.payload?.logger?.error?.(`Magic byte validation error: ${e}`)
+                    throw new APIError('Invalid image file', 400)
                 }
             },
         ],

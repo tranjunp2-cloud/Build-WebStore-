@@ -340,9 +340,9 @@ export default function BlogEditorPage() {
                 }, 1000)
             }
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : t.dashboard.blog.editor.saveFailed
-            setError(msg)
-            toast.error(msg)
+            console.error('[Blog] Save failed:', err)
+            setError(t.dashboard.blog.editor.saveFailed)
+            toast.error(t.dashboard.blog.editor.saveFailed)
         } finally {
             setIsSaving(false)
             isSubmittingRef.current = false
@@ -475,8 +475,8 @@ export default function BlogEditorPage() {
 
             toast.success(t.dashboard.blog.editor.aiGenerated, { id: 'ai-blog' })
         } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : t.dashboard.blog.editor.aiGenerationFailed
-            toast.error(msg, { id: 'ai-blog' })
+            console.error('[Blog] AI generation failed:', error)
+            toast.error(t.dashboard.blog.editor.aiGenerationFailed, { id: 'ai-blog' })
         } finally {
             setIsGenerating(false)
         }
