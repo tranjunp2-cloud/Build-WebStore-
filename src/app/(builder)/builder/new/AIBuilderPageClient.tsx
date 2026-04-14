@@ -148,6 +148,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const [isPublishing, setIsPublishing] = useState(false)
     const [isNavigating, setIsNavigating] = useState(false)
     const [publishedSiteUrl, setPublishedSiteUrl] = useState<string | null>(null)
+    const [publishedPagesCount, setPublishedPagesCount] = useState<number>(0)
     const [draftSaveState, setDraftSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle')
     const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -593,6 +594,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
             }
 
             setPublishedSiteUrl(payload?.data?.url || null)
+            setPublishedPagesCount(typeof payload?.data?.pagesCount === 'number' ? payload.data.pagesCount : 0)
             if (payload?.data?.id) {
                 void trackBuilderEvent(payload.data.id, 'builder_publish_success', {
                     url: payload?.data?.url,
@@ -744,16 +746,26 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                     totalBlocks={blocks.length || 7}
                 />
                 <CongratsModal
-                    dashboardHref="/admin"
-                    dashboardLabel="Go to Admin Dashboard"
+                    dashboardHref="/dashboard"
+                    dashboardLabel="Go to Dashboard"
                     isOpen={!!publishedSiteUrl}
                     onOpenChange={(open) => {
-                        if (!open) setPublishedSiteUrl(null)
+                        if (!open) {
+                            // Dismissing success modal → land users on their dashboard
+                            // (X, backdrop click, Esc all route here). Reset builder state first
+                            // so navigating back to /builder/new starts clean.
+                            setPublishedSiteUrl(null)
+                            setPublishedPagesCount(0)
+                            reset()
+                            clearBuilderSessionStorage()
+                            router.push('/dashboard')
+                        }
                     }}
                     onNavigate={() => {
                         reset()
                         clearBuilderSessionStorage()
                     }}
+                    pagesCount={publishedPagesCount}
                     siteId={siteId || ''}
                     siteName={siteName || businessInfo?.businessName || 'your-site'}
                     siteUrl={publishedSiteUrl || ''}

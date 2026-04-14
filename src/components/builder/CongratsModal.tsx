@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
-import { CheckCircle2, Copy, ExternalLink, Globe, LayoutDashboard, PartyPopper, X } from 'lucide-react'
+import { CheckCircle2, Copy, ExternalLink, FileText, Globe, LayoutDashboard, PartyPopper, Search, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -14,6 +14,8 @@ interface CongratsModalProps {
     siteUrl: string
     siteName: string
     siteId: string
+    /** Number of published pages — shown in the stats section. 0 hides the row. */
+    pagesCount?: number
     dashboardHref?: string
     dashboardLabel?: string
     onNavigate?: () => void
@@ -25,6 +27,7 @@ export function CongratsModal({
     siteUrl,
     siteName,
     siteId,
+    pagesCount = 0,
     dashboardHref = '/dashboard',
     dashboardLabel = 'Go to Dashboard',
     onNavigate,
@@ -81,7 +84,7 @@ export function CongratsModal({
                                     </Dialog.Description>
 
                                     {/* Domain Display & Copy */}
-                                    <div className="mb-8 w-full">
+                                    <div className="mb-4 w-full">
                                         <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
                                             <div className="flex items-center gap-3 overflow-hidden">
                                                 <Globe className="h-5 w-5 shrink-0 text-blue-400" />
@@ -91,8 +94,8 @@ export function CongratsModal({
                                                 onClick={handleCopy}
                                                 className={cn(
                                                     "ml-3 flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all min-w-[100px]",
-                                                    copied 
-                                                        ? "bg-green-500/20 text-green-400 border border-green-500/30" 
+                                                    copied
+                                                        ? "bg-green-500/20 text-green-400 border border-green-500/30"
                                                         : "bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white"
                                                 )}
                                                 title="Copy Link"
@@ -109,6 +112,23 @@ export function CongratsModal({
                                                     </>
                                                 )}
                                             </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Stats — per design spec docs/design/F01-wireframe-lowfi.md#post-publish */}
+                                    <div className="mb-6 flex w-full flex-col gap-2 rounded-xl border border-white/5 bg-white/[0.03] p-3 text-left">
+                                        {pagesCount > 0 && (
+                                            <div className="flex items-center gap-2 text-xs text-gray-300">
+                                                <FileText className="h-3.5 w-3.5 text-blue-400" />
+                                                <span>
+                                                    <strong className="font-semibold text-white">{pagesCount}</strong>{' '}
+                                                    {pagesCount === 1 ? 'page' : 'pages'} published
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-2 text-xs text-gray-300">
+                                            <Search className="h-3.5 w-3.5 text-emerald-400" />
+                                            <span>SEO metadata auto-generated</span>
                                         </div>
                                     </div>
 
