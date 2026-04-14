@@ -238,11 +238,12 @@ function buildFeatures(biz: BusinessSample, category: string): Record<string, un
 }
 
 function buildTestimonials(content: CategoryContent): Record<string, unknown> {
+  // Emit up to 6 so masonry/grid-4 variants have enough data (was slicing to 3 → masonry empty).
   return {
     blockType: 'testimonials',
     variant: 'cards',
     headline: 'What Our Customers Say',
-    testimonials: content.testimonials.slice(0, 3).map((t) => ({
+    testimonials: content.testimonials.slice(0, 6).map((t) => ({
       quote: t.quote,
       name: t.name,
       title: t.title,
@@ -837,14 +838,42 @@ function buildIndustryBlock(blockType: string, content: CategoryContent, biz: Bu
       return buildReviewCards(content)
     case 'video-showcase':
       return buildVideoShowcase()
-    case 'doctor-profile':
-      return buildDoctorProfile(content)
+    case 'doctor-profile': {
+      const items = Array.from({ length: 4 }, (_, i) => ({
+        name: `Dr. ${['Aisha', 'Rahman', 'Mei Ling', 'Kumar', 'Siti', 'Jonathan'][i % 6]} ${['Tan', 'Lee', 'Wong', 'Patel', 'Ismail', 'Lim'][i % 6]}`,
+        title: ['Consultant Physician', 'Senior Specialist', 'Chief Medical Officer', 'Head of Department'][i % 4],
+        specialty: ['Cardiology', 'Pediatrics', 'General Practice', 'Dermatology'][i % 4],
+        image: `https://placehold.co/400x400/0ea5e9/ffffff?text=Dr.+${i + 1}`,
+        bio: `Experienced medical professional at ${biz.name}.`,
+        experience: `${10 + i} years`,
+      }))
+      return {
+        blockType: 'doctor-profile',
+        variant: 'cards',
+        headline: 'Meet Our Specialists',
+        subheadline: `Expert care at ${biz.name}`,
+        items,
+      }
+    }
     case 'property-card':
       return buildPropertyCard()
     case 'product-quick-view':
       return buildProductQuickView()
-    case 'portfolio-grid':
-      return buildPortfolioGrid()
+    case 'portfolio-grid': {
+      const items = Array.from({ length: 6 }, (_, i) => ({
+        title: `${biz.name} Project ${i + 1}`,
+        category: ['Branding', 'Web Design', 'Photography', 'Illustration'][i % 4],
+        image: `https://placehold.co/600x800/1e293b/ffffff?text=Portfolio+${i + 1}`,
+        description: `Creative project showcasing ${biz.tagline ?? 'our craft'}.`,
+      }))
+      return {
+        blockType: 'portfolio-grid',
+        variant: 'masonry',
+        headline: 'Our Work',
+        subheadline: biz.tagline ?? 'Selected projects',
+        items,
+      }
+    }
     case 'service-cards':
       return buildServiceCards(biz, category)
     case 'client-logos':
@@ -899,8 +928,26 @@ function buildHomePage(
   // Middle blocks — collect all, then optionally shuffle
   const middleBlocks: Record<string, unknown>[] = []
 
-  // Features / Services (always included)
-  middleBlocks.push({ ...buildFeatures(biz, category), variant: getVariant('features', 'grid-3') })
+  // Features / Services (always included) — enforce min content so grid-4 doesn't render partial
+  const featuresBlock = buildFeatures(biz, category) as Record<string, unknown>
+  const featuresCount = Array.isArray(featuresBlock.features) ? featuresBlock.features.length : 3
+  const featuresVariant = enforceMinContent('features', getVariant('features', 'grid-3'), featuresCount)
+  middleBlocks.push({ ...featuresBlock, variant: featuresVariant })
+
+  // Ben-Ben guard: starter tier must also include signature blocks + stats + gallery
+  // to avoid the hero → generic → footer empty-hole symptom.
+  // Inject up to 2 category-specific industry blocks + universal stats + gallery.
+  if (variant === 'starter') {
+    const industryBlockTypes = CATEGORY_INDUSTRY_BLOCKS[category] ?? []
+    const maxIndustry = Math.min(2, industryBlockTypes.length)
+    for (let i = 0; i < maxIndustry; i++) {
+      const block = buildIndustryBlock(industryBlockTypes[i]!, content, biz, category)
+      if (block) middleBlocks.push(block)
+    }
+    // Universal trust blocks — also cover business category signature (stats, team)
+    middleBlocks.push({ ...buildStats(category), variant: getVariant('stats', 'row') })
+    middleBlocks.push({ ...buildGallery(biz), variant: getVariant('gallery', 'grid') })
+  }
 
   if (variant === 'professional' || variant === 'premium') {
     middleBlocks.push({ ...buildStats(category), variant: getVariant('stats', 'row') })
@@ -1114,30 +1161,117 @@ function buildBlockFromSpec(
       return buildReviewCards(content)
     case 'video-showcase':
       return buildVideoShowcase()
-    case 'doctor-profile':
-      return buildDoctorProfile(content)
+    // doctor-profile handled below (line ~1188) with items
     case 'property-card':
       return buildPropertyCard()
     case 'product-quick-view':
       return buildProductQuickView()
-    case 'portfolio-grid':
-      return buildPortfolioGrid()
+    case 'portfolio-grid': {
+      const count = spec.count ?? 6
+      const items = Array.from({ length: count }, (_, i) => ({
+        title: `${biz.name} Project ${i + 1}`,
+        category: ['Branding', 'Web Design', 'Photography', 'Illustration'][i % 4],
+        image: `https://placehold.co/600x800/1e293b/ffffff?text=Portfolio+${i + 1}`,
+        description: `Creative project showcasing ${biz.tagline ?? 'our craft'}.`,
+      }))
+      return {
+        blockType: 'portfolio-grid',
+        variant: resolvedVariant ?? 'masonry',
+        headline: 'Our Work',
+        subheadline: biz.tagline ?? 'Selected projects',
+        items,
+      }
+    }
     case 'service-cards':
       return buildServiceCards(biz, category)
     case 'feature-comparison':
       return buildFeatureComparison()
     case 'pricing-table':
       return buildPricingTable()
-    case 'before-after':
-      return { blockType: 'before-after', variant: resolvedVariant ?? 'slider' }
+    case 'doctor-profile': {
+      const count = spec.count ?? 4
+      const items = Array.from({ length: count }, (_, i) => ({
+        name: `Dr. ${['Aisha', 'Rahman', 'Mei Ling', 'Kumar', 'Siti', 'Jonathan'][i % 6]} ${['Tan', 'Lee', 'Wong', 'Patel', 'Ismail', 'Lim'][i % 6]}`,
+        title: ['Consultant Physician', 'Senior Specialist', 'Chief Medical Officer', 'Head of Department'][i % 4],
+        specialty: ['Cardiology', 'Pediatrics', 'General Practice', 'Dermatology'][i % 4],
+        image: `https://placehold.co/400x400/0ea5e9/ffffff?text=Dr.+${i + 1}`,
+        bio: `Experienced medical professional at ${biz.name}.`,
+        experience: `${10 + i} years`,
+      }))
+      return {
+        blockType: 'doctor-profile',
+        variant: resolvedVariant ?? 'cards',
+        headline: 'Meet Our Specialists',
+        subheadline: `Expert care at ${biz.name}`,
+        items,
+      }
+    }
+    case 'before-after': {
+      // Supply an items array (slider variant renders from items[] not single pair).
+      // Enforce minimum 3 so grid/slider variants don't render partial.
+      const count = Math.max(spec.count ?? 3, 3)
+      const items = Array.from({ length: count }, (_, i) => ({
+        label: `Transformation ${i + 1}`,
+        beforeImage: {
+          url: `https://placehold.co/600x400/e2e8f0/64748b?text=Before+${i + 1}`,
+          alt: `Before ${i + 1}`,
+        },
+        afterImage: {
+          url: `https://placehold.co/600x400/10b981/ffffff?text=After+${i + 1}`,
+          alt: `After ${i + 1}`,
+        },
+      }))
+      return {
+        blockType: 'before-after',
+        variant: resolvedVariant ?? 'slider',
+        headline: 'See the Transformation',
+        subheadline: `Real results from ${biz.name}`,
+        items,
+      }
+    }
     case 'countdown-timer':
       return { blockType: 'countdown-timer', variant: resolvedVariant ?? 'elegant', targetDate: '2026-12-31T00:00:00' }
-    case 'blog-list':
-      return { blockType: 'blog-list', variant: resolvedVariant ?? 'grid', count: spec.count ?? 3 }
+    case 'blog-list': {
+      // Enforce min 3 for hero-card/masonry variants
+      const count = Math.max(spec.count ?? 3, 4)
+      const items = Array.from({ length: count }, (_, i) => ({
+        title: [`Inside ${biz.name}`, 'Tips & Insights', 'Latest News', 'Case Study', 'Industry Update', 'Best Practices'][i % 6]!,
+        excerpt: `Stay up to date with the latest from ${biz.name}. Read our take on ${biz.tagline ?? 'the industry'}.`,
+        image: `https://placehold.co/800x500/6366f1/ffffff?text=Post+${i + 1}`,
+        author: ['Editorial Team', 'Lead Writer', 'Guest Contributor'][i % 3],
+        date: '2026-04-14',
+        category: ['News', 'Guides', 'Stories'][i % 3],
+        readTime: `${3 + (i % 5)} min`,
+      }))
+      return {
+        blockType: 'blog-list',
+        variant: resolvedVariant ?? 'grid',
+        headline: 'Latest Articles',
+        subheadline: `Fresh reads from ${biz.name}`,
+        count,
+        items,
+      }
+    }
     case 'social-proof':
       return { blockType: 'social-proof', variant: resolvedVariant ?? 'counter' }
-    case 'products-grid':
-      return { blockType: 'products-grid', variant: resolvedVariant ?? 'grid-3', count: spec.count ?? 6 }
+    case 'products-grid': {
+      // Generate placeholder items — previously this returned only {variant, count}
+      // with no items array, causing render to show empty grid (Ben-Ben class bug).
+      const count = spec.count ?? 6
+      const items = Array.from({ length: count }, (_, i) => ({
+        name: `${biz.name} Item ${i + 1}`,
+        price: `RM ${(25 + i * 15).toFixed(2)}`,
+        image: `https://placehold.co/400x400/e2e8f0/64748b?text=Product+${i + 1}`,
+        description: `Curated product from ${biz.name}`,
+        category: biz.tagline ?? 'Featured',
+      }))
+      return {
+        blockType: 'products-grid',
+        variant: resolvedVariant ?? 'grid-3',
+        count,
+        items,
+      }
+    }
     // ── Aliases: map preset blockType names to actual block builders ──
     case 'contact-form':
       return { ...buildContact(biz), blockType: 'contact', ...(resolvedVariant ? { variant: resolvedVariant } : {}) }
