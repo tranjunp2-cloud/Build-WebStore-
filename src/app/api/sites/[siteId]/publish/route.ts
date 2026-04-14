@@ -90,20 +90,6 @@ export async function PATCH(
             // revalidateTag requires Next.js request context — skip in tests/non-Next environments
         }
 
-        // Count published pages for the success modal stats section
-        let pagesCount = 0
-        try {
-            const pagesRes = await payload.find({
-                collection: 'pages',
-                where: { site: { equals: siteId } },
-                limit: 0,
-                depth: 0,
-            })
-            pagesCount = pagesRes.totalDocs ?? 0
-        } catch {
-            // Non-critical — stats fallback to 0
-        }
-
         // Build public URL. Subdomain routing ({slug}.primeweb.app) only works
         // when DNS wildcards resolve — fine on staging/prod. On localhost there's
         // no wildcard DNS, so fall back to path-based routing which the middleware
@@ -136,7 +122,6 @@ export async function PATCH(
                 publishedAt: site.publishedAt,
                 url: publicUrl,
                 domain: displayDomain,
-                pagesCount,
             },
         })
 
