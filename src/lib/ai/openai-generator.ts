@@ -945,7 +945,7 @@ export function sanitizeBlockData(
             })
             // Enforce min 2 CTAs for visual richness — add secondary if only 1
             // Note: avoid "Learn More" — blocked by design-quality content rules
-            if (s.ctaButtons.length === 1) {
+            if ((s.ctaButtons as unknown[]).length === 1) {
                 (s.ctaButtons as Array<{ label: string; url: string; style: string }>).push({
                     label: 'About Us',
                     url: '#about',
