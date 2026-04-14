@@ -39,8 +39,8 @@ export async function POST(request: NextRequest) {
         await payload.create({
             collection: 'analytics',
             data: {
-                tenant: tenantId,
-                site: siteId,
+                tenant: Number(tenantId),
+                site: Number(siteId),
                 event,
                 pageUrl,
                 referrer: referrer || '',

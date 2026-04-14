@@ -57,6 +57,9 @@ _agent/
 .worktrees/
 .gitnexus
 
+## Vercel CLI (project link + pulled env files)
+.vercel/
+
 # Playwright auth state
 e2e/.auth/
 coverage/

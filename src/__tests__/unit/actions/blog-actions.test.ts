@@ -98,7 +98,9 @@ describe('createBlogCategoryAction [TC-F17.02]', () => {
 
     it('creates category with correct tenant and slug', async () => {
         vi.mocked(getCurrentUser).mockResolvedValue(mockUser as any)
-        mockFind.mockResolvedValue({ docs: [{ id: 'site-1' }] })
+        // First call: site lookup, Second call: duplicate name check (empty = no duplicate)
+        mockFind.mockResolvedValueOnce({ docs: [{ id: 'site-1' }] })
+        mockFind.mockResolvedValueOnce({ docs: [] })
         mockCreate.mockResolvedValue({ id: 'cat-new', name: 'My Category', slug: 'my-category' })
 
         const result = await createBlogCategoryAction({ name: 'My Category' })
@@ -169,15 +171,15 @@ describe('deleteBlogCategoryAction [TC-F17.04]', () => {
         expect(mockDelete).not.toHaveBeenCalled()
     })
 
-    it('deletes category when tenant matches', async () => {
+    it('soft-deletes category when tenant matches', async () => {
         vi.mocked(getCurrentUser).mockResolvedValue(mockUser as any)
         mockFindByID.mockResolvedValue({ id: 'cat-1', tenant: { id: 'tenant-1' } })
-        mockDelete.mockResolvedValue({})
+        mockUpdate.mockResolvedValue({ id: 'cat-1', status: 'deleted' })
 
         const result = await deleteBlogCategoryAction('cat-1')
         expect(result).toEqual({ success: true })
-        expect(mockDelete).toHaveBeenCalledWith(
-            expect.objectContaining({ collection: 'blog_categories', id: 'cat-1' }),
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({ collection: 'blog_categories', id: 'cat-1', data: { status: 'deleted' } }),
         )
     })
 })

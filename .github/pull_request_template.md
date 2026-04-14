@@ -23,7 +23,10 @@
 
 - [ ] **9-Point Done** (SPEC §13): Loading (skeleton), Empty, Error, Form validation, Button states, Toast, Auth redirect, Mobile 375px, TypeScript clean
 - [ ] **TypeScript / lint:** `tsc --noEmit` và `eslint` pass (hoặc tương đương)
-- [ ] **Test:** Đã thêm/sửa test liên quan (nếu có); test steps bên dưới đã điền
+- [ ] **Test:** Chọn 1:
+  - [ ] Feature mới → đã thêm E2E test trong `tests/*.spec.ts`
+  - [ ] Bug fix → đã thêm E2E test reproduce bug
+  - [ ] Refactor/CSS/docs → không cần test mới
 - [ ] **Security:** Không commit secret/credential; input đã validate/sanitize
 - [ ] **Branch:** Đã cập nhật với base (merge/rebase `main`); không conflict
 

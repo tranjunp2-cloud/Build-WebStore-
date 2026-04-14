@@ -83,11 +83,16 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
             ? extractTextContent(page.layout).join('. ')
             : ''
 
+        // Fetch tracked keywords from site (AC-15)
+        const trackedKeywords = ((site as any)?.seo?.trackedKeywords as Array<{ keyword: string }> | undefined)
+            ?.map(k => k.keyword).filter(Boolean) || []
+
         const { title, description } = await generateAutoSEOMeta(
             'page',
             page.title,
             siteName,
-            textContext
+            textContext,
+            trackedKeywords,
         )
 
         // Generate slug if page is not published
@@ -101,10 +106,21 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                 .replace(/^-+|-+$/g, '')
         }
 
+        // Return with existing meta for comparison (AC-16, BR-06)
+        const existing = {
+            title: (page as any).seo?.title || null,
+            description: (page as any).seo?.description || null,
+        }
+        const hasExisting = !!(existing.title || existing.description)
+
         return NextResponse.json({
+            proposed: { title, description, ...(newSlug ? { slug: newSlug } : {}) },
+            existing,
+            hasExisting,
+            // Backward compat — flat fields for consumers not yet updated
             title,
             description,
-            ...(newSlug ? { slug: newSlug } : {})
+            ...(newSlug ? { slug: newSlug } : {}),
         })
     } catch (error) {
         console.error('Error generating SEO:', error)

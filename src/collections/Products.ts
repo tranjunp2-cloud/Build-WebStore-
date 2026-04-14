@@ -44,14 +44,22 @@ const formatSlug = (fallback: string): FieldHook => async ({ value, originalDoc,
     return slug
 }
 
-const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation }) => {
+const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
     const isPublishingUpdate = operation === 'update' && doc.status === 'active' && previousDoc?.status !== 'active'
     const isActiveCreate = operation === 'create' && doc.status === 'active'
 
     // Wait until it becomes active and seo title is empty
     if ((isPublishingUpdate || isActiveCreate) && !doc.seo?.title) {
+        const siteId = typeof doc.site === 'object' ? doc.site.id : doc.site
+
+        // Check if auto meta generation is enabled for this site
+        try {
+            const site = await req.payload.findByID({ collection: 'sites', id: siteId, depth: 0 })
+            if (site.seo?.autoMetaEnabled === false) return
+        } catch { /* proceed if can't check */ }
+
         // Trigger background generation
-        queueSEOAutoGeneration('products', doc.id, typeof doc.site === 'object' ? doc.site.id : doc.site, doc.name, doc.shortDescription)
+        queueSEOAutoGeneration('products', doc.id, siteId, doc.name, doc.shortDescription)
     }
 }
 

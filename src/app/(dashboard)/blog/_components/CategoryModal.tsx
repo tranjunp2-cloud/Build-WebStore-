@@ -132,8 +132,12 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
     }
 
     return (
-        <div className="fixed inset-0 w-screen h-screen z-[999] flex flex-col items-center justify-center border-0 bg-black/60 p-4 animate-in fade-in duration-200">
-            <div className="flex flex-col p-[1px] w-[768px] items-start bg-[#1E293B] border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] relative overflow-hidden">
+        <div className="fixed inset-0 w-screen h-screen z-[999] flex flex-col items-end xl:items-center justify-end xl:justify-center border-0 bg-[rgba(15,23,42,0.7)] backdrop-blur-sm xl:p-4 animate-in fade-in duration-200">
+            <div className="flex flex-col p-[1px] w-full xl:w-[768px] max-h-[90vh] items-start bg-[#1E293B] border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-t-[16px] xl:rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] relative overflow-hidden animate-in slide-in-from-bottom xl:slide-in-from-bottom-0 duration-300">
+                {/* Mobile drag handle */}
+                <div className="flex xl:hidden items-start justify-center pt-[12px] w-full shrink-0">
+                    <div className="bg-[rgba(255,255,255,0.2)] h-[4px] rounded-[9999px] shrink-0 w-[48px]" />
+                </div>
                 {/* Header (31611:5304) */}
                 <div className="flex flex-row justify-between items-center w-full px-[24px] py-[12px]" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                     <span className="font-['Inter'] font-[700] text-[20px] leading-[1.4em] text-[#F8FAFC]">{t.dashboard.blog.categoryModal.title}</span>
@@ -146,7 +150,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                 </div>
 
                 {/* Body (31611:5322) */}
-                <div className="flex flex-col w-full px-[24px] py-[24px] gap-[24px]">
+                <div className="flex flex-col w-full px-[24px] py-[24px] gap-[24px] overflow-y-auto flex-1">
                     <div className="flex flex-col w-full gap-[12px]">
                         {/* Title Row (31611:5328) */}
                         <div className="flex flex-row justify-between items-center w-full h-[20px] shrink-0">
@@ -214,7 +218,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                                             </div>
 
                                             {/* Action Buttons (31611:5461) - Visible on hover */}
-                                            <div className="flex flex-row items-center gap-[8px] opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex flex-row items-center gap-[8px] opacity-100 xl:opacity-0 xl:group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={(e) => { e.preventDefault(); startEditing(cat); }}
                                                     className="flex flex-col items-center pt-[8px] px-[8px] pb-0 w-[32px] h-[32px] rounded-[12px] hover:bg-white/10 transition-colors"
@@ -287,7 +291,7 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
             {/* Delete Confirmation Modal (31611:5609) */}
             {deleteTarget && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 rounded-[16px]">
-                    <div className="flex flex-col shrink-0 items-center gap-[13px] p-[25px_10px] w-[433px] bg-[#0B1120] border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-[16px] relative">
+                    <div className="flex flex-col shrink-0 items-center gap-[13px] p-[25px_10px] w-full max-w-[433px] bg-[#0B1120] border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-[16px] relative">
                         {/* Icon Container */}
                         <div className="flex justify-center items-center px-[16px] w-[64px] h-[64px] bg-[rgba(240,177,0,0.1)] rounded-full">
                             <AlertTriangle className="w-[32px] h-[32px] text-[#F0B100]" strokeWidth={2.666} />
@@ -306,17 +310,17 @@ export function CategoryModal({ onClose, onCategoryUpdated }: CategoryModalProps
                         </div>
 
                         {/* Buttons */}
-                        <div className="flex flex-row gap-[12px] w-[398px] mt-[6px]">
+                        <div className="flex flex-row gap-[12px] w-full max-w-[398px] mt-[6px] px-[10px]">
                             <button
                                 onClick={(e) => { e.preventDefault(); setDeleteTarget(null); }}
-                                className="flex shrink-0 justify-center items-center pt-[12px] pb-[14px] px-0 w-[194px] border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-[16px] hover:bg-white/5 transition-colors cursor-pointer"
+                                className="flex flex-1 justify-center items-center pt-[12px] pb-[14px] px-0 border-[1px] border-solid border-[rgba(255,255,255,0.08)] rounded-[16px] hover:bg-white/5 transition-colors cursor-pointer"
                             >
                                 <span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#F8FAFC]">{t.dashboard.blog.categoryModal.cancelBtn}</span>
                             </button>
                             <button
                                 onClick={(e) => { e.preventDefault(); handleDelete(); }}
                                 disabled={isDeleting}
-                                className="flex shrink-0 justify-center items-center gap-[8px] pt-[12px] pb-[14px] px-0 w-[192px] bg-[#FB2C36] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] rounded-[16px] hover:bg-opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
+                                className="flex flex-1 justify-center items-center gap-[8px] pt-[12px] pb-[14px] px-0 bg-[#FB2C36] shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] rounded-[16px] hover:bg-opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
                             >
                                 {isDeleting ? (
                                     <><Loader2 className="w-[20px] h-[20px] text-white animate-spin" /><span className="font-['Inter'] font-[600] text-[16px] leading-[1.5em] text-[#FFFFFF]">{t.dashboard.blog.categoryModal.deletingBtn}</span></>

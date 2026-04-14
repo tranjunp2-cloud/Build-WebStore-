@@ -63,6 +63,22 @@ export async function createBlogCategoryAction(data: { name: string }) {
 
     const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '')
 
+    // Check duplicate name within same tenant
+    const existing = await payload.find({
+        collection: 'blog_categories',
+        where: {
+            and: [
+                { name: { equals: data.name.trim() } },
+                { tenant: { equals: tenantId } },
+                { status: { not_equals: 'deleted' } },
+            ],
+        },
+        limit: 1,
+    })
+    if (existing.docs.length > 0) {
+        return { error: 'A category with this name already exists' }
+    }
+
     try {
         const result = await payload.create({
             collection: 'blog_categories',
@@ -152,9 +168,10 @@ export async function deleteBlogCategoryAction(id: string) {
             )
         }
 
-        await payload.delete({
+        await payload.update({
             collection: 'blog_categories',
             id,
+            data: { status: 'deleted' as const },
             user: user as any,
         })
         return { success: true }
@@ -180,6 +197,7 @@ export async function saveBlogAction(data: {
     status: string
     category?: string | null
     thumbnail?: string | null
+    publishedAt?: string | null
     seo?: {
         metaTitle?: string
         metaDescription?: string
@@ -214,6 +232,7 @@ export async function saveBlogAction(data: {
         status: data.status,
         category: data.category ? (isNaN(Number(data.category)) ? data.category : Number(data.category)) : null,
         thumbnail: data.thumbnail ? (isNaN(Number(data.thumbnail)) ? data.thumbnail : Number(data.thumbnail)) : null,
+        publishedAt: data.publishedAt || null,
         seo: data.seo || {},
         author: (user as UserWithTenants).id,
     }
@@ -222,6 +241,21 @@ export async function saveBlogAction(data: {
         // Only set tenant and site on creation
         body.tenant = tenantId
         body.site = siteId
+
+        // Auto-suffix slug if duplicate exists within same site
+        let slug = body.slug
+        let suffix = 0
+        while (true) {
+            const existing = await payload.find({
+                collection: 'blogs',
+                where: { slug: { equals: slug }, site: { equals: siteId } },
+                limit: 1,
+            })
+            if (existing.docs.length === 0) break
+            suffix++
+            slug = `${body.slug}-${suffix}`
+        }
+        body.slug = slug
 
         const result = await payload.create({
             collection: 'blogs',
@@ -258,10 +292,11 @@ export async function listBlogsAction(params: {
     if (tenantId) where.tenant = { equals: tenantId }
     if (params.status && params.status !== 'all') where.status = { equals: params.status }
     if (params.category && params.category !== 'all') where.category = { equals: params.category }
-    if (params.search) {
+    const trimmedSearch = params.search?.trim()
+    if (trimmedSearch) {
         where.or = [
-            { title: { contains: params.search } },
-            { slug: { contains: params.search } },
+            { title: { contains: trimmedSearch } },
+            { slug: { contains: trimmedSearch } },
         ]
     }
 
@@ -369,6 +404,7 @@ export async function getBlogByIdAction(id: string) {
     const result = await payload.findByID({
         collection: 'blogs',
         id,
+        depth: 2,
     })
 
     const tenantId = getTenantId(user as UserWithTenants)

@@ -146,6 +146,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     const [previewMode, setPreviewMode] = useState<BuilderPreviewMode>('desktop')
     const [generationTimeMs, setGenerationTimeMs] = useState(0)
     const [isPublishing, setIsPublishing] = useState(false)
+    const [isNavigating, setIsNavigating] = useState(false)
     const [publishedSiteUrl, setPublishedSiteUrl] = useState<string | null>(null)
     const [draftSaveState, setDraftSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle')
     const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
@@ -551,6 +552,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
     }, [handleGenerateStart])
 
     const handleDashboard = useCallback(async () => {
+        setIsNavigating(true)
         // Save draft in background — don't block navigation
         void saveDraftNow()
         // Navigate FIRST, then clear state (prevents flash of empty form)
@@ -727,6 +729,7 @@ export default function AIBuilderPageClient({ userId }: AIBuilderPageClientProps
                 <BuilderCompletionView
                     blocks={blocks}
                     generationTimeLabel={generationTimeMs > 0 ? `${Math.round(generationTimeMs / 1000)}s` : '0s'}
+                    isNavigating={isNavigating}
                     isPublishing={isPublishing}
                     onDashboard={handleDashboard}
                     onMoveBlock={handleMoveBlock}

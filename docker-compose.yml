@@ -17,7 +17,6 @@ services:
       - PAYLOAD_SECRET=primeweb-dev-secret-2026
       - NEXT_PUBLIC_SERVER_URL=http://localhost:3005
       - NEXT_PUBLIC_PLATFORM_DOMAIN=localhost:3005
-      - NEXT_PUBLIC_APP_URL=http://localhost:3005
       - NEXT_PUBLIC_S3_ENDPOINT=${NEXT_PUBLIC_S3_ENDPOINT}
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET=primeweb-media

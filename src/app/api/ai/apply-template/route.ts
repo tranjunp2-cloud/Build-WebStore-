@@ -6,6 +6,7 @@ import { applyTemplateSchema } from '@/lib/validations/ai'
 import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 
 /**
  * POST /api/ai/apply-template
@@ -15,7 +16,7 @@ import { checkRateLimit } from '@/lib/rateLimit'
 export const POST = withAuth(async (user, req) => {
     try {
         // Rate Limit: 20 template applications per hour
-        const rateLimit = checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(String(user.id), 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },
@@ -52,11 +53,11 @@ export const POST = withAuth(async (user, req) => {
             tenantId = (tenantId as Record<string, unknown>).id
         }
         if (!tenantId) {
-            // Auto-create tenant for users without one (new users, post-reset)
-            const fallbackSlug = `store-${user.id}`
+            // Try recovering orphaned tenant with legacy slug first
+            const legacySlug = `store-${user.id}`
             const existing = await payload.find({
                 collection: 'tenants',
-                where: { slug: { equals: fallbackSlug } },
+                where: { slug: { equals: legacySlug } },
                 limit: 1,
             })
             if (existing.docs.length > 0) {
@@ -67,10 +68,16 @@ export const POST = withAuth(async (user, req) => {
                     data: { tenants: [{ tenant: tenantId, role: 'owner' }] } as Record<string, unknown>,
                 })
             } else {
+                // Smart slug from template name (F23), fallback to store-{id}
                 const firstName = userWithTenants.firstName || userWithTenants.name || 'My'
+                const templateName = (template.name as string) || ''
+                const tenantName = templateName ? `${firstName}'s ${templateName}` : `${firstName}'s Store`
+                const baseSlug = slugify(templateName || firstName)
+                const tenantSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
+
                 const newTenant = await payload.create({
                     collection: 'tenants',
-                    data: { name: `${firstName}'s Store`, slug: fallbackSlug },
+                    data: { name: tenantName, slug: tenantSlug },
                 })
                 tenantId = newTenant.id
                 await payload.update({
@@ -78,6 +85,28 @@ export const POST = withAuth(async (user, req) => {
                     id: user.id,
                     data: { tenants: [{ tenant: tenantId, role: 'owner' }] } as Record<string, unknown>,
                 })
+            }
+        }
+
+        // F23: Auto-upgrade legacy store-{id} slug to smart slug from template name
+        if (tenantId) {
+            try {
+                const tenant = await payload.findByID({ collection: 'tenants', id: tenantId as string | number })
+                const currentSlug = tenant?.slug as string | undefined
+                const templateName = (template.name as string) || ''
+                if (currentSlug && /^store-\d+$/.test(currentSlug) && templateName) {
+                    const baseSlug = slugify(templateName)
+                    if (baseSlug && baseSlug !== currentSlug) {
+                        const newSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
+                        await payload.update({
+                            collection: 'tenants',
+                            id: tenantId as string | number,
+                            data: { slug: newSlug } as Record<string, unknown>,
+                        })
+                    }
+                }
+            } catch {
+                // Non-critical — slug upgrade failure shouldn't block template apply
             }
         }
 

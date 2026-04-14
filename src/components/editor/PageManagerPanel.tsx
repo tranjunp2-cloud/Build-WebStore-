@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useEditorStore } from '@/store/editorStore'
+import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 import type { PageData } from '@/store/editorStore'
 
@@ -31,7 +32,7 @@ const SYSTEM_PAGE_SLUGS = new Set(['404', '/404'])
 
 function getPagePath(page: PageData) {
     if (page.isHomepage || page.slug === 'home' || page.slug === '') return '/'
-    return `/${page.slug}`
+    return page.slug.startsWith('/') ? page.slug : `/${page.slug}`
 }
 
 function getStatusBadge(page: PageData) {
@@ -58,7 +59,10 @@ export function PageManagerPanel({
     onPagesChanged,
     onEditPage,
 }: PageManagerPanelProps) {
+    const { t } = useI18n()
+    const pm = t.editor.pageManager
     const pages = useEditorStore(state => state.pages)
+    const setPages = useEditorStore(state => state.setPages)
     const addPageToState = useEditorStore(state => state.addPageToState)
     const updatePageInState = useEditorStore(state => state.updatePageInState)
 
@@ -106,14 +110,17 @@ export function PageManagerPanel({
                 body: JSON.stringify({ title: newPageTitle, slug }),
             })
 
-            if (!res.ok) throw new Error('Failed to create page')
+            if (!res.ok) {
+                const errorText = await res.text()
+                throw new Error(errorText || 'Failed to create page')
+            }
 
             const data = await res.json()
 
             addPageToState(data.page)
             setNewPageTitle('')
             setIsAdding(false)
-            toast.success('Page created successfully')
+            toast.success(pm.pageCreated)
 
             const pageId = data.page?.id
             if (pageId) {
@@ -122,8 +129,8 @@ export function PageManagerPanel({
             }
 
             onPagesChanged?.()
-        } catch {
-            toast.error('Error creating page')
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Error creating page')
         } finally {
             setIsSubmitting(false)
         }
@@ -147,11 +154,11 @@ export function PageManagerPanel({
             onPagesChanged?.()
 
             if (!newVisible) {
-                toast('Đã ẩn trang này')
+                toast(pm.pageHidden)
             }
         } catch {
             updatePageInState(page.id, { isVisible: page.isVisible })
-            toast.error('Lỗi khi cập nhật trạng thái hiển thị')
+            toast.error(pm.visibilityFailed)
         }
     }
 
@@ -172,21 +179,23 @@ export function PageManagerPanel({
             })
             if (!res.ok) throw new Error('Failed to delete page')
 
+            // Switch to homepage if deleted page is currently being viewed
+            if (String(page.id) === String(currentPageId)) {
+                const homepage = pages.find(p => p.isHomepage && !p.deletedAt)
+                if (homepage) onPageSelected(String(homepage.id))
+            }
             onPagesChanged?.()
         } catch {
             updatePageInState(page.id, { deletedAt: null })
             setPendingPageId(null)
-            toast.error('Không thể xóa trang')
+            toast.error(pm.deleteFailed)
             return
         }
 
-        toast('Đã xóa. Hoàn tác?', {
+        toast(pm.deleteSuccess, {
             action: {
-                label: 'Undo',
+                label: pm.undo,
                 onClick: async () => {
-                    updatePageInState(page.id, { deletedAt: null })
-                    setPendingPageId(null)
-
                     try {
                         const res = await fetch(`/api/sites/${siteId}/pages/${page.id}`, {
                             method: 'PATCH',
@@ -196,10 +205,18 @@ export function PageManagerPanel({
                         })
                         if (!res.ok) throw new Error('Failed to undo deletion')
 
+                        // Refetch pages from server to restore the page in state
+                        const pagesRes = await fetch(`/api/sites/${siteId}/pages`, { credentials: 'include' })
+                        if (pagesRes.ok) {
+                            const pagesData = await pagesRes.json()
+                            setPages(pagesData.pages || [])
+                        }
+
+                        setPendingPageId(null)
                         onPagesChanged?.()
+                        toast.success(pm.restored)
                     } catch {
-                        updatePageInState(page.id, { deletedAt: now })
-                        toast.error('Không thể hoàn tác')
+                        toast.error(pm.restoreFailed)
                     }
                 },
             },
@@ -231,7 +248,7 @@ export function PageManagerPanel({
                         className="flex h-9 w-full items-center justify-center gap-2 rounded-[10px] bg-[linear-gradient(90deg,#3B82F6_0%,#2DD4BF_100%)] px-4 text-[14px] font-medium text-white shadow-[0_10px_20px_rgba(45,212,191,0.12)] transition-opacity hover:opacity-95"
                     >
                         <Plus className="h-4 w-4" />
-                        Add New Page
+                        {pm.addNewPage}
                     </button>
                 ) : (
                     <form onSubmit={handleCreatePage} className="rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -240,7 +257,7 @@ export function PageManagerPanel({
                             required
                             value={newPageTitle}
                             onChange={e => setNewPageTitle(e.target.value)}
-                            placeholder="Tên trang (VD: Khuyến mãi)"
+                            placeholder={pm.pageNamePlaceholder}
                             variant="editor"
                         />
                         <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
@@ -254,11 +271,11 @@ export function PageManagerPanel({
                                     }}
                                     className="text-gray-400 transition-colors hover:text-white"
                                 >
-                                    Hủy
+                                    {pm.cancel}
                                 </button>
                                 <Button type="submit" size="sm" disabled={isSubmitting || !newPageTitle.trim()}>
                                     {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                                    Tạo trang
+                                    {pm.create}
                                 </Button>
                             </div>
                         </div>
@@ -270,7 +287,7 @@ export function PageManagerPanel({
                     <Input
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
-                        placeholder="Tìm kiếm trang..."
+                        placeholder={pm.searchPlaceholder}
                         variant="editor"
                         className="pl-9"
                     />
@@ -322,13 +339,13 @@ export function PageManagerPanel({
                                                     {page.isHomepage ? (
                                                         <span className="inline-flex items-center gap-1 rounded-[4px] border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] px-2 py-[3px] text-[12px] font-semibold leading-4 text-[#b9f8cf]">
                                                             <House className="h-3 w-3" />
-                                                            Trang chủ
+                                                            {pm.home}
                                                         </span>
                                                     ) : null}
                                                     {isCurrent ? (
                                                         <span className="inline-flex items-center gap-1 rounded-[4px] border border-cyan-400/30 bg-cyan-500/15 px-2 py-[3px] text-[11px] font-semibold leading-4 text-cyan-300">
                                                             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
-                                                            Editing
+                                                            {pm.editing}
                                                         </span>
                                                     ) : (
                                                         <span className={cn('inline-flex items-center gap-1 rounded-[4px] px-2 py-[3px] text-[12px] font-semibold leading-4', statusBadge.className)}>
@@ -360,7 +377,7 @@ export function PageManagerPanel({
                                             className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#3B82F6] to-[#2DD4BF] text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                                            Edit with AI Chat
+                                            {pm.editWithAI}
                                         </button>
                                     )}
 
@@ -375,14 +392,14 @@ export function PageManagerPanel({
                                                     ? 'opacity-60'
                                                     : 'hover:border-cyan-500/20 hover:bg-white/10',
                                             )}
-                                            title={isProtectedPage ? 'Homepage cannot be hidden' : page.isVisible ? 'Ẩn trang' : 'Hiện trang'}
+                                            title={isProtectedPage ? pm.homeHideProtected : page.isVisible ? pm.hidePage : pm.showPage}
                                         >
                                             {page.isVisible ? (
                                                 <Eye className="h-3.5 w-3.5" />
                                             ) : (
                                                 <EyeOff className="h-3.5 w-3.5 text-amber-300" />
                                             )}
-                                            {page.isVisible ? 'Visible' : 'Hidden'}
+                                            {page.isVisible ? pm.visible : pm.hidden}
                                         </button>
 
                                         <button
@@ -397,14 +414,14 @@ export function PageManagerPanel({
                                                         ? 'opacity-50'
                                                         : 'hover:bg-[rgba(251,44,54,0.16)]',
                                             )}
-                                            title={isProtectedPage ? 'Homepage cannot be deleted' : 'Xóa trang'}
+                                            title={isProtectedPage ? pm.homeProtected : pm.deletePage}
                                         >
                                             {pendingPageId === page.id ? (
                                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                             ) : (
                                                 <Trash2 className="h-3.5 w-3.5" />
                                             )}
-                                            Delete
+                                            {pm.delete}
                                         </button>
                                     </div>
                                 </div>
@@ -423,7 +440,7 @@ export function PageManagerPanel({
                                     >
                                         <div className="flex items-center gap-2">
                                             <Settings2 className="h-3.5 w-3.5 text-[#94A3B8]" />
-                                            <p className="text-[12px] font-medium leading-4 text-[#F8FAFC]">404 Not Found Page</p>
+                                            <p className="text-[12px] font-medium leading-4 text-[#F8FAFC]">{pm.customPage}</p>
                                         </div>
                                         {is404SectionOpen ? (
                                             <ChevronDown className="h-4 w-4 text-[#94A3B8]" />
@@ -435,7 +452,7 @@ export function PageManagerPanel({
                                     {is404SectionOpen ? (
                                         <div className="mt-2 rounded-[8px] bg-[#1E293B] px-3 py-3">
                                             <p className="text-[10px] font-normal leading-4 text-[#64748B]">
-                                                Open 404 Page to Edit
+                                                {pm.customPage}
                                             </p>
                                             <button
                                                 type="button"
@@ -443,7 +460,7 @@ export function PageManagerPanel({
                                                 className="mt-2 flex h-8 w-full items-center justify-center gap-2 rounded-[4px] border border-[rgba(59,130,246,0.04)] bg-[#253046] text-[12px] font-medium text-[#F8FAFC] transition-colors hover:border-cyan-500/20 hover:bg-[#2A3750]"
                                             >
                                                 <span aria-hidden="true">✏️</span>
-                                                Edit 404 Page
+                                                {pm.editWithAI}
                                             </button>
                                         </div>
                                     ) : null}
@@ -470,16 +487,16 @@ export function PageManagerPanel({
 
                             <div className="mt-4 text-center">
                                 <p className="text-[28px] font-semibold leading-7 text-white">
-                                    Confirm Delete
+                                    {pm.deleteConfirmTitle}
                                 </p>
                                 <p className="mt-3 text-[14px] leading-6 text-[#CBD5E1]">
-                                    Are you sure you want to delete page
+                                    {pm.deleteConfirmMsg}
                                     {' '}
                                     <span className="text-[#2DD4BF]">&quot;{deleteTarget.title}&quot;</span>
                                     ?
                                 </p>
                                 <p className="text-[14px] leading-5 text-[#94A3B8]">
-                                    Bạn có thể hoàn tác trong vài giây sau khi xóa.
+                                    {pm.deleteConfirmDesc}
                                 </p>
                             </div>
 
@@ -489,7 +506,7 @@ export function PageManagerPanel({
                                     onClick={() => setDeleteTarget(null)}
                                     className="flex h-11 items-center justify-center rounded-[10px] border border-[rgba(59,130,246,0.04)] bg-[rgba(255,255,255,0.05)] text-[14px] font-medium text-white transition-colors hover:bg-[rgba(255,255,255,0.08)]"
                                 >
-                                    Cancel
+                                    {pm.cancel}
                                 </button>
                                 <button
                                     type="button"
@@ -502,7 +519,7 @@ export function PageManagerPanel({
                                     ) : (
                                         <Trash2 className="h-4 w-4" />
                                     )}
-                                    Delete Page
+                                    {pm.confirmDelete}
                                 </button>
                             </div>
                         </div>

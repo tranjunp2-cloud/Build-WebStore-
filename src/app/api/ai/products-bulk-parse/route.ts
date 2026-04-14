@@ -12,7 +12,7 @@ function getOpenAI(): OpenAI | null {
 export const POST = withAuth(async (user, req) => {
     try {
         // Rate limit: 5 bulk AI tasks per hour (heavy resource usage)
-        const rateLimit = checkRateLimit(String(user.id), 5)
+        const rateLimit = await checkRateLimit(String(user.id), 5)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { error: 'Rate limit exceeded. Try again later.' },

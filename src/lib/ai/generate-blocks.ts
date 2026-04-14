@@ -21,10 +21,19 @@ type GeneratedBlock = {
     [key: string]: unknown
 }
 
+type GeneratedPage = {
+    title: string
+    slug: string
+    isHomepage: boolean
+    blocks: GeneratedBlock[]
+    seo: { title: string; description: string }
+}
+
 type GenerationResult = {
     siteName: string
     siteType: BusinessIntent['type']
     blocks: GeneratedBlock[]
+    pages?: GeneratedPage[]
     seo: { title: string; description: string }
     language?: 'en' | 'ms' | 'vi'
     theme: {
@@ -303,4 +312,4 @@ export function generateBlocks(prompt: string): GenerationResult {
     }
 }
 
-export type { GenerationResult, BusinessIntent, GeneratedBlock }
+export type { GenerationResult, GeneratedPage, BusinessIntent, GeneratedBlock }

@@ -12,10 +12,10 @@
 
 | Feature | Tổng Bug | P0 Critical | P1 High | P2 Medium | Trạng thái |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| F05 — AI Editor | 21 | 4 | 3 | 3 | 🔴 BLOCKED |
+| F05 — AI Editor | 48 | 7 | 13 | 14 | 2 | 🔴 BLOCKED |
 
 > **⚠️ Release Decision: BLOCKED**
-> Có 4 lỗi P0 Critical liên quan đến luồng chính (Block/Crash) phải được fix ngay lập tức.
+> Có 7 lỗi P0 Critical liên quan đến luồng chính (Block/Crash) và rủi ro bảo mật (XSS) phải được fix ngay lập tức.
 
 ---
 
@@ -416,3 +416,305 @@ Block Library Panel hiện chứa 12 blocks không phù hợp, cần loại bỏ
 - Implement Add Link UI (Nút thêm link) trong Menu panel (Liên đới BUG-F05-002).
 - Tích hợp Cart/Checkout widget.
 - Implement Unsaved Warning modal.
+
+---
+
+## Bổ sung 27 Bugs từ QA Staging (Issue Comments)
+
+---
+
+### BUG-F05-022 · Hover trigger không chạy trên Inline Edit (Phải click)
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / Inline Edit |
+| **Nguồn** | Issue #67 |
+
+**Mô tả:** Spec yêu cầu hover vào phần tử 200ms thì hiển thị nút "✨ Edit with AI", nhưng thực tế phải bấm click trực tiếp thì nút mới xuất hiện. (TC-F05-03-01)
+
+---
+
+### BUG-F05-023 · Mobile Popup Inline Edit hiển thị sai dạng Floating Box
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / Inline Edit |
+| **Nguồn** | Issue #67 |
+
+**Mô tả:** Trên mobile (375px), popup sửa AI hiển thị bị lọt thỏm dạng hộp nổi (Floating box). Spec yêu cầu phải tự chuyển thành vuốt Bottom Sheet để phù hợp màn hình nhỏ.
+
+---
+
+### BUG-F05-024 · Bỏ quên giới hạn chiều dài của ô lệnh (Instruction)
+| | |
+| :--- | :--- |
+| **Severity** | 🟢 P3 Low |
+| **Module** | Editor / Inline Edit |
+| **Nguồn** | Issue #67 |
+
+**Mô tả:** Input lệnh AI không giới hạn số ký tự maximum, user có thể ném 400+ ký tự vào gây lãng phí API và overflow UI.
+
+---
+
+### BUG-F05-025 · Lưu font chữ báo lỗi Server HTTP 500
+| | |
+| :--- | :--- |
+| **Severity** | 🔴 P0 Critical |
+| **Module** | Editor / Styling |
+| **Nguồn** | Issue #67 |
+
+**Mô tả:** User chọn font chữ và submit cập nhật bằng tính năng inline edit, hệ thống crash trả lỗi báo HTTP 500 do lỗi data xử lý trên Server. Lỗi chặn quy trình design web.
+
+---
+
+### BUG-F05-026 · Box kéo thả thiếu Handle Bar (⠿) 
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / Drag Drop |
+| **Nguồn** | Issue #69 |
+
+**Mô tả:** Hover vào component block không làm lộ ra các icon neo (Drag Handle ⠿) để user biết là có thể kéo. Không tuân thủ AC-1 UX của kéo thả.
+
+---
+
+### BUG-F05-027 · AI Chat trả về Generic Error Message khi dùng công cụ
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / AI Engine |
+| **Nguồn** | Issue #69 |
+
+**Mô tả:** Trong luồng thao tác Drag & Drop sắp xếp, bot AI thỉnh thoảng gián đoạn và tự trả về string lỗi hệ thống (Generic error message) ra thẳng màn hình chat.
+
+---
+
+### BUG-F05-028 · Thao tác Hoàn tác (Undo) từ UI không cập nhật lại Preview iframe
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / Canvas |
+| **Nguồn** | Issue #69 |
+
+**Mô tả:** Tính năng lịch sử hoạt động ghi nhận thao tác, nhưng khi click nút Undo (AC-2 quy định) thì Canvas Preview / iframe bên trái đứng im, không render lại nội dung đã khôi phục.
+
+---
+
+### BUG-F05-029 · Mất tính năng Floating Toolbar trên Text
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / Inline WYSIWYG |
+| **Nguồn** | Issue #84 |
+
+**Mô tả:** Mốc AC-1 quy định double-click vào đoạn text trên iframe phải mở toolbar nổi (B, I, Link...), nhưng trigger event bị chết, không hiển thị thanh công cụ để định dạng.
+
+---
+
+### BUG-F05-030 · Không thể mở Image Toolbar khi chọn ảnh
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / Image WYSIWYG |
+| **Nguồn** | Issue #84 |
+
+**Mô tả:** Click trực tiếp vào một cấu kiện thư viện hình ảnh không mở được popup Image Toolbar (AC-2). User hiện bị kẹt không thể thay/đổi ảnh.
+
+---
+
+### BUG-F05-031 · Sidebar mất kết nối trực tiếp với Preview Events (Disconnecting state)
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / Sidebar |
+| **Nguồn** | Issue #84 |
+
+**Mô tả:** Sự kiện tương tác trên Iframe (click panel/ block) không kích hoạt trạng thái selected qua lại với bảng Sidebar panel bên tay phải. Flow React State sync có bug.
+
+---
+
+### BUG-F05-032 · Click vào Header không tự trigger chuyển tab sang Navigation Panel
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / Header Settings |
+| **Nguồn** | Issue #85 |
+
+**Mô tả:** Theo AC-1, click vào cục Header trên trang sẽ tự bắt Event nhảy sang tab cấu hình "Menu & Branding" trên sidebar, nhưng hiện không hoạt động.
+
+---
+
+### BUG-F05-033 · Sub-menu không render thành dropdown trên Storefront thực tế
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / Navigation |
+| **Nguồn** | Issue #85 |
+
+**Mô tả:** Dữ liệu cấu hình đã tạo tree cấu trúc Menu cấp cha-con, nhưng ra trang chủ hệ thống render toàn bộ link ra hàng ngang. Submenu bị gãy giao diện k thả dropdown xuống.
+
+---
+
+### BUG-F05-034 · Form thêm Menu Link không cho thả "Destination Type"
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / Navigation |
+| **Nguồn** | Issue #85 |
+
+**Mô tả:** Nút thêm liên kết không cho cấu hình Type (Trỏ về page trong hệ thống hay Trỏ External Link ra ngoài web). Cản trở tạo external link.
+
+---
+
+### BUG-F05-035 · Mất hoàn toàn tính năng thay Favicon
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / Branding |
+| **Nguồn** | Issue #85 |
+
+**Mô tả:** Yêu cầu (AC-2) có khả năng set Browser Icon tự động nhưng panel ko có tính năng uploasd / config Favicon.
+
+---
+
+### BUG-F05-036 · Endpoint 404 trả về cấu trúc Raw JSON thô thay vì Render giao diện
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / 404 Engine |
+| **Nguồn** | Issue #87 |
+
+**Mô tả:** Cố tình vào Invalid Link (đường dẫn lỗi), Server nhả thẳng Raw data JSON của page settings ra Client thay vì Compile component React. (AC-2 hỏng).
+
+---
+
+### BUG-F05-037 · Trợ lí tác vụ AI Chat từ chối nhận lệnh với Page 404
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / Chat |
+| **Nguồn** | Issue #87 |
+
+**Mô tả:** Mở màn Edit 404 Custom page rồi yêu cầu AI sửa một vài thứ, AI bị lỗi logic từ chối (Failed to process).
+
+---
+
+### BUG-F05-038 · Nút "Publish/Re-Publish" mở nhầm hộp thoại Unpublish
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / Publish |
+| **Nguồn** | Issue #88 |
+
+**Mô tả:** Bấm Cập nhật bản chỉnh sửa mới sau khi Live nhầm trigger mở modal cảnh báo "Bạn có muốn hạ website không". Code map nhầm Handle (BUG-02 AC-2). 
+
+---
+
+### BUG-F05-039 · Chế độ bảo trì hệ thống bị khuyết Banner Warning (Màu Vàng)
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / Maintainance |
+| **Nguồn** | Issue #88 |
+
+**Mô tả:** Website rơi vào trạng thái Unpublish, AC-4 yêu cầu owner trong Editor thấy Banner vàng "Trong quá trình bảo trì" ghim trên top nhưng thực tế không hiển thị banner nào.
+
+---
+
+### BUG-F05-040 · Thiếu thông báo Toast "Website đã Live" lúc Publish
+| | |
+| :--- | :--- |
+| **Severity** | 🟢 P3 Low |
+| **Module** | Editor / Publish |
+| **Nguồn** | Issue #88 |
+
+**Mô tả:** Trình xuất bản code thiếu thông báo trực quan xác nhận Publish Success trên Editor.
+
+---
+
+### BUG-F05-041 · 🔴 LỖI BẢO MẬT: XSS Payload lọt xuống Database qua ô Social Links
+| | |
+| :--- | :--- |
+| **Severity** | 🔴 P0 Critical |
+| **Module** | Editor / Social Network |
+| **Nguồn** | Issue #89 |
+
+**Mô tả:** Validation cho Links mxh không hoạt động. Điền code Injection XSS (`<script>alert(1)</script>`) và lưu -> Load Frontend dính nguy cơ thực thi code. Trực tiếp là lỗi Security Severity High. 
+
+---
+
+### BUG-F05-042 · Font Awesome Components gãy Icon, chữ "FA" nhường chỗ
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / UI Libs |
+| **Nguồn** | Issue #89 |
+
+**Mô tả:** Icon các mạng xã hội gắn bị tải hư (Broken text font). Chữ "FA" bị hở ra trên web client.
+
+---
+
+### BUG-F05-043 · Không Validation Format (định dạng URL) đối với Social Links
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / Social Network |
+| **Nguồn** | Issue #89 |
+
+**Mô tả:** Điền các dữ liệu URL sai "abc", "không url" hệ thống mạng không bắt lỗi sai format url (AC-1).
+
+---
+
+### BUG-F05-044 · 🔴 LỖI BẢO MẬT: XSS Data Injection vào Tên Công Ty (Business Name)
+| | |
+| :--- | :--- |
+| **Severity** | 🔴 P0 Critical |
+| **Module** | Editor / Global Settings |
+| **Nguồn** | Issue #90 |
+
+**Mô tả:** Tiếp tục xuất hiện lỗ hổng Check Data: Input Business Name cho phép truyền XSS script tag. 
+
+---
+
+### BUG-F05-045 · Mất Validation check ngữ pháp Email và Phone
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / Global Info |
+| **Nguồn** | Issue #90 |
+
+**Mô tả:** Global Setting không filter ký tự. Điền text abc vào ô Số điện thoại hoặc @! email lộn xộn đều Submit hợp lệ lưu DB (AC-2).
+
+---
+
+### BUG-F05-046 · Giao diện chuyển ngữ cảnh Context-Sensitive Panel không tự kích hoạt
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / UX Flow |
+| **Nguồn** | Issue #90 |
+
+**Mô tả:** Cơ chế thông minh mở đúng Tab Panel tùy thuộc việc user Click khối nào dưới Iframe không trigger (Thiếu auto-switch).
+
+---
+
+### BUG-F05-047 · Dropdown chọn trang Page thuộc Tab SEO không hiển thị bất kỳ kết quả nào
+| | |
+| :--- | :--- |
+| **Severity** | 🟠 P1 High |
+| **Module** | Editor / SEO |
+| **Nguồn** | Issue #90 |
+
+**Mô tả:** Tab SEO Panel cung cấp Select Form dropdown "Select a page", tuy nhiên dữ liệu mảng trả về là RỖNG (No pages available) mặc dù hệ thống đang edit page đó.
+
+---
+
+### BUG-F05-048 · Khối Configuration SEO Settings hiển thị sai khu vực 
+| | |
+| :--- | :--- |
+| **Severity** | 🟡 P2 Medium |
+| **Module** | Editor / SEO |
+| **Nguồn** | Issue #90 |
+
+**Mô tả:** Modules SEO không chạy đúng trong Accordion "Global/SEO" đã đề cập ở Spec (AC-1, BUG-01).
+

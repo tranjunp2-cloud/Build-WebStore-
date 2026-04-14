@@ -1,133 +1,137 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useNotificationStore } from '@/store/notificationStore'
 import { useI18n } from '@/i18n'
 import type { NotificationsResponse } from '@/types/notification'
 
-const DEBOUNCE_MS = 1000
-const RECONNECT_BASE_MS = 3000
-const RECONNECT_MAX_MS = 60000
-const MAX_RECONNECT_ATTEMPTS = 10
+const POLL_INTERVAL_MS = 15_000
+const POLL_BACKOFF_MAX_MS = 60_000
+const POLL_ERROR_MULTIPLIER = 2
 
 /**
- * Headless provider that manages the SSE connection to /api/notifications/stream.
+ * Headless provider that polls /api/notifications for new notifications.
  *
- * On each incoming notification event:
- *  1. Immediately increments the unread badge count
- *  2. Buffers events for 1s (debounce)
- *  3. After quiet period, emits a 'notification-toast' CustomEvent:
- *     - Single event → fetches latest notification for specific toast content
- *     - Burst (N events) → generic "{count} new notifications" toast
+ * On each poll cycle:
+ *  1. Fetches notifications newer than last check
+ *  2. Updates unread badge count
+ *  3. Emits 'notification-toast' CustomEvent for new items:
+ *     - Single new item → fetches details for specific toast
+ *     - Multiple new items → generic "{count} new notifications" toast
  *
- * Auto-reconnects on SSE error with exponential backoff.
- * Cleans up EventSource + timers on unmount.
+ * Pauses polling when tab is hidden (Visibility API).
+ * Uses AbortController to prevent overlapping fetches.
+ * Exponential backoff on consecutive errors.
  */
 export function NotificationProvider() {
-    const incrementUnreadCount = useNotificationStore((s) => s.incrementUnreadCount)
+    const { setUnreadCount } = useNotificationStore()
     const { t, ti } = useI18n()
 
-    // Refs to access latest values in async callbacks without re-triggering effects
     const tRef = useRef(t)
     const tiRef = useRef(ti)
     tRef.current = t
     tiRef.current = ti
-    const incrementRef = useRef(incrementUnreadCount)
-    incrementRef.current = incrementUnreadCount
+
+    const lastPollRef = useRef<string>(new Date().toISOString())
+    const intervalRef = useRef(POLL_INTERVAL_MS)
+    const prevUnreadRef = useRef<number | null>(null)
+    const abortRef = useRef<AbortController | null>(null)
+
+    const emitToast = useCallback((detail: { id: string; title: string; type?: string; message?: string }) => {
+        window.dispatchEvent(new CustomEvent('notification-toast', { detail }))
+    }, [])
+
+    const poll = useCallback(async () => {
+        // Abort any in-flight request
+        if (abortRef.current) abortRef.current.abort()
+        const controller = new AbortController()
+        abortRef.current = controller
+
+        try {
+            const since = encodeURIComponent(lastPollRef.current)
+            const res = await fetch(`/api/notifications?since=${since}`, {
+                signal: controller.signal,
+            })
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+            const data = (await res.json()) as NotificationsResponse
+            const newItems = data.items ?? []
+            const serverUnread = data.unreadCount ?? 0
+
+            // Update unread count from server (source of truth)
+            setUnreadCount(serverUnread)
+
+            // Emit toast only for genuinely new notifications
+            const hadPrevCount = prevUnreadRef.current !== null
+            const countDelta = hadPrevCount ? serverUnread - (prevUnreadRef.current ?? 0) : 0
+            prevUnreadRef.current = serverUnread
+
+            if (hadPrevCount && countDelta > 0 && newItems.length > 0) {
+                if (newItems.length === 1) {
+                    const item = newItems[0]
+                    emitToast({
+                        id: item.id,
+                        title: item.title,
+                        type: item.type,
+                        message: item.message,
+                    })
+                } else {
+                    const title = tiRef.current(tRef.current.notifications.toast.newCount, {
+                        count: newItems.length,
+                    })
+                    emitToast({ id: `burst-${Date.now()}`, title, type: 'BURST' })
+                }
+            }
+
+            lastPollRef.current = new Date().toISOString()
+            // Reset interval on success
+            intervalRef.current = POLL_INTERVAL_MS
+        } catch (err) {
+            if ((err as Error).name === 'AbortError') return
+            // Exponential backoff on error
+            intervalRef.current = Math.min(
+                intervalRef.current * POLL_ERROR_MULTIPLIER,
+                POLL_BACKOFF_MAX_MS,
+            )
+        }
+    }, [setUnreadCount, emitToast])
 
     useEffect(() => {
         let mounted = true
-        let eventSource: EventSource | null = null
-        const buffer: string[] = []
-        let debounceTimer: ReturnType<typeof setTimeout> | null = null
-        let reconnectTimer: ReturnType<typeof setTimeout> | null = null
-        let reconnectAttempts = 0
+        let timer: ReturnType<typeof setTimeout> | null = null
 
-        function emitToast(detail: { id: string; title: string; type?: string; message?: string }) {
-            window.dispatchEvent(new CustomEvent('notification-toast', { detail }))
-        }
-
-        async function processBuffer() {
-            const events = buffer.splice(0)
-            if (events.length === 0) return
-
-            if (events.length === 1) {
-                try {
-                    const res = await fetch('/api/notifications?limit=1')
-                    if (res.ok) {
-                        const data = (await res.json()) as NotificationsResponse
-                        const item = data.items?.[0]
-                        if (item) {
-                            emitToast({
-                                id: item.id,
-                                title: item.title,
-                                type: item.type,
-                                message: item.message,
-                            })
-                            return
-                        }
-                    }
-                } catch (err) {
-                    console.warn('Failed to fetch notification', err)
-                }
-                emitToast({
-                    id: events[0],
-                    title: tRef.current.notifications.toast.newNotification,
-                })
-            } else {
-                const title = tiRef.current(tRef.current.notifications.toast.newCount, {
-                    count: events.length,
-                })
-                emitToast({ id: `burst-${Date.now()}`, title, type: 'BURST' })
-            }
-        }
-
-        function connect() {
+        function scheduleNext() {
             if (!mounted) return
-            if (eventSource) eventSource.close()
+            timer = setTimeout(async () => {
+                await poll()
+                scheduleNext()
+            }, intervalRef.current)
+        }
 
-            const es = new EventSource('/api/notifications/stream')
-            eventSource = es
+        // Initial poll immediately
+        poll().then(() => scheduleNext())
 
-            es.addEventListener('connected', () => {
-                reconnectAttempts = 0
-            })
-
-            es.addEventListener('notification', (event: MessageEvent) => {
-                try {
-                    const data = JSON.parse(event.data) as { id?: string | number }
-                    incrementRef.current()
-                    buffer.push(String(data.id ?? Date.now()))
-                    if (debounceTimer) clearTimeout(debounceTimer)
-                    debounceTimer = setTimeout(() => processBuffer(), DEBOUNCE_MS)
-                } catch (err) {
-                    console.warn('Malformed notification event', err)
-                }
-            })
-
-            es.onerror = () => {
-                es.close()
-                eventSource = null
-                if (mounted && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                    const delay = Math.min(
-                        RECONNECT_BASE_MS * 2 ** reconnectAttempts,
-                        RECONNECT_MAX_MS,
-                    )
-                    reconnectAttempts += 1
-                    reconnectTimer = setTimeout(() => connect(), delay)
-                }
+        // Pause/resume on visibility change
+        function handleVisibility() {
+            if (document.hidden) {
+                if (timer) clearTimeout(timer)
+                timer = null
+            } else {
+                // Fetch immediately on tab focus, then resume schedule
+                poll().then(() => scheduleNext())
             }
         }
 
-        connect()
+        document.addEventListener('visibilitychange', handleVisibility)
 
         return () => {
             mounted = false
-            if (eventSource) eventSource.close()
-            if (debounceTimer) clearTimeout(debounceTimer)
-            if (reconnectTimer) clearTimeout(reconnectTimer)
+            if (timer) clearTimeout(timer)
+            if (abortRef.current) abortRef.current.abort()
+            document.removeEventListener('visibilitychange', handleVisibility)
         }
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps -- refs used for latest values
+    }, [poll])
 
     return null
 }

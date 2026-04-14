@@ -53,6 +53,7 @@ type SiteData = {
     }
     publishedAt?: string | null
     tenantSlug?: string | null
+    primaryDomain?: string | null
 }
 
 type LoadedPageData = {
@@ -100,6 +101,7 @@ export default function EditorPage() {
     const pages = useEditorStore(state => state.pages)
     const currentPageId = useEditorStore(state => state.currentPageId)
     const hasUnsavedChanges = useEditorStore(state => state.hasUnsavedChanges)
+    const hasUnpublishedChanges = useEditorStore(state => state.hasUnpublishedChanges)
     const lastSavedAt = useEditorStore(state => state.lastSavedAt)
     const isSaving = useEditorStore(state => state.isSaving)
     const autoSaveEnabled = useEditorStore(state => state.autoSaveEnabled)
@@ -124,6 +126,7 @@ export default function EditorPage() {
     const canUndo = useEditorStore(state => state.canUndo)
     const canRedo = useEditorStore(state => state.canRedo)
     const markSaved = useEditorStore(state => state.markSaved)
+    const markPublished = useEditorStore(state => state.markPublished)
     const setIsSaving = useEditorStore(state => state.setIsSaving)
 
     const currentBlock = useMemo(
@@ -133,11 +136,14 @@ export default function EditorPage() {
     const isPublished = site?.status === 'published'
     const wasPublished = !isPublished && !!site?.publishedAt
     const siteUrl = useMemo(() => {
+        if (site?.primaryDomain) {
+            return `https://${site.primaryDomain}`
+        }
         const slug = site?.tenantSlug
         if (!slug) return null
         const domain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
         return `https://${slug}.${domain}`
-    }, [site?.tenantSlug])
+    }, [site?.primaryDomain, site?.tenantSlug])
 
     const lastSavedLabel = useMemo(() => {
         if (!lastSavedAt) return null
@@ -300,6 +306,18 @@ export default function EditorPage() {
         return () => window.clearTimeout(timer)
     }, [autoSaveEnabled, autoSaveIntervalMs, handleSave, hasUnsavedChanges, siteId])
 
+    // Warn user before leaving page with unsaved changes
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (hasUnsavedChanges) {
+                e.preventDefault()
+                e.returnValue = ''
+            }
+        }
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+    }, [hasUnsavedChanges])
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement
@@ -434,16 +452,17 @@ export default function EditorPage() {
         void handleSave({ showToast: false, refreshPreview: true })
     }, [updateBlock, handleSave])
 
-    const handleReorderBlocks = useCallback((fromIndex: number, toIndex: number) => {
+    const handleReorderBlocks = useCallback(async (fromIndex: number, toIndex: number) => {
         if (fromIndex === toIndex) return
         reorderBlocks(fromIndex, toIndex)
         setSelectedBlock(toIndex)
-        setIframeKey(key => key + 1)
+        // Save FIRST so iframe reloads with correct order from DB
+        await handleSave({ showToast: false, refreshPreview: true })
         setChatActivity({
             id: `reorder-${Date.now()}`,
             content: `Moved block #${fromIndex + 1} to position #${toIndex + 1}`,
         })
-    }, [reorderBlocks])
+    }, [reorderBlocks, handleSave])
 
     const handleBlockDrop = useCallback((index: number, blockData: { blockType: string, variant: string }) => {
         const nextBlock = normalizeAddSectionBlock(
@@ -580,7 +599,12 @@ export default function EditorPage() {
 
             setIsPublishModalOpen(false)
             setIsUnpublishModalOpen(false)
-            
+
+            // Clear unpublished changes flag after successful publish
+            if (!currentlyPublished) {
+                markPublished()
+            }
+
             if (!currentlyPublished) {
                 const data = await res.json()
                 const siteUrl = data?.data?.url || data?.data?.domain
@@ -606,7 +630,54 @@ export default function EditorPage() {
         } finally {
             setIsPublishing(false)
         }
-    }, [handleSave, hasUnsavedChanges, isPublishing, site?.status, siteId, siteName])
+    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, site?.status, siteId, siteName])
+
+    // Re-publish: always PATCH (never DELETE). Used by "Update" button on published sites.
+    const handleRepublish = useCallback(async () => {
+        if (!siteId || isPublishing) return
+
+        setIsPublishing(true)
+        try {
+            if (hasUnsavedChanges) {
+                const saved = await handleSave({ showToast: false, refreshPreview: true })
+                if (!saved) {
+                    setIsPublishing(false)
+                    return
+                }
+            }
+
+            const res = await fetch(`/api/sites/${siteId}/publish`, {
+                method: 'PATCH',
+                credentials: 'include',
+            })
+
+            if (!res.ok) throw new Error(`Server returned ${res.status}`)
+
+            markPublished()
+            setPublishSuccess(true)
+
+            const data = await res.json()
+            const url = data?.data?.url || data?.data?.domain
+            if (url) {
+                toast.success(`🎉 ${t.editor.toast.publishSuccess}`, {
+                    description: ti(t.editor.toast.publishSuccessDomain, { domain: url.replace(/^https?:\/\//, '') }),
+                    action: {
+                        label: 'View',
+                        onClick: () => window.open(url.startsWith('http') ? url : `https://${url}`, '_blank')
+                    }
+                })
+            } else {
+                toast.success(`🎉 ${t.editor.toast.publishSuccess}`)
+            }
+
+            window.setTimeout(() => setPublishSuccess(false), 3000)
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Publish failed'
+            toast.error(t.editor.toast.publishFailed, { description: message })
+        } finally {
+            setIsPublishing(false)
+        }
+    }, [handleSave, hasUnsavedChanges, isPublishing, markPublished, siteId])
 
     const handlePageSelected = useCallback(async (pageId: string) => {
         const store = useEditorStore.getState()
@@ -735,6 +806,7 @@ export default function EditorPage() {
                 isSaving={isSaving}
                 saveSuccess={saveSuccess}
                 hasUnsavedChanges={hasUnsavedChanges}
+                hasUnpublishedChanges={hasUnpublishedChanges}
                 isPublishing={isPublishing}
                 publishSuccess={publishSuccess}
                 canUndo={canUndo()}
@@ -748,7 +820,7 @@ export default function EditorPage() {
                 onRedo={handleRedo}
                 onSave={() => void handleSave()}
                 onPublish={() => setIsPublishModalOpen(true)}
-                onRepublish={handlePublish}
+                onRepublish={handleRepublish}
                 onUnpublish={() => setIsUnpublishModalOpen(true)}
                 onViewLive={() => siteUrl && window.open(siteUrl, '_blank')}
                 onCopyLink={() => {

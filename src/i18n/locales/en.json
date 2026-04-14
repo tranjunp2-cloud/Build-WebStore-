@@ -296,11 +296,11 @@
             "morning": "morning",
             "afternoon": "afternoon",
             "evening": "evening",
-            "customize": "Customize Dashboard",
+            "customize": "Customize",
             "stats": {
-                "views": "Traffic / Views",
-                "leads": "Leads / Clicks",
-                "engagement": "Engagement",
+                "views": "Views (Traffic)",
+                "leads": "Clicks (Leads)",
+                "engagement": "Checkout (Engagement)",
                 "revenue": "Revenue",
                 "pendingOrders": "pending orders"
             },
@@ -420,6 +420,54 @@
                 "description": "Create a site first to use the SEO Dashboard",
                 "cta": "Go to Dashboard"
             },
+            "healthOverview": "SEO Health Overview",
+            "scoreLabel": "Score: {score}/100",
+            "fixAllButton": "✨ AI Fix All Issues",
+            "contentQuality": "Content Quality",
+            "technicalSeo": "Technical SEO",
+            "sitemapAndMeta": "Sitemap & Meta Tags",
+            "lastUpdated": "Last updated: {date}",
+            "generating": "Generating...",
+            "sitemapCount": "Sitemap generated — {count} pages",
+            "sitemapEmpty": "Sitemap generated — no pages yet",
+            "autoMeta": {
+                "enabled": "Auto Meta Generation: Enabled",
+                "disabled": "Auto Meta Generation: Disabled"
+            },
+            "keywordColumns": {
+                "keyword": "Keyword",
+                "rank": "Rank",
+                "trend": "Trend",
+                "action": "Action",
+                "delete": "Del"
+            },
+            "keywordModal": {
+                "title": "Add Keyword",
+                "label": "Enter new keyword",
+                "placeholder": "Enter keyword...",
+                "cancel": "Cancel",
+                "save": "Save"
+            },
+            "emptySlot": "(Empty slot)",
+            "fixAllProgress": "AI Fix in Progress",
+            "reviewTitle": "Review Proposed Fixes",
+            "currentLabel": "Current",
+            "proposedLabel": "Proposed",
+            "fixAllComplete": "All Issues Fixed!",
+            "fixAllFailed": "Fix Failed",
+            "overallProgress": "Overall Progress",
+            "fixAllAnalysing": "Analysing {count} items...",
+            "fixAllApply": "Apply {count} Fixes",
+            "selectAll": "Select all",
+            "deselectAll": "Deselect all",
+            "warningLabel": "Warning",
+            "allGood": "All good! No critical SEO issues.",
+            "issueMissingProductTitle": "Missing Meta Title in {count} products",
+            "issueMissingPageTitle": "Missing Meta Title in {count} pages",
+            "issueMissingBlogTitle": "Missing Meta Title in {count} blog posts",
+            "issueMissingDesc": "Missing Meta Description across {count} resources",
+            "issueMissingAlt": "Images missing Alt text in {count} products",
+            "issueScoreLow": "SEO score is {score}/100 — improve Content & Technical SEO",
             "error": {
                 "failed": "SEO analysis failed",
                 "retry": "Retry"
@@ -1316,23 +1364,19 @@
         },
         "overview": {
             "title": "Help Center",
-            "subtitle": "Learn how to use your online store management system.",
+            "subtitle": "Learn how to use your website management system.",
             "welcomeTitle": "👋 Welcome to EchPrime!",
-            "welcomeDesc": "EchPrime CMS helps you manage your entire online store — from creating websites, managing products, processing orders to analyzing revenue. Here is an overview of the main features.",
+            "welcomeDesc": "EchPrime helps you build and manage your professional website — from creating websites with AI, writing SEO-optimized blog posts to tracking traffic and engagement. Here is an overview of the main features.",
             "featuresTitle": "🚀 Key Features",
             "features": {
                 "dashboardTitle": "Dashboard",
-                "dashboardDesc": "View real-time overview of revenue, orders, and visitors.",
+                "dashboardDesc": "View real-time overview of website traffic, leads, and engagement.",
                 "aiBuilderTitle": "AI Website Builder",
-                "aiBuilderDesc": "Create a professional sales website in just 5 minutes with AI.",
-                "productsTitle": "Products",
-                "productsDesc": "Manage products, RM prices, inventory, Halal Badge, and product images.",
-                "ordersTitle": "Orders",
-                "ordersDesc": "Process COD, Bank Transfer, DuitNow orders. Print invoices with one click.",
+                "aiBuilderDesc": "Create a professional website in just 5 minutes with AI.",
                 "blogTitle": "Blog",
                 "blogDesc": "Write SEO-friendly blog posts to attract more customers.",
-                "settingsTitle": "Store Settings",
-                "settingsDesc": "Configure domain, payments, and invite admin staff."
+                "settingsTitle": "Settings",
+                "settingsDesc": "Configure domain and invite admin staff."
             },
             "needHelpTitle": "📞 Need more help?",
             "needHelpDesc": "If you can't find the answer, contact our support team via WhatsApp or email "
@@ -1347,47 +1391,12 @@
                 "fullResolution": "Full resolution screenshot"
             },
             "data": {
-                "products": {
-                    "label": "Products",
-                    "steps": [
-                        {
-                            "title": "Access Products Menu",
-                            "desc": "From the left Sidebar, click on <strong>\"📦 Products\"</strong> to open your current product list.",
-                            "imgTitle": "Product List View"
-                        },
-                        {
-                            "title": "Create New Product",
-                            "desc": "Click the <strong>[+ Add Product]</strong> button at the top right. Fill out the form:<ul class=\"text-[#9CA3AF] mb-4 mt-1 ml-5 text-[14px] leading-[24px] list-disc marker:text-[#9CA3AF]\"><li>Product name, RM price, detailed description</li><li>Upload product images (WebP recommended, ≤ 5MB/image)</li><li>Enable Halal Badge if the product has JAKIM certification</li><li>Set inventory and shipping weight</li></ul>",
-                            "imgTitle": "Product Create Form"
-                        },
-                        {
-                            "title": "Manage Product Images",
-                            "desc": "Drag and drop or click <strong>Browse Files</strong> to upload multiple images. Drag and drop to reorder. The first image will be the primary image on the Storefront.",
-                            "imgTitle": "Image Gallery Manager"
-                        }
-                    ]
-                },
-                "orders": {
-                    "label": "Orders",
-                    "steps": [
-                        {
-                            "title": "View Order List",
-                            "desc": "Go to <strong>\"🛒 Orders\"</strong> to view all orders. Use the Status filter to find orders that need processing.",
-                            "imgTitle": "Orders List"
-                        },
-                        {
-                            "title": "Process Orders",
-                            "desc": "Click on an order to view details. Update status: <strong>Confirmed → Shipped → Delivered</strong>. Enter J&T/Pos Laju tracking code.",
-                            "imgTitle": "Order Detail"
-                        }
-                    ]
-                },
                 "dashboard": {
                     "label": "Dashboard",
                     "steps": [
                         {
                             "title": "Dashboard Overview",
-                            "desc": "The dashboard displays key metrics: total revenue, number of orders, visitors, and Quick Actions.",
+                            "desc": "The dashboard displays key metrics: website traffic, leads, engagement, and SEO health score.",
                             "imgTitle": "Dashboard Overview"
                         }
                     ]
@@ -1419,23 +1428,34 @@
             "emptyTitle": "No answers found",
             "emptyDesc": "Try different keywords or contact support via WhatsApp.",
             "categories": {
-                "productsTitle": "🛍️ Product Management",
-                "qAddProduct": "How to add new products?",
-                "aAddProduct": "Go to <strong>Products</strong> menu → click <strong>[+ Add Product]</strong> at top right. Fill in name, RM price, description, upload product images (max 10, WebP recommended). Click <strong>Save</strong>.",
-                "qMultipleImages": "How to upload multiple images?",
-                "aMultipleImages": "Drag and drop images into upload area, or use <strong>Browse Files</strong>. Max 10 images, ≤ 5MB each. Formats: JPG, PNG, WebP.",
-                "qHalal": "Where does Halal Badge display?",
-                "aHalal": "Halal Badge (JAKIM) shows on <strong>Product Card</strong> and <strong>Product Detail Page</strong> at storefront. Enable it in product form → <strong>Halal Certification</strong> section.",
-                "ordersTitle": "🛒 Order Management",
-                "qCod": "How are COD orders processed?",
-                "aCod": "COD orders will have a <strong>Pending Payment</strong> status until shipper confirms collection. You can manually update status in order details → <strong>Mark as Paid</strong>.",
-                "qInvoice": "How to print packing slips/invoices?",
-                "aInvoice": "Go to <strong>Orders</strong> → select order → click <strong>Print Invoice</strong> or <strong>Print Packing Slip</strong>. The system will generate a PDF for printing.",
-                "paymentsTitle": "💳 Payments",
-                "qFpx": "Which payment methods are supported?",
-                "aFpx": "EchPrime supports: <strong>FPX</strong> (Malaysia online banking), <strong>Credit/Debit Card</strong> (Visa, Mastercard), <strong>DuitNow QR</strong>, <strong>COD</strong> (Cash on Delivery), and manual <strong>Bank Transfer</strong>.",
-                "qSst": "Is SST 6% calculated automatically?",
-                "aSst": "Yes, when you enable <strong>SST</strong> in <strong>Store Settings → Tax Configuration</strong>, the system calculates 6% SST automatically and displays it clearly to the buyer."
+                "dashboardTitle": "📊 Dashboard",
+                "qDashboardMetrics": "What metrics are shown on the Dashboard?",
+                "aDashboardMetrics": "The Dashboard displays three key metrics: <strong>Traffic / Views</strong> (total page visits), <strong>Leads / Clicks</strong> (link clicks and interactions), and <strong>Engagement</strong> (non-pageview user activities). Use the period selector to view data for Today, 7 days, or 30 days.",
+                "qDashboardCustomize": "How to customize the Dashboard layout?",
+                "aDashboardCustomize": "Click the <strong>Customize</strong> button at the top right of the Dashboard. A modal will appear where you can drag-and-drop to reorder metric cards, and toggle the eye icon to show or hide specific metrics.",
+                "qDashboardSeo": "What is the SEO Health Widget?",
+                "aDashboardSeo": "The <strong>SEO Health Widget</strong> displays your website's SEO score out of 100. It shows warnings like missing meta titles or unoptimized images. Click <strong>\"AI Fix All Issues\"</strong> to let AI automatically optimize your site's SEO.",
+                "builderTitle": "🤖 AI Website Builder",
+                "qBuilderCreate": "How to create a website with AI?",
+                "aBuilderCreate": "Click <strong>\"Build with AI\"</strong> on the Dashboard or go to <strong>Builder → New</strong>. Enter your business name, select your industry, describe your products/services, then click <strong>\"Continue — AI will create your website\"</strong>. AI will generate a complete website in about 30-60 seconds.",
+                "qBuilderEdit": "Can I edit the AI-generated website?",
+                "aBuilderEdit": "Yes! After AI generates your website, you can fully customize it using the <strong>Visual Editor</strong>. Edit text, change images, rearrange sections, adjust colors and fonts — all with a drag-and-drop interface.",
+                "qBuilderMobile": "Is the AI-generated website mobile-responsive?",
+                "aBuilderMobile": "Yes, all AI-generated websites are fully responsive. You can preview both <strong>Desktop</strong> and <strong>Mobile</strong> views using the toggle buttons in the Website Preview page. The layout automatically adapts to all screen sizes.",
+                "blogTitle": "📝 Blog",
+                "qBlogCreate": "How to create a new blog post?",
+                "aBlogCreate": "Go to <strong>\"📝 Blog\"</strong> in the sidebar → click <strong>[+ New Post]</strong>. Enter a title, write content using the Rich Text Editor, upload a featured thumbnail, set the category and publish date, then click <strong>Publish</strong> or <strong>Save Draft</strong>.",
+                "qBlogAi": "How does the AI Blog Assistant work?",
+                "aBlogAi": "Click the <strong>\"AI Assistant\"</strong> button (purple) at the top right of the blog editor. Enter your topic, choose a tone of voice (Professional, Friendly, or Persuasive), then click <strong>\"Generate Blog Idea\"</strong>. AI will generate a title, content outline, and SEO meta for you.",
+                "qBlogSeo": "How to optimize blog posts for SEO?",
+                "aBlogSeo": "In the blog editor, scroll to the <strong>\"Search Optimization (SEO)\"</strong> section on the right sidebar. Fill in the <strong>Meta Title</strong> (max 60 characters) and <strong>Meta Description</strong> (max 160 characters). You can also click <strong>\"Generate via AI\"</strong> to auto-generate optimized meta tags.",
+                "settingsTitle": "⚙️ Settings",
+                "qSettingsDomain": "How to connect a custom domain?",
+                "aSettingsDomain": "Go to <strong>\"⚙️ Settings → Domains\"</strong>. Click <strong>\"+ Add Custom Domain\"</strong>, enter your domain name (e.g., abccompany.com). Then configure DNS records at your domain registrar and click <strong>\"Verify Connection\"</strong>.",
+                "qSettingsDns": "How to configure DNS records?",
+                "aSettingsDns": "After adding your domain, the system shows the required DNS records:<ul><li><strong>A Record</strong> — Point your domain to the static IP address shown (e.g., 162.159.140.98)</li><li><strong>CNAME Record</strong> — Point to <strong>web-v2.dev.ecommercehub.my</strong></li></ul>DNS propagation typically takes 15 minutes to 48 hours depending on your registrar.",
+                "qSettingsStaff": "How to invite admin staff?",
+                "aSettingsStaff": "Go to <strong>\"⚙️ Settings → Staff\"</strong>. Click <strong>\"Invite Staff\"</strong>, enter their email address, and select a role (Viewer or Full Access). They will receive an email invitation to join your workspace."
             }
         }
     },
@@ -1585,6 +1605,41 @@
         "maintenance": {
             "banner": "Website is in Maintenance Mode. Customers will see a maintenance page.",
             "republish": "Re-publish"
+        },
+        "pageManager": {
+            "addNewPage": "+ Add New Page",
+            "searchPlaceholder": "Search pages...",
+            "pageNamePlaceholder": "Page name (e.g. Promotions)",
+            "slugPreview": "Slug:",
+            "cancel": "Cancel",
+            "create": "Create",
+            "home": "Home",
+            "editing": "Editing",
+            "editWithAI": "Edit with AI Chat",
+            "visible": "Visible",
+            "hidden": "Hidden",
+            "delete": "Delete",
+            "pageCreated": "Page created successfully",
+            "pageHidden": "Page hidden",
+            "visibilityFailed": "Failed to update visibility",
+            "deleteFailed": "Failed to delete page",
+            "deleteSuccess": "Page deleted. Undo?",
+            "undo": "Undo",
+            "restored": "Page restored",
+            "restoreFailed": "Failed to restore page",
+            "hidePage": "Hide page",
+            "showPage": "Show page",
+            "deletePage": "Delete page",
+            "homeProtected": "Homepage cannot be deleted",
+            "homeHideProtected": "Homepage cannot be hidden",
+            "deleteConfirmTitle": "Delete this page?",
+            "deleteConfirmMsg": "Are you sure you want to delete page",
+            "deleteConfirmDesc": "You can undo within a few seconds after deletion.",
+            "confirmDelete": "Delete",
+            "customPage": "Custom 404 Page",
+            "emptyTitle": "No pages yet",
+            "emptyDesc": "Create your first page to get started.",
+            "slugLocked": "Slug is locked after publishing to protect SEO and external links."
         }
     }
 }
