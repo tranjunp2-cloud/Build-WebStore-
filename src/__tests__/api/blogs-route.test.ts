@@ -51,7 +51,12 @@ describe('GET /api/blogs [TC-F17]', () => {
 
         expect(mockFind).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: expect.objectContaining({ title: { contains: 'test' } }),
+                where: expect.objectContaining({
+                    or: [
+                        { title: { contains: 'test' } },
+                        { slug: { contains: 'test' } },
+                    ],
+                }),
             }),
         )
     })

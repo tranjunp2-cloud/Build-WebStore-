@@ -44,7 +44,10 @@ export const GET = withAuth(async (user, req) => {
         }
 
         if (search) {
-            where.title = { contains: search }
+            where.or = [
+                { title: { contains: search } },
+                { slug: { contains: search } },
+            ]
         }
         if (status && (status === 'draft' || status === 'published')) {
             where.status = { equals: status }
