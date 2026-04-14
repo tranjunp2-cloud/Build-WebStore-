@@ -1,18 +1,19 @@
 'use client'
 
-import { useI18n } from '@/i18n'
+import { DashboardTabs } from './DashboardTabs'
 import { PeriodSelector } from './PeriodSelector'
 
 export function AnalyticsHeader() {
-    const { t } = useI18n()
-    
     return (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-                <h1 className="text-2xl font-bold text-white">{t.dashboard.analytics.title}</h1>
-                <p className="mt-1 text-sm text-gray-400">{t.dashboard.analytics.subtitle}</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <DashboardTabs />
+            
+            <div className="flex items-center flex-wrap gap-3">
+                <PeriodSelector />
+                <button className="flex items-center px-4 py-[7px] border border-[#1F2937] rounded-lg text-[13px] font-semibold text-white/90 hover:border-blue-500 hover:text-blue-500 transition-colors h-full bg-[#161E2E]">
+                    ⚙️ Settings
+                </button>
             </div>
-            <PeriodSelector />
         </div>
     )
 }

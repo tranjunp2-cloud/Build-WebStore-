@@ -397,21 +397,29 @@ const GalleryBlock = {
 }
 
 
-const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation }) => {
+const afterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, operation, req }) => {
     const isPublishingUpdate = operation === 'update' && doc._status === 'published' && previousDoc?._status !== 'published'
     const isPublishingCreate = operation === 'create' && doc._status === 'published'
 
     // Wait until it becomes published and seo title is empty
     if ((isPublishingUpdate || isPublishingCreate) && !doc.seo?.title) {
+        const siteId = typeof doc.site === 'object' ? doc.site.id : doc.site
+
+        // Check if auto meta generation is enabled for this site
+        try {
+            const site = await req.payload.findByID({ collection: 'sites', id: siteId, depth: 0 })
+            if (site.seo?.autoMetaEnabled === false) return
+        } catch { /* proceed if can't check */ }
+
         // Collect text content for context (very basic extraction)
         let textContext = ''
         if (Array.isArray(doc.layout)) {
             const texts = doc.layout.map((block: Record<string, unknown>) => block.headline || block.sectionLabel || '').filter(Boolean)
             textContext = texts.join('. ')
         }
-        
+
         // Trigger background generation
-        queueSEOAutoGeneration('pages', doc.id, typeof doc.site === 'object' ? doc.site.id : doc.site, doc.title, textContext)
+        queueSEOAutoGeneration('pages', doc.id, siteId, doc.title, textContext)
     }
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCartStore } from '@/store/cartStore'
+import { trackEvent } from '@/lib/analytics/track-event'
 
 type AddToCartButtonProps = {
     product: {
@@ -15,9 +16,10 @@ type AddToCartButtonProps = {
     }
     primaryColor: string
     siteSlug: string
+    siteId?: string
 }
 
-export function AddToCartButton({ product, primaryColor, siteSlug }: AddToCartButtonProps) {
+export function AddToCartButton({ product, primaryColor, siteSlug, siteId }: AddToCartButtonProps) {
     const { addItem, setSiteSlug } = useCartStore()
     const isOutOfStock = product.inventory <= 0
 
@@ -33,6 +35,13 @@ export function AddToCartButton({ product, primaryColor, siteSlug }: AddToCartBu
             currency: product.currency || 'MYR',
             imageUrl: product.imageUrl,
         })
+        if (siteId) {
+            trackEvent({
+                siteId,
+                event: 'add_to_cart',
+                metadata: { productId: product.id, productSlug: product.slug, price: product.price },
+            })
+        }
     }
 
     return (

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useCartStore } from '@/store/cartStore'
+import { trackEvent } from '@/lib/analytics/track-event'
 import { ArrowLeft, CheckCircle, Loader2, ShoppingBag, Upload, X, CreditCard, Banknote, QrCode, AlertCircle } from 'lucide-react'
 
 function formatPrice(price: number, currency: string) {
@@ -188,6 +189,18 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             if (res.ok && data.success) {
                 setOrderResult(data.data)
                 clearCart()
+                if (siteId) {
+                    trackEvent({
+                        siteId,
+                        event: 'purchase',
+                        metadata: {
+                            orderNumber: data.data.orderNumber,
+                            total: data.data.total,
+                            currency: data.data.currency,
+                            itemCount: items.length,
+                        },
+                    })
+                }
             } else {
                 // AC-2: Cart preserved on error
                 setError(data.error?.message || 'Failed to place order')

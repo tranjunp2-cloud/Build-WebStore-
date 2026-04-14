@@ -5,7 +5,9 @@ import configPromise from '@payload-config';
 import { revalidatePath } from 'next/cache';
 import { getCurrentTenantId } from '@/lib/auth';
 
-// DigitalOcean API Constants
+// TODO: Replace with Vercel Domains API in Phase 4
+// DO API calls are guarded by env vars (DO_API_TOKEN, DO_APP_ID).
+// Without those vars set, all DO API blocks are skipped.
 const DO_API_URL = 'https://api.digitalocean.com/v2/apps';
 
 type DomainEntry = { domain: string; status: 'pending' | 'active'; isPrimary?: boolean };

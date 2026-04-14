@@ -45,42 +45,72 @@ export const POST = withAuth(async (_user, request) => {
 
         const siteName = site.businessName || site.name || 'Website'
 
-        // 2. Map promises for AI parallel generation
-        const proposalsPromise = Promise.all(
-            missingSeo.map(async (item) => {
-                const { title, description } = await generateAutoSEOMeta(
-                    item.collection === 'products' ? 'product' : 'page',
-                    item.title,
-                    siteName,
-                    item.context
-                )
+        // Fetch tracked keywords from site (AC-15)
+        const trackedKeywords = ((site as any)?.seo?.trackedKeywords as Array<{ keyword: string }> | undefined)
+            ?.map(k => k.keyword).filter(Boolean) || []
 
-                return {
-                    id: String(item.id),
-                    targetId: String(item.id),
-                    collection: item.collection,
-                    name: item.title,
-                    proposedTitle: item.missingFields.includes('title') ? title : undefined,
-                    proposedDescription: item.missingFields.includes('description') ? description : undefined,
-                }
-            })
-        )
+        // 2. Setup SSE stream with 15s timeout (NFR)
+        const encoder = new TextEncoder()
+        const FIX_ALL_TIMEOUT_MS = 15_000
 
-        // 3. Setup strict timeout race (12s limit to allow 3s for API parsing)
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('AI generation timed out')), 12000)
-        )
+        const stream = new ReadableStream({
+            async start(controller) {
+                // Send retry directive so clients auto-reconnect on drop
+                controller.enqueue(encoder.encode(`retry: 3000\n\n`))
 
-        const results = await Promise.race([proposalsPromise, timeoutPromise])
+                let timedOut = false
+                const timeout = setTimeout(() => {
+                    timedOut = true
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'timeout', message: 'AI Fix timed out after 15s' })}\n\n`))
+                    controller.close()
+                }, FIX_ALL_TIMEOUT_MS)
 
-        return NextResponse.json({ success: true, data: results })
+                const promises = missingSeo.map(async (item) => {
+                    if (timedOut) return
+                    try {
+                        const { title, description } = await generateAutoSEOMeta(
+                            item.collection === 'products' ? 'product' : 'page',
+                            item.title,
+                            siteName,
+                            item.context,
+                            trackedKeywords,
+                        )
+
+                        if (timedOut) return
+
+                        const result = {
+                            id: String(item.id),
+                            targetId: String(item.id),
+                            collection: item.collection,
+                            name: item.title,
+                            proposedTitle: item.missingFields.includes('title') ? title : undefined,
+                            proposedDescription: item.missingFields.includes('description') ? description : undefined,
+                        }
+
+                        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(result)}\n\n`)) } catch { /* stream closed */ }
+                    } catch (error: any) {
+                        console.error('[AI Fix All Partial Error]', error)
+                    }
+                })
+
+                await Promise.allSettled(promises)
+                clearTimeout(timeout)
+                if (!timedOut) controller.close()
+            }
+        })
+
+        return new NextResponse(stream, {
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache, no-transform',
+                'Connection': 'keep-alive',
+            },
+        })
     } catch (error: any) {
         console.error('[AI Fix All Error]', error)
-        // If timeout, return 504 to trigger the prompt/toast
-        const status = error.message?.includes('time') ? 504 : 500
         return NextResponse.json(
-            { success: false, error: { code: 'AI_ERROR', message: 'AI fix failed' } },
-            { status }
+            { success: false, error: { code: 'AI_ERROR', message: 'Failed to initialize AI stream' } },
+            { status: 500 }
         )
     }
 })

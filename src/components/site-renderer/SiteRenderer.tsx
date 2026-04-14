@@ -7,6 +7,7 @@ import { GoogleFontsLoader } from './GoogleFontsLoader'
 import { generatePageSchemas } from '@/lib/seo/json-ld'
 import { HeadingProvider } from '@/lib/seo/heading-context'
 import { getBlockHeadingLevel } from '@/lib/seo/heading-utils'
+import { TrackingManager } from './TrackingManager'
 
 // ── SiteRenderer — renders all blocks for a page using block registry ────────
 
@@ -41,9 +42,11 @@ export type SiteRendererProps = {
     }
     pages?: NavPage[]
     isEditor?: boolean
+    siteId?: string
+    isOwner?: boolean
 }
 
-export function SiteRenderer({ site, page, pages = [], isEditor = false }: SiteRendererProps) {
+export function SiteRenderer({ site, page, pages = [], isEditor = false, siteId, isOwner }: SiteRendererProps) {
     const theme: ThemeConfig = resolveTheme({
         primaryColor: site.theme?.primaryColor,
         secondaryColor: site.theme?.secondaryColor,
@@ -63,8 +66,22 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false }: SiteR
 
     const themeCSS = generateThemeCSS(theme)
 
-    type PreviewBlock = { blockType: string; links?: NavLinkItem[]; [key: string]: unknown }
-    const blocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
+    type PreviewBlock = { blockType: string; links?: NavLinkItem[]; ctaButton?: { url?: string; [key: string]: unknown }; ctaButtons?: Array<{ url?: string; [key: string]: unknown }>; [key: string]: unknown }
+    const rawBlocks: PreviewBlock[] = (page?.layout as PreviewBlock[]) || []
+
+    // In editor preview, rewrite internal nav/CTA links to '#' to prevent iframe navigation to 404
+    const blocks = isEditor
+        ? rawBlocks.map(b => {
+            if (b.blockType === 'navigation') {
+                return {
+                    ...b,
+                    links: b.links?.map(l => ({ ...l, url: l.url?.startsWith('http') ? l.url : '#' })),
+                    ctaButton: b.ctaButton ? { ...b.ctaButton, url: '#' } : b.ctaButton,
+                }
+            }
+            return b
+        })
+        : rawBlocks
 
     // JSON-LD schemas — auto-detect from blocks present
     const isHomepage = blocks.some(b => b.blockType === 'hero') && blocks[0]?.blockType === 'navigation'
@@ -99,6 +116,11 @@ export function SiteRenderer({ site, page, pages = [], isEditor = false }: SiteR
             <noscript>
                 <style>{`[style*="opacity: 0"], [style*="opacity:0"] { opacity: 1 !important; transform: none !important; }`}</style>
             </noscript>
+
+            {/* Analytics & Tracking */}
+            {siteId && !isEditor && (
+                <TrackingManager siteId={siteId} isOwner={isOwner} />
+            )}
 
             {/* JSON-LD Structured Data */}
             {jsonLdSchemas.map((schema, i) => (

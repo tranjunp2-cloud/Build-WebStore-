@@ -7,7 +7,7 @@
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
 import { buildSystemPrompt, type BusinessInfoInput } from './system-prompt'
-import { generateBlocks, type GenerationResult, type GeneratedBlock } from './generate-blocks'
+import { generateBlocks, type GenerationResult, type GeneratedBlock, type GeneratedPage } from './generate-blocks'
 import { buildUserPrompt } from './system-prompt'
 
 function getOpenAI(): OpenAI | null {
@@ -71,7 +71,18 @@ export async function generateSiteWithAI(
 
         events.push({ event: 'step', data: { step: 'parsing', label: 'Processing AI results...', progress: 60 } })
 
-        const parsed = JSON.parse(content) as Record<string, unknown>
+        let parsed: Record<string, unknown>
+        try {
+            parsed = JSON.parse(content) as Record<string, unknown>
+        } catch {
+            // AI response may be truncated — try to repair by trimming incomplete trailing content
+            const lastBrace = content.lastIndexOf('}')
+            if (lastBrace > 0) {
+                parsed = JSON.parse(content.slice(0, lastBrace + 1)) as Record<string, unknown>
+            } else {
+                throw new Error('Invalid JSON response from AI')
+            }
+        }
 
         // Set theme (validate fonts against Payload CMS allowed values)
         const ALLOWED_HEADING_FONTS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
@@ -91,41 +102,77 @@ export async function generateSiteWithAI(
 
         events.push({ event: 'theme_set', data: { theme } })
 
-        // Validate and emit each block
-        const validBlocks: Record<string, unknown>[] = []
-        const rawBlocks = Array.isArray(parsed.blocks) ? parsed.blocks : []
-
-        for (let i = 0; i < rawBlocks.length; i++) {
-            const block = rawBlocks[i]
-            const progress = 60 + Math.round((i / rawBlocks.length) * 30)
-
-            const blockTypeStr = (typeof block === 'object' && block !== null && 'blockType' in block) ? String((block as Record<string, unknown>).blockType) : 'section'
-
-            events.push({ event: 'step', data: { step: `block_${i}`, label: `Creating ${blockTypeStr}...`, progress } })
-
-            // Sanitize block data FIRST (before validation)
-            const sanitized = sanitizeBlockData(block as Record<string, unknown>)
-
-            // Validate with block registry
-            if (typeof sanitized.blockType === 'string' && blockRegistry.has(sanitized.blockType)) {
-                const validation = blockRegistry.validate(sanitized.blockType, sanitized)
-                if (validation.success) {
-                    validBlocks.push(validation.data as Record<string, unknown>)
-                } else {
-                    // Use sanitized block if validation fails (graceful degradation)
-                    console.warn(`[AI] Block "${sanitized.blockType}" validation warning:`, validation.error)
-                    validBlocks.push(sanitized)
+        // Helper: validate and sanitize an array of raw blocks
+        function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
+            const valid: Record<string, unknown>[] = []
+            for (const block of rawBlocks) {
+                const sanitized = sanitizeBlockData(block as Record<string, unknown>)
+                if (typeof sanitized.blockType === 'string' && blockRegistry.has(sanitized.blockType)) {
+                    const validation = blockRegistry.validate(sanitized.blockType, sanitized)
+                    if (validation.success) {
+                        valid.push(validation.data as Record<string, unknown>)
+                    } else {
+                        console.warn(`[AI] Block "${sanitized.blockType}" validation warning:`, validation.error)
+                        valid.push(sanitized)
+                    }
+                } else if (sanitized.blockType) {
+                    console.warn(`[AI] Unknown block type: ${sanitized.blockType}, skipping`)
                 }
-            } else if (sanitized.blockType) {
-                // Unknown block type — skip
-                console.warn(`[AI] Unknown block type: ${sanitized.blockType}, skipping`)
-                continue
             }
-
-            events.push({ event: 'block_complete', data: { block: validBlocks[validBlocks.length - 1], index: validBlocks.length - 1 } })
+            return valid
         }
 
-        // SEO
+        // Parse pages (multi-page) or blocks (single-page backward compat)
+        const rawPages = Array.isArray(parsed.pages) ? parsed.pages : null
+        let validBlocks: Record<string, unknown>[]
+        let generatedPages: GeneratedPage[] | undefined
+
+        if (rawPages && rawPages.length > 0) {
+            // Multi-page format
+            generatedPages = []
+            const allBlocks: Record<string, unknown>[] = []
+
+            for (let p = 0; p < rawPages.length; p++) {
+                const rawPage = rawPages[p] as Record<string, unknown>
+                const pageBlocks = validateBlocks(Array.isArray(rawPage.blocks) ? rawPage.blocks : [])
+                const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
+
+                generatedPages.push({
+                    title: String(rawPage.title || `Page ${p + 1}`),
+                    slug: String(rawPage.slug || (p === 0 ? '/' : `page-${p}`)),
+                    isHomepage: rawPage.isHomepage === true || p === 0,
+                    blocks: pageBlocks as GeneratedBlock[],
+                    seo: {
+                        title: String(pageSeo.title || rawPage.title || '').substring(0, 60),
+                        description: String(pageSeo.description || '').substring(0, 160),
+                    },
+                })
+
+                // First page blocks used as main blocks for backward compat
+                if (p === 0) allBlocks.push(...pageBlocks)
+
+                events.push({ event: 'step', data: { step: `page_${p}`, label: `Creating ${rawPage.title || 'page'}...`, progress: 60 + Math.round((p / rawPages.length) * 30) } })
+            }
+
+            validBlocks = allBlocks
+
+            for (let i = 0; i < validBlocks.length; i++) {
+                events.push({ event: 'block_complete', data: { block: validBlocks[i], index: i } })
+            }
+        } else {
+            // Single-page backward compat
+            const rawBlocks = Array.isArray(parsed.blocks) ? parsed.blocks : []
+            validBlocks = validateBlocks(rawBlocks)
+
+            for (let i = 0; i < validBlocks.length; i++) {
+                const progress = 60 + Math.round((i / validBlocks.length) * 30)
+                const blockTypeStr = String((validBlocks[i] as Record<string, unknown>).blockType || 'section')
+                events.push({ event: 'step', data: { step: `block_${i}`, label: `Creating ${blockTypeStr}...`, progress } })
+                events.push({ event: 'block_complete', data: { block: validBlocks[i], index: i } })
+            }
+        }
+
+        // SEO (root-level for homepage)
         const parsedSeo = (parsed.seo && typeof parsed.seo === 'object' ? parsed.seo : {}) as Record<string, unknown>
         const seo = {
             title: String(parsedSeo.title || parsed.siteName || 'Website').substring(0, 60),
@@ -139,6 +186,7 @@ export async function generateSiteWithAI(
             siteName: String(parsed.siteName || 'My Website'),
             siteType: (['business', 'ecommerce', 'restaurant', 'portfolio', 'blog'] as const).includes(parsed.category as 'business' | 'ecommerce' | 'restaurant' | 'portfolio' | 'blog') ? (parsed.category as 'business' | 'ecommerce' | 'restaurant' | 'portfolio' | 'blog') : 'business',
             blocks: validBlocks as GeneratedBlock[],
+            pages: generatedPages,
             seo,
             language: (['en', 'ms', 'vi'] as const).includes(parsed.language as 'en' | 'ms' | 'vi') ? (parsed.language as 'en' | 'ms' | 'vi') : 'en',
             theme,

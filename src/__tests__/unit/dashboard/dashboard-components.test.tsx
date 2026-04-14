@@ -41,6 +41,9 @@ vi.mock('@/i18n', () => ({
                         statusGood: 'Healthy',
                         statusWarning: 'Needs Attention',
                         fixAll: 'AI Fix All Issues',
+                        warnings: {
+                            issueScoreLow: 'SEO score is low',
+                        },
                     },
                     periods: { today: 'Today', '7d': 'Last 7 days', '30d': 'Last 30 days' },
                     customize: 'Customize',
@@ -59,11 +62,24 @@ vi.mock('@/i18n', () => ({
                     topReferrers: 'Top Referrers',
                     views: 'Views',
                     clicks: 'Clicks',
-                    empty: { description: 'No data available' },
+                    empty: { description: 'No data available for this period.' },
+                },
+                seo: {
+                    issueScoreLow: 'SEO score is low',
+                    warningLabel: 'Warning',
+                    allGood: 'All good',
                 },
             },
         },
         locale: 'en',
+        ti: (str: string, params?: any) => {
+            if (!params) return str
+            let res = str
+            for (const [k, v] of Object.entries(params)) {
+                res = res.replace(`{${k}}`, String(v))
+            }
+            return res
+        }
     }),
 }))
 
@@ -145,15 +161,15 @@ describe('DashboardStats', () => {
         views: 1200,
         leads: 50,
         engagement: 300,
+        currency: 'MYR'
     }
 
-    it('[TC-F03.07] renders all 3 default stat cards (v1.0: no revenue)', () => {
+    it('[TC-F03.07] renders all 4 default stat cards', () => {
         render(<DashboardStats {...defaultProps} />)
         expect(screen.getByText('Views')).toBeInTheDocument()
         expect(screen.getByText('Leads')).toBeInTheDocument()
         expect(screen.getByText('Engagement')).toBeInTheDocument()
-        // v1.0: Revenue card removed (ecom deferred to v1.1)
-        expect(screen.queryByText('Revenue')).not.toBeInTheDocument()
+        expect(screen.getByText('Revenue')).toBeInTheDocument()
     })
 
     it('[TC-F03.18] hides "views" card when excluded from preferences', () => {
@@ -198,8 +214,8 @@ describe('DashboardActionList', () => {
     it('[TC-F03.10] each order row has a link to /orders/:id', () => {
         const orders = [makeOrder(1)]
         render(<DashboardActionList pendingOrders={orders} />)
-        const link = screen.getByRole('link', { name: /fulfill/i })
-        expect(link).toHaveAttribute('href', '/orders/order-1')
+        const rowLink = screen.getAllByRole('link')[0]
+        expect(rowLink).toHaveAttribute('href', '/orders/order-1')
     })
 
     it('shows empty state message when no pending orders', () => {
@@ -209,7 +225,7 @@ describe('DashboardActionList', () => {
 
     it('renders order number and customer name', () => {
         render(<DashboardActionList pendingOrders={[makeOrder(1)]} />)
-        expect(screen.getByText('ORD-1001')).toBeInTheDocument()
+        expect(screen.getByText(/ORD-1001/)).toBeInTheDocument()
         expect(screen.getByText(/Customer 1/)).toBeInTheDocument()
     })
 })
@@ -225,19 +241,18 @@ describe('SEOHealthWidget', () => {
 
     it('[TC-F03.12] renders "AI Fix All Issues" CTA button', () => {
         render(<SEOHealthWidget score={60} />)
-        const link = screen.getByRole('link', { name: /ai fix all issues/i })
-        expect(link).toBeInTheDocument()
-        expect(link).toHaveAttribute('href', '/dashboard/seo')
+        const button = screen.getByRole('button', { name: /ai fix all issues/i })
+        expect(button).toBeInTheDocument()
     })
 
-    it('[TC-F03.34] shows "warning" status for score < 80 (e.g. 75)', () => {
+    it('[TC-F03.34] shows "warning" status for score < 90 (e.g. 75)', () => {
         render(<SEOHealthWidget score={75} />)
-        expect(screen.getByText('Needs Attention')).toBeInTheDocument()
+        expect(screen.getByText(/Warning/)).toBeInTheDocument()
     })
 
-    it('[TC-F03.34] shows "good" status for score >= 80', () => {
-        render(<SEOHealthWidget score={85} />)
-        expect(screen.getByText('Healthy')).toBeInTheDocument()
+    it('[TC-F03.34] shows "good" status for score >= 90', () => {
+        render(<SEOHealthWidget score={95} />)
+        expect(screen.getByText(/All good/)).toBeInTheDocument()
     })
 })
 
@@ -306,6 +321,6 @@ describe('TopPerformingList', () => {
 
     it('[TC-F03.30] shows empty state message when active tab has no data', () => {
         render(<TopPerformingList {...defaultProps} />)
-        expect(screen.getByText('No data available')).toBeInTheDocument()
+        expect(screen.getByText(/No data available/)).toBeInTheDocument()
     })
 })

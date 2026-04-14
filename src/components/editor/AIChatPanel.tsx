@@ -145,6 +145,15 @@ function AIChatPanelInner({
             }
 
             if (eventName === 'action') {
+                const actionType = payload?.result?.action ?? payload?.action
+                if (actionType === 'none') {
+                    updateAssistantMessage(messageId, {
+                        content: payload.result?.message || payload.message || 'I can only help with editing your website.',
+                        isStreaming: false,
+                        undoable: false,
+                    })
+                    return
+                }
                 await onAIAction(payload as AIAction)
                 return
             }
@@ -233,12 +242,22 @@ function AIChatPanelInner({
             }
 
             const data = await res.json()
-            await onAIAction(data as AIAction)
-            updateAssistantMessage(assistantMessageId, {
-                content: data.message || 'Applied changes to website.',
-                isStreaming: false,
-                undoable: true,
-            })
+            const resultAction = data?.result?.action ?? data?.action
+            if (resultAction === 'none') {
+                // Out-of-scope request — show message only, no changes applied
+                updateAssistantMessage(assistantMessageId, {
+                    content: data.result?.message || data.description || 'I can only help with editing your website.',
+                    isStreaming: false,
+                    undoable: false,
+                })
+            } else {
+                await onAIAction(data as AIAction)
+                updateAssistantMessage(assistantMessageId, {
+                    content: data.message || data.description || 'Applied changes to website.',
+                    isStreaming: false,
+                    undoable: true,
+                })
+            }
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Unknown error'
             handleAIError(assistantMessageId, message)

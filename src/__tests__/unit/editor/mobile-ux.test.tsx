@@ -70,55 +70,51 @@ const defaultPreviewProps: PreviewFrameProps = {
 describe('DashboardStats — mobile grid layout', () => {
     it('[TC-F03.18] renders with grid-cols-2 class for mobile 2x2 layout', () => {
         const { container } = render(
-            <DashboardStats views={100} leads={50} engagement={75} />,
+            <DashboardStats views={100} leads={50} engagement={75} currency="MYR" />,
         )
         const gridContainer = container.firstElementChild as HTMLElement
         expect(gridContainer).toBeTruthy()
         expect(gridContainer.className).toContain('grid-cols-2')
     })
 
-    it('[TC-F03.27] grid container has sm:grid-cols-3 for tablet+ breakpoint', () => {
+    it('[TC-F03.27] grid container has md:grid-cols-4 for tablet+ breakpoint', () => {
         const { container } = render(
-            <DashboardStats views={100} leads={50} engagement={75} />,
+            <DashboardStats views={100} leads={50} engagement={75} currency="MYR" />,
         )
         const gridContainer = container.firstElementChild as HTMLElement
-        expect(gridContainer.className).toContain('sm:grid-cols-3')
+        expect(gridContainer.className).toContain('md:grid-cols-4')
     })
 
-    it('[TC-F03.18] renders exactly 3 stat cards by default', () => {
+    it('[TC-F03.18] renders exactly 4 stat cards by default', () => {
         const { container } = render(
-            <DashboardStats views={200} leads={80} engagement={90} />,
+            <DashboardStats views={200} leads={80} engagement={90} currency="MYR" />,
         )
         const gridContainer = container.firstElementChild as HTMLElement
-        // 3 stat card children: views, leads, engagement
-        expect(gridContainer.children.length).toBe(3)
+        expect(gridContainer.children.length).toBe(4)
     })
 
-    it('[TC-F03.18] stat cards use responsive padding p-3 md:p-5', () => {
+    it('[TC-F03.18] stat cards use padding p-5', () => {
         const { container } = render(
-            <DashboardStats views={100} leads={50} engagement={75} />,
+            <DashboardStats views={100} leads={50} engagement={75} currency="MYR" />,
         )
         const gridContainer = container.firstElementChild as HTMLElement
         const cards = Array.from(gridContainer.children)
-        expect(cards.length).toBe(3)
+        expect(cards.length).toBe(4)
         cards.forEach((card) => {
-            expect(card.className).toContain('p-3')
-            expect(card.className).toContain('md:p-5')
+            expect(card.className).toContain('p-5')
         })
     })
 
-    it('[TC-F03.18] stat values use responsive text-lg md:text-2xl', () => {
-        render(<DashboardStats views={1234} leads={567} engagement={89} />)
+    it('[TC-F03.18] stat values use text-[24px]', () => {
+        render(<DashboardStats views={1234} leads={567} engagement={89} currency="MYR" />)
         const viewsValue = screen.getByText('1,234')
-        expect(viewsValue.className).toContain('text-lg')
-        expect(viewsValue.className).toContain('md:text-2xl')
+        expect(viewsValue.className).toContain('text-[24px]')
     })
 
-    it('[TC-F03.18] stat labels use responsive text-xs md:text-sm', () => {
-        render(<DashboardStats views={100} leads={50} engagement={75} />)
+    it('[TC-F03.18] stat labels use text-[14px]', () => {
+        render(<DashboardStats views={100} leads={50} engagement={75} currency="MYR" />)
         const viewsLabel = screen.getByText('Views')
-        expect(viewsLabel.className).toContain('text-xs')
-        expect(viewsLabel.className).toContain('md:text-sm')
+        expect(viewsLabel.className).toContain('text-[14px]')
     })
 
     it('[TC-F03.27] respects custom preferences order', () => {
@@ -127,6 +123,7 @@ describe('DashboardStats — mobile grid layout', () => {
                 views={100}
                 leads={50}
                 engagement={75}
+                currency="MYR"
                 preferences={['engagement', 'views', 'leads']}
             />,
         )
@@ -141,12 +138,12 @@ describe('DashboardStats — mobile grid layout', () => {
                 views={100}
                 leads={50}
                 engagement={75}
+                currency="MYR"
                 preferences={['views', 'revenue', 'leads', 'engagement']}
             />,
         )
         const gridContainer = container.firstElementChild as HTMLElement
-        // revenue is filtered out, so only 3 cards
-        expect(gridContainer.children.length).toBe(3)
+        expect(gridContainer.children.length).toBe(4)
     })
 })
 

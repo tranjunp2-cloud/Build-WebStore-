@@ -24,7 +24,7 @@ export const POST = withAuth(async (user, req) => {
         const { url } = data!
 
         // 2. Rate limit: 5 extractions/min per user
-        const rateLimit = checkRateLimit(String(user.id), 5)
+        const rateLimit = await checkRateLimit(String(user.id), 5)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 {

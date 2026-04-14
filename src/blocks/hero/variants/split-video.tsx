@@ -10,7 +10,7 @@ import { CTAButtons } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
 
-export function SplitVideoHero({ block }: BlockProps<HeroConfig>) {
+export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [], badge, videoUrl } = block
     const primaryColor = CSS_VARS.primary
 
@@ -49,7 +49,7 @@ export function SplitVideoHero({ block }: BlockProps<HeroConfig>) {
                         {subheadline && (
                             <RichText text={subheadline} as="p" className="text-xl opacity-60 mb-10 max-w-lg leading-relaxed" />
                         )}
-                        <CTAButtons buttons={ctaButtons} />
+                        <CTAButtons buttons={ctaButtons} siteId={site?.id ? String(site.id) : undefined} />
                     </motion.div>
 
                     {/* Right — Video */}

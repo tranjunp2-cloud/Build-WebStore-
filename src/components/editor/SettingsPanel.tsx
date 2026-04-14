@@ -12,12 +12,32 @@ import { NavigationEditor, type NavLinkItem } from './NavigationEditor'
 import { LogoEditor } from './LogoEditor'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { PageData } from '@/store/editorStore'
+import { useI18n } from '@/i18n'
 import { toast } from 'sonner'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
 function stripHtmlForDisplay(value: unknown): string {
     if (!value || typeof value !== 'string') return ''
     return value.replace(/<[^>]*>/g, '')
+}
+
+/** Strip HTML tags from input to prevent XSS */
+function sanitizeInput(value: string): string {
+    return value.replace(/<[^>]*>/g, '').trim()
+}
+
+/** Check if input contains HTML/script injection */
+function containsHtml(value: string): boolean {
+    return /<[^>]*>/i.test(value)
+}
+
+/** Validate URL format — only allow http/https */
+function isValidUrl(value: string): boolean {
+    if (!value) return true
+    try {
+        const url = new URL(value)
+        return url.protocol === 'http:' || url.protocol === 'https:'
+    } catch { return false }
 }
 
 type SocialWidgetLink = {
@@ -82,6 +102,7 @@ interface SettingsPanelProps {
         name: string
         status: string
         domain?: string | null
+        primaryDomain?: string | null
         branding?: {
             logo?: string
             favicon?: string
@@ -137,6 +158,8 @@ function SettingsPanelInner({
     onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate
 }: SettingsPanelProps) {
+    const { t } = useI18n()
+    const pm = t.editor.pageManager
     // Version key: changes when block data changes (from inline editing or AI) → forces input re-mount
     const blockDataVersion = useMemo(() => {
         if (!block) return ''
@@ -259,7 +282,12 @@ function SettingsPanelInner({
                         <Input
                             defaultValue={siteName || site?.name || ''}
                             key={`business-name-${siteName || site?.name || ''}`}
-                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ name: e.target.value })}
+                            onBlur={(e: FieldBlurEvent) => {
+                                const sanitized = sanitizeInput(e.target.value)
+                                if (sanitized !== e.target.value) e.target.value = sanitized
+                                onSiteSettingsChange?.({ name: sanitized })
+                            }}
+                            maxLength={200}
                             variant="editor"
                             className={editorInputClassName}
                             placeholder="Your Company"
@@ -331,22 +359,33 @@ function SettingsPanelInner({
 
             {renderGlobalAccordion('social', 'Social Links', (
                 <div className="space-y-3">
-                    <Input
-                        defaultValue={siteSocialLinks.facebook || ''}
-                        key={`social-facebook-${siteSocialLinks.facebook || ''}`}
-                        onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ socialLinks: { ...siteSocialLinks, facebook: e.target.value } })}
-                        variant="editor"
-                        className={editorInputClassName}
-                        placeholder="Facebook URL"
-                    />
-                    <Input
-                        defaultValue={siteSocialLinks.instagram || ''}
-                        key={`social-instagram-${siteSocialLinks.instagram || ''}`}
-                        onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ socialLinks: { ...siteSocialLinks, instagram: e.target.value } })}
-                        variant="editor"
-                        className={editorInputClassName}
-                        placeholder="Instagram URL"
-                    />
+                    {(['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok'] as const).map(platform => (
+                        <Input
+                            key={`social-${platform}-${(siteSocialLinks as Record<string, string>)[platform] || ''}`}
+                            defaultValue={(siteSocialLinks as Record<string, string>)[platform] || ''}
+                            onBlur={(e: FieldBlurEvent) => {
+                                const raw = e.target.value.trim()
+                                if (!raw) {
+                                    onSiteSettingsChange?.({ socialLinks: { ...siteSocialLinks, [platform]: null } })
+                                    return
+                                }
+                                if (containsHtml(raw)) {
+                                    toast.error(`Invalid input for ${platform} — HTML is not allowed`)
+                                    e.target.value = ''
+                                    return
+                                }
+                                if (!isValidUrl(raw)) {
+                                    toast.error(`Please enter a valid URL for ${platform} (https://...)`)
+                                    e.target.value = ''
+                                    return
+                                }
+                                onSiteSettingsChange?.({ socialLinks: { ...siteSocialLinks, [platform]: raw } })
+                            }}
+                            variant="editor"
+                            className={editorInputClassName}
+                            placeholder={`${platform.charAt(0).toUpperCase() + platform.slice(1)} URL`}
+                        />
+                    ))}
                 </div>
             ))}
 
@@ -402,7 +441,7 @@ function SettingsPanelInner({
     const isHomepage = activePage?.isHomepage || activePage?.slug === 'home' || activePage?.slug === '/' || activePage?.slug === ''
     const normalizedPreviewPath = isHomepage ? '' : seoSlugValue.replace(/^\//, '')
     const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN!
-    const previewDomain = (site?.domain || `${(siteName || site?.name || 'site').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}.${platformDomain}`).replace(/^https?:\/\//, '')
+    const previewDomain = (site?.primaryDomain || site?.domain || `${(siteName || site?.name || 'site').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}.${platformDomain}`).replace(/^https?:\/\//, '')
     const metaTitleWarning = seoTitleValue.length > 60 ? 'Title may be truncated on Google Search.' : null
     const metaDescriptionWarning = seoDescriptionValue.length > 160 ? 'Description may be truncated on Google Search.' : null
 
@@ -421,7 +460,7 @@ function SettingsPanelInner({
                     <label className={labelCls}>URL Slug</label>
                     <Input
                         value={isHomepage ? '/' : seoSlugValue}
-                        disabled={isHomepage}
+                        disabled={isHomepage || site?.status === 'published'}
                         onChange={(e) => {
                             setSeoSlugInput(e.target.value)
                             setSeoFieldError(null)
@@ -434,6 +473,9 @@ function SettingsPanelInner({
                         variant="editor"
                         className={editorInputClassName}
                     />
+                    {site?.status === 'published' && !isHomepage ? (
+                        <p className="mt-1 text-[10px] text-amber-400">{pm.slugLocked}</p>
+                    ) : null}
                     {seoFieldError ? (
                         <p className="mt-1 text-[10px] text-rose-400">{seoFieldError}</p>
                     ) : null}
@@ -508,12 +550,27 @@ function SettingsPanelInner({
                                 })
                                 if (res.ok) {
                                 const data = await res.json()
-                                    if (data.title) setSeoTitleInput(data.title)
-                                    if (data.description) setSeoDescriptionInput(data.description)
-                                    if (data.slug && !isHomepage) setSeoSlugInput(data.slug)
-                                    if (data.title) await handleSeoUpdate('seoTitle', data.title)
-                                    if (data.description) await handleSeoUpdate('seoDescription', data.description)
-                                    if (data.slug && !isHomepage) await handleSeoUpdate('slug', data.slug)
+                                    const proposed = data.proposed || data
+                                    const applyChanges = async () => {
+                                        if (proposed.title) setSeoTitleInput(proposed.title)
+                                        if (proposed.description) setSeoDescriptionInput(proposed.description)
+                                        if (proposed.slug && !isHomepage) setSeoSlugInput(proposed.slug)
+                                        if (proposed.title) await handleSeoUpdate('seoTitle', proposed.title)
+                                        if (proposed.description) await handleSeoUpdate('seoDescription', proposed.description)
+                                        if (proposed.slug && !isHomepage) await handleSeoUpdate('slug', proposed.slug)
+                                    }
+                                    // AC-16, BR-06: confirm before overwriting existing meta
+                                    if (data.hasExisting) {
+                                        toast.dismiss(loadingToastId)
+                                        const confirmed = window.confirm(
+                                            `Existing meta will be replaced:\n\nTitle: "${data.existing?.title || '(empty)'}"\n→ "${proposed.title}"\n\nDescription: "${data.existing?.description || '(empty)'}"\n→ "${proposed.description}"\n\nApply changes?`
+                                        )
+                                        if (!confirmed) {
+                                            toast.info('SEO changes cancelled')
+                                            return
+                                        }
+                                    }
+                                    await applyChanges()
                                     toast.success('SEO optimization successfully generated!', { id: loadingToastId })
                                 } else {
                                     toast.error('Failed to generate SEO', { id: loadingToastId })

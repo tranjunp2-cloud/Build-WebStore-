@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { getPayload } from 'payload'
+import config from '@payload-config'
 import { withAuth } from '@/lib/auth'
 import OpenAI from 'openai'
 import { checkRateLimit } from '@/lib/rateLimit'
@@ -26,7 +28,7 @@ function getOpenAI(): OpenAI | null {
 export const POST = withAuth(async (user, req) => {
     try {
         // Rate Limit: 20 AI tasks per hour
-        const rateLimit = checkRateLimit(String(user.id), 20)
+        const rateLimit = await checkRateLimit(String(user.id), 20)
         if (!rateLimit.allowed) {
             return NextResponse.json(
                 { success: false, error: 'Rate limit exceeded. Try again later.' },
@@ -35,7 +37,18 @@ export const POST = withAuth(async (user, req) => {
         }
 
         const body = await req.json()
-        const { name, category, language = 'en' } = body
+        const { name, category, language = 'en', siteId } = body
+
+        // Fetch tracked keywords if siteId provided (AC-15)
+        let trackedKeywords: string[] = []
+        if (siteId) {
+            try {
+                const payload = await getPayload({ config })
+                const site = await payload.findByID({ collection: 'sites', id: siteId })
+                trackedKeywords = ((site as any)?.seo?.trackedKeywords as Array<{ keyword: string }> | undefined)
+                    ?.map(k => k.keyword).filter(Boolean) || []
+            } catch { /* site fetch failed — proceed without keywords */ }
+        }
 
         if (!name || typeof name !== 'string' || name.trim().length < 3) {
             return NextResponse.json(
@@ -73,8 +86,12 @@ IMPORTANT RULES:
 4. Do NOT include store brand name in title or description.
 5. Use natural, friendly language appropriate for Malaysian SME market.`
 
+        const keywordContext = trackedKeywords.length
+            ? `\nTarget Keywords: ${trackedKeywords.join(', ')}\n- Naturally incorporate 1-2 keywords if relevant (keyword density ≤ 2%)`
+            : ''
+
         const userPrompt = `Generate SEO metadata for this product:
-Product Name: "${name.trim()}"${categoryContext}
+Product Name: "${name.trim()}"${categoryContext}${keywordContext}
 
 Remember: title ≤ 70 chars, description 150-160 chars, slug kebab-case ASCII.`
 

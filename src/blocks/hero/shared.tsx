@@ -3,9 +3,10 @@
 import { motion } from 'framer-motion'
 import type { HeroConfig } from './config'
 import { RichText } from '../shared/RichText'
+import { trackEvent } from '@/lib/analytics/track-event'
 
 // ── Shared CTA renderer ──────────────────────────────────────────────────────
-export function CTAButtons({ buttons, variant = 'default' }: { buttons: HeroConfig['ctaButtons']; variant?: 'default' | 'glass' }) {
+export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: HeroConfig['ctaButtons']; variant?: 'default' | 'glass'; siteId?: string }) {
     if (!buttons || buttons.length === 0) return null
 
     return (
@@ -14,6 +15,9 @@ export function CTAButtons({ buttons, variant = 'default' }: { buttons: HeroConf
                 <motion.a
                     key={i}
                     href={btn?.url}
+                    onClick={() => {
+                        if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' } })
+                    }}
                     whileHover={{ scale: 1.03, y: -2 }}
                     whileTap={{ scale: 0.98 }}
                     className="px-8 py-4 rounded-xl font-semibold text-sm transition-all duration-300"

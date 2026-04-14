@@ -63,16 +63,14 @@ describe('[TC-F20.01] Default Help Center Overview Page', () => {
         ).toBeInTheDocument()
     })
 
-    it('renders all 6 feature cards with correct titles', () => {
+    it('renders all 4 feature cards with correct titles', () => {
         renderPage()
 
         const expectedTitles = [
             'Dashboard',
             'AI Website Builder',
-            'Products',
-            'Orders',
             'Blog',
-            'Store Settings',
+            'Settings',
         ]
 
         for (const title of expectedTitles) {
@@ -80,18 +78,16 @@ describe('[TC-F20.01] Default Help Center Overview Page', () => {
         }
     })
 
-    it('renders all 6 feature card icon containers (emoji-based, aria-hidden)', () => {
+    it('renders all 4 feature card icon containers (emoji-based, aria-hidden)', () => {
         renderPage()
 
         // Icons are now emoji divs with aria-hidden="true".
-        // Verify all 6 feature titles exist to confirm cards rendered correctly.
+        // Verify all 4 feature titles exist to confirm cards rendered correctly.
         const expectedTitles = [
             'Dashboard',
             'AI Website Builder',
-            'Products',
-            'Orders',
             'Blog',
-            'Store Settings',
+            'Settings',
         ]
         for (const title of expectedTitles) {
             expect(screen.getByRole('heading', { level: 4, name: title })).toBeInTheDocument()

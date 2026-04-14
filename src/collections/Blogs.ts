@@ -103,6 +103,13 @@ export const Blogs: CollectionConfig = {
             ],
         },
         {
+            name: 'publishedAt',
+            type: 'date',
+            admin: {
+                description: 'When this post was or will be published.',
+            },
+        },
+        {
             name: 'category',
             type: 'relationship',
             relationTo: 'blog_categories',
