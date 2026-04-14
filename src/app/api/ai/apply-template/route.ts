@@ -243,14 +243,16 @@ export const POST = withAuth(async (user, req) => {
         // Pick only valid theme fields — Payload select fields reject unknown values
         const VALID_HEADING_FONTS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
         const VALID_BODY_FONTS = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
+        const VALID_COLOR_MODES = ['light', 'dark']
         const rawHeading = String(rawTheme.fontHeading || '')
         const rawBody = String(rawTheme.fontBody || '')
+        const rawColorMode = String(rawTheme.colorMode || '')
         const templateTheme = {
             primaryColor: String(rawTheme.primaryColor || '#0ea5e9'),
             secondaryColor: String(rawTheme.secondaryColor || '#d946ef'),
             fontHeading: VALID_HEADING_FONTS.includes(rawHeading) ? rawHeading : 'Outfit',
             fontBody: VALID_BODY_FONTS.includes(rawBody) ? rawBody : 'Inter',
-            colorMode: String(rawTheme.colorMode || 'dark'),
+            colorMode: VALID_COLOR_MODES.includes(rawColorMode) ? rawColorMode : 'dark',
         }
 
         // === APPLY TO EXISTING SITE (multi-page + transaction) ===
