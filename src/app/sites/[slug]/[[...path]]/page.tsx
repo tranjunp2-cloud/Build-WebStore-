@@ -145,6 +145,8 @@ async function getTenantAndPage(slug: string, pagePath: string) {
             if (blogPost) {
                 return { tenant, site, page: null, pages: navigationPages.docs, blogPost, isOwner }
             }
+            // Explicit 404 for missing/unpublished blog post
+            notFound()
         }
     }
 
@@ -166,6 +168,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
     const title = blogPost?.seo?.metaTitle || blogPost?.title || page?.seo?.title || site.seo?.metaTitle || site.name
     const description = blogPost?.seo?.metaDescription || page?.seo?.description || site.seo?.metaDescription
+    type BlogMedia = { url?: string }
+    const blogThumb = blogPost ? (blogPost as unknown as { thumbnail?: BlogMedia | string }).thumbnail : null
+    const ogImage = blogThumb && typeof blogThumb === 'object' ? blogThumb.url ?? null : null
 
     // Resolve canonical URL from middleware-injected headers
     const reqHeaders = await headers()
@@ -196,6 +201,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             description: description ?? undefined,
             type: blogPost ? 'article' : 'website',
             ...(canonical ? { url: canonical } : {}),
+            ...(ogImage ? { images: [{ url: ogImage }] } : {}),
         },
         robots: page?.seo?.noIndex ? { index: false, follow: false } : undefined,
     }
@@ -232,7 +238,15 @@ export default async function TenantSitePage({ params }: Props) {
     // Blog detail page — render published blog post
     if ('blogPost' in data && data.blogPost) {
         const { blogPost } = data
-        const post = blogPost as any
+        type BlogPost = {
+            title?: string; slug?: string; content?: string; status?: string
+            publishedAt?: string; createdAt?: string; updatedAt?: string
+            thumbnail?: { url?: string } | string
+            category?: { name?: string } | string
+            author?: { firstName?: string; lastName?: string; email?: string } | string
+            seo?: { metaTitle?: string; metaDescription?: string }
+        }
+        const post = blogPost as BlogPost
         const thumbUrl = typeof post.thumbnail === 'object' ? post.thumbnail?.url : null
         const catName = typeof post.category === 'object' ? post.category?.name : null
         const authorName = typeof post.author === 'object'

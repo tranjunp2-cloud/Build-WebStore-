@@ -21,7 +21,7 @@ export async function uploadMediaAction(formData: FormData) {
 
     const payload = await getPayload({ config: configPromise })
 
-    // Create the media document in Payload
+    // Magic byte validation handled by Media.ts beforeChange hook
     const res = await payload.create({
         collection: 'media',
         data: {
@@ -78,7 +78,7 @@ export async function getOrCreateCrateCartonIdAction() {
                 mimetype: 'image/png',
                 size: fileData.length,
             },
-            user: user as any,
+            user: user as Parameters<typeof payload.create>[0]['user'],
         })
         
         return res.id
