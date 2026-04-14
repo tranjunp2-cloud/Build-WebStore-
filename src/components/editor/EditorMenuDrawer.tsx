@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-    Bell,
     ChevronDown,
     Globe,
     Headphones,
@@ -14,6 +13,7 @@ import {
     Settings,
     X,
 } from 'lucide-react'
+import { NotificationBell } from '@/components/dashboard/NotificationBell'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
@@ -35,10 +35,9 @@ type EditorMenuDrawerProps = {
     currentUserRole?: string
     userName?: string
     userInitial?: string
-    notificationCount?: number
 }
 
-export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial, notificationCount = 0 }: EditorMenuDrawerProps) {
+export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer', userName, userInitial }: EditorMenuDrawerProps) {
     const pathname = usePathname()
     const { locale, toggleLocale } = useI18n()
     const [expandedGroups, setExpandedGroups] = useState<string[]>(['/editor'])
@@ -217,17 +216,7 @@ export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'vie
                             </div>
                             <span className="text-[14px] font-medium text-[#F8FAFC]">{userName || 'User'}</span>
                         </div>
-                        <button
-                            type="button"
-                            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] transition-colors hover:bg-white/5"
-                        >
-                            <Bell className="h-5 w-5 text-[rgba(248,250,252,0.7)]" />
-                            {notificationCount > 0 ? (
-                                <span className="absolute -top-1 left-5 flex h-5 min-w-[24px] items-center justify-center rounded-full border-2 border-[#1E293B] bg-gradient-to-r from-[#FB2C36] to-[#E7000B] px-2 py-1 text-[12px] font-semibold text-white">
-                                    {notificationCount}
-                                </span>
-                            ) : null}
-                        </button>
+                        <NotificationBell />
                     </div>
 
                     {/* Language toggle */}

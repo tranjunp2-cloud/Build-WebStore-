@@ -88,6 +88,7 @@ export default function EditorPage() {
     const [viewport, setViewport] = useState<'desktop' | 'mobile'>('desktop')
     const [activeSidebarTab, setActiveSidebarTab] = useState<EditorSidebarTabId>('chat')
     const [isMenuOpen, setIsMenuOpen] = useState(false)
+    const [userData, setUserData] = useState<{ name: string; initial: string } | null>(null)
     const [chatActivity, setChatActivity] = useState<{ id: string; content: string } | null>(null)
     const [isCompactLayout, setIsCompactLayout] = useState(false)
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false)
@@ -236,6 +237,19 @@ export default function EditorPage() {
 
         void loadData()
     }, [init, selectedPageId, setCurrentPageId, setPages, siteId])
+
+    // Fetch user info for menu drawer
+    useEffect(() => {
+        fetch('/api/users/me', { credentials: 'include' })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data?.user) {
+                    const name = data.user.firstName || data.user.email?.split('@')[0] || 'User'
+                    setUserData({ name, initial: name.charAt(0).toUpperCase() })
+                }
+            })
+            .catch(() => {})
+    }, [])
 
     const handleSave = useCallback(async (options: SaveOptions = {}) => {
         if (!siteId) return false
@@ -794,6 +808,8 @@ export default function EditorPage() {
                 siteId={siteId}
                 open={isMenuOpen}
                 onClose={() => setIsMenuOpen(false)}
+                userName={userData?.name}
+                userInitial={userData?.initial}
             />
 
             <EditorToolbar
