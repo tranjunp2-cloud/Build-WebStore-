@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { selectModel } from '@/lib/ai/config'
 
 function getOpenAI(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY
@@ -96,7 +97,7 @@ Rules:
 `
 
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: selectModel('bulk-parse'),
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: promptText },

@@ -46,28 +46,32 @@ describe('selectModel — default routing [TC-F01.08, TC-F01.10]', () => {
         expect(selectModel('site-generation')).toBe('gpt-4.1-mini')
     })
 
-    it('returns gpt-4o-mini for chat-edit (cost-optimized)', () => {
-        expect(selectModel('chat-edit')).toBe('gpt-4o-mini')
+    it('returns gpt-4.1-mini for chat-edit (phase-04: better instruction following)', () => {
+        expect(selectModel('chat-edit')).toBe('gpt-4.1-mini')
     })
 
-    it('returns gpt-4o-mini for inline-edit', () => {
-        expect(selectModel('inline-edit')).toBe('gpt-4o-mini')
+    it('returns gpt-4.1-mini for inline-edit (phase-04)', () => {
+        expect(selectModel('inline-edit')).toBe('gpt-4.1-mini')
     })
 
-    it('returns gpt-4o-mini for seo-generation', () => {
-        expect(selectModel('seo-generation')).toBe('gpt-4o-mini')
+    it('returns gpt-4.1-nano for seo-generation (phase-04: 4x cheaper lightweight)', () => {
+        expect(selectModel('seo-generation')).toBe('gpt-4.1-nano')
     })
 
-    it('returns gpt-4o-mini for content-rewrite', () => {
-        expect(selectModel('content-rewrite')).toBe('gpt-4o-mini')
+    it('returns gpt-4.1-nano for content-rewrite (phase-04)', () => {
+        expect(selectModel('content-rewrite')).toBe('gpt-4.1-nano')
     })
 
-    it('returns gpt-4o-mini for product-description', () => {
-        expect(selectModel('product-description')).toBe('gpt-4o-mini')
+    it('returns gpt-4.1-nano for product-description (phase-04)', () => {
+        expect(selectModel('product-description')).toBe('gpt-4.1-nano')
     })
 
-    it('returns gpt-4o-mini for bulk-parse (new task, phase-04 flips to nano)', () => {
-        expect(selectModel('bulk-parse')).toBe('gpt-4o-mini')
+    it('returns gpt-4.1-nano for bulk-parse (phase-04: 50x cheaper for CSV extraction)', () => {
+        expect(selectModel('bulk-parse')).toBe('gpt-4.1-nano')
+    })
+
+    it('returns gpt-4.1-nano for url-extraction (phase-04)', () => {
+        expect(selectModel('url-extraction')).toBe('gpt-4.1-nano')
     })
 })
 

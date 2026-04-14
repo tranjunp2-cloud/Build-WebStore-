@@ -175,7 +175,9 @@ For undoing the previous action:
             { role: 'system', content: systemPrompt },
             { role: 'user', content: instruction },
         ],
-        temperature: 0.7,
+        // phase-04: lower temperature 0.7 → 0.3 — edit-block needs fidelity, not variety.
+        // User request "change hero headline to X" should return X verbatim, not a creative rephrasing.
+        temperature: 0.3,
         max_tokens: 2000,
         response_format: { type: 'json_object' },
     })

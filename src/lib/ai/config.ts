@@ -61,14 +61,20 @@ export type AITask =
  * to instantly revert without redeploy.
  */
 const DEFAULT_MODELS: Record<AITask, AIModel> = {
+    // phase-03a: gpt-4o → gpt-4.1-mini (eval-2026-04-14 confirmed parity)
     'site-generation':    'gpt-4.1-mini',
-    'chat-edit':          'gpt-4o-mini',
-    'inline-edit':        'gpt-4o-mini',
-    'seo-generation':     'gpt-4o-mini',
-    'content-rewrite':    'gpt-4o-mini',
-    'product-description': 'gpt-4o-mini',
-    'url-extraction':     'gpt-4o-mini',
-    'bulk-parse':         'gpt-4o-mini',
+    // phase-04: gpt-4o-mini → gpt-4.1-mini (better instruction following for chat edits)
+    'chat-edit':          'gpt-4.1-mini',
+    'inline-edit':        'gpt-4.1-mini',
+    // Lightweight tasks stay on cheap tier. 4.1-nano is 4x cheaper than 4o-mini,
+    // plenty for single-field text generation or short structured extraction.
+    'seo-generation':     'gpt-4.1-nano',
+    'content-rewrite':    'gpt-4.1-nano',
+    'product-description': 'gpt-4.1-nano',
+    'url-extraction':     'gpt-4.1-nano',
+    // phase-04: hardcoded gpt-4o → gpt-4.1-nano for bulk product CSV parsing
+    // (structured extraction, low creativity, 50x cheaper)
+    'bulk-parse':         'gpt-4.1-nano',
 }
 
 /**
