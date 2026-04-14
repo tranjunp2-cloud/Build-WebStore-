@@ -122,7 +122,7 @@ export function StaffDrawer({
                 }
             } catch (err: unknown) {
                 // BUG-F19.16: Catch any uncaught errors — never expose internal error to client
-                console.error('[StaffDrawer] invite error:', err);
+                console.error('[StaffDrawer] invite failed');
                 toast.error(t?.Staff?.drawer?.errorGeneric || 'Something went wrong. Please try again.');
             }
         });
