@@ -4,38 +4,40 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+    ChevronDown,
     Globe,
     Headphones,
     LayoutDashboard,
+    LayoutTemplate,
     LogOut,
-    Menu,
-    Package,
     Settings,
-    ShoppingCart,
-    Store,
     X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n'
 
+type LocaleLabel = { en: string; ms: string }
+
+type NavItem = {
+    label: LocaleLabel
+    href: string
+    icon?: React.ComponentType<{ className?: string }>
+    children?: { label: LocaleLabel; href: string; roleFilter?: (role: string) => boolean }[]
+    badge?: string
+    roleFilter?: (role: string) => boolean
+}
+
 type EditorMenuDrawerProps = {
     siteId: string
     open: boolean
     onClose: () => void
+    currentUserRole?: string
 }
 
-type NavItem = {
-    label: string
-    href?: string
-    icon?: React.ComponentType<{ className?: string }>
-    children?: { label: string; href: string }[]
-    badge?: string
-}
-
-export function EditorMenuDrawer({ siteId, open, onClose }: EditorMenuDrawerProps) {
+export function EditorMenuDrawer({ siteId, open, onClose, currentUserRole = 'viewer' }: EditorMenuDrawerProps) {
     const pathname = usePathname()
     const { locale, toggleLocale } = useI18n()
-    const [expandedStore, setExpandedStore] = useState(true)
+    const [expandedGroups, setExpandedGroups] = useState<string[]>(['/editor'])
 
     useEffect(() => {
         if (!open) return
@@ -53,24 +55,35 @@ export function EditorMenuDrawer({ siteId, open, onClose }: EditorMenuDrawerProp
         }
     }, [onClose, open])
 
-    const navItems = useMemo<NavItem[]>(
-        () => [
-            { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    const navItems = useMemo<NavItem[]>(() => {
+        const items: NavItem[] = [
+            { label: { en: 'Dashboard', ms: 'Papan Pemuka' }, href: '/dashboard', icon: LayoutDashboard },
             {
-                label: 'My Webstore',
-                icon: Store,
+                label: { en: 'My Website', ms: 'Laman Web Saya' },
+                href: '/editor',
+                icon: LayoutTemplate,
                 children: [
-                    { label: 'Editor', href: `/editor/${siteId}` },
-                    { label: 'Blog', href: '/blog' },
+                    { label: { en: 'Editor', ms: 'Editor' }, href: `/editor/${siteId}` },
+                    { label: { en: 'Blog', ms: 'Blog' }, href: '/blog' },
                 ],
             },
-            { label: 'Products', href: '/products', icon: Package },
-            { label: 'Orders', href: '/orders', icon: ShoppingCart, badge: '5' },
-            { label: 'Store Config', href: '/settings', icon: Settings },
-            { label: 'Help Center', href: '/help', icon: Headphones },
-        ],
-        [siteId],
-    )
+            {
+                label: { en: 'Site Settings', ms: 'Tetapan Laman' },
+                href: '/settings',
+                icon: Settings,
+                children: [
+                    { label: { en: 'Domains', ms: 'Domain' }, href: '/settings/domains' },
+                    { label: { en: 'Staff', ms: 'Kakitangan' }, href: '/settings/staff', roleFilter: (role) => role === 'owner' },
+                ],
+            },
+            { label: { en: 'Help Center', ms: 'Pusat Bantuan' }, href: '/help', icon: Headphones },
+        ]
+        // Filter children by role
+        return items.map(item => {
+            if (!item.children) return item
+            return { ...item, children: item.children.filter(c => !c.roleFilter || c.roleFilter(currentUserRole)) }
+        })
+    }, [siteId, currentUserRole])
 
     const handleLogout = async () => {
         try {
@@ -113,26 +126,31 @@ export function EditorMenuDrawer({ siteId, open, onClose }: EditorMenuDrawerProp
                     {navItems.map(item => {
                         const Icon = item.icon
                         const isGroup = Boolean(item.children?.length)
-                        const isActive = item.href ? pathname === item.href || pathname?.startsWith(item.href + '/') : false
+                        const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
+                        const isExpanded = expandedGroups.includes(item.href)
+                        const label = item.label[locale] || item.label.en
 
                         if (isGroup) {
                             return (
-                                <div key={item.label}>
+                                <div key={item.href}>
                                     <button
                                         type="button"
-                                        onClick={() => setExpandedStore(prev => !prev)}
+                                        onClick={() => setExpandedGroups(prev =>
+                                            prev.includes(item.href) ? prev.filter(g => g !== item.href) : [...prev, item.href]
+                                        )}
                                         className="flex h-[44px] w-full items-center gap-3 rounded-[16px] px-4 text-left text-[14px] font-medium text-[rgba(248,250,252,0.7)] transition-colors hover:bg-white/5 hover:text-white"
                                     >
                                         {Icon ? <Icon className="h-5 w-5 shrink-0" /> : null}
-                                        <span className="flex-1">{item.label}</span>
-                                        <Menu className={cn('h-4 w-4 shrink-0 transition-transform', expandedStore && 'rotate-90')} />
+                                        <span className="flex-1">{label}</span>
+                                        <ChevronDown className={cn('h-4 w-4 shrink-0 transition-transform', isExpanded && 'rotate-180')} />
                                     </button>
-                                    <div className={cn('overflow-hidden transition-all', expandedStore ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0')}>
+                                    <div className={cn('overflow-hidden transition-all', isExpanded ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0')}>
                                         <div className="flex flex-col gap-1 pl-4">
                                             {item.children?.map(child => {
                                                 const childActive =
                                                     pathname === child.href ||
                                                     pathname?.startsWith(child.href + '/')
+                                                const childLabel = child.label[locale] || child.label.en
 
                                                 return (
                                                     <Link
@@ -152,7 +170,7 @@ export function EditorMenuDrawer({ siteId, open, onClose }: EditorMenuDrawerProp
                                                                 childActive ? 'bg-[#3B82F6]' : 'bg-[rgba(248,250,252,0.6)]',
                                                             )}
                                                         />
-                                                        <span>{child.label}</span>
+                                                        <span>{childLabel}</span>
                                                     </Link>
                                                 )
                                             })}
@@ -164,8 +182,8 @@ export function EditorMenuDrawer({ siteId, open, onClose }: EditorMenuDrawerProp
 
                         return (
                             <Link
-                                key={item.label}
-                                href={item.href || '#'}
+                                key={item.href}
+                                href={item.href}
                                 onClick={onClose}
                                 className={cn(
                                     'flex h-[44px] items-center gap-3 rounded-[16px] px-4 text-[14px] font-medium transition-colors',
@@ -175,7 +193,7 @@ export function EditorMenuDrawer({ siteId, open, onClose }: EditorMenuDrawerProp
                                 )}
                             >
                                 {Icon ? <Icon className="h-5 w-5 shrink-0" /> : null}
-                                <span className="flex-1">{item.label}</span>
+                                <span className="flex-1">{label}</span>
                                 {item.badge ? (
                                     <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#2DD4BF] px-1.5 text-[12px] font-semibold text-[#0B1120]">
                                         {item.badge}
