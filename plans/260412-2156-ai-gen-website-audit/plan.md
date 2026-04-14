@@ -122,6 +122,14 @@ All AI-generated websites look identical despite 47+ blocks with 100+ variants a
 - TypeScript: 0 errors
 - Lint: 0 errors
 
+### Render-level coverage (added 2026-04-14)
+- **AI Gen Test Harness** shipped — see `plans/260414-0837-ai-gen-test-harness/plan.md`
+- Matrix runner: 14 categories × 3 variants × 5 seeds = 210 fixtures, ~90ms structural pass (`735fa85` + `8598e64`)
+- 6 structural guards caught 185 real bugs in `template-composer.ts` → fixed in `8598e64`
+- 12 new TCs (TC-F01-V.39..50) appended to `docs/qa/F01-ai-builder-variety.md` §4.8 — covers Ben-Ben class bugs that 3694 unit tests miss
+- CI workflow `.github/workflows/ai-harness.yml` (label-only `run-harness` trigger), uploads artifact 14d, smart-notify on fail
+- **Phase 03/04 (visual render + HTML report) still pending** in harness plan — TC-F01-V.43, V.48, V.49 marked pending
+
 ## Key Files
 - `src/lib/ai/system-prompt.ts` — 403 lines (was 176)
 - `src/lib/ai/openai-generator.ts` — 847 lines (was 562)

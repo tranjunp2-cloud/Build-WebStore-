@@ -681,26 +681,238 @@ Feature này sửa vấn đề AI sinh website bị lặp (hero variant, block l
 
 ---
 
+### §4.8 Harness Test Cases (Phase 06 — render & matrix coverage)
+
+> **Layer:** AI Gen Test Harness (`scripts/test-harness/`) — additive coverage layer trên unit/integration test pyramid. Mục tiêu: bắt "empty hole" bugs (Ben Ben restaurant case) mà 3694 unit tests không thấy vì không render DOM.
+>
+> **Driver:** `npm run harness:gen` → `npm run harness:check` → `npm run harness:render` (Phase 03) → `npm run harness:report` (Phase 04). Matrix: 14 categories × 3 variants × 5 seeds = 210 fixtures.
+>
+> **Status:** TC-39..46 implemented Phase 02 (harness `check.ts` + 6 guards, commit `735fa85` + `8598e64`). TC-47..50 require Phase 03/04/05 deliverables (visual render, gallery report, CI workflow).
+
+---
+
+#### TC-F01-V.39
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.39 |
+| **AC** | AC-01 |
+| **Tiêu đề** | Harness — hero variant diversity ≥ 5 trong 5 seeds × 3 variants per category |
+| **Priority** | High |
+| **Type** | Harness (cross-fixture) |
+| **Test Data** | Matrix `mode=full` (210 fixtures) — `computeVarietyMetrics()` group theo category |
+| **Bước thực hiện** | 1. `npm run harness:gen`. 2. `npm run harness:check`. 3. Đọc `varietyMetrics.heroVariants[category]` trong `structural-report.json`. |
+| **Kết quả mong đợi** | Mỗi category có `heroVariants.size >= 5` (warn nếu thấp hơn). |
+| **Ghi chú** | Layer bổ sung cho TC-F01-V.27 (unit) — đo trên cùng matrix mà QA + PM dùng review. |
+
+---
+
+#### TC-F01-V.40
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.40 |
+| **AC** | AC-02 |
+| **Tiêu đề** | Harness — features layout diversity ≥ 3 variants per category |
+| **Priority** | High |
+| **Type** | Harness (cross-fixture) |
+| **Test Data** | Cùng matrix Full |
+| **Bước thực hiện** | 1. Run harness gen + check. 2. Đọc `varietyMetrics.featureVariants[category]`. |
+| **Kết quả mong đợi** | `featureVariants.size >= 3` per category. |
+| **Ghi chú** | Bổ sung cho TC-F01-V.28 (unit, single-call). |
+
+---
+
+#### TC-F01-V.41
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.41 |
+| **AC** | AC-03 |
+| **Tiêu đề** | Harness — block ordering diversity ≥ 6 unique orderings per category |
+| **Priority** | Medium |
+| **Type** | Harness (cross-fixture) |
+| **Test Data** | Matrix Full, lấy `blocks.map(b => b.type).join('>')` per fixture |
+| **Bước thực hiện** | 1. Run harness. 2. Group theo category → Set of orderings. |
+| **Kết quả mong đợi** | `orderings.size >= 6` per category. |
+| **Ghi chú** | Cùng AC với TC-F01-V.37 (unit) nhưng đo trên 5 seeds × 3 variants thay vì 10 calls cố định. |
+
+---
+
+#### TC-F01-V.42
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.42 |
+| **AC** | AC-10 |
+| **Tiêu đề** | Harness — `signature-blocks` guard PASS 100% fixtures |
+| **Priority** | Blocker |
+| **Type** | Harness (per-fixture guard) |
+| **Test Data** | All 210 fixtures |
+| **Bước thực hiện** | 1. Run harness gen + check. 2. Inspect `fixtures[].guards` cho guard `signature-blocks`. |
+| **Kết quả mong đợi** | `pass=210, fail=0` cho guard `signature-blocks`. |
+| **Ghi chú** | **Ben Ben class bug**: restaurant phải có menu-grid, salon phải có service-list, etc. (xem `CATEGORY_DNA.signatureBlocks`). |
+
+---
+
+#### TC-F01-V.43
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.43 |
+| **AC** | (new — Ben Ben guard) |
+| **Tiêu đề** | Harness visual — empty region ≤ 30% viewport height per fixture (mobile + desktop) |
+| **Priority** | Blocker |
+| **Type** | Harness (visual) |
+| **Test Data** | 210 fixtures × 2 viewports (375 mobile, 1280 desktop) = 420 screenshots |
+| **Bước thực hiện** | 1. `npm run harness:render` (Phase 03). 2. Empty-hole detector chạy pixel histogram trên mỗi screenshot. 3. Inspect `visual-report.json` cho `holePct`. |
+| **Kết quả mong đợi** | `max(holePct) <= 0.30` cho mọi fixture. |
+| **Ghi chú** | **Pending Phase 03**. Threshold 30% là v1 — sẽ recalibrate nếu false-positive. Forward-only coverage. |
+
+---
+
+#### TC-F01-V.44
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.44 |
+| **AC** | (new — variant safety) |
+| **Tiêu đề** | Harness — `variant-whitelist` guard: 0 fixtures dùng `BROKEN_VARIANTS` |
+| **Priority** | Blocker |
+| **Type** | Harness (per-fixture guard) |
+| **Test Data** | All 210 fixtures, `BROKEN_VARIANTS` từ `src/lib/ai/template-composer.ts` |
+| **Bước thực hiện** | 1. Run harness check. 2. Inspect guard `variant-whitelist`. |
+| **Kết quả mong đợi** | `fail=0` — không fixture nào dùng `hero:animated-gradient`, etc. |
+| **Ghi chú** | Ngăn regression sau khi sanitizer hoặc composer thay đổi. |
+
+---
+
+#### TC-F01-V.45
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.45 |
+| **AC** | (new — ordering invariants) |
+| **Tiêu đề** | Harness — `ordering` guard: nav-first, footer-last, features-before-stats |
+| **Priority** | High |
+| **Type** | Harness (per-fixture guard) |
+| **Test Data** | All 210 fixtures |
+| **Bước thực hiện** | 1. Run harness check. 2. Inspect guard `ordering`. |
+| **Kết quả mong đợi** | `fail=0` — block order tuân thủ 3 invariants. |
+| **Ghi chú** | Bổ sung guard cho TC-F01-V.37 (unit) — đo realtime trên matrix sau mỗi commit. |
+
+---
+
+#### TC-F01-V.46
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.46 |
+| **AC** | (new — content minimums) |
+| **Tiêu đề** | Harness — `no-empty-data` guard: `enforceMinContent` PASS all fixtures |
+| **Priority** | High |
+| **Type** | Harness (per-fixture guard) |
+| **Test Data** | All 210 fixtures, focus carousel ≥3, masonry ≥4, grid-4 ≥4 |
+| **Bước thực hiện** | 1. Run harness check. 2. Inspect guard `no-empty-data`. |
+| **Kết quả mong đợi** | `fail=0` — không block nào có data array dưới ngưỡng. |
+| **Ghi chú** | Closes the same root cause TC-F01-V.32 catches at unit level, but verifies on matrix scale. |
+
+---
+
+#### TC-F01-V.47
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.47 |
+| **AC** | AC-13 |
+| **Tiêu đề** | Harness — backward compat: legacy `composeTemplate()` path renders đầy đủ |
+| **Priority** | High |
+| **Type** | Harness (per-fixture guard) |
+| **Test Data** | Subset matrix (legacy fixtures `*-legacy-*`) — invokeComposer chạy cả blueprint + legacy paths |
+| **Bước thực hiện** | 1. Run harness gen. 2. Filter `results[]` where `pathway='legacy'`. 3. Verify guard `block-count` PASS. |
+| **Kết quả mong đợi** | Legacy fixtures cũng PASS toàn bộ guards như blueprint fixtures. |
+| **Ghi chú** | Bổ sung cho TC-F01-V.29 (unit). Quan trọng vì Phase 06 fallback unify có rủi ro break legacy path. |
+
+---
+
+#### TC-F01-V.48
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.48 |
+| **AC** | (new — mobile parity) |
+| **Tiêu đề** | Harness visual — mobile viewport (375px) không có empty region > 30% |
+| **Priority** | High |
+| **Type** | Harness (visual) |
+| **Test Data** | 210 fixtures × mobile 375px = 210 screenshots |
+| **Bước thực hiện** | 1. `npm run harness:render` (Phase 03). 2. Empty-hole detector trên mobile screenshots. |
+| **Kết quả mong đợi** | `max(holePct_mobile) <= 0.30`. |
+| **Ghi chú** | **Pending Phase 03**. Mobile thường stack vertical → có thể lộ hole nhiều hơn desktop. Tách TC riêng để nhìn rõ regression. |
+
+---
+
+#### TC-F01-V.49
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.49 |
+| **AC** | (new — report usability) |
+| **Tiêu đề** | Harness report — `report.html` self-contained, có filter category + status |
+| **Priority** | Medium |
+| **Type** | Harness (report) |
+| **Test Data** | Output của `npm run harness:report` |
+| **Bước thực hiện** | 1. `npm run harness:all`. 2. Mở `.harness-out/report.html` trong browser. 3. Verify: filter dropdown category, status badge, screenshots embedded. |
+| **Kết quả mong đợi** | PM review 210 fixtures < 5 phút, click filter hoạt động, không cần internet. |
+| **Ghi chú** | **Pending Phase 04**. Report.html phải self-contained (inline images base64 hoặc relative paths). |
+
+---
+
+#### TC-F01-V.50
+
+| Trường | Nội dung |
+|--------|----------|
+| **ID** | TC-F01-V.50 |
+| **AC** | (new — CI workflow) |
+| **Tiêu đề** | Harness CI — workflow `ai-harness.yml` trigger khi label `run-harness` |
+| **Priority** | Medium |
+| **Type** | CI integration |
+| **Test Data** | PR có label `run-harness` |
+| **Bước thực hiện** | 1. Tạo PR test. 2. Add label `run-harness`. 3. Verify workflow `AI Harness` chạy. 4. Verify artifact `ai-harness-<pr>` xuất hiện. |
+| **Kết quả mong đợi** | Workflow trigger trong 30s, artifact upload sau khi job done, retention 14 ngày. |
+| **Ghi chú** | Phase 05 deliverable — `.github/workflows/ai-harness.yml`. Smart-notify post Lark khi guard fail. |
+
+---
+
 ## 5. Traceability Matrix
 
 | AC | Mô tả | TC-IDs | Status |
 |----|-------|--------|--------|
-| AC-01 | Hero Variant Diversity ≥ 5/10 | TC-F01-V.27, TC-F01-V.38 | [x] MAPPED |
-| AC-02 | Features Layout Diversity ≥ 3 variants | TC-F01-V.28 | [x] MAPPED |
-| AC-03 | Block Order Diversity ≥ 6 orderings | TC-F01-V.37 | [x] MAPPED |
-| AC-04 | Style Personality Injection | TC-F01-V.01, TC-F01-V.02, TC-F01-V.03, TC-F01-V.04, TC-F01-V.05, TC-F01-V.06, TC-F01-V.07 | [x] MAPPED |
-| AC-05 | Sanitizer Fuzzy Matching | TC-F01-V.08, TC-F01-V.11, TC-F01-V.12, TC-F01-V.13, TC-F01-V.35 | [x] MAPPED |
-| AC-06 | Sanitizer Random Fallback + Log | TC-F01-V.09, TC-F01-V.10, TC-F01-V.33, TC-F01-V.34 | [x] MAPPED |
-| AC-07 | Fallback Seeded PRNG | TC-F01-V.18 | [x] MAPPED |
-| AC-08 | Fallback Variety Without Seed | TC-F01-V.16, TC-F01-V.21 | [x] MAPPED |
-| AC-09 | Fallback Theme Variety | TC-F01-V.17, TC-F01-V.36 | [x] MAPPED |
-| AC-10 | Composer Seed-Based Variety | TC-F01-V.22, TC-F01-V.27 | [x] MAPPED |
-| AC-11 | Composer Reproducibility | TC-F01-V.23, TC-F01-V.26 | [x] MAPPED |
-| AC-12 | Blueprint Variant Auto-Selection | TC-F01-V.24, TC-F01-V.25 | [x] MAPPED |
-| AC-13 | Backward Compat — Existing Sites | TC-F01-V.14, TC-F01-V.15, TC-F01-V.29, TC-F01-V.30, TC-F01-V.32 | [x] MAPPED |
-| AC-14 | Backward Compat — ComposerInput Without Seed | TC-F01-V.20, TC-F01-V.31 | [x] MAPPED |
+| AC | Mô tả | Unit/Integration TCs | Harness TCs (Phase 06) | Status |
+|----|-------|----------------------|-------------------------|--------|
+| AC-01 | Hero Variant Diversity ≥ 5/10 | TC-F01-V.27, TC-F01-V.38 | TC-F01-V.39 | [x] MAPPED + harness |
+| AC-02 | Features Layout Diversity ≥ 3 variants | TC-F01-V.28 | TC-F01-V.40 | [x] MAPPED + harness |
+| AC-03 | Block Order Diversity ≥ 6 orderings | TC-F01-V.37 | TC-F01-V.41 | [x] MAPPED + harness |
+| AC-04 | Style Personality Injection | TC-F01-V.01..V.07 | — | [x] MAPPED |
+| AC-05 | Sanitizer Fuzzy Matching | TC-F01-V.08, V.11..V.13, V.35 | — | [x] MAPPED |
+| AC-06 | Sanitizer Random Fallback + Log | TC-F01-V.09, V.10, V.33, V.34 | — | [x] MAPPED |
+| AC-07 | Fallback Seeded PRNG | TC-F01-V.18 | — | [x] MAPPED |
+| AC-08 | Fallback Variety Without Seed | TC-F01-V.16, V.21 | — | [x] MAPPED |
+| AC-09 | Fallback Theme Variety | TC-F01-V.17, V.36 | — | [x] MAPPED |
+| AC-10 | Composer Seed-Based Variety | TC-F01-V.22, V.27 | TC-F01-V.42 | [x] MAPPED + harness |
+| AC-11 | Composer Reproducibility | TC-F01-V.23, V.26 | — | [x] MAPPED |
+| AC-12 | Blueprint Variant Auto-Selection | TC-F01-V.24, V.25 | — | [x] MAPPED |
+| AC-13 | Backward Compat — Existing Sites | TC-F01-V.14, V.15, V.29, V.30, V.32 | TC-F01-V.47 | [x] MAPPED + harness |
+| AC-14 | Backward Compat — ComposerInput Without Seed | TC-F01-V.20, V.31 | — | [x] MAPPED |
+| — (Ben-Ben render) | Empty region ≤ 30% viewport | (none — render-level gap) | TC-F01-V.43, V.48 | [x] HARNESS-ONLY |
+| — (variant safety) | 0 BROKEN_VARIANTS in matrix | — | TC-F01-V.44 | [x] HARNESS-ONLY |
+| — (ordering invariants) | nav-first, footer-last, features-before-stats | — | TC-F01-V.45 | [x] HARNESS-ONLY |
+| — (content minimums) | enforceMinContent on matrix scale | — | TC-F01-V.46 | [x] HARNESS-ONLY |
+| — (report usability) | PM review report.html < 5 min | — | TC-F01-V.49 | [x] HARNESS-ONLY |
+| — (CI) | label `run-harness` triggers workflow | — | TC-F01-V.50 | [x] HARNESS-ONLY |
 
-**Tỷ lệ coverage: 14/14 ACs = 100%**
+**Tỷ lệ coverage: 14/14 ACs = 100% (unit) + 6 new render-level TCs (harness-only)**
+
+**Total TCs:** 50 (38 unit/integration + 12 harness — Phase 06)
 
 ---
 

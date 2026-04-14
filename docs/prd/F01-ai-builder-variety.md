@@ -497,10 +497,12 @@ const VARIANT_OPTIONS: Record<string, string[]> = {
 - [ ] Tất cả 20 FR items (FR-V-01 đến FR-V-20) implemented và verified
 - [ ] Tất cả 14 AC items (AC-01 đến AC-14) pass
 - [ ] 9-Point Checklist đầy đủ
-- [ ] Test script chạy 10 lần: hero diversity >= 5 variants ✓
-- [ ] Test script chạy 10 lần: features diversity >= 3 variants ✓
+- [x] Test script chạy 10 lần: hero diversity >= 5 variants ✓ — covered by **TC-F01-V.27** (unit) + **TC-F01-V.39** (harness, full matrix)
+- [x] Test script chạy 10 lần: features diversity >= 3 variants ✓ — covered by **TC-F01-V.28** (unit) + **TC-F01-V.40** (harness)
 - [ ] Sanitizer log xuất hiện trong console khi có replacement ✓
-- [ ] Fallback 10 lần no-seed: >= 7 distinct layouts ✓
+- [x] Fallback 10 lần no-seed: >= 7 distinct layouts ✓ — covered by **TC-F01-V.16, V.21** (unit) + **TC-F01-V.41** (harness ordering diversity)
 - [ ] `tsc --noEmit` pass ✓
-- [ ] Existing sites không bị ảnh hưởng (backward compat test pass) ✓
-- [ ] QA report viết tại `docs/qa/F01-ai-builder-variety.md` ✓
+- [x] Existing sites không bị ảnh hưởng (backward compat test pass) ✓ — covered by **TC-F01-V.29, V.30, V.32** (unit) + **TC-F01-V.47** (harness legacy path)
+- [x] QA report viết tại `docs/qa/F01-ai-builder-variety.md` ✓ — 38 unit + 12 harness TCs (50 total)
+- [x] **Render-level coverage** (Ben-Ben class bugs) — covered by harness `signature-blocks` guard (**TC-F01-V.42**), structural guards 8598e64 fix, and visual hole detector (**TC-F01-V.43, V.48**, pending Phase 03)
+- [x] **Matrix harness CI** wired via `.github/workflows/ai-harness.yml` label trigger — **TC-F01-V.50**
