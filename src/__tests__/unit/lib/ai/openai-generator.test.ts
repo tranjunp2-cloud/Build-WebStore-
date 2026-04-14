@@ -168,7 +168,10 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
         expect(errorEvent).toBeDefined()
     })
 
-    it('validates font against allowed list', async () => {
+    it('overrides AI theme with curated category preset [TC-F01D-CP.60]', async () => {
+        // New contract: category theme preset is authoritative.
+        // AI output for theme colors/fonts is IGNORED — preset wins.
+        // See plans/260414-1630-phase-08-audit/phase-02-happy-path-integration.md
         const OpenAI = (await import('openai')).default as any
         OpenAI.mockImplementation(() => ({
             chat: {
@@ -178,7 +181,8 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
                             message: {
                                 content: JSON.stringify({
                                     siteName: 'Test',
-                                    theme: { fontHeading: 'Comic Sans', fontBody: 'Papyrus', colorMode: 'light' },
+                                    // AI attempts garbage fonts + generic blue
+                                    theme: { primaryColor: '#0ea5e9', fontHeading: 'Comic Sans', fontBody: 'Papyrus', colorMode: 'light' },
                                     blocks: [],
                                     seo: {},
                                 }),
@@ -191,9 +195,20 @@ describe('generateSiteWithAI — OpenAI path [TC-F01.08]', () => {
 
         const { result } = await generateSiteWithAI(businessInfo)
 
-        // Invalid fonts should fall back to defaults
-        expect(result.theme.fontHeading).toBe('Outfit')
-        expect(result.theme.fontBody).toBe('Inter')
+        // Fonts come from the preset's fontPairingId (always allowlist).
+        const ALLOWED_HEADING = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
+        const ALLOWED_BODY = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
+        expect(ALLOWED_HEADING).toContain(result.theme.fontHeading)
+        expect(ALLOWED_BODY).toContain(result.theme.fontBody)
+
+        // "Test Cafe" + Restaurant industry → composer resolves to "restaurant".
+        // Restaurant presets all use warm/earth primary colors, NEVER #0ea5e9.
+        expect(result.theme.primaryColor).not.toBe('#0ea5e9')
+        expect(result.theme.primaryColor).toMatch(/^#[0-9a-f]{6}$/i)
+
+        // Optional preset-only fields exposed by the wider type.
+        expect(result.theme.accentColor).toBeTruthy()
+        expect(result.theme.fontPairingId).toBeTruthy()
     })
 
     it('truncates SEO title to 60 chars and description to 160 chars', async () => {

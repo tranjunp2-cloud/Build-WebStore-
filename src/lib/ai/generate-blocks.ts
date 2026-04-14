@@ -48,6 +48,14 @@ export type GenerationResult = {
         fontHeading: string
         fontBody: string
         colorMode: 'light' | 'dark'
+        // Optional fields populated when a category preset is applied
+        // (openai-generator.ts happy path + fallback-adapter composer).
+        // resolveTheme() downstream uses them when present, defaults otherwise.
+        accentColor?: string
+        fontPairingId?: string
+        spacingPreset?: 'compact' | 'default' | 'relaxed'
+        borderRadius?: 'sharp' | 'subtle' | 'rounded' | 'soft' | 'pill'
+        shadowPreset?: 'none' | 'subtle' | 'medium' | 'dramatic'
     }
 }
 

@@ -5,6 +5,45 @@
  */
 
 import { blockRegistry } from '@/blocks/registry'
+import type { ThemePreset } from './theme-presets'
+import { resolveFontPairing } from './font-pairings'
+
+// ── Theme context for soft guidance injection ─────────────────────────────
+
+export type ThemePromptContext = {
+  preset: ThemePreset
+  category: string
+}
+
+/**
+ * Describe the mood a preset should set so AI copy (CTAs, taglines, headings)
+ * matches the palette. Keeps the prompt readable without dumping every variant.
+ */
+function moodHint(preset: ThemePreset, category: string): string {
+  const dark = preset.colorMode === 'dark'
+  const warmCategories = new Set(['restaurant', 'fnb', 'fitness', 'beauty', 'events', 'creative'])
+  const trustCategories = new Set(['health', 'realestate', 'business', 'education'])
+  const edgeCategories = new Set(['tech', 'ecommerce', 'blog', 'travel'])
+
+  if (warmCategories.has(category)) {
+    return dark
+      ? 'warm appetite / intimate nightlife — evocative copy, sensory language, urgency'
+      : 'warm, inviting, appetite-driving — sensory adjectives, human touch, scarcity CTAs'
+  }
+  if (trustCategories.has(category)) {
+    return dark
+      ? 'calm authority — understated confidence, credentials, proof points'
+      : 'calm, trustworthy, stable — reassurance, credentials, clinical clarity'
+  }
+  if (edgeCategories.has(category)) {
+    return dark
+      ? 'sharp, modern, confident — benefit-led, outcome-focused copy'
+      : 'clean, efficient, outcome-driven — benefit-led CTAs, specific metrics'
+  }
+  return dark
+    ? 'premium, confident, focused — concise copy, strong verbs'
+    : 'polished, professional, approachable — benefit-led, specific'
+}
 
 // ── Style Personalities ────────────────────────────────────────────────────
 // Each personality has keywords that match user input for context-aware selection.
@@ -182,14 +221,43 @@ const CATEGORY_HINTS: Record<string, string> = {
   business: 'services, company, agency, startup',
 }
 
-export function buildSystemPrompt(language: 'en' | 'ms' | 'vi' | 'auto' = 'auto'): string {
+export function buildSystemPrompt(
+  language: 'en' | 'ms' | 'vi' | 'auto' = 'auto',
+  themeContext?: ThemePromptContext,
+): string {
   const blockMetas = blockRegistry.getAllMeta()
 
   const blockList = blockMetas.map(m =>
     `- **${m.type}** (${m.name}): ${m.description}. Variants: [${m.variants.join(', ')}]. Fields: ${m.editableFields.join(', ')}`
   ).join('\n')
 
-  return `You are an expert website designer AI. Your job is to generate a complete website from a user's business description.
+  // Unused locale parameter placeholder — suppress TS lint without affecting runtime.
+  void language
+
+  const themeSection = themeContext
+    ? (() => {
+        const { preset, category } = themeContext
+        const fontPair = resolveFontPairing(preset.fontPairingId)
+        return `
+
+## REQUIRED THEME (use these EXACT values in your \`theme\` object — do NOT invent different colors)
+\`\`\`json
+{
+  "primaryColor": "${preset.primaryColor}",
+  "secondaryColor": "${preset.secondaryColor}",
+  "fontHeading": "${fontPair.fontHeading}",
+  "fontBody": "${fontPair.fontBody}",
+  "colorMode": "${preset.colorMode}"
+}
+\`\`\`
+Preset name: "${preset.name}" — curated for ${category} businesses.
+Mood: ${moodHint(preset, category)}.
+Write hero headlines, section titles, and CTA copy that reinforces this mood. Do NOT default to generic blue/purple.
+`
+      })()
+    : ''
+
+  return `You are an expert website designer AI. Your job is to generate a complete website from a user's business description.${themeSection}
 
 ## OUTPUT FORMAT
 You MUST respond with a valid JSON object in this exact format:

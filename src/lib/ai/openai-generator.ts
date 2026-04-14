@@ -14,6 +14,9 @@ import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
+import { pickCategoryTheme, hashBusinessName } from './category-theme-picker'
+import { resolveComposerCategory } from './composer-category-resolver'
+import { resolveFontPairing } from './font-pairings'
 import {
     validateBlockContent,
     validateOrdering,
@@ -61,7 +64,15 @@ export async function generateSiteWithAI(
     try {
         events.push({ event: 'step', data: { step: 'analyzing', label: 'Analysing requirements...', progress: 10 } })
 
-        const systemPrompt = buildSystemPrompt(language)
+        // Resolve category + pick deterministic theme preset BEFORE prompt build
+        // so phase-03 can inject the exact hex/font hint into the system prompt.
+        // Precedence downstream: URL extraction visualStyle (route.ts) > this preset > AI output.
+        const presetCategory = resolveComposerCategory(promptText)
+        const themeSeed = hashBusinessName(businessInfo.businessName)
+        const themePreset = pickCategoryTheme(presetCategory, themeSeed)
+        console.log(`[Theme] Using category preset "${themePreset.name}" for category=${presetCategory} (seed=${themeSeed})`)
+
+        const systemPrompt = buildSystemPrompt(language, { preset: themePreset, category: presetCategory })
         const userPromptText = buildUserPrompt(businessInfo, extraInstructions, language, referencePrompt)
 
         events.push({ event: 'step', data: { step: 'generating', label: 'AI is generating content...', progress: 20 } })
@@ -122,20 +133,25 @@ export async function generateSiteWithAI(
             }
         }
 
-        // Set theme (validate fonts against Payload CMS allowed values)
-        const ALLOWED_HEADING_FONTS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
-        const ALLOWED_BODY_FONTS = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
-
-        const parsedTheme = (parsed.theme && typeof parsed.theme === 'object' ? parsed.theme : {}) as Record<string, unknown>
-        const rawHeadingFont = String(parsedTheme.fontHeading || 'Outfit')
-        const rawBodyFont = String(parsedTheme.fontBody || 'Inter')
-
-        const theme = {
-            primaryColor: String(parsedTheme.primaryColor || '#0ea5e9'),
-            secondaryColor: String(parsedTheme.secondaryColor || '#d946ef'),
-            fontHeading: ALLOWED_HEADING_FONTS.includes(rawHeadingFont) ? rawHeadingFont : 'Outfit',
-            fontBody: ALLOWED_BODY_FONTS.includes(rawBodyFont) ? rawBodyFont : 'Inter',
-            colorMode: (['light', 'dark'] as const).includes(parsedTheme.colorMode as 'light' | 'dark') ? (parsedTheme.colorMode as 'light' | 'dark') : 'dark',
+        // Hard override AI theme with curated category preset.
+        // Preserves content/SEO/blocks from AI but forces theme DNA (colors + fonts +
+        // spacing + radius + shadow) from the 14×5 preset library so every generation
+        // feels category-appropriate instead of generic AI blue.
+        //
+        // URL extraction (route.ts:258-277) still runs AFTER this return and wins for
+        // primary/secondary/colorMode when the user provided a reference URL.
+        const fontPair = resolveFontPairing(themePreset.fontPairingId)
+        const theme: GenerationResult['theme'] = {
+            primaryColor: themePreset.primaryColor,
+            secondaryColor: themePreset.secondaryColor,
+            accentColor: themePreset.accentColor,
+            fontPairingId: themePreset.fontPairingId,
+            fontHeading: fontPair.fontHeading,
+            fontBody: fontPair.fontBody,
+            colorMode: themePreset.colorMode,
+            spacingPreset: themePreset.spacingPreset,
+            borderRadius: themePreset.borderRadius,
+            shadowPreset: themePreset.shadowPreset,
         }
 
         events.push({ event: 'theme_set', data: { theme } })
