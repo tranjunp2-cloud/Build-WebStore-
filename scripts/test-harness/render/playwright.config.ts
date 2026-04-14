@@ -52,7 +52,15 @@ export default defineConfig({
     },
     {
       name: 'harness-mobile',
-      use: { ...devices['iPhone 13'], viewport: { width: 375, height: 812 } },
+      // Don't spread iPhone 13 profile — its built-in viewport conflicts with
+      // our override and causes the test runner to crash before screenshot.
+      // Just declare mobile-flavoured props directly.
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 375, height: 812 },
+        isMobile: true,
+        hasTouch: true,
+      },
     },
   ],
 })

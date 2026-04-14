@@ -95,6 +95,11 @@ for (const result of renderable) {
     const viewport = page.viewportSize()
     const viewportHeight = viewport?.height ?? 800
 
+    // Emulate reduced motion so Framer Motion `whileInView` animations
+    // bypass IntersectionObserver and render at final state immediately.
+    // Without this, fullPage screenshot captures opacity:0 for sections
+    // that are out of the initial viewport — false positive empty-hole.
+    await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto(`/test-harness/${fixture.id}`, { waitUntil: 'networkidle' })
     // Actually await fonts.ready (returning the Promise to evaluate works;
     // waitForFunction would not — it would resolve immediately because a
