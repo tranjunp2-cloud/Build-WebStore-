@@ -15,15 +15,35 @@ type CategoryConfig = {
     blockTypes: string[]
 }
 
+/** BUG-F05-021: Blocks to hide from the library panel.
+ *  - Duplicate functionality (have variant replacements)
+ *  - Out of scope per PRD
+ *  - Missing backend / tech constraints
+ *  Kept in registry for backward compatibility with existing sites. */
+const HIDDEN_BLOCKS = new Set([
+    'gallery-masonry',   // → use gallery variant=masonry
+    'pricing-table',     // → use pricing variant=table
+    'accordion',         // → use faq variant=accordion
+    'client-logos',      // → use logo-cloud
+    'custom-html',       // out of scope: no HTML/CSS injection
+    'breadcrumb',        // out of scope: should auto-generate
+    'video-background',  // out of scope: duplicates video variant
+    'before-after',      // out of scope: too niche
+    'blog-list',         // missing: no CMS backend
+    'download-cta',      // missing: no file hosting
+    'google-maps',       // missing: requires API key config
+    'countdown-timer',   // missing: client-side only, no persist
+])
+
 const categoryConfig: CategoryConfig[] = [
     { id: 'basics', label: 'Basics', icon: '📦', blockTypes: ['hero', 'cta', 'about', 'features', 'step-process', 'service-cards'] },
-    { id: 'content', label: 'Content', icon: '📄', blockTypes: ['faq', 'accordion', 'blog-list', 'testimonials', 'social-proof', 'portfolio-grid'] },
-    { id: 'media', label: 'Media', icon: '🖼️', blockTypes: ['gallery', 'gallery-masonry', 'video', 'video-background', 'carousel', 'before-after'] },
-    { id: 'store', label: 'Business', icon: '💼', blockTypes: ['pricing', 'pricing-table', 'feature-comparison', 'menu-food', 'countdown-timer'] },
+    { id: 'content', label: 'Content', icon: '📄', blockTypes: ['faq', 'testimonials', 'social-proof', 'portfolio-grid'] },
+    { id: 'media', label: 'Media', icon: '🖼️', blockTypes: ['gallery', 'video', 'carousel'] },
+    { id: 'store', label: 'Business', icon: '💼', blockTypes: ['pricing', 'feature-comparison', 'menu-food'] },
     { id: 'commerce', label: 'Commerce', icon: '🛒', blockTypes: ['products-grid', 'products-featured', 'cartWidget'] },
-    { id: 'form', label: 'Form & Contact', icon: '📝', blockTypes: ['contact', 'newsletter', 'download-cta', 'google-maps', 'whatsapp-button'] },
-    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'client-logos', 'socialWidget', 'team'] },
-    { id: 'layout', label: 'Layout', icon: '📐', blockTypes: ['custom-html', 'divider', 'breadcrumb', 'announcement-bar'] },
+    { id: 'form', label: 'Form & Contact', icon: '📝', blockTypes: ['contact', 'newsletter', 'whatsapp-button'] },
+    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'socialWidget', 'team'] },
+    { id: 'layout', label: 'Layout', icon: '📐', blockTypes: ['divider', 'announcement-bar'] },
 ]
 
 const itemIconOverrides: Record<string, string> = {
@@ -86,6 +106,7 @@ export function BlockLibraryPanel({
 
         return categoryConfig.map(category => {
             const items = category.blockTypes
+                .filter(bt => !HIDDEN_BLOCKS.has(bt))
                 .map(getBlockMeta)
                 .filter(item => {
                     if (!keyword) return true

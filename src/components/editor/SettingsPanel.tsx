@@ -85,7 +85,7 @@ const labelCls = "text-[11px] font-medium text-slate-400"
 const sectionCls = "border-t border-white/10 pt-4"
 
 type FieldBlurEvent = React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>
-type SettingsTab = 'global' | 'seo' | 'menu' | 'block'
+export type SettingsTab = 'global' | 'seo' | 'menu' | 'block'
 
 function getBlockInfo(blockType: string) {
     const meta = blockRegistry.getBlockMeta(blockType)
@@ -150,13 +150,16 @@ interface SettingsPanelProps {
     }) => void | Promise<void>
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
+    /** External tab request — set to 'menu' when navigation/footer block is clicked (BUG-F05-032/046) */
+    requestedTab?: SettingsTab | null
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
 function SettingsPanelInner({
     block, blockIndex, theme, site, siteName, siteStatus, headerBlock, footerBlock, pages, currentPageId,
     onThemeChange, onDeleteBlock, onDuplicateBlock, onBlockFieldChange, onBlockUpdate,
-    onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate
+    onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
+    requestedTab,
 }: SettingsPanelProps) {
     const { t } = useI18n()
     const pm = t.editor.pageManager
@@ -188,6 +191,13 @@ function SettingsPanelInner({
 
         setActiveTab(prev => (prev === 'block' ? 'global' : prev))
     }, [block])
+
+    // BUG-F05-032/046: respond to external tab requests (e.g. clicking header → 'menu')
+    useEffect(() => {
+        if (requestedTab) {
+            setActiveTab(requestedTab)
+        }
+    }, [requestedTab])
 
     const siteContactInfo = site?.contactInfo || {}
     const siteSocialLinks = site?.socialLinks || {}
@@ -319,7 +329,14 @@ function SettingsPanelInner({
                         <Input
                             defaultValue={siteContactInfo.phone || ''}
                             key={`contact-phone-${siteContactInfo.phone || ''}`}
-                            onBlur={(e: FieldBlurEvent) => onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: e.target.value } })}
+                            onBlur={(e: FieldBlurEvent) => {
+                                const v = e.target.value.trim()
+                                if (!v || /^\+?[\d\s\-().]*$/.test(v)) {
+                                    void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: v } })
+                                } else {
+                                    toast.error('Please enter a valid phone number (digits, +, -, spaces)')
+                                }
+                            }}
                             variant="editor"
                             className={editorInputClassName}
                             placeholder="+60 12-345-6789"

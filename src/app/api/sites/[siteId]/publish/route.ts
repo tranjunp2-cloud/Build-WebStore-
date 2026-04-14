@@ -167,12 +167,21 @@ export async function DELETE(
             },
         })
 
+        // Invalidate cached site data so storefront shows maintenance page
+        try {
+            revalidateTag(`site-${siteId}`)
+            revalidateTag('tenants')
+        } catch {
+            // revalidateTag requires Next.js request context — skip in tests
+        }
+
         return NextResponse.json({
             success: true,
             data: {
                 id: site.id,
                 name: site.name,
                 status: 'draft',
+                unpublishedAt: new Date().toISOString(),
             },
         })
 

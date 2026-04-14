@@ -576,7 +576,7 @@ export function PreviewScripts() {
         document.addEventListener('mouseover', onMouseOver)
         document.addEventListener('mouseout', onMouseOut)
         document.addEventListener('pointerdown', onPointerDown)
-        document.addEventListener('click', onTextClick)
+        document.addEventListener('dblclick', onTextClick)
         document.addEventListener('blur', onBlur, true) // capture phase
         document.addEventListener('keydown', onKeyDown)
         document.addEventListener('click', onClick)
@@ -656,7 +656,7 @@ export function PreviewScripts() {
             document.removeEventListener('mouseover', onMouseOver)
             document.removeEventListener('mouseout', onMouseOut)
             document.removeEventListener('pointerdown', onPointerDown)
-            document.removeEventListener('click', onTextClick)
+            document.removeEventListener('dblclick', onTextClick)
             document.removeEventListener('blur', onBlur, true)
             document.removeEventListener('keydown', onKeyDown)
             document.removeEventListener('click', onClick)
