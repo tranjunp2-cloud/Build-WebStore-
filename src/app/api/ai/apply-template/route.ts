@@ -240,12 +240,16 @@ export const POST = withAuth(async (user, req) => {
         }
 
         const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
-        // Pick only valid theme fields — Payload groups may have extra metadata
+        // Pick only valid theme fields — Payload select fields reject unknown values
+        const VALID_HEADING_FONTS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
+        const VALID_BODY_FONTS = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
+        const rawHeading = String(rawTheme.fontHeading || '')
+        const rawBody = String(rawTheme.fontBody || '')
         const templateTheme = {
             primaryColor: String(rawTheme.primaryColor || '#0ea5e9'),
             secondaryColor: String(rawTheme.secondaryColor || '#d946ef'),
-            fontHeading: String(rawTheme.fontHeading || 'Outfit'),
-            fontBody: String(rawTheme.fontBody || 'Inter'),
+            fontHeading: VALID_HEADING_FONTS.includes(rawHeading) ? rawHeading : 'Outfit',
+            fontBody: VALID_BODY_FONTS.includes(rawBody) ? rawBody : 'Inter',
             colorMode: String(rawTheme.colorMode || 'dark'),
         }
 
