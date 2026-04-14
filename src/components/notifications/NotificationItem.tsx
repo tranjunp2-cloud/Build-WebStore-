@@ -1,6 +1,7 @@
 'use client'
 
 import { formatDistanceToNow } from 'date-fns'
+import { ms as dateFnsMsLocale } from 'date-fns/locale/ms'
 import { ShoppingCart, Megaphone, CircleAlert, FileText, type LucideIcon } from 'lucide-react'
 import { useI18n } from '@/i18n'
 import type { NotificationItem as NotificationItemType } from '@/types/notification'
@@ -12,7 +13,7 @@ interface Props {
 
 export function NotificationItem({ notification, onClick }: Props) {
   const { type, title, message, isRead, createdAt } = notification
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
 
   let Icon: LucideIcon = ShoppingCart
   let iconBgClass = 'bg-[#00BC7D]/10 text-[#00BC7D]'
@@ -58,7 +59,7 @@ export function NotificationItem({ notification, onClick }: Props) {
           {message}
         </p>
         <p className="text-[12px] font-medium leading-[16px] text-[#64748B] mt-1">
-          {formatDistanceToNow(new Date(createdAt), { addSuffix: true })}
+          {formatDistanceToNow(new Date(createdAt), { addSuffix: true, locale: locale === 'ms' ? dateFnsMsLocale : undefined })}
         </p>
       </div>
     </div>

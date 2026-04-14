@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Bell, X } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
@@ -37,23 +38,29 @@ async function registerAndSubscribe(): Promise<PushSubscription | null> {
 
 export function PushOptInPrompt() {
   const [show, setShow] = useState(false)
+  const { t } = useI18n()
 
-  const shouldShow = useCallback(() => {
+  // Auto re-subscribe on every mount if permission already granted
+  // This ensures each user (even on shared browser) has their subscription saved
+  useEffect(() => {
+    if (!VAPID_PUBLIC_KEY) return
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return
+    if (Notification.permission === 'granted') {
+      registerAndSubscribe().catch((err) =>
+        console.warn('[Push] Auto re-subscribe failed', err),
+      )
+    }
+  }, [])
+
+  const shouldShowPrompt = useCallback(() => {
     if (!VAPID_PUBLIC_KEY) return false
     if (typeof window === 'undefined') return false
     if (!('Notification' in window) || !('serviceWorker' in navigator)) return false
     if (Notification.permission === 'denied') return false
-    if (Notification.permission === 'granted') {
-      // Already granted — silently register SW + subscribe
-      registerAndSubscribe().catch((err) =>
-        console.warn('[Push] Silent re-subscribe failed', err),
-      )
-      return false
-    }
+    if (Notification.permission === 'granted') return false
     if (localStorage.getItem('push-opt-in-completed')) return false
     const dismissed = localStorage.getItem('push-opt-in-dismissed')
     if (dismissed) {
-      // Re-prompt after 7 days
       const dismissedAt = parseInt(dismissed, 10)
       if (Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000) return false
     }
@@ -61,22 +68,20 @@ export function PushOptInPrompt() {
   }, [])
 
   useEffect(() => {
-    // Show immediately if wizard was already seen
     const wizardSeen = !document.querySelector('[data-wizard-open]')
-    if (wizardSeen && shouldShow()) {
+    if (wizardSeen && shouldShowPrompt()) {
       const timer = setTimeout(() => setShow(true), 2000)
       return () => clearTimeout(timer)
     }
 
-    // Listen for wizard close event
     const handleWizardClosed = () => {
-      if (shouldShow()) {
+      if (shouldShowPrompt()) {
         setTimeout(() => setShow(true), 1500)
       }
     }
     window.addEventListener('wizard-closed', handleWizardClosed)
     return () => window.removeEventListener('wizard-closed', handleWizardClosed)
-  }, [shouldShow])
+  }, [shouldShowPrompt])
 
   const handleEnable = async () => {
     try {
@@ -114,10 +119,10 @@ export function PushOptInPrompt() {
         </div>
         <div>
           <h4 className="text-[14px] font-semibold text-white leading-tight mb-1">
-            Enable desktop notifications?
+            {t.notifications.push.title}
           </h4>
           <p className="text-[12px] text-[#94A3B8] leading-relaxed">
-            Get notified about new orders and updates even when this tab is in the background.
+            {t.notifications.push.description}
           </p>
         </div>
       </div>
@@ -127,13 +132,13 @@ export function PushOptInPrompt() {
           onClick={handleEnable}
           className="flex-1 h-[36px] rounded-lg bg-gradient-to-r from-blue-500 to-teal-400 text-white text-[13px] font-medium hover:opacity-90 transition-opacity"
         >
-          Enable
+          {t.notifications.push.enable}
         </button>
         <button
           onClick={handleLater}
           className="flex-1 h-[36px] rounded-lg text-white/60 text-[13px] font-medium hover:text-white/80 hover:bg-white/5 transition-colors"
         >
-          Later
+          {t.notifications.push.later}
         </button>
       </div>
     </div>

@@ -1686,6 +1686,12 @@
             "newCount": "{count} new notifications",
             "justNow": "Just now",
             "dismiss": "Dismiss"
+        },
+        "push": {
+            "title": "Enable desktop notifications?",
+            "description": "Get notified about new orders and updates even when this tab is in the background.",
+            "enable": "Enable",
+            "later": "Later"
         }
     },
     "Staff": {

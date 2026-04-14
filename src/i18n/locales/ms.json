@@ -1686,6 +1686,12 @@
             "newCount": "{count} pemberitahuan baharu",
             "justNow": "Baru sahaja",
             "dismiss": "Tutup"
+        },
+        "push": {
+            "title": "Aktifkan pemberitahuan desktop?",
+            "description": "Dapatkan pemberitahuan tentang pesanan baharu dan kemas kini walaupun tab ini di latar belakang.",
+            "enable": "Aktifkan",
+            "later": "Nanti"
         }
     },
     "Staff": {
