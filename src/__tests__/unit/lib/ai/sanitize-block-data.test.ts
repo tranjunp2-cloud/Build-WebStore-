@@ -415,7 +415,7 @@ describe('sanitizeBlockData — pricing plans extended [TC-F01.08]', () => {
 // ─── Gallery + logo-cloud cleanup (lines 480-489) ────────────────────────────
 
 describe('sanitizeBlockData — gallery and logo-cloud cleanup [TC-F01.08]', () => {
-    it('converts gallery URL strings to alt-text objects', () => {
+    it('wraps gallery URL strings to { image: { url, alt }, caption } per Zod schema', () => {
         // Arrange
         const input = {
             blockType: 'gallery',
@@ -425,10 +425,12 @@ describe('sanitizeBlockData — gallery and logo-cloud cleanup [TC-F01.08]', () 
         // Act
         const output = sanitizeBlockData(input)
 
-        // Assert — URL strings converted to alt metadata, not emptied
-        const images = output.images as Array<Record<string, unknown>>
+        // Assert — URL strings wrapped into ImageRef shape, not stripped
+        const images = output.images as Array<{ image: { url: string; alt: string }; caption: string }>
         expect(images).toHaveLength(2)
-        expect(images[0]).toHaveProperty('alt')
+        expect(images[0]).toHaveProperty('image')
+        expect(images[0]!.image.url).toBe('https://example.com/img1.jpg')
+        expect(images[1]!.image.url).toBe('https://example.com/img2.jpg')
     })
 
     it('converts logo-cloud URL strings to name objects', () => {

@@ -688,33 +688,28 @@ function parsePrice(raw: unknown): number | null {
     return Number.isFinite(n) ? n : null
 }
 
-// Clamp absurd stat values + format with commas.
-// AI hallucinates "50,000,000+ Cups Served" for a small cafe → cap at 100K.
+// Clamp absurd stat values to 100K+. For non-absurd values, return the original
+// string verbatim (preserve "+", "%", custom units like "kg", etc).
+// Only triggers when AI hallucinates "50,000,000+ Cups Served" for a small cafe.
 function clampStatValue(raw: string): string {
-    const trimmed = raw.trim()
+    const trimmed = String(raw).trim()
     if (!trimmed) return '0'
-    // Extract numeric part (handles "50,000,000+", "RM 1.5M", "2000000 kg")
-    const match = trimmed.match(/^([^\d-]*)([\d.,]+)\s*([A-Za-z+%]*)\s*(.*)$/)
+    const match = trimmed.match(/^([^\d-]*)([\d.,]+)([A-Za-z+%]*)(.*)$/)
     if (!match) return trimmed
     const [, prefix, numStr, suffix, rest] = match
     const cleanNum = numStr.replace(/,/g, '')
-    let n = Number(cleanNum)
+    const n = Number(cleanNum)
     if (!Number.isFinite(n)) return trimmed
-    // Apply suffix multiplier (k, m, b, kg → keep as-is)
+    // Apply suffix multiplier to detect absurdity
     const suffixLower = suffix.toLowerCase()
-    if (suffixLower === 'k') n *= 1000
-    else if (suffixLower === 'm') n *= 1000000
-    else if (suffixLower === 'b') n *= 1000000000
-    // Clamp: nothing for a small business should exceed 100K
-    if (n > 100000) n = 100000
-    // Format: <1000 raw, <10K → "5K+", <100K → "50K+"
-    let formatted: string
-    if (n < 1000) formatted = String(Math.round(n))
-    else if (n < 10000) formatted = `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
-    else formatted = `${Math.round(n / 1000)}K+`
-    // Preserve trailing unit (kg, etc.) but drop K/M/B from suffix since we re-applied
-    const unit = ['k', 'm', 'b', '+', '%'].includes(suffixLower) ? '' : suffix
-    return `${prefix}${formatted}${unit ? ' ' + unit : ''}${rest ? ' ' + rest : ''}`.trim()
+    let multiplied = n
+    if (suffixLower === 'k') multiplied = n * 1000
+    else if (suffixLower === 'm') multiplied = n * 1000000
+    else if (suffixLower === 'b') multiplied = n * 1000000000
+    // If not absurdly large, return verbatim — preserve "+", "%", units
+    if (multiplied <= 100000) return trimmed
+    // Clamp absurd value
+    return `${prefix}100K+${rest}`.trim()
 }
 
 function normalizeIcon(raw: unknown): string {
@@ -1369,10 +1364,12 @@ export function sanitizeBlockData(
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Generic links array cleanup — skip blocks with custom links shape
-    // (navigation handled above; socialWidget needs platform field preserved)
+    // Generic links array cleanup — skip blocks with custom links shape.
+    // navigation handles its own links above.
+    // socialWidget needs platform field preserved (not just label/url).
+    // Footer top-level `links` (rare) still uses generic shape — handled here.
     // ═══════════════════════════════════════════════════════════════════════
-    const BLOCKS_WITH_CUSTOM_LINKS = new Set(['navigation', 'socialWidget', 'footer'])
+    const BLOCKS_WITH_CUSTOM_LINKS = new Set(['navigation', 'socialWidget'])
     if (Array.isArray(s.links) && !BLOCKS_WITH_CUSTOM_LINKS.has(String(s.blockType))) {
         const rawLinks = norm(s.links, (v) => ({ label: v, url: '#' }))
         s.links = rawLinks.map((link: unknown) => {
