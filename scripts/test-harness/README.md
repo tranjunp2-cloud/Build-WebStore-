@@ -21,11 +21,30 @@ Output lands in `.harness-out/` (gitignored).
 | `npm run harness:quick` | 3 fixtures, premium variant only | <60s | `.harness-out/matrix.json` |
 | `npm run harness:gen`   | full matrix 210 fixtures        | ~90ms | `.harness-out/matrix.json` |
 | `npm run harness:check` | run structural guards on matrix | <1s   | `.harness-out/structural-report.json` |
-| `npm run harness:render`| Playwright screenshots          | ~10m  | `.harness-out/screenshots/` *(Phase 03)* |
+| `npm run harness:render`| Playwright screenshots + empty-hole detect | ~10m  | `.harness-out/screenshots/` + `visual-report.<project>.w<N>.json` |
+| `npm run harness:merge` | merge structural + visual → combined-report.json | <1s | `.harness-out/combined-report.json` |
 | `npm run harness:report`| HTML gallery                    | ~5s   | `.harness-out/report.html` *(Phase 04)* |
-| `npm run harness:all`   | gen → check → render → report   | ~12m  | full pipeline |
+| `npm run harness:all`   | gen → check → render → merge → report | ~12m  | full pipeline |
 
 `pnpm` users: replace `npm run` with `pnpm`.
+
+### `harness:render` — local prerequisites
+
+The render step boots Playwright against a Next dev server with the harness route enabled. Before running:
+
+```bash
+# 1. Generate matrix first (so the route has fixtures to look up)
+npm run harness:gen
+
+# 2. Boot dev server with harness route on (in a separate terminal)
+ENABLE_HARNESS=1 npm run dev
+
+# 3. Once dev is ready on http://localhost:3000:
+npm run harness:render
+npm run harness:merge
+```
+
+The harness route lives at `src/app/test-harness/[fixtureId]/page.harness.tsx` and is excluded from `pageExtensions` unless `ENABLE_HARNESS=1` — production / staging builds never see it.
 
 ## Daily dev loop
 
@@ -86,7 +105,10 @@ Render and report steps are `continue-on-error` until Phase 03 + 04 land — the
 | `check.ts` | Phase 02 — structural guards, writes `structural-report.json` |
 | `assertions/` | 6 guards + variety metrics |
 | `types.ts` | Shared TypeScript types for matrix / report shapes |
-| `render/` | Phase 03 — Playwright config + empty-hole detector *(pending)* |
+| `render/playwright.config.ts` | Phase 03 — Playwright config (desktop + mobile projects) |
+| `render/harness.spec.ts` | Phase 03 — render loop, screenshots, detector wiring |
+| `render/empty-hole-detector.ts` | Phase 03 — pure PNG analyser, sliding window variance + brightness |
+| `render/visual-report.ts` | Phase 03 — merger structural + visual → combined-report.json |
 | `report/` | Phase 04 — HTML gallery generator *(pending)* |
 
 ## Background
