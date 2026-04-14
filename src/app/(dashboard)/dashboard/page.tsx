@@ -32,29 +32,45 @@ interface Props {
 
 export default async function DashboardRoot({ searchParams }: Props) {
     const resolvedParams = await searchParams
-    const tab = typeof resolvedParams.tab === 'string' ? resolvedParams.tab : 'overview'
+    const rawTab = typeof resolvedParams.tab === 'string' ? resolvedParams.tab : 'overview'
 
     // We fetch preferences here so we can pass it down to modal safely
     let dashboardPreferences: string[] | undefined = undefined
+    let hasUsableSites = false
     const tenantId = await getCurrentTenantId()
     if (tenantId) {
         const payload = await getPayload({ config })
         const tenantResult = await payload.findByID({ collection: 'tenants', id: tenantId })
         dashboardPreferences = (tenantResult as { settings?: { dashboardPreferences?: string[] } })?.settings?.dashboardPreferences
+
+        const allSites = await payload.find({
+            collection: 'sites',
+            where: { tenant: { equals: tenantId } },
+            limit: 5,
+        })
+        hasUsableSites = allSites.docs.some((s) => {
+            const gs = (s as Record<string, unknown>).generationStatus
+            return !gs || gs === 'none' || gs === 'completed'
+        })
     }
+
+    // Force overview tab when no usable sites — prevents empty analytics/seo views via direct URL
+    const tab = hasUsableSites ? rawTab : 'overview'
 
     return (
         <div className="space-y-6">
             <DashboardTabContent defaultTab={tab}>
-                {/* Universal Page Header / Toolbar */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <DashboardTabs />
+                {/* Universal Page Header / Toolbar — hidden when no usable sites */}
+                {hasUsableSites && (
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <DashboardTabs />
 
-                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                        <PeriodSelector />
-                        <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+                        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                            <PeriodSelector />
+                            <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Only render the active tab — avoids 3x query cost */}
                 {tab === 'overview' && (
