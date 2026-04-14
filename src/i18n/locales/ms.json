@@ -1228,28 +1228,6 @@
                 "toastDeleteSuccess": "Kategori \"{name}\" telah dipadam",
                 "toastDeleteFail": "Gagal memadam kategori"
             },
-            "categoryPage": {
-                "title": "Urus Kategori",
-                "existingTitle": "Kategori Sedia Ada",
-                "itemsCount": "{count} item",
-                "noCategories": "Belum ada kategori",
-                "addNew": "Tambah Kategori Baru",
-                "namePlaceholder": "Nama kategori",
-                "close": "Tutup",
-                "deleteTitle": "Padam Kategori",
-                "deleteConfirm": "Adakah anda pasti ingin memadam",
-                "deleteWarning": "Kiriman yang ditetapkan kepada kategori ini akan menjadi tanpa kategori. Tindakan ini tidak boleh dibatalkan.",
-                "cancel": "Batal",
-                "delete": "Padam",
-                "deleting": "Memadam...",
-                "toastCreated": "Kategori \"{name}\" dicipta",
-                "toastCreateFail": "Gagal mencipta kategori",
-                "toastUpdated": "Kategori dikemas kini",
-                "toastUpdateFail": "Gagal mengemas kini kategori",
-                "toastDeleted": "Kategori \"{name}\" telah dipadam",
-                "toastDeleteFail": "Gagal memadam kategori",
-                "toastLoadFail": "Gagal memuatkan kategori"
-            },
             "pagination": {
                 "previous": "Sebelumnya",
                 "next": "Seterusnya"

@@ -88,14 +88,6 @@ export default function BlogEditorPage() {
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
     const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
     const [thumbnailId, setThumbnailId] = useState<string | null>(null)
-    const thumbnailObjectUrlRef = useRef<string | null>(null)
-
-    // Cleanup object URL on unmount
-    useEffect(() => {
-        return () => {
-            if (thumbnailObjectUrlRef.current) URL.revokeObjectURL(thumbnailObjectUrlRef.current)
-        }
-    }, [])
 
     type TenantRef = { tenant: { id: string } | string; role?: string; status?: string }
     type CurrentUser = { id: string; email: string; firstName?: string; lastName?: string; tenants?: TenantRef[] }
@@ -719,9 +711,7 @@ export default function BlogEditorPage() {
                                             e.target.value = ''
                                             return
                                         }
-                                        if (thumbnailObjectUrlRef.current) URL.revokeObjectURL(thumbnailObjectUrlRef.current)
                                         const url = URL.createObjectURL(file)
-                                        thumbnailObjectUrlRef.current = url
                                         setThumbnailPreview(url)
                                         setThumbnailFile(file)
                                     }}

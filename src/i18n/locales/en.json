@@ -1228,28 +1228,6 @@
                 "toastDeleteSuccess": "Category \"{name}\" deleted",
                 "toastDeleteFail": "Failed to delete category"
             },
-            "categoryPage": {
-                "title": "Manage Category",
-                "existingTitle": "Existing Category",
-                "itemsCount": "{count} items",
-                "noCategories": "No categories yet",
-                "addNew": "Add new Category",
-                "namePlaceholder": "Category name",
-                "close": "Close",
-                "deleteTitle": "Delete Category",
-                "deleteConfirm": "Are you sure you want to delete",
-                "deleteWarning": "Posts assigned to this category will become uncategorized. This cannot be undone.",
-                "cancel": "Cancel",
-                "delete": "Delete",
-                "deleting": "Deleting...",
-                "toastCreated": "Category \"{name}\" created",
-                "toastCreateFail": "Failed to create category",
-                "toastUpdated": "Category updated",
-                "toastUpdateFail": "Failed to update category",
-                "toastDeleted": "Category \"{name}\" deleted",
-                "toastDeleteFail": "Failed to delete category",
-                "toastLoadFail": "Failed to load categories"
-            },
             "pagination": {
                 "previous": "Previous",
                 "next": "Next"

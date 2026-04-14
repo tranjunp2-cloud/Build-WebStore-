@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-    Plus, Pencil, Trash2, X, Check, Loader2,
-    AlertTriangle,
+    ArrowLeft, Plus, Pencil, Trash2, X, Check, Loader2,
+    Tag, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useI18n } from '@/i18n'
 
 type Category = {
     id: string
@@ -18,8 +18,6 @@ type Category = {
 
 export default function BlogCategoriesPage() {
     const router = useRouter()
-    const { t } = useI18n()
-    const cp = t.dashboard.blog.categoryPage
     const [categories, setCategories] = useState<Category[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -41,15 +39,14 @@ export default function BlogCategoriesPage() {
         setLoading(true)
         try {
             const res = await fetch('/api/blog-categories', { credentials: 'include' })
-            if (!res.ok) throw new Error('fetch failed')
             const json = await res.json()
             setCategories(json.data || [])
         } catch {
-            toast.error(cp.toastLoadFail)
+            toast.error('Failed to load categories')
         } finally {
             setLoading(false)
         }
-    }, [cp.toastLoadFail])
+    }, [])
 
     useEffect(() => {
         fetchCategories()
@@ -66,14 +63,13 @@ export default function BlogCategoriesPage() {
                 body: JSON.stringify({ name: newName.trim() }),
             })
             const json = await res.json()
-            if (!res.ok) throw new Error(json.error?.details || cp.toastCreateFail)
-            toast.success(cp.toastCreated.replace('{name}', newName.trim()))
+            if (!res.ok) throw new Error(json.error?.details || 'Failed to create')
+            toast.success(`Category "${newName.trim()}" created`)
             setNewName('')
             setShowCreateInput(false)
             fetchCategories()
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : cp.toastCreateFail
-            toast.error(msg)
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to create category')
         } finally {
             setIsCreating(false)
         }
@@ -95,13 +91,12 @@ export default function BlogCategoriesPage() {
                 body: JSON.stringify({ name: editName.trim() }),
             })
             const json = await res.json()
-            if (!res.ok) throw new Error(json.error?.details || cp.toastUpdateFail)
-            toast.success(cp.toastUpdated)
+            if (!res.ok) throw new Error(json.error?.details || 'Failed to update')
+            toast.success('Category updated')
             setEditingId(null)
             fetchCategories()
-        } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : cp.toastUpdateFail
-            toast.error(msg)
+        } catch (err: any) {
+            toast.error(err.message || 'Failed to update category')
         } finally {
             setIsUpdating(false)
         }
@@ -115,12 +110,12 @@ export default function BlogCategoriesPage() {
                 method: 'DELETE',
                 credentials: 'include',
             })
-            if (!res.ok) throw new Error(cp.toastDeleteFail)
-            toast.success(cp.toastDeleted.replace('{name}', deleteTarget.name))
+            if (!res.ok) throw new Error('Failed to delete')
+            toast.success(`Category "${deleteTarget.name}" deleted`)
             setDeleteTarget(null)
             fetchCategories()
         } catch {
-            toast.error(cp.toastDeleteFail)
+            toast.error('Failed to delete category')
         } finally {
             setIsDeleting(false)
         }
@@ -131,7 +126,7 @@ export default function BlogCategoriesPage() {
             <div className="flex flex-col p-[1px] w-full max-w-[768px] bg-[#1E293B] border-[1px] border-[rgba(255,255,255,0.08)] rounded-[16px] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)]">
                 {/* Header (31611:5304) */}
                 <div className="flex flex-row justify-between items-center w-full px-[24px] py-[12px] border-b-[1px] border-b-[rgba(255,255,255,0.08)]">
-                    <span className="font-['Inter'] font-[700] text-[20px] leading-[1.4em] text-[#F8FAFC]">{cp.title}</span>
+                    <span className="font-['Inter'] font-[700] text-[20px] leading-[1.4em] text-[#F8FAFC]">Manage Category</span>
                     <button
                         onClick={() => router.push('/blog')}
                         className="flex flex-col items-center justify-center pt-[8px] px-[8px] w-[36px] h-[36px] rounded-[12px] hover:bg-white/5 transition-colors"
@@ -145,8 +140,8 @@ export default function BlogCategoriesPage() {
                     <div className="flex flex-col w-full gap-[12px]">
                         {/* Title Row */}
                         <div className="flex flex-row justify-between items-center h-[20px] w-full">
-                            <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">{cp.existingTitle}</span>
-                            <span className="font-['Inter'] font-[400] text-[12px] leading-[1.6666666666666667em] text-[#F8FAFC]">{cp.itemsCount.replace('{count}', String(categories.length))}</span>
+                            <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC]">Existing Category</span>
+                            <span className="font-['Inter'] font-[400] text-[12px] leading-[1.6666666666666667em] text-[#F8FAFC]">{categories.length} items</span>
                         </div>
 
                         {/* List Frame (31611:5417) */}
@@ -157,7 +152,7 @@ export default function BlogCategoriesPage() {
                                 </div>
                             ) : categories.length === 0 ? (
                                 <div className="flex flex-col p-[12px] gap-[12px] border-[1px] border-[#374151] rounded-[12px] items-center justify-center py-[24px]">
-                                    <span className="text-[#9F9FA9] text-[14px]">{cp.noCategories}</span>
+                                    <span className="text-[#9F9FA9] text-[14px]">No categories yet</span>
                                 </div>
                             ) : (
                                 categories.map((cat, index) => {
@@ -194,7 +189,7 @@ export default function BlogCategoriesPage() {
                                                     <div className="flex flex-row items-center px-[12px] py-[4px] min-w-0 bg-[rgba(255,255,255,0.1)] border-[1px] border-[rgba(255,255,255,0.3)] rounded-[12px] w-fit">
                                                         <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[#FFFFFF] truncate">{cat.name}</span>
                                                     </div>
-                                                    <div className="flex items-center gap-[8px] xl:opacity-0 xl:group-hover:opacity-100 transition-opacity">
+                                                    <div className="flex items-center gap-[8px] opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <button
                                                             onClick={() => startEditing(cat)}
                                                             className="text-[#9F9FA9] hover:text-white p-[4px]"
@@ -226,7 +221,7 @@ export default function BlogCategoriesPage() {
                                 onChange={e => setNewName(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
                                 autoFocus
-                                placeholder={cp.namePlaceholder}
+                                placeholder="Category name"
                                 className="flex-1 bg-transparent font-['Inter'] font-[600] text-[14px] text-[#FFFFFF] outline-none placeholder-[#9F9FA9] border-b-[1px] border-b-[rgba(255,255,255,0.2)] pb-[4px]"
                             />
                             <div className="flex gap-[4px]">
@@ -244,7 +239,7 @@ export default function BlogCategoriesPage() {
                             className="flex flex-row items-center w-full gap-[6px] hover:opacity-80 transition-opacity"
                         >
                             <Plus className="w-[24px] h-[24px] text-white" strokeWidth={1.5} />
-                            <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#FFFFFF]">{cp.addNew}</span>
+                            <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#FFFFFF]">Add new Category</span>
                         </button>
                     )}
                 </div>
@@ -255,7 +250,7 @@ export default function BlogCategoriesPage() {
                         onClick={() => router.push('/blog')}
                         className="flex flex-row justify-center items-center px-[16px] py-[8px] h-[48px] bg-[#0B1120] border-[1px] border-[rgba(255,255,255,0.08)] rounded-[10px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.1)] transition-colors hover:bg-white/5"
                     >
-                        <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA]">{cp.close}</span>
+                        <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#FAFAFA]">Close</span>
                     </button>
                 </div>
             </div>
@@ -267,24 +262,24 @@ export default function BlogCategoriesPage() {
                         <div className="flex items-center justify-between mb-[16px]">
                             <h3 className="text-[18px] font-bold text-white flex items-center gap-[8px]">
                                 <AlertTriangle className="w-[20px] h-[20px] text-red-500" />
-                                {cp.deleteTitle}
+                                Delete Category
                             </h3>
                             <button onClick={() => setDeleteTarget(null)} className="text-[#9F9FA9] hover:text-white transition-colors">
                                 <X className="w-[20px] h-[20px]" />
                             </button>
                         </div>
                         <p className="text-[14px] text-gray-400 mb-[8px]">
-                            {cp.deleteConfirm} <span className="text-white font-bold">&quot;{deleteTarget.name}&quot;</span>?
+                            Are you sure you want to delete <span className="text-white font-bold">&quot;{deleteTarget.name}&quot;</span>?
                         </p>
                         <p className="text-[13px] text-gray-500 mb-[24px]">
-                            {cp.deleteWarning}
+                            Posts assigned to this category will become uncategorized. Space cannot be undone.
                         </p>
                         <div className="flex justify-end gap-[12px]">
                             <button
                                 onClick={() => setDeleteTarget(null)}
                                 className="px-[16px] py-[10px] rounded-[8px] text-[14px] font-medium text-[#9F9FA9] hover:text-white hover:bg-white/5 transition-colors"
                             >
-                                {cp.cancel}
+                                Cancel
                             </button>
                             <button
                                 onClick={handleDelete}
@@ -292,9 +287,9 @@ export default function BlogCategoriesPage() {
                                 className="flex items-center gap-[8px] rounded-[8px] bg-red-600 px-[16px] py-[10px] text-[14px] font-medium text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
                             >
                                 {isDeleting ? (
-                                    <><Loader2 className="w-[16px] h-[16px] animate-spin" /> {cp.deleting}</>
+                                    <><Loader2 className="w-[16px] h-[16px] animate-spin" /> Deleting...</>
                                 ) : (
-                                    <><Trash2 className="w-[16px] h-[16px]" /> {cp.delete}</>
+                                    <><Trash2 className="w-[16px] h-[16px]" /> Delete</>
                                 )}
                             </button>
                         </div>
