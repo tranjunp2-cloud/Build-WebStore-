@@ -1649,6 +1649,11 @@
             "lastName": "Last name",
             "email": "Email Address",
             "emailNeeded": "We need an email so we can send an invitation.",
+            "errorEmailRequired": "Please enter an email address",
+            "errorEmailInvalid": "Invalid email address",
+            "errorEmailTooLong": "Email must not exceed 254 characters",
+            "errorSelfInvite": "You cannot invite yourself",
+            "errorGeneric": "Something went wrong. Please try again.",
             "roles": {
                 "label": "Access Level",
                 "admin": "Manager",
@@ -1687,6 +1692,15 @@
             "updated": "User marked as {status}",
             "resent": "Invitation email resent successfully"
         }
+    },
+    "Domains": {
+        "errorHttpPrefix": "Do not include http/https, enter the domain name only",
+        "errorRequired": "Please enter a domain name",
+        "errorSpaces": "Domain name cannot contain spaces",
+        "errorTooLong": "Domain name must not exceed 253 characters",
+        "errorNoTld": "Domain must include an extension (e.g., .com, .my)",
+        "errorInvalidChars": "Domain contains invalid characters",
+        "errorInvalidFormat": "Invalid domain format"
     },
     "editor": {
         "toolbar": {

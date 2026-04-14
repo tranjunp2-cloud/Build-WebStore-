@@ -1649,6 +1649,11 @@
             "lastName": "Nama Belakang",
             "email": "Alamat E-mel",
             "emailNeeded": "Kami memerlukan e-mel untuk menghantar jemputan.",
+            "errorEmailRequired": "Sila masukkan alamat e-mel",
+            "errorEmailInvalid": "Alamat e-mel tidak sah",
+            "errorEmailTooLong": "E-mel tidak boleh melebihi 254 aksara",
+            "errorSelfInvite": "Anda tidak boleh menjemput diri sendiri",
+            "errorGeneric": "Sesuatu telah berlaku. Sila cuba lagi.",
             "roles": {
                 "label": "Tahap Akses",
                 "admin": "Pengurus",
@@ -1687,6 +1692,15 @@
             "updated": "Pengguna ditandakan sebagai {status}",
             "resent": "E-mel jemputan berjaya dihantar semula"
         }
+    },
+    "Domains": {
+        "errorHttpPrefix": "Tidak perlu masukkan http/https, masukkan nama domain sahaja",
+        "errorRequired": "Sila masukkan nama domain",
+        "errorSpaces": "Nama domain tidak boleh mengandungi ruang",
+        "errorTooLong": "Nama domain tidak boleh melebihi 253 aksara",
+        "errorNoTld": "Domain mesti mempunyai sambungan (cth: .com, .my)",
+        "errorInvalidChars": "Domain mengandungi aksara tidak sah",
+        "errorInvalidFormat": "Format domain tidak sah"
     },
     "editor": {
         "toolbar": {

@@ -14,7 +14,26 @@ vi.mock('sonner', () => ({
     toast: {
         success: vi.fn(),
         error: vi.fn(),
+        warning: vi.fn(),
     }
+}));
+
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        locale: 'en',
+        t: {
+            Domains: {
+                errorHttpPrefix: 'Do not include http/https, enter the domain name only',
+                errorRequired: 'Please enter a domain name',
+                errorSpaces: 'Domain name cannot contain spaces',
+                errorTooLong: 'Domain name must not exceed 253 characters',
+                errorNoTld: 'Domain must include an extension (e.g., .com, .my)',
+                errorInvalidChars: 'Domain contains invalid characters',
+                errorInvalidFormat: 'Invalid domain format',
+            }
+        },
+        ti: (key: string) => key,
+    }),
 }));
 
 Object.assign(navigator, {
@@ -60,7 +79,8 @@ describe('F19 Domain Management (DomainsClient)', () => {
         fireEvent.click(submitBtn);
 
         await waitFor(() => {
-            expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Invalid domain format'));
+            // 'invalid-domain!@#$' has no TLD dot, so this error fires first
+            expect(screen.getByText('Domain must include an extension (e.g., .com, .my)')).toBeInTheDocument();
         });
     });
 
