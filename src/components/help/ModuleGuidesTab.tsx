@@ -23,10 +23,29 @@ interface ModuleData {
   steps: StepData[]
 }
 
+interface LocaleStep {
+  title: string
+  desc: string
+  imgTitle?: string
+  guide?: string[]
+}
+
+interface LocaleModule {
+  label: string
+  steps: LocaleStep[]
+}
+
+interface HelpModulesData {
+  dashboard: LocaleModule
+  builder: LocaleModule
+  blog: LocaleModule
+  settings: LocaleModule
+}
+
 export function ModuleGuidesTab() {
   const { t } = useI18n()
 
-  const d = t.help.modules.data as any
+  const d = t.help.modules.data as unknown as HelpModulesData
 
   const MODULES_DATA: ModuleData[] = [
     {
@@ -50,7 +69,7 @@ export function ModuleGuidesTab() {
       id: 'builder',
       icon: '🚀',
       label: d.builder.label,
-      steps: (d.builder.steps || []).map((s: any, i: number) => ({
+      steps: (d.builder.steps || []).map((s: LocaleStep, i: number) => ({
         num: i + 1,
         title: s.title,
         desc: s.desc,
@@ -65,7 +84,7 @@ export function ModuleGuidesTab() {
       id: 'blog',
       icon: '📝',
       label: d.blog.label,
-      steps: (d.blog.steps || []).map((s: any, i: number) => ({
+      steps: (d.blog.steps || []).map((s: LocaleStep, i: number) => ({
         num: i + 1,
         title: s.title,
         desc: s.desc,
