@@ -16,6 +16,10 @@ import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
 import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
 import { resolveComposerCategory } from './composer-category-resolver'
+import { generateAllPageSeo, type PageForSeo } from './seo-generator'
+import { mapBusinessInfo } from './business-info-mapper'
+import type { BusinessSample } from './content/types'
+import { runConsistencyCheck, logConsistencyReport } from './consistency-validator'
 import { resolveFontPairing } from './font-pairings'
 import { seededShufflePick, hashString } from './seeded-random'
 import {
@@ -257,6 +261,42 @@ export async function generateSiteWithAI(
 
             validBlocks = allBlocks
 
+            // Phase 06 — override per-page SEO with deterministic unique values
+            // mined from page content, and attach ogImage + JSON-LD. AI-returned
+            // descriptions are frequently duplicated across pages; this step
+            // guarantees each page ships a distinct meta description plus a
+            // LocalBusiness schema (and FAQPage where an FAQ block exists).
+            const seoBizOverride = mapBusinessInfo(businessInfo)
+            const seoBiz: BusinessSample = {
+                name: seoBizOverride.name ?? businessInfo.businessName,
+                tagline: seoBizOverride.tagline ?? '',
+                description: seoBizOverride.description ?? '',
+                phone: seoBizOverride.phone ?? '',
+                email: seoBizOverride.email ?? '',
+                address: seoBizOverride.address ?? '',
+                heroHeadline: '',
+                heroSubheadline: '',
+                products: seoBizOverride.products,
+            }
+            const seoPages: PageForSeo[] = generatedPages.map((gp) => ({
+                title: gp.title,
+                slug: gp.slug,
+                isHomepage: gp.isHomepage,
+                blocks: gp.blocks as unknown as Array<Record<string, unknown>>,
+            }))
+            const seoList = generateAllPageSeo(seoPages, {
+                biz: seoBiz,
+                category: detectedCategory ?? businessInfo.industry ?? 'business',
+            })
+            for (let i = 0; i < generatedPages.length; i++) {
+                generatedPages[i]!.seo = {
+                    title: seoList[i]!.title,
+                    description: seoList[i]!.description,
+                    ogImage: seoList[i]!.ogImage,
+                    jsonLd: seoList[i]!.jsonLd as unknown as Array<Record<string, unknown>>,
+                }
+            }
+
             // Phase 04 — page-level guards: min block count + AIDA ordering.
             // Both log warnings only; they do not mutate pages or throw.
             for (const genPage of generatedPages) {
@@ -338,6 +378,11 @@ export async function generateSiteWithAI(
             language: (['en', 'ms', 'vi'] as const).includes(parsed.language as 'en' | 'ms' | 'vi') ? (parsed.language as 'en' | 'ms' | 'vi') : 'en',
             theme,
         }
+
+        // Phase 06 — warn-only consistency check on the final AI happy-path
+        // result. Never blocks save; findings are logged for dev triage.
+        const report = runConsistencyCheck(result)
+        logConsistencyReport(report, 'ai')
 
         events.push({ event: 'done', data: { totalBlocks: validBlocks.length, timeMs: 0 } })
 

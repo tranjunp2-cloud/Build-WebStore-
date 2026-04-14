@@ -32,7 +32,14 @@ export type GeneratedPage = {
     slug: string
     isHomepage: boolean
     blocks: GeneratedBlock[]
-    seo: { title: string; description: string }
+    seo: {
+        title: string
+        description: string
+        /** Plan 260414-2249 phase-06: per-page og:image. */
+        ogImage?: string
+        /** Plan 260414-2249 phase-06: schema.org JSON-LD array. */
+        jsonLd?: Array<Record<string, unknown>>
+    }
 }
 
 export type GenerationResult = {

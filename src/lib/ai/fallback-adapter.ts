@@ -21,6 +21,8 @@ import type { GenerationResult, GeneratedBlock, GeneratedPage, BusinessIntent } 
 import { filterUnsupportedBlocks } from './unsupported-blocks'
 import { mapBusinessInfo } from './business-info-mapper'
 import type { BusinessInfoInput } from './system-prompt'
+import { generateAllPageSeo, type PageForSeo } from './seo-generator'
+import { runConsistencyCheck, logConsistencyReport } from './consistency-validator'
 
 type Language = 'en' | 'ms' | 'vi'
 
@@ -50,6 +52,21 @@ function truncate(str: string, max: number): string {
     if (!str) return ''
     if (str.length <= max) return str
     return str.slice(0, max - 1).trimEnd() + '…'
+}
+
+/**
+ * Scan a block list for the first http image URL (image / backgroundImage /
+ * imageUrl). Used to derive a site-wide hero fallback for SEO og:image +
+ * LocalBusiness JSON-LD.
+ */
+function findFirstImage(blocks: GeneratedBlock[]): string | undefined {
+    for (const block of blocks) {
+        const b = block as unknown as Record<string, unknown>
+        if (typeof b.image === 'string' && b.image.startsWith('http')) return b.image
+        if (typeof b.backgroundImage === 'string' && b.backgroundImage.startsWith('http')) return b.backgroundImage
+        if (typeof b.imageUrl === 'string' && b.imageUrl.startsWith('http')) return b.imageUrl
+    }
+    return undefined
 }
 
 /**
@@ -84,15 +101,42 @@ export function adaptTemplateSeedToGenerationResult(
     const rawHomeBlocks = (homePage?.layout ?? []) as GeneratedBlock[]
     const blocks = filterUnsupportedBlocks(rawHomeBlocks, 'fallback')
 
-    // Preserve full multi-page structure for downstream consumers that want it.
-    const pages: GeneratedPage[] = templateSeed.pages.map((page, idx) => ({
+    // Phase 06: generate unique per-page SEO instead of reusing site tagline.
+    // First materialize the filtered block list per page so the SEO generator
+    // mines from blocks the user will actually see.
+    const filteredPages = templateSeed.pages.map((page, idx) => ({
         title: page.title,
         slug: page.slug,
         isHomepage: idx === 0,
         blocks: filterUnsupportedBlocks(page.layout as GeneratedBlock[], 'fallback'),
+    }))
+
+    const pagesForSeo: PageForSeo[] = filteredPages.map((p) => ({
+        title: p.title,
+        slug: p.slug,
+        isHomepage: p.isHomepage,
+        blocks: p.blocks as unknown as Array<Record<string, unknown>>,
+    }))
+    // Derive a site-wide hero image from the homepage's first imagey block so
+    // LocalBusiness JSON-LD and sub-page og:image fall back to a real URL.
+    const siteHeroImage = findFirstImage(filteredPages[0]?.blocks ?? [])
+    const pageSeoList = generateAllPageSeo(pagesForSeo, {
+        biz,
+        category,
+        siteHeroImage,
+    })
+
+    // Preserve full multi-page structure for downstream consumers that want it.
+    const pages: GeneratedPage[] = filteredPages.map((p, idx) => ({
+        title: p.title,
+        slug: p.slug,
+        isHomepage: p.isHomepage,
+        blocks: p.blocks,
         seo: {
-            title: `${biz.name} — ${page.title}`,
-            description: truncate(biz.tagline ?? templateSeed.description, 160),
+            title: pageSeoList[idx]!.title,
+            description: pageSeoList[idx]!.description,
+            ogImage: pageSeoList[idx]!.ogImage,
+            jsonLd: pageSeoList[idx]!.jsonLd as unknown as Array<Record<string, unknown>>,
         },
     }))
 
@@ -164,5 +208,12 @@ export function composeFallbackResult(
         ? { ...baseBiz, ...bizOverride }
         : baseBiz
 
-    return adaptTemplateSeedToGenerationResult(templateSeed, biz, category, language)
+    const result = adaptTemplateSeedToGenerationResult(templateSeed, biz, category, language)
+
+    // Phase 06 — warn-only consistency check. Findings are logged but never
+    // block the return; auto-retry is out of scope for this phase.
+    const report = runConsistencyCheck(result)
+    logConsistencyReport(report, 'fallback')
+
+    return result
 }
