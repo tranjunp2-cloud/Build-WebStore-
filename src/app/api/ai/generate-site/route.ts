@@ -1,4 +1,10 @@
 export const dynamic = 'force-dynamic'
+// Override vercel.json's 60s default — AI site generation runs:
+//   OpenAI GPT-4.1-mini → Unsplash pipeline (5-10 images) → Payload create
+// Real-world timing sits around 60-120s, previous 60s cap produced 504
+// Gateway Timeout (staging run 00:42:15 2026-04-14 `[Theme] Using category…`).
+// Vercel Pro / Fluid Compute allows up to 800s; 300s leaves comfortable headroom.
+export const maxDuration = 300
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'

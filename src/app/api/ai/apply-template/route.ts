@@ -1,4 +1,9 @@
 export const dynamic = 'force-dynamic'
+// Override vercel.json's 60s default — template application merges blocks,
+// may re-run AI content generation, and persists 1 site + N pages + M blocks
+// through Payload, which comfortably exceeds 60s in practice. Same root cause
+// as generate-site 504s. Keeping parity to avoid another latency surprise.
+export const maxDuration = 300
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'

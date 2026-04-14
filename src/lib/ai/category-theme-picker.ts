@@ -32,6 +32,7 @@ import {
     type ThemePreset,
 } from './theme-presets'
 import { THEME_MOODS, type ThemeMood } from './theme-moods'
+import { seededShufflePick } from './seeded-random'
 
 export type { ThemePreset } from './theme-presets'
 export type { ThemeMood } from './theme-moods'
@@ -80,8 +81,10 @@ export function pickCategoryTheme(category: string, seed: number): ThemePreset {
     const key = canonicalizeCategory(category)
     const presets = CATEGORY_PRESETS[key] ?? BUSINESS_PRESETS
     if (presets.length === 0) return BUSINESS_PRESETS[0]!
-    const index = Math.abs(Math.floor(seed)) % presets.length
-    return presets[index]!
+    // Plan 2253 Phase 02 — fixes R3 (modulo-5 hash clustering).
+    // Fisher-Yates seeded shuffle distributes presets more evenly across
+    // djb2-biased business name hashes (common names cluster on low indices).
+    return seededShufflePick(presets, seed) ?? presets[0]!
 }
 
 /**

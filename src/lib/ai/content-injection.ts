@@ -14,6 +14,7 @@
 import { getCategoryContent } from './content'
 import type { BusinessSample, TestimonialSample, FAQSample } from './content'
 import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
+import { hashString, seededShuffle, seededShufflePick } from './seeded-random'
 
 export interface InjectionContext {
     businessName?: string
@@ -28,10 +29,31 @@ function substituteBusinessName(str: string, name?: string): string {
     return str.replace(/\$\{businessName\}/g, name).replace(/\{businessName\}/g, name)
 }
 
+/**
+ * Plan 2253 Phase 03 amendment v3 — originally used modulo which had the same
+ * djb2 clustering bug as R3. Now delegates to shared `seededShufflePick`
+ * (Fisher-Yates) so same-category businesses land on different BusinessSamples.
+ */
 function pickSeeded<T>(arr: readonly T[], seed: number): T | undefined {
-    if (arr.length === 0) return undefined
-    const idx = Math.abs(Math.floor(seed)) % arr.length
-    return arr[idx]
+    return seededShufflePick(arr, seed)
+}
+
+/**
+ * Shuffle a pool of items by seed so different businesses in the same category
+ * pull different subsets / orderings.
+ *
+ * Plan 2253 Phase 03 — fixes R5 (padItems reuse). Originally used modulo
+ * rotation which re-introduced the R3 clustering bug (common business names
+ * collide on `seed % pool.length`). Now uses Fisher-Yates seeded shuffle via
+ * `seededShuffle` — same helper Phase 02 uses for theme preset distribution.
+ *
+ * Plan 2253 Phase 03 amendment (2026-04-15) after variety-delta measurement
+ * showed testimonial collision regressed on 4/5 categories due to the modulo
+ * variant of this helper.
+ */
+function rotateSlice<T>(pool: readonly T[], seed: number): T[] {
+    if (pool.length === 0) return []
+    return seededShuffle(pool, seed)
 }
 
 /** Normalized testimonial for Zod schema shape. */
@@ -63,8 +85,19 @@ export function buildBlockFromLibrary(
     const content = getCategoryContent(category) ?? getCategoryContent('business')
     if (!content) return null
 
-    const biz: BusinessSample | undefined = content.businesses[0]
+    // Plan 2253 Phase 03 — fixes R4 (businesses[0] hardcode).
+    // Rotate the BusinessSample pick by seed so different businesses in the same
+    // category inject different canned copy + tagline + description when the AI
+    // underfills and structure-enforcer has to gap-fill.
+    const bizSeed = ctx.seed ?? 0
+    const biz: BusinessSample | undefined =
+        pickSeeded(content.businesses, bizSeed) ?? content.businesses[0]
     const name = ctx.businessName ?? biz?.name ?? 'Our Business'
+
+    // Seed-rotated content pool slices for testimonials / faqs / features so
+    // within-category businesses pull different subsets of the library.
+    const testimonialSlice = rotateSlice(content.testimonials, bizSeed)
+    const faqSlice = rotateSlice(content.faqItems, bizSeed ^ hashString('faq'))
 
     switch (blockType) {
         case 'navigation':
@@ -109,7 +142,7 @@ export function buildBlockFromLibrary(
                 blockType: 'testimonials',
                 variant: 'cards',
                 headline: 'What Our Customers Say',
-                testimonials: content.testimonials.slice(0, 4).map(mapTestimonial),
+                testimonials: testimonialSlice.slice(0, 4).map(mapTestimonial),
             }
 
         case 'faq':
@@ -117,7 +150,7 @@ export function buildBlockFromLibrary(
                 blockType: 'faq',
                 variant: 'accordion',
                 headline: 'Frequently Asked Questions',
-                items: content.faqItems.slice(0, 5).map(mapFaq),
+                items: faqSlice.slice(0, 5).map(mapFaq),
             }
 
         case 'cta':
@@ -158,57 +191,87 @@ export function buildBlockFromLibrary(
                 ],
             }
 
-        case 'features':
+        case 'features': {
+            // Plan 2253 Phase 03 amendment v3 — shuffle + slice from 8-item pool
+            // by compound seed so same-category businesses inject different
+            // first 4 features, killing the "Quality Service / Fast Response..."
+            // collision observed in post-fix-v2 measurement.
+            const pool = [
+                { icon: '⭐', title: 'Quality Service', description: 'Exceptional quality in every interaction.' },
+                { icon: '🚀', title: 'Fast Response', description: 'Quick turnaround on all requests.' },
+                { icon: '💎', title: 'Premium Experience', description: 'Carefully crafted for discerning customers.' },
+                { icon: '🛡️', title: 'Trusted & Reliable', description: 'Years of consistent service excellence.' },
+                { icon: '🎯', title: 'Results-Focused', description: 'Measurable outcomes you can count on.' },
+                { icon: '🤝', title: 'Personal Attention', description: 'Every client matters to us.' },
+                { icon: '✨', title: 'Craftsmanship', description: 'Details that make a lasting impression.' },
+                { icon: '📈', title: 'Proven Track Record', description: 'Trusted by hundreds of satisfied clients.' },
+            ]
+            const shuffled = seededShuffle(pool, bizSeed ^ hashString('features'))
             return {
                 blockType: 'features',
                 variant: 'grid-3',
                 headline: 'Why Choose Us',
-                features: [
-                    { icon: '⭐', title: 'Quality Service', description: 'Exceptional quality in every interaction.' },
-                    { icon: '🚀', title: 'Fast Response', description: 'Quick turnaround on all requests.' },
-                    { icon: '💎', title: 'Premium Experience', description: 'Carefully crafted for discerning customers.' },
-                    { icon: '🛡️', title: 'Trusted & Reliable', description: 'Years of consistent service excellence.' },
-                ],
+                features: shuffled.slice(0, 4),
             }
+        }
 
-        case 'stats':
+        case 'stats': {
+            const pool = [
+                { value: '500+', label: 'Happy Customers' },
+                { value: '10+', label: 'Years Experience' },
+                { value: '4.9★', label: 'Average Rating' },
+                { value: '98%', label: 'Satisfaction Rate' },
+                { value: '24/7', label: 'Support Available' },
+                { value: '1M+', label: 'Projects Delivered' },
+            ]
+            const shuffled = seededShuffle(pool, bizSeed ^ hashString('stats'))
             return {
                 blockType: 'stats',
                 variant: 'row',
                 headline: 'Our Impact',
-                stats: [
-                    { value: '500+', label: 'Happy Customers' },
-                    { value: '10+', label: 'Years Experience' },
-                    { value: '4.9★', label: 'Average Rating' },
-                ],
+                stats: shuffled.slice(0, 3),
             }
+        }
 
-        case 'team':
+        case 'team': {
+            // Note: Payload schema uses `image` field (not `avatar`) for member photos.
+            // Media pipeline fills this via BLOCK_IMAGE_SPEC.team.
+            const pool = [
+                { name: 'Team Lead', role: 'Founder', bio: 'Passionate about delivering great experiences.' },
+                { name: 'Senior Specialist', role: 'Expert', bio: 'Years of experience in the field.' },
+                { name: 'Customer Success', role: 'Support Lead', bio: 'Dedicated to your satisfaction.' },
+                { name: 'Creative Director', role: 'Design Lead', bio: 'Obsessed with craft and detail.' },
+                { name: 'Operations Manager', role: 'Ops Lead', bio: 'Keeps every project on track.' },
+                { name: 'Client Partner', role: 'Account Lead', bio: 'Your trusted point of contact.' },
+            ]
+            const shuffled = seededShuffle(pool, bizSeed ^ hashString('team'))
             return {
                 blockType: 'team',
                 variant: 'grid',
                 headline: 'Meet Our Team',
-                members: [
-                    // Note: Payload schema uses `image` field (not `avatar`) for member photos.
-                    // Media pipeline fills this via BLOCK_IMAGE_SPEC.team.
-                    { name: 'Team Lead', role: 'Founder', bio: 'Passionate about delivering great experiences.' },
-                    { name: 'Senior Specialist', role: 'Expert', bio: 'Years of experience in the field.' },
-                    { name: 'Customer Success', role: 'Support Lead', bio: 'Dedicated to your satisfaction.' },
-                ],
+                members: shuffled.slice(0, 3),
             }
+        }
 
-        case 'service-cards':
+        case 'service-cards': {
+            const pool = [
+                { icon: '⭐', title: 'Premium Service', description: 'Our flagship offering.' },
+                { icon: '🚀', title: 'Fast Delivery', description: 'Quick turnaround on every job.' },
+                { icon: '💎', title: 'Custom Solutions', description: 'Tailored to your needs.' },
+                { icon: '🛡️', title: 'Ongoing Support', description: 'We stand behind our work.' },
+                { icon: '🎨', title: 'Expert Consultation', description: 'Guidance from seasoned professionals.' },
+                { icon: '🔧', title: 'Flexible Options', description: 'Packages that fit every need.' },
+                { icon: '✅', title: 'Guaranteed Results', description: 'Quality you can measure.' },
+                { icon: '📞', title: 'Dedicated Account Manager', description: 'One point of contact, always.' },
+            ]
+            const shuffled = seededShuffle(pool, bizSeed ^ hashString('service-cards'))
             return {
                 blockType: 'service-cards',
                 variant: 'grid',
                 headline: 'Our Services',
-                services: [
-                    { icon: '⭐', title: 'Premium Service', description: 'Our flagship offering.' },
-                    { icon: '🚀', title: 'Fast Delivery', description: 'Quick turnaround on every job.' },
-                    { icon: '💎', title: 'Custom Solutions', description: 'Tailored to your needs.' },
-                    { icon: '🛡️', title: 'Ongoing Support', description: 'We stand behind our work.' },
-                ],
+                services: shuffled.slice(0, 4),
             }
+        }
 
         case 'gallery':
             return {
@@ -290,24 +353,29 @@ export function buildBlockFromLibrary(
 /**
  * Pad an existing item array up to `minCount` by pulling from content library.
  * Returns the padded array. Handles testimonials, faq, team, features duplication.
+ *
+ * Plan 2253 Phase 03 — fixes R5 (padItems pool reuse). Accepts ctx so the pool
+ * start offset rotates per-business; same-category gens no longer converge on
+ * the same first 4 testimonials.
  */
 export function padItems(
     blockType: string,
     existing: readonly unknown[],
     minCount: number,
     category: string,
+    ctx: InjectionContext = {},
 ): unknown[] {
     if (existing.length >= minCount) return [...existing]
 
     const content = getCategoryContent(category)
     const result: unknown[] = [...existing]
+    const baseSeed = ctx.seed ?? 0
 
     if (blockType === 'testimonials' && content) {
-        const pool = content.testimonials
+        const pool = rotateSlice(content.testimonials, baseSeed)
         let i = 0
         while (result.length < minCount && i < pool.length) {
             const candidate = mapTestimonial(pool[i]!)
-            // Avoid exact dupes by name
             const isDupe = result.some(
                 (r) =>
                     typeof r === 'object' && r !== null && (r as Block).name === candidate.name,
@@ -316,7 +384,7 @@ export function padItems(
             i++
         }
     } else if (blockType === 'faq' && content) {
-        const pool = content.faqItems
+        const pool = rotateSlice(content.faqItems, baseSeed ^ hashString('faq'))
         let i = 0
         while (result.length < minCount && i < pool.length) {
             const candidate = mapFaq(pool[i]!)
@@ -330,7 +398,7 @@ export function padItems(
     } else {
         // Generic padding — inject from library block, dedup by `title` field
         // (features, service-cards have title). Avoids "Quality Service" appearing twice.
-        const libBlock = buildBlockFromLibrary(blockType, category)
+        const libBlock = buildBlockFromLibrary(blockType, category, ctx)
         if (libBlock) {
             const field = ITEM_FIELD_BY_BLOCK[blockType]
             if (field && Array.isArray(libBlock[field])) {
