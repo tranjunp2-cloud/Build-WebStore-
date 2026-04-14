@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 
 import { useI18n } from '@/i18n'
 
@@ -186,12 +187,12 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
                   <span className="text-sm font-medium">{stepData.title}</span>
                 </div>
               ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
+                <Image
                   src={stepData.icon}
                   alt={stepData.title}
-                  className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-                  loading="eager"
+                  fill
+                  unoptimized
+                  className={`object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                   onLoad={() => setImageLoaded(true)}
                   onError={() => setImageError(true)}
                 />
@@ -292,11 +293,12 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
             className="relative w-[90vw] max-w-5xl h-[80vh] rounded-xl overflow-hidden cursor-default bg-[#1e293b] flex items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <Image
               src={lightboxSrc.src}
               alt={lightboxSrc.title}
-              className="max-w-full max-h-full object-contain"
+              fill
+              unoptimized
+              className="object-contain"
             />
           </div>
 
