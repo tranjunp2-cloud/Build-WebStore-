@@ -42,8 +42,8 @@ describe('selectModel — default routing [TC-F01.08, TC-F01.10]', () => {
         }
     })
 
-    it('returns gpt-4o for site-generation (default, phase-03 will flip)', () => {
-        expect(selectModel('site-generation')).toBe('gpt-4o')
+    it('returns gpt-4.1-mini for site-generation (phase-03a default, 9.9x cheaper than gpt-4o)', () => {
+        expect(selectModel('site-generation')).toBe('gpt-4.1-mini')
     })
 
     it('returns gpt-4o-mini for chat-edit (cost-optimized)', () => {
@@ -102,15 +102,21 @@ describe('selectModel — env override', () => {
 
     it('invalid override falls back to default + console.warn', () => {
         process.env.AI_MODEL_SITEGEN = 'nonexistent-model'
-        expect(selectModel('site-generation')).toBe('gpt-4o')
+        // Default is gpt-4.1-mini after phase-03a flip
+        expect(selectModel('site-generation')).toBe('gpt-4.1-mini')
         expect(warnSpy).toHaveBeenCalledOnce()
         expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('nonexistent-model'))
     })
 
     it('empty-string override treated as no override', () => {
         process.env.AI_MODEL_SITEGEN = ''
-        expect(selectModel('site-generation')).toBe('gpt-4o')
+        expect(selectModel('site-generation')).toBe('gpt-4.1-mini')
         expect(warnSpy).not.toHaveBeenCalled()
+    })
+
+    it('canary rollback via env var: AI_MODEL_SITEGEN=gpt-4o restores legacy', () => {
+        process.env.AI_MODEL_SITEGEN = 'gpt-4o'
+        expect(selectModel('site-generation')).toBe('gpt-4o')
     })
 })
 
@@ -202,7 +208,10 @@ describe('ESTIMATED_COSTS structure', () => {
         }
     })
 
-    it('site-generation costs more than other tasks (uses gpt-4o)', () => {
+    it('site-generation costs more than other tasks (heavier prompt + output)', () => {
+        // Note: ESTIMATED_COSTS still reflects pre-phase-03 gpt-4o pricing.
+        // Post-phase-03 actual cost is ~$0.004 (gpt-4.1-mini). Estimate table
+        // will be refreshed when phase-05 wires real observability.
         const siteGenCost = ESTIMATED_COSTS['site-generation']
         for (const task of ALL_TASKS.filter(t => t !== 'site-generation')) {
             expect(siteGenCost).toBeGreaterThan(ESTIMATED_COSTS[task])

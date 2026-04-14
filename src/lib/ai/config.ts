@@ -48,13 +48,20 @@ export type AITask =
     | 'bulk-parse'
 
 /**
- * Default model per task. Phase-02 keeps production defaults unchanged
- * (site-generation still on gpt-4o, chat-edit still on gpt-4o-mini) so
- * this phase is a no-op for production behavior. Phase-03 + 04 flip
- * defaults to gpt-4.1-mini / gpt-4.1-nano after eval validation.
+ * Default model per task.
+ *
+ * Phase-03a (2026-04-14): site-generation flipped gpt-4o → gpt-4.1-mini.
+ * Validated by plans/260414-0914-ai-model-optimization/reports/eval-2026-04-14.md
+ * — 30 runs x 3 inputs, 100% valid, 22.8 avg blocks (vs 22.9 for gpt-4o),
+ * 9.9x cheaper ($0.004 vs $0.043 per call). p95 latency is worse
+ * (~99s vs ~45s) but acceptable tradeoff — deferred tuning to phase-03b.
+ *
+ * Other tasks (chat-edit etc.) still on gpt-4o-mini — phase-04 flips those.
+ * Rollback: set env var AI_MODEL_SITEGEN=gpt-4o at environment scope
+ * to instantly revert without redeploy.
  */
 const DEFAULT_MODELS: Record<AITask, AIModel> = {
-    'site-generation':    'gpt-4o',
+    'site-generation':    'gpt-4.1-mini',
     'chat-edit':          'gpt-4o-mini',
     'inline-edit':        'gpt-4o-mini',
     'seo-generation':     'gpt-4o-mini',
