@@ -82,8 +82,10 @@ describe('composeFallbackResult — behaviors', () => {
         expect(result.pages![0]!.isHomepage).toBe(true)
     })
 
-    it('restaurant fallback contains menu-display or booking-widget signature blocks', () => {
-        // Try multiple seeds since not every preset uses every signature block
+    it('restaurant fallback emits at least one restaurant-appropriate block', () => {
+        // menu-display, booking-widget, gallery dropped by unsupported-blocks filter
+        // (fc0020d regression fix). Test now checks for any survivable restaurant block.
+        const ACCEPTABLE = new Set(['hero', 'features', 'testimonials', 'faq', 'cta', 'stats', 'team', 'pricing'])
         const blockTypes = new Set<string>()
         for (let seed = 0; seed < 4; seed++) {
             const result = composeFallbackResult('restaurant', seed, 'en')
@@ -91,13 +93,45 @@ describe('composeFallbackResult — behaviors', () => {
                 blockTypes.add(block.blockType as string)
             }
         }
-        const hasSignature = blockTypes.has('menu-display') || blockTypes.has('booking-widget') || blockTypes.has('gallery')
-        expect(hasSignature).toBe(true)
+        const hasAny = [...ACCEPTABLE].some((t) => blockTypes.has(t))
+        expect(hasAny).toBe(true)
     })
 
     it('zero-keyword prompt → business category fallback works', () => {
         const result = composeFallbackResult('something generic', 0, 'en')
         expect(result.siteType).toBe('business')
         expect(result.blocks.length).toBeGreaterThan(0)
+    })
+
+    it('drops unsupported blocks from fallback output (fc0020d regression fix)', () => {
+        // Health seed 7 previously emitted booking-widget; must not leak through.
+        // Fitness seed 11 emitted before-after; Creative seed 5 emitted portfolio-grid.
+        const UNSUPPORTED = new Set([
+            'gallery',
+            'before-after',
+            'portfolio-grid',
+            'menu-display',
+            'review-cards',
+            'booking-widget',
+        ])
+
+        const scenarios: Array<[string, number]> = [
+            ['dental clinic', 7],
+            ['crossfit gym', 11],
+            ['wedding photographer portfolio', 5],
+            ['italian restaurant', 42],
+        ]
+
+        for (const [prompt, seed] of scenarios) {
+            const result = composeFallbackResult(prompt, seed, 'en')
+            for (const block of result.blocks) {
+                expect(UNSUPPORTED.has(block.blockType as string)).toBe(false)
+            }
+            for (const page of result.pages ?? []) {
+                for (const block of page.blocks) {
+                    expect(UNSUPPORTED.has(block.blockType as string)).toBe(false)
+                }
+            }
+        }
     })
 })

@@ -17,27 +17,30 @@ type Expectation = {
     signatureBlocks: string[]
 }
 
+// NOTE: menu-display, booking-widget, portfolio-grid, gallery, before-after,
+// review-cards are all dropped via unsupported-blocks.ts filter (no media pipeline /
+// missing from Payload schema). Signature expectations below reflect what survives.
 const SCENARIOS: Expectation[] = [
     {
         label: 'restaurant',
         prompt: 'Ristorante Bella Vista, family Italian in District 1, pasta and pizza',
         seed: 42,
         extractedName: 'Ristorante Bella Vista',
-        signatureBlocks: ['menu-display', 'booking-widget', 'faq', 'gallery'],
+        signatureBlocks: ['hero', 'features', 'testimonials', 'faq'],
     },
     {
         label: 'health',
         prompt: 'Saigon Dental Clinic with 10 years experience, implant specialist',
         seed: 7,
         extractedName: 'Saigon Dental Clinic',
-        signatureBlocks: ['doctor-profile', 'service-cards', 'faq'],
+        signatureBlocks: ['doctor-profile', 'faq', 'features'],
     },
     {
         label: 'fitness',
         prompt: 'CrossFit Box 247, 24-hour access, women-only classes',
         seed: 11,
         extractedName: 'CrossFit Box 247',
-        signatureBlocks: ['pricing', 'gallery', 'features'],
+        signatureBlocks: ['features', 'class-schedule', 'stats'],
     },
     {
         label: 'tech',
@@ -51,7 +54,7 @@ const SCENARIOS: Expectation[] = [
         prompt: 'Minh Nguyen, wedding photographer in Hanoi portfolio',
         seed: 5,
         extractedName: 'Minh Nguyen Studio',
-        signatureBlocks: ['portfolio-grid', 'gallery', 'about'],
+        signatureBlocks: ['video-showcase', 'features', 'testimonials'],
     },
 ]
 

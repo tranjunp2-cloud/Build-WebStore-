@@ -18,6 +18,7 @@ import { resolveComposerCategory, type ComposerCategory } from './composer-categ
 import { getCategoryContent } from './content'
 import type { BusinessSample } from './content/types'
 import type { GenerationResult, GeneratedBlock, GeneratedPage, BusinessIntent } from './generate-blocks'
+import { filterUnsupportedBlocks } from './unsupported-blocks'
 
 type Language = 'en' | 'ms' | 'vi'
 
@@ -75,15 +76,18 @@ export function adaptTemplateSeedToGenerationResult(
     const fontPair = resolveFontPairing(templateSeed.theme.fontPairingId)
 
     // Homepage blocks = first page's layout (composer always builds home first).
+    // Filter out unsupported blocks (require media pipeline or missing from Payload schema) —
+    // must match the drop list applied in AI happy path (openai-generator validateBlocks).
     const homePage = templateSeed.pages[0]
-    const blocks = (homePage?.layout ?? []) as GeneratedBlock[]
+    const rawHomeBlocks = (homePage?.layout ?? []) as GeneratedBlock[]
+    const blocks = filterUnsupportedBlocks(rawHomeBlocks, 'fallback')
 
     // Preserve full multi-page structure for downstream consumers that want it.
     const pages: GeneratedPage[] = templateSeed.pages.map((page, idx) => ({
         title: page.title,
         slug: page.slug,
         isHomepage: idx === 0,
-        blocks: page.layout as GeneratedBlock[],
+        blocks: filterUnsupportedBlocks(page.layout as GeneratedBlock[], 'fallback'),
         seo: {
             title: `${biz.name} — ${page.title}`,
             description: truncate(biz.tagline ?? templateSeed.description, 160),

@@ -10,6 +10,7 @@ import { buildSystemPrompt, type BusinessInfoInput } from './system-prompt'
 import { generateBlocks, type GenerationResult, type GeneratedBlock, type GeneratedPage } from './generate-blocks'
 import { buildUserPrompt } from './system-prompt'
 import { composeFallbackResult } from './fallback-adapter'
+import { isUnsupportedBlock } from './unsupported-blocks'
 import {
     validateBlockContent,
     validateOrdering,
@@ -118,20 +119,9 @@ export async function generateSiteWithAI(
         // normalizeLang handles 'auto' → 'en' internally.
         const contentLang: ContentLang = normalizeLang(language)
 
-        // Blocks that REQUIRE Payload Media IDs but have no image pipeline yet.
-        // AI can only provide URL strings, which Payload upload fields reject → empty
-        // placeholders in UI. Drop until a download-and-upload pipeline lands.
-        const BLOCKS_REQUIRE_MEDIA_PIPELINE = new Set([
-            'gallery', 'before-after', 'portfolio-grid', 'menu-display',
-            'review-cards', 'booking-widget',
-        ])
-        // Blocks NOT registered in Payload Pages.ts layout.blocks — silently dropped on save.
-        // Better to drop early so SSE event count matches what user actually sees.
-        const BLOCKS_NOT_IN_PAYLOAD = new Set([
-            'before-after', 'menu-display', 'review-cards', 'booking-widget',
-        ])
-
-        // Helper: validate and sanitize an array of raw blocks
+        // Helper: validate and sanitize an array of raw blocks.
+        // Unsupported block drop list lives in ./unsupported-blocks for reuse
+        // between happy path (here) and fallback path (fallback-adapter).
         function validateBlocks(rawBlocks: unknown[]): Record<string, unknown>[] {
             const valid: Record<string, unknown>[] = []
             for (const block of rawBlocks) {
@@ -139,7 +129,7 @@ export async function generateSiteWithAI(
                 const blockType = typeof sanitized.blockType === 'string' ? sanitized.blockType : ''
                 if (!blockType) continue
 
-                if (BLOCKS_REQUIRE_MEDIA_PIPELINE.has(blockType) || BLOCKS_NOT_IN_PAYLOAD.has(blockType)) {
+                if (isUnsupportedBlock(blockType)) {
                     console.warn(`[AI] Dropping "${blockType}" block — needs media pipeline or not in Payload schema`)
                     continue
                 }
