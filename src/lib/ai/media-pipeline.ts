@@ -25,6 +25,8 @@ import {
     type ImgixParams,
 } from './unsplash-client'
 
+import type { ThemeMood } from './theme-moods'
+
 export interface MediaPipelineContext {
     businessName: string
     tenantId: string
@@ -32,6 +34,9 @@ export interface MediaPipelineContext {
     // Plan 260414-2249 phase-01: user-supplied products drive primary Unsplash
     // query via deriveKeywords. vi/ms terms are translated at query time.
     products?: string[]
+    // Plan 260414-2249 phase-02: theme mood appends 1-2 imagery adjectives
+    // (warm/candlelit/minimalist/...) to every Unsplash query for cohesion.
+    mood?: ThemeMood
 }
 
 export interface BatchFetchResult {
