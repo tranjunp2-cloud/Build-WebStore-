@@ -42,9 +42,9 @@ const FONT_PAIRINGS: Record<string, ResolvedFontPairing> = {
     // ── New unique pairs (Plan 2253 Phase 02) ─────────────────────────────
     'magazine-cover':  { fontHeading: 'Playfair Display', fontBody: 'Open Sans' },
     'boutique-serif':  { fontHeading: 'Playfair Display', fontBody: 'Inter' },
-    'warm-editorial':  { fontHeading: 'Poppins',          fontBody: 'Lato' },
+    'warm-editorial':  { fontHeading: 'Poppins',          fontBody: 'Nunito' },
     'contemporary':    { fontHeading: 'Raleway',          fontBody: 'DM Sans' },
-    'classical':       { fontHeading: 'Inter',            fontBody: 'Lato' },
+    'classical':       { fontHeading: 'Inter',            fontBody: 'Lora' },
     'hospitality':     { fontHeading: 'Poppins',          fontBody: 'Open Sans' },
 }
 
