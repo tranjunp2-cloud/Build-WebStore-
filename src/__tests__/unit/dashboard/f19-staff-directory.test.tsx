@@ -101,7 +101,7 @@ describe('F19 Staff Management (StaffDirectoryClient & StaffDrawer)', () => {
 
             // Statuses
             expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
-            expect(screen.getByText('Pending Inv.')).toBeInTheDocument();
+            expect(screen.getByText('Pending')).toBeInTheDocument();
         });
 
     });

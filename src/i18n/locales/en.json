@@ -1705,7 +1705,7 @@
             "viewer": "Viewer",
             "active": "Active",
             "suspended": "Suspended",
-            "pending": "Pending Inv."
+            "pending": "Pending"
         },
         "actions": {
             "edit": "Edit Permission",
