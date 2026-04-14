@@ -14,6 +14,7 @@
 import { getCategoryContent } from './content'
 import type { BusinessSample, TestimonialSample, FAQSample } from './content'
 import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
+import { hashString } from './seeded-random'
 
 export interface InjectionContext {
     businessName?: string
@@ -32,6 +33,19 @@ function pickSeeded<T>(arr: readonly T[], seed: number): T | undefined {
     if (arr.length === 0) return undefined
     const idx = Math.abs(Math.floor(seed)) % arr.length
     return arr[idx]
+}
+
+/**
+ * Slice a pool of items starting from a seed-derived offset so that different
+ * businesses in the same category pull different subsets.
+ *
+ * Plan 2253 Phase 03 — fixes R5 (padItems reuse) by rotating the pool start
+ * index instead of always iterating from 0.
+ */
+function rotateSlice<T>(pool: readonly T[], seed: number): T[] {
+    if (pool.length === 0) return []
+    const offset = Math.abs(Math.floor(seed)) % pool.length
+    return [...pool.slice(offset), ...pool.slice(0, offset)]
 }
 
 /** Normalized testimonial for Zod schema shape. */
@@ -63,8 +77,19 @@ export function buildBlockFromLibrary(
     const content = getCategoryContent(category) ?? getCategoryContent('business')
     if (!content) return null
 
-    const biz: BusinessSample | undefined = content.businesses[0]
+    // Plan 2253 Phase 03 — fixes R4 (businesses[0] hardcode).
+    // Rotate the BusinessSample pick by seed so different businesses in the same
+    // category inject different canned copy + tagline + description when the AI
+    // underfills and structure-enforcer has to gap-fill.
+    const bizSeed = ctx.seed ?? 0
+    const biz: BusinessSample | undefined =
+        pickSeeded(content.businesses, bizSeed) ?? content.businesses[0]
     const name = ctx.businessName ?? biz?.name ?? 'Our Business'
+
+    // Seed-rotated content pool slices for testimonials / faqs / features so
+    // within-category businesses pull different subsets of the library.
+    const testimonialSlice = rotateSlice(content.testimonials, bizSeed)
+    const faqSlice = rotateSlice(content.faqItems, bizSeed ^ hashString('faq'))
 
     switch (blockType) {
         case 'navigation':
@@ -109,7 +134,7 @@ export function buildBlockFromLibrary(
                 blockType: 'testimonials',
                 variant: 'cards',
                 headline: 'What Our Customers Say',
-                testimonials: content.testimonials.slice(0, 4).map(mapTestimonial),
+                testimonials: testimonialSlice.slice(0, 4).map(mapTestimonial),
             }
 
         case 'faq':
@@ -117,7 +142,7 @@ export function buildBlockFromLibrary(
                 blockType: 'faq',
                 variant: 'accordion',
                 headline: 'Frequently Asked Questions',
-                items: content.faqItems.slice(0, 5).map(mapFaq),
+                items: faqSlice.slice(0, 5).map(mapFaq),
             }
 
         case 'cta':
@@ -290,24 +315,29 @@ export function buildBlockFromLibrary(
 /**
  * Pad an existing item array up to `minCount` by pulling from content library.
  * Returns the padded array. Handles testimonials, faq, team, features duplication.
+ *
+ * Plan 2253 Phase 03 — fixes R5 (padItems pool reuse). Accepts ctx so the pool
+ * start offset rotates per-business; same-category gens no longer converge on
+ * the same first 4 testimonials.
  */
 export function padItems(
     blockType: string,
     existing: readonly unknown[],
     minCount: number,
     category: string,
+    ctx: InjectionContext = {},
 ): unknown[] {
     if (existing.length >= minCount) return [...existing]
 
     const content = getCategoryContent(category)
     const result: unknown[] = [...existing]
+    const baseSeed = ctx.seed ?? 0
 
     if (blockType === 'testimonials' && content) {
-        const pool = content.testimonials
+        const pool = rotateSlice(content.testimonials, baseSeed)
         let i = 0
         while (result.length < minCount && i < pool.length) {
             const candidate = mapTestimonial(pool[i]!)
-            // Avoid exact dupes by name
             const isDupe = result.some(
                 (r) =>
                     typeof r === 'object' && r !== null && (r as Block).name === candidate.name,
@@ -316,7 +346,7 @@ export function padItems(
             i++
         }
     } else if (blockType === 'faq' && content) {
-        const pool = content.faqItems
+        const pool = rotateSlice(content.faqItems, baseSeed ^ hashString('faq'))
         let i = 0
         while (result.length < minCount && i < pool.length) {
             const candidate = mapFaq(pool[i]!)
@@ -330,7 +360,7 @@ export function padItems(
     } else {
         // Generic padding — inject from library block, dedup by `title` field
         // (features, service-cards have title). Avoids "Quality Service" appearing twice.
-        const libBlock = buildBlockFromLibrary(blockType, category)
+        const libBlock = buildBlockFromLibrary(blockType, category, ctx)
         if (libBlock) {
             const field = ITEM_FIELD_BY_BLOCK[blockType]
             if (field && Array.isArray(libBlock[field])) {

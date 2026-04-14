@@ -223,6 +223,7 @@ export async function generateSiteWithAI(
                     pageBlocks = enforceMinItems(
                         pageBlocks as Record<string, unknown>[],
                         detectedCategory,
+                        enforcerCtx,
                     ) as typeof pageBlocks
                 }
                 const pageSeo = (rawPage.seo && typeof rawPage.seo === 'object' ? rawPage.seo : {}) as Record<string, unknown>
@@ -284,6 +285,7 @@ export async function generateSiteWithAI(
                 validBlocks = enforceMinItems(
                     validBlocks as Record<string, unknown>[],
                     detectedCategory,
+                    enforcerCtx,
                 ) as typeof validBlocks
             }
 

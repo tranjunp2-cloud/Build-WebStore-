@@ -135,8 +135,16 @@ export function enforceMinimumStructure(
 /**
  * Pad per-block items to meet minItems requirements.
  * Mutates blocks in place + returns same array for chainability.
+ *
+ * Plan 2253 Phase 03 — accept InjectionContext so padItems can seed-rotate
+ * its library pool start index, avoiding testimonial/FAQ repetition across
+ * same-category businesses.
  */
-export function enforceMinItems(blocks: Block[], category: string): Block[] {
+export function enforceMinItems(
+    blocks: Block[],
+    category: string,
+    ctx: InjectionContext = {},
+): Block[] {
     const req = getCategoryRequirement(category)
     const mins = req.minItems
     if (!mins) return blocks
@@ -154,7 +162,7 @@ export function enforceMinItems(blocks: Block[], category: string): Block[] {
         if (!Array.isArray(current)) continue
         if (current.length >= minCount) continue
 
-        const padded = padItems(blockType, current, minCount, category)
+        const padded = padItems(blockType, current, minCount, category, ctx)
         block[itemField] = padded
         console.info(
             `[Structure Enforcer] padded ${blockType}.${itemField}: ${current.length} → ${padded.length}`,
