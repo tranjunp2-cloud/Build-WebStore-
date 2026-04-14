@@ -1097,6 +1097,42 @@ Bundle imagery mood, copy voice, photography filter, và category-tuned CTAs và
 
 ---
 
+## 12. Phase 03 — Image Pool + Visual Consistency (plan `260414-2249-ai-gen-wix-level-optimize`)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-03-image-pool-consistency.md`
+> PR: `feat(f01): [US-F01-09] image pool per site for visual cohesion`
+
+### Mục tiêu
+
+Replace per-block Unsplash searches với ONE per-site **image pool**. Một gen site chỉ gọi 1-2 `searchPhotos` thay vì 6-8 → tất cả blocks share cùng photographer, lighting, mood → visual cohesion by design. Pool inherits mood qua `mood.imageryKeywords` + `mood.photographyFilter`.
+
+### Test Cases
+
+| TC ID | Test File | Mô tả | Status |
+|-------|-----------|-------|--------|
+| **TC-F01-W.13** | `image-pool.test.ts` | `buildImagePool` shape: ImagePool structure, PoolPhoto fields, aspect ratio derivation | ✅ |
+| **TC-F01-W.14** | `image-pool.test.ts` | Query construction: product + mood imagery adjectives, category fallback, 2 searchPhotos calls (landscape + squarish), dedupe | ✅ |
+| **TC-F01-W.15** | `image-pool.test.ts` | `pickFromPool` determinism: same seed same photo, role → bucket mapping, role salting prevents collision, `pickManyFromPool` distinct ids | ✅ |
+| **TC-F01-W.16** | `image-pool.test.ts` | Underfill backoff: relaxed retry, `pool.underfill` flag, searchPhotos rejection → empty bucket | ✅ |
+| **TC-F01-W.17** | `image-pool.test.ts` | Integration spy: 5 same-seed runs = 10 Unsplash calls total; query stable across reruns | ✅ |
+
+### Files Modified
+
+- `src/lib/ai/image-pool.ts` — **NEW** 350 lines: types, `buildImagePool` 2-search + backoff, `pickFromPool` mulberry32, `pickManyFromPool` Fisher-Yates, `mergePool`, `poolSize`
+- `src/lib/ai/media-pipeline.ts` — `MediaPipelineContext.pool?: ImagePool`; new `batchFetchFromPool` + `fetchAndStorePoolPhoto` helpers (download + upload PoolPhotos, skip search)
+- `src/lib/ai/media-injector.ts` — `fulfillImageNeeds` pool-aware fast path: when `ctx.pool` present, picks via `pickManyFromPool` → `batchFetchFromPool` → media IDs; legacy per-block search kept as fallback. `roleForBlock` + `hashBlockSeed` helpers
+- `src/app/api/ai/generate-site/route.ts` — builds `imagePool` once per gen, passes into fulfillment ctx, logs `[Image Pool]` line with counts + underfill flag
+
+### Acceptance Criteria
+
+- Restaurant × `elegant` mood gen → pool query contains `refined|candlelit|marble|timeless`.
+- `pickFromPool(pool, 'hero', seed)` and `pickFromPool(pool, 'gallery', seed)` pick DIFFERENT photos at same seed (role salt).
+- Pool underfill backoff fires when initial < 3 landscape photos, retries with relaxed query, sets `pool.underfill=true`.
+- Full gen: hero + features + gallery + team blocks ALL receive Media IDs sourced from the same pool — verified by `[Image Pool] query="..." landscape=N square=M` log line.
+- Legacy path preserved: `ctx.pool === undefined` falls through to `getMediaForBlock` per-block search (no regression).
+
+---
+
 ## 13. Phase 04 — Layout Recipes A/B/C (plan `260414-2249-ai-gen-wix-level-optimize`)
 
 > Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-04-layout-recipes.md`
@@ -1128,12 +1164,13 @@ Replace single `CATEGORY_SIGNATURE_BLOCKS[category]` với **3 hand-curated reci
 - Composer path (no recipe passed) backward compat — legacy `generateCompositionHint` still fires for non-AI callers.
 - 42 recipes non-empty + all block IDs valid + rhythm distribution sanity (no rhythm > 40%).
 
-### Test Summary (cumulative Phase 01 + 02 + 04)
+### Test Summary (cumulative Phase 01 + 02 + 03 + 04)
 
 | Suite | Count | Status |
 |---|---|---|
 | Phase 01 tests | 69 | ✅ |
 | Phase 02 tests | 235+ | ✅ |
+| Phase 03 tests | 23 (image-pool) + 14 (media-injector regression) | ✅ |
 | Phase 04 tests | 407 + 22 = 429 | ✅ |
 | Legacy regression | 22 | ✅ |
-| **Total** | **755+** | ✅ |
+| **Total** | **790+** | ✅ |

@@ -13,7 +13,8 @@
  */
 
 import { deriveKeywords, type KeywordLanguage } from './image-keywords'
-import { getMediaForBlock, type MediaPipelineContext } from './media-pipeline'
+import { getMediaForBlock, batchFetchFromPool, type MediaPipelineContext } from './media-pipeline'
+import { pickManyFromPool, type ImageRole } from './image-pool'
 
 /** Describes how to find/mutate image fields for each block type. */
 export interface BlockImageSpec {
@@ -63,6 +64,43 @@ export interface FulfillmentContext extends MediaPipelineContext {
 }
 
 type AIBlock = Record<string, unknown>
+
+/**
+ * Map a composer block type to the image-pool role bucket.
+ * Plan 260414-2249 phase-03 — used when ctx.pool is present.
+ */
+function roleForBlock(blockType: string): ImageRole {
+    switch (blockType) {
+        case 'hero':
+        case 'video-background':
+            return 'hero'
+        case 'gallery':
+        case 'gallery-masonry':
+        case 'portfolio-grid':
+        case 'before-after':
+            return 'gallery'
+        case 'team':
+        case 'doctor-profile':
+            return 'team'
+        case 'products-grid':
+        case 'products-featured':
+        case 'product-quick-view':
+        case 'property-card':
+            return 'product'
+        default:
+            return 'any'
+    }
+}
+
+/** Deterministic seed per blockType + businessName — stable across reruns. */
+function hashBlockSeed(blockType: string, businessName: string): number {
+    const str = `${blockType}::${businessName}`
+    let hash = 5381
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0
+    }
+    return Math.abs(hash)
+}
 
 /**
  * Walk blocks and collect image needs as a flat list of "tasks".
@@ -199,6 +237,52 @@ export async function fulfillImageNeeds(
         const totalCount = groupNeeds.reduce((sum, n) => sum + n.count, 0)
         if (totalCount === 0) continue
 
+        // Plan 260414-2249 phase-03: pool-aware fast path.
+        // When ctx.pool is present, pick from the pre-built site pool
+        // instead of calling Unsplash search per block. This is what
+        // delivers visual cohesion — all blocks share the same source.
+        if (ctx.pool) {
+            const role = roleForBlock(blockType)
+            // Pool seed derived from blockType so different blocks pick
+            // different pool entries (no collision on the same hero photo
+            // across features + gallery).
+            const poolSeed = hashBlockSeed(blockType, ctx.businessName)
+            const picks = pickManyFromPool(ctx.pool, role, poolSeed, totalCount)
+            if (picks.length > 0) {
+                try {
+                    const result = await batchFetchFromPool(picks, blockType, ctx, payload)
+                    const ids = [...result.mediaIds]
+                    for (const need of groupNeeds) {
+                        const slice = ids.splice(0, need.count)
+                        if (slice.length > 0) {
+                            need.assign(slice)
+                            succeeded += slice.length
+                            failed += need.count - slice.length
+                        } else {
+                            failed += need.count
+                        }
+                    }
+                    if (result.failures.length > 0) {
+                        console.warn(
+                            `[Media Injector] ${blockType}: ${result.failures.length} pool photo(s) failed`,
+                        )
+                    }
+                    // Pool path succeeded — skip legacy search below
+                    continue
+                } catch (err) {
+                    const msg = err instanceof Error ? err.message : String(err)
+                    console.warn(`[Media Injector] ${blockType} pool path failed, falling back to search: ${msg}`)
+                    // Fall through to legacy search path as backfill
+                }
+            } else {
+                console.warn(
+                    `[Media Injector] ${blockType} pool picks empty (role=${role}) — falling back to legacy search`,
+                )
+                // Fall through to legacy search path
+            }
+        }
+
+        // Legacy path: per-block searchPhotos (pool absent or pool picks empty)
         const keywords = deriveKeywords(category, blockType, {
             businessName: ctx.businessName,
             industry: ctx.category,
