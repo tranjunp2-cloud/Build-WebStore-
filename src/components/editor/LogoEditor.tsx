@@ -69,6 +69,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             // 2. Upload logo via server action (same as product form)
             const formData = new FormData()
             formData.append('file', processed)
+            formData.append('alt', 'Site Logo')
 
             const uploadedLogo = await uploadMediaAction(formData)
             const logoUrl = uploadedLogo.url as string
@@ -80,6 +81,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             if (faviconBlob) {
                 const faviconForm = new FormData()
                 faviconForm.append('file', new File([faviconBlob], 'favicon.png', { type: 'image/png' }))
+                faviconForm.append('alt', 'Favicon')
 
                 const faviconData = await uploadMediaAction(faviconForm)
                 faviconUrl = faviconData.url as string

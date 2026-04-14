@@ -507,6 +507,7 @@ function PreviewFrameInner({
         try {
             const formData = new FormData()
             formData.append('file', file)
+            formData.append('alt', 'Uploaded image')
 
             const uploadedMedia = await uploadMediaAction(formData)
             const newUrl = uploadedMedia.url
