@@ -23,6 +23,7 @@ import { normalizeBusinessInput } from '@/lib/ai/input-normalizer'
 import { parseProductsString } from '@/lib/ai/business-info-mapper'
 import { pickCategoryThemeWithMood, hashBusinessName } from '@/lib/ai/category-theme-picker'
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
+import { buildImagePool } from '@/lib/ai/image-pool'
 import { resolveTheme } from '@/lib/theme/resolve'
 
 
@@ -320,6 +321,22 @@ export async function POST(req: NextRequest) {
                     const presetCategory = resolveComposerCategory(businessInfo.industry)
                     const themeSeed = hashBusinessName(businessInfo.businessName)
                     const { mood: themeMood } = pickCategoryThemeWithMood(presetCategory, themeSeed)
+
+                    // Plan 260414-2249 phase-03: build ONE per-site image pool
+                    // before fulfillment so all blocks share the same photographer,
+                    // lighting, mood. 1-2 Unsplash calls total (landscape + square)
+                    // — replaces 6-8 per-block calls and delivers visual cohesion.
+                    const topProduct = parsedProducts[0]
+                    const imagePool = await buildImagePool({
+                        category: presetCategory,
+                        mood: themeMood,
+                        topProduct,
+                        seed: themeSeed,
+                    })
+                    console.info(
+                        `[Image Pool] query="${imagePool.queryUsed}" landscape=${imagePool.landscape.length} square=${imagePool.square.length} underfill=${imagePool.underfill}`,
+                    )
+
                     await fulfillImageNeeds(
                         needs,
                         {
@@ -329,6 +346,7 @@ export async function POST(req: NextRequest) {
                             language: resolvedLang,
                             products: parsedProducts.length > 0 ? parsedProducts : undefined,
                             mood: themeMood,
+                            pool: imagePool,
                         },
                         payload as unknown as Parameters<typeof fulfillImageNeeds>[2],
                     )
