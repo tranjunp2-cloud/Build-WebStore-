@@ -19,6 +19,7 @@ import {
     type CategoryRequirement,
 } from './category-requirements'
 import { buildBlockFromLibrary, padItems, type InjectionContext } from './content-injection'
+import { seededShufflePick, hashString } from './seeded-random'
 
 type Block = Record<string, unknown>
 
@@ -82,9 +83,13 @@ export function enforceMinimumStructure(
     )
 
     // Upgrade navigation variant per category (before any other enforcement).
-    // AI often picks bland "simple" or "transparent" — override with category-appropriate.
-    const preferredNav = NAV_VARIANT_BY_CATEGORY[category]
-    if (preferredNav) {
+    // AI often picks bland "simple" or "transparent" — override with a seed-picked
+    // variant from the category pool so same-category businesses rotate through
+    // multiple nav styles instead of locking to one. (Plan 2253 Phase 01 — R9)
+    const navPool = NAV_VARIANT_BY_CATEGORY[category]
+    if (navPool && navPool.length > 0) {
+        const navSeed = (ctx.seed ?? 0) ^ hashString('navigation' + category)
+        const preferredNav = seededShufflePick(navPool, navSeed) ?? navPool[0]
         for (const block of out) {
             if (block.blockType === 'navigation') {
                 block.variant = preferredNav
@@ -130,8 +135,16 @@ export function enforceMinimumStructure(
 /**
  * Pad per-block items to meet minItems requirements.
  * Mutates blocks in place + returns same array for chainability.
+ *
+ * Plan 2253 Phase 03 — accept InjectionContext so padItems can seed-rotate
+ * its library pool start index, avoiding testimonial/FAQ repetition across
+ * same-category businesses.
  */
-export function enforceMinItems(blocks: Block[], category: string): Block[] {
+export function enforceMinItems(
+    blocks: Block[],
+    category: string,
+    ctx: InjectionContext = {},
+): Block[] {
     const req = getCategoryRequirement(category)
     const mins = req.minItems
     if (!mins) return blocks
@@ -149,7 +162,7 @@ export function enforceMinItems(blocks: Block[], category: string): Block[] {
         if (!Array.isArray(current)) continue
         if (current.length >= minCount) continue
 
-        const padded = padItems(blockType, current, minCount, category)
+        const padded = padItems(blockType, current, minCount, category, ctx)
         block[itemField] = padded
         console.info(
             `[Structure Enforcer] padded ${blockType}.${itemField}: ${current.length} → ${padded.length}`,

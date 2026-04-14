@@ -18,7 +18,10 @@ import {
 import type { ThemePreset } from '@/lib/ai/theme-presets'
 import { FONT_PAIRINGS } from '@/lib/fonts/pairings'
 
-// ── TC-S3-010: Theme presets — 5 per category, valid values ──────────────
+// ── TC-S3-010: Theme presets — 8 per category, valid values ──────────────
+// Plan 2253 Phase 02 expanded presets 5 → 8 per category and added 6 new
+// fontPairingIds (magazine-cover, boutique-serif, warm-editorial,
+// contemporary, classical, hospitality) to increase variety.
 
 const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/
 const VALID_SPACING = ['compact', 'default', 'relaxed']
@@ -44,9 +47,9 @@ const fontPairingIds = FONT_PAIRINGS.map((fp) => fp.id)
 
 describe('[TC-S3-010] Theme presets — count per category', () => {
   for (const { name, presets } of ALL_PRESET_ARRAYS) {
-    it(`${name} has exactly 5 presets`, () => {
+    it(`${name} has exactly 8 presets`, () => {
       // Assert
-      expect(presets).toHaveLength(5)
+      expect(presets).toHaveLength(8)
     })
   }
 })
@@ -130,7 +133,7 @@ describe('[TC-S3-010] CATEGORY_PRESETS map', () => {
     const presets = getCategoryPresets('restaurant')
 
     // Assert
-    expect(presets).toHaveLength(5)
+    expect(presets).toHaveLength(8)
     expect(presets).toBe(RESTAURANT_PRESETS)
   })
 

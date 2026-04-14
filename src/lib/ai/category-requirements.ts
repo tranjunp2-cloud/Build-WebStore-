@@ -122,25 +122,29 @@ export function getCategoryRequirement(category: string | undefined): CategoryRe
 }
 
 /**
- * Recommended navigation variant per category. Overrides AI's default choice
- * (which often picks bland "simple" or "transparent"). Applied in sanitizer.
+ * Recommended navigation variants per category (2-3 per category). Overrides
+ * AI's default choice (which often picks bland "simple" or "transparent").
+ * Seed-picked in structure-enforcer so businesses within the same category
+ * rotate through the pool instead of locking to one variant.
  * All variants: simple | centered | mega-menu | transparent | sidebar | pill
+ *
+ * Plan 2253 Phase 01 — fixes R9 (single nav variant per category).
  */
-export const NAV_VARIANT_BY_CATEGORY: Readonly<Record<string, string>> = {
-    beauty: 'pill',
-    restaurant: 'centered',
-    fnb: 'pill',
-    tech: 'centered',
-    health: 'centered',
-    education: 'centered',
-    realestate: 'centered',
-    fitness: 'pill',
-    creative: 'pill',
-    business: 'centered',
-    ecommerce: 'mega-menu',
-    events: 'centered',
-    blog: 'centered',
-    travel: 'pill',
+export const NAV_VARIANT_BY_CATEGORY: Readonly<Record<string, string[]>> = {
+    beauty: ['pill', 'centered', 'transparent'],
+    restaurant: ['centered', 'pill', 'mega-menu'],
+    fnb: ['pill', 'centered', 'transparent'],
+    tech: ['centered', 'pill', 'mega-menu'],
+    health: ['centered', 'pill', 'transparent'],
+    education: ['centered', 'mega-menu', 'pill'],
+    realestate: ['centered', 'mega-menu', 'transparent'],
+    fitness: ['pill', 'centered', 'transparent'],
+    creative: ['pill', 'transparent', 'centered'],
+    business: ['centered', 'mega-menu', 'pill'],
+    ecommerce: ['mega-menu', 'pill', 'centered'],
+    events: ['centered', 'transparent', 'pill'],
+    blog: ['centered', 'pill', 'transparent'],
+    travel: ['pill', 'transparent', 'centered'],
 }
 
 /** Maps block type → the array field where items live (for padding). */

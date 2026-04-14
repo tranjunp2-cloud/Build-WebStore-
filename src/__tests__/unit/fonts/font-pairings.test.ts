@@ -8,11 +8,14 @@ import {
     type FontPairing,
 } from '@/lib/fonts/pairings'
 
-// ── TC-S1-011: 20 font pairings available ───────────────────────────────────
-describe('[TC-S1-011] FONT_PAIRINGS — 20 curated pairings with complete metadata', () => {
-    it('has exactly 20 font pairings', () => {
+// ── TC-S1-011: 26 font pairings available ───────────────────────────────────
+// Plan 2253 Phase 02 added 6 new unique pairs (magazine-cover, boutique-serif,
+// warm-editorial, contemporary, classical, hospitality) to fix R6 — font
+// pairing duplication across categories. Legacy 20 kept for backward compat.
+describe('[TC-S1-011] FONT_PAIRINGS — 26 curated pairings with complete metadata', () => {
+    it('has exactly 26 font pairings', () => {
         // Assert
-        expect(FONT_PAIRINGS).toHaveLength(20)
+        expect(FONT_PAIRINGS).toHaveLength(26)
     })
 
     it('each pairing has all required fields', () => {
