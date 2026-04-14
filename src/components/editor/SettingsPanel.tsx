@@ -217,7 +217,7 @@ function SettingsPanelInner({
         const headerLinks = (((headerBlock as Record<string, unknown>)?.links as Array<Record<string, unknown>>) || [])
         if (headerLinks.length > 0) return normalizeNavLinkItems(headerLinks, pages)
         // Fallback: find navigation block in page layout
-        const navBlock = storeBlocks.find(b => (b as Record<string, unknown>).blockType === 'navigation')
+        const navBlock = Array.isArray(storeBlocks) ? storeBlocks.find(b => (b as Record<string, unknown>).blockType === 'navigation') : undefined
         const navLinks = (((navBlock as Record<string, unknown>)?.links as Array<Record<string, unknown>>) || [])
         return normalizeNavLinkItems(navLinks, pages)
     }, [headerBlock, pages, storeBlocks])

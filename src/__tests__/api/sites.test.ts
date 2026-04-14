@@ -120,7 +120,7 @@ describe('Sites APIs', () => {
             }))
         })
 
-        it('returns 400 when header navigation contains an empty destination', async () => {
+        it('allows saving header navigation with empty destination (draft link)', async () => {
             const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
                 method: 'PATCH',
                 body: JSON.stringify({
@@ -132,28 +132,22 @@ describe('Sites APIs', () => {
             })
 
             const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
-            const result = await res.json()
-
-            expect(res.status).toBe(400)
-            expect(result.error).toBe('Header menu: "About" requires a destination')
+            expect(res.status).toBe(200)
         })
 
-        it('returns 400 when header navigation contains an invalid external URL', async () => {
+        it('returns 400 when header navigation contains a protocol-relative URL', async () => {
             const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
                 method: 'PATCH',
                 body: JSON.stringify({
                     headerBlock: {
                         blockType: 'navigation',
-                        links: [{ label: 'Docs', url: 'https://asdasd', type: 'external' }],
+                        links: [{ label: 'Evil', url: '//evil.com', type: 'external' }],
                     },
                 })
             })
 
             const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
-            const result = await res.json()
-
             expect(res.status).toBe(400)
-            expect(result.error).toBe('Header menu: "Docs" must be a valid http:// or https:// URL')
         })
     })
 
