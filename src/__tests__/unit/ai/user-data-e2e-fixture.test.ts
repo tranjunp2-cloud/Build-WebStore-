@@ -50,7 +50,11 @@ describe('TC-F01-W.08 — user data threading e2e fixture', () => {
       expect(features).toBeDefined()
       const cards = features!.features as Array<{ title: string }>
       const titles = cards.map((c) => c.title.toLowerCase())
-      expect(titles).toContain('ramen')
+      // Titles wrap products in category-tuned templates:
+      // "Ramen Specialties / Fresh Sushi / Handmade Gyoza"
+      expect(titles.some((t) => t.includes('ramen'))).toBe(true)
+      expect(titles.some((t) => t.includes('sushi'))).toBe(true)
+      expect(titles.some((t) => t.includes('gyoza'))).toBe(true)
     })
 
     it('composer contact block has user phone + email + address verbatim', () => {
@@ -113,8 +117,9 @@ describe('TC-F01-W.08 — user data threading e2e fixture', () => {
       expect(features).toBeDefined()
       const cards = features!.features as Array<{ title: string }>
       const titles = cards.map((c) => c.title.toLowerCase())
-      expect(titles).toContain('nasi lemak')
-      expect(titles).toContain('teh tarik')
+      // Titles wrap Malay products in templates (e.g. "Nasi lemak Specialties").
+      expect(titles.some((t) => t.includes('nasi lemak'))).toBe(true)
+      expect(titles.some((t) => t.includes('teh tarik'))).toBe(true)
     })
 
     it('contact block has MY phone + email verbatim', () => {

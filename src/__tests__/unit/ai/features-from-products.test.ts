@@ -27,7 +27,7 @@ function findFeaturesBlock(result: GenerationResult): Record<string, unknown> | 
 }
 
 describe('TC-F01-W.03 — features from user products', () => {
-  it('emits product-derived cards when products.length >= 2', () => {
+  it('emits product-derived cards when products.length >= 2 (title mentions product)', () => {
     const info: BusinessInfoInput = {
       businessName: 'Ramen Ichiban',
       industry: 'restaurant',
@@ -42,12 +42,37 @@ describe('TC-F01-W.03 — features from user products', () => {
     expect(Array.isArray(cards)).toBe(true)
     expect(cards.length).toBeGreaterThanOrEqual(2)
 
-    const titles = cards.map((c) => c.title.toLowerCase())
-    expect(titles).toContain('ramen')
-    expect(titles).toContain('sushi')
+    // Each card title must MENTION the user product (case-insensitive substring).
+    // Spec example: "Ramen Specialties / Fresh Sushi / Handmade Gyoza".
+    const titlesLower = cards.map((c) => c.title.toLowerCase())
+    expect(titlesLower.some((t) => t.includes('ramen'))).toBe(true)
+    expect(titlesLower.some((t) => t.includes('sushi'))).toBe(true)
+    expect(titlesLower.some((t) => t.includes('gyoza'))).toBe(true)
   })
 
-  it('capitalizes product titles', () => {
+  it('titles wrap products with rotating category-tuned templates', () => {
+    const info: BusinessInfoInput = {
+      businessName: 'Ramen Ichiban',
+      industry: 'restaurant',
+      products: 'ramen, sushi, gyoza',
+      shortDescription: 'Japanese classics.',
+    }
+    const result = composeFallbackResult('ramen restaurant', 42, 'en', info)
+    const cards = (findFeaturesBlock(result)?.features as FeatureCard[]) ?? []
+
+    // Restaurant templates: Specialties / Fresh / Handmade / Signature / House / Authentic
+    const restaurantSuffixes = /Specialties|Fresh|Handmade|Signature|House|Authentic/
+    for (const card of cards) {
+      expect(card.title).toMatch(restaurantSuffixes)
+    }
+    // Rotation: 3 cards → 3 different template suffixes (no dupes when products >= 3)
+    const distinctSuffixes = new Set(
+      cards.slice(0, 3).map((c) => c.title.replace(/\s*(Ramen|Sushi|Gyoza)\s*/i, '').trim()),
+    )
+    expect(distinctSuffixes.size).toBe(3)
+  })
+
+  it('capitalizes product name inside title template', () => {
     const info: BusinessInfoInput = {
       businessName: 'Laksa House',
       industry: 'restaurant',
@@ -56,8 +81,10 @@ describe('TC-F01-W.03 — features from user products', () => {
     }
     const result = composeFallbackResult('malaysian restaurant', 42, 'en', info)
     const cards = (findFeaturesBlock(result)?.features as FeatureCard[]) ?? []
-    expect(cards[0]!.title).toBe('Laksa')
-    expect(cards[1]!.title).toBe('Nasi lemak')
+    // First card uses template[0] = "{P} Specialties" → "Laksa Specialties"
+    expect(cards[0]!.title).toContain('Laksa')
+    expect(cards[0]!.title).not.toBe('laksa') // capitalized
+    expect(cards[1]!.title).toContain('Nasi lemak')
   })
 
   it('description uses category-tuned template with product name', () => {
@@ -133,7 +160,8 @@ describe('TC-F01-W.03 — features from user products', () => {
       shortDescription: 'Fashion store.',
     })
     const ecCards = (findFeaturesBlock(ec)?.features as FeatureCard[]) ?? []
-    expect(ecCards.map((c) => c.title.toLowerCase())).toContain('dresses')
+    const ecTitles = ecCards.map((c) => c.title.toLowerCase())
+    expect(ecTitles.some((t) => t.includes('dresses'))).toBe(true)
 
     // Beauty
     const bt = composeFallbackResult('beauty salon', 42, 'en', {
@@ -143,6 +171,7 @@ describe('TC-F01-W.03 — features from user products', () => {
       shortDescription: 'Beauty studio.',
     })
     const btCards = (findFeaturesBlock(bt)?.features as FeatureCard[]) ?? []
-    expect(btCards.map((c) => c.title.toLowerCase())).toContain('facials')
+    const btTitles = btCards.map((c) => c.title.toLowerCase())
+    expect(btTitles.some((t) => t.includes('facials'))).toBe(true)
   })
 })

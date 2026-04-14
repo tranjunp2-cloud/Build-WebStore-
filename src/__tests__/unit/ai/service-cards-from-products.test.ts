@@ -42,8 +42,9 @@ describe('TC-F01-W.04 — service-cards from user products', () => {
     if (services) {
       const list = services.services as Array<{ title: string }>
       const titles = list.map((s) => s.title.toLowerCase())
+      // Titles wrap products in beauty templates (e.g. "Signature Eyelash extensions")
       const hasUser = titles.some((t) =>
-        ['eyelash extensions', 'microblading', 'chemical peel'].includes(t),
+        ['eyelash extensions', 'microblading', 'chemical peel'].some((p) => t.includes(p)),
       )
       expect(hasUser).toBe(true)
     }

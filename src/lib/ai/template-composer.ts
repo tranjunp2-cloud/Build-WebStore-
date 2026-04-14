@@ -172,6 +172,27 @@ const PRODUCT_FEATURE_ICONS: Record<string, string[]> = {
   travel: ['Map', 'Compass', 'Plane', 'Camera', 'Mountain', 'Globe'],
 }
 
+// Category-tuned TITLE templates for product-derived feature cards. `{P}` is
+// replaced with the capitalized product name, and templates rotate by index
+// so 3 cards never share the same suffix. Matches the spec example format:
+// "Ramen Specialties / Fresh Sushi / Handmade Gyoza".
+const FEATURE_TITLE_TEMPLATES: Record<string, string[]> = {
+  restaurant: ['{P} Specialties', 'Fresh {P}', 'Handmade {P}', 'Signature {P}', 'House {P}', 'Authentic {P}'],
+  fnb: ['Signature {P}', 'Our {P}', 'Fresh {P}', 'House {P}', 'Artisan {P}', 'Daily {P}'],
+  ecommerce: ['Premium {P}', 'Best-Selling {P}', '{P} Collection', '{P} Essentials', 'Curated {P}', 'Exclusive {P}'],
+  beauty: ['Signature {P}', 'Custom {P}', 'Premium {P}', '{P} Treatment', 'Expert {P}', 'Luxury {P}'],
+  health: ['{P} Service', 'Expert {P}', 'Comprehensive {P}', 'Specialist {P}', 'Trusted {P}'],
+  fitness: ['{P} Program', 'Signature {P}', 'Expert {P}', 'Personal {P}', 'Group {P}'],
+  education: ['{P} Program', '{P} Course', 'Comprehensive {P}', 'Expert {P}', 'Intensive {P}'],
+  tech: ['{P} Platform', 'Enterprise {P}', 'Scalable {P}', 'Advanced {P}', 'Cloud {P}'],
+  creative: ['{P} Service', 'Signature {P}', 'Premium {P}', 'Custom {P}', 'Award-winning {P}'],
+  business: ['{P} Advisory', 'Strategic {P}', '{P} Consulting', 'Expert {P}', 'Bespoke {P}'],
+  realestate: ['Featured {P}', 'Exclusive {P}', 'Premium {P}', 'Curated {P}', 'Signature {P}'],
+  events: ['{P} Package', 'Signature {P}', 'Custom {P}', 'Luxury {P}', 'Bespoke {P}'],
+  blog: ['{P} Stories', '{P} Coverage', '{P} Insights', 'Latest {P}', 'In-depth {P}'],
+  travel: ['{P} Experience', 'Guided {P}', 'Signature {P}', 'Curated {P}', 'Adventure {P}'],
+}
+
 // Category-tuned body copy template for a product. `{product}` is replaced
 // with the product name as provided by the user (first letter capitalized).
 // Kept short, benefit-oriented, Malaysia-audience friendly.
@@ -198,12 +219,14 @@ function capitalizeFirst(s: string): string {
 }
 
 /**
- * Build feature cards from user-supplied products. Each card gets an icon
- * rotated from PRODUCT_FEATURE_ICONS[category] and body copy from the
- * FEATURE_BODY_TEMPLATES[category] template.
+ * Build feature cards from user-supplied products. Each card gets:
+ *  - icon rotated from PRODUCT_FEATURE_ICONS[category]
+ *  - title rotated from FEATURE_TITLE_TEMPLATES[category] (e.g. "{P} Specialties")
+ *  - description from FEATURE_BODY_TEMPLATES[category]
  *
  * Caps at `maxCards` (usually 3-4) to match existing featureMap cardinality
- * and prevent layout overflow.
+ * and prevent layout overflow. Spec example: ["ramen","sushi","gyoza"] in
+ * restaurant category → "Ramen Specialties / Fresh Sushi / Handmade Gyoza".
  */
 function featuresFromProducts(
   products: string[],
@@ -211,13 +234,17 @@ function featuresFromProducts(
   maxCards: number,
 ): { icon: string; title: string; description: string }[] {
   const icons = PRODUCT_FEATURE_ICONS[category] ?? PRODUCT_FEATURE_ICONS['business']!
-  const template = FEATURE_BODY_TEMPLATES[category] ?? FEATURE_BODY_TEMPLATES['business']!
+  const titleTpls = FEATURE_TITLE_TEMPLATES[category] ?? FEATURE_TITLE_TEMPLATES['business']!
+  const bodyTpl = FEATURE_BODY_TEMPLATES[category] ?? FEATURE_BODY_TEMPLATES['business']!
 
-  return products.slice(0, maxCards).map((product, idx) => ({
-    icon: icons[idx % icons.length]!,
-    title: capitalizeFirst(product),
-    description: template.replace('{product}', product),
-  }))
+  return products.slice(0, maxCards).map((product, idx) => {
+    const capitalized = capitalizeFirst(product)
+    return {
+      icon: icons[idx % icons.length]!,
+      title: titleTpls[idx % titleTpls.length]!.replace('{P}', capitalized),
+      description: bodyTpl.replace('{product}', product),
+    }
+  })
 }
 
 function buildFeatures(biz: BusinessSample, category: string): Record<string, unknown> {
