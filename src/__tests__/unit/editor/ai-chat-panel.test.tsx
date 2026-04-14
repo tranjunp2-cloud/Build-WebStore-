@@ -1,3 +1,4 @@
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
@@ -26,7 +27,7 @@ vi.mock('@/i18n', () => ({
         },
         locale: 'en',
     }),
-    I18nProvider: ({ children }: any) => children,
+    I18nProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 
 vi.mock('@/components/editor/AddSectionPromptChips', () => ({
