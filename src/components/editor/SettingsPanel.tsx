@@ -13,6 +13,7 @@ import { LogoEditor } from './LogoEditor'
 import type { BlockData, ThemeData, CtaButton, NavLink, FeatureItem, TestimonialItem, FooterColumn } from '@/types/editor'
 import type { PageData } from '@/store/editorStore'
 import { useI18n } from '@/i18n'
+import { useEditorStore } from '@/store/editorStore'
 import { toast } from 'sonner'
 
 /** Strip HTML tags for display in text inputs (block fields may contain inline formatting) */
@@ -92,6 +93,45 @@ function getBlockInfo(blockType: string) {
     return { label: meta?.name || blockType, icon: meta?.icon || '🧩', variants: meta?.variants || [] }
 }
 
+function normalizePagePath(slug?: string | null) {
+    if (!slug || slug === '/' || slug === 'home') return '/'
+    return slug.startsWith('/') ? slug : `/${slug}`
+}
+
+function inferNavLinkType(url: string, pages?: PageData[]): NavLinkItem['type'] {
+    if (!url?.startsWith('/')) return 'external'
+    if (!pages?.length) return 'page'
+
+    const normalizedUrl = normalizePagePath(url)
+    return pages.some(page => normalizePagePath(page.slug) === normalizedUrl)
+        ? 'page'
+        : 'external'
+}
+
+function normalizeNavLinkItems(
+    links: Array<Record<string, unknown> | NavLinkItem>,
+    pages?: PageData[],
+): NavLinkItem[] {
+    return links.map((link, index) => {
+        const raw = link as Record<string, unknown>
+        const inferredType = raw.type === 'page' || raw.type === 'external'
+            ? raw.type
+            : inferNavLinkType(typeof raw.url === 'string' ? raw.url : '', pages)
+        const url = typeof raw.url === 'string' && raw.url.length > 0
+            ? raw.url
+            : inferredType === 'page' ? '#' : ''
+        const children = Array.isArray(raw.children) ? normalizeNavLinkItems(raw.children as Array<Record<string, unknown>>, pages) : []
+
+        return {
+            id: typeof raw.id === 'string' && raw.id.length > 0 ? raw.id : `legacy_${index}_${String(raw.label || 'link')}`,
+            label: typeof raw.label === 'string' ? raw.label : '',
+            url,
+            type: inferredType,
+            children,
+        }
+    })
+}
+
 // ─── Props ──────────────────────────────────────────────────────────────
 interface SettingsPanelProps {
     block: BlockData | null
@@ -150,8 +190,8 @@ interface SettingsPanelProps {
     }) => void | Promise<void>
     currentPageId?: string | null
     onPageUpdate?: (pageId: string, changes: Partial<PageData>) => Promise<PageData | null> | PageData | null
-    /** External tab request — set to 'menu' when navigation/footer block is clicked (BUG-F05-032/046) */
-    requestedTab?: SettingsTab | null
+    /** External tab request — set to { tab, key } when navigation/footer block is clicked (BUG-F05-032/046) */
+    requestedTab?: { tab: SettingsTab; key: number } | null
 }
 
 // ─── Component ──────────────────────────────────────────────────────────
@@ -171,6 +211,17 @@ function SettingsPanelInner({
     }, [block])
     const bk = `${blockIndex}-${blockDataVersion.length}` // short block key for input keys
 
+    // Resolve navigation links: prefer headerBlock.links, fallback to layout nav block
+    const storeBlocks = useEditorStore(state => state.blocks)
+    const resolvedNavLinks = useMemo(() => {
+        const headerLinks = (((headerBlock as Record<string, unknown>)?.links as Array<Record<string, unknown>>) || [])
+        if (headerLinks.length > 0) return normalizeNavLinkItems(headerLinks, pages)
+        // Fallback: find navigation block in page layout
+        const navBlock = Array.isArray(storeBlocks) ? storeBlocks.find(b => (b as Record<string, unknown>).blockType === 'navigation') : undefined
+        const navLinks = (((navBlock as Record<string, unknown>)?.links as Array<Record<string, unknown>>) || [])
+        return normalizeNavLinkItems(navLinks, pages)
+    }, [headerBlock, pages, storeBlocks])
+
     const [activeTab, setActiveTab] = useState<SettingsTab>(block ? 'block' : 'global')
     const [openGlobalSections, setOpenGlobalSections] = useState({
         brand: true,
@@ -184,21 +235,18 @@ function SettingsPanelInner({
     const [seoDescriptionInput, setSeoDescriptionInput] = useState('')
     const [seoFieldError, setSeoFieldError] = useState<string | null>(null)
 
+    // BUG-F05-032/046: unified tab switching — block changes + external requestedTab
     useEffect(() => {
+        if (requestedTab) {
+            setActiveTab(requestedTab.tab)
+            return
+        }
         if (block) {
             setActiveTab('block')
             return
         }
-
         setActiveTab(prev => (prev === 'block' ? 'global' : prev))
-    }, [block])
-
-    // BUG-F05-032/046: respond to external tab requests (e.g. clicking header → 'menu')
-    useEffect(() => {
-        if (requestedTab) {
-            setActiveTab(requestedTab)
-        }
-    }, [requestedTab])
+    }, [block, requestedTab])
 
     const siteContactInfo = site?.contactInfo || {}
     const siteSocialLinks = site?.socialLinks || {}
@@ -650,7 +698,7 @@ function SettingsPanelInner({
             {/* Navigation Editor (AC-1) */}
             <div className={sectionCls}>
                 <NavigationEditor
-                    links={((headerBlock as Record<string, unknown>)?.links as NavLinkItem[]) || []}
+                    links={resolvedNavLinks}
                     onUpdate={(links) => onHeaderUpdate?.({ links })}
                     pages={pages}
                 />
@@ -964,13 +1012,7 @@ function SettingsPanelInner({
                 {bt === 'navigation' && (
                     <div className={sectionCls}>
                         <NavigationEditor
-                            links={((block.links || []) as NavLinkItem[]).map((link: NavLinkItem, i: number) => ({
-                                id: link.id || `legacy_${i}`,
-                                label: link.label || '',
-                                url: link.url || '#',
-                                type: link.type || 'external' as const,
-                                children: link.children || [],
-                            }))}
+                            links={normalizeNavLinkItems((block.links || []) as Array<Record<string, unknown>>, pages)}
                             onUpdate={(links) => onBlockUpdate(currentBlockIndex, { links })}
                             pages={pages}
                         />
