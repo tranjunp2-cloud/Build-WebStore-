@@ -7,6 +7,7 @@ import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
 
+
 /** Only persist theme fields defined in the Sites collection schema.
  *  Extra keys (from AI or stale client state) are stripped so Payload
  *  does not throw a validation error (BUG-F05-025). */
@@ -65,6 +66,8 @@ export async function PATCH(
         const { data, errorResponse } = await parseRequest(req, saveSiteSchema)
         if (errorResponse) return errorResponse
         const { blocks, theme, locale, shippingConfig, headerBlock, footerBlock, siteName, contactInfo, socialLinks, branding, seo, isDraft } = data!
+        // Navigation URL validation removed — allow saving draft links freely.
+        // Strict validation should happen at publish time (PrePublishModal).
         const normalizedBlocks = blocks ? normalizeBlocksForPersistence(blocks as Record<string, unknown>[]) : undefined
 
         type SiteUpdateData = Partial<{

@@ -1,0 +1,92 @@
+import React from 'react'
+import { describe, it, expect, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { NavigationBlock } from '@/blocks/navigation'
+
+vi.mock('framer-motion', () => {
+    const React = require('react')
+
+    const createPrimitive = (tag: keyof JSX.IntrinsicElements) =>
+        React.forwardRef(({ children, ...props }: React.HTMLAttributes<HTMLElement>, ref: React.Ref<HTMLElement>) =>
+            React.createElement(tag, { ...props, ref }, children))
+
+    return {
+        motion: {
+            nav: createPrimitive('nav'),
+            div: createPrimitive('div'),
+            a: createPrimitive('a'),
+            button: createPrimitive('button'),
+        },
+        AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    }
+})
+
+describe('NavigationBlock nested links', () => {
+    const site = { theme: {} }
+
+    it('renders nested children inside the sidebar variant', () => {
+        render(
+            <NavigationBlock
+                block={{
+                    blockType: 'navigation',
+                    variant: 'sidebar',
+                    logoText: 'Brand',
+                    links: [
+                        {
+                            label: 'Services',
+                            url: '/services',
+                            children: [
+                                { label: 'Consulting', url: '/services/consulting' },
+                                { label: 'Training', url: '/services/training' },
+                            ],
+                        },
+                    ],
+                }}
+                theme={{}}
+                site={site}
+                page={{}}
+            />
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }))
+
+        expect(screen.getByText('Services')).toBeInTheDocument()
+        expect(screen.getByText('Consulting')).toBeInTheDocument()
+        expect(screen.getByText('Training')).toBeInTheDocument()
+    })
+
+    it('renders actual child links in mega-menu panels', () => {
+        render(
+            <NavigationBlock
+                block={{
+                    blockType: 'navigation',
+                    variant: 'mega-menu',
+                    logoText: 'Brand',
+                    links: [
+                        {
+                            label: 'Services',
+                            url: '/services',
+                            children: [
+                                { label: 'Consulting', url: '/services/consulting' },
+                                { label: 'Training', url: '/services/training' },
+                            ],
+                        },
+                        {
+                            label: 'About',
+                            url: '/about',
+                        },
+                    ],
+                }}
+                theme={{}}
+                site={site}
+                page={{}}
+            />
+        )
+
+        fireEvent.mouseEnter(screen.getByRole('button', { name: /Services/i }))
+
+        expect(screen.getByText('Consulting')).toBeInTheDocument()
+        expect(screen.getByText('Training')).toBeInTheDocument()
+        expect(screen.queryByText('Overview')).not.toBeInTheDocument()
+    })
+})

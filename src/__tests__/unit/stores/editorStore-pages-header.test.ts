@@ -168,6 +168,28 @@ describe('EditorStore — Header/Footer Block Operations', () => {
         expect(useEditorStore.getState().headerBlock).toEqual(originalHeader)
     })
 
+    it('updateHeaderBlock also syncs the navigation block inside page layout', () => {
+        useEditorStore.getState().reset()
+        useEditorStore.getState().init(
+            'site-1',
+            [
+                { blockType: 'navigation', links: [{ label: 'Home', url: '/' }] },
+                makeBlock('hero'),
+            ],
+            { primaryColor: '#000' },
+            'Test Site',
+            { blockType: 'navigation', links: [{ label: 'Home', url: '/' }] },
+            { blockType: 'footer', text: 'Copyright' },
+        )
+
+        useEditorStore.getState().updateHeaderBlock({
+            links: [{ label: 'About', url: '/about' }],
+        })
+
+        expect((useEditorStore.getState().headerBlock as any).links).toEqual([{ label: 'About', url: '/about' }])
+        expect((useEditorStore.getState().blocks[0] as any).links).toEqual([{ label: 'About', url: '/about' }])
+    })
+
     // ── TC-F05.17 — updateFooterBlock ───────────────────────────────────
     it('[TC-F05.17] updateFooterBlock merges changes into footer', () => {
         useEditorStore.getState().updateFooterBlock({ text: 'New Footer' })
@@ -187,6 +209,26 @@ describe('EditorStore — Header/Footer Block Operations', () => {
         useEditorStore.getState().updateFooterBlock({ text: 'Changed' })
         useEditorStore.getState().undo()
         expect(useEditorStore.getState().footerBlock).toEqual(originalFooter)
+    })
+
+    it('updateFooterBlock also syncs the footer block inside page layout', () => {
+        useEditorStore.getState().reset()
+        useEditorStore.getState().init(
+            'site-1',
+            [
+                makeBlock('hero'),
+                { blockType: 'footer', text: 'Old Footer' },
+            ],
+            { primaryColor: '#000' },
+            'Test Site',
+            { blockType: 'navigation', links: [] },
+            { blockType: 'footer', text: 'Old Footer' },
+        )
+
+        useEditorStore.getState().updateFooterBlock({ text: 'New Footer' })
+
+        expect((useEditorStore.getState().footerBlock as any).text).toBe('New Footer')
+        expect((useEditorStore.getState().blocks[1] as any).text).toBe('New Footer')
     })
 
     it('init with no header/footer creates defaults', () => {

@@ -193,6 +193,33 @@ describe('SettingsPanel', () => {
         expect(screen.getByText('Light')).toBeInTheDocument()
     })
 
+    it('infers page link type and current page value for legacy menu links without explicit type', () => {
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    headerBlock={{
+                        blockType: 'navigation',
+                        links: [{ label: 'About', url: '/about' }],
+                    }}
+                    pages={[
+                        { id: 'home', title: 'Homepage', slug: '/', status: 'published', isVisible: true, updatedAt: '' },
+                        { id: 'about', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: '' },
+                    ]}
+                    requestedTab={{ tab: 'menu', key: 1 }}
+                />
+            </I18nProvider>
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: '✏️' }))
+
+        const selects = screen.getAllByRole('combobox')
+        expect(selects[0]).toHaveValue('page')
+        expect(selects[1]).toHaveValue('/about')
+    })
+
     it('clicking Light mode calls onThemeChange with colorMode', () => {
         // Arrange
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)

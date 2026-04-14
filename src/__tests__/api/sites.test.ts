@@ -119,6 +119,42 @@ describe('Sites APIs', () => {
                 })
             }))
         })
+
+        it('returns 400 when header navigation contains an empty destination', async () => {
+            const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    headerBlock: {
+                        blockType: 'navigation',
+                        links: [{ label: 'About', url: '' }],
+                    },
+                })
+            })
+
+            const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
+            const result = await res.json()
+
+            expect(res.status).toBe(400)
+            expect(result.error).toBe('Header menu: "About" requires a destination')
+        })
+
+        it('returns 400 when header navigation contains an invalid external URL', async () => {
+            const req = new NextRequest('http://localhost:3000/api/sites/123/save', {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    headerBlock: {
+                        blockType: 'navigation',
+                        links: [{ label: 'Docs', url: 'https://asdasd', type: 'external' }],
+                    },
+                })
+            })
+
+            const res = await SavePATCH(req, { params: Promise.resolve({ siteId: '123' }) })
+            const result = await res.json()
+
+            expect(res.status).toBe(400)
+            expect(result.error).toBe('Header menu: "Docs" must be a valid http:// or https:// URL')
+        })
     })
 
     describe('PATCH & DELETE /api/sites/[siteId]/publish', () => {
