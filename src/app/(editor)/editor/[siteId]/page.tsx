@@ -210,6 +210,12 @@ export default function EditorPage() {
                     setSite(data.site)
                 }
 
+                // Extract user info for menu drawer
+                if (data.user) {
+                    const name = data.user.firstName || data.user.email?.split('@')[0] || 'User'
+                    setUserData({ name, initial: name.charAt(0).toUpperCase() })
+                }
+
                 if (data.page) {
                     const loadedPage = { id: data.page.id, title: data.page.title }
                     setPage(loadedPage)
@@ -238,18 +244,7 @@ export default function EditorPage() {
         void loadData()
     }, [init, selectedPageId, setCurrentPageId, setPages, siteId])
 
-    // Fetch user info for menu drawer
-    useEffect(() => {
-        fetch('/api/users/me', { credentials: 'include' })
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
-                if (data?.user) {
-                    const name = data.user.firstName || data.user.email?.split('@')[0] || 'User'
-                    setUserData({ name, initial: name.charAt(0).toUpperCase() })
-                }
-            })
-            .catch(() => {})
-    }, [])
+    // User data is loaded from editor-data API in loadData useEffect above
 
     const handleSave = useCallback(async (options: SaveOptions = {}) => {
         if (!siteId) return false
