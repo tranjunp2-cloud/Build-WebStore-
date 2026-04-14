@@ -253,6 +253,29 @@ describe('Sites APIs', () => {
             expect(result.page.layout[0].blockType).toBe('hero')
         })
 
+        it('returns user.role field in editor-data response', async () => {
+            // Default mock user has tenants: [{ tenant: 'tenant-1' }] without explicit role
+            // → role resolves to 'viewer' fallback (tenant match exists but role undefined)
+            // @ts-ignore
+            getPayload.mockResolvedValueOnce({
+                findByID: vi.fn().mockResolvedValue({
+                    id: '123', name: 'Test Site', status: 'draft', tenant: 'tenant-1', locale: 'ms',
+                    theme: { primaryColor: '#000' }, seo: {}, socialLinks: {}, branding: {}, contactInfo: {},
+                    shippingConfig: { westRate: 800 },
+                }),
+                find: vi.fn().mockResolvedValue({
+                    docs: [{ id: 'page-1', title: 'Home', layout: [{ blockType: 'hero' }] }]
+                })
+            })
+
+            const req = new NextRequest('http://localhost:3000/api/sites/123/editor-data')
+            const res = await EditorDataGET(req, { params: Promise.resolve({ siteId: '123' }) })
+            expect(res.status).toBe(200)
+            const result = await res.json()
+            expect(result.user).toHaveProperty('role')
+            expect(typeof result.user.role).toBe('string')
+        })
+
         it('[TC-editor-data-null-tenant] returns 403 (not 500) when site.tenant is null', async () => {
             // Regression test: typeof null === 'object' → accessing null.id used to throw TypeError → 500
             // After fix: resolveTenantId(null) returns null → siteTenantId is null → 403 Forbidden

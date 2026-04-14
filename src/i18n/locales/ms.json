@@ -1787,7 +1787,7 @@
             "republish": "Terbitkan Semula"
         },
         "pageManager": {
-            "addNewPage": "+ Tambah Halaman Baru",
+            "addNewPage": "Tambah Halaman Baru",
             "searchPlaceholder": "Cari halaman...",
             "pageNamePlaceholder": "Nama halaman (cth: Promosi)",
             "slugPreview": "Slug:",

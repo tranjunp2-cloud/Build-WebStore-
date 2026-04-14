@@ -1787,7 +1787,7 @@
             "republish": "Re-publish"
         },
         "pageManager": {
-            "addNewPage": "+ Add New Page",
+            "addNewPage": "Add New Page",
             "searchPlaceholder": "Search pages...",
             "pageNamePlaceholder": "Page name (e.g. Promotions)",
             "slugPreview": "Slug:",
