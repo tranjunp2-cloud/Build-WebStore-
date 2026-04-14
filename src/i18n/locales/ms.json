@@ -1388,7 +1388,8 @@
             },
             "tab": {
                 "escToClose": "ESC untuk tutup · Cubit untuk zum di mudah alih",
-                "fullResolution": "Tangkapan skrin resolusi penuh"
+                "fullResolution": "Tangkapan skrin resolusi penuh",
+                "stepByStepGuide": "Panduan Langkah demi Langkah"
             },
             "data": {
                 "dashboard": {
@@ -1397,7 +1398,90 @@
                         {
                             "title": "Gambaran Keseluruhan Papan Pemuka",
                             "desc": "Papan pemuka memaparkan metrik utama: trafik laman web, petunjuk, penglibatan, dan skor kesihatan SEO.",
-                            "imgTitle": "Gambaran Keseluruhan"
+                            "imgTitle": "Gambaran Keseluruhan",
+                            "guide": [
+                                "Navigasi ke <strong>Papan Pemuka</strong> dari bar sisi — ini adalah skrin utama anda selepas log masuk.",
+                                "Tab <strong>Gambaran Keseluruhan</strong> memaparkan metrik utama: jumlah paparan laman web (Trafik), klik pautan (Petunjuk), dan penglibatan pengguna.",
+                                "Gunakan <strong>Pemilih Tempoh</strong> (Hari Ini / 7 hari / 30 hari) di kanan atas untuk menukar julat masa analitik.",
+                                "Klik <strong>Sesuaikan</strong> untuk seret-dan-lepas, tunjuk/sembunyikan kad metrik untuk memperibadikan susun atur papan pemuka anda.",
+                                "Widget <strong>Kesihatan SEO</strong> memaparkan skor SEO laman anda daripada 100 dengan amaran tindakan — klik \"AI Baiki Semua Isu\" untuk optimum automatik."
+                            ]
+                        }
+                    ]
+                },
+                "builder": {
+                    "label": "Pembina Laman Web AI",
+                    "steps": [
+                        {
+                            "title": "Masukkan Maklumat Perniagaan",
+                            "desc": "Berikan maklumat asas supaya AI dapat mencipta laman web yang sempurna untuk anda.",
+                            "imgTitle": "Borang Maklumat Perniagaan",
+                            "guide": [
+                                "Masukkan <strong>Nama Perniagaan</strong> anda (cth., \"The Cookie House\", \"Beauty Spa Hana\").",
+                                "Pilih <strong>Industri</strong> anda — pilih daripada: Restoran/Kafe/F&B, Kedai/Fesyen/E-dagang, Teknologi/IT/SaaS, Kesihatan/Pergigian/Klinik, Hartanah, Portfolio/Freelancer/Agensi, Pendidikan/Latihan, Gim/Kecergasan/Yoga, atau Lain-lain.",
+                                "Terangkan <strong>Produk / Perkhidmatan</strong> anda — AI akan menggunakannya untuk mencadangkan imej produk dan susun atur.",
+                                "Tambah <strong>Penerangan</strong> secara pilihan untuk lebih konteks tentang perniagaan anda.",
+                                "Klik <strong>\"Teruskan — AI akan cipta laman web anda →\"</strong> untuk memulakan proses penjanaan."
+                            ]
+                        },
+                        {
+                            "title": "AI Menjana Laman Web Anda",
+                            "desc": "AI menganalisis maklumat perniagaan anda dan menjana reka bentuk sempurna secara automatik.",
+                            "imgTitle": "Skrin Pemprosesan AI",
+                            "guide": [
+                                "Selepas klik Teruskan, AI mula <strong>menganalisis maklumat perniagaan anda</strong>.",
+                                "Sistem kemudian <strong>menjana kandungan & reka bentuk</strong> — termasuk susun atur, warna, dan imej sepadan dengan industri anda.",
+                                "Akhirnya, ia <strong>menyediakan pratonton</strong> supaya anda boleh menyemak hasilnya.",
+                                "Proses ini biasanya mengambil masa 30-60 saat. Anda akan melihat bar kemajuan dengan setiap langkah."
+                            ]
+                        },
+                        {
+                            "title": "Pratonton & Semakan Responsif",
+                            "desc": "Semak laman web AI anda pada kedua-dua paparan Desktop dan Mudah Alih sebelum menerbitkan.",
+                            "imgTitle": "Pratonton Laman Web - Desktop",
+                            "guide": [
+                                "Setelah dijana, anda akan melihat halaman <strong>Pratonton Laman Web</strong> dengan laman AI anda.",
+                                "Togol antara paparan <strong>Desktop</strong> dan <strong>Mudah Alih</strong> untuk menyemak susun atur responsif.",
+                                "Klik <strong>\"Lihat Pratonton Penuh\"</strong> untuk membuka laman web dalam tab baru.",
+                                "Jika berpuas hati, teruskan untuk menerbitkan laman web anda. Anda sentiasa boleh mengeditnya kemudian."
+                            ]
+                        },
+                        {
+                            "title": "Chat AI — Edit dengan Perbualan",
+                            "desc": "Gunakan Chat AI untuk membuat perubahan pada laman web anda dengan hanya menerangkan apa yang anda mahu.",
+                            "imgTitle": "Editor Chat AI",
+                            "guide": [
+                                "Buka tab <strong>AI CHAT</strong> di bar sisi kiri Editor.",
+                                "Taip apa yang anda mahu ubah — cth., <strong>\"Boleh tukar warna ke merah jambu?\"</strong> atau <strong>\"Tambah bahagian baru\"</strong>.",
+                                "AI akan memproses permintaan anda dan menunjukkan <strong>\"Menyediakan perubahan untuk pratonton...\"</strong> semasa mengemas kini.",
+                                "Gunakan <strong>cip cadangan pantas</strong> di bawah (cth., \"Tukar warna\", \"+ Tambah bahagian\") untuk tindakan biasa.",
+                                "Perubahan diterapkan secara masa nyata pada pratonton — semak dan simpan atau minta penyesuaian lanjut."
+                            ]
+                        },
+                        {
+                            "title": "Tukar Templat",
+                            "desc": "Layari dan tukar ke reka bentuk templat berbeza pada bila-bila masa.",
+                            "imgTitle": "Galeri Templat",
+                            "guide": [
+                                "Dalam Editor, klik untuk membuka <strong>Galeri Templat</strong> untuk melayari reka bentuk yang tersedia.",
+                                "Gunakan <strong>bar carian</strong> atau <strong>penapis kategori</strong> (Restoran, E-Dagang, Kecantikan, Teknologi, Kesihatan, Pendidikan, dll.) untuk mencari templat yang sesuai.",
+                                "Setiap templat menunjukkan pratonton, nama, penerangan, dan palet warna.",
+                                "Klik pada templat untuk menerapkannya — kandungan anda akan dipindahkan ke susun atur reka bentuk baru.",
+                                "Kedua-dua templat Percuma dan <strong>Pro</strong> tersedia bergantung pada pelan anda."
+                            ]
+                        },
+                        {
+                            "title": "Edit Komponen pada Setiap Halaman",
+                            "desc": "Gunakan panel Komponen untuk menambah, mengalih keluar, dan menyesuaikan bahagian pada halaman anda.",
+                            "imgTitle": "Panel Komponen",
+                            "guide": [
+                                "Buka tab <strong>KOMPO...</strong> (Komponen) di bar sisi kiri.",
+                                "Layari kategori komponen: <strong>Asas</strong> (Hero, CTA, Tentang, Ciri, Proses Langkah, Kad Perkhidmatan), <strong>Kandungan</strong>, <strong>Media</strong>, <strong>Perniagaan</strong>, <strong>Perdagangan</strong>, <strong>Borang & Hubungi</strong>, <strong>Widget</strong>, dan <strong>Susun Atur</strong>.",
+                                "Gunakan <strong>Cari blok</strong> untuk mencari jenis komponen tertentu dengan cepat.",
+                                "Seret komponen dari panel untuk menambahnya ke halaman anda pada kedudukan yang dikehendaki.",
+                                "Klik pada mana-mana komponen dalam pratonton untuk memilih dan mengedit kandungan, gaya, dan tetapannya.",
+                                "Beralih antara halaman menggunakan tab <strong>HALAMAN</strong> untuk mengedit bahagian berbeza laman web anda."
+                            ]
                         }
                     ]
                 },
@@ -1405,9 +1489,50 @@
                     "label": "Blog",
                     "steps": [
                         {
-                            "title": "Cipta Artikel Blog Baru",
-                            "desc": "Pergi ke <strong>\"📝 Blog\"</strong> → klik <strong>[+ Artikel Baru]</strong>. Tulis kandungan menggunakan Editor Teks Kaya, tambah imej, dan tetapkan meta SEO.",
-                            "imgTitle": "Editor Blog"
+                            "title": "Akses Pengurusan Blog",
+                            "desc": "Navigasi ke bahagian Blog dari bar sisi untuk melihat dan mengurus semua artikel blog anda.",
+                            "imgTitle": "Pengurusan Blog",
+                            "guide": [
+                                "Klik <strong>\"📝 Blog\"</strong> di bar sisi kiri untuk membuka halaman pengurusan blog.",
+                                "Anda akan melihat senarai semua artikel blog anda dengan status (Draf / Diterbitkan), kategori, dan tarikh terbit.",
+                                "Gunakan <strong>bar carian</strong> untuk mencari artikel tertentu, atau tapis mengikut status dan kategori.",
+                                "Klik <strong>[+ Artikel Baru]</strong> di kanan atas untuk mula mencipta artikel blog baru."
+                            ]
+                        },
+                        {
+                            "title": "Cipta & Edit Artikel Blog",
+                            "desc": "Gunakan editor teks kaya untuk menulis kandungan, tambah imej, dan konfigurasikan tetapan artikel.",
+                            "imgTitle": "Editor Blog & Pembantu AI",
+                            "guide": [
+                                "Masukkan <strong>Tajuk Artikel</strong> anda di atas — slug URL dijana automatik daripada tajuk (boleh diedit).",
+                                "Gunakan <strong>Editor Teks Kaya</strong> untuk menulis kandungan dengan pemformatan: tajuk, tebal, italik, senarai, pautan, dan imej terbenam.",
+                                "Di bar sisi kanan, konfigurasikan <strong>Tetapan Artikel</strong>: Kategori, Penulis, dan Tarikh Terbit.",
+                                "Muat naik <strong>Imej Kecil Utama</strong> (PNG/JPG sehingga 10MB) — ini muncul dalam senarai blog dan perkongsian sosial.",
+                                "Isi bahagian <strong>Pengoptimuman Carian (SEO)</strong>: Meta Tajuk (maks 60 aksara) dan Meta Penerangan (maks 160 aksara) untuk kedudukan carian yang lebih baik."
+                            ]
+                        },
+                        {
+                            "title": "Gunakan Pembantu AI",
+                            "desc": "Biarkan AI membantu anda menjana idea dan kandungan blog untuk menjimatkan masa.",
+                            "imgTitle": "Pembantu AI Blog",
+                            "guide": [
+                                "Klik butang <strong>\"Pembantu AI\"</strong> (ungu, kanan atas) untuk membuka penjana blog AI.",
+                                "Masukkan <strong>topik</strong> anda (cth., \"Strategi Pemasaran E-dagang\") dalam medan teks.",
+                                "Pilih <strong>Nada Suara</strong>: Profesional, Mesra, atau Persuasif.",
+                                "Klik <strong>\"Jana Idea Blog\"</strong> — AI akan mencipta draf tajuk, rangka kandungan, dan meta SEO untuk anda.",
+                                "Anda juga boleh klik <strong>\"Jana melalui AI\"</strong> di sebelah bahagian SEO untuk menjana automatik tajuk meta dan penerangan."
+                            ]
+                        },
+                        {
+                            "title": "Terbit atau Simpan Draf",
+                            "desc": "Simpan kerja anda sebagai draf atau terbitkan secara langsung ke laman web anda.",
+                            "imgTitle": "Pilihan Penerbitan",
+                            "guide": [
+                                "Klik <strong>\"Simpan Draf\"</strong> untuk menyimpan artikel tanpa menerbitkan — anda boleh terus mengedit kemudian.",
+                                "Klik <strong>\"Terbit\"</strong> untuk menjadikan artikel anda langsung di laman web dengan segera.",
+                                "Artikel yang diterbitkan muncul di halaman blog laman web anda dan diindeks oleh enjin carian.",
+                                "Anda boleh menyahterbit atau mengedit mana-mana artikel pada bila-bila masa dari halaman senarai blog."
+                            ]
                         }
                     ]
                 },
@@ -1417,7 +1542,15 @@
                         {
                             "title": "Konfigurasi Domain",
                             "desc": "Pergi ke <strong>\"⚙️ Tetapan → Domain\"</strong>. Tambah domain khas, konfigurasi DNS (A Record, CNAME), dan sahkan sambungan.",
-                            "imgTitle": "Tetapan Domain"
+                            "imgTitle": "Tetapan Domain",
+                            "guide": [
+                                "Pergi ke <strong>\"⚙️ Tetapan → Domain\"</strong> dari bar sisi untuk membuka Pengurusan Domain.",
+                                "Subdomain lalai anda (cth., <code>kedai-anda.web-v2.dev.ecommercehub.my</code>) ditetapkan dan disambungkan secara automatik.",
+                                "Klik <strong>\"+ Tambah Domain Khas\"</strong> untuk menyambungkan domain anda sendiri (cth., <code>syarikat-abc.com</code>).",
+                                "Konfigurasikan DNS di pendaftar domain anda: <strong>A Record</strong> → Tunjuk ke IP statik yang ditunjukkan, <strong>CNAME Record</strong> → Tunjuk ke <code>web-v2.dev.ecommercehub.my</code>.",
+                                "Klik <strong>\"Sahkan Sambungan\"</strong> untuk menyemak penyebaran DNS. Status akan bertukar dari \"Pengesahan Tertangguh\" ke \"Disambungkan\".",
+                                "Gunakan <strong>\"Pilih domain utama\"</strong> untuk menetapkan domain mana yang pelawat lihat sebagai URL utama."
+                            ]
                         }
                     ]
                 }

@@ -162,6 +162,36 @@ describe('AIDiscoveryWizard', () => {
         expect(screen.getByTestId('dashboard-content')).toBeVisible()
     })
 
+    it('[TC-F06.13] X button chỉ đóng UI, không gọi API dismiss', () => {
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Find the X close button (aria-label="Close")
+        const closeBtn = screen.getByLabelText('Close')
+        fireEvent.click(closeBtn)
+
+        // Assert: Wizard closed
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+
+        // Assert: API was NOT called (close ≠ dismiss)
+        expect(global.fetch).not.toHaveBeenCalled()
+    })
+
+    it('[TC-F06.14] X button close → wizard reappears on re-mount', () => {
+        const { unmount } = render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Close via X
+        fireEvent.click(screen.getByLabelText('Close'))
+        expect(screen.queryByText('Discover the Power of AI')).not.toBeInTheDocument()
+        expect(global.fetch).not.toHaveBeenCalled()
+
+        // Re-mount simulates next page visit
+        unmount()
+        render(<AIDiscoveryWizard userId="u-123" />)
+
+        // Wizard should reappear since flag was not persisted
+        expect(screen.getByText('Discover the Power of AI')).toBeVisible()
+    })
+
     it('[TC-F06.17] Security Integrity - Unauthorized Patch Fallback', async () => {
         // Arrange
         const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
