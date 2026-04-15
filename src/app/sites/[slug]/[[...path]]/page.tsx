@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
@@ -296,9 +297,9 @@ export default async function TenantSitePage({ params }: Props) {
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(typeof post.content === 'string' ? post.content : '') }}
                     />
                     <div className="mt-16 pt-8 border-t border-white/10">
-                        <a href="/blogs" className="text-blue-500 hover:text-blue-400 font-medium">
+                        <Link href="/blogs" className="text-blue-500 hover:text-blue-400 font-medium">
                             ← Back to all posts
-                        </a>
+                        </Link>
                     </div>
                 </article>
             </div>

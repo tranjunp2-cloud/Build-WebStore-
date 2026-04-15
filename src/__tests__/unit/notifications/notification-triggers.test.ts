@@ -196,7 +196,7 @@ describe('[TC-F16.14] BLOG_PUBLISHED trigger — Blogs.afterChange', () => {
             type: 'BLOG_PUBLISHED',
             title: 'Blog Published',
             message: 'My Blog Post has been published',
-            actionUrl: '/blogs',
+            actionUrl: '/blog',
         })
     })
 

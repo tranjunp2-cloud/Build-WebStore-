@@ -181,7 +181,7 @@ export function NotificationDropdown() {
         <button
           onClick={handleMarkAll}
           disabled={!data || data.unreadCount === 0}
-          className="text-[12px] sm:text-[14px] font-medium text-blue-500 hover:text-blue-400 transition-colors disabled:text-white/20 disabled:cursor-not-allowed"
+          className="text-[12px] sm:text-[14px] font-medium text-blue-500 hover:text-blue-400 transition-colors disabled:text-white/20 disabled:cursor-not-allowed disabled:pointer-events-none"
         >
           {t.notifications.markAllRead}
         </button>

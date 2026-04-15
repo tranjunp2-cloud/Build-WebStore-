@@ -31,7 +31,25 @@ self.addEventListener('push', (event) => {
     data: { actionUrl: data.actionUrl || '/' },
   }
 
-  event.waitUntil(self.registration.showNotification(data.title, options))
+  event.waitUntil(
+    self.registration.showNotification(data.title, options).then(() => {
+      // Notify all open tabs so they can update badge + show in-app toast
+      return self.clients.matchAll({ type: 'window' }).then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({
+            type: 'PUSH_NOTIFICATION',
+            payload: {
+              id: data.id || `push-${Date.now()}`,
+              title: data.title,
+              message: data.body,
+              type: data.tag,
+              actionUrl: data.actionUrl,
+            },
+          })
+        })
+      })
+    })
+  )
 })
 
 self.addEventListener('notificationclick', (event) => {
