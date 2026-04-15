@@ -501,9 +501,19 @@ function generateWithFallback(
 
     const seed = Date.now()
 
+    // Plan 260415 fix-500 — composeFallbackResult now returns null (not
+    // throws) for unrecoverable states. Treat null exactly like a thrown
+    // exception: log + fall through to the legacy safety net.
+    let composerResult: GenerationResult | null = null
+    let composerErrMsg: string | null = null
     try {
-        const result = composeFallbackResult(prompt, seed, language, businessInfo)
+        composerResult = composeFallbackResult(prompt, seed, language, businessInfo)
+    } catch (composerError: unknown) {
+        composerErrMsg = composerError instanceof Error ? composerError.message : String(composerError)
+    }
 
+    if (composerResult) {
+        const result = composerResult
         events.push({ event: 'step', data: { step: 'fallback_validating', label: 'Validating content...', progress: 75 } })
         events.push({ event: 'theme_set', data: { theme: result.theme } })
 
@@ -529,10 +539,12 @@ function generateWithFallback(
         })
 
         return { result, events }
-    } catch (composerError: unknown) {
-        // Legacy safety net — runs only if composeFallbackResult throws.
-        // Do not extend generate-blocks.ts; see plans/260412-2156-ai-gen-website-audit/phase-06-step-7.
-        const errMsg = composerError instanceof Error ? composerError.message : String(composerError)
+    }
+
+    // Legacy safety net — runs when composeFallbackResult returned null OR threw.
+    // Do not extend generate-blocks.ts; see plans/260412-2156-ai-gen-website-audit/phase-06-step-7.
+    {
+        const errMsg = composerErrMsg ?? 'composeFallbackResult returned null'
         console.warn('[Fallback] composer failed, using legacy generateBlocks', errMsg)
 
         events.push({ event: 'step', data: { step: 'fallback_legacy', label: 'Using legacy templates...', progress: 55 } })

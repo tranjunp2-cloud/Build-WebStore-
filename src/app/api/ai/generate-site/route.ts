@@ -25,6 +25,8 @@ import { pickCategoryThemeWithMood, hashBusinessName } from '@/lib/ai/category-t
 import { resolveComposerCategory } from '@/lib/ai/composer-category-resolver'
 import { buildImagePool } from '@/lib/ai/image-pool'
 import { resolveTheme } from '@/lib/theme/resolve'
+import { resolveSiteType } from '@/lib/ai/site-type'
+import { withPayloadRetry } from '@/lib/payload-retry'
 
 
 // Flexible interface to handle unpredictable AI JSON structures
@@ -430,6 +432,13 @@ export async function POST(req: NextRequest) {
         // Resolve complete theme before saving (prevents color mismatch between builder preview and editor)
         const resolvedTheme = resolveTheme(result.theme)
 
+        // Plan 260415 fix-500 — coerce AI/fallback category to a valid Sites
+        // enum value. Previously `result.siteType` could be 'portfolio' (from
+        // fallback-adapter creative→portfolio mapping) which Payload rejected
+        // → "The following field is invalid: Site Type" → 500. Logs showed
+        // this was the dominant 500 source (~7 hits / 6h window).
+        const safeSiteType = resolveSiteType(result.siteType)
+
         if (existingSites.docs.length > 0) {
             // UPDATE existing site (template swap — keep site ID, update content)
             site = await payload.update({
@@ -439,7 +448,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     generationStatus: 'generating',
-                    siteType: result.siteType,
+                    siteType: safeSiteType,
                     locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
                     theme: resolvedTheme,
                     seo: {
@@ -449,7 +458,7 @@ export async function POST(req: NextRequest) {
                     aiGenerationMetadata: {
                         generatedAt: new Date().toISOString(),
                         originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
-                        businessType: result.siteType,
+                        businessType: safeSiteType,
                     },
                 },
             })
@@ -472,7 +481,7 @@ export async function POST(req: NextRequest) {
                     name: result.siteName,
                     status: 'draft',
                     generationStatus: 'generating',
-                    siteType: result.siteType,
+                    siteType: safeSiteType,
                     locale: ['ms', 'en'].includes(result.language || language) ? (result.language || language) : 'en',
                     theme: resolvedTheme,
                     seo: {
@@ -482,7 +491,7 @@ export async function POST(req: NextRequest) {
                     aiGenerationMetadata: {
                         generatedAt: new Date().toISOString(),
                         originalPrompt: `${businessInfo.businessName} | ${businessInfo.industry} | ${businessInfo.shortDescription || ''} | ${businessInfo.products}`,
-                        businessType: result.siteType,
+                        businessType: safeSiteType,
                     },
                 },
             })
@@ -543,6 +552,7 @@ export async function POST(req: NextRequest) {
         })
 
         const createdPages: Record<string, unknown>[] = []
+        const pageFailures: Array<{ slug: string; title: string; error: string }> = []
 
         for (const pageDefinition of pageDefinitions) {
             // Sanitize variants in each page's layout blocks (safety net for cloned heroes)
@@ -569,21 +579,59 @@ export async function POST(req: NextRequest) {
                 ? sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b)))
                 : variantFixed
 
-            const createdPage = await payload.create({
-                collection: 'pages',
-                data: {
-                    title: pageDefinition.title,
+            // Plan 260415 fix-500 — per-page try/catch so one bad page (FK
+            // violation, block validation, stale _parent_id from drizzle
+            // transaction race) does NOT abort the entire generation. If
+            // homepage fails, outer catch still fires. Sub-page failures are
+            // logged and skipped; user gets a site with fewer pages instead
+            // of a full 500 + "try again".
+            try {
+                // Plan 260415 fix-500 — wrap create in retry. Same transient
+                // deadlock / pages_blocks_*_parent_id_fk races observed on
+                // /api/sites/*/save also hit AI gen create (1 hit / 6h
+                // window). Reuses the save-route retry wrapper.
+                const createdPage = await withPayloadRetry(
+                    () => payload.create({
+                        collection: 'pages',
+                        data: {
+                            title: pageDefinition.title,
+                            slug: pageDefinition.slug,
+                            site: site.id,
+                            isHomepage: pageDefinition.isHomepage,
+                            _status: 'published',
+                            layout: sanitizedLayout,
+                            seo: pageDefinition.seo,
+                        },
+                    }),
+                    {
+                        onRetry: (attempt, kind) => {
+                            console.warn(
+                                `[generate-site] Retry page create attempt=${attempt} kind=${kind} slug=${pageDefinition.slug}`,
+                            )
+                        },
+                    },
+                )
+                createdPages.push(createdPage)
+                _createdPagesCount++
+            } catch (pageErr) {
+                const errMsg = pageErr instanceof Error ? pageErr.message : String(pageErr)
+                pageFailures.push({
                     slug: pageDefinition.slug,
-                    site: site.id,
+                    title: pageDefinition.title,
+                    error: errMsg,
+                })
+                console.error('[generate-site] Page create failed', JSON.stringify({
+                    slug: pageDefinition.slug,
                     isHomepage: pageDefinition.isHomepage,
-                    _status: 'published',
-                    layout: sanitizedLayout,
-                    seo: pageDefinition.seo,
-                },
-            })
-
-            createdPages.push(createdPage)
-            _createdPagesCount++
+                    blockCount: Array.isArray(sanitizedLayout) ? sanitizedLayout.length : 0,
+                    errMsg,
+                }))
+                // Homepage failure is fatal — rethrow so outer catch returns 500
+                if (pageDefinition.isHomepage) {
+                    throw pageErr
+                }
+                // Sub-page failure is soft — continue loop, gen still ships
+            }
         }
 
         // BUG-F05-005: Auto-create 404 page for every new site
@@ -679,7 +727,7 @@ export async function POST(req: NextRequest) {
             pageId: homepagePage.id,
             siteName: result.siteName,
             siteLanguage: result.language || language,
-            siteType: result.siteType,
+            siteType: safeSiteType,
             blockCount: result.blocks.length,
             totalPages: createdPages.length,
             theme: result.theme,
@@ -699,9 +747,25 @@ export async function POST(req: NextRequest) {
 
         const errMsg = error instanceof Error ? error.message : String(error)
         const errStack = error instanceof Error ? error.stack : ''
-        console.error('[AI Generate Site Error]', errMsg, errStack)
+
+        // Plan 260415 fix-500 — structured error log with debugId + stage
+        // context so Vercel log search can group failures + PM can cite a
+        // support ID when users report "it broke". Stop leaking raw errMsg
+        // into the user response body (security + UX smell).
+        const debugId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+        console.error('[AI Generate Site Error]', JSON.stringify({
+            debugId,
+            errMsg,
+            pagesCreated: _createdPagesCount,
+            siteId: _site?.id ?? null,
+        }))
+        if (errStack) console.error('[AI Generate Site Error Stack]', debugId, errStack)
+
         return NextResponse.json(
-            { error: `Failed to generate website. Please try again. (${errMsg})` },
+            {
+                error: 'Failed to generate website. Please try again in a moment.',
+                debugId,
+            },
             { status: 500 },
         )
     }

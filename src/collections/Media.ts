@@ -3,33 +3,68 @@ import { APIError } from 'payload'
 
 // Plan 260415 fix-500 — custom handler for /api/media/file/[filename] that
 // survives missing-on-disk errors. Payload's default getFileHandler calls
-// fs.stat(staticDir/filename) and returns 500 on ENOENT; we intercept first,
-// redirect to S3 when configured, otherwise return 404 cleanly.
-const mediaFileFallbackHandler: PayloadHandler = async (_req) => {
-    const filename = (_req as unknown as { routeParams?: { filename?: string } }).routeParams?.filename
+// fs.stat(staticDir/filename) and returns 500 on ENOENT. We intercept FIRST
+// and always return a concrete Response (so there's no fall-through typing
+// ambiguity):
+//   1. Local file exists → stream it with correct Content-Type
+//   2. Missing + S3 env configured → 302 redirect to public S3 URL
+//   3. Missing + no S3 → clean 404
+// Logs showed ~90 x 500/24h from this path alone before the fix.
+
+const MIME_BY_EXT: Record<string, string> = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.pdf': 'application/pdf',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+}
+
+function mimeFromFilename(filename: string): string {
+    const dotIndex = filename.lastIndexOf('.')
+    if (dotIndex < 0) return 'application/octet-stream'
+    const ext = filename.slice(dotIndex).toLowerCase()
+    return MIME_BY_EXT[ext] ?? 'application/octet-stream'
+}
+
+const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> => {
+    const routeParams = (req as unknown as { routeParams?: { filename?: string } }).routeParams
+    const filename = routeParams?.filename
     if (typeof filename !== 'string' || filename.length === 0) {
         return new Response('Missing filename', { status: 400 })
     }
+
+    // 1. Try local disk first (dev + legacy files). Match the staticDir env
+    // logic above so we check the same path Payload's upload handler writes to.
+    const localDir = process.env.VERCEL === '1' ? '/tmp/media' : 'public/media'
     try {
         const fs = await import('fs/promises')
         const path = await import('path')
-        const stat = await fs.stat(path.resolve('public/media', filename))
-        // Local file exists — signal "fall through" by returning undefined
-        // via a hacky workaround: Payload only falls through when the handler
-        // returns non-Response. Return a Response only when we want to short
-        // circuit. Here we prefer to let the default handler stream the file.
-        if (stat.isFile()) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return undefined as any
-        }
+        const localPath = path.resolve(localDir, filename)
+        const data = await fs.readFile(localPath)
+        return new Response(data, {
+            status: 200,
+            headers: {
+                'Content-Type': mimeFromFilename(filename),
+                'Content-Length': String(data.byteLength),
+                'Cache-Control': 'public, max-age=31536000, immutable',
+            },
+        })
     } catch {
-        /* fall through to S3 redirect */
+        /* fall through — not a local file */
     }
+
+    // 2. Redirect to S3 if configured.
     const bucket = process.env.S3_BUCKET
     const endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.S3_ENDPOINT
     if (bucket && endpoint) {
         return Response.redirect(`${endpoint}/${bucket}/${filename}`, 302)
     }
+
+    // 3. Nothing found — return clean 404 (not 500).
     return new Response('File not found', { status: 404 })
 }
 
@@ -68,12 +103,20 @@ export const Media: CollectionConfig = {
         ],
     },
     upload: {
-        staticDir: 'public/media',
+        // Plan 260415 fix-500 — On Vercel, `/var/task` (cwd) is a readonly
+        // build artifact. Payload + Sharp try `fs.mkdir('public', { recursive:
+        // true })` to write image size thumbnails before the s3Storage plugin
+        // uploads them → ENOENT / EROFS → the entire request 500s. Seen on
+        // /products/new (20 hits/24h), /products/[id] (30), /blog/new (50).
+        // Switch the staticDir to /tmp/media in any Vercel environment — /tmp
+        // is writable + ephemeral which is exactly what we want for thumbnail
+        // staging before the S3 upload picks them up.
+        staticDir: process.env.VERCEL === '1' ? '/tmp/media' : 'public/media',
         // Plan 260415 fix-500 — Vercel ephemeral FS + S3 migration means old
         // media rows may reference files that don't exist on disk. Payload's
         // default getFileHandler returns 500 on ENOENT (see node_modules/
         // payload/dist/uploads/endpoints/getFile.js). Intercept requests here:
-        //   1. If local file exists → fall through to default (stream from disk)
+        //   1. If local file exists → stream it with correct Content-Type
         //   2. If missing but S3 configured → 302 redirect to public S3 URL
         //   3. If missing with no S3 → clean 404 (not 500)
         // Logs showed ~90 x 500/24h from this path alone.
