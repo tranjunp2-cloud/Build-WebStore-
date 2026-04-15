@@ -118,72 +118,62 @@ describe('PreviewScripts', () => {
     })
 
     describe('SET_DROP_HINT message', () => {
+        const dispatchDropHint = (text: string) => {
+            // Dispatch MessageEvent with origin matching window.location.origin
+            // so PreviewScripts' origin check passes in JSDOM
+            const event = new MessageEvent('message', {
+                data: { type: 'SET_DROP_HINT', text },
+                origin: window.location.origin,
+            })
+            window.dispatchEvent(event)
+        }
+
         afterEach(() => {
             document.getElementById('editor-preview-styles')?.remove()
         })
 
-        it('should update CSS drop hint text when receiving SET_DROP_HINT message', async () => {
-            // Arrange — inject the style element that PreviewScripts creates
+        it('should update CSS drop hint text when receiving SET_DROP_HINT message', () => {
+            // Arrange
             const style = document.createElement('style')
             style.id = 'editor-preview-styles'
-            style.innerHTML = `
-                .insert-marker::after {
-                  content: 'Drop to add block'; /*drop-hint*/
-                }
-            `
+            style.innerHTML = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
             document.head.appendChild(style)
 
             render(<PreviewScripts />)
 
-            // Act — use postMessage so JSDOM sets origin correctly
-            await new Promise<void>(resolve => {
-                const handler = () => { window.removeEventListener('message', handler); resolve() }
-                window.addEventListener('message', handler)
-                window.postMessage({ type: 'SET_DROP_HINT', text: 'Lepaskan untuk tambah blok' }, '*')
-            })
+            // Act
+            dispatchDropHint('Lepaskan untuk tambah blok')
 
-            // Assert — CSS content should be updated
+            // Assert
             expect(style.innerHTML).toContain("content: 'Lepaskan untuk tambah blok'")
             expect(style.innerHTML).toContain('/*drop-hint*/')
         })
 
-        it('should escape single quotes in drop hint text', async () => {
+        it('should escape single quotes in drop hint text', () => {
             // Arrange
             const style = document.createElement('style')
             style.id = 'editor-preview-styles'
-            style.innerHTML = `
-                .insert-marker::after {
-                  content: 'Drop to add block'; /*drop-hint*/
-                }
-            `
+            style.innerHTML = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
             document.head.appendChild(style)
 
             render(<PreviewScripts />)
 
-            // Act — text with single quote
-            await new Promise<void>(resolve => {
-                const handler = () => { window.removeEventListener('message', handler); resolve() }
-                window.addEventListener('message', handler)
-                window.postMessage({ type: 'SET_DROP_HINT', text: "Drop it's here" }, '*')
-            })
+            // Act
+            dispatchDropHint("Drop it's here")
 
-            // Assert — single quote should be escaped
+            // Assert
             expect(style.innerHTML).toContain("content: 'Drop it\\'s here'")
         })
 
-        it('should not crash when style element is missing', async () => {
-            // Arrange — no style element injected, spy on console.error
+        it('should not crash when style element is missing', () => {
+            // Arrange — no style element, spy console.error
             const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
             render(<PreviewScripts />)
 
             // Act
-            await new Promise<void>(resolve => {
-                const handler = () => { window.removeEventListener('message', handler); resolve() }
-                window.addEventListener('message', handler)
-                window.postMessage({ type: 'SET_DROP_HINT', text: 'Test' }, '*')
-            })
+            dispatchDropHint('Test')
 
-            // Assert — no errors thrown
+            // Assert — no errors
             expect(errorSpy).not.toHaveBeenCalled()
             errorSpy.mockRestore()
         })
