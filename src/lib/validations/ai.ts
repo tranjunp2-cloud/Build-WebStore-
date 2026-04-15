@@ -93,9 +93,9 @@ export const editBlockSchema = z.object({
     currentPageSlug: z.string().optional(),
     currentPageTitle: z.string().optional(),
     chatHistory: z.array(z.object({
-        role: z.string(),
-        content: z.string(),
-    })).optional(),
+        role: z.enum(['user', 'assistant']),
+        content: z.string().max(300),
+    })).max(10).optional(),
 })
 
 export const rewriteTextSchema = z.object({
