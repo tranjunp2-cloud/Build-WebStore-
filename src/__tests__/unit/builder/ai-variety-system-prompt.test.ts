@@ -20,6 +20,7 @@ vi.mock('@/blocks/registry', () => ({
 
 import { buildSystemPrompt, buildUserPrompt } from '@/lib/ai/system-prompt'
 import { THEME_MOODS } from '@/lib/ai/theme-moods'
+import { CATEGORY_RECIPES } from '@/lib/ai/category-recipes'
 
 const businessInfo = {
   businessName: 'Nasi Kandar Pelita',
@@ -138,8 +139,16 @@ describe('buildSystemPrompt — design quality rules', () => {
     expect(prompt).toContain('Anti-Patterns')
   })
 
-  it('should not contain legacy composition hint (replaced by RHYTHM recipes)', () => {
+  it('should not contain legacy composition hint without recipe', () => {
     const prompt = buildUserPrompt(businessInfo)
     expect(prompt).not.toContain('Suggested block composition')
+  })
+
+  it('should contain RHYTHM section when recipe is provided', () => {
+    const recipe = CATEGORY_RECIPES.restaurant[0]!
+    const prompt = buildUserPrompt(businessInfo, { recipe })
+    expect(prompt).toContain('RHYTHM:')
+    expect(prompt).toContain(recipe.label)
+    expect(prompt).toContain(recipe.blocks.join(' → '))
   })
 })
