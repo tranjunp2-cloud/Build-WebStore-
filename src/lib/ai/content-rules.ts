@@ -61,6 +61,8 @@ export const CONTENT_RULES = {
 /**
  * Substrings flagged as "AI slop" — generic filler copy produced when the
  * model has nothing specific to say. Matched case-insensitively.
+ *
+ * STRONG signals — any single match flags the content as generic.
  */
 export const BLOCKED_CONTENT: ReadonlyArray<string> = [
     'welcome to our website',
@@ -71,6 +73,49 @@ export const BLOCKED_CONTENT: ReadonlyArray<string> = [
     'quality service guaranteed',
     'we are the best',
     'the best in the business',
+] as const
+
+/**
+ * Plan 260415 Phase 04 — weak generic phrase signals. Each individual phrase
+ * is not definitive (AI sometimes emits them for legitimate category-fitting
+ * content), but TWO OR MORE matches in the same block indicate generic slop.
+ *
+ * Used by `isGenericContent()` to decide whether to swap AI output for
+ * curated composer content.
+ */
+export const GENERIC_PHRASE_BLACKLIST: ReadonlyArray<string> = [
+    'quality service',
+    'exceptional quality',
+    'exceptional service',
+    'premium experience',
+    'premium service',
+    'industry-leading',
+    'industry leading',
+    'cutting-edge',
+    'cutting edge',
+    'world-class',
+    'world class',
+    'dedicated team',
+    'passionate about',
+    'delivering great',
+    'committed to excellence',
+    'your success is our priority',
+    'serving customers since',
+    'fast response',
+    'fast turnaround',
+    'quick turnaround',
+    'happy customers',
+    'satisfied customers',
+    'trusted by',
+    'at our business',
+    'at our company',
+    'exceptional care',
+    'every interaction',
+    'every customer',
+    'our mission is',
+    'we strive to',
+    'we specialise in',
+    'we specialize in',
 ] as const
 
 // ── Multi-language Blocked CTA Labels ───────────────────────────────────────
@@ -166,10 +211,130 @@ function countChars(text: unknown): number {
     return [...text].length
 }
 
-function isBlockedCopy(text: unknown): boolean {
+export function isBlockedCopy(text: unknown): boolean {
     if (typeof text !== 'string') return false
     const lower = text.toLowerCase()
     return BLOCKED_CONTENT.some((phrase) => lower.includes(phrase))
+}
+
+// ── Plan 260415 Phase 04 — Generic content detection for post-AI swap ────
+
+/**
+ * Extract every visible text field from a block for content analysis. Walks
+ * top-level string props + nested array items (features, testimonials, faqs,
+ * plans, members, services). Returns a single lowercased string.
+ */
+export function extractBlockText(block: Record<string, unknown>): string {
+    const parts: string[] = []
+    const PRIMARY_FIELDS = [
+        'headline',
+        'subheadline',
+        'subtext',
+        'body',
+        'description',
+        'tagline',
+        'sectionLabel',
+        'tagline',
+        'title',
+    ]
+    for (const field of PRIMARY_FIELDS) {
+        const val = block[field]
+        if (typeof val === 'string') parts.push(val)
+    }
+
+    const ARRAY_FIELDS = [
+        'features',
+        'testimonials',
+        'faqs',
+        'plans',
+        'members',
+        'services',
+        'stats',
+        'items',
+    ] as const
+    for (const field of ARRAY_FIELDS) {
+        const arr = block[field]
+        if (!Array.isArray(arr)) continue
+        for (const item of arr) {
+            if (!item || typeof item !== 'object') continue
+            const obj = item as Record<string, unknown>
+            for (const k of ['title', 'name', 'text', 'description', 'quote', 'question', 'answer', 'bio', 'role', 'label', 'value']) {
+                const val = obj[k]
+                if (typeof val === 'string') parts.push(val)
+            }
+        }
+    }
+    return parts.join(' \n ').toLowerCase()
+}
+
+/**
+ * Check whether a block's text references user-supplied business identifiers
+ * (name, products, services). When true, block should NOT be swapped — AI
+ * correctly wove user data in and composer replacement would destroy it.
+ */
+export function hasUserDataReference(
+    block: Record<string, unknown>,
+    biz: { name?: string; products?: string[]; services?: string[] } | undefined,
+): boolean {
+    if (!biz) return false
+    const text = extractBlockText(block)
+    if (text.length === 0) return false
+
+    const needles: string[] = []
+    if (biz.name && biz.name.trim().length >= 3) {
+        needles.push(biz.name.trim().toLowerCase())
+    }
+    for (const p of biz.products ?? []) {
+        if (typeof p === 'string' && p.trim().length >= 3) {
+            needles.push(p.trim().toLowerCase())
+        }
+    }
+    for (const s of biz.services ?? []) {
+        if (typeof s === 'string' && s.trim().length >= 3) {
+            needles.push(s.trim().toLowerCase())
+        }
+    }
+    return needles.some((n) => text.includes(n))
+}
+
+/**
+ * Decide whether a block's content is generic AI slop that should be swapped
+ * for curated composer output. Two-tier detection:
+ *
+ *   1. STRONG — any BLOCKED_CONTENT phrase → generic (single match is enough).
+ *   2. WEAK — ≥2 GENERIC_PHRASE_BLACKLIST matches → generic.
+ *
+ * Returns an object with `generic: boolean` + diagnostic fields for telemetry.
+ */
+export function isGenericContent(block: Record<string, unknown>): {
+    generic: boolean
+    reason: string | null
+    matchedPhrases: string[]
+} {
+    const text = extractBlockText(block)
+    if (text.length === 0) {
+        return { generic: false, reason: null, matchedPhrases: [] }
+    }
+
+    const strongHits = BLOCKED_CONTENT.filter((phrase) => text.includes(phrase))
+    if (strongHits.length > 0) {
+        return {
+            generic: true,
+            reason: 'strong-blocked-phrase',
+            matchedPhrases: strongHits.slice(),
+        }
+    }
+
+    const weakHits = GENERIC_PHRASE_BLACKLIST.filter((phrase) => text.includes(phrase))
+    if (weakHits.length >= 2) {
+        return {
+            generic: true,
+            reason: 'multi-weak-phrase',
+            matchedPhrases: weakHits.slice(),
+        }
+    }
+
+    return { generic: false, reason: null, matchedPhrases: weakHits.slice() }
 }
 
 function isBlockedCTALabel(label: unknown, lang: ContentLang): boolean {
