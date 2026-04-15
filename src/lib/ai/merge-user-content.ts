@@ -8,6 +8,7 @@ const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
 
 // All allowed fields per block type (from Pages.ts Payload schema)
 export const PAGES_FIELDS: Record<string, string[]> = {
+    // Core blocks
     hero: ['variant', 'headline', 'subheadline', 'videoUrl'],
     navigation: ['style', 'logoText', 'links'],
     about: ['layout', 'sectionLabel', 'headline', 'body'],
@@ -22,6 +23,27 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     team: ['headline'],
     socialWidget: ['variant', 'headline', 'links'],
     cartWidget: ['variant', 'label', 'showLabel'],
+    // AI-generated / Block Library blocks (must be here for content merge during template switch)
+    cta: ['variant', 'headline', 'subheadline', 'ctaLabel', 'ctaUrl', 'ctaStyle'],
+    newsletter: ['variant', 'headline', 'subheadline', 'buttonLabel', 'placeholder'],
+    video: ['variant', 'headline', 'subheadline', 'videoUrl', 'posterImage'],
+    'logo-cloud': ['variant', 'headline', 'logos'],
+    'products-grid': ['variant', 'headline', 'subheadline', 'limit', 'category'],
+    'products-featured': ['variant', 'headline', 'subheadline'],
+    'service-cards': ['variant', 'headline', 'subheadline', 'services'],
+    carousel: ['variant', 'headline', 'autoplay', 'interval', 'items'],
+    'step-process': ['variant', 'headline', 'subheadline', 'steps'],
+    divider: ['variant', 'height', 'color'],
+    'announcement-bar': ['variant', 'message', 'linkText', 'linkUrl', 'dismissible', 'backgroundColor'],
+    'whatsapp-button': ['variant', 'phoneNumber', 'message', 'label', 'position'],
+    'menu-food': ['variant', 'headline', 'categories'],
+    'social-proof': ['variant', 'headline', 'reviews'],
+    'portfolio-grid': ['variant', 'headline', 'subheadline', 'projects'],
+    'google-maps': ['variant', 'headline', 'embedUrl', 'address', 'height'],
+    accordion: ['variant', 'headline', 'description', 'items'],
+    'countdown-timer': ['variant', 'headline', 'targetDate', 'expiredMessage', 'showDays', 'showHours', 'showMinutes', 'showSeconds'],
+    'custom-html': ['html'],
+    'blog-list': ['variant', 'headline', 'subheadline', 'limit'],
 }
 
 // Content fields per block type = PAGES_FIELDS minus structural fields
@@ -37,10 +59,25 @@ for (const [bt, fields] of Object.entries(PAGES_FIELDS)) {
  * take structural fields (variant/layout) from template,
  * take content fields (headline, body, etc.) from user's existing block.
  */
+export type MergeResult = {
+    mergedBlocks: Record<string, unknown>[]
+    unmatchedUserBlocks: Record<string, unknown>[]
+}
+
 export function mergeUserContent(
     templateBlocks: Record<string, unknown>[],
     existingBlocks: Record<string, unknown>[],
-): Record<string, unknown>[] {
+): Record<string, unknown>[]
+export function mergeUserContent(
+    templateBlocks: Record<string, unknown>[],
+    existingBlocks: Record<string, unknown>[],
+    options: { returnDetails: true },
+): MergeResult
+export function mergeUserContent(
+    templateBlocks: Record<string, unknown>[],
+    existingBlocks: Record<string, unknown>[],
+    options?: { returnDetails: boolean },
+): Record<string, unknown>[] | MergeResult {
     // Group existing blocks by blockType (preserve order for multiple same-type blocks)
     const existingByType: Record<string, Record<string, unknown>[]> = {}
     for (const block of existingBlocks) {
@@ -52,7 +89,7 @@ export function mergeUserContent(
     // Track usage index per blockType to handle multiple blocks of same type
     const usageIndex: Record<string, number> = {}
 
-    return templateBlocks.map(templateBlock => {
+    const mergedBlocks = templateBlocks.map(templateBlock => {
         const bt = templateBlock.blockType as string
         if (!bt) return templateBlock
 
@@ -76,4 +113,26 @@ export function mergeUserContent(
         }
         return merged
     })
+
+    if (!options?.returnDetails) return mergedBlocks
+
+    // Compute unmatched user blocks: blocks with types not in template, or extras beyond template count
+    const templateTypeCounts: Record<string, number> = {}
+    for (const tb of templateBlocks) {
+        const bt = tb.blockType as string
+        if (bt) templateTypeCounts[bt] = (templateTypeCounts[bt] || 0) + 1
+    }
+
+    const unmatchedUserBlocks: Record<string, unknown>[] = []
+    const existingCounts: Record<string, number> = {}
+    for (const eb of existingBlocks) {
+        const bt = eb.blockType as string
+        if (!bt || bt === 'navigation' || bt === 'footer') continue
+        existingCounts[bt] = (existingCounts[bt] || 0) + 1
+        if (!templateTypeCounts[bt] || existingCounts[bt] > templateTypeCounts[bt]) {
+            unmatchedUserBlocks.push(eb)
+        }
+    }
+
+    return { mergedBlocks, unmatchedUserBlocks }
 }

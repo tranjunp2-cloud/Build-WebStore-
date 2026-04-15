@@ -10,20 +10,24 @@ import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { mergeUserContent } from '@/lib/ai/merge-user-content'
 
 /** Recursively strip Payload system fields so Payload creates fresh records.
- *  Also normalizes populated relationship fields (objects with `id`) back to just the ID,
- *  which Payload expects for relationship/upload fields like image_id, background_image_id. */
+ *  Also normalizes populated relationship fields (objects with `id` + `url`/`filename`)
+ *  back to just the numeric ID, which Payload expects for upload/relationship fields. */
 const STRIP_KEYS = new Set(['id', '_order', '_parent_id', '_path', '_uuid', 'createdAt', 'updatedAt'])
-const RELATIONSHIP_FIELDS = new Set(['image', 'backgroundImage', 'background_image', 'qrImage'])
 function stripSystemFields(obj: unknown): unknown {
     if (Array.isArray(obj)) return obj.map(stripSystemFields)
     if (obj && typeof obj === 'object') {
+        const record = obj as Record<string, unknown>
         const result: Record<string, unknown> = {}
-        for (const [key, val] of Object.entries(obj)) {
+        for (const [key, val] of Object.entries(record)) {
             if (STRIP_KEYS.has(key)) continue
-            // Normalize populated relationship fields → just the ID
-            if (RELATIONSHIP_FIELDS.has(key) && val && typeof val === 'object' && 'id' in val) {
-                result[key] = (val as Record<string, unknown>).id
-                continue
+            // Detect populated relationship/upload objects: { id: number, url: string, ... }
+            // Normalize to just the ID so Payload accepts it
+            if (val && typeof val === 'object' && !Array.isArray(val)) {
+                const nested = val as Record<string, unknown>
+                if (typeof nested.id === 'number' && (nested.url || nested.filename || nested.mimeType)) {
+                    result[key] = nested.id
+                    continue
+                }
             }
             result[key] = stripSystemFields(val)
         }
@@ -145,9 +149,17 @@ export const POST = withAuth(async (user, req) => {
         // Only 14 block types have DB tables. Each has specific field names + enum values.
 
         const PAGES_BLOCK_WHITELIST = new Set([
+            // Core blocks
             'navigation', 'hero', 'about', 'features', 'testimonials',
             'contact', 'gallery', 'footer', 'stats', 'pricing',
             'faq', 'team', 'socialWidget', 'cartWidget',
+            // AI-generated / Block Library blocks
+            'cta', 'newsletter', 'video', 'logo-cloud', 'products-grid',
+            'products-featured', 'service-cards', 'carousel', 'step-process',
+            'divider', 'announcement-bar', 'whatsapp-button', 'menu-food',
+            'social-proof', 'portfolio-grid', 'google-maps', 'accordion',
+            'countdown-timer', 'custom-html', 'blog-list',
+            'breadcrumb', 'client-logos',
         ])
 
         // Pages.ts schema per block: which field holds variant, what values are valid
@@ -264,19 +276,34 @@ export const POST = withAuth(async (user, req) => {
 
         const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
         // Pick only valid theme fields — Payload select fields reject unknown values
-        const VALID_HEADING_FONTS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
-        const VALID_BODY_FONTS = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
-        const VALID_COLOR_MODES = ['light', 'dark']
+        const VALID_HEADING_FONTS = new Set(['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway', 'Plus Jakarta Sans'])
+        const VALID_BODY_FONTS = new Set(['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito', 'Poppins', 'Plus Jakarta Sans'])
+        const VALID_COLOR_MODES = new Set(['light', 'dark'])
+        const VALID_BORDER_RADIUS = new Set(['sharp', 'subtle', 'rounded', 'soft', 'pill'])
+        const VALID_SPACING = new Set(['compact', 'default', 'relaxed'])
+        const VALID_SHADOW = new Set(['none', 'subtle', 'medium', 'dramatic'])
         const rawHeading = String(rawTheme.fontHeading || '')
         const rawBody = String(rawTheme.fontBody || '')
         const rawColorMode = String(rawTheme.colorMode || '')
-        const templateTheme = {
+        const templateTheme: Record<string, unknown> = {
             primaryColor: String(rawTheme.primaryColor || '#0ea5e9'),
             secondaryColor: String(rawTheme.secondaryColor || '#d946ef'),
-            fontHeading: VALID_HEADING_FONTS.includes(rawHeading) ? rawHeading : 'Outfit',
-            fontBody: VALID_BODY_FONTS.includes(rawBody) ? rawBody : 'Inter',
-            colorMode: VALID_COLOR_MODES.includes(rawColorMode) ? rawColorMode : 'dark',
+            fontHeading: VALID_HEADING_FONTS.has(rawHeading) ? rawHeading : 'Outfit',
+            fontBody: VALID_BODY_FONTS.has(rawBody) ? rawBody : 'Inter',
+            colorMode: VALID_COLOR_MODES.has(rawColorMode) ? rawColorMode : 'dark',
         }
+        // Include optional theme fields if template defines them
+        if (rawTheme.backgroundColor) templateTheme.backgroundColor = String(rawTheme.backgroundColor)
+        if (rawTheme.accentColor) templateTheme.accentColor = String(rawTheme.accentColor)
+        if (rawTheme.surfaceColor) templateTheme.surfaceColor = String(rawTheme.surfaceColor)
+        if (rawTheme.textColor) templateTheme.textColor = String(rawTheme.textColor)
+        if (rawTheme.mutedColor) templateTheme.mutedColor = String(rawTheme.mutedColor)
+        const rawBorderRadius = String(rawTheme.borderRadius || '')
+        if (VALID_BORDER_RADIUS.has(rawBorderRadius)) templateTheme.borderRadius = rawBorderRadius
+        const rawSpacing = String(rawTheme.spacingPreset || '')
+        if (VALID_SPACING.has(rawSpacing)) templateTheme.spacingPreset = rawSpacing
+        const rawShadow = String(rawTheme.shadowPreset || '')
+        if (VALID_SHADOW.has(rawShadow)) templateTheme.shadowPreset = rawShadow
 
         // === APPLY TO EXISTING SITE (multi-page + transaction) ===
         if (siteId) {
@@ -307,16 +334,44 @@ export const POST = withAuth(async (user, req) => {
                 : blocks
             const sanitizedTemplateBlocks = sanitizeBlocks(templateBlockList)
 
-            // Extract variant/style per blockType from template (first match wins)
+            // Extract structural + visual fields per blockType from template (first match wins)
+            // These fields define the template's look — user content (headlines, text, images) is preserved
+            const TEMPLATE_FIELDS = [
+                'variant', 'layout', 'style',           // structural
+                'badge',                                  // hero badge config
+                'showSocialLinks', 'showMap',             // toggle features
+            ]
             const templateVariantMap: Record<string, Record<string, unknown>> = {}
             for (const tb of sanitizedTemplateBlocks) {
                 const bt = tb.blockType as string
                 if (!bt || templateVariantMap[bt]) continue
                 const structural: Record<string, unknown> = {}
-                for (const field of ['variant', 'layout', 'style']) {
+                for (const field of TEMPLATE_FIELDS) {
                     if (tb[field] !== undefined) structural[field] = tb[field]
                 }
                 templateVariantMap[bt] = structural
+            }
+
+            // Track unmatched blocks across all pages for notification
+            const allUnmatchedBlocks: Record<string, unknown>[] = []
+
+            // 2. Fetch existing pages + snapshot for rollback (BR-06)
+            // MUST use draft: true — editor saves blocks as drafts,
+            // reading published version would miss user's latest edits
+            const existingPages = await payload.find({
+                collection: 'pages',
+                where: { site: { equals: Number(siteId) } },
+                limit: 100,
+                depth: 0,
+                draft: true,
+            })
+
+            const rollbackData = {
+                theme: existingSite.theme,
+                pages: existingPages.docs.map((page) => ({
+                    id: page.id,
+                    layout: (page as Record<string, unknown>).layout,
+                })),
             }
 
             // Mark as re-skinning
@@ -326,52 +381,119 @@ export const POST = withAuth(async (user, req) => {
                 data: { generationStatus: 'generating' },
             })
 
-            // 1. Update site theme only
-            await payload.update({
-                collection: 'sites',
-                id: Number(siteId),
-                data: { theme: templateTheme },
-            })
-
-            // 2. Re-skin existing pages: keep all pages, blocks, and content
-            //    Only change variant/style/layout per block from template
-            const existingPages = await payload.find({
-                collection: 'pages',
-                where: { site: { equals: Number(siteId) } },
-                limit: 100,
-            })
-
-            for (const page of existingPages.docs) {
-                const pageData = page as Record<string, unknown>
-                const currentBlocks = (pageData.layout as Record<string, unknown>[]) || []
-                if (currentBlocks.length === 0) continue
-
-                // Re-skin each block: apply template variant, keep all user content
-                const reskinned = currentBlocks.map(block => {
-                    const bt = block.blockType as string
-                    if (!bt) return block
-
-                    const templateVariant = templateVariantMap[bt]
-                    if (!templateVariant || Object.keys(templateVariant).length === 0) return block
-
-                    // Only overwrite structural fields (variant/layout/style)
-                    return { ...block, ...templateVariant }
-                })
-
+            try {
+                // 1. Update site theme only
                 await payload.update({
-                    collection: 'pages',
-                    id: page.id,
-                    data: { layout: stripSystemFields(reskinned) as Record<string, unknown>[] },
+                    collection: 'sites',
+                    id: Number(siteId),
+                    data: { theme: templateTheme },
                 })
-                _createdPagesCount++
-            }
 
-            // 3. Mark completed
-            await payload.update({
-                collection: 'sites',
-                id: Number(siteId),
-                data: { generationStatus: 'completed' },
-            })
+                // Template has blocks for homepage only — sanitize them
+                const templateBlocksClean = sanitizeBlocks(
+                    templatePages?.length
+                        ? (templatePages.flatMap(p => (p.layout as Record<string, unknown>[]) || []))
+                        : blocks
+                )
+
+                // 2. Smart Mapping: replace layout with template blocks, map user content
+                //    PRD F07 US-F07-05: "mapping nội dung hiện tại sang block tương ứng của template mới"
+                for (const page of existingPages.docs) {
+                    const pageData = page as Record<string, unknown>
+                    const currentBlocks = (pageData.layout as Record<string, unknown>[]) || []
+                    if (currentBlocks.length === 0) continue
+
+                    const isHomepage = Boolean(pageData.isHomepage)
+
+                    let newLayout: Record<string, unknown>[]
+
+                    if (isHomepage && templateBlocksClean.length > 0) {
+                        // HOMEPAGE: Smart Mapping — replace layout with template blocks,
+                        // merge user content into matching blockTypes
+                        const { mergedBlocks: merged, unmatchedUserBlocks } = mergeUserContent(
+                            templateBlocksClean, currentBlocks, { returnDetails: true }
+                        )
+
+                        // Track unmatched blocks for notification (FR-05)
+                        if (unmatchedUserBlocks.length > 0) {
+                            allUnmatchedBlocks.push(...unmatchedUserBlocks)
+                        }
+
+                        // Insert unmatched blocks before footer (PRD AC-2: don't lose content)
+                        const footerIdx = merged.findIndex(b => b.blockType === 'footer')
+                        if (footerIdx !== -1 && unmatchedUserBlocks.length > 0) {
+                            merged.splice(footerIdx, 0, ...unmatchedUserBlocks)
+                        } else if (unmatchedUserBlocks.length > 0) {
+                            merged.push(...unmatchedUserBlocks)
+                        }
+
+                        newLayout = merged
+                    } else {
+                        // SUBPAGES: Re-skin only — keep all blocks, overlay template variant
+                        newLayout = currentBlocks.map(block => {
+                            const bt = block.blockType as string
+                            if (!bt) return block
+                            const templateVariant = templateVariantMap[bt]
+                            if (!templateVariant || Object.keys(templateVariant).length === 0) return block
+                            const cleanVariant = stripSystemFields(templateVariant) as Record<string, unknown>
+                            return { ...block, ...cleanVariant }
+                        })
+                    }
+
+                    // Ensure footer is always last
+                    const footerIdx = newLayout.findIndex(b => b.blockType === 'footer')
+                    if (footerIdx !== -1 && footerIdx < newLayout.length - 1) {
+                        const footer = newLayout.splice(footerIdx, 1)[0]
+                        newLayout.push(footer)
+                    }
+
+                    // Strip system fields — Payload rejects 'id' in layout block data
+                    const cleanLayout = stripSystemFields(newLayout) as Record<string, unknown>[]
+
+
+                    await payload.update({
+                        collection: 'pages',
+                        id: page.id,
+                        data: { layout: cleanLayout },
+                    })
+                    _createdPagesCount++
+                }
+
+                // 3. Mark completed
+                await payload.update({
+                    collection: 'sites',
+                    id: Number(siteId),
+                    data: { generationStatus: 'completed' },
+                })
+            } catch (applyError) {
+                // ROLLBACK (BR-06): restore previous theme + page layouts
+                console.error('[Apply Template] Mutation failed, rolling back:', applyError)
+                try {
+                    await payload.update({
+                        collection: 'sites',
+                        id: Number(siteId),
+                        data: { theme: rollbackData.theme, generationStatus: 'completed' } as Record<string, unknown>,
+                    })
+                    for (const page of rollbackData.pages) {
+                        await payload.update({
+                            collection: 'pages',
+                            id: page.id,
+                            data: { layout: page.layout } as Record<string, unknown>,
+                        })
+                    }
+                } catch (rollbackError) {
+                    console.error('[Apply Template] Rollback also failed:', rollbackError)
+                    await payload.update({
+                        collection: 'sites',
+                        id: Number(siteId),
+                        data: { generationStatus: 'failed' },
+                    }).catch(() => {})
+                }
+                return NextResponse.json(
+                    { error: 'Failed to apply template. Your previous content has been restored.' },
+                    { status: 500 }
+                )
+            }
 
             // 5. Increment template usage count
             await payload.update({
@@ -387,6 +509,9 @@ export const POST = withAuth(async (user, req) => {
                 templateName: template.name,
                 pagesUpdated: _createdPagesCount,
                 applied: true,
+                unmatchedBlocks: allUnmatchedBlocks.length > 0
+                    ? [...new Set(allUnmatchedBlocks.map(b => b.blockType as string))]
+                    : undefined,
             })
         }
 

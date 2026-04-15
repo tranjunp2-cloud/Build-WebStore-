@@ -25,14 +25,21 @@ const CATEGORIES = [
     { value: 'travel', label: 'Travel' },
 ]
 
+export interface TemplateApplyResult {
+    templateName: string
+    siteId: string | number
+    unmatchedBlocks?: string[]
+}
+
 interface EditorTemplateModalProps {
     isOpen: boolean
     onClose: () => void
     siteId: string
-    onApplied: () => void
+    onBeforeApply?: () => Promise<void>
+    onApplied: (result: TemplateApplyResult) => void
 }
 
-export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: EditorTemplateModalProps) {
+export function EditorTemplateModal({ isOpen, onClose, siteId, onBeforeApply, onApplied }: EditorTemplateModalProps) {
     const [templates, setTemplates] = useState<Template[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [searchInput, setSearchInput] = useState('')
@@ -121,6 +128,9 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
         setIsApplying(confirmTemplate.id)
 
         try {
+            // Save unsaved changes before applying template
+            if (onBeforeApply) await onBeforeApply()
+
             const res = await fetch('/api/ai/apply-template', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -139,9 +149,13 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                 throw new Error(errMsg)
             }
 
-            toast.success(`Template "${confirmTemplate.name}" applied!`)
+            const data = await res.json().catch(() => ({}))
             setConfirmTemplate(null)
-            onApplied()
+            onApplied({
+                templateName: confirmTemplate.name,
+                siteId: data.siteId ?? siteId,
+                unmatchedBlocks: data.unmatchedBlocks,
+            })
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to apply template'
             toast.error('Failed to apply template', { description: message })

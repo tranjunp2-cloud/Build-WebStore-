@@ -17,7 +17,8 @@ import type { AIAction } from '@/types/editor'
 import { useI18n } from '@/i18n'
 import { PrePublishModal } from '@/components/editor/PrePublishModal'
 import { UnpublishModal } from '@/components/editor/UnpublishModal'
-import { EditorTemplateModal } from '@/components/editor/EditorTemplateModal'
+import { EditorTemplateModal, type TemplateApplyResult } from '@/components/editor/EditorTemplateModal'
+import { cn } from '@/lib/utils'
 
 type SiteData = {
     id: string
@@ -96,6 +97,9 @@ export default function EditorPage() {
     const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
     const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false)
     const [settingsRequestedTab, setSettingsRequestedTab] = useState<{ tab: SettingsTab; key: number } | null>(null)
+    const [isTransitioning, setIsTransitioning] = useState(false)
+    const [templateApplied, setTemplateApplied] = useState(false)
+    const [showSaveGuard, setShowSaveGuard] = useState(false)
 
     const blocks = useEditorStore(state => state.blocks)
     const theme = useEditorStore(state => state.theme)
@@ -314,14 +318,15 @@ export default function EditorPage() {
     }, [markSaved, page, setIsSaving, siteId])
 
     useEffect(() => {
-        if (!siteId || !hasUnsavedChanges || !autoSaveEnabled) return
+        // Pause auto-save while template was just applied (user must confirm save first)
+        if (!siteId || !hasUnsavedChanges || !autoSaveEnabled || templateApplied) return
 
         const timer = window.setTimeout(() => {
             void handleSave({ showToast: false, refreshPreview: true })
         }, autoSaveIntervalMs)
 
         return () => window.clearTimeout(timer)
-    }, [autoSaveEnabled, autoSaveIntervalMs, handleSave, hasUnsavedChanges, siteId])
+    }, [autoSaveEnabled, autoSaveIntervalMs, handleSave, hasUnsavedChanges, siteId, templateApplied])
 
     // Warn user before leaving page with unsaved changes
     useEffect(() => {
@@ -361,7 +366,11 @@ export default function EditorPage() {
 
             if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
                 e.preventDefault()
-                void handleSave()
+                if (templateApplied) {
+                    setShowSaveGuard(true)
+                } else {
+                    void handleSave()
+                }
             }
         }
 
@@ -576,6 +585,8 @@ export default function EditorPage() {
         if (!canUndo()) return
         undo()
         setIframeKey(key => key + 1)
+        // If user undoes the template apply, clear the save guard
+        setTemplateApplied(false)
     }, [canUndo, undo])
 
     const handleRedo = useCallback(() => {
@@ -850,7 +861,13 @@ export default function EditorPage() {
                 onPageSelected={handlePageSelected}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
-                onSave={() => void handleSave()}
+                onSave={() => {
+                    if (templateApplied) {
+                        setShowSaveGuard(true)
+                    } else {
+                        void handleSave()
+                    }
+                }}
                 onPublish={() => setIsPublishModalOpen(true)}
                 onRepublish={handleRepublish}
                 onUnpublish={() => setIsUnpublishModalOpen(true)}
@@ -947,7 +964,7 @@ export default function EditorPage() {
                         {sidebarContent}
                     </EditorSidebar>
 
-                    <div className="flex flex-1 flex-col">
+                    <div className={cn("flex flex-1 flex-col transition-opacity duration-300", isTransitioning && "opacity-0")}>
                         <PreviewFrame
                             siteId={siteId}
                             pageId={currentPageId}
@@ -1017,12 +1034,107 @@ export default function EditorPage() {
                 isOpen={isTemplateModalOpen}
                 onClose={() => setIsTemplateModalOpen(false)}
                 siteId={siteId}
-                onApplied={() => {
+                onBeforeApply={async () => {
+                    // ALWAYS force-save before template apply — draft/published version
+                    // mismatch means hasUnsavedChanges can be stale
+                    await handleSave({ showToast: false, refreshPreview: false })
+                }}
+                onApplied={async ({ templateName, unmatchedBlocks }: TemplateApplyResult) => {
                     setIsTemplateModalOpen(false)
-                    // Reload editor with new template data
-                    window.location.reload()
+                    setIsTransitioning(true)
+
+                    try {
+                        // Re-fetch fresh data from DB (template already applied by API)
+                        const editorUrl = new URL(`/api/sites/${siteId}/editor-data`, window.location.origin)
+                        if (currentPageId) editorUrl.searchParams.set('pageId', currentPageId)
+                        const res = await fetch(editorUrl.toString(), { credentials: 'include' })
+                        if (!res.ok) throw new Error('Failed to reload editor data')
+                        const data = await res.json()
+
+                        // Push as single undoable batch (existing history preserved for Ctrl+Z)
+                        const store = useEditorStore.getState()
+                        store.pushBatch(
+                            data.page?.layout || [],
+                            data.site?.theme || {},
+                            `Apply template: ${templateName}`
+                        )
+
+                        // Update header/footer
+                        if (data.site?.headerBlock) store.updateHeaderBlock(data.site.headerBlock)
+                        if (data.site?.footerBlock) store.updateFooterBlock(data.site.footerBlock)
+
+                        // Update local site state
+                        if (data.site) setSite(data.site)
+
+                        // Mark template as just applied (for save guard)
+                        setTemplateApplied(true)
+
+                        // Refresh preview iframe
+                        setIframeKey(prev => prev + 1)
+
+                        // Show unmatched block notification (Phase 3)
+                        if (unmatchedBlocks && unmatchedBlocks.length > 0) {
+                            const types = unmatchedBlocks.join(', ')
+                            toast.info(
+                                `${unmatchedBlocks.length} section(s) (${types}) had no match in the new template and were placed before the footer.`,
+                                { duration: 6000 }
+                            )
+                        }
+
+                        toast.success(`Template "${templateName}" applied! Press Ctrl+Z to undo.`)
+                    } catch (err) {
+                        const message = err instanceof Error ? err.message : 'Failed to refresh editor'
+                        toast.error('Template applied but editor refresh failed', { description: message })
+                        window.location.reload()
+                    } finally {
+                        setTimeout(() => setIsTransitioning(false), 300)
+                    }
                 }}
             />
+
+            {/* Save guard modal — warns user that saving after template apply is permanent */}
+            {showSaveGuard && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setShowSaveGuard(false)}
+                    />
+                    <div
+                        className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1120] p-6"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="mb-4 flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-white">Save Template Changes?</h3>
+                                <p className="mt-1 text-sm text-gray-400">
+                                    Changes will be saved permanently. You will not be able to undo the template change after saving.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setShowSaveGuard(false)}
+                                className="rounded-lg bg-white/5 px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/10"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setShowSaveGuard(false)
+                                    setTemplateApplied(false)
+                                    await handleSave({ showToast: true, refreshPreview: true })
+                                }}
+                                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-500"
+                            >
+                                Confirm Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
