@@ -16,6 +16,8 @@ import {
     getCategoryRequirement,
     ITEM_FIELD_BY_BLOCK,
     NAV_VARIANT_BY_CATEGORY,
+    CONTACT_VARIANT_BY_CATEGORY,
+    FOOTER_VARIANT_BY_CATEGORY,
     type CategoryRequirement,
 } from './category-requirements'
 import { buildBlockFromLibrary, padItems, type InjectionContext } from './content-injection'
@@ -218,6 +220,11 @@ export function enforceMinimumStructure(
             return ai - bi
         })
 
+        // Plan 260415 — rotate contact + footer variants AFTER recipe
+        // injection so freshly injected blocks also pick up the category-
+        // seeded variant instead of the library hardcoded default.
+        applyStructuralVariantRotation(out, category, ctx.seed ?? 0)
+
         return out
     }
 
@@ -253,7 +260,43 @@ export function enforceMinimumStructure(
         console.info(`[Structure Enforcer] padded recommended "${next}" to reach minBlocks=${req.minBlocks}`)
     }
 
+    // Plan 260415 — legacy path also rotates contact + footer variants
+    // against the category pool on the way out.
+    applyStructuralVariantRotation(out, category, ctx.seed ?? 0)
+
     return out
+}
+
+/**
+ * Plan 260415 — rotate contact + footer block variants against the curated
+ * per-category pool using the same seeded-shuffle approach as nav rotation.
+ * Mutates blocks in place. Shared helper so the recipe + legacy paths both
+ * apply the rotation on their final block list.
+ */
+function applyStructuralVariantRotation(out: Block[], category: string, seed: number): void {
+    const contactPool = CONTACT_VARIANT_BY_CATEGORY[category]
+    if (contactPool && contactPool.length > 0) {
+        const contactSeed = seed ^ hashString('contact' + category)
+        const preferredContact = seededShufflePick(contactPool, contactSeed) ?? contactPool[0]
+        for (const block of out) {
+            if (block.blockType === 'contact') {
+                block.variant = preferredContact
+                break
+            }
+        }
+    }
+
+    const footerPool = FOOTER_VARIANT_BY_CATEGORY[category]
+    if (footerPool && footerPool.length > 0) {
+        const footerSeed = seed ^ hashString('footer' + category)
+        const preferredFooter = seededShufflePick(footerPool, footerSeed) ?? footerPool[0]
+        for (const block of out) {
+            if (block.blockType === 'footer') {
+                block.variant = preferredFooter
+                break
+            }
+        }
+    }
 }
 
 /**

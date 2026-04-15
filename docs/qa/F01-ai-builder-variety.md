@@ -1281,3 +1281,91 @@ Kill sub-page stubs. Every site ships ≥5 pages: Home / About / Contact / Blog 
 | Phase 06 tests | 39 (seo-generator + consistency-validator) | ✅ |
 | Legacy regression | 22 | ✅ |
 | **Total** | **880+** | ✅ |
+
+## Section 16 — Phase 07 Variety Retrofit (US-F01-13)
+
+> Plan: `plans/260414-2249-ai-gen-wix-level-optimize/phase-07-variety-retrofit.md`
+> Diagnostic repro (pre-fix): 11 same / 2 diff fields across 3 restaurant fixtures at seed=42.
+> Post-fix gate: ≥ 8 of 13 fields differ (TC-F01-W.44).
+
+### Goal
+
+Thread user biz data into the SHARED block-library builder (`buildBlockFromLibrary`)
+and the fallback composer hero (`buildHero`), extend the image pool query to use
+the full top-3 translated products, make `pickRecipe` biz-aware, template the blog
+seeds, and reroute SEO mining so the homepage prefers `biz.description` over the
+enforcer-padded hero subheadline.
+
+### Test Cases (TC-F01-W.43 .. W.50)
+
+| TC | File | Scenario | Status |
+|---|---|---|---|
+| **TC-F01-W.43** | `image-pool.test.ts` | `buildPoolQuery` threads top-3 products, joins with mood imagery, drops duplicates | ✅ (covered by existing W.14/W.15) |
+| **TC-F01-W.44** | `variety-repro.test.ts` | **Gate** — 3 restaurant fixtures @ seed=42 differ on ≥ 8 of 13 fields (hero headline / sub / CTA / features items / about body / home SEO desc / blog first title / contact phone / site name / site SEO) | ✅ |
+| **TC-F01-W.45** | `block-library-biz.test.ts` | `buildBlockFromLibrary` threads `userBiz` into hero / about / features / contact / cta / newsletter / footer; backward-compat when `userBiz` omitted; testimonials + FAQ stay canned | ✅ |
+| **TC-F01-W.46** | `hero-user-data.test.ts` | Composer `buildHero` uses biz.name + description excerpt + mood CTA; 3 fixtures produce 3 distinct headlines; headline ≤ 10 words (C3 rule) | ✅ |
+| **TC-F01-W.47** | `recipe-picker-biz.test.ts` | `pickRecipe(category, seed, { name })` uses djb2(name) ^ seed so 10 names rotate across ≥ 2 recipes; `composeFromBlueprint` reorders homepage blocks per recipe best-effort; backward-compat when biz omitted | ✅ |
+| **TC-F01-W.48** | `block-library-biz.test.ts` | Contact block emits user `phone/email/address` verbatim when provided; features headline includes biz.name | ✅ |
+| **TC-F01-W.49** | `blog-seeds-coverage.test.ts` + `variety-repro.test.ts` | `getBlogSeeds(category, biz?)` substitutes `{business}` / `{product}` placeholders; backward-compat (biz omitted) returns raw strings | ✅ |
+| **TC-F01-W.50** | `seo-generator.test.ts` + `variety-repro.test.ts` | Homepage SEO description prefers `biz.description` over hero subheadline when `biz.description.length > 40`; sub-pages keep legacy mining priority | ✅ |
+
+### Files touched
+
+- `src/lib/ai/content-injection.ts` — `InjectionContext` gains `userBiz?` + `mood?`; `buildBlockFromLibrary` threads biz into hero/about/features/contact/cta/newsletter/footer; new helpers `threadHeroBiz`, `truncateOnWord`, `capWords`, `resolveLibraryCTA`
+- `src/lib/ai/structure-enforcer.ts` — unchanged (ctx already forwarded)
+- `src/lib/ai/openai-generator.ts` — builds `enforcerBizOverride = mapBusinessInfo(businessInfo)` once, passes it + `themeMood` into both enforcer ctx (multi-page + single-page branches) and the SEO override step
+- `src/lib/ai/template-composer.ts` — `buildHero` rewritten to use biz.name + description + mood CTA; `composeFromBlueprint` calls `pickRecipe(category, seed, { name: biz.name })` and applies `reorderSpecsByRecipe` to homepage specs; `getBlogSeeds` now passed `biz`
+- `src/lib/ai/image-pool.ts` — `BuildPoolCtx.products?: string[]` + `buildPoolQuery` joins top-3 products
+- `src/app/api/ai/generate-site/route.ts` — passes `parsedProducts.slice(0, 3)` to `buildImagePool`
+- `src/lib/ai/category-recipes.ts` — `pickRecipe` accepts optional `biz?: { name?: string }`; djb2(biz.name) XOR seed gates the index
+- `src/lib/ai/content/blog-seeds.ts` — a handful of restaurant / ecommerce / fnb seeds gain `{business}` / `{product}` templates; `getBlogSeeds(category, biz?)` substitutes placeholders
+- `src/lib/ai/seo-generator.ts` — `minePageText(page, biz?, isHomepage)` prefers user biz.description on homepage when non-empty + > 40 chars
+
+### New test files
+
+- `src/__tests__/unit/ai/block-library-biz.test.ts` — 15 tests, TC-F01-W.45 + W.48
+- `src/__tests__/unit/ai/hero-user-data.test.ts` — 5 tests, TC-F01-W.46
+- `src/__tests__/unit/ai/recipe-picker-biz.test.ts` — 6 tests, TC-F01-W.47
+- `src/__tests__/unit/ai/variety-repro.test.ts` — 3 tests, TC-F01-W.44 **(gate)**
+
+### Acceptance Criteria
+
+- `variety-repro.test.ts` asserts ≥ 8 of 13 fields differ across the 3 restaurant
+  fixtures at seed=42. Failing this test is a revert trigger.
+- Fallback composer path: hero headline + subheadline + CTA labels all reflect
+  user data when `biz.name` / `biz.description` / `biz.products` are provided.
+- AI happy path: when the enforcer injects blocks to meet `minBlocks`, the
+  injected content references `biz.name` + `biz.products` instead of canned
+  category phrases — because `enforcerCtx.userBiz` now threads through to
+  `buildBlockFromLibrary`.
+- Production `route.ts:generate-site` passes `parsedProducts.slice(0, 3)` into
+  `buildImagePool`; staging gen for 3 different restaurants yields 3 different
+  Unsplash queries.
+- Layout recipes: 3 same-seed `composeFromBlueprint` calls with different
+  `biz.name` emit at least 2 distinct homepage block sequences via `pickRecipe`
+  + `reorderSpecsByRecipe`.
+- Cumulative: 965/965 AI unit tests + 5205/5205 full project unit tests green.
+
+### Risk Notes
+
+- **Recipe reorder is best-effort**, not strict. When a recipe lists blocks the
+  preset blueprint doesn't have (commonly `contact` / `about` — those live on
+  sub-pages in our blueprints), the recipe silently skips those entries and
+  reorders what it can. No block is ever dropped — leftover specs append after
+  the recipe-matched middle. This is the documented "fall back to preset
+  sequence when no compatible recipe exists" pattern from the plan's risk
+  mitigation (Risk 3), loosened from a hard compat gate to best-effort.
+- **Hero headline cap at 10 words** (C3 consistency rule) may truncate very
+  long biz names + tails. The fallback is `biz.heroHeadline` from the canned
+  pool when biz.name is empty.
+- **Blog seed placeholders** default to "our" / "menu" when biz fields are
+  empty — the seeds never ship with visible `{placeholder}` braces.
+
+### Test Summary (cumulative Phase 01 + 02 + 03 + 04 + 05 + 06 + 07)
+
+| Suite | Count | Status |
+|---|---|---|
+| Phase 01-06 carry | 880+ | ✅ |
+| Phase 07 new tests | 29 (15 block-library + 5 hero + 6 recipe + 3 variety-repro) | ✅ |
+| **Total AI suite** | **965** (across 29 files) | ✅ |
+| Full project suite | **5205** (across 264 files) | ✅ |

@@ -581,14 +581,38 @@ export const EXPECTED_RECIPE_COUNT = 42
 // ── Public API ──────────────────────────────────────────────────────────────
 
 /**
+ * djb2 string hash — non-cryptographic, deterministic. Used to derive a
+ * stable per-business seed offset so same-category businesses land on
+ * different recipes at the same caller-supplied seed.
+ */
+function djb2(str: string): number {
+  let h = 5381
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h + str.charCodeAt(i)) | 0
+  }
+  return Math.abs(h)
+}
+
+/**
  * Deterministic recipe selection. Same `(category, seed)` always returns
  * the same recipe so regenerating a site is stable, but different seeds
  * rotate across the 3 recipes.
  *
+ * Plan 07 — accepts an optional third `biz` argument. When `biz.name` is
+ * provided, the effective selection seed becomes `djb2(biz.name) ^ seed`
+ * so two businesses in the same category at the same base seed still land
+ * on different recipes. Backward-compat: omitting `biz` preserves legacy
+ * `seed % 3` semantics.
+ *
  * @param category - category slug (unknown → business fallback)
  * @param seed     - any integer; typically `hashBusinessName(name)`
+ * @param biz      - optional `{ name?: string }` — enables per-business variety
  */
-export function pickRecipe(category: string, seed: number): CategoryRecipe {
+export function pickRecipe(
+  category: string,
+  seed: number,
+  biz?: { name?: string },
+): CategoryRecipe {
   const key = (ALL_RECIPE_CATEGORIES as readonly string[]).includes(category)
     ? (category as RecipeCategory)
     : 'business'
@@ -597,7 +621,9 @@ export function pickRecipe(category: string, seed: number): CategoryRecipe {
     // Should never happen — coverage test asserts 3 per cat.
     return BUSINESS_RECIPES[0]!
   }
-  const index = Math.abs(Math.floor(seed)) % recipes.length
+  const nameHash = biz?.name ? djb2(biz.name) : 0
+  const effectiveSeed = Math.abs(Math.floor(seed)) ^ nameHash
+  const index = effectiveSeed % recipes.length
   return recipes[index]!
 }
 

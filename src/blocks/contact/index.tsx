@@ -246,7 +246,8 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
             <ContactSection>
                 <ContactHeader headline={headline} subtext={subtext} />
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-5xl mx-auto">
+                {/* Plan 260415 — drop inner max-w-5xl; outer CONTACT_CONTAINER already caps at max-w-6xl. */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                     {/* Map + Contact Info */}
                     <div
                         className={`rounded-xl aspect-video lg:aspect-auto flex flex-col items-center justify-center ${CARD_PADDING.lg} overflow-hidden`}
@@ -368,7 +369,8 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
         return (
             <ContactSection>
                 <ContactHeader headline={headline} subtext={subtext} />
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 max-w-5xl mx-auto">
+                {/* Plan 260415 — drop inner max-w-5xl; outer CONTACT_CONTAINER already caps at max-w-6xl. */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                     {/* Form */}
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
                         <ContactForm formFields={formFields} />
@@ -385,18 +387,22 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
     }
 
     // ── Default: form ────────────────────────────────────────────────────
+    // Plan 260415 contact fix: drop the inner `max-w-5xl` (CONTACT_CONTAINER
+    // already caps at max-w-6xl = 1152px, and the nested max-w-5xl was
+    // shrinking the form to ~820px on desktop, leaving huge empty space)
+    // and switch to a 1:2 split so the form column gets ~66% instead of 60%.
     return (
         <ContactSection>
             <ContactHeader headline={headline} subtext={subtext} />
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 max-w-5xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                 {/* Contact Info */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-1 space-y-6">
                     {email && <ContactInfoCard icon={Mail} label="Email" value={email} />}
                     {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} />}
                     {address && <ContactInfoCard icon={MapPin} label="Address" value={address} />}
                 </div>
                 {/* Contact Form */}
-                <div className="lg:col-span-3">
+                <div className="lg:col-span-2">
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
                         <ContactForm formFields={formFields} />
                     </GlassCard>

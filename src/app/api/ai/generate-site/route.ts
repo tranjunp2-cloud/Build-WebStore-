@@ -356,11 +356,15 @@ export async function POST(req: NextRequest) {
                     // before fulfillment so all blocks share the same photographer,
                     // lighting, mood. 1-2 Unsplash calls total (landscape + square)
                     // — replaces 6-8 per-block calls and delivers visual cohesion.
+                    //
+                    // Plan 07 — pass top-3 products so two restaurants whose
+                    // first product collides still produce different queries.
                     const topProduct = parsedProducts[0]
                     const imagePool = await buildImagePool({
                         category: presetCategory,
                         mood: themeMood,
                         topProduct,
+                        products: parsedProducts.slice(0, 3),
                         seed: themeSeed,
                     })
                     console.info(
