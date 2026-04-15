@@ -118,6 +118,10 @@ describe('PreviewScripts', () => {
     })
 
     describe('SET_DROP_HINT message', () => {
+        afterEach(() => {
+            document.getElementById('editor-preview-styles')?.remove()
+        })
+
         it('should update CSS drop hint text when receiving SET_DROP_HINT message', () => {
             // Arrange — inject the style element that PreviewScripts creates
             const style = document.createElement('style')

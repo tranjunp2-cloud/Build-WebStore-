@@ -305,7 +305,7 @@ export default function EditorPage() {
             window.setTimeout(() => setSaveSuccess(false), 2000)
             return true
         } catch (err) {
-            console.error('[Editor] Save failed:', err)
+            if (process.env.NODE_ENV === 'development') console.error('[Editor] Save failed:', err)
             toast.error(t.editor.toast.saveFailed)
             return false
         } finally {
@@ -642,7 +642,7 @@ export default function EditorPage() {
 
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
-            console.error('[Editor] Publish failed:', err)
+            if (process.env.NODE_ENV === 'development') console.error('[Editor] Publish failed:', err)
             toast.error(t.editor.toast.publishFailed)
         } finally {
             setIsPublishing(false)
@@ -689,7 +689,7 @@ export default function EditorPage() {
 
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
-            console.error('[Editor] Re-publish failed:', err)
+            if (process.env.NODE_ENV === 'development') console.error('[Editor] Re-publish failed:', err)
             toast.error(t.editor.toast.publishFailed)
         } finally {
             setIsPublishing(false)
