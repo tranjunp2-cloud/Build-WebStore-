@@ -45,7 +45,7 @@ export function VideoHero({ block, site }: BlockProps<HeroConfig>) {
     }
 
     return (
-        <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
+        <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
             {/* Full-bleed background video */}
             {videoUrl ? (
                 <video

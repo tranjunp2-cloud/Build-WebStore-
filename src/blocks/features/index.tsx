@@ -57,6 +57,14 @@ function FeaturesHeader({
 export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
     const { headline, subheadline, features = [], variant = 'grid-3' } = block
 
+    /* Plan 260415 Lỗi E — empty state dev warn thay vì render header trống */
+    if (!features.length) {
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+            console.warn('[features] features array empty — block rendered nothing')
+        }
+        return null
+    }
+
     // ── icon-top variant ──────────────────────────────────────────────────
     if (variant === 'icon-top') {
         return (
@@ -64,7 +72,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                 <FeaturesHeader sectionLabel={block.sectionLabel} headline={headline} subheadline={subheadline} />
                 <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {features.map((feature, i) => (
-                        <StaggerItem key={i}>
+                        <StaggerItem key={`${feature.title}-${i}`}>
                             <HoverCard
                                 className={`${CARD_PADDING.lg} rounded-2xl h-full text-center group transition-all duration-300 hover:shadow-xl`}
                                 style={{
@@ -96,7 +104,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                 <FeaturesHeader sectionLabel={block.sectionLabel} headline={headline} subheadline={subheadline} />
                 <StaggerGrid className="flex flex-col gap-6 max-w-3xl mx-auto">
                     {features.map((feature, i) => (
-                        <StaggerItem key={i}>
+                        <StaggerItem key={`${feature.title}-${i}`}>
                             <div
                                 className={`flex items-start gap-5 ${CARD_PADDING.md} rounded-2xl transition-all duration-300 hover:shadow-lg`}
                                 style={{
@@ -143,7 +151,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                         const isEven = i % 2 === 1
                         return (
                             <motion.div
-                                key={i}
+                                key={`${feature.title}-${i}`}
                                 variants={staggerItem}
                                 className={`flex flex-col md:flex-row items-center gap-8 ${isEven ? 'md:flex-row-reverse' : ''}`}
                             >
@@ -184,7 +192,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
                 <FeaturesHeader sectionLabel={block.sectionLabel} headline={headline} subheadline={subheadline} />
                 <StaggerGrid className="flex flex-col gap-5 max-w-3xl mx-auto">
                     {features.map((feature, i) => (
-                        <StaggerItem key={i}>
+                        <StaggerItem key={`${feature.title}-${i}`}>
                             <HoverCard
                                 className={`flex items-center gap-6 ${CARD_PADDING.md} rounded-2xl h-full group transition-all duration-300 hover:shadow-xl`}
                                 style={{
@@ -223,7 +231,7 @@ export function FeaturesBlock({ block, theme }: BlockProps<FeaturesConfig>) {
             {/* Feature Cards */}
             <StaggerGrid className={`grid gap-6 ${gridCols}`}>
                 {features.map((feature, i) => (
-                    <StaggerItem key={i}>
+                    <StaggerItem key={`${feature.title}-${i}`}>
                         <HoverCard
                             className={`${CARD_PADDING.lg} rounded-2xl h-full transition-all duration-300 group hover:shadow-xl`}
                             style={{
@@ -298,7 +306,7 @@ function FeaturesCarousel({
                 {/* Nav arrows — desktop only */}
                 <button
                     onClick={() => scroll('left')}
-                    className={`hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollLeft ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
+                    className={`flex absolute left-2 md:-left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-10 md:h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollLeft ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
                     style={{
                         background: CSS_VARS.surfacePrimary,
                         borderColor: 'rgba(var(--brand-primary-rgb), 0.2)',
@@ -310,7 +318,7 @@ function FeaturesCarousel({
                 </button>
                 <button
                     onClick={() => scroll('right')}
-                    className={`hidden md:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollRight ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
+                    className={`flex absolute right-2 md:-right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 md:w-10 md:h-10 items-center justify-center rounded-full border transition-opacity duration-200 ${canScrollRight ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}
                     style={{
                         background: CSS_VARS.surfacePrimary,
                         borderColor: 'rgba(var(--brand-primary-rgb), 0.2)',
@@ -329,12 +337,13 @@ function FeaturesCarousel({
                 >
                     {features.map((feature, i) => (
                         <motion.div
-                            key={i}
+                            /* Plan 260415 Lỗi F — stable key; Lỗi C — responsive card width */
+                            key={`${feature.title}-${i}`}
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
                             transition={{ delay: i * 0.1, duration: 0.4 }}
-                            className={`flex-shrink-0 w-[300px] snap-start ${CARD_PADDING.lg} rounded-2xl group transition-all duration-300 hover:shadow-xl`}
+                            className={`flex-shrink-0 w-[280px] sm:w-[300px] md:w-[320px] snap-start ${CARD_PADDING.lg} rounded-2xl group transition-all duration-300 hover:shadow-xl`}
                             style={{
                                 background: 'linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)',
                                 border: '1px solid rgba(var(--brand-primary-rgb), 0.071)',
