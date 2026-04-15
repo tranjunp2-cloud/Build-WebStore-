@@ -14,6 +14,7 @@ export interface NotificationItem {
     type: NotificationType
     title: string
     message: string
+    metadata?: Record<string, string>
     actionUrl: string | null
     isRead: boolean
     createdAt: string

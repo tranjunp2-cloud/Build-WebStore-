@@ -14,6 +14,7 @@ import { isUnsupportedBlock } from './unsupported-blocks'
 import { selectModel } from './config'
 import { logAiUsage } from './log-usage'
 import { enforceMinimumStructure, enforceMinItems } from './structure-enforcer'
+import { postAISwapStep, isPostAISwapEnabled, type SwapTelemetry } from './post-ai-swap'
 import { pickCategoryThemeWithMood, hashBusinessName } from './category-theme-picker'
 import { pickRecipe } from './category-recipes'
 import { resolveComposerCategory } from './composer-category-resolver'
@@ -236,6 +237,12 @@ export async function generateSiteWithAI(
         // user data into library-built blocks. Done before both branches.
         const enforcerBizOverride = mapBusinessInfo(businessInfo)
 
+        // Plan 260415 Phase 04 — aggregate telemetry from post-AI swap across
+        // pages. Returned in generation metadata so Phase 07 measurement
+        // harness can count swap decisions without log scraping.
+        const swapTelemetry: SwapTelemetry[] = []
+        const postSwapEnabled = isPostAISwapEnabled()
+
         if (rawPages && rawPages.length > 0) {
             // Multi-page format
             generatedPages = []
@@ -255,6 +262,22 @@ export async function generateSiteWithAI(
             for (let p = 0; p < rawPages.length; p++) {
                 const rawPage = rawPages[p] as Record<string, unknown>
                 let pageBlocks = validateBlocks(Array.isArray(rawPage.blocks) ? rawPage.blocks : [])
+
+                // Plan 260415 Phase 04 — post-AI content swap runs on homepage
+                // only. Swaps generic AI-emitted blocks (hero/features/about/
+                // etc.) for curated composer output when content matches the
+                // generic blacklist AND doesn't reference user data.
+                if (p === 0 && postSwapEnabled && detectedCategory) {
+                    const swapResult = postAISwapStep(
+                        pageBlocks as Record<string, unknown>[],
+                        enforcerBizOverride,
+                        detectedCategory,
+                        themeMood,
+                    )
+                    pageBlocks = swapResult.blocks as typeof pageBlocks
+                    swapTelemetry.push(...swapResult.telemetry)
+                }
+
                 // Apply structure enforcer ONLY to homepage (other pages have own content requirements)
                 if (p === 0 && detectedCategory) {
                     pageBlocks = enforceMinimumStructure(
@@ -347,6 +370,19 @@ export async function generateSiteWithAI(
             // Single-page backward compat
             const rawBlocks = Array.isArray(parsed.blocks) ? parsed.blocks : []
             validBlocks = validateBlocks(rawBlocks)
+
+            // Plan 260415 Phase 04 — post-AI swap on single-page path too.
+            if (postSwapEnabled && detectedCategory) {
+                const swapResult = postAISwapStep(
+                    validBlocks as Record<string, unknown>[],
+                    enforcerBizOverride,
+                    detectedCategory,
+                    themeMood,
+                )
+                validBlocks = swapResult.blocks as typeof validBlocks
+                swapTelemetry.push(...swapResult.telemetry)
+            }
+
             // Apply structure enforcer to ensure min block count + item counts
             if (detectedCategory) {
                 const enforcerCtx = {
@@ -407,6 +443,16 @@ export async function generateSiteWithAI(
             seo,
             language: (['en', 'ms', 'vi'] as const).includes(parsed.language as 'en' | 'ms' | 'vi') ? (parsed.language as 'en' | 'ms' | 'vi') : 'en',
             theme,
+            // Plan 260415 Phase 04 — swap telemetry surfaced for Phase 07 harness.
+            postAISwap: {
+                enabled: postSwapEnabled,
+                swapCount: swapTelemetry.filter((t) => t.action === 'swapped').length,
+                decisions: swapTelemetry.map((t) => ({
+                    blockType: t.blockType,
+                    action: t.action,
+                    reason: t.reason,
+                })),
+            },
         }
 
         // Phase 06 — warn-only consistency check on the final AI happy-path

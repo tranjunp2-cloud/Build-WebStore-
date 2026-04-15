@@ -200,6 +200,7 @@ async function handleCheckoutCompleted(
                     title: `New Order #${order.orderNumber} - ${order.currency || 'MYR'} ${(order.total ?? 0).toFixed(2)}`,
                     message: `Order placed by ${order.customerName}`,
                     actionUrl: '/orders',
+                    metadata: { orderNumber: order.orderNumber, currency: order.currency || 'MYR', total: (order.total ?? 0).toFixed(2), customerName: order.customerName },
                 })
             })
             .catch((err) => console.error('[Notification] ORDER_NEW (Stripe) hook failed', err))
@@ -259,6 +260,7 @@ async function handlePaymentFailed(
                 title: `Payment Failed - Order #${order.orderNumber}`,
                 message: `Payment for order #${order.orderNumber} has failed. Customer may retry.`,
                 actionUrl: '/orders',
+                metadata: { orderNumber: order.orderNumber },
             })
         })
         .catch((err) => console.error('[Notification] PAYMENT_FAILED hook failed', err))

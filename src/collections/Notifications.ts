@@ -117,6 +117,11 @@ export const Notifications: CollectionConfig = {
             admin: { description: 'Optional URL to navigate to when notification is clicked' },
         },
         {
+            name: 'metadata',
+            type: 'json',
+            admin: { description: 'Dynamic values for client-side i18n template interpolation' },
+        },
+        {
             name: 'isRead',
             type: 'checkbox',
             defaultValue: false,

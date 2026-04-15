@@ -2429,6 +2429,11 @@ const MIGRATIONS = [
     name: 'sites.generation_status_backfill',
     sql: `UPDATE sites SET generation_status = 'completed' WHERE generation_status IS NULL;`,
   },
+  // ── F16-04: Add metadata column for notification i18n ──
+  {
+    name: 'notifications.metadata',
+    sql: `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata jsonb;`,
+  },
 ];
 
 async function runMigrations(pool) {

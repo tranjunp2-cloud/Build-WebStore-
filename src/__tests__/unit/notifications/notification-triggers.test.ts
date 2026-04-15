@@ -43,6 +43,7 @@ describe('[TC-F16.14] ORDER_NEW trigger — Orders.afterChange', () => {
             title: 'New Order #ORD-001 - MYR 150.00',
             message: 'Order placed by Alice',
             actionUrl: '/orders',
+            metadata: { orderNumber: 'ORD-001', currency: 'MYR', total: '150.00', customerName: 'Alice' },
         })
     })
 
@@ -118,6 +119,7 @@ describe('[TC-F16.14] PRODUCT_LOW_STOCK trigger — Products.afterChange', () =>
             title: 'Low Stock Alert',
             message: 'Widget is running low (5 units left)',
             actionUrl: '/products',
+            metadata: { productName: 'Widget', quantity: '5' },
         })
     })
 
@@ -197,6 +199,7 @@ describe('[TC-F16.14] BLOG_PUBLISHED trigger — Blogs.afterChange', () => {
             title: 'Blog Published',
             message: 'My Blog Post has been published',
             actionUrl: '/blog',
+            metadata: { blogTitle: 'My Blog Post' },
         })
     })
 
