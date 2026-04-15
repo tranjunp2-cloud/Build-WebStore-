@@ -191,7 +191,7 @@ function capHeroWords(str: string, maxWords: number): string {
   return words.slice(0, maxWords).join(' ')
 }
 
-function buildHero(
+export function buildHero(
   biz: BusinessSample,
   category: string,
   variantIndex: number,
@@ -665,6 +665,41 @@ export function buildPricing(category: string): Record<string, unknown> {
       { name: 'Brand Identity', price: 'RM 3,500', period: '/project', features: ['Logo + Stationery', 'Brand Book', 'Social Templates', 'Unlimited Revisions'], highlighted: true },
       { name: 'Full Agency', price: 'RM 8,000', period: '/month', features: ['All Design Work', 'Web Design', 'Social Content', 'Monthly Reports', 'Dedicated Designer'], highlighted: false },
     ],
+    restaurant: [
+      { name: 'Set Lunch', price: 'RM 28', period: '/pax', features: ['2-course meal', 'Soft drink', 'Weekday 12-3pm', 'Dine-in only'], highlighted: false },
+      { name: 'Chef\'s Tasting', price: 'RM 128', period: '/pax', features: ['6-course menu', 'Wine pairing option', 'Seasonal ingredients', 'Reservation required'], highlighted: true },
+      { name: 'Private Event', price: 'RM 2,500', period: '/booking', features: ['Full restaurant buyout', 'Custom menu', '20-40 pax', 'Dedicated host', 'Valet parking'], highlighted: false },
+    ],
+    fnb: [
+      { name: 'Retail Box', price: 'RM 35', period: '/pack', features: ['12 pieces', 'Freshly baked', 'Self-collect at outlet', 'Walk-in welcome'], highlighted: false },
+      { name: 'Party Platter', price: 'RM 180', period: '/tray', features: ['60 pieces mixed', '48h pre-order', 'Delivery available', 'Halal certified'], highlighted: true },
+      { name: 'Corporate Catering', price: 'RM 18', period: '/pax', features: ['Minimum 30 pax', 'Buffet setup', 'Full service staff', 'KL & Selangor delivery'], highlighted: false },
+    ],
+    ecommerce: [
+      { name: 'Starter', price: 'RM 0', period: '/forever', features: ['Free shipping over RM 150', 'Standard 3-5 day delivery', 'Returns within 14 days', 'Email support'], highlighted: false },
+      { name: 'Member', price: 'RM 88', period: '/year', features: ['Free shipping all orders', 'Priority 1-2 day delivery', 'Exclusive member sales', 'WhatsApp concierge', 'Early access drops'], highlighted: true },
+      { name: 'VIP', price: 'RM 288', period: '/year', features: ['All Member perks', 'Birthday gift box', 'Personal styling session', 'Free alterations', 'Dedicated account manager'], highlighted: false },
+    ],
+    realestate: [
+      { name: 'Consultation', price: 'RM 0', period: '/session', features: ['Area market briefing', 'Property viewing tour', 'Price negotiation tips', 'No obligation'], highlighted: false },
+      { name: 'Full Service', price: '2%', period: 'of sale price', features: ['Unlimited viewings', 'Professional photos', 'Rumah123 + PropertyGuru listing', 'SPA & legal support', 'Loan application help'], highlighted: true },
+      { name: 'Premium Marketing', price: '2.5%', period: 'of sale price', features: ['All Full Service items', 'Drone + video tour', 'Social media campaign', 'Featured placement', 'International listings', 'Open house events'], highlighted: false },
+    ],
+    events: [
+      { name: 'Intimate Gathering', price: 'RM 3,500', period: '/event', features: ['Up to 30 pax', 'Venue coordination', 'Decor setup', 'Photography 2 hours'], highlighted: false },
+      { name: 'Wedding Package', price: 'RM 18,000', period: '/event', features: ['Up to 200 pax', 'Full planning + execution', 'Decor + flowers', 'MC + entertainment', 'Photography + videography', 'Bridal car'], highlighted: true },
+      { name: 'Corporate Gala', price: 'RM 35,000', period: '/event', features: ['Up to 500 pax', 'Full production', 'AV + staging', 'Live band', 'Catering coordination', 'RSVP management'], highlighted: false },
+    ],
+    travel: [
+      { name: 'Day Trip', price: 'RM 180', period: '/pax', features: ['8-hour itinerary', 'English/Malay guide', 'Transport + entry tickets', 'Lunch included'], highlighted: false },
+      { name: 'Weekend Escape', price: 'RM 680', period: '/pax', features: ['3D2N package', 'Hotel + meals', 'Airport transfer', 'Licensed tour guide', 'Cultural experiences'], highlighted: true },
+      { name: 'Custom Itinerary', price: 'RM 1,500', period: '/pax', features: ['Tailored 5-7 day plan', 'Premium hotels', 'Private vehicle', 'Dedicated guide', 'Flexible schedule', '24/7 concierge'], highlighted: false },
+    ],
+    blog: [
+      { name: 'Newsletter Free', price: 'RM 0', period: '/forever', features: ['Weekly newsletter', 'Public articles', 'Basic archive access'], highlighted: false },
+      { name: 'Member', price: 'RM 19', period: '/month', features: ['All premium articles', 'Monthly deep-dives', 'Member-only podcast', 'Comment access', 'Ad-free reading'], highlighted: true },
+      { name: 'Founding Reader', price: 'RM 190', period: '/year', features: ['All Member perks', 'Early access content', 'Direct reply channel', 'Merchandise discount', 'Annual live event invite'], highlighted: false },
+    ],
   }
 
   const defaultPlans = [
@@ -709,6 +744,56 @@ export function buildTeam(category: string): Record<string, unknown> {
       { name: 'Dato\' Rahman', role: 'Managing Partner', bio: '25 years of C-suite advisory across ASEAN markets.' },
       { name: 'Jennifer Ooi', role: 'Strategy Director', bio: 'Former McKinsey consultant with deep expertise in market entry.' },
       { name: 'Harith bin Yusof', role: 'Operations Lead', bio: 'Operational excellence specialist with manufacturing and logistics background.' },
+    ],
+    restaurant: [
+      { name: 'Chef Azman Yusof', role: 'Executive Chef', bio: 'Trained at Le Cordon Bleu Paris, 18 years running Malaysian fine-dining kitchens.' },
+      { name: 'Nurul Izzati', role: 'Restaurant Manager', bio: 'Former front-of-house at Shangri-La KL, service obsessed and fluent in BM/EN/CN.' },
+      { name: 'Pak Samad', role: 'Head of Sourcing', bio: 'Builds relationships with Cameron Highlands farmers and Tanjung Sepat fishermen for daily fresh ingredients.' },
+    ],
+    fnb: [
+      { name: 'Cikgu Aminah', role: 'Master Baker', bio: '30 years of heritage kuih recipes passed down from her grandmother in Melaka.' },
+      { name: 'Jonathan Lim', role: 'Operations Manager', bio: 'Scaled 12 outlets across Klang Valley, JAKIM halal certification specialist.' },
+      { name: 'Priya Devi', role: 'Catering Lead', bio: 'Orchestrates corporate catering for 500+ PAX events with 100% satisfaction record.' },
+    ],
+    beauty: [
+      { name: 'Jessica Wong', role: 'Principal Aesthetician', bio: 'CIDESCO certified, specialist in Korean skincare protocols and anti-ageing treatments.' },
+      { name: 'Sofia Binti Hassan', role: 'Lash & Brow Artist', bio: '8 years shaping brows for KL\'s top influencers. Natural-look expert.' },
+      { name: 'Tan Hui Ling', role: 'Senior Nail Artist', bio: 'Gelish Malaysia brand ambassador with a 5-week booking waitlist.' },
+    ],
+    education: [
+      { name: 'Mr. David Koh', role: 'Founder & Head Tutor', bio: 'First-class MSc Maths (UM), 20+ years SPM coaching with 95% A-grade record.' },
+      { name: 'Pn. Siti Hawa', role: 'Head of Bahasa Melayu', bio: 'Former SBP senior teacher, sets past-year SPM model answers used by 30+ tuition centres.' },
+      { name: 'Dr. Raymond Teh', role: 'Science Coordinator', bio: 'PhD Chemistry (Monash), simplifies the hardest concepts for Form 4-5 students.' },
+    ],
+    realestate: [
+      { name: 'Michelle Lau REN', role: 'Principal Agent', bio: 'REN 45822. Closed 80+ KLCC/Mont Kiara transactions. Mandarin, English, Cantonese.' },
+      { name: 'Firdaus Abdullah', role: 'Landed Property Specialist', bio: 'REN 39117. Shah Alam and Subang expert, helps young families find their first home.' },
+      { name: 'Shalini Murugan', role: 'Investment Consultant', bio: 'Bank-negara licensed financial planner. Advises on property loan structuring and ROI analysis.' },
+    ],
+    fitness: [
+      { name: 'Coach Adam Razak', role: 'Head Trainer', bio: 'Former national weightlifting athlete. NASM-CPT certified. 12 years coaching experience.' },
+      { name: 'Yasmin Tan', role: 'Yoga & Pilates Lead', bio: '500-hour RYT, specialises in prenatal, postnatal, and injury rehabilitation.' },
+      { name: 'Daniel Mok', role: 'Strength Coach', bio: 'Powerlifting silver medallist SEA Games 2023. Programs natural lifters for competition.' },
+    ],
+    ecommerce: [
+      { name: 'Rachel Chen', role: 'Founder & Buyer', bio: 'Curates each piece personally from Seoul, Tokyo and Milan factory partners.' },
+      { name: 'Izzah Latiff', role: 'Head of Customer Experience', bio: 'Runs the WhatsApp concierge, 2-hour response guarantee 7 days a week.' },
+      { name: 'Aaron Koh', role: 'Logistics Manager', bio: 'Pos Laju + DHL account manager, optimises 2-day Peninsular Malaysia delivery.' },
+    ],
+    events: [
+      { name: 'Natasha Zulkifli', role: 'Creative Director', bio: 'Styled 200+ weddings and galas. Featured in MingleMingle and Her World Brides.' },
+      { name: 'Kumar Raju', role: 'Production Manager', bio: 'AV + staging specialist for corporate events up to 2000 PAX. Handles KLCC, PWTC venues.' },
+      { name: 'Elaine Fong', role: 'Client Relations', bio: 'Bilingual wedding planner fluent in Mandarin and English. 0% complaint rate in 4 years.' },
+    ],
+    travel: [
+      { name: 'Hakim bin Rosli', role: 'Lead Tour Guide', bio: 'Licensed by Tourism Malaysia (PE2341). Expert on KL heritage and Melaka historical sites.' },
+      { name: 'Wei Ling Chua', role: 'Trip Designer', bio: 'Plans custom itineraries across Peninsular and East Malaysia. 8 years in outbound travel.' },
+      { name: 'Joseph Tan', role: 'Adventure Coordinator', bio: 'PADI dive master, certified jungle trek guide for Taman Negara and Mulu Caves.' },
+    ],
+    blog: [
+      { name: 'Aaron Siah', role: 'Editor in Chief', bio: 'Former features writer at The Edge Malaysia. Covers startups, tech and Malaysian economy.' },
+      { name: 'Lina Razak', role: 'Senior Writer', bio: 'Longform investigative journalist. Published in R.AGE and Malaysiakini.' },
+      { name: 'Kevin Ng', role: 'Podcast Producer', bio: 'Produces weekly interview shows with founders. 50k+ monthly listeners.' },
     ],
   }
 
@@ -983,6 +1068,66 @@ export function buildServiceCards(biz: BusinessSample, category: string): Record
       { title: 'Facial Treatment', description: 'Customised facials for every skin type and concern.', icon: 'Sparkles', price: 'From RM 120', priceUnit: '/session' },
       { title: 'Nail Art', description: 'Classic to creative nail designs using premium products.', icon: 'Palette', price: 'From RM 45', priceUnit: '/session' },
       { title: 'Lash Extensions', description: 'Natural to dramatic lash looks that last 3-4 weeks.', icon: 'Eye', price: 'From RM 120', priceUnit: '/set' },
+    ],
+    health: [
+      { title: 'General Consultation', description: 'Doctor consultation for acute and chronic conditions, all age groups.', icon: 'Stethoscope', price: 'From RM 80', priceUnit: '/visit' },
+      { title: 'Health Screening', description: 'Comprehensive blood panel, ECG and imaging with specialist review.', icon: 'Activity', price: 'From RM 550', priceUnit: '/package' },
+      { title: 'Minor Procedures', description: 'Wound dressing, vaccinations, IV drip and nebuliser therapy.', icon: 'Syringe', price: 'From RM 60', priceUnit: '/procedure' },
+    ],
+    tech: [
+      { title: 'Managed Hosting', description: '99.9% uptime SLA on AWS Singapore + KL redundancy.', icon: 'Server', price: 'From RM 299', priceUnit: '/month' },
+      { title: 'DevOps Setup', description: 'CI/CD pipelines, observability stack and on-call runbook.', icon: 'GitBranch', price: 'From RM 8,000', priceUnit: '/project' },
+      { title: '24/7 Support', description: 'Dedicated account engineer with 15-minute response SLA.', icon: 'Headphones', price: 'From RM 2,500', priceUnit: '/month' },
+    ],
+    education: [
+      { title: 'Group Classes', description: 'Small-group SPM and UPSR tuition, max 8 students per class.', icon: 'Users', price: 'From RM 200', priceUnit: '/month' },
+      { title: '1-on-1 Tutoring', description: 'Personalised coaching with weekly progress reports to parents.', icon: 'User', price: 'From RM 120', priceUnit: '/hour' },
+      { title: 'Exam Bootcamp', description: 'Intensive revision programme in the month before major exams.', icon: 'GraduationCap', price: 'From RM 800', priceUnit: '/bootcamp' },
+    ],
+    fitness: [
+      { title: 'Personal Training', description: 'Customised 1-on-1 strength + cardio programming with nutrition plan.', icon: 'Dumbbell', price: 'From RM 150', priceUnit: '/session' },
+      { title: 'Group Classes', description: 'HIIT, yoga, pilates and spin classes every morning and evening.', icon: 'Users', price: 'From RM 250', priceUnit: '/month' },
+      { title: 'Sports Rehab', description: 'Physiotherapy and injury recovery for weekend warriors and athletes.', icon: 'HeartPulse', price: 'From RM 180', priceUnit: '/session' },
+    ],
+    creative: [
+      { title: 'Brand Identity', description: 'Logo, colour system, typography and full brand guidelines.', icon: 'Palette', price: 'From RM 3,500', priceUnit: '/project' },
+      { title: 'Web Design', description: 'Conversion-focused website design with UX audit and wireframes.', icon: 'Monitor', price: 'From RM 5,500', priceUnit: '/project' },
+      { title: 'Content Creation', description: 'Monthly social media content, photography and short-form video.', icon: 'Camera', price: 'From RM 2,800', priceUnit: '/month' },
+    ],
+    restaurant: [
+      { title: 'Dine-In Experience', description: 'Curated multi-course menu with seasonal specials and optional wine pairing.', icon: 'Utensils', price: 'From RM 88', priceUnit: '/pax' },
+      { title: 'Private Events', description: 'Restaurant buy-out for weddings, birthdays and corporate dinners.', icon: 'Calendar', price: 'From RM 2,500', priceUnit: '/event' },
+      { title: 'Catering Service', description: 'Full-service off-site catering for groups of 20-200.', icon: 'Truck', price: 'From RM 45', priceUnit: '/pax' },
+    ],
+    fnb: [
+      { title: 'Retail Store', description: 'Daily fresh bakes and heritage kuih available at all outlets.', icon: 'Store', price: 'From RM 5', priceUnit: '/item' },
+      { title: 'Party Platters', description: 'Pre-order trays and boxes for birthdays, office meetings and family gatherings.', icon: 'Package', price: 'From RM 120', priceUnit: '/tray' },
+      { title: 'Corporate Catering', description: 'Buffet + plated meal service for offices in Klang Valley.', icon: 'Truck', price: 'From RM 18', priceUnit: '/pax' },
+    ],
+    ecommerce: [
+      { title: 'Fast Delivery', description: 'Next-day shipping to Klang Valley and 2-day nationwide delivery.', icon: 'Truck', price: 'Free', priceUnit: 'over RM 150' },
+      { title: 'Easy Returns', description: 'Hassle-free 14-day return policy with free pickup service.', icon: 'RotateCcw', price: 'Free', priceUnit: 'returns' },
+      { title: 'WhatsApp Concierge', description: 'Personal shopping assistance and styling advice on demand.', icon: 'MessageCircle', price: 'Free', priceUnit: 'all customers' },
+    ],
+    realestate: [
+      { title: 'Property Viewing', description: 'Guided viewings with market briefing and neighbourhood tour.', icon: 'Home', price: 'Free', priceUnit: 'consultation' },
+      { title: 'Sale & Purchase', description: 'End-to-end transaction handling: negotiation, SPA, loan and legal.', icon: 'FileText', price: '2%', priceUnit: 'of sale price' },
+      { title: 'Investment Advisory', description: 'ROI analysis, rental yield forecasting and portfolio structuring.', icon: 'TrendingUp', price: 'From RM 500', priceUnit: '/session' },
+    ],
+    events: [
+      { title: 'Wedding Planning', description: 'Full-service wedding coordination from proposal to reception.', icon: 'Heart', price: 'From RM 8,000', priceUnit: '/wedding' },
+      { title: 'Corporate Events', description: 'Product launches, galas and team-building for 50-1000 PAX.', icon: 'Briefcase', price: 'From RM 15,000', priceUnit: '/event' },
+      { title: 'Décor & Styling', description: 'Floral design, lighting and stage setup for any celebration.', icon: 'Sparkles', price: 'From RM 3,500', priceUnit: '/event' },
+    ],
+    travel: [
+      { title: 'Day Tours', description: 'Half-day and full-day curated experiences in KL, Penang and Melaka.', icon: 'Map', price: 'From RM 180', priceUnit: '/pax' },
+      { title: 'Multi-Day Packages', description: 'Peninsular and East Malaysia itineraries with hotels and transport.', icon: 'Backpack', price: 'From RM 680', priceUnit: '/pax' },
+      { title: 'Custom Itineraries', description: 'Tailor-made trips designed around your schedule and interests.', icon: 'Compass', price: 'From RM 1,500', priceUnit: '/pax' },
+    ],
+    blog: [
+      { title: 'Sponsored Articles', description: 'Long-form branded features published on our main blog.', icon: 'FileText', price: 'From RM 2,500', priceUnit: '/article' },
+      { title: 'Newsletter Placements', description: 'Featured slot in our weekly newsletter reaching 20k+ readers.', icon: 'Mail', price: 'From RM 800', priceUnit: '/placement' },
+      { title: 'Podcast Interviews', description: 'Guest spot on our flagship podcast with cross-promotion.', icon: 'Mic', price: 'From RM 1,500', priceUnit: '/episode' },
     ],
   }
 
