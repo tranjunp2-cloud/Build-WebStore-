@@ -128,10 +128,10 @@ describe('TC-F01-V.25: composeTemplate — all blocks have variant', () => {
   })
 })
 
-// ── TC-F01-V.26: businessIndex out of range → throw ─────────────────────
+// ── TC-F01-V.26: businessIndex out of range → return null (Plan 260415 fix-500) ──
 
 describe('TC-F01-V.26: composeTemplate — businessIndex out of range', () => {
-  it('should throw error with helpful message', () => {
+  it('should return null so fallback chain degrades gracefully', () => {
     const input: ComposerInput = {
       category: 'restaurant',
       businessIndex: 999,
@@ -139,7 +139,7 @@ describe('TC-F01-V.26: composeTemplate — businessIndex out of range', () => {
       themePreset: RESTAURANT_PRESETS[0]!,
     }
 
-    expect(() => composeTemplate(input)).toThrow()
+    expect(composeTemplate(input)).toBeNull()
   })
 })
 
