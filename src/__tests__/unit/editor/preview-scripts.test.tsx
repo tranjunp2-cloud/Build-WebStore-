@@ -172,17 +172,20 @@ describe('PreviewScripts', () => {
         })
 
         it('should not crash when style element is missing', async () => {
-            // Arrange — no style element injected
+            // Arrange — no style element injected, spy on console.error
+            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
             render(<PreviewScripts />)
 
-            // Act — should not throw
+            // Act
             await new Promise<void>(resolve => {
                 const handler = () => { window.removeEventListener('message', handler); resolve() }
                 window.addEventListener('message', handler)
                 window.postMessage({ type: 'SET_DROP_HINT', text: 'Test' }, '*')
             })
-            // If we reach here without throwing, the test passes
-            expect(true).toBe(true)
+
+            // Assert — no errors thrown
+            expect(errorSpy).not.toHaveBeenCalled()
+            errorSpy.mockRestore()
         })
     })
 })
