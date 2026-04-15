@@ -3,32 +3,37 @@
 import { useState } from 'react'
 import type { BlockProps } from '../types'
 import type { MenuFoodConfig, MenuItem } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body, Caption } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 
-export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
+void _CSS_VARS
+
+export function MenuFoodBlock({ block, theme: _theme }: BlockProps<MenuFoodConfig>) {
+    void _theme
     const { headline, categories = [], variant = 'classic' } = block
 
     const [activeTab, setActiveTab] = useState(0)
 
     const TagBadge = ({ tag }: { tag: string }) => (
-        <span
-            className="px-2 py-0.5 rounded-full text-xs font-semibold"
+        <Caption
+            className="px-2 py-0.5 rounded-full font-semibold"
             style={{ background: `rgba(var(--brand-primary-rgb), 0.125)`, color: 'var(--brand-primary)' }}
         >
             {tag}
-        </span>
+        </Caption>
     )
 
     const renderClassicItem = (item: MenuItem, i: number) => (
         <div key={i} className="flex items-start gap-4 py-4">
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                    <h4 className="text-base font-bold font-heading">{item.name}</h4>
+                    <Heading level={4} className="text-base">{item.name}</Heading>
                     {item.tag && <TagBadge tag={item.tag} />}
                 </div>
-                {item.description && <p className="text-sm opacity-50 mb-2">{item.description}</p>}
+                {item.description && <Body size="small" className="opacity-50 mb-2">{item.description}</Body>}
             </div>
             <div className="flex items-center gap-1 shrink-0">
                 <span
@@ -55,10 +60,10 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
             )}
             <div className="p-5">
                 <div className="flex items-center justify-between gap-2 mb-2">
-                    <h4 className="text-base font-bold font-heading">{item.name}</h4>
+                    <Heading level={4} className="text-base">{item.name}</Heading>
                     {item.tag && <TagBadge tag={item.tag} />}
                 </div>
-                {item.description && <p className="text-sm opacity-50 mb-3">{item.description}</p>}
+                {item.description && <Body size="small" className="opacity-50 mb-3">{item.description}</Body>}
                 <p className="text-lg font-bold" style={{ color: 'var(--brand-primary)' }}>
                     {item.currency || 'RM'} {item.price}
                 </p>
@@ -85,11 +90,13 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
     const activeCategory = categories[activeTab]
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 {/* Header */}
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
+                    <Heading level={2} className="mb-5 leading-tight">
+                        <RichText text={headline} as="span" />
+                    </Heading>
                 </div>
 
                 {/* Category tabs */}
@@ -98,12 +105,14 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
                         {categories.map((cat, i) => (
                             <button
                                 key={i}
+                                type="button"
                                 onClick={() => setActiveTab(i)}
-                                className="px-5 py-2 rounded-full text-sm font-medium transition-all duration-200"
+                                className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${TOUCH_TARGET.min}`}
                                 style={activeTab === i
                                     ? { background: 'var(--brand-primary)', color: '#fff' }
                                     : { background: `rgba(var(--brand-primary-rgb), 0.063)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }
                                 }
+                                aria-current={activeTab === i}
                             >
                                 {cat.name}
                             </button>
@@ -115,12 +124,9 @@ export function MenuFoodBlock({ block, theme }: BlockProps<MenuFoodConfig>) {
                     <div className="max-w-3xl mx-auto">
                         {/* Category name (when single category) */}
                         {categories.length === 1 && (
-                            <h3
-                                className="text-2xl font-bold font-heading mb-8 text-center"
-                                style={{ color: 'var(--brand-primary)' }}
-                            >
+                            <Heading level={3} className="mb-8 text-center" style={{ color: 'var(--brand-primary)' }}>
                                 {activeCategory.name}
-                            </h3>
+                            </Heading>
                         )}
 
                         {/* Items */}

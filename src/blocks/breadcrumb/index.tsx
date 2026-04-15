@@ -2,15 +2,19 @@
 
 import type { BlockProps } from '../types'
 import type { BreadcrumbConfig } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
+import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 
-export function BreadcrumbBlock({ block, theme }: BlockProps<BreadcrumbConfig>) {
+void _CSS_VARS
+
+export function BreadcrumbBlock({ block, theme: _theme }: BlockProps<BreadcrumbConfig>) {
+    void _theme
     const { items = [], variant = 'simple' } = block
 
     return (
         <AnimatedSection className="py-4">
-            <div className="container mx-auto px-6">
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 <nav aria-label="Breadcrumb">
                     <ol className="flex items-center flex-wrap gap-1 text-sm">
                         {items.map((item, i) => {
@@ -43,7 +47,7 @@ export function BreadcrumbBlock({ block, theme }: BlockProps<BreadcrumbConfig>) 
                                     ) : (
                                         <a
                                             href={item?.url}
-                                            className="opacity-70 hover:opacity-100 transition-opacity"
+                                            className={`opacity-70 hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} inline-flex items-center`}
                                         >
                                             {item.label}
                                         </a>

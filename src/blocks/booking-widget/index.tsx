@@ -1,12 +1,65 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { BookingWidgetConfig, BookingService } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body, Caption } from '../shared/Typography'
+import {
+    CONTAINER,
+    INNER_PADDING,
+    SECTION_PADDING,
+    CARD_PADDING,
+    TOUCH_TARGET,
+} from '@/lib/design-tokens'
+
+// ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
+
+const BOOKING_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
+
+/** Outer wrapper consuming section padding + container. */
+function BookingSection({ children }: { children: ReactNode }) {
+    return (
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={BOOKING_CONTAINER}>{children}</div>
+        </AnimatedSection>
+    )
+}
+
+type BookingHeaderProps = {
+    headline?: string
+    subheadline?: string
+    className?: string
+}
+
+/** Section header with headline + subheadline. Used 3 times. */
+function BookingHeader({ headline, subheadline, className = 'text-center max-w-2xl mx-auto mb-12' }: BookingHeaderProps) {
+    return (
+        <div className={className}>
+            {headline && (
+                <Heading level={2} className="mb-5 leading-tight">
+                    <RichText text={headline} as="span" />
+                </Heading>
+            )}
+            {subheadline && (
+                <Body size="lg" className="opacity-50 leading-relaxed">
+                    <RichText text={subheadline} as="span" />
+                </Body>
+            )}
+        </div>
+    )
+}
+
+/** Step label above each booking step (Service / Date / Time). */
+function StepLabel({ children }: { children: ReactNode }) {
+    return (
+        <Caption className="font-semibold uppercase tracking-wider opacity-50 mb-4 block">
+            {children}
+        </Caption>
+    )
+}
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -28,7 +81,7 @@ function generateTimeSlots(start: string, end: string, interval: number): string
 function getNextDays(availableDays: number[], count: number): Date[] {
     const dates: Date[] = []
     const today = new Date()
-    let d = new Date(today)
+    const d = new Date(today)
     while (dates.length < count) {
         if (availableDays.includes(d.getDay())) {
             dates.push(new Date(d))
@@ -74,13 +127,14 @@ function BookingForm({
         <div className="space-y-8">
             {/* Step 1: Service */}
             <div>
-                <h4 className="text-sm font-semibold uppercase tracking-wider opacity-50 mb-4">1. Select Service</h4>
+                <StepLabel>1. Select Service</StepLabel>
                 <div className="space-y-3">
                     {services.map((s, i) => (
                         <button
                             key={i}
+                            type="button"
                             onClick={() => { setSelectedService(i); setSelectedDate(null); setSelectedTime(null) }}
-                            className="w-full text-left p-4 rounded-xl transition-all duration-200"
+                            className={`w-full text-left ${CARD_PADDING.sm} rounded-xl transition-all duration-200 ${TOUCH_TARGET.min}`}
                             style={{
                                 border: `2px solid ${selectedService === i ? 'var(--brand-primary)' : `rgba(var(--brand-primary-rgb), 0.082)`}`,
                                 background: selectedService === i ? `rgba(var(--brand-primary-rgb), 0.04)` : 'transparent',
@@ -88,9 +142,9 @@ function BookingForm({
                         >
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="font-bold font-heading">{s.name}</p>
-                                    <p className="text-sm opacity-50">{s.duration} min</p>
-                                    {s.description && <p className="text-sm opacity-40 mt-1">{s.description}</p>}
+                                    <Body className="font-bold font-heading">{s.name}</Body>
+                                    <Body size="small" className="opacity-50">{s.duration} min</Body>
+                                    {s.description && <Body size="small" className="opacity-40 mt-1">{s.description}</Body>}
                                 </div>
                                 {showPrice && (
                                     <span className="font-bold text-lg shrink-0" style={{ color: 'var(--brand-primary)' }}>
@@ -105,24 +159,26 @@ function BookingForm({
 
             {/* Step 2: Date */}
             <div>
-                <h4 className="text-sm font-semibold uppercase tracking-wider opacity-50 mb-4">2. Choose Date</h4>
+                <StepLabel>2. Choose Date</StepLabel>
                 <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                     {nextDates.map((date, i) => {
                         const isSelected = selectedDate === i
                         return (
                             <button
                                 key={i}
+                                type="button"
                                 onClick={() => { setSelectedDate(i); setSelectedTime(null) }}
-                                className="flex flex-col items-center px-4 py-3 rounded-xl shrink-0 transition-all duration-200"
+                                className={`flex flex-col items-center px-4 py-3 rounded-xl shrink-0 transition-all duration-200 ${TOUCH_TARGET.min}`}
+                                aria-pressed={isSelected}
                                 style={{
                                     border: `2px solid ${isSelected ? 'var(--brand-primary)' : `rgba(var(--brand-primary-rgb), 0.082)`}`,
                                     background: isSelected ? 'var(--brand-primary)' : 'transparent',
                                     color: isSelected ? '#fff' : 'inherit',
                                 }}
                             >
-                                <span className="text-xs font-medium">{DAY_NAMES[date.getDay()]}</span>
+                                <Caption className="font-medium">{DAY_NAMES[date.getDay()]}</Caption>
                                 <span className="text-lg font-bold">{date.getDate()}</span>
-                                <span className="text-xs opacity-60">{date.toLocaleDateString('en', { month: 'short' })}</span>
+                                <Caption className="opacity-60">{date.toLocaleDateString('en', { month: 'short' })}</Caption>
                             </button>
                         )
                     })}
@@ -132,15 +188,17 @@ function BookingForm({
             {/* Step 3: Time */}
             {selectedDate !== null && (
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-                    <h4 className="text-sm font-semibold uppercase tracking-wider opacity-50 mb-4">3. Select Time</h4>
+                    <StepLabel>3. Select Time</StepLabel>
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                         {timeSlots.map((slot) => {
                             const isSelected = selectedTime === slot
                             return (
                                 <button
                                     key={slot}
+                                    type="button"
                                     onClick={() => setSelectedTime(slot)}
-                                    className="py-2.5 px-3 rounded-lg text-sm font-medium transition-all duration-200"
+                                    className={`px-3 rounded-lg text-sm font-medium transition-all duration-200 ${TOUCH_TARGET.min}`}
+                                    aria-pressed={isSelected}
                                     style={{
                                         border: `1px solid ${isSelected ? 'var(--brand-primary)' : `rgba(var(--brand-primary-rgb), 0.125)`}`,
                                         background: isSelected ? 'var(--brand-primary)' : 'transparent',
@@ -159,26 +217,27 @@ function BookingForm({
             {selectedTime && service && (
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="pt-4">
                     <div
-                        className="p-4 rounded-xl mb-4"
+                        className={`${CARD_PADDING.sm} rounded-xl mb-4`}
                         style={{ background: `rgba(var(--brand-primary-rgb), 0.04)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
                     >
-                        <p className="text-sm opacity-50">Booking Summary</p>
-                        <p className="font-bold font-heading">{service.name}</p>
-                        <p className="text-sm opacity-60">
+                        <Body size="small" className="opacity-50">Booking Summary</Body>
+                        <Body className="font-bold font-heading">{service.name}</Body>
+                        <Body size="small" className="opacity-60">
                             {nextDates[selectedDate!]?.toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' })} at {selectedTime}
-                        </p>
+                        </Body>
                     </div>
                     {bookingUrl ? (
                         <a
                             href={bookingUrl}
-                            className="block w-full py-3.5 rounded-xl font-semibold text-center text-white transition-opacity hover:opacity-90"
+                            className={`block w-full py-3.5 rounded-xl font-semibold text-center text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                             style={{ background: 'var(--brand-primary)' }}
                         >
                             Confirm Booking
                         </a>
                     ) : (
                         <button
-                            className="w-full py-3.5 rounded-xl font-semibold text-white transition-opacity hover:opacity-90"
+                            type="button"
+                            className={`w-full py-3.5 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                             style={{ background: 'var(--brand-primary)' }}
                         >
                             Confirm Booking
@@ -211,67 +270,59 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
     /* ── Inline ──────────────────────────────────────────────────────────────── */
     if (variant === 'inline') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6">
-                    <div className="text-center max-w-2xl mx-auto mb-12">
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                        {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
-                    </div>
-                    <div className="max-w-2xl mx-auto">
-                        <BookingForm {...formProps} />
-                    </div>
+            <BookingSection>
+                <BookingHeader headline={headline} subheadline={subheadline} />
+                <div className="max-w-2xl mx-auto">
+                    <BookingForm {...formProps} />
                 </div>
-            </AnimatedSection>
+            </BookingSection>
         )
     }
 
     /* ── Sidebar ─────────────────────────────────────────────────────────────── */
     if (variant === 'sidebar') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-                        <div>
-                            <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                            {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed mb-8" />}
-                            <div className="space-y-4">
-                                {services.map((s, i) => (
-                                    <div
-                                        key={i}
-                                        className="p-5 rounded-xl"
-                                        style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
-                                    >
-                                        <h3 className="font-bold font-heading mb-1">{s.name}</h3>
-                                        <p className="text-sm opacity-50">{s.duration} min{s.description ? ` — ${s.description}` : ''}</p>
-                                    </div>
-                                ))}
-                            </div>
+            <BookingSection>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                    <div>
+                        <BookingHeader headline={headline} subheadline={subheadline} className="mb-8" />
+                        <div className="space-y-4">
+                            {services.map((s, i) => (
+                                <div
+                                    key={i}
+                                    className="p-5 rounded-xl"
+                                    style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.082)` }}
+                                >
+                                    <Heading level={4} className="font-bold font-heading mb-1">{s.name}</Heading>
+                                    <Body size="small" className="opacity-50">{s.duration} min{s.description ? ` — ${s.description}` : ''}</Body>
+                                </div>
+                            ))}
                         </div>
-                        <div className="lg:sticky lg:top-8">
-                            <div
-                                className="p-8 rounded-2xl"
-                                style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`, background: `rgba(var(--brand-primary-rgb), 0.02)` }}
-                            >
-                                <h3 className="text-xl font-bold font-heading mb-6">Book Now</h3>
-                                <BookingForm {...formProps} />
-                            </div>
+                    </div>
+                    <div className="lg:sticky lg:top-8">
+                        <div
+                            className={`${CARD_PADDING.lg} rounded-2xl`}
+                            style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.125)`, background: `rgba(var(--brand-primary-rgb), 0.02)` }}
+                        >
+                            <Heading level={3} className="mb-6">Book Now</Heading>
+                            <BookingForm {...formProps} />
                         </div>
                     </div>
                 </div>
-            </AnimatedSection>
+            </BookingSection>
         )
     }
 
     /* ── Modal Trigger ───────────────────────────────────────────────────────── */
     if (variant === 'modal-trigger') return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={BOOKING_CONTAINER}>
                 <div className="text-center max-w-2xl mx-auto">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed mb-8" />}
+                    <BookingHeader headline={headline} subheadline={subheadline} className="mb-8" />
                     <button
+                        type="button"
                         onClick={() => setShowModal(true)}
-                        className="px-8 py-4 rounded-xl font-semibold text-white text-lg transition-opacity hover:opacity-90"
+                        className={`px-8 py-4 rounded-xl font-semibold text-white text-lg transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
                         style={{ background: 'var(--brand-primary)' }}
                     >
                         Book an Appointment
@@ -297,14 +348,15 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl p-8"
+                            className={`w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl ${CARD_PADDING.lg}`}
                             style={{ background: 'var(--brand-surface, #fff)', border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
                         >
                             <div className="flex items-center justify-between mb-6">
-                                <h3 className="text-xl font-bold font-heading">Book Appointment</h3>
+                                <Heading level={3}>Book Appointment</Heading>
                                 <button
+                                    type="button"
                                     onClick={() => setShowModal(false)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-full opacity-50 hover:opacity-100 transition-opacity"
+                                    className={`flex items-center justify-center rounded-full opacity-50 hover:opacity-100 transition-opacity ${TOUCH_TARGET.min} min-w-[44px]`}
                                     aria-label="Close"
                                 >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -322,16 +374,11 @@ export function BookingWidgetBlock({ block }: BlockProps<BookingWidgetConfig>) {
 
     /* ── Default: same as inline ────────────────────────────────────────────── */
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
-                <div className="text-center max-w-2xl mx-auto mb-12">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
-                </div>
-                <div className="max-w-2xl mx-auto">
-                    <BookingForm {...formProps} />
-                </div>
+        <BookingSection>
+            <BookingHeader headline={headline} subheadline={subheadline} />
+            <div className="max-w-2xl mx-auto">
+                <BookingForm {...formProps} />
             </div>
-        </AnimatedSection>
+        </BookingSection>
     )
 }

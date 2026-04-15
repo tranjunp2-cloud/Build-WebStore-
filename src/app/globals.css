@@ -14,6 +14,26 @@
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
   --radius: 0.5rem;
+
+  /* Semantic layer (Plan B Phase 03) — dark baseline for admin + non-theme
+     contexts. Per-site generateThemeCSS() overrides these via <style> tag. */
+  --accent: var(--brand-primary);
+  --accent-hover: #0284c7;
+  --accent-rgb: 14, 165, 233;
+  --surface-primary: var(--surface-1);
+  --surface-secondary: var(--surface-2);
+  --surface-card: var(--surface-3);
+  --text-inverse: #09090b;
+  --text-muted: var(--text-secondary);
+  --border-semantic: var(--border);
+  --divider: var(--border);
+
+  /* Typography fallbacks — ensure `font-sans` / body rule resolves even
+     OUTSIDE the AppShell wrapper (portals, toasts, modals mounted directly
+     on document.body). next/font's `.inter_xxx__variable` class on the
+     AppShell div overrides these with the real self-hosted font names. */
+  --font-inter: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-outfit: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 /* ── Base Styles ──────────────────────────────────────────────────────────── */
@@ -39,7 +59,7 @@
   input,
   textarea,
   select {
-    font-family: var(--font-inter), system-ui, sans-serif;
+    font-family: var(--font-body, var(--font-inter)), system-ui, sans-serif;
   }
 
   h1,

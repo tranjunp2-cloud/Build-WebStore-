@@ -74,6 +74,25 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Guard against stray lockfiles
+        # Repo uses npm only. A stray pnpm-lock.yaml / yarn.lock makes
+        # `vercel build` auto-detect pnpm/yarn and spawn a binary the
+        # runner does not have (ENOENT), breaking deploy. Seen twice:
+        # 83f91a75, then PR #555 (commit e4d0448c) reintroduced it and
+        # broke staging deploy run 24412315694. Fail fast here before
+        # npm install so dev gets the signal in ~1 second.
+        run: |
+          STRAY=$(ls pnpm-lock.yaml yarn.lock 2>/dev/null || true)
+          if [ -n "$STRAY" ]; then
+            echo "::error::Stray lockfile detected: $STRAY"
+            echo "::error::Repo uses npm only. Delete with: git rm $STRAY && git commit"
+            echo "::error::Background: vercel build auto-detects pnpm/yarn from lockfile"
+            echo "::error::and spawns a binary not installed on the CI runner (ENOENT)."
+            echo "::error::See plans/260413-1126-vercel-deploy-blocked/ for history."
+            exit 1
+          fi
+          echo "✓ no stray lockfiles"
+
       - name: Install dependencies
         run: npm ci
 

@@ -17,4 +17,5 @@ export const customHtmlMeta: BlockMeta = {
     defaultVariant: 'default',
     editableFields: ['html'],
     quickActions: [],
+    aiVisible: false,
 }

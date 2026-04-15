@@ -5,7 +5,7 @@ import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
 import { GradientBlob, DotGrid, SectionLabel } from '../../shared/decorative'
-import { CTAButtons } from '../shared'
+import { CTAButtons, HERO_CONTAINER } from '../shared'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { getHeroImage } from '@/lib/images/industry-images'
 import { RichText } from '../../shared/RichText'
@@ -22,7 +22,7 @@ export function SplitHero({ block, site }: BlockProps<HeroConfig>) {
             <GradientBlob color={CSS_VARS.primary} className="bottom-[-15%] left-[-8%]" size={500} opacity={0.08} />
             <DotGrid color={CSS_VARS.primary} />
 
-            <div className="container mx-auto px-6 relative z-10">
+            <div className={`${HERO_CONTAINER} relative z-10`}>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     {/* Left — Content */}
                     <motion.div

@@ -24,4 +24,5 @@ export const cartWidgetMeta = {
     defaultVariant: 'floating',
     editableFields: ['label', 'showLabel'],
     quickActions: ['Open cart', 'Toggle cart label'],
+    aiVisible: false,
 }

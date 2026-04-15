@@ -49,12 +49,56 @@ CI will block PR if migration is missing or uses wrong convention.
 },
 ```
 
-## Docker Standalone Constraints
+## Vercel Deploy Architecture (CI-driven, since 2026-04-13)
+
+> **CRITICAL:** All deploys go through GitHub Actions using `VERCEL_TOKEN`. Vercel's git webhook is **disabled** (`vercel.json` → `git.deploymentEnabled: false`). DO NOT re-enable.
+
+### How it works
+
+```
+Push to staging  →  ci.yml: quality-check → test → deploy-staging
+Push to main     →  ci.yml: quality-check → test → deploy-production
+
+deploy-staging job:
+  vercel pull --environment=staging --token=$VERCEL_TOKEN
+  vercel build --target=staging --token=$VERCEL_TOKEN
+  vercel deploy --prebuilt --target=staging --archive=tgz --token=$VERCEL_TOKEN
+  Verify alias rollover (API check web-v2.dev.ecommercehub.my)
+  smart-notify deploy_success
+```
+
+All deploys attributed to `phuongltweb` (token owner) → bypasses Vercel's commit-author access check that blocks non-team-member commits.
+
+### Why this exists
+Vercel Pro plan rejects deploys whose commit author isn't on the Vercel team. Team has 1 member (phuongltweb). Without CI deploy, Junkio/Duylinh03/etc commits → "Blocked because the commit author does not have contributing access". CI uses owner's token → all commits land.
+
+### How to check deploy status
+1. Wait for GitHub Actions CI to finish (~11 min: 1.5m quality + 4.5m test + 6m deploy)
+2. `gh run watch <run-id>` from terminal, or watch in GitHub Actions UI
+3. After `Deploy: Vercel (staging)` job passes, alias rollover step verifies via API
+4. Vercel dashboard: filter `Source: cli` to see CI deploys (excludes webhook noise from old branches)
+5. Lark notify in CI/CD group `[PrimeWeb - V2] — CI/CD` (preview-target events are filtered out by prime-bot-assistant since 2026-04-13)
+
+### Required GitHub secrets
+- `VERCEL_TOKEN` — project-scoped token from `vercel.com/account/tokens`, scope `Nguyen Phuong's projects`, rotate yearly (next: 2027-04)
+- `VERCEL_ORG_ID = team_H3WAlHhz2xqvIFRcxfWevPTs`
+- `VERCEL_PROJECT_ID = prj_84DQ47BSv2hBX28w0FzjFScfbuRr`
+
+### CRITICAL rules
+- DO NOT re-enable Vercel git webhook (`git.deploymentEnabled` must stay `false`)
+- DO NOT remove `--target=staging` from `vercel build` or `vercel deploy` — must match all 3 stages (pull/build/deploy)
+- DO NOT change `vercel pull --environment=staging` — file `.vercel/.env.staging.local` has `VERCEL_TARGET_ENV=staging` which the prebuilt check requires
+- Old feature branches (created before 2026-04-13) still have outdated vercel.json → webhook may fire and ERROR (harmless dashboard noise) until rebased; bot filters these out from Lark notifications
+- Plan history: `plans/260413-1126-vercel-deploy-blocked/` (6 PRs documented: #559, #560, #562, #565, #567, #569)
+
+## Legacy Docker Standalone (DEPRECATED 2026-04-12)
+
+> Project migrated from DigitalOcean App Platform to Vercel on 2026-04-12. Following section retained as historical reference for `scripts/db-setup.js` migration patterns which are STILL active (`vercel build` runs db-setup.js as part of the buildCommand).
 
 - `push: true` in payload.config.ts only works with `NODE_ENV=development`
 - Docker standalone does NOT have Drizzle compiler — pushDevSchema may not work
 - All schema changes MUST go through `scripts/db-setup.js` migrations
-- `db-setup.js` runs as Docker CMD before starting the Next.js server
+- `db-setup.js` runs as Docker CMD before starting the Next.js server (legacy DO) AND as part of `vercel build` buildCommand (current Vercel)
 
 ## Email/SMTP
 
@@ -65,33 +109,42 @@ CI will block PR if migration is missing or uses wrong convention.
 
 ## Environment Variables & Secrets
 
-**Source of truth: GitHub Secrets** → auto-synced to DigitalOcean on every deploy.
+**Source of truth: Vercel Project Environment Variables** (Dashboard → Settings → Environment Variables). GitHub Secrets are only used for CI tooling (`VERCEL_TOKEN`, `BOT_*`, `GH_BOT_TOKEN`), test creds (`E2E_*`), and bot routing (`LARK_WEBHOOK_*`).
 
-### How it works
+### How it works (current — Vercel CI)
 
 ```
-GitHub Secrets → CI (sync-do-envs.py) → DigitalOcean App → Running container
+Vercel Dashboard env vars → vercel pull (in CI) → .vercel/.env.staging.local → vercel build → bundle
 ```
 
-- Script `.github/scripts/sync-do-envs.py` syncs all secrets from GitHub → DO on every staging/production deploy
-- Dev NEVER hardcodes secrets in code, Dockerfile, or `.do/app.yaml`
+- App runtime env vars are managed at `vercel.com/nguyen-phuongs-projects/ech-prime-web-v2/settings/environment-variables`
+- Custom env `staging` has its own scope; vars must be explicitly added to it (Preview scope does NOT auto-inherit)
+- `vercel pull --environment=staging` in CI downloads the merged env into `.vercel/.env.staging.local`
+- `vercel build --target=staging` reads the local file and bakes `NEXT_PUBLIC_*` into the bundle
+- Non-public vars (DATABASE_URI, SMTP, etc.) are read at runtime by the running serverless function
 - `.env.local` is for local development only (gitignored)
+- `.vercel/` directory is gitignored (contains pulled secrets)
 
-### Adding a new env var (2 steps only)
+### Legacy DO sync (DEPRECATED — script kept for reference but no longer runs)
 
-1. **Add placeholder to both env files:**
+`.github/scripts/sync-do-envs.py` synced GitHub Secrets → DigitalOcean App on every deploy. Now defunct (DO project retired 2026-04-12). Will remove in cleanup PR.
+
+### Adding a new env var (Vercel-first)
+
+1. **Add to Vercel Dashboard** (the source of truth):
+   - `vercel.com/nguyen-phuongs-projects/ech-prime-web-v2/settings/environment-variables`
+   - Choose scope: `Production`, `Preview`, `Custom Environment: staging`, or all
+   - For staging custom env, must be explicitly added (Preview scope does NOT auto-inherit)
+
+2. **Add placeholder to both env files:**
    - `.env.staging.example` — staging values/placeholders
    - `.env.production.example` — production values/placeholders
 
-2. **Add real value to GitHub Secrets:**
-   ```bash
-   gh secret set MY_NEW_KEY --body "my-secret-value"
-   ```
+3. **Local dev:** copy real value into `.env.local`
 
-That's it! CI auto-syncs ALL GitHub Secrets to DO on deploy. No need to edit ci.yml or sync script.
+Next CI run will `vercel pull` the new var into the runner automatically. No GitHub secret needed (unless it's a CI-tooling secret like VERCEL_TOKEN).
 
 - CI will **block PR** if code uses `process.env.NEW_VAR` but env files are missing the key.
-- CI-only secrets (webhooks, test creds) are auto-excluded from DO sync.
 
 ### Env files structure
 
@@ -132,10 +185,12 @@ That's it! CI auto-syncs ALL GitHub Secrets to DO on deploy. No need to edit ci.
 ### IMPORTANT rules
 
 - NEVER commit real secrets to `.env.example` — use placeholders only
-- NEVER hardcode secrets in `.do/app.yaml` — let sync script handle it
-- Local dev: copy `.env.example` → `.env.local`, fill in real values
-- Check if secret exists: `gh secret list`
-- Missing secret on DO → feature silently fails (no crash, just logs error)
+- App env vars belong in **Vercel Dashboard**, not GitHub Secrets
+- GitHub Secrets are only for: CI tooling (`VERCEL_TOKEN`, `BOT_*`, `GH_BOT_TOKEN`), test creds (`E2E_*`), bot routing (`LARK_WEBHOOK_*`)
+- Local dev: copy `.env.example` → `.env.local`, fill in real values OR run `vercel pull --environment=development`
+- Check Vercel env vars: `vercel env ls --token=$VERCEL_TOKEN`
+- Check GitHub secrets: `gh secret list`
+- Missing var on Vercel → feature fails at runtime (check Vercel deployment logs)
 
 ## Git Flow
 
@@ -224,13 +279,17 @@ Follow `docs/TEST_CONVENTION.md` for all test code. Key rules:
 
 | File | Purpose |
 |------|---------|
-| `scripts/db-setup.js` | Migration executor + server orchestrator |
+| `vercel.json` | Vercel build/deploy config; `git.deploymentEnabled: false` (do not change) |
+| `.vercelignore` | Excludes plans/docs/.claude from `vercel deploy --prebuilt` upload |
+| `scripts/db-setup.js` | Migration executor; runs as part of `vercel build` buildCommand |
 | `scripts/check-migrations.js` | CI schema validation |
 | `scripts/check-env-vars.js` | CI env var validation |
 | `src/payload.config.ts` | Payload + DB config |
 | `src/collections/*.ts` | Collection definitions (schema source of truth) |
-| `.github/workflows/ci.yml` | CI pipeline |
-| `.github/scripts/sync-do-envs.py` | Sync GitHub Secrets → DO env vars |
+| `.github/workflows/ci.yml` | CI pipeline (quality + test + deploy-staging + deploy-production) |
+| `.github/actions/smart-notify/action.yml` | Lark notify action (calls prime-bot-assistant API) |
+| `.github/scripts/sync-do-envs.py` | DEPRECATED — DO sync, retained for history |
 | `.github/GIT_AND_CI_RULES.md` | Git rules + issue lifecycle |
 | `.github/CONTRIBUTING.md` | Dev/QC workflow guide |
-| `Dockerfile` | Docker build (CMD = db-setup.js) |
+| `Dockerfile` | DEPRECATED — only used for local docker-compose dev |
+| `plans/260413-1126-vercel-deploy-blocked/` | Full plan + reports for Option B rollout |

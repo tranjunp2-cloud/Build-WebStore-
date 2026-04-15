@@ -8,6 +8,7 @@ import {
     SPACING_PRESETS,
     RADIUS_PRESETS,
     SHADOW_PRESETS,
+    CSS_VARS,
 } from '@/lib/theme/resolve'
 import { ThemeConfigSchema } from '@/blocks/types'
 
@@ -420,11 +421,82 @@ describe('generateThemeCSS — additional edge cases', () => {
         expect(css).toContain('--brand-accent-rgb: 0, 0, 0')
     })
 
-    it('font names are wrapped in single quotes in CSS output', () => {
+    it('font CSS vars reference next/font scoped variables (post-F01D fix)', () => {
+        // Phase 02 fix: generateThemeCSS now outputs var(--font-<pairing>)
+        // references instead of raw family name strings, so next/font-hosted
+        // fonts actually render. Editorial pairing = Playfair Display + Lora.
         const theme = resolveTheme({ fontPairingId: 'editorial' })
         const css = generateThemeCSS(theme)
-        expect(css).toContain("--font-heading: 'Playfair Display'")
-        expect(css).toContain("--font-body: 'Lora'")
+        expect(css).toContain('--font-heading: var(--font-playfair-display)')
+        expect(css).toContain('--font-body: var(--font-lora)')
+    })
+
+    it('emits semantic color layer alongside legacy brand vars (Phase 03)', () => {
+        const theme = resolveTheme({ primaryColor: '#0ea5e9', colorMode: 'light' })
+        const css = generateThemeCSS(theme)
+
+        // Legacy vars still present
+        expect(css).toContain('--brand-primary: #0ea5e9')
+        expect(css).toContain('--surface:')
+        expect(css).toContain('--text:')
+
+        // Semantic layer added
+        expect(css).toContain('--accent:')
+        expect(css).toContain('--accent-hover:')
+        expect(css).toContain('--accent-rgb:')
+        expect(css).toContain('--surface-primary:')
+        expect(css).toContain('--surface-secondary:')
+        expect(css).toContain('--surface-card:')
+        expect(css).toContain('--text-primary:')
+        expect(css).toContain('--text-secondary:')
+        expect(css).toContain('--text-inverse:')
+        expect(css).toContain('--text-muted:')
+        expect(css).toContain('--border-semantic:')
+        expect(css).toContain('--divider:')
+    })
+
+    it('semantic accent matches brand primary exactly', () => {
+        const css = generateThemeCSS(resolveTheme({ primaryColor: '#ff0000', colorMode: 'light' }))
+        expect(css).toContain('--accent: #ff0000')
+    })
+
+    it('dark mode produces dark surface-primary', () => {
+        const css = generateThemeCSS(resolveTheme({ primaryColor: '#0ea5e9', colorMode: 'dark' }))
+        const match = css.match(/--surface-primary:\s*(#[0-9a-f]{6})/)
+        expect(match).not.toBeNull()
+        // Parse lightness from hex — should be very dark
+        const hex = match![1]
+        const r = parseInt(hex.slice(1, 3), 16)
+        const g = parseInt(hex.slice(3, 5), 16)
+        const b = parseInt(hex.slice(5, 7), 16)
+        const avg = (r + g + b) / 3
+        expect(avg).toBeLessThan(50) // dark
+    })
+
+    it('light mode produces near-white surface-primary', () => {
+        const css = generateThemeCSS(resolveTheme({ primaryColor: '#0ea5e9', colorMode: 'light' }))
+        const match = css.match(/--surface-primary:\s*(#[0-9a-f]{6})/)
+        expect(match).not.toBeNull()
+        const hex = match![1]
+        const r = parseInt(hex.slice(1, 3), 16)
+        const g = parseInt(hex.slice(3, 5), 16)
+        const b = parseInt(hex.slice(5, 7), 16)
+        const avg = (r + g + b) / 3
+        expect(avg).toBeGreaterThan(200) // near-white
+    })
+
+    it('CSS_VARS exports both legacy and semantic accessors', () => {
+        // Legacy preserved
+        expect(CSS_VARS.primary).toContain('var(--brand-primary')
+        expect(CSS_VARS.surface).toContain('var(--surface')
+        expect(CSS_VARS.brandAccent).toContain('var(--brand-accent')
+        // Semantic added (Phase 03)
+        expect(CSS_VARS.accent).toContain('var(--accent')
+        expect(CSS_VARS.surfacePrimary).toContain('var(--surface-primary')
+        expect(CSS_VARS.textPrimary).toContain('var(--text-primary')
+        expect(CSS_VARS.textInverse).toContain('var(--text-inverse')
+        expect(CSS_VARS.borderSemantic).toContain('var(--border-semantic')
+        expect(CSS_VARS.divider).toContain('var(--divider')
     })
 
     it('output count contains at least 26 CSS variable declarations', () => {

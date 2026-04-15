@@ -2350,6 +2350,37 @@ const MIGRATIONS = [
     name: 'blogs.published_at',
     sql: `ALTER TABLE blogs ADD COLUMN IF NOT EXISTS published_at timestamp(3) with time zone;`,
   },
+  // ── AI Usage Logs (plan 260414-0914 phase-05) — per-call observability ──
+  {
+    name: 'ai_usage_logs.create_table',
+    sql: `CREATE TABLE IF NOT EXISTS ai_usage_logs (
+      id serial PRIMARY KEY,
+      user_id integer,
+      tenant_id integer,
+      endpoint varchar NOT NULL,
+      model varchar NOT NULL,
+      tokens_in integer NOT NULL DEFAULT 0,
+      tokens_out integer NOT NULL DEFAULT 0,
+      cost_usd numeric(12, 6) NOT NULL DEFAULT 0,
+      duration_ms integer NOT NULL DEFAULT 0,
+      success boolean NOT NULL DEFAULT true,
+      error_code varchar,
+      updated_at timestamptz DEFAULT now() NOT NULL,
+      created_at timestamptz DEFAULT now() NOT NULL
+    );`,
+  },
+  {
+    name: 'ai_usage_logs.created_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_created_at_idx ON ai_usage_logs (created_at DESC);`,
+  },
+  {
+    name: 'ai_usage_logs.endpoint_model_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_endpoint_model_idx ON ai_usage_logs (endpoint, model);`,
+  },
+  {
+    name: 'ai_usage_logs.user_idx',
+    sql: `CREATE INDEX IF NOT EXISTS ai_usage_logs_user_idx ON ai_usage_logs (user_id) WHERE user_id IS NOT NULL;`,
+  },
   // ── Sites: AI generation status tracking ──
   {
     name: 'sites.generation_status',
@@ -2384,6 +2415,7 @@ const COLLECTION_SLUGS = [
   'templates', 'subscriptions', 'products', 'orders',
   'analytics', 'blogs', 'blog_categories', 'categories',
   'seo_meta_jobs', 'notifications', 'subscribers',
+  'ai_usage_logs',
 ];
 
 /**
