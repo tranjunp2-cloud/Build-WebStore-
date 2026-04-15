@@ -1,11 +1,13 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { FooterConfig } from './config'
 import { GradientLine } from '../shared/decorative'
+import { getSocialIcon } from '../shared/social-icons'
+import { FooterNewsletterForm } from './FooterNewsletterForm'
 import { mergeFooterSocialsWithSite } from '@/lib/site-settings'
-import { Facebook, Instagram, Twitter, Linkedin, Youtube, Globe } from 'lucide-react'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { Heading, Body, Caption } from '../shared/Typography'
 import {
@@ -15,19 +17,14 @@ import {
     TOUCH_TARGET,
 } from '@/lib/design-tokens'
 
-const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
-    facebook: Facebook,
-    instagram: Instagram,
-    twitter: Twitter,
-    x: Twitter,
-    linkedin: Linkedin,
-    youtube: Youtube,
-    tiktok: Globe,
-}
-
+/**
+ * Plan 260415 Lỗi B + 7F — SocialIcon giờ dùng shared SOCIAL_ICONS map
+ * (src/blocks/shared/social-icons.tsx) với real TikTok/Threads/X/Discord/WhatsApp
+ * inline SVG + Link fallback cho unknown platforms (thay vì chữ cái đầu legacy).
+ */
 function SocialIcon({ platform }: { platform: string }) {
-    const Icon = SOCIAL_ICONS[platform.toLowerCase()]
-    return Icon ? <Icon size={16} /> : <span>{(platform || '').charAt(0).toUpperCase()}</span>
+    const Icon = getSocialIcon(platform)
+    return <Icon size={16} />
 }
 
 // ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
@@ -50,9 +47,25 @@ type FooterSectionProps = {
  * positioning relative to the OUTER footer (full width), not the inner
  * max-w-6xl container. Local wrapper keeps `relative` on the footer tag.
  */
+/**
+ * Plan 260415 Lỗi C — wrap footer trong motion.footer để scroll reveal.
+ * Fade-in y: 30 → 0 khi scroll vào viewport. Respect prefers-reduced-motion →
+ * skip animation entirely (render static <footer>).
+ */
+const FOOTER_VARIANTS = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+    },
+}
+
 function FooterSection({ paddingClass, showGradientLine = true, children }: FooterSectionProps) {
-    return (
-        <footer className={`${paddingClass} relative`}>
+    const shouldReduce = useReducedMotion()
+
+    const innerContent = (
+        <>
             {showGradientLine && (
                 <GradientLine
                     from={CSS_VARS.primary}
@@ -64,7 +77,23 @@ function FooterSection({ paddingClass, showGradientLine = true, children }: Foot
             <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 {children}
             </div>
-        </footer>
+        </>
+    )
+
+    if (shouldReduce) {
+        return <footer className={`${paddingClass} relative`}>{innerContent}</footer>
+    }
+
+    return (
+        <motion.footer
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: '-80px' }}
+            variants={FOOTER_VARIANTS}
+            className={`${paddingClass} relative`}
+        >
+            {innerContent}
+        </motion.footer>
     )
 }
 
@@ -93,7 +122,8 @@ function BrandLogo({ logoText, logo, size = 'lg', className = '' }: BrandLogoPro
     return (
         <div className={`font-bold ${textCls} font-heading ${className}`.trim()}>
             {logo?.url ? (
-                <img src={logo.url} alt={logoText || ''} className={`${imgCls} w-auto`} />
+                /* Plan 260415 Lỗi 8F — alt fallback tốt hơn cho WCAG 1.1.1 */
+                <img src={logo.url} alt={logoText ? `${logoText} logo` : 'Company logo'} className={`${imgCls} w-auto`} />
             ) : (
                 <span style={{
                     background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.502))`,
@@ -114,9 +144,15 @@ type SocialIconListProps = {
     className?: string
 }
 
+/**
+ * Plan 260415 Lỗi 15F — tăng touch target lên 44×44px đạt WCAG 2.5.5.
+ * Cũ: w-8 h-8 (32px) / w-9 h-9 (36px) — fail WCAG AA touch target minimum.
+ * Mới: w-11 h-11 (44px) cho mọi size — icon bên trong vẫn 16px, padding tạo
+ * tap area đạt chuẩn mobile.
+ */
 const SOCIAL_BUTTON_SIZE = {
-    sm: 'w-8 h-8',
-    md: 'w-9 h-9',
+    sm: 'w-11 h-11',
+    md: 'w-11 h-11',
 } as const
 
 /**
@@ -128,21 +164,27 @@ function SocialIconList({ socials, iconSize = 'md', className = '' }: SocialIcon
     const sizeCls = SOCIAL_BUTTON_SIZE[iconSize]
     return (
         <div className={`flex gap-3 ${className}`.trim()}>
-            {socials.map((social, i) => (
-                <a
-                    key={i}
-                    href={social.url || '#'}
-                    aria-label={social.label || social.platform || 'social link'}
-                    className={`${sizeCls} rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110`}
-                    style={{
-                        background: `rgba(var(--brand-primary-rgb), 0.063)`,
-                        border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
-                        color: 'var(--brand-primary)',
-                    }}
-                >
-                    <SocialIcon platform={social.platform || ''} />
-                </a>
-            ))}
+            {socials.map((social, i) => {
+                const platform = social.platform || ''
+                const aria = social.label || (platform ? `Visit ${platform}` : 'social link')
+                return (
+                    <a
+                        key={`${platform}-${i}`}
+                        href={social.url || '#'}
+                        aria-label={aria}
+                        target={social.url?.startsWith('http') ? '_blank' : undefined}
+                        rel={social.url?.startsWith('http') ? 'noopener noreferrer' : undefined}
+                        className={`${sizeCls} ${TOUCH_TARGET.min} rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)]`}
+                        style={{
+                            background: `rgba(var(--brand-primary-rgb), 0.063)`,
+                            border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
+                            color: 'var(--brand-primary)',
+                        }}
+                    >
+                        <SocialIcon platform={platform} />
+                    </a>
+                )
+            })}
         </div>
     )
 }
@@ -153,18 +195,21 @@ type LinkColumnProps = {
     spacing?: 'tight' | 'default'
 }
 
-/** Link column: <h4> column title + <ul> of links. */
+/**
+ * Plan 260415 Lỗi 12F — opacity-40 fail WCAG contrast. Đổi sang opacity-70
+ * (≥4.5:1 ratio trên bg thường). Hover vẫn tăng lên 100%.
+ */
 function LinkColumn({ title, links, spacing = 'default' }: LinkColumnProps) {
     const ulSpacing = spacing === 'tight' ? 'space-y-2.5' : 'space-y-3'
     return (
         <div>
-            <Heading level={4} className="mb-4 opacity-80">{title}</Heading>
+            <Heading level={4} className="mb-4 opacity-90">{title}</Heading>
             <ul className={ulSpacing}>
                 {(links || []).map((link, j) => (
-                    <li key={j}>
+                    <li key={`${link?.label || 'link'}-${j}`}>
                         <a
                             href={link?.url}
-                            className="opacity-40 hover:opacity-80 transition-all duration-200 hover:translate-x-1 inline-block"
+                            className="opacity-70 hover:opacity-100 transition-all duration-200 hover:translate-x-1 inline-block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
                         >
                             <Body size="small" as="span">{link.label}</Body>
                         </a>
@@ -181,6 +226,18 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
     void _theme
     const mergedBlock = mergeFooterSocialsWithSite(block, site)
     const { logoText, tagline, columns = [], copyrightText, variant = 'simple' } = mergedBlock
+    // Plan 260415 Lỗi G-pattern — safe String cast cho siteId (dùng trong newsletter form POST)
+    const siteId = site?.id != null ? String(site.id) : undefined
+
+    /**
+     * Plan 260415 Lỗi F — legal links (privacy/terms/cookies). Config optional,
+     * fallback về /privacy /terms (default site pages). Admin có thể override
+     * qua `block.legalLinks.privacy` nếu có.
+     */
+    const legalLinks = {
+        privacy: (block as unknown as { legalLinks?: { privacy?: string } })?.legalLinks?.privacy || '/privacy',
+        terms: (block as unknown as { legalLinks?: { terms?: string } })?.legalLinks?.terms || '/terms',
+    }
 
     const copyrightLine = copyrightText
         ? copyrightText.replace(/\d{4}/, String(new Date().getFullYear()))
@@ -195,23 +252,27 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                 <div className="text-center">
                     <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4 mx-auto" />
                     {tagline && (
-                        <Body size="small" className="opacity-40 mb-8 max-w-md mx-auto">{tagline}</Body>
+                        <Body size="small" className="opacity-70 mb-8 max-w-md mx-auto">{tagline}</Body>
                     )}
 
                     {/* Link columns as horizontal lists */}
                     {columns.length > 0 && (
                         <div className="mb-8 space-y-4">
                             {columns.map((col, i) => (
-                                <div key={i}>
+                                <div key={`${col.title}-${i}`}>
                                     <Heading
                                         level={4}
-                                        className="text-xs font-semibold uppercase tracking-widest opacity-50 mb-2"
+                                        className="text-xs font-semibold uppercase tracking-widest opacity-80 mb-2"
                                     >
                                         {col.title}
                                     </Heading>
                                     <div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
                                         {(col.links || []).map((link, j) => (
-                                            <a key={j} href={link?.url} className="opacity-40 hover:opacity-80 transition-opacity duration-200">
+                                            <a
+                                                key={`${link?.label || 'link'}-${j}`}
+                                                href={link?.url}
+                                                className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
+                                            >
                                                 <Body size="small" as="span">{link.label}</Body>
                                             </a>
                                         ))}
@@ -223,7 +284,7 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
 
                     <SocialIconList socials={socialsArr} className="justify-center mb-8" />
 
-                    <Caption className="opacity-30">{copyrightLine}</Caption>
+                    <Caption className="opacity-60">{copyrightLine}</Caption>
                 </div>
             </FooterSection>
         )
@@ -243,42 +304,33 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                         <Body size="small" className="text-white/70 mb-4">
                             Subscribe for the latest updates and news.
                         </Body>
-                        <div className="flex gap-2 max-w-md mx-auto">
-                            <input
-                                type="email"
-                                placeholder="Enter your email"
-                                aria-label="Email address"
-                                className="flex-1 px-4 py-2.5 rounded-lg text-base bg-white/20 text-white placeholder-white/50 border border-white/20 outline-none focus:border-white/40 transition-colors"
-                            />
-                            <button
-                                className={`px-5 py-2.5 rounded-lg text-sm font-semibold bg-white transition-opacity hover:opacity-90 ${TOUCH_TARGET.min}`}
-                                style={{ color: 'var(--brand-primary)' }}
-                            >
-                                Subscribe
-                            </button>
-                        </div>
+                        {/* Plan 260415 Lỗi A — wire vào FooterNewsletterForm, không còn inert */}
+                        <FooterNewsletterForm
+                            siteId={siteId}
+                            variant="mega-footer"
+                            placeholder="Enter your email"
+                            buttonLabel="Subscribe"
+                        />
                     </div>
                 </div>
 
                 {/* Main footer content */}
                 <div className="pt-14 pb-8">
                     <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
-                        {/* Plan 260415 nav-bugfix — grid-cols-2 cứng trên mobile làm
-                            Brand column và LinkColumn squish vào 2 cột hẹp (~150px).
-                            Đổi sang grid-cols-1 ở base để stack đẹp, sm:grid-cols-2
-                            từ 640px, md:grid-cols-3 từ 768px, lg:grid-cols-5 từ 1024px. */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-12">
+                        {/* Plan 260415 — grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5
+                            với gap-6 mobile → gap-8 sm+ (Lỗi E — giảm gap mobile). */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8 mb-12">
                             {/* Brand column */}
                             <div className="sm:col-span-2 md:col-span-1">
                                 <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="md" className="mb-3" />
                                 {tagline && (
-                                    <Body size="small" className="opacity-40 leading-relaxed max-w-xs">{tagline}</Body>
+                                    <Body size="small" className="opacity-70 leading-relaxed max-w-xs">{tagline}</Body>
                                 )}
                             </div>
 
                             {/* Link columns */}
                             {columns.map((col, i) => (
-                                <LinkColumn key={i} title={col.title} links={col.links || []} spacing="tight" />
+                                <LinkColumn key={`${col.title}-${i}`} title={col.title} links={col.links || []} spacing="tight" />
                             ))}
                         </div>
 
@@ -287,14 +339,14 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                             className="pt-6 flex flex-col md:flex-row items-center justify-between gap-4"
                             style={FOOTER_DIVIDER_STYLE}
                         >
-                            <Caption className="opacity-30">{copyrightLine}</Caption>
-                            <div className="flex items-center gap-4">
+                            <Caption className="opacity-60">{copyrightLine}</Caption>
+                            <div className="flex items-center gap-4 flex-wrap justify-center">
                                 <SocialIconList socials={socialsArr} iconSize="sm" />
                                 <div className="flex gap-4">
-                                    <a href="#" className="opacity-30 hover:opacity-80 transition-opacity">
+                                    <a href={legalLinks.privacy} className="opacity-60 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded">
                                         <Caption>Privacy</Caption>
                                     </a>
-                                    <a href="#" className="opacity-30 hover:opacity-80 transition-opacity">
+                                    <a href={legalLinks.terms} className="opacity-60 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded">
                                         <Caption>Terms</Caption>
                                     </a>
                                 </div>
@@ -312,7 +364,9 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
             <footer
                 className={`${SECTION_PADDING.compact} relative`}
                 style={{
-                    background: `linear-gradient(to bottom, transparent, rgba(0,0,0,0.08))`,
+                    /* Plan 260415 Lỗi 16F — theme-adaptive gradient thay vì hardcode đen.
+                       color-mix var(--background) với 94% độ đục → hiện cả light + dark themes. */
+                    background: `linear-gradient(to bottom, transparent, color-mix(in srgb, var(--background, #000000) 92%, black))`,
                 }}
             >
                 <GradientLine
@@ -379,52 +433,40 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                 {/* Divider */}
                 <div style={FOOTER_DIVIDER_STYLE} />
 
-                {/* Newsletter row */}
+                {/* Plan 260415 Lỗi A — wire newsletter form, không còn inert. */}
                 <div className="py-8 flex flex-col md:flex-row items-center justify-between gap-6">
                     <div>
                         <Heading level={4} className="mb-1">Subscribe to our newsletter</Heading>
-                        <Body size="small" className="opacity-40">
+                        <Body size="small" className="opacity-70">
                             Get the latest updates delivered to your inbox.
                         </Body>
                     </div>
-                    <div className="flex gap-2 w-full md:w-auto">
-                        <input
-                            type="email"
+                    <div className="w-full md:w-auto md:max-w-md">
+                        <FooterNewsletterForm
+                            siteId={siteId}
+                            variant="expanded"
                             placeholder="Enter your email"
-                            aria-label="Email address"
-                            className="flex-1 md:w-64 px-4 py-2.5 rounded-lg text-base outline-none transition-colors"
-                            style={{
-                                background: 'rgba(var(--brand-primary-rgb), 0.04)',
-                                border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
-                                color: 'inherit',
-                            }}
+                            buttonLabel="Subscribe"
                         />
-                        <button
-                            className={`px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90 flex-shrink-0 ${TOUCH_TARGET.min}`}
-                            style={{ background: 'var(--brand-primary)' }}
-                        >
-                            Subscribe
-                        </button>
                     </div>
                 </div>
 
                 {/* Copyright bar */}
                 <div className="pt-6 text-center" style={FOOTER_DIVIDER_STYLE}>
-                    <Caption className="opacity-30">{copyrightLine}</Caption>
+                    <Caption className="opacity-60">{copyrightLine}</Caption>
                 </div>
             </FooterSection>
         )
     }
 
     // ── Minimal variant ──────────────────────────────────────────────────
-    // Custom thin padding (py-6) — smaller than SECTION_PADDING.compact (py-12+).
-    // A "thin bar" footer doesn't fit the standard token range; kept inline.
+    // Plan 260415 Lỗi 14F — minimal variant không show GradientLine (visual noise unnecessary).
     if (variant === 'minimal') {
         // All flat links from all columns
         const allLinks = columns.flatMap(col => col.links || [])
 
         return (
-            <FooterSection paddingClass="py-6">
+            <FooterSection paddingClass="py-6" showGradientLine={false}>
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                     {/* Logo / brand text — left */}
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -436,9 +478,9 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1">
                             {allLinks.slice(0, 6).map((link, i) => (
                                 <a
-                                    key={i}
+                                    key={`${link?.label || 'link'}-${i}`}
                                     href={link?.url}
-                                    className="opacity-40 hover:opacity-80 transition-opacity duration-200"
+                                    className="opacity-70 hover:opacity-100 transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.35)] rounded"
                                 >
                                     <Body size="small" as="span">{link.label}</Body>
                                 </a>
@@ -447,35 +489,36 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                     )}
 
                     {/* Copyright — right */}
-                    <Caption className="opacity-30 flex-shrink-0">{copyrightLine}</Caption>
+                    <Caption className="opacity-60 flex-shrink-0">{copyrightLine}</Caption>
                 </div>
             </FooterSection>
         )
     }
 
     // ── Default: simple ──────────────────────────────────────────────────
-    // Custom asymmetric padding — same reason as expanded variant.
+    // Plan 260415 Lỗi D — grid responsive sm:grid-cols-2 md:grid-cols-4 (bỏ
+    // md 2-col trung gian vì 4 cột đều hơn với 1 brand + 3 link cols).
     return (
         <FooterSection paddingClass="pt-16 md:pt-20 pb-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-16">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-16">
                 {/* Brand Column */}
-                <div className="md:col-span-1">
+                <div className="sm:col-span-2 md:col-span-1">
                     <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="lg" className="mb-4" />
                     {tagline && (
-                        <Body size="small" className="opacity-40 leading-relaxed max-w-xs">{tagline}</Body>
+                        <Body size="small" className="opacity-70 leading-relaxed max-w-xs">{tagline}</Body>
                     )}
                     <SocialIconList socials={socialsArr} className="mt-6" />
                 </div>
 
                 {/* Link Columns */}
                 {columns.map((col, i) => (
-                    <LinkColumn key={i} title={col.title} links={col.links || []} />
+                    <LinkColumn key={`${col.title}-${i}`} title={col.title} links={col.links || []} />
                 ))}
             </div>
 
             {/* Bottom bar */}
             <div className="pt-8 text-center" style={FOOTER_DIVIDER_STYLE}>
-                <Caption className="opacity-30">{copyrightLine}</Caption>
+                <Caption className="opacity-60">{copyrightLine}</Caption>
             </div>
         </FooterSection>
     )
