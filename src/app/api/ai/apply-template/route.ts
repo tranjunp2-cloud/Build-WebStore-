@@ -9,14 +9,22 @@ import { checkRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { mergeUserContent } from '@/lib/ai/merge-user-content'
 
-/** Recursively strip Payload system fields so Payload creates fresh records */
+/** Recursively strip Payload system fields so Payload creates fresh records.
+ *  Also normalizes populated relationship fields (objects with `id`) back to just the ID,
+ *  which Payload expects for relationship/upload fields like image_id, background_image_id. */
 const STRIP_KEYS = new Set(['id', '_order', '_parent_id', '_path', '_uuid', 'createdAt', 'updatedAt'])
+const RELATIONSHIP_FIELDS = new Set(['image', 'backgroundImage', 'background_image', 'qrImage'])
 function stripSystemFields(obj: unknown): unknown {
     if (Array.isArray(obj)) return obj.map(stripSystemFields)
     if (obj && typeof obj === 'object') {
         const result: Record<string, unknown> = {}
         for (const [key, val] of Object.entries(obj)) {
             if (STRIP_KEYS.has(key)) continue
+            // Normalize populated relationship fields → just the ID
+            if (RELATIONSHIP_FIELDS.has(key) && val && typeof val === 'object' && 'id' in val) {
+                result[key] = (val as Record<string, unknown>).id
+                continue
+            }
             result[key] = stripSystemFields(val)
         }
         return result
