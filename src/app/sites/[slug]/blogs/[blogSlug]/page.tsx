@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import DOMPurify from 'isomorphic-dompurify'
+import { I18nText } from '@/components/storefront/I18nText'
 
 export const dynamic = 'force-dynamic'
 
@@ -100,11 +101,11 @@ export default async function BlogDetailPage({ params }: Props) {
                 {/* Breadcrumb */}
                 <nav className="flex items-center gap-2 text-sm text-gray-500 mb-8">
                     <Link href={`/sites/${slug}`} className="hover:text-gray-300 transition-colors">
-                        Home
+                        <I18nText render={t => t.storefront.products.home} />
                     </Link>
                     <span>/</span>
                     <Link href={`/sites/${slug}/blogs`} className="hover:text-gray-300 transition-colors">
-                        Blog
+                        <I18nText render={t => t.storefront.blog.title} />
                     </Link>
                     <span>/</span>
                     <span className="text-gray-400 truncate">{post.title as string}</span>
@@ -164,7 +165,7 @@ export default async function BlogDetailPage({ params }: Props) {
                         className="text-sm font-medium hover:opacity-80 transition-opacity"
                         style={{ color: primaryColor }}
                     >
-                        ← Back to Blog
+                        <I18nText render={t => t.storefront.blog.backToBlog} />
                     </Link>
                 </div>
             </article>

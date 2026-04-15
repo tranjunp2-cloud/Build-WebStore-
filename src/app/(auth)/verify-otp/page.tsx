@@ -132,11 +132,11 @@ function VerifyOTPContent() {
                 const data = await res.json().catch(() => null)
                 const rawMsg = data?.errors?.[0]?.message
 
-                let message = t.auth.otp?.verificationFailed || 'Verification failed'
-                if (rawMsg?.includes('Invalid')) message = t.auth.otp?.invalidCode || 'Invalid verification code.'
-                else if (rawMsg?.includes('expired')) message = t.auth.otp?.codeExpired || 'Code has expired. Please request a new one.'
-                else if (rawMsg?.includes('Too many')) message = t.auth.otp?.tooManyAttempts || 'Too many attempts. Please request a new code.'
-                else if (rawMsg?.includes('No verification')) message = t.auth.otp?.noCodeFound || 'No verification code found. Please request a new one.'
+                let message = t.auth.otp.verificationFailed
+                if (rawMsg?.includes('Invalid')) message = t.auth.otp.invalidCode
+                else if (rawMsg?.includes('expired')) message = t.auth.otp.codeExpired
+                else if (rawMsg?.includes('Too many')) message = t.auth.otp.tooManyAttempts
+                else if (rawMsg?.includes('No verification')) message = t.auth.otp.noCodeFound
                 else if (rawMsg) message = rawMsg
 
                 setError(message)
@@ -148,8 +148,8 @@ function VerifyOTPContent() {
             }
 
             const data = await res.json()
-            toast.success(t.auth.otp?.successTitle || 'Verification successful!', {
-                description: t.auth.otp?.successDesc || 'Redirecting to dashboard...',
+            toast.success(t.auth.otp.successTitle, {
+                description: t.auth.otp.successDesc,
             })
 
             if (data.token) {
@@ -163,8 +163,8 @@ function VerifyOTPContent() {
             }
             window.location.replace(returnUrl)
         } catch {
-            setError(t.auth.otp?.connectionError || 'Connection error. Please try again.')
-            toast.error(t.auth.otp?.connectionError || 'Connection error. Please try again.')
+            setError(t.auth.otp.connectionError)
+            toast.error(t.auth.otp.connectionError)
         } finally {
             setIsVerifying(false)
         }
@@ -183,12 +183,12 @@ function VerifyOTPContent() {
 
             if (!res.ok) {
                 const data = await res.json().catch(() => null)
-                const message = data?.errors?.[0]?.message || (t.auth.otp?.resendFailed || 'Failed to resend code')
+                const message = data?.errors?.[0]?.message || t.auth.otp.resendFailed
                 toast.error(message)
                 return
             }
 
-            toast.success(t.auth.otp?.newCodeSent || 'New code sent!', { description: t.auth.otp?.newCodeDesc || 'Check your email inbox.' })
+            toast.success(t.auth.otp.newCodeSent, { description: t.auth.otp.newCodeDesc })
             sessionStorage.setItem('otp_resend_end', String(Date.now() + RESEND_COOLDOWN_S * 1000))
             sessionStorage.setItem('otp_expiry_end', String(Date.now() + COUNTDOWN_INITIAL_S * 1000))
             setResendCooldown(RESEND_COOLDOWN_S)
@@ -197,7 +197,7 @@ function VerifyOTPContent() {
             setError('')
             inputRefs.current[0]?.focus()
         } catch {
-            toast.error(t.auth.otp?.resendFailedRetry || 'Failed to resend. Please try again.')
+            toast.error(t.auth.otp.resendFailedRetry)
         } finally {
             setIsResending(false)
         }
@@ -212,9 +212,9 @@ function VerifyOTPContent() {
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                     </svg>
                 </div>
-                <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'Inter, sans-serif' }}>{t.auth.otp?.noEmail || 'No email provided'}</h2>
+                <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'Inter, sans-serif' }}>{t.auth.otp.noEmail}</h2>
                 <p className="mt-2 text-sm" style={{ color: 'rgba(248, 250, 252, 0.70)', fontFamily: 'Inter, sans-serif' }}>
-                    {t.auth.otp?.noEmailDesc || 'Please log in first to verify your identity.'}
+                    {t.auth.otp.noEmailDesc}
                 </p>
                 <div className="mt-8 w-full flex flex-col items-center" style={{ gap: 24 }}>
                     <Link
@@ -229,7 +229,7 @@ function VerifyOTPContent() {
                         }}
                     >
                         <svg className="h-4 w-4 text-[#3B82F6]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5" /><path d="M12 19l-7-7 7-7" /></svg>
-                        {t.auth.otp?.backLogin || 'Back to Login'}
+                        {t.auth.otp.backLogin}
                     </Link>
                     <div className="w-full">
                         <LanguageSwitcher variant="segmented" />
@@ -313,7 +313,7 @@ function VerifyOTPContent() {
                             margin: 0,
                         }}
                     >
-                        {t.auth.otp?.title || 'Two-Step Verification'}
+                        {t.auth.otp.title}
                     </h1>
 
                     {/* Description — Inter 400, 14px, 1.4286em, center, rgba(248,250,252,0.7) */}
@@ -328,7 +328,7 @@ function VerifyOTPContent() {
                             margin: 0,
                         }}
                     >
-                        {t.auth.otp?.description || 'Please enter the 6-digit OTP that was sent to'}{' '}
+                        {t.auth.otp.description}{' '}
                         <span style={{ fontWeight: 500, color: '#F8FAFC' }}>{maskEmail(email)}</span>
                     </p>
                 </div>
@@ -421,10 +421,10 @@ function VerifyOTPContent() {
                     {isVerifying ? (
                         <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {t.auth.otp?.verifying || 'Verifying...'}
+                            {t.auth.otp.verifying}
                         </>
                     ) : (
-                        t.auth.otp?.confirmButton || 'Confirm OTP'
+                        t.auth.otp.confirmButton
                     )}
                 </button>
             </div>
@@ -446,10 +446,10 @@ function VerifyOTPContent() {
                     }}
                 >
                     {isResending
-                        ? (t.auth.otp?.resending || 'Sending...')
+                        ? t.auth.otp.resending
                         : isMounted && resendCooldown > 0
-                            ? `${t.auth.otp?.resendCode || 'Resend code'} (${t.auth.otp?.after || 'After'} ${resendCooldown}s)`
-                            : (t.auth.otp?.resendCode || 'Resend code')
+                            ? `${t.auth.otp.resendCode} (${t.auth.otp.after} ${resendCooldown}s)`
+                            : t.auth.otp.resendCode
                     }
                 </p>
 

@@ -5,6 +5,7 @@ import { X, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react'
 import { toast } from 'sonner'
 import { trackEvent } from '@/lib/analytics/track-event'
 import { useIsOwner } from '@/components/site-renderer/OwnerContext'
+import { useI18n } from '@/i18n'
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -15,6 +16,7 @@ function formatPrice(price: number, currency: string) {
 export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: string }) {
     const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, itemCount } = useCartStore()
     const isOwner = useIsOwner()
+    const { t } = useI18n()
     const hasCheckoutRoute = Boolean(siteSlug)
 
     if (!isOpen) return null
@@ -44,7 +46,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <ShoppingBag size={20} />
                         <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>
-                            Cart ({itemCount()})
+                            {t.storefront.cart.title} ({itemCount()})
                         </h2>
                     </div>
                     <button onClick={closeCart} style={{
@@ -59,7 +61,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                     {items.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '48px 0', color: '#999' }}>
                             <ShoppingBag size={48} style={{ opacity: 0.3, margin: '0 auto 16px' }} />
-                            <p>Your cart is empty</p>
+                            <p>{t.storefront.cart.empty}</p>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -129,7 +131,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                 {items.length > 0 && (
                     <div style={{ padding: '20px 24px', borderTop: '1px solid #eee' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                            <span style={{ fontSize: '16px', fontWeight: 600 }}>Subtotal</span>
+                            <span style={{ fontSize: '16px', fontWeight: 600 }}>{t.storefront.cart.subtotal}</span>
                             <span style={{ fontSize: '20px', fontWeight: 700 }}>{formatPrice(subtotal(), currency)}</span>
                         </div>
                         {hasCheckoutRoute ? (
@@ -147,19 +149,19 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                     padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: 600,
                                     textDecoration: 'none',
                                 }}>
-                                Proceed to Checkout
+                                {t.storefront.cart.proceedToCheckout}
                             </a>
                         ) : (
                             <button
                                 type="button"
-                                onClick={() => toast.info('Tính năng Checkout đang được phát triển')}
+                                onClick={() => toast.info(t.storefront.cart.checkoutUnavailable)}
                                 style={{
                                     display: 'block', width: '100%', background: '#111', color: 'white', textAlign: 'center',
                                     padding: '14px', borderRadius: '12px', fontSize: '15px', fontWeight: 600,
                                     border: 'none', cursor: 'pointer',
                                 }}
                             >
-                                Proceed to Checkout
+                                {t.storefront.cart.proceedToCheckout}
                             </button>
                         )}
                     </div>
