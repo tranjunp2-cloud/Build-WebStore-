@@ -562,6 +562,15 @@ export function PreviewScripts() {
                 })
             }
             // Live theme update — inject CSS variables without page reload
+            if (e.data?.type === 'SET_DROP_HINT' && e.data.text) {
+                const styleEl = document.getElementById('editor-preview-styles')
+                if (styleEl) {
+                    styleEl.innerHTML = styleEl.innerHTML.replace(
+                        /content:\s*'[^']*';\s*\/\*drop-hint\*\//,
+                        `content: '${e.data.text.replace(/'/g, "\\'")}'; /*drop-hint*/`
+                    )
+                }
+            }
             if (e.data?.type === 'THEME_UPDATE' && e.data.css) {
                 let themeStyle = document.getElementById('live-theme-override')
                 if (!themeStyle) {
@@ -615,7 +624,7 @@ export function PreviewScripts() {
                   pointer-events: none;
                 }
                 .insert-marker::after {
-                  content: 'Drop to add block';
+                  content: 'Drop to add block'; /*drop-hint*/
                   position: absolute;
                   left: 50%;
                   transform: translateX(-50%);

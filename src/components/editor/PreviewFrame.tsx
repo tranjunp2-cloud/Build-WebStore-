@@ -230,6 +230,21 @@ function PreviewFrameInner({
         )
     }, [frameElement, storeTheme])
 
+    // Send translated drop hint text to iframe for CSS pseudo-element
+    useEffect(() => {
+        if (!frameElement) return
+        const sendHint = () => {
+            frameElement.contentWindow?.postMessage(
+                { type: 'SET_DROP_HINT', text: t.editor.blockLibrary.dropToAdd },
+                window.location.origin,
+            )
+        }
+        frameElement.addEventListener('load', sendHint)
+        // Also send immediately in case iframe is already loaded
+        sendHint()
+        return () => frameElement.removeEventListener('load', sendHint)
+    }, [frameElement, t.editor.blockLibrary.dropToAdd])
+
     const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null)
     const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null)
     const clearHoverTimerRef = useRef<number | null>(null)
@@ -509,7 +524,7 @@ function PreviewFrameInner({
         try {
             const formData = new FormData()
             formData.append('file', file)
-            formData.append('alt', 'Uploaded image')
+            formData.append('alt', t.editor.preview.altUploadedImage)
 
             const uploadedMedia = await uploadMediaAction(formData)
             const newUrl = uploadedMedia.url
@@ -869,7 +884,7 @@ function PreviewFrameInner({
                             }}
                         >
                             <GripVertical className="h-4 w-4 text-slate-400 group-hover/drag:text-slate-600" />
-                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 group-hover/drag:text-slate-700">Drag</span>
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 group-hover/drag:text-slate-700">{t.editor.toolbar.drag}</span>
                         </button>
                         )
                     })()}
@@ -958,7 +973,7 @@ function PreviewFrameInner({
                             }}
                             onClick={() => setIsEditing(true)}
                         >
-                            ✨ Edit with AI
+                            ✨ {t.editor.preview.editWithAI}
                         </div>
                     )}
                     {isEditing && canInlineEdit && (

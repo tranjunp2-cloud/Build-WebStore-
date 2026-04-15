@@ -36,15 +36,15 @@ const HIDDEN_BLOCKS = new Set([
     'countdown-timer',   // missing: client-side only, no persist
 ])
 
-const categoryConfig: CategoryConfig[] = [
-    { id: 'basics', label: 'Basics', icon: '📦', blockTypes: ['hero', 'cta', 'about', 'features', 'step-process', 'service-cards'] },
-    { id: 'content', label: 'Content', icon: '📄', blockTypes: ['faq', 'testimonials', 'social-proof', 'portfolio-grid'] },
-    { id: 'media', label: 'Media', icon: '🖼️', blockTypes: ['gallery', 'video', 'carousel'] },
-    { id: 'store', label: 'Business', icon: '💼', blockTypes: ['pricing', 'feature-comparison', 'menu-food'] },
-    { id: 'commerce', label: 'Commerce', icon: '🛒', blockTypes: ['products-grid', 'products-featured', 'cartWidget'] },
-    { id: 'form', label: 'Form & Contact', icon: '📝', blockTypes: ['contact', 'newsletter', 'whatsapp-button'] },
-    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'socialWidget', 'team'] },
-    { id: 'layout', label: 'Layout', icon: '📐', blockTypes: ['divider', 'announcement-bar'] },
+const categoryConfig: Omit<CategoryConfig, 'label'>[] = [
+    { id: 'basics', icon: '📦', blockTypes: ['hero', 'cta', 'about', 'features', 'step-process', 'service-cards'] },
+    { id: 'content', icon: '📄', blockTypes: ['faq', 'testimonials', 'social-proof', 'portfolio-grid'] },
+    { id: 'media', icon: '🖼️', blockTypes: ['gallery', 'video', 'carousel'] },
+    { id: 'store', icon: '💼', blockTypes: ['pricing', 'feature-comparison', 'menu-food'] },
+    { id: 'commerce', icon: '🛒', blockTypes: ['products-grid', 'products-featured', 'cartWidget'] },
+    { id: 'form', icon: '📝', blockTypes: ['contact', 'newsletter', 'whatsapp-button'] },
+    { id: 'widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'socialWidget', 'team'] },
+    { id: 'layout', icon: '📐', blockTypes: ['divider', 'announcement-bar'] },
 ]
 
 const itemIconOverrides: Record<string, string> = {
@@ -76,12 +76,13 @@ const itemIconOverrides: Record<string, string> = {
     carousel: '🎠',
 }
 
-function getBlockMeta(blockType: string) {
+function getBlockMeta(blockType: string, blockTranslations?: Record<string, { name: string; description: string }>) {
     const meta = blockRegistry.getBlockMeta(blockType)
+    const translated = blockTranslations?.[blockType]
     return {
         type: blockType,
-        name: meta?.name || blockType,
-        description: meta?.description || 'Reusable page block',
+        name: translated?.name || meta?.name || blockType,
+        description: translated?.description || meta?.description || 'Reusable page block',
         icon: itemIconOverrides[blockType] || meta?.icon || '🧩',
         defaultVariant: meta?.defaultVariant || meta?.variants?.[0] || 'default',
     }
@@ -101,6 +102,8 @@ export function BlockLibraryPanel({
 }: BlockLibraryPanelProps) {
     const { t } = useI18n()
     const bl = t.editor.blockLibrary
+    const categoryLabels = bl.categories as Record<string, string>
+    const blockTranslations = bl.blocks as Record<string, { name: string; description: string }>
     const [query, setQuery] = useState('')
     const [expandedCategory, setExpandedCategory] = useState<LibraryCategoryId>('basics')
 
@@ -110,7 +113,7 @@ export function BlockLibraryPanel({
         return categoryConfig.map(category => {
             const items = category.blockTypes
                 .filter(bt => !HIDDEN_BLOCKS.has(bt))
-                .map(getBlockMeta)
+                .map(bt => getBlockMeta(bt, blockTranslations))
                 .filter(item => {
                     if (!keyword) return true
                     return (
@@ -122,11 +125,12 @@ export function BlockLibraryPanel({
 
             return {
                 ...category,
+                label: categoryLabels[category.id] || category.id,
                 items,
                 totalCount: category.blockTypes.length,
             }
         }).filter(category => category.items.length > 0 || !keyword)
-    }, [query])
+    }, [query, categoryLabels, blockTranslations])
 
     const handleAddBlock = (blockType: string, variant: string) => {
         const afterIndex = selectedBlock ?? (blocks.length - 1)

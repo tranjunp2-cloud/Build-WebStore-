@@ -299,14 +299,14 @@ export default function EditorPage() {
             }
 
             if (options.showToast ?? true) {
-                toast.success('Changes saved')
+                toast.success(t.editor.toast.saveSuccess)
             }
 
             window.setTimeout(() => setSaveSuccess(false), 2000)
             return true
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Save failed'
-            toast.error('Save failed', { description: message })
+            const message = err instanceof Error ? err.message : t.editor.toast.saveFailed
+            toast.error(t.editor.toast.saveFailed, { description: message })
             return false
         } finally {
             setIsSaving(false)
@@ -629,7 +629,7 @@ export default function EditorPage() {
                     toast.success(`🎉 ${t.editor.toast.publishSuccess}`, {
                         description: ti(t.editor.toast.publishSuccessDomain, { domain: siteUrl.replace(/^https?:\/\//, '') }),
                         action: {
-                            label: 'View',
+                            label: t.editor.toast.viewAction,
                             onClick: () => window.open(siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`, '_blank')
                         }
                     })
@@ -642,7 +642,7 @@ export default function EditorPage() {
 
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Publish failed'
+            const message = err instanceof Error ? err.message : t.editor.toast.publishFailed
             toast.error(t.editor.toast.publishFailed, { description: message })
         } finally {
             setIsPublishing(false)
@@ -689,7 +689,7 @@ export default function EditorPage() {
 
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Publish failed'
+            const message = err instanceof Error ? err.message : t.editor.toast.publishFailed
             toast.error(t.editor.toast.publishFailed, { description: message })
         } finally {
             setIsPublishing(false)

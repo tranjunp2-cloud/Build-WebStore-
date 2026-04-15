@@ -1945,7 +1945,8 @@
             "mobile": "Mobile",
             "changesPending": "Changes pending",
             "sitePreview": "Site Preview",
-            "dragToReorder": "Drag to reorder section"
+            "dragToReorder": "Drag to reorder section",
+            "drag": "Drag"
         },
         "publishModal": {
             "title": "Ready to Publish?",
@@ -2008,7 +2009,10 @@
             "unpublishSuccess": "Website is now in maintenance mode.",
             "linkCopied": "Link copied!",
             "publishFailed": "Publish failed",
-            "updateSuccess": "Website updated!"
+            "updateSuccess": "Website updated!",
+            "viewAction": "View",
+            "saveSuccess": "Changes saved",
+            "saveFailed": "Save failed"
         },
         "maintenance": {
             "banner": "Website is in Maintenance Mode. Customers will see a maintenance page.",
@@ -2047,7 +2051,9 @@
             "customPage": "Custom 404 Page",
             "emptyTitle": "No pages yet",
             "emptyDesc": "Create your first page to get started.",
-            "slugLocked": "Slug is locked after publishing to protect SEO and external links."
+            "slugLocked": "Slug is locked after publishing to protect SEO and external links.",
+            "statusLive": "Live",
+            "statusDraft": "Draft"
         },
         "aiChat": {
             "welcomeMessage": "Hello! What would you like to edit?",
@@ -2078,7 +2084,48 @@
         "blockLibrary": {
             "searchPlaceholder": "Search blocks...",
             "dragHint": "click or drag",
-            "footerHint": "Click to add or drag blocks into preview"
+            "footerHint": "Click to add or drag blocks into preview",
+            "dropToAdd": "Drop to add block",
+            "categories": {
+                "basics": "Basics",
+                "content": "Content",
+                "media": "Media",
+                "store": "Business",
+                "commerce": "Commerce",
+                "form": "Form & Contact",
+                "widgets": "Widgets",
+                "layout": "Layout"
+            },
+            "blocks": {
+                "hero": { "name": "Hero", "description": "Hero banner with headline and CTA" },
+                "cta": { "name": "CTA", "description": "Call to action banner" },
+                "about": { "name": "About", "description": "About us section" },
+                "features": { "name": "Features", "description": "Feature highlights with icons" },
+                "step-process": { "name": "Step Process", "description": "Step-by-step process flow" },
+                "service-cards": { "name": "Service Cards", "description": "Service offerings with cards" },
+                "faq": { "name": "FAQ", "description": "Frequently asked questions" },
+                "testimonials": { "name": "Testimonials", "description": "Customer reviews and testimonials" },
+                "social-proof": { "name": "Social Proof", "description": "Customer reviews with star ratings" },
+                "portfolio-grid": { "name": "Portfolio Grid", "description": "Portfolio showcase grid" },
+                "gallery": { "name": "Gallery", "description": "Image gallery with layouts" },
+                "video": { "name": "Video", "description": "Embedded video section" },
+                "carousel": { "name": "Carousel", "description": "Image or content carousel" },
+                "pricing": { "name": "Pricing", "description": "Pricing plans comparison" },
+                "feature-comparison": { "name": "Feature Comparison", "description": "Compare products with feature matrix" },
+                "menu-food": { "name": "Food Menu", "description": "Restaurant food menu" },
+                "products-grid": { "name": "Products Grid", "description": "Product listing grid" },
+                "products-featured": { "name": "Featured Products", "description": "Highlighted product showcase" },
+                "cartWidget": { "name": "Cart Button", "description": "Shopping cart widget" },
+                "contact": { "name": "Contact", "description": "Contact form and business info" },
+                "newsletter": { "name": "Newsletter", "description": "Email subscription form" },
+                "whatsapp-button": { "name": "WhatsApp Button", "description": "WhatsApp contact button" },
+                "stats": { "name": "Stats", "description": "Key metrics and statistics" },
+                "logo-cloud": { "name": "Logo Cloud", "description": "Partner and client logos" },
+                "socialWidget": { "name": "Social Media", "description": "Social media links widget" },
+                "team": { "name": "Team", "description": "Team member profiles" },
+                "divider": { "name": "Divider", "description": "Visual separator between sections" },
+                "announcement-bar": { "name": "Announcement Bar", "description": "Top banner for promotions" }
+            }
         },
         "inlineEdit": {
             "title": "Inline AI Edit",
@@ -2094,7 +2141,9 @@
             "faviconGenerated": " & Favicon generated",
             "error": "Failed to update logo",
             "uploading": "Uploading...",
-            "clickToUpload": "Click to upload"
+            "clickToUpload": "Click to upload",
+            "altSiteLogo": "Site Logo",
+            "altFavicon": "Favicon"
         },
         "navigation": {
             "title": "Navigation Links",
@@ -2126,6 +2175,15 @@
             "address": "Address",
             "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
             "socialLinks": "Social Links",
+            "socialPlatforms": {
+                "facebook": { "label": "Facebook", "placeholder": "facebook.com/yourbrand" },
+                "whatsapp": { "label": "WhatsApp", "placeholder": "60123456789" },
+                "instagram": { "label": "Instagram", "placeholder": "instagram.com/yourbrand" },
+                "linkedin": { "label": "LinkedIn", "placeholder": "linkedin.com/company/yourbrand" },
+                "youtube": { "label": "YouTube", "placeholder": "youtube.com/@yourbrand" }
+            },
+            "socialHintWhatsapp": "Phone number or wa.me link",
+            "socialHintDefault": "Public profile URL",
             "invalidSocialHtml": "Invalid input — HTML is not allowed",
             "invalidSocialUrl": "Please enter a valid URL (https://...)",
             "themeColors": "Theme & Colors",
@@ -2152,6 +2210,8 @@
             "generating": "Generating...",
             "autoSeo": "Automatic SEO Optimization",
             "navStyle": "Navigation Style",
+            "navStyleStandard": "Standard",
+            "navStyleCentered": "Centered",
             "globalSettings": "Global Site Settings",
             "seoSettings": "SEO Settings",
             "menuSettings": "Menu Settings",
@@ -2212,7 +2272,13 @@
             "showTextLabel": "Show Text Label",
             "labelVisible": "Label visible",
             "iconOnly": "Icon only",
-            "badgeDesc": "Badge count always stays visible"
+            "badgeDesc": "Badge count always stays visible",
+            "buttonN": "Button {n}",
+            "featureN": "Feature {n}",
+            "reviewN": "Review {n}",
+            "columnN": "Column {n}",
+            "defaultCustomerName": "Customer",
+            "defaultReviewQuote": "Great experience!"
         },
         "statusBar": {
             "connected": "Connected",
@@ -2300,6 +2366,8 @@
             "rewrite": "Rewrite"
         },
         "preview": {
+            "altUploadedImage": "Uploaded image",
+            "editWithAI": "Edit with AI",
             "mapImageError": "Could not map image to block field",
             "imageReplaceSuccess": "Image replaced successfully",
             "imageReplaceFailed": "Failed to replace image",
