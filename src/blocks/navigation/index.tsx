@@ -454,19 +454,20 @@ function TransparentNav({ mergedBlock, logoText, links, ctaButton }: {
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
             style={{
-                // Plan 260415 — when scrolled, the transparent nav snaps to
-                // the site's resolved surface + text color instead of the
-                // hardcoded white → near-black pair. Above the hero it stays
-                // transparent with white text (standard overlay pattern).
+                // Plan 260415 — TransparentNav giờ LUÔN có nền mờ nhẹ (25%
+                // khi chưa scroll, 95% khi scroll) + text theo `--text` CSS var,
+                // không dùng text trắng cứng nữa. Lý do: site light-theme (beauty,
+                // fnb, wellness) có hero sáng, text trắng trên hero sáng =
+                // invisible (bug gốc làm nav "biến mất" trên staging 2026-04-15).
                 background: scrolled
                     ? `color-mix(in srgb, var(--background, #ffffff) 95%, transparent)`
-                    : 'transparent',
-                backdropFilter: scrolled ? 'blur(20px)' : 'none',
-                WebkitBackdropFilter: scrolled ? 'blur(20px)' : 'none',
+                    : `color-mix(in srgb, var(--background, #ffffff) 25%, transparent)`,
+                backdropFilter: scrolled ? 'blur(20px)' : 'blur(8px)',
+                WebkitBackdropFilter: scrolled ? 'blur(20px)' : 'blur(8px)',
                 borderBottom: scrolled
                     ? NAV_SURFACE_BORDER
                     : '1px solid transparent',
-                color: scrolled ? NAV_SURFACE_TEXT : '#fff',
+                color: NAV_SURFACE_TEXT,
             }}
         >
             <div className={`${NAV_CONTAINER} h-16 flex items-center justify-between`}>
