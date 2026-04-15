@@ -10,9 +10,9 @@
 - **Date**: 2026-04-15
 - **Description**: Export 5 builders (`buildFeatures`, `buildStats`, `buildPricing`, `buildTeam`, `buildServiceCards`) from `template-composer.ts`. Rewrite 5 switch cases in `content-injection.buildBlockFromLibrary` to delegate to template-composer instead of returning hardcoded generic blocks. Reuse existing `mapBusinessInfo()` adapter to convert `BusinessInfoInput → BusinessSample`. ~4h work, 1 PR.
 - **Priority**: P0 (ship pre-v1.0 if possible)
-- **Implementation status**: pending
-- **Review status**: not reviewed
-- **Effort**: 4h (including tests)
+- **Implementation status**: ✅ shipped (`6bfa3c12` / PR #618, 2026-04-15)
+- **Review status**: pending PR #618 review
+- **Effort**: 4h planned / ~1h actual (scout pre-verified plumbing already existed via plan 2249 phase-07 — skipped 2 plumbing steps)
 
 ## Key Insights
 - **Zero content curation new** — template-composer builders have ~280 curated entries already written + production-proven via template gallery path
@@ -151,18 +151,18 @@ openai-generator.generateSiteWithAI
     - Verify features/stats/team output matches template content
 
 ## Todo list
-- [ ] Export 5 builders from template-composer.ts
-- [ ] Extend InjectionContext with businessInfo
-- [ ] Delegate features case
-- [ ] Delegate stats case
-- [ ] Delegate pricing case
-- [ ] Delegate team case
-- [ ] Delegate service-cards case
-- [ ] Propagate businessInfo through enforcerCtx
-- [ ] Write content-delegation unit tests
-- [ ] Regression run (1474+ pass)
-- [ ] Live smoke test
-- [ ] Commit + push + PR to staging
+- [x] Export 5 builders from template-composer.ts
+- [x] Extend InjectionContext with businessInfo
+- [x] Delegate features case
+- [x] Delegate stats case
+- [x] Delegate pricing case
+- [x] Delegate team case
+- [x] Delegate service-cards case
+- [x] Propagate businessInfo through enforcerCtx
+- [x] Write content-delegation unit tests
+- [x] Regression run (1474+ pass)
+- [x] Live smoke test
+- [x] Commit + push + PR to staging
 
 ## Success Criteria
 - Unit test `content-delegation.test.ts` passes với 10+ cases covering 5 delegated blocks + fallback

@@ -15,7 +15,7 @@ export const Blogs: CollectionConfig = {
                             type: 'BLOG_PUBLISHED',
                             title: 'Blog Published',
                             message: `${doc.title} has been published`,
-                            actionUrl: '/blogs',
+                            actionUrl: '/blog',
                         })
                     })
                     .catch((err) => console.error('[Notification] BLOG_PUBLISHED hook failed', err))

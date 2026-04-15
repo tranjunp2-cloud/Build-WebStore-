@@ -1495,6 +1495,41 @@ const MIGRATIONS = [
     name: '_pages_v_blocks_gallery.variant',
     sql: `ALTER TABLE _pages_v_blocks_gallery ADD COLUMN IF NOT EXISTS variant varchar;`,
   },
+  // ── Plan 260415 — variant column for blocks whose Payload schemas were
+  // missing a variant field entirely. Without this, AI gen + composer
+  // rotation had zero effect because Payload stripped the variant on save.
+  {
+    name: 'pages_blocks_contact.variant',
+    sql: `ALTER TABLE pages_blocks_contact ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_footer.variant',
+    sql: `ALTER TABLE pages_blocks_footer ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_stats.variant',
+    sql: `ALTER TABLE pages_blocks_stats ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: 'pages_blocks_team.variant',
+    sql: `ALTER TABLE pages_blocks_team ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_contact.variant',
+    sql: `ALTER TABLE _pages_v_blocks_contact ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_footer.variant',
+    sql: `ALTER TABLE _pages_v_blocks_footer ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_stats.variant',
+    sql: `ALTER TABLE _pages_v_blocks_stats ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_team.variant',
+    sql: `ALTER TABLE _pages_v_blocks_team ADD COLUMN IF NOT EXISTS variant varchar;`,
+  },
   // ── Tenants: Payment Methods ──
   {
     name: 'tenants.payments_payment_cod',

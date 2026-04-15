@@ -8,7 +8,11 @@
         "learnMore": "Learn More",
         "copyright": "© 2026 Web Store. All rights reserved.",
         "language": "Language",
-        "search": "Search..."
+        "search": "Search...",
+        "desktop": "Desktop",
+        "mobile": "Mobile",
+        "preview": "Preview",
+        "back": "Back"
     },
     "nav": {
         "platform": "Platform",
@@ -166,7 +170,40 @@
             "stepGenerating": "Generating content & design",
             "stepPreparing": "Preparing preview",
             "progressLabel": "Building your website",
-            "processing": "Processing..."
+            "processing": "Processing...",
+            "elapsed": "Elapsed: {seconds}s",
+            "timeoutWarning": "Taking longer than expected...",
+            "cancelButton": "Cancel generation",
+            "draftExpired": "Your previous AI builder draft expired after 24 hours.",
+            "saveFailed": "Failed to save the latest preview changes."
+        },
+        "completion": {
+            "successMessage": "has been created successfully!",
+            "sectionsGenerated": "+{count} sections",
+            "sectionsGeneratedLabel": "generated",
+            "generationTimeLabel": "generation time",
+            "description": "You can view the Preview on the right, open the Editor to make changes, or Publish now!",
+            "previewTitle": "Website Preview",
+            "previewSubtitle": "Your AI-generated website",
+            "viewFullPreview": "View Full Preview",
+            "startingMessage": "Starting website creation...",
+            "mobilePreviewTitle": "Mobile preview",
+            "mobilePreviewDescription": "Open the immersive preview to review the generated site on mobile.",
+            "openPreviewButton": "Open Preview",
+            "arrangeSectionsTitle": "Arrange sections",
+            "arrangeSectionsDescription": "Use list mode on mobile to move sections up or down safely.",
+            "openEditor": "Open Editor",
+            "publishing": "Publishing...",
+            "publishWebsite": "Publish Website",
+            "publishSuccess": "Website published successfully!",
+            "loading": "Loading...",
+            "goToDashboard": "Go To Dashboard",
+            "congratulations": "Congratulations!",
+            "websiteLiveMessage": "Your website {name} is now live and published to the internet.",
+            "copyLink": "Copy Link",
+            "copied": "Copied",
+            "linkCopied": "Link copied! 🎉",
+            "copyFailed": "Failed to copy link"
         },
         "form": {
             "businessName": "Business Name",
@@ -212,7 +249,18 @@
             "errorUnsafe": "This URL contains content that is not allowed.",
             "errorRateLimit": "Too many requests. Please wait a moment and try again.",
             "errorGeneric": "Something went wrong. Please try again or enter info manually.",
-            "tryManual": "Try manual entry"
+            "tryManual": "Try manual entry",
+            "initializing": "Initializing...",
+            "slugLabel": "Your website address",
+            "slugPlaceholder": "your-store-name",
+            "slugMinLength": "At least 3 characters required",
+            "slugInvalidFormat": "Invalid format",
+            "slugReserved": "This subdomain is reserved",
+            "slugTaken": "Already taken",
+            "slugAvailable": "Available",
+            "slugChecking": "Checking availability...",
+            "slugCheckError": "Unable to check. Please try again.",
+            "slugHelperText": "You can change this later in Settings > Domains"
         }
     },
     "email": {
@@ -1691,6 +1739,12 @@
             "newCount": "{count} new notifications",
             "justNow": "Just now",
             "dismiss": "Dismiss"
+        },
+        "push": {
+            "title": "Enable desktop notifications?",
+            "description": "Get notified about new orders and updates even when this tab is in the background.",
+            "enable": "Enable",
+            "later": "Later"
         }
     },
     "Staff": {
