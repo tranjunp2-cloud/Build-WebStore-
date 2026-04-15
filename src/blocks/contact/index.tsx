@@ -3,11 +3,12 @@
 import type { ReactNode, ComponentType } from 'react'
 import type { BlockProps } from '../types'
 import type { ContactConfig, FormField } from './config'
+import { useContactForm } from './useContactForm'
 import { AnimatedSection } from '../shared/animations'
 import { GradientBlob, SectionLabel, GlassCard } from '../shared/decorative'
 import { motion } from 'framer-motion'
 import { mergeContactInfoWithSite } from '@/lib/site-settings'
-import { Mail, Phone, MapPin } from 'lucide-react'
+import { Mail, Phone, MapPin, Loader2 } from 'lucide-react'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../shared/RichText'
 import { Heading, Body, Caption } from '../shared/Typography'
@@ -61,8 +62,22 @@ type ContactInfoCardProps = {
     icon: ComponentType<{ size?: number }>
     label: string
     value: string
+    type?: 'email' | 'phone' | 'address'
     layout?: 'inline' | 'center'
     iconBoxSize?: 'sm' | 'lg'
+}
+
+/**
+ * Plan 260415 contact-bugfix — derive interactive href cho value.
+ * Email → mailto:, phone → tel:, address → Google Maps link.
+ * User tap trên mobile mở đúng app thay vì plain text.
+ */
+function hrefForContactValue(type: ContactInfoCardProps['type'], value: string): string | undefined {
+    if (!value) return undefined
+    if (type === 'email') return `mailto:${value}`
+    if (type === 'phone') return `tel:${value.replace(/[^\d+]/g, '')}`
+    if (type === 'address') return `https://maps.google.com/?q=${encodeURIComponent(value)}`
+    return undefined
 }
 
 /**
@@ -70,11 +85,29 @@ type ContactInfoCardProps = {
  * info-only / split / form (default) variants. Two layouts:
  * - inline: icon-left + text-right (split/form)
  * - center: icon-top + text-center (info-only)
+ *
+ * Plan 260415 contact-bugfix — value giờ là interactive link (mailto/tel/maps)
+ * thay vì plain text. Mobile users có thể tap để mở native app tương ứng.
  */
-function ContactInfoCard({ icon: Icon, label, value, layout = 'inline', iconBoxSize = 'sm' }: ContactInfoCardProps) {
+function ContactInfoCard({ icon: Icon, label, value, type, layout = 'inline', iconBoxSize = 'sm' }: ContactInfoCardProps) {
     const iconSize = iconBoxSize === 'lg' ? 22 : 18
     const iconBoxClass = iconBoxSize === 'lg' ? 'w-12 h-12' : 'w-10 h-10'
     const padding = iconBoxSize === 'lg' ? CARD_PADDING.md : 'p-5'
+    const href = hrefForContactValue(type, value)
+    const isExternal = href?.startsWith('http')
+
+    const valueNode = href ? (
+        <a
+            href={href}
+            target={isExternal ? '_blank' : undefined}
+            rel={isExternal ? 'noopener noreferrer' : undefined}
+            className="font-medium break-words hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40 rounded"
+        >
+            {value}
+        </a>
+    ) : (
+        <span className="font-medium break-words">{value}</span>
+    )
 
     if (layout === 'center') {
         return (
@@ -86,23 +119,23 @@ function ContactInfoCard({ icon: Icon, label, value, layout = 'inline', iconBoxS
                     <Icon size={iconSize} />
                 </div>
                 <Caption className="uppercase tracking-wider opacity-40 mb-1 block">{label}</Caption>
-                <Body size="small" className="font-medium">{value}</Body>
+                <Body size="small">{valueNode}</Body>
             </GlassCard>
         )
     }
 
     return (
         <GlassCard color={CSS_VARS.primary} className={padding}>
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-4">
                 <div
-                    className={`${iconBoxClass} rounded-xl flex items-center justify-center text-lg`}
+                    className={`${iconBoxClass} shrink-0 rounded-xl flex items-center justify-center text-lg`}
                     style={{ background: `rgba(var(--brand-primary-rgb), 0.082)`, color: 'var(--brand-primary)' }}
                 >
                     <Icon size={iconSize} />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                     <Caption className="opacity-40 mb-0.5 block">{label}</Caption>
-                    <Body size="small" className="font-medium">{value}</Body>
+                    <Body size="small">{valueNode}</Body>
                 </div>
             </div>
         </GlassCard>
@@ -111,83 +144,170 @@ function ContactInfoCard({ icon: Icon, label, value, layout = 'inline', iconBoxS
 
 type ContactFormProps = {
     formFields: FormField[]
+    siteId?: string
     className?: string
+    submitLabel?: string
 }
 
-/** Standard form with FormFieldInput loop + SubmitButton. Used 4 times. */
-function ContactForm({ formFields, className = 'space-y-5' }: ContactFormProps) {
-    return (
-        <form className={className} onSubmit={e => e.preventDefault()}>
-            {formFields.map((field, i) => (
-                <div key={i}>
-                    <label className="block text-sm font-medium mb-2 opacity-70">
-                        {field.label}
-                        {field.required && <span style={{ color: 'var(--brand-primary)' }}> *</span>}
-                    </label>
-                    <FormFieldInput field={field} />
+/**
+ * Plan 260415 contact-bugfix — Standard form wired vào useContactForm hook.
+ * - POST tới /api/contact-submit
+ * - Client validation (required, email, phone pattern)
+ * - Per-field error inline
+ * - Submit error alert area
+ * - Loading spinner + disabled button
+ * - Success state replaces form với "Thanks" message
+ * - Honeypot field (name="website") ẩn cho bot
+ */
+function ContactForm({ formFields, siteId, className = 'space-y-5', submitLabel = 'Send Message →' }: ContactFormProps) {
+    const requiredFieldNames = formFields
+        .filter(f => f.required)
+        .map(f => f.fieldName || f.fieldType || 'message')
+
+    const { state, errors, submitError, handleSubmit } = useContactForm({
+        siteId,
+        requiredFieldNames,
+    })
+
+    if (state === 'success') {
+        return (
+            <div
+                className={`flex flex-col items-center justify-center text-center py-8 px-4 rounded-xl ${className.includes('space-y') ? '' : className}`}
+                role="status"
+                aria-live="polite"
+                style={{
+                    background: `rgba(var(--brand-primary-rgb), 0.04)`,
+                    border: `1px solid rgba(var(--brand-primary-rgb), 0.15)`,
+                }}
+            >
+                <div
+                    className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
+                    style={{ background: `rgba(var(--brand-primary-rgb), 0.12)`, color: 'var(--brand-primary)' }}
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5" />
+                    </svg>
                 </div>
-            ))}
-            <SubmitButton />
+                <Heading level={4} className="mb-1">Thanks for reaching out!</Heading>
+                <Body size="small" className="opacity-60">We will get back to you shortly.</Body>
+            </div>
+        )
+    }
+
+    return (
+        <form className={className} onSubmit={handleSubmit} noValidate>
+            {/* Honeypot — ẩn khỏi user, bot fill thì reject */}
+            <div style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }} aria-hidden="true">
+                <label>
+                    Website
+                    <input type="text" name="website" tabIndex={-1} autoComplete="off" />
+                </label>
+            </div>
+
+            {formFields.map((field, i) => {
+                const fieldName = field.fieldName || field.fieldType || `field-${i}`
+                const error = errors[fieldName as keyof typeof errors]
+                const errorId = error ? `${fieldName}-error` : undefined
+                return (
+                    <div key={fieldName}>
+                        <label htmlFor={fieldName} className="block text-sm font-medium mb-2 opacity-70">
+                            {field.label}
+                            {field.required && <span style={{ color: 'var(--brand-primary)' }}> *</span>}
+                        </label>
+                        <FormFieldInput field={field} error={!!error} errorId={errorId} />
+                        {error && (
+                            <p id={errorId} className="mt-1 text-xs" style={{ color: '#ef4444' }} role="alert">
+                                {error}
+                            </p>
+                        )}
+                    </div>
+                )
+            })}
+
+            {submitError && (
+                <div
+                    role="alert"
+                    className="px-4 py-3 rounded-lg text-sm"
+                    style={{
+                        background: 'rgba(239,68,68,0.08)',
+                        border: '1px solid rgba(239,68,68,0.25)',
+                        color: '#ef4444',
+                    }}
+                >
+                    {submitError}
+                </div>
+            )}
+
+            <SubmitButton label={submitLabel} isSubmitting={state === 'loading'} />
         </form>
     )
 }
 
-// ── Shared form input styles ─────────────────────────────────────────────────
+// ── Shared form input classes ─────────────────────────────────────────────────
+// Plan 260415 contact-bugfix — thay inline handleFocus/handleBlur mutation bằng
+// Tailwind focus-visible classes. Không mutate DOM style trực tiếp, hỗ trợ a11y
+// (focus-visible chỉ hiện khi keyboard nav, không khi click chuột).
 
-const inputStyle = {
-    background: `rgba(var(--brand-primary-rgb), 0.024)`,
-    border: `1px solid rgba(var(--brand-primary-rgb), 0.082)`,
-    color: 'inherit',
-}
+const INPUT_BASE_CLASS =
+    'w-full px-4 py-3 rounded-xl text-sm outline-none transition-colors bg-[rgba(var(--brand-primary-rgb),0.03)] border border-[rgba(var(--brand-primary-rgb),0.12)] focus-visible:border-[rgba(var(--brand-primary-rgb),0.45)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--brand-primary-rgb),0.18)] disabled:opacity-50 disabled:cursor-not-allowed'
 
-function handleFocus(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
-    e.currentTarget.style.borderColor = `rgba(var(--brand-primary-rgb), 0.251)`
-    e.currentTarget.style.boxShadow = `0 0 0 3px rgba(var(--brand-primary-rgb), 0.063)`
-}
+function FormFieldInput({ field, error, errorId }: { field: FormField; error?: boolean; errorId?: string }) {
+    const name = field.fieldName || field.fieldType || 'field'
+    const isTextarea = field.fieldType === 'textarea'
+    const type = field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'
 
-function handleBlur(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
-    e.currentTarget.style.borderColor = `rgba(var(--brand-primary-rgb), 0.082)`
-    e.currentTarget.style.boxShadow = 'none'
-}
+    // Plan 260415 contact-bugfix — autoComplete hints giúp browser password
+    // manager / 1Password gợi ý fill đúng field.
+    const autoComplete =
+        field.fieldType === 'email'
+            ? 'email'
+            : field.fieldType === 'phone'
+              ? 'tel'
+              : name === 'name'
+                ? 'name'
+                : 'off'
 
-function FormFieldInput({ field }: { field: FormField }) {
-    if (field.fieldType === 'textarea') {
-        return (
-            <textarea
-                placeholder={field.placeholder || field.label}
-                rows={4}
-                className="w-full px-4 py-3 rounded-xl text-sm transition-all duration-200 outline-none resize-none"
-                style={inputStyle}
-                onFocus={handleFocus}
-                onBlur={handleBlur}
-            />
-        )
+    const errorClass = error ? ' border-[#ef4444] focus-visible:ring-[#ef4444]/30' : ''
+    const commonProps = {
+        id: name,
+        name,
+        required: field.required,
+        'aria-required': field.required,
+        'aria-invalid': error,
+        'aria-describedby': errorId,
+        placeholder: field.placeholder || field.label,
+        className: INPUT_BASE_CLASS + errorClass,
     }
+
+    if (isTextarea) {
+        return <textarea {...commonProps} rows={4} className={INPUT_BASE_CLASS + errorClass + ' resize-none'} />
+    }
+
     return (
         <input
-            type={field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'}
-            placeholder={field.placeholder || field.label}
-            className="w-full px-4 py-3 rounded-xl text-sm transition-all duration-200 outline-none"
-            style={inputStyle}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
+            {...commonProps}
+            type={type}
+            autoComplete={autoComplete}
+            pattern={field.fieldType === 'phone' ? '[0-9+\\s()-]{9,20}' : undefined}
         />
     )
 }
 
-function SubmitButton({ label = 'Send Message \u2192' }: { label?: string }) {
+function SubmitButton({ label = 'Send Message →', isSubmitting = false }: { label?: string; isSubmitting?: boolean }) {
     return (
         <motion.button
             type="submit"
-            whileHover={{ scale: 1.02, y: -1 }}
-            whileTap={{ scale: 0.98 }}
-            className={`w-full py-3.5 rounded-xl font-semibold text-sm text-white transition-all duration-300 ${TOUCH_TARGET.min} flex items-center justify-center`}
+            disabled={isSubmitting}
+            whileHover={isSubmitting ? undefined : { scale: 1.02, y: -1 }}
+            whileTap={isSubmitting ? undefined : { scale: 0.98 }}
+            className={`w-full py-3.5 rounded-xl font-semibold text-sm text-white transition-all duration-300 ${TOUCH_TARGET.min} flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed`}
             style={{
                 background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
                 boxShadow: `0 6px 25px rgba(var(--brand-primary-rgb), 0.188)`,
             }}
         >
-            {label}
+            {isSubmitting && <Loader2 size={16} className="animate-spin" aria-hidden="true" />}
+            {isSubmitting ? 'Sending…' : label}
         </motion.button>
     )
 }
@@ -197,6 +317,7 @@ function SubmitButton({ label = 'Send Message \u2192' }: { label?: string }) {
 export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) {
     const mergedBlock = mergeContactInfoWithSite(block, site?.contactInfo)
     const { headline, subtext, email, phone, address, formFields = [], variant = 'form' } = mergedBlock
+    const siteId = site?.id ? String(site.id) : undefined
 
     // ── Card Float variant ────────────────────────────────────────────────
     if (variant === 'card-float') {
@@ -209,30 +330,54 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                 <div className={`${CONTACT_CONTAINER} relative z-10`}>
                     <ContactHeader headline={headline} subtext={subtext} className="text-center max-w-2xl mx-auto mb-10" />
 
-                    {/* Floating card */}
-                    <div className={`bg-white dark:bg-zinc-900 shadow-xl rounded-2xl ${CARD_PADDING.lg} mx-auto max-w-xl`} style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.063)` }}>
-                        <ContactForm formFields={formFields} />
+                    {/* Plan 260415 contact-bugfix — Floating card dùng theme surface
+                        thay vì hardcode bg-white/dark:bg-zinc-900. Dark theme + brand
+                        colors giờ render đúng card bg theo token. */}
+                    <div
+                        className={`shadow-xl rounded-2xl ${CARD_PADDING.lg} mx-auto max-w-xl`}
+                        style={{
+                            background: `color-mix(in srgb, var(--surface, #ffffff) 95%, transparent)`,
+                            border: `1px solid rgba(var(--brand-primary-rgb), 0.12)`,
+                        }}
+                    >
+                        <ContactForm formFields={formFields} siteId={siteId} />
                     </div>
 
-                    {/* Info chips below card */}
+                    {/* Plan 260415 contact-bugfix — Info chips giờ là interactive
+                        link (mailto/tel/maps) + max-w-full + truncate để dài không
+                        tràn mobile 375px. */}
                     <div className="flex flex-wrap justify-center gap-4 mt-8 max-w-xl mx-auto">
                         {email && (
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'var(--brand-primary)' }}>
-                                <Mail size={14} aria-hidden="true" />
-                                <span>{email}</span>
-                            </div>
+                            <a
+                                href={`mailto:${email}`}
+                                className="flex items-center gap-2 px-4 py-2 rounded-full text-sm max-w-full hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40"
+                                style={{ background: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'var(--brand-primary)' }}
+                            >
+                                <Mail size={14} aria-hidden="true" className="shrink-0" />
+                                <span className="truncate">{email}</span>
+                            </a>
                         )}
                         {phone && (
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'var(--brand-primary)' }}>
-                                <Phone size={14} aria-hidden="true" />
-                                <span>{phone}</span>
-                            </div>
+                            <a
+                                href={`tel:${phone.replace(/[^\d+]/g, '')}`}
+                                className="flex items-center gap-2 px-4 py-2 rounded-full text-sm max-w-full hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40"
+                                style={{ background: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'var(--brand-primary)' }}
+                            >
+                                <Phone size={14} aria-hidden="true" className="shrink-0" />
+                                <span className="truncate">{phone}</span>
+                            </a>
                         )}
                         {address && (
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm" style={{ background: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'var(--brand-primary)' }}>
-                                <MapPin size={14} aria-hidden="true" />
-                                <span>{address}</span>
-                            </div>
+                            <a
+                                href={`https://maps.google.com/?q=${encodeURIComponent(address)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 px-4 py-2 rounded-full text-sm max-w-full hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]/40"
+                                style={{ background: `rgba(var(--brand-primary-rgb), 0.063)`, color: 'var(--brand-primary)' }}
+                            >
+                                <MapPin size={14} aria-hidden="true" className="shrink-0" />
+                                <span className="truncate">{address}</span>
+                            </a>
                         )}
                     </div>
                 </div>
@@ -290,7 +435,7 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
 
                     {/* Contact form */}
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
-                        <ContactForm formFields={formFields} />
+                        <ContactForm formFields={formFields} siteId={siteId} />
                     </GlassCard>
                 </div>
             </ContactSection>
@@ -312,39 +457,15 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                         </div>
                     )}
 
-                    <form className="flex flex-wrap gap-4 items-end" onSubmit={e => e.preventDefault()}>
-                        {formFields.map((field, i) => (
-                            <div key={i} className="flex-1 min-w-[200px]">
-                                <label className="block text-xs font-medium mb-1 opacity-50">{field.label}</label>
-                                <input
-                                    type={field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'}
-                                    placeholder={field.placeholder || field.label}
-                                    className="w-full px-0 py-2 text-sm transition-all duration-200 outline-none bg-transparent"
-                                    style={{
-                                        borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.15)`,
-                                        color: 'inherit',
-                                    }}
-                                    onFocus={e => {
-                                        e.currentTarget.style.borderBottomColor = `var(--brand-primary)`
-                                    }}
-                                    onBlur={e => {
-                                        e.currentTarget.style.borderBottomColor = `rgba(var(--brand-primary-rgb), 0.15)`
-                                    }}
-                                />
-                            </div>
-                        ))}
-                        <motion.button
-                            type="submit"
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className={`px-6 py-2 rounded-lg font-semibold text-sm text-white transition-all duration-300 ${TOUCH_TARGET.min} inline-flex items-center justify-center`}
-                            style={{
-                                background: `var(--brand-primary)`,
-                            }}
-                        >
-                            Send
-                        </motion.button>
-                    </form>
+                    {/* Plan 260415 contact-bugfix — minimal-inline giờ dùng ContactForm
+                        hook wired. Layout wraps horizontal flex cho inputs nhưng vẫn
+                        có full submit state + validation + honeypot. */}
+                    <ContactForm
+                        formFields={formFields}
+                        siteId={siteId}
+                        className="flex flex-wrap gap-4 items-start"
+                        submitLabel="Send"
+                    />
                 </div>
             </AnimatedSection>
         )
@@ -356,9 +477,9 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
             <ContactSection>
                 <ContactHeader headline={headline} subtext={subtext} />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                    {email && <ContactInfoCard icon={Mail} label="Email" value={email} layout="center" iconBoxSize="lg" />}
-                    {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} layout="center" iconBoxSize="lg" />}
-                    {address && <ContactInfoCard icon={MapPin} label="Address" value={address} layout="center" iconBoxSize="lg" />}
+                    {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" layout="center" iconBoxSize="lg" />}
+                    {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" layout="center" iconBoxSize="lg" />}
+                    {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" layout="center" iconBoxSize="lg" />}
                 </div>
             </ContactSection>
         )
@@ -373,13 +494,13 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                     {/* Form */}
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
-                        <ContactForm formFields={formFields} />
+                        <ContactForm formFields={formFields} siteId={siteId} />
                     </GlassCard>
                     {/* Contact Info */}
                     <div className="space-y-6">
-                        {email && <ContactInfoCard icon={Mail} label="Email" value={email} />}
-                        {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} />}
-                        {address && <ContactInfoCard icon={MapPin} label="Address" value={address} />}
+                        {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" />}
+                        {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" />}
+                        {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" />}
                     </div>
                 </div>
             </ContactSection>
@@ -397,14 +518,14 @@ export function ContactBlock({ block, theme, site }: BlockProps<ContactConfig>) 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                 {/* Contact Info */}
                 <div className="lg:col-span-1 space-y-6">
-                    {email && <ContactInfoCard icon={Mail} label="Email" value={email} />}
-                    {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} />}
-                    {address && <ContactInfoCard icon={MapPin} label="Address" value={address} />}
+                    {email && <ContactInfoCard icon={Mail} label="Email" value={email} type="email" />}
+                    {phone && <ContactInfoCard icon={Phone} label="Phone" value={phone} type="phone" />}
+                    {address && <ContactInfoCard icon={MapPin} label="Address" value={address} type="address" />}
                 </div>
                 {/* Contact Form */}
                 <div className="lg:col-span-2">
                     <GlassCard color={CSS_VARS.primary} className={CARD_PADDING.lg}>
-                        <ContactForm formFields={formFields} />
+                        <ContactForm formFields={formFields} siteId={siteId} />
                     </GlassCard>
                 </div>
             </div>
