@@ -125,7 +125,7 @@ export function PushOptInPrompt() {
       <button
         onClick={handleLater}
         className="absolute top-3 right-3 text-white/40 hover:text-white/80 transition-colors"
-        aria-label="Close"
+        aria-label={t.notifications.close}
       >
         <X className="h-4 w-4" />
       </button>

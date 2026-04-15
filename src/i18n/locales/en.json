@@ -1756,6 +1756,24 @@
             "description": "Get notified about new orders and updates even when this tab is in the background.",
             "enable": "Enable",
             "later": "Later"
+        },
+        "types": {
+            "BLOG_PUBLISHED": {
+                "title": "Blog Published",
+                "message": "{blogTitle} has been published"
+            },
+            "PRODUCT_LOW_STOCK": {
+                "title": "Low Stock Alert",
+                "message": "{productName} is running low ({quantity} units left)"
+            },
+            "ORDER_NEW": {
+                "title": "New Order #{orderNumber} - {currency} {total}",
+                "message": "Order placed by {customerName}"
+            },
+            "SYSTEM_ALERT": {
+                "title": "Payment Failed - Order #{orderNumber}",
+                "message": "Payment for order #{orderNumber} has failed. Customer may retry."
+            }
         }
     },
     "Staff": {

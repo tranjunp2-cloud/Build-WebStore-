@@ -80,6 +80,7 @@ export const lowStockHook: CollectionAfterChangeHook = async ({ doc, previousDoc
                     title: 'Low Stock Alert',
                     message: `${doc.name} is running low (${currInventory} units left)`,
                     actionUrl: '/products',
+                    metadata: { productName: doc.name, quantity: String(currInventory) },
                 })
             })
             .catch((err) => console.error('[Notification] PRODUCT_LOW_STOCK hook failed', err))

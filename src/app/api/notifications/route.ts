@@ -89,6 +89,7 @@ export const GET = withAuth(async (user, request) => {
             type: doc.type as NotificationsResponse['items'][number]['type'],
             title: doc.title as string,
             message: (doc.message as string) ?? '',
+            ...(doc.metadata ? { metadata: doc.metadata as Record<string, string> } : {}),
             actionUrl: (doc.actionUrl as string | null) ?? null,
             isRead: Boolean(doc.isRead),
             createdAt: doc.createdAt as string,
