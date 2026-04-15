@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 
 export const metadata: Metadata = {
     title: {
@@ -18,6 +18,18 @@ export const metadata: Metadata = {
     twitter: {
         card: 'summary_large_image',
     },
+}
+
+// Plan 260415 nav-bugfix hotfix: add viewport meta so mobile browsers render
+// generated template pages at actual device width (375-428px) instead of the
+// legacy 980px default. Without this, Tailwind `md:`/`lg:` responsive classes
+// fire at the wrong viewport and sections like service-cards / contact / footer
+// show desktop multi-column layouts squished into mobile screens (issue reported
+// 2026-04-15 on staging).
+export const viewport: Viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
 }
 
 /**

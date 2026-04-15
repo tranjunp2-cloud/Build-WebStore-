@@ -90,6 +90,12 @@ export const editBlockSchema = z.object({
     allBlocks: z.array(z.record(z.unknown())).optional(),
     theme: z.record(z.unknown()).optional(),
     siteName: z.string().optional(),
+    currentPageSlug: z.string().optional(),
+    currentPageTitle: z.string().optional(),
+    chatHistory: z.array(z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().max(300),
+    })).max(10).optional(),
 })
 
 export const rewriteTextSchema = z.object({

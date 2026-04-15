@@ -31,6 +31,8 @@ interface AIChatPanelProps {
     onUndoLastAction: () => void
     siteName: string
     theme: ThemeData | undefined
+    currentPageSlug?: string
+    currentPageTitle?: string
     externalActivity?: {
         id: string
         content: string
@@ -52,6 +54,8 @@ function AIChatPanelInner({
     onUndoLastAction,
     siteName,
     theme,
+    currentPageSlug,
+    currentPageTitle,
     externalActivity,
     compact = false,
 }: AIChatPanelProps) {
@@ -218,6 +222,13 @@ function AIChatPanelInner({
 
         try {
             const currentBlock = selectedBlock !== null ? (blocks[selectedBlock] || null) : null
+
+            // Spec §1.3: send last 10 chat messages as context
+            const recentMessages = messages
+                .filter(m => !m.isStreaming)
+                .slice(-10)
+                .map(m => ({ role: m.role, content: m.content }))
+
             const res = await fetch('/api/ai/edit-block?stream=true', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -229,6 +240,9 @@ function AIChatPanelInner({
                     allBlocks: blocks,
                     theme,
                     siteName,
+                    currentPageSlug: currentPageSlug || 'home',
+                    currentPageTitle: currentPageTitle || '',
+                    chatHistory: recentMessages,
                 }),
             })
 
