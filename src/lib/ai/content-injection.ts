@@ -17,6 +17,18 @@ import { ITEM_FIELD_BY_BLOCK } from './category-requirements'
 import { hashString, seededShuffle, seededShufflePick } from './seeded-random'
 import type { ThemeMood } from './theme-moods'
 import { getCategoryCTA } from './theme-moods'
+// Plan 2253 follow-up (260415-0900) — wire template composer builders into
+// gap-fill path. These builders have ~280 hand-curated Malaysia-specific
+// content entries (JAKIM halal, FPX payment, MBBS UM credentials, RM pricing)
+// that the generic gap-fill pool was missing. Delegation with try-catch
+// fallback to legacy hardcoded blocks.
+import {
+    buildFeatures as composerBuildFeatures,
+    buildStats as composerBuildStats,
+    buildPricing as composerBuildPricing,
+    buildTeam as composerBuildTeam,
+    buildServiceCards as composerBuildServiceCards,
+} from './template-composer'
 
 export interface InjectionContext {
     businessName?: string
@@ -199,6 +211,15 @@ export function buildBlockFromLibrary(
     const testimonialSlice = rotateSlice(content.testimonials, bizSeed)
     const faqSlice = rotateSlice(content.faqItems, bizSeed ^ hashString('faq'))
 
+    // Plan 2253 follow-up (260415-0900) — merged business sample for
+    // delegation to template-composer builders. Library default (biz) +
+    // user overrides from ctx.userBiz (name, tagline, products, contact).
+    // Used by features/stats/pricing/team/service-cards delegation below.
+    const mergedBiz: BusinessSample = {
+        ...(biz ?? ({} as BusinessSample)),
+        ...(userBiz ?? {}),
+    }
+
     switch (blockType) {
         case 'navigation':
             return {
@@ -315,10 +336,18 @@ export function buildBlockFromLibrary(
             }
 
         case 'features': {
-            // Plan 2253 Phase 03 amendment v3 — shuffle + slice from 8-item pool
-            // by compound seed so same-category businesses inject different
-            // first 4 features, killing the "Quality Service / Fast Response..."
-            // collision observed in post-fix-v2 measurement.
+            // Plan 2253 follow-up (260415-0900) — delegate to template-composer
+            // buildFeatures which has hand-curated Malaysia-specific features per
+            // 14 categories (JAKIM halal for restaurant, MBBS UM for health, etc).
+            // Composer also handles user product injection via featuresFromProducts
+            // so same-category businesses diverge. Fallback to legacy Phase 03
+            // shuffle pool on error (defensive).
+            try {
+                return composerBuildFeatures(mergedBiz, category)
+            } catch (err) {
+                console.warn('[content-injection] composerBuildFeatures failed, falling back:', err)
+            }
+
             const pool = [
                 { icon: '⭐', title: 'Quality Service', description: 'Exceptional quality in every interaction.' },
                 { icon: '🚀', title: 'Fast Response', description: 'Quick turnaround on all requests.' },
@@ -330,10 +359,6 @@ export function buildBlockFromLibrary(
                 { icon: '📈', title: 'Proven Track Record', description: 'Trusted by hundreds of satisfied clients.' },
             ]
             const shuffled = seededShuffle(pool, bizSeed ^ hashString('features'))
-
-            // Plan 07 — when the user supplied ≥2 products, replace the first
-            // cards with product-derived titles so same-category businesses
-            // emit different features on the enforcer-padded path.
             let features = shuffled.slice(0, 4)
             if (userProducts.length >= 2) {
                 const productCards = userProducts.slice(0, 4).map((product, idx) => {
@@ -345,21 +370,27 @@ export function buildBlockFromLibrary(
                         description: `Our signature ${product} — a favourite with every ${name} guest.`,
                     }
                 })
-                // Pad to 4 cards from the shuffled canned pool when user has < 4 products.
                 const needed = Math.max(0, 4 - productCards.length)
                 features = productCards.concat(shuffled.slice(4, 4 + needed))
             }
-
             return {
                 blockType: 'features',
                 variant: 'grid-3',
-                // Plan 07 — headline references biz name so same-category variants diverge.
                 headline: `Why Choose ${name}`,
                 features,
             }
         }
 
         case 'stats': {
+            // Plan 2253 follow-up (260415-0900) — delegate to template-composer
+            // buildStats for category-curated stats (20+ Years / 15000+ Patients
+            // Treated for health; 50000+ Customers for restaurant; etc).
+            try {
+                return composerBuildStats(category)
+            } catch (err) {
+                console.warn('[content-injection] composerBuildStats failed, falling back:', err)
+            }
+
             const pool = [
                 { value: '500+', label: 'Happy Customers' },
                 { value: '10+', label: 'Years Experience' },
@@ -378,8 +409,17 @@ export function buildBlockFromLibrary(
         }
 
         case 'team': {
-            // Note: Payload schema uses `image` field (not `avatar`) for member photos.
-            // Media pipeline fills this via BLOCK_IMAGE_SPEC.team.
+            // Plan 2253 follow-up (260415-0900) — delegate to template-composer
+            // buildTeam for category-curated team members (Dr. Tan Wei Ming MBBS
+            // for health, Ahmad Razif CTO for tech, Dato' Rahman for business).
+            // Note: Payload schema uses `image` field (not `avatar`) — composer
+            // bios don't set image, media pipeline fills via BLOCK_IMAGE_SPEC.team.
+            try {
+                return composerBuildTeam(category)
+            } catch (err) {
+                console.warn('[content-injection] composerBuildTeam failed, falling back:', err)
+            }
+
             const pool = [
                 { name: 'Team Lead', role: 'Founder', bio: 'Passionate about delivering great experiences.' },
                 { name: 'Senior Specialist', role: 'Expert', bio: 'Years of experience in the field.' },
@@ -398,6 +438,16 @@ export function buildBlockFromLibrary(
         }
 
         case 'service-cards': {
+            // Plan 2253 follow-up (260415-0900) — delegate to template-composer
+            // buildServiceCards for category-curated services ("Halal Catering"
+            // for fnb; "Dental Implants" for health; etc). Composer also reads
+            // biz.products so user-supplied services drive output when provided.
+            try {
+                return composerBuildServiceCards(mergedBiz, category)
+            } catch (err) {
+                console.warn('[content-injection] composerBuildServiceCards failed, falling back:', err)
+            }
+
             const pool = [
                 { icon: '⭐', title: 'Premium Service', description: 'Our flagship offering.' },
                 { icon: '🚀', title: 'Fast Delivery', description: 'Quick turnaround on every job.' },
@@ -439,7 +489,17 @@ export function buildBlockFromLibrary(
                 placeholder: 'your@email.com',
             }
 
-        case 'pricing':
+        case 'pricing': {
+            // Plan 2253 follow-up (260415-0900) — delegate to template-composer
+            // buildPricing for category-curated RM tiers ("Bridal Package RM 800"
+            // for beauty, "Executive Checkup RM 1200" for health, etc). Composer
+            // has 7 category-specific maps + RM default for other categories.
+            try {
+                return composerBuildPricing(category)
+            } catch (err) {
+                console.warn('[content-injection] composerBuildPricing failed, falling back:', err)
+            }
+
             return {
                 blockType: 'pricing',
                 variant: 'cards',
@@ -479,6 +539,7 @@ export function buildBlockFromLibrary(
                     },
                 ],
             }
+        }
 
         case 'logo-cloud':
             return {
