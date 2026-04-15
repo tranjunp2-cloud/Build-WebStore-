@@ -1945,7 +1945,8 @@
             "mobile": "Mudah Alih",
             "changesPending": "Perubahan menunggu",
             "sitePreview": "Pratonton Laman",
-            "dragToReorder": "Seret untuk susun semula bahagian"
+            "dragToReorder": "Seret untuk susun semula bahagian",
+            "drag": "Seret"
         },
         "publishModal": {
             "title": "Sedia untuk Terbitkan?",
@@ -2008,7 +2009,10 @@
             "unpublishSuccess": "Laman web kini dalam mod penyelenggaraan.",
             "linkCopied": "Pautan disalin!",
             "publishFailed": "Gagal menerbitkan",
-            "updateSuccess": "Laman web dikemaskini!"
+            "updateSuccess": "Laman web dikemaskini!",
+            "viewAction": "Lihat",
+            "saveSuccess": "Perubahan disimpan",
+            "saveFailed": "Gagal menyimpan"
         },
         "maintenance": {
             "banner": "Laman web dalam Mod Penyelenggaraan. Pelanggan akan melihat halaman penyelenggaraan.",
@@ -2047,7 +2051,9 @@
             "customPage": "Halaman 404 Tersuai",
             "emptyTitle": "Tiada halaman lagi",
             "emptyDesc": "Cipta halaman pertama anda untuk bermula.",
-            "slugLocked": "Slug dikunci selepas diterbitkan untuk melindungi SEO dan pautan luaran."
+            "slugLocked": "Slug dikunci selepas diterbitkan untuk melindungi SEO dan pautan luaran.",
+            "statusLive": "Aktif",
+            "statusDraft": "Draf"
         },
         "aiChat": {
             "welcomeMessage": "Hai! Apa yang anda ingin ubah?",
@@ -2078,7 +2084,48 @@
         "blockLibrary": {
             "searchPlaceholder": "Cari blok...",
             "dragHint": "klik atau seret",
-            "footerHint": "Klik untuk tambah atau seret blok ke pratonton"
+            "footerHint": "Klik untuk tambah atau seret blok ke pratonton",
+            "dropToAdd": "Lepaskan untuk tambah blok",
+            "categories": {
+                "basics": "Asas",
+                "content": "Kandungan",
+                "media": "Media",
+                "store": "Perniagaan",
+                "commerce": "Perdagangan",
+                "form": "Borang & Hubungi",
+                "widgets": "Widget",
+                "layout": "Susun Atur"
+            },
+            "blocks": {
+                "hero": { "name": "Hero", "description": "Sepanduk hero dengan tajuk dan CTA" },
+                "cta": { "name": "CTA", "description": "Sepanduk seruan tindakan" },
+                "about": { "name": "Tentang Kami", "description": "Bahagian tentang kami" },
+                "features": { "name": "Ciri-ciri", "description": "Sorotan ciri dengan ikon" },
+                "step-process": { "name": "Proses Langkah", "description": "Aliran proses langkah demi langkah" },
+                "service-cards": { "name": "Kad Perkhidmatan", "description": "Tawaran perkhidmatan dengan kad" },
+                "faq": { "name": "Soalan Lazim", "description": "Soalan yang kerap ditanya" },
+                "testimonials": { "name": "Testimoni", "description": "Ulasan dan testimoni pelanggan" },
+                "social-proof": { "name": "Bukti Sosial", "description": "Ulasan pelanggan dengan penilaian bintang" },
+                "portfolio-grid": { "name": "Grid Portfolio", "description": "Pameran portfolio dalam grid" },
+                "gallery": { "name": "Galeri", "description": "Galeri gambar dengan susun atur" },
+                "video": { "name": "Video", "description": "Bahagian video terbenam" },
+                "carousel": { "name": "Karusel", "description": "Karusel gambar atau kandungan" },
+                "pricing": { "name": "Harga", "description": "Perbandingan pelan harga" },
+                "feature-comparison": { "name": "Perbandingan Ciri", "description": "Bandingkan produk dengan matriks ciri" },
+                "menu-food": { "name": "Menu Makanan", "description": "Menu makanan restoran" },
+                "products-grid": { "name": "Grid Produk", "description": "Grid senarai produk" },
+                "products-featured": { "name": "Produk Pilihan", "description": "Pameran produk yang ditonjolkan" },
+                "cartWidget": { "name": "Butang Troli", "description": "Widget troli beli-belah" },
+                "contact": { "name": "Hubungi", "description": "Borang hubungi dan maklumat perniagaan" },
+                "newsletter": { "name": "Surat Berita", "description": "Borang langganan e-mel" },
+                "whatsapp-button": { "name": "Butang WhatsApp", "description": "Butang hubungi WhatsApp" },
+                "stats": { "name": "Statistik", "description": "Metrik dan statistik utama" },
+                "logo-cloud": { "name": "Awan Logo", "description": "Logo rakan kongsi dan pelanggan" },
+                "socialWidget": { "name": "Media Sosial", "description": "Widget pautan media sosial" },
+                "team": { "name": "Pasukan", "description": "Profil ahli pasukan" },
+                "divider": { "name": "Pemisah", "description": "Pemisah visual antara bahagian" },
+                "announcement-bar": { "name": "Bar Pengumuman", "description": "Sepanduk atas untuk promosi" }
+            }
         },
         "inlineEdit": {
             "title": "Suntingan AI Sebaris",
@@ -2094,7 +2141,9 @@
             "faviconGenerated": " & Favicon dijana",
             "error": "Gagal mengemas kini logo",
             "uploading": "Memuat naik...",
-            "clickToUpload": "Klik untuk muat naik"
+            "clickToUpload": "Klik untuk muat naik",
+            "altSiteLogo": "Logo Laman",
+            "altFavicon": "Favicon"
         },
         "navigation": {
             "title": "Pautan Navigasi",
@@ -2126,6 +2175,15 @@
             "address": "Alamat",
             "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
             "socialLinks": "Pautan Sosial",
+            "socialPlatforms": {
+                "facebook": { "label": "Facebook", "placeholder": "facebook.com/yourbrand" },
+                "whatsapp": { "label": "WhatsApp", "placeholder": "60123456789" },
+                "instagram": { "label": "Instagram", "placeholder": "instagram.com/yourbrand" },
+                "linkedin": { "label": "LinkedIn", "placeholder": "linkedin.com/company/yourbrand" },
+                "youtube": { "label": "YouTube", "placeholder": "youtube.com/@yourbrand" }
+            },
+            "socialHintWhatsapp": "Nombor telefon atau pautan wa.me",
+            "socialHintDefault": "URL profil awam",
             "invalidSocialHtml": "Input tidak sah — HTML tidak dibenarkan",
             "invalidSocialUrl": "Sila masukkan URL yang sah (https://...)",
             "themeColors": "Tema & Warna",
@@ -2152,6 +2210,8 @@
             "generating": "Menjana...",
             "autoSeo": "Pengoptimuman SEO Automatik",
             "navStyle": "Gaya Navigasi",
+            "navStyleStandard": "Standard",
+            "navStyleCentered": "Berpusat",
             "globalSettings": "Tetapan Laman Global",
             "seoSettings": "Tetapan SEO",
             "menuSettings": "Tetapan Menu",
@@ -2212,7 +2272,13 @@
             "showTextLabel": "Tunjukkan Label Teks",
             "labelVisible": "Label terlihat",
             "iconOnly": "Ikon sahaja",
-            "badgeDesc": "Kiraan lencana sentiasa terlihat"
+            "badgeDesc": "Kiraan lencana sentiasa terlihat",
+            "buttonN": "Butang {n}",
+            "featureN": "Ciri {n}",
+            "reviewN": "Ulasan {n}",
+            "columnN": "Lajur {n}",
+            "defaultCustomerName": "Pelanggan",
+            "defaultReviewQuote": "Pengalaman yang hebat!"
         },
         "statusBar": {
             "connected": "Disambungkan",
@@ -2300,6 +2366,8 @@
             "rewrite": "Tulis Semula"
         },
         "preview": {
+            "altUploadedImage": "Gambar dimuat naik",
+            "editWithAI": "Sunting dengan AI",
             "mapImageError": "Tidak dapat memetakan imej ke medan blok",
             "imageReplaceSuccess": "Imej berjaya diganti",
             "imageReplaceFailed": "Gagal mengganti imej",

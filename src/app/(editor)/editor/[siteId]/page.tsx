@@ -299,14 +299,14 @@ export default function EditorPage() {
             }
 
             if (options.showToast ?? true) {
-                toast.success('Changes saved')
+                toast.success(t.editor.toast.saveSuccess)
             }
 
             window.setTimeout(() => setSaveSuccess(false), 2000)
             return true
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Save failed'
-            toast.error('Save failed', { description: message })
+            if (process.env.NODE_ENV === 'development') console.error('[Editor] Save failed:', err)
+            toast.error(t.editor.toast.saveFailed)
             return false
         } finally {
             setIsSaving(false)
@@ -629,7 +629,7 @@ export default function EditorPage() {
                     toast.success(`🎉 ${t.editor.toast.publishSuccess}`, {
                         description: ti(t.editor.toast.publishSuccessDomain, { domain: siteUrl.replace(/^https?:\/\//, '') }),
                         action: {
-                            label: 'View',
+                            label: t.editor.toast.viewAction,
                             onClick: () => window.open(siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`, '_blank')
                         }
                     })
@@ -642,8 +642,8 @@ export default function EditorPage() {
 
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Publish failed'
-            toast.error(t.editor.toast.publishFailed, { description: message })
+            if (process.env.NODE_ENV === 'development') console.error('[Editor] Publish failed:', err)
+            toast.error(t.editor.toast.publishFailed)
         } finally {
             setIsPublishing(false)
         }
@@ -689,8 +689,8 @@ export default function EditorPage() {
 
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Publish failed'
-            toast.error(t.editor.toast.publishFailed, { description: message })
+            if (process.env.NODE_ENV === 'development') console.error('[Editor] Re-publish failed:', err)
+            toast.error(t.editor.toast.publishFailed)
         } finally {
             setIsPublishing(false)
         }

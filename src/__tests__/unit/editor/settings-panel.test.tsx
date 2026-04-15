@@ -76,8 +76,8 @@ describe('SettingsPanel', () => {
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
 
         // Assert
-        expect(screen.getByText('default')).toBeInTheDocument()
-        expect(screen.getByText('centered')).toBeInTheDocument()
+        expect(screen.getByText('Default')).toBeInTheDocument()
+        expect(screen.getByText('Centered')).toBeInTheDocument()
     })
 
     it('clicking a variant calls onBlockFieldChange', () => {
@@ -85,7 +85,7 @@ describe('SettingsPanel', () => {
         render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
 
         // Act
-        fireEvent.click(screen.getByText('centered'))
+        fireEvent.click(screen.getByText('Centered'))
 
         // Assert
         expect(defaultProps.onBlockFieldChange).toHaveBeenCalledWith(0, 'variant', 'centered')

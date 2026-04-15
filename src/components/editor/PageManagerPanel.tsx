@@ -35,17 +35,17 @@ function getPagePath(page: PageData) {
     return page.slug.startsWith('/') ? page.slug : `/${page.slug}`
 }
 
-function getStatusBadge(page: PageData) {
+function getStatusBadge(page: PageData, labels: { live: string; draft: string }) {
     if (page.status === 'published') {
         return {
-            label: 'Live',
+            label: labels.live,
             className: 'border border-[rgba(0,201,80,0.3)] bg-[rgba(0,201,80,0.2)] text-[#b9f8cf]',
             dotClassName: 'bg-[#00c950]',
         }
     }
 
     return {
-        label: 'Draft',
+        label: labels.draft,
         className: 'border border-[rgba(106,114,130,0.3)] bg-[rgba(106,114,130,0.2)] text-[#d1d5dc]',
         dotClassName: '',
     }
@@ -314,7 +314,7 @@ export function PageManagerPanel({
                         {regularPages.map(page => {
                             const isCurrent = page.id === currentPageId
                             const isProtectedPage = Boolean(page.isHomepage) || SYSTEM_PAGE_SLUGS.has(page.slug)
-                            const statusBadge = getStatusBadge(page)
+                            const statusBadge = getStatusBadge(page, { live: pm.statusLive, draft: pm.statusDraft })
 
                             return (
                                 <div
