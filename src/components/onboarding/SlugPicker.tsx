@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Check, X, Loader2 } from 'lucide-react'
+import { useI18n } from '@/i18n'
 
 interface SlugCheckResult {
     available: boolean
@@ -37,6 +38,8 @@ function clientSlugify(name: string): string {
 }
 
 export default function SlugPicker({ businessName = '', onSlugChange, platformDomain }: SlugPickerProps) {
+    const { t } = useI18n()
+    const f = t.onboarding.form
     const [slug, setSlug] = useState('')
     const [status, setStatus] = useState<SlugStatus>('idle')
     const [message, setMessage] = useState('')
@@ -59,7 +62,7 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
     const checkAvailability = useCallback(async (slugToCheck: string) => {
         if (slugToCheck.length < 3) {
             setStatus('invalid')
-            setMessage('At least 3 characters required')
+            setMessage(f.slugMinLength)
             onSlugChange?.(slugToCheck, false)
             return
         }
@@ -84,25 +87,25 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
                 onSlugChange?.(slugToCheck, true)
             } else if (res.status === 422) {
                 setStatus('invalid')
-                setMessage(data.message || 'Invalid format')
+                setMessage(data.message || f.slugInvalidFormat)
                 onSlugChange?.(slugToCheck, false)
             } else if (res.status === 409) {
                 setStatus('unavailable')
-                setMessage('This subdomain is reserved')
+                setMessage(f.slugReserved)
                 onSlugChange?.(slugToCheck, false)
             } else {
                 setStatus('unavailable')
-                setMessage('Already taken')
+                setMessage(f.slugTaken)
                 if (data.suggestion) setSuggestion(data.suggestion)
                 onSlugChange?.(slugToCheck, false)
             }
         } catch (err) {
             if ((err as Error).name === 'AbortError') return
             setStatus('error')
-            setMessage('Unable to check. Please try again.')
+            setMessage(f.slugCheckError)
             onSlugChange?.(slugToCheck, false)
         }
-    }, [onSlugChange])
+    }, [onSlugChange, f.slugMinLength, f.slugInvalidFormat, f.slugReserved, f.slugTaken, f.slugCheckError])
 
     // Debounced check when slug changes
     useEffect(() => {
@@ -136,7 +139,7 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
     return (
         <div className="flex flex-col gap-2">
             <label className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">
-                Your website address
+                {f.slugLabel}
             </label>
 
             <div className="flex items-center gap-0">
@@ -146,7 +149,7 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
                         type="text"
                         value={slug}
                         onChange={(e) => handleInputChange(e.target.value)}
-                        placeholder="your-store-name"
+                        placeholder={f.slugPlaceholder}
                         className="h-[44px] w-full px-4 rounded-l-[12px] border border-r-0 border-white/[0.08] bg-[#1E293B]/40 text-[14px] text-[#F8FAFC] font-mono placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 transition-colors"
                     />
                     {/* Status icon */}
@@ -169,20 +172,20 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
                     {status === 'available' && (
                         <div className="flex items-center gap-1.5 h-[26px] px-3 rounded-full border border-[#00C950]/30 bg-[#00C950]/10">
                             <Check className="h-3 w-3 text-[#05DF72]" strokeWidth={2.5} />
-                            <span className="text-[12px] font-medium text-[#B9F8CF]">Available</span>
+                            <span className="text-[12px] font-medium text-[#B9F8CF]">{f.slugAvailable}</span>
                         </div>
                     )}
                     {status === 'unavailable' && (
                         <div className="flex items-center gap-1.5 h-[26px] px-3 rounded-full border border-[rgba(251,44,54,0.3)] bg-[rgba(251,44,54,0.1)]">
                             <X className="h-3 w-3 text-[#FF6467]" strokeWidth={2.5} />
-                            <span className="text-[12px] font-medium text-[#FFC9C9]">{message || 'Taken'}</span>
+                            <span className="text-[12px] font-medium text-[#FFC9C9]">{message || f.slugTaken}</span>
                         </div>
                     )}
                     {status === 'invalid' && (
                         <span className="text-[12px] text-[#FF6467]">{message}</span>
                     )}
                     {status === 'checking' && (
-                        <span className="text-[12px] text-slate-500">Checking availability...</span>
+                        <span className="text-[12px] text-slate-500">{f.slugChecking}</span>
                     )}
                     {status === 'error' && (
                         <span className="text-[12px] text-orange-400">{message}</span>
@@ -197,13 +200,13 @@ export default function SlugPicker({ businessName = '', onSlugChange, platformDo
                     onClick={applySuggestion}
                     className="text-left text-[12px] text-blue-400 hover:text-blue-300 transition-colors"
                 >
-                    Try <span className="font-mono font-medium">{suggestion}</span> instead?
+                    <span className="font-mono font-medium">{suggestion}</span>
                 </button>
             )}
 
             {/* Helper text */}
             <p className="text-[11px] text-slate-600">
-                You can change this later in Settings &gt; Domains
+                {f.slugHelperText}
             </p>
         </div>
     )
