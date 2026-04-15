@@ -1,6 +1,9 @@
+'use client'
+
 import type { ReactNode } from 'react'
 import { Monitor, Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/i18n'
 
 export type BuilderPreviewMode = 'desktop' | 'mobile'
 
@@ -13,6 +16,7 @@ export function BuilderPreviewModeToggle({
     mode,
     onChange,
 }: BuilderPreviewModeToggleProps) {
+    const { t } = useI18n()
     return (
         <div className="flex h-[42px] w-[206px] items-center gap-2 rounded-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] px-[5px] py-px shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
             <button
@@ -26,7 +30,7 @@ export function BuilderPreviewModeToggle({
                 type="button"
             >
                 <Monitor className="size-4" />
-                <span>Desktop</span>
+                <span>{t.common.desktop}</span>
             </button>
             <button
                 className={cn(
@@ -39,7 +43,7 @@ export function BuilderPreviewModeToggle({
                 type="button"
             >
                 <Smartphone className="size-4" />
-                <span>Mobile</span>
+                <span>{t.common.mobile}</span>
             </button>
         </div>
     )

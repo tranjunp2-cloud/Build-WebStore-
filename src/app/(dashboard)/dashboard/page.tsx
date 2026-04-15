@@ -8,7 +8,7 @@ import { SEOView } from '@/components/dashboard/views/SEOView'
 import { DashboardTabs } from '@/components/dashboard/DashboardTabs'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
 import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
-import { DashboardTabContent } from '@/components/dashboard/DashboardTabContent'
+import { DashboardTabContent, TabPanel } from '@/components/dashboard/DashboardTabContent'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentTenantId } from '@/lib/auth'
@@ -32,45 +32,76 @@ interface Props {
 
 export default async function DashboardRoot({ searchParams }: Props) {
     const resolvedParams = await searchParams
-    const tab = typeof resolvedParams.tab === 'string' ? resolvedParams.tab : 'overview'
+    const rawTab = typeof resolvedParams.tab === 'string' ? resolvedParams.tab : 'overview'
 
     // We fetch preferences here so we can pass it down to modal safely
     let dashboardPreferences: string[] | undefined = undefined
+    let hasUsableSites = false
     const tenantId = await getCurrentTenantId()
     if (tenantId) {
         const payload = await getPayload({ config })
         const tenantResult = await payload.findByID({ collection: 'tenants', id: tenantId })
         dashboardPreferences = (tenantResult as { settings?: { dashboardPreferences?: string[] } })?.settings?.dashboardPreferences
+
+        const usableSiteCount = await payload.count({
+            collection: 'sites',
+            where: {
+                and: [
+                    { tenant: { equals: tenantId } },
+                    {
+                        or: [
+                            { generationStatus: { equals: 'completed' } },
+                            { generationStatus: { equals: 'none' } },
+                            { generationStatus: { equals: null } },
+                            { generationStatus: { exists: false } },
+                        ],
+                    },
+                ],
+            },
+        })
+        hasUsableSites = usableSiteCount.totalDocs > 0
     }
+
+    // Force overview tab when no usable sites — prevents empty analytics/seo views via direct URL
+    const tab = hasUsableSites ? rawTab : 'overview'
 
     return (
         <div className="space-y-6">
             <DashboardTabContent defaultTab={tab}>
-                {/* Universal Page Header / Toolbar */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <DashboardTabs />
+                {/* Universal Page Header / Toolbar — hidden when no usable sites */}
+                {hasUsableSites && (
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <DashboardTabs />
 
-                    <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-                        <PeriodSelector />
-                        <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+                        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                            <PeriodSelector />
+                            <DashboardCustomizeModal defaultPreferences={dashboardPreferences} />
+                        </div>
                     </div>
-                </div>
+                )}
 
-                {/* Only render the active tab — avoids 3x query cost */}
-                {tab === 'overview' && (
+                {/* Render all tabs — TabPanel hides inactive via CSS for instant switching.
+                   Note: PeriodSelector still uses router.push() which re-renders all tabs.
+                   This is an accepted tradeoff — period changes are rare (1-2x/session)
+                   while tab switches are frequent and must be instant. */}
+                <TabPanel tabId="overview">
                     <Suspense fallback={<OverviewSkeleton />}>
                         <OverviewView searchParams={searchParams} />
                     </Suspense>
-                )}
-                {tab === 'analytics' && (
-                    <Suspense fallback={<AnalyticsSkeleton />}>
-                        <AnalyticsView searchParams={searchParams} />
-                    </Suspense>
-                )}
-                {tab === 'seo' && (
-                    <Suspense fallback={<SEOSkeleton />}>
-                        <SEOView />
-                    </Suspense>
+                </TabPanel>
+                {hasUsableSites && (
+                    <>
+                        <TabPanel tabId="analytics">
+                            <Suspense fallback={<AnalyticsSkeleton />}>
+                                <AnalyticsView searchParams={searchParams} />
+                            </Suspense>
+                        </TabPanel>
+                        <TabPanel tabId="seo">
+                            <Suspense fallback={<SEOSkeleton />}>
+                                <SEOView />
+                            </Suspense>
+                        </TabPanel>
+                    </>
                 )}
             </DashboardTabContent>
         </div>

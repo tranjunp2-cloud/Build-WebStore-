@@ -9,6 +9,12 @@ export const generateSiteSchema = z.object({
         businessUrl: z.string().url().optional(),
         source: z.enum(['form', 'url', 'image']).optional(),
         slug: z.string().regex(/^[a-z0-9-]+$/).min(3).max(63).optional(),
+        // Plan 260414-2249 phase-01: user-supplied optional fields. Wire-level
+        // ephemeral — not persisted to Payload, used only for this generation.
+        tagline: z.string().max(200).optional(),
+        phone: z.string().max(40).optional(),
+        email: z.string().email().max(100).optional().or(z.literal('')),
+        address: z.string().max(300).optional(),
     }),
     extraInstructions: z.string().optional(),
     language: z.enum(['en', 'ms', 'vi', 'auto']).optional(),
@@ -84,6 +90,12 @@ export const editBlockSchema = z.object({
     allBlocks: z.array(z.record(z.unknown())).optional(),
     theme: z.record(z.unknown()).optional(),
     siteName: z.string().optional(),
+    currentPageSlug: z.string().optional(),
+    currentPageTitle: z.string().optional(),
+    chatHistory: z.array(z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().max(300),
+    })).max(10).optional(),
 })
 
 export const rewriteTextSchema = z.object({

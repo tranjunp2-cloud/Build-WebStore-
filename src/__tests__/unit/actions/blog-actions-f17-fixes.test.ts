@@ -60,14 +60,18 @@ describe('listBlogsAction — search trim [TC-F17.01]', () => {
         mockFind.mockResolvedValue({ docs: [], totalDocs: 0, totalPages: 0, page: 1, hasPrevPage: false, hasNextPage: false })
         await listBlogsAction({ search: '  hello  ' })
         const call = mockFind.mock.calls[0][0]
-        expect(call.where.or[0].title.contains).toBe('hello')
+        // where is now { and: [...] } — find the or condition inside and
+        const orCondition = call.where.and.find((c: Record<string, unknown>) => 'or' in c)
+        expect(orCondition.or[0].title.contains).toBe('hello')
     })
 
     it('[TC-10] whitespace-only search treated as no filter', async () => {
         mockFind.mockResolvedValue({ docs: [], totalDocs: 0, totalPages: 0, page: 1, hasPrevPage: false, hasNextPage: false })
         await listBlogsAction({ search: '   ' })
         const call = mockFind.mock.calls[0][0]
-        expect(call.where.or).toBeUndefined()
+        // Only tenant condition, no or/search condition
+        const orCondition = call.where.and?.find((c: Record<string, unknown>) => 'or' in c)
+        expect(orCondition).toBeUndefined()
     })
 })
 

@@ -45,102 +45,13 @@ export interface TemplatePreset {
   description: string
 }
 
-// ── Category DNA ───────────────────────────────────────────────────────────
-// Each category has unique: signature blocks, visual mood, mandatory blocks
-
-export interface CategoryDna {
-  signatureBlocks: string[]
-  mandatoryHomepageOrder: string[]
-  subPageSet: string[]
-  visualMood: string
-}
-
-export const CATEGORY_DNA: Record<string, CategoryDna> = {
-  restaurant: {
-    signatureBlocks: ['menu-display', 'booking-widget', 'gallery'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'menu-display', 'gallery', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Menu', 'Gallery', 'About', 'Contact'],
-    visualMood: 'warm',
-  },
-  ecommerce: {
-    signatureBlocks: ['products-grid', 'product-quick-view', 'pricing'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'products-grid', 'features', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Products', 'About', 'Blog', 'Contact'],
-    visualMood: 'clean',
-  },
-  beauty: {
-    signatureBlocks: ['gallery-masonry', 'booking-widget', 'before-after'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'features', 'gallery-masonry', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Services', 'Gallery', 'About', 'Contact'],
-    visualMood: 'pastel',
-  },
-  tech: {
-    signatureBlocks: ['feature-comparison', 'pricing', 'video-showcase', 'stats'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'features', 'stats', 'cta', 'pricing', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Features', 'Pricing', 'About', 'Contact'],
-    visualMood: 'dark-tech',
-  },
-  health: {
-    signatureBlocks: ['doctor-profile', 'booking-widget', 'stats'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'features', 'doctor-profile', 'stats', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Services', 'Team', 'About', 'Contact'],
-    visualMood: 'trust',
-  },
-  education: {
-    signatureBlocks: ['class-schedule', 'pricing', 'stats'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'features', 'class-schedule', 'stats', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Programs', 'Schedule', 'About', 'Contact'],
-    visualMood: 'academic',
-  },
-  realestate: {
-    signatureBlocks: ['property-card', 'gallery-masonry', 'stats'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'property-card', 'stats', 'gallery-masonry', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Properties', 'Gallery', 'About', 'Contact'],
-    visualMood: 'luxury',
-  },
-  fitness: {
-    signatureBlocks: ['class-schedule', 'pricing', 'before-after'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'features', 'class-schedule', 'before-after', 'cta', 'pricing', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Classes', 'Pricing', 'About', 'Contact'],
-    visualMood: 'bold',
-  },
-  creative: {
-    signatureBlocks: ['portfolio-grid', 'gallery-masonry', 'video-showcase'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'portfolio-grid', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Portfolio', 'About', 'Services', 'Contact'],
-    visualMood: 'minimal-or-vibrant',
-  },
-  business: {
-    signatureBlocks: ['stats', 'team', 'feature-comparison'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'features', 'stats', 'team', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Services', 'About', 'Team', 'Contact'],
-    visualMood: 'corporate',
-  },
-  fnb: {
-    signatureBlocks: ['menu-display', 'gallery', 'review-cards'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'menu-display', 'gallery', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Menu', 'About', 'Gallery', 'Contact'],
-    visualMood: 'warm-playful',
-  },
-  events: {
-    signatureBlocks: ['countdown-timer', 'booking-widget', 'gallery'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'features', 'gallery', 'countdown-timer', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Services', 'Gallery', 'About', 'Contact'],
-    visualMood: 'elegant',
-  },
-  blog: {
-    signatureBlocks: ['blog-list', 'newsletter', 'social-proof'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'blog-list', 'features', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Articles', 'About', 'Categories', 'Contact'],
-    visualMood: 'editorial',
-  },
-  travel: {
-    signatureBlocks: ['gallery', 'booking-widget', 'stats'],
-    mandatoryHomepageOrder: ['navigation', 'hero', 'logo-cloud', 'gallery', 'features', 'stats', 'cta', 'testimonials', 'faq', 'newsletter', 'footer'],
-    subPageSet: ['Destinations', 'Tours', 'About', 'Contact'],
-    visualMood: 'tropical',
-  },
-}
+// ── Category DNA — DELETED (Plan 2253 audit-unused-code) ───────────────────
+// Removed: `CategoryDna` interface + `CATEGORY_DNA` record. 0 code consumers
+// found in repo scan; only stale comment references in test-harness and PRD
+// docs. Superseded by:
+//   - plan 2249 phase-02 `ThemeMood` (imagery/voice mood archetypes)
+//   - plan 2249 phase-04 `CategoryRecipe` (block sequences + required blocks)
+//   - `category-requirements.ts` (minBlocks + mandatory/recommended)
 
 // ── Deprecated: Old ComposerInput (backward compat) ────────────────────────
 /** @deprecated Use TemplatePreset + composeFromBlueprint() instead */

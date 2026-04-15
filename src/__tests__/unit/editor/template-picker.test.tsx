@@ -22,7 +22,27 @@ vi.mock('@/components/frontend/TemplatePreviewModal', () => ({
 vi.mock('@/i18n', () => ({
     useI18n: vi.fn(() => ({
         locale: 'en',
-        t: {},
+        t: {
+            editor: {
+                template: {
+                    title: 'Choose a Template', searchPlaceholder: 'Search templates...',
+                    showingCount: 'Showing {filtered} of {total} templates',
+                    loading: 'Loading templates...', loadError: 'Failed to load templates',
+                    noTemplates: 'No templates available yet.',
+                    seedHint: 'Run POST /api/templates/seed to create templates.',
+                    noMatch: 'No templates match this filter',
+                    applyConfirmTitle: 'Apply "{name}"?',
+                    applyConfirmDesc: 'This will apply the new template layout and theme. Your existing content (text, images) will be preserved where possible.',
+                    cancel: 'Cancel', applying: 'Applying...', applyButton: 'Apply Template',
+                    appliedSuccess: 'Template "{name}" applied!', applyFailed: 'Failed to apply template',
+                    previewTitle: 'Preview: {name}',
+                    all: 'All', restaurant: 'Restaurant', ecommerce: 'E-Commerce', beauty: 'Beauty',
+                    tech: 'Tech', health: 'Health', education: 'Education', realEstate: 'Real Estate',
+                    fitness: 'Fitness', creative: 'Creative', business: 'Business',
+                    cafeBakery: 'Cafe & Bakery', events: 'Events', blog: 'Blog', travel: 'Travel',
+                },
+            },
+        },
         setLocale: vi.fn(),
         toggleLocale: vi.fn(),
         tp: vi.fn(),
@@ -112,7 +132,7 @@ describe('[TC-S4-005] EditorTemplateModal — template picker', () => {
         vi.restoreAllMocks()
     })
 
-    it('CATEGORIES array includes all 12 categories (all + 11 industry)', async () => {
+    it('CATEGORIES array includes all 15 categories (all + 14 industry)', async () => {
         // Act
         render(
             <EditorTemplateModal isOpen={true} onClose={vi.fn()} siteId="s1" onApplied={vi.fn()} />,
@@ -126,12 +146,13 @@ describe('[TC-S4-005] EditorTemplateModal — template picker', () => {
         const expectedLabels = [
             'All', 'Restaurant', 'E-Commerce', 'Beauty', 'Tech', 'Health',
             'Education', 'Real Estate', 'Fitness', 'Creative', 'Business', 'Cafe & Bakery',
+            'Events', 'Blog', 'Travel',
         ]
         for (const label of expectedLabels) {
             expect(screen.getByText(label)).toBeInTheDocument()
         }
-        // Total 12 categories
-        expect(expectedLabels).toHaveLength(12)
+        // Total 15 categories
+        expect(expectedLabels).toHaveLength(15)
     })
 
     it('filter matches templates by name', async () => {

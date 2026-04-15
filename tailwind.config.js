@@ -16,8 +16,20 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-                heading: ['var(--font-outfit)', 'system-ui', 'sans-serif'],
+                // Theme-aware chain — MUST use nested var() fallbacks, not a
+                // flat comma list. Reason: when --font-body/heading is unset
+                // (dashboard, auth, builder, editor — anywhere generateThemeCSS
+                // does NOT run), a flat `var(--font-body), var(--font-inter)`
+                // substitutes to an empty leading token, making the whole
+                // font-family declaration invalid-at-computed-value-time, so
+                // the browser reverts to the UA default (serif).
+                //   1. --font-body/heading — populated by generateThemeCSS()
+                //      per site, references the chosen pairing's next/font var
+                //   2. --font-inter/outfit — always loaded in AppShell.tsx,
+                //      safe fallback when no theme CSS present (admin routes)
+                //   3. System fallback
+                sans: ['var(--font-body, var(--font-inter))', 'system-ui', 'sans-serif'],
+                heading: ['var(--font-heading, var(--font-outfit))', 'system-ui', 'sans-serif'],
             },
             colors: {
                 brand: {

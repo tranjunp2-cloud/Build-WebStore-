@@ -25,6 +25,7 @@ import { nodemailerAdapter } from '@payloadcms/email-nodemailer'
 import { Categories } from './collections/Categories'
 import { Notifications } from './collections/Notifications'
 import { PushSubscriptions } from './collections/PushSubscriptions'
+import { AiUsageLogs } from './collections/AiUsageLogs'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -122,6 +123,7 @@ export default buildConfig({
     Categories,
     Notifications,
     PushSubscriptions,
+    AiUsageLogs,
   ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || 'fallback-dev-secret',

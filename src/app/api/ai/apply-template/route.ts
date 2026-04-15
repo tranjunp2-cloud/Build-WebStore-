@@ -1,4 +1,9 @@
 export const dynamic = 'force-dynamic'
+// Override vercel.json's 60s default — template application merges blocks,
+// may re-run AI content generation, and persists 1 site + N pages + M blocks
+// through Payload, which comfortably exceeds 60s in practice. Same root cause
+// as generate-site 504s. Keeping parity to avoid another latency surprise.
+export const maxDuration = 300
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -8,6 +13,7 @@ import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { mergeUserContent } from '@/lib/ai/merge-user-content'
+import { sanitizeBlocksForPayload } from '@/lib/ai/pages-schema'
 
 /** Recursively strip Payload system fields so Payload creates fresh records.
  *  Also normalizes populated relationship fields (objects with `id` + `url`/`filename`)
@@ -145,109 +151,10 @@ export const POST = withAuth(async (user, req) => {
 
         const blocks = (template.defaultBlocks as Record<string, unknown>[]) || []
 
-        // ── Sanitize blocks to match Pages.ts Payload schema (DB source of truth) ──
-        // Only 14 block types have DB tables. Each has specific field names + enum values.
-
-        const PAGES_BLOCK_WHITELIST = new Set([
-            // Core blocks
-            'navigation', 'hero', 'about', 'features', 'testimonials',
-            'contact', 'gallery', 'footer', 'stats', 'pricing',
-            'faq', 'team', 'socialWidget', 'cartWidget',
-            // AI-generated / Block Library blocks
-            'cta', 'newsletter', 'video', 'logo-cloud', 'products-grid',
-            'products-featured', 'service-cards', 'carousel', 'step-process',
-            'divider', 'announcement-bar', 'whatsapp-button', 'menu-food',
-            'social-proof', 'portfolio-grid', 'google-maps', 'accordion',
-            'countdown-timer', 'custom-html', 'blog-list',
-            'breadcrumb', 'client-logos',
-        ])
-
-        // Pages.ts schema per block: which field holds variant, what values are valid
-        // null = block has NO variant/layout field → strip any variant data
-        const PAGES_SCHEMA: Record<string, { field: string; values: string[]; fallback: string } | null> = {
-            hero:         { field: 'variant', values: ['centered', 'split-left', 'split-right', 'fullscreen', 'video'], fallback: 'centered' },
-            navigation:   { field: 'style',   values: ['fixed', 'sticky', 'static', 'transparent'], fallback: 'fixed' },
-            about:        { field: 'layout',  values: ['image-right', 'image-left', 'centered', 'cards'], fallback: 'image-right' },
-            features:     { field: 'layout',  values: ['grid-3', 'grid-2', 'alternating', 'centered-list'], fallback: 'grid-3' },
-            testimonials: { field: 'variant', values: ['carousel', 'grid', 'masonry', 'single'], fallback: 'carousel' },
-            gallery:      { field: 'layout',  values: ['masonry', 'grid', 'carousel', 'lightbox'], fallback: 'masonry' },
-            socialWidget: { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
-            cartWidget:   { field: 'variant', values: ['floating', 'inline'], fallback: 'floating' },
-            contact: null, footer: null, stats: null, pricing: null, faq: null, team: null,
-        }
-
-        // Map blueprint variant names → Pages.ts valid values
-        const ALIASES: Record<string, Record<string, string>> = {
-            hero: {
-                'split': 'split-left', 'split-image': 'split-left', 'editorial': 'centered',
-                'fullscreen-image': 'fullscreen', 'fullscreen-video': 'video',
-                'video-background': 'video', 'video-bg': 'video', 'overlay': 'fullscreen',
-                'story': 'split-left', 'magazine': 'split-left', 'minimal': 'centered',
-                'cards-overlay': 'fullscreen', 'gradient': 'centered', 'parallax': 'fullscreen',
-                'slideshow': 'centered', 'split-video': 'video',
-            },
-            about: { 'simple': 'centered', 'split': 'image-right', 'story': 'image-right', 'single-column': 'centered', 'two-column': 'image-right', 'timeline': 'image-right' },
-            features: { 'grid': 'grid-3', 'list': 'centered-list', 'icon-grid': 'grid-3', 'card-grid': 'grid-3', 'cards': 'grid-3', 'detailed': 'centered-list', 'detailed-list': 'centered-list', 'icon-top': 'grid-3', 'icon-left': 'grid-2', 'zigzag': 'alternating', 'carousel': 'grid-3', 'minimal-list': 'centered-list' },
-            testimonials: { 'cards': 'grid', 'simple': 'carousel', 'spotlight': 'single', 'minimal-quote': 'single', 'avatar-row': 'carousel', 'video-text': 'carousel', 'featured': 'single', 'marquee': 'carousel', 'quote': 'single', 'single-highlight': 'single', 'slider': 'carousel' },
-            gallery: { 'filmstrip': 'carousel', 'justified': 'grid', 'fullscreen-grid': 'grid', 'slider': 'carousel', 'spotlight': 'lightbox' },
-            navigation: { 'simple': 'fixed', 'centered': 'fixed', 'mega-menu': 'fixed', 'sidebar': 'fixed', 'pill': 'fixed' },
-        }
-
-        // Strip each block to ONLY fields Pages.ts defines. Everything else → dropped.
-        // This prevents Payload validation errors from unknown/invalid field values.
-        const PAGES_FIELDS: Record<string, string[]> = {
-            hero: ['variant', 'headline', 'subheadline', 'videoUrl'],
-            navigation: ['style', 'logoText', 'links'],
-            about: ['layout', 'sectionLabel', 'headline', 'body'],
-            features: ['sectionLabel', 'headline', 'subheadline', 'layout', 'features'],
-            testimonials: ['headline', 'variant', 'testimonials'],
-            gallery: ['headline', 'layout'],
-            contact: ['headline', 'subtext', 'email', 'phone', 'address', 'showMap', 'mapEmbedUrl'],
-            footer: ['logoText', 'logo', 'tagline', 'columns', 'copyrightText', 'showSocialLinks'],
-            stats: ['headline', 'stats'],
-            pricing: ['headline', 'subheadline'],
-            faq: ['headline', 'faqs'],
-            team: ['headline'],
-            socialWidget: ['variant', 'headline', 'links'],
-            cartWidget: ['variant', 'label', 'showLabel'],
-        }
-
-        function sanitizeBlocks(blockList: Record<string, unknown>[]): Record<string, unknown>[] {
-            return blockList
-                .filter(b => PAGES_BLOCK_WHITELIST.has(b.blockType as string))
-                .map(block => {
-                    const bt = block.blockType as string
-                    const schema = PAGES_SCHEMA[bt]
-                    const allowedFields = PAGES_FIELDS[bt] || []
-
-                    // Start with only blockType
-                    const result: Record<string, unknown> = { blockType: bt }
-
-                    // Copy only allowed fields from template data
-                    for (const field of allowedFields) {
-                        if (block[field] !== undefined) {
-                            result[field] = block[field]
-                        }
-                    }
-
-                    // Handle variant/layout field mapping + validation
-                    if (schema) {
-                        const raw = (block.variant ?? block.layout) as string | undefined
-                        const aliased = raw && ALIASES[bt]?.[raw] ? ALIASES[bt]![raw]! : raw
-                        const resolved = aliased && schema.values.includes(aliased) ? aliased : schema.fallback
-                        result[schema.field] = resolved
-                        // Remove the other field if it was copied
-                        if (schema.field === 'variant') delete result.layout
-                        if (schema.field === 'layout') delete result.variant
-                    } else {
-                        // No variant/layout schema → remove both
-                        delete result.variant
-                        delete result.layout
-                    }
-
-                    return result
-                })
-        }
+        // Block sanitization moved to `src/lib/ai/pages-schema.ts` — shared with
+        // merge-user-content + unit-testable in isolation. See that file for
+        // whitelist/schema/aliases rationale.
+        const sanitizeBlocks = sanitizeBlocksForPayload
 
         // Auto-generate navigation links from template pages
         function injectNavLinks(

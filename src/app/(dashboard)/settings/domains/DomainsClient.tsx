@@ -20,6 +20,7 @@ function SelectPrimaryPanel({
     isPending,
     onClose,
     onSave,
+    t,
 }: {
     tenantSlug: string;
     domains: DomainEntry[];
@@ -27,6 +28,7 @@ function SelectPrimaryPanel({
     isPending: boolean;
     onClose: () => void;
     onSave: (selected: string | null) => void;
+    t: ReturnType<typeof useI18n>['t'];
 }) {
     const platformDomain = `${tenantSlug}.${DNS_CNAME}`;
     const activeDomains = domains.filter(d => d.status === 'active');
@@ -60,7 +62,7 @@ function SelectPrimaryPanel({
                 {/* Content */}
                 <div className="flex flex-col flex-1 px-[32px] pt-[32px] pb-[24px] overflow-y-auto">
                     <h2 className="text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter'] mb-[24px]">
-                        Select primary domain
+                        {t?.Domains?.selectPrimary || 'Select primary domain'}
                     </h2>
 
                     {/* Radio list */}
@@ -97,7 +99,7 @@ function SelectPrimaryPanel({
 
                     {activeDomains.length === 0 && (
                         <p className="mt-[16px] text-[13px] text-[rgba(248,250,252,0.4)] font-['Inter']">
-                            No verified custom domains yet. Add and verify a custom domain first.
+                            {t?.Domains?.noVerifiedDomains || 'No verified custom domains yet. Add and verify a custom domain first.'}
                         </p>
                     )}
                 </div>
@@ -109,7 +111,7 @@ function SelectPrimaryPanel({
                         onClick={onClose}
                         className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium hover:bg-white/5 transition-colors font-['Inter']"
                     >
-                        Cancel
+                        {t?.Domains?.cancel || 'Cancel'}
                     </button>
                     <button
                         type="button"
@@ -119,7 +121,7 @@ function SelectPrimaryPanel({
                         className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity shadow-[0_4px_6px_-4px_rgba(0,0,0,0.1),0_10px_15px_-3px_rgba(0,0,0,0.1)] font-['Inter'] disabled:opacity-50"
                     >
                         {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
-                        Save
+                        {t?.Domains?.save || 'Save'}
                     </button>
                 </div>
             </div>
@@ -160,16 +162,16 @@ export function DomainsClient({
 
     const checkSlugAvailability = useCallback(async (slug: string) => {
         if (slug === currentSlug) { setSlugStatus('idle'); return; }
-        if (slug.length < 3) { setSlugStatus('invalid'); setSlugMessage('At least 3 characters'); return; }
+        if (slug.length < 3) { setSlugStatus('invalid'); setSlugMessage(t?.Domains?.slugMinChars || 'At least 3 characters'); return; }
         setSlugStatus('checking');
         try {
             const res = await fetch(`/api/slug/check?slug=${encodeURIComponent(slug)}`);
             const data = await res.json();
             if (res.ok && data.available) { setSlugStatus('available'); setSlugMessage(''); }
             else if (res.status === 422) { setSlugStatus('invalid'); setSlugMessage(data.message || 'Invalid format'); }
-            else if (res.status === 409) { setSlugStatus('unavailable'); setSlugMessage('Reserved'); }
-            else { setSlugStatus('unavailable'); setSlugMessage('Already taken'); }
-        } catch { setSlugStatus('invalid'); setSlugMessage('Check failed'); }
+            else if (res.status === 409) { setSlugStatus('unavailable'); setSlugMessage(t?.Domains?.slugReserved || 'Reserved'); }
+            else { setSlugStatus('unavailable'); setSlugMessage(t?.Domains?.slugTaken || 'Already taken'); }
+        } catch { setSlugStatus('invalid'); setSlugMessage(t?.Domains?.slugCheckFailed || 'Check failed'); }
     }, [currentSlug]);
 
     useEffect(() => {
@@ -193,12 +195,12 @@ export function DomainsClient({
                 setCurrentSlug(data.slug);
                 setIsEditingSlug(false);
                 setShowSlugConfirm(false);
-                toast.success('Subdomain updated successfully!');
+                toast.success(t?.Domains?.subdomainUpdated || 'Subdomain updated successfully!');
             } else {
-                toast.error(data.message || 'Failed to update subdomain');
+                toast.error(data.message || t?.Domains?.subdomainUpdateFailed || 'Failed to update subdomain');
             }
         } catch {
-            toast.error('Failed to update subdomain. Please try again.');
+            toast.error(t?.Domains?.subdomainUpdateError || 'Failed to update subdomain. Please try again.');
         } finally {
             setSavingSlug(false);
         }
@@ -251,10 +253,10 @@ export function DomainsClient({
                 if (res.warning) {
                     toast.warning(res.warning);
                 } else {
-                    toast.success('Domain added successfully! Please configure DNS.');
+                    toast.success(t?.Domains?.domainAdded || 'Domain added successfully! Please configure DNS.');
                 }
             } else {
-                toast.error(res.error || 'Failed to add domain');
+                toast.error(res.error || t?.Domains?.domainAddFailed || 'Failed to add domain');
             }
         });
     };
@@ -268,9 +270,9 @@ export function DomainsClient({
             setVerifyingDomain(null);
             if (res.success) {
                 setDomains(prev => prev.map(d => d.domain === domain ? { ...d, status: 'active' } : d));
-                toast.success('Domain verified successfully! SSL connection secured.');
+                toast.success(t?.Domains?.domainVerified || 'Domain verified successfully! SSL connection secured.');
             } else {
-                setVerifyErrors(prev => ({ ...prev, [domain]: res.error || 'Verification failed.' }));
+                setVerifyErrors(prev => ({ ...prev, [domain]: res.error || t?.Domains?.verificationFailed || 'Verification failed.' }));
             }
         });
     };
@@ -286,10 +288,10 @@ export function DomainsClient({
                 if (res.warning) {
                     toast.warning(res.warning);
                 } else {
-                    toast.success('Custom domain removed.');
+                    toast.success(t?.Domains?.domainRemoved || 'Custom domain removed.');
                 }
             } else {
-                toast.error(res.error || 'Failed to remove domain');
+                toast.error(res.error || t?.Domains?.domainRemoveFailed || 'Failed to remove domain');
             }
         });
     };
@@ -303,17 +305,17 @@ export function DomainsClient({
                 res = await clearPrimaryDomain();
                 if (res.success) {
                     setDomains(prev => prev.map(d => ({ ...d, isPrimary: false })));
-                    toast.success('Platform subdomain is now your primary domain.');
+                    toast.success(t?.Domains?.platformPrimary || 'Platform subdomain is now your primary domain.');
                 }
             } else {
                 res = await setPrimaryDomain(selected);
                 if (res.success) {
                     setDomains(prev => prev.map(d => ({ ...d, isPrimary: d.domain === selected })));
-                    toast.success(`"${selected}" is now your Primary Domain.`);
+                    toast.success((t?.Domains?.customPrimary || '"{domain}" is now your Primary Domain.').replace('{domain}', selected));
                 }
             }
             if (!res.success) {
-                toast.error(res.error || 'Failed to update primary domain.');
+                toast.error(res.error || t?.Domains?.primaryUpdateFailed || 'Failed to update primary domain.');
             } else {
                 setIsSelectPrimaryOpen(false);
             }
@@ -332,8 +334,8 @@ export function DomainsClient({
                     <Globe className="h-6 w-6 text-blue-500" />
                 </div>
                 <div>
-                    <h1 className="text-[24px] font-bold text-slate-50">Domain Management</h1>
-                    <p className="mt-1 text-[14px] text-slate-50/60 font-normal">Manage custom domains for your webstore</p>
+                    <h1 className="text-[24px] font-bold text-slate-50">{t?.Domains?.title || 'Domain Management'}</h1>
+                    <p className="mt-1 text-[14px] text-slate-50/60 font-normal">{t?.Domains?.subtitle || 'Manage custom domains for your webstore'}</p>
                 </div>
             </div>
 
@@ -342,8 +344,8 @@ export function DomainsClient({
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px] py-[25px] px-[25px] rounded-[16px] border border-white/[0.08] bg-[#1E293B]/60" style={{ minHeight: '102px' }}>
                     {/* Text — Figma layout_T77324: column, gap 4px — self-center to prevent stretch */}
                     <div className="self-center">
-                        <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.556em] font-['Inter']">Add a Domain to your store</h2>
-                        <p className="mt-[4px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.429em] font-['Inter']">Connect your custom domain to make your store accessible</p>
+                        <h2 className="text-[18px] font-semibold text-[#F8FAFC] leading-[1.556em] font-['Inter']">{t?.Domains?.addDomainHeading || 'Add a Domain to your store'}</h2>
+                        <p className="mt-[4px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.429em] font-['Inter']">{t?.Domains?.addDomainDesc || 'Connect your custom domain to make your store accessible'}</p>
                     </div>
                     {/* Buttons — stack on mobile, row on desktop */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-[12px] sm:gap-[24px] shrink-0">
@@ -352,7 +354,7 @@ export function DomainsClient({
                             onClick={() => setIsSelectPrimaryOpen(true)}
                             className="flex items-center justify-center py-[12px] px-[24px] sm:px-[68px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[14px] sm:text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors whitespace-nowrap font-['Inter']"
                         >
-                            Select primary domain
+                            {t?.Domains?.selectPrimary || 'Select primary domain'}
                         </button>
                         <button
                             type="button"
@@ -361,7 +363,7 @@ export function DomainsClient({
                             className="flex items-center justify-center gap-2 h-[48px] px-6 rounded-[16px] text-white text-[14px] sm:text-[16px] font-semibold shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] hover:opacity-90 transition-opacity whitespace-nowrap font-['Inter']"
                         >
                             <Plus className="h-5 w-5" />
-                            <span>Add Custom Domain</span>
+                            <span>{t?.Domains?.addCustomDomain || 'Add Custom Domain'}</span>
                         </button>
                     </div>
                 </div>
@@ -375,7 +377,7 @@ export function DomainsClient({
                                     <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{currentSlug}.{DNS_CNAME}</h3>
                                     {!hasCustomPrimary && (
                                         <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
-                                            <span className="text-[12px] font-semibold text-[#C4B5FD]">Current Primary Domain</span>
+                                            <span className="text-[12px] font-semibold text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
                                         </div>
                                     )}
                                 </div>
@@ -402,7 +404,7 @@ export function DomainsClient({
                             )}
                             <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
                                 <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
-                                <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">Connected</span>
+                                <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">{t?.Domains?.connected || 'Connected'}</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -413,7 +415,7 @@ export function DomainsClient({
                                     className="flex items-center gap-2 py-[10px] px-[16px] rounded-[12px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[13px] font-medium hover:bg-white/5 transition-colors"
                                 >
                                     <Pencil className="h-3.5 w-3.5" />
-                                    Change subdomain
+                                    {t?.Domains?.changeSubdomain || 'Change subdomain'}
                                 </button>
                             ) : (
                                 <div className="flex items-center gap-2">
@@ -422,7 +424,7 @@ export function DomainsClient({
                                         onClick={() => { setIsEditingSlug(false); setSlugInput(currentSlug); setSlugStatus('idle'); }}
                                         className="py-[10px] px-[16px] rounded-[12px] border border-white/[0.08] text-[#F8FAFC] text-[13px] font-medium hover:bg-white/5 transition-colors"
                                     >
-                                        Cancel
+                                        {t?.Domains?.cancel || 'Cancel'}
                                     </button>
                                     <button
                                         type="button"
@@ -431,7 +433,7 @@ export function DomainsClient({
                                         className="py-[10px] px-[16px] rounded-[12px] text-white text-[13px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
                                         style={{ background: slugStatus === 'available' ? 'linear-gradient(90deg, #3B82F6, #2DD4BF)' : '#374151' }}
                                     >
-                                        Save
+                                        {t?.Domains?.save || 'Save'}
                                     </button>
                                 </div>
                             )}
@@ -444,13 +446,13 @@ export function DomainsClient({
                     <>
                         <div className="fixed inset-0 z-[100] bg-[#0B1120]/60 animate-in fade-in duration-200" onClick={() => setShowSlugConfirm(false)} />
                         <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-full max-w-[420px] rounded-[16px] border border-white/[0.08] bg-[#1E293B] p-6 shadow-xl animate-in zoom-in-95 duration-200">
-                            <h3 className="text-[18px] font-semibold text-[#F8FAFC]">Change subdomain?</h3>
+                            <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{t?.Domains?.changeSubdomainTitle || 'Change subdomain?'}</h3>
                             <div className="mt-3 space-y-2">
                                 <p className="text-[14px] text-[rgba(248,250,252,0.6)]">
-                                    Your current subdomain <span className="font-mono text-[#F8FAFC]">{currentSlug}</span> will redirect to <span className="font-mono text-[#F8FAFC]">{slugInput}</span> for 30 days.
+                                    {(t?.Domains?.subdomainRedirectMsg || 'Your current subdomain {old} will redirect to {new} for 30 days.').replace('{old}', currentSlug).replace('{new}', slugInput)}
                                 </p>
                                 <p className="text-[14px] text-orange-400">
-                                    After 30 days, the old link will stop working. Update your marketing materials.
+                                    {t?.Domains?.subdomainWarning || 'After 30 days, the old link will stop working. Update your marketing materials.'}
                                 </p>
                             </div>
                             <div className="mt-5 flex justify-end gap-3">
@@ -459,7 +461,7 @@ export function DomainsClient({
                                     onClick={() => setShowSlugConfirm(false)}
                                     className="py-[10px] px-[20px] rounded-[12px] border border-white/[0.08] text-[#F8FAFC] text-[14px] font-medium hover:bg-white/5 transition-colors"
                                 >
-                                    Cancel
+                                    {t?.Domains?.cancel || 'Cancel'}
                                 </button>
                                 <button
                                     type="button"
@@ -469,7 +471,7 @@ export function DomainsClient({
                                     style={{ background: 'linear-gradient(90deg, #3B82F6, #2DD4BF)' }}
                                 >
                                     {savingSlug && <Loader2 className="h-4 w-4 animate-spin" />}
-                                    Confirm change
+                                    {t?.Domains?.confirmChange || 'Confirm change'}
                                 </button>
                             </div>
                         </div>
@@ -487,16 +489,16 @@ export function DomainsClient({
                                     <h3 className="text-[18px] font-semibold text-[#F8FAFC]">{domain}</h3>
                                     <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-orange-500/30 bg-orange-500/10 pl-[12px] pr-[16px]">
                                         <AlertCircle className="h-4 w-4 text-orange-400" strokeWidth={2.5} />
-                                        <span className="text-[14px] font-medium leading-none text-orange-300">Pending Verification</span>
+                                        <span className="text-[14px] font-medium leading-none text-orange-300">{t?.Domains?.pendingVerification || 'Pending Verification'}</span>
                                     </div>
                                 </div>
 
                                 <div className="flex flex-col p-[16px] rounded-[16px] border border-white/[0.08] bg-[#0B1120]/50 gap-4">
-                                    <p className="text-[14px] text-[#F8FAFC]">Configure these DNS records at your domain registrar:</p>
+                                    <p className="text-[14px] text-[#F8FAFC]">{t?.Domains?.configureDns || 'Configure these DNS records at your domain registrar:'}</p>
                                     <div className="flex flex-col gap-4">
                                         {/* A Record */}
                                         <div className="flex flex-col gap-1.5">
-                                            <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">A Record (Static IPs)</span>
+                                            <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">{t?.Domains?.aRecord || 'A Record (Static IPs)'}</span>
                                             <div className="flex flex-col gap-2">
                                                 {DNS_A_RECORD.split(',').map((ip, idx) => (
                                                     <div key={idx} className="flex items-center gap-2">
@@ -505,26 +507,26 @@ export function DomainsClient({
                                                         </div>
                                                         <button
                                                             type="button"
-                                                            onClick={() => { navigator.clipboard.writeText(ip.trim()); toast.success(`Copied IP ${idx + 1}! ✅`); }}
+                                                            onClick={() => { navigator.clipboard.writeText(ip.trim()); toast.success((t?.Domains?.copiedIp || 'Copied IP {n}!').replace('{n}', String(idx + 1))); }}
                                                             className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0"
                                                         >
                                                             <Copy className="h-5 w-5" />
                                                         </button>
                                                     </div>
                                                 ))}
-                                                <p className="text-[12px] text-slate-400">Point your domain to any of these IPs.</p>
+                                                <p className="text-[12px] text-slate-400">{t?.Domains?.pointToIps || 'Point your domain to any of these IPs.'}</p>
                                             </div>
                                         </div>
                                         {/* CNAME Record */}
                                         <div className="flex flex-col gap-1.5">
-                                            <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">CNAME Record</span>
+                                            <span className="text-[12px] font-medium text-[rgba(248,250,252,0.6)] uppercase tracking-wider">{t?.Domains?.cnameRecord || 'CNAME Record'}</span>
                                             <div className="flex items-center gap-2">
                                                 <div className="flex-1 h-[44px] flex items-center px-4 rounded-[12px] border border-white/[0.08] bg-[#1E293B]/40">
                                                     <span className="text-[14px] text-[#F8FAFC] font-mono">{DNS_CNAME}</span>
                                                 </div>
                                                 <button
                                                     type="button"
-                                                    onClick={() => { navigator.clipboard.writeText(DNS_CNAME); toast.success('Copied! ✅'); }}
+                                                    onClick={() => { navigator.clipboard.writeText(DNS_CNAME); toast.success(t?.Domains?.copied || 'Copied!'); }}
                                                     className="flex h-[44px] w-[44px] items-center justify-center rounded-[12px] bg-blue-500/10 border border-blue-500/20 text-blue-500 hover:bg-blue-500/20 transition-colors shrink-0"
                                                 >
                                                     <Copy className="h-5 w-5" />
@@ -554,7 +556,7 @@ export function DomainsClient({
                                         style={{ background: 'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(45,212,191,1) 100%)' }}
                                     >
                                         {verifyingDomain === domain ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" strokeWidth={2.5} />}
-                                        {verifyingDomain === domain ? 'Verifying...' : 'Verify Connection'}
+                                        {verifyingDomain === domain ? (t?.Domains?.verifying || 'Verifying...') : (t?.Domains?.verifyConnection || 'Verify Connection')}
                                     </button>
                                     <button
                                         type="button"
@@ -562,7 +564,7 @@ export function DomainsClient({
                                         disabled={isPending}
                                         className="w-full sm:w-[112px] flex items-center justify-center h-[50px] rounded-[16px] border border-[rgba(251,44,54,0.3)] bg-transparent text-[#FF6467] hover:bg-[rgba(251,44,54,0.08)] text-[16px] font-semibold font-['Inter'] transition-colors disabled:opacity-50"
                                     >
-                                        Remove
+                                        {t?.Domains?.remove || 'Remove'}
                                     </button>
                                 </div>
                             </div>
@@ -578,11 +580,11 @@ export function DomainsClient({
                                     <div className="flex flex-wrap gap-2 items-center">
                                         <div className="flex h-[34px] w-fit items-center justify-center gap-[6px] rounded-[12px] border border-[#00C950]/30 bg-[#00C950]/10 pl-[12px] pr-[16px]">
                                             <Check className="h-4 w-4 text-[#05DF72]" strokeWidth={2.5} />
-                                            <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">Connected & Secured</span>
+                                            <span className="text-[14px] font-medium leading-none text-[#B9F8CF]">{t?.Domains?.connectedSecured || 'Connected & Secured'}</span>
                                         </div>
                                         {isPrimary && (
                                             <div className="flex items-center justify-center h-[26px] px-3 rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.2)]">
-                                                <span className="text-[12px] font-semibold text-[#C4B5FD]">Current Primary Domain</span>
+                                                <span className="text-[12px] font-semibold text-[#C4B5FD]">{t?.Domains?.currentPrimary || 'Current Primary Domain'}</span>
                                             </div>
                                         )}
                                     </div>
@@ -596,7 +598,7 @@ export function DomainsClient({
                                         className="flex items-center justify-center h-[44px] px-[16px] rounded-[12px] border border-[#FB2C36]/30 bg-transparent text-[#FF6467] hover:bg-[#FB2C36]/10 text-[14px] font-semibold transition-colors font-['Inter'] disabled:opacity-50"
                                         title={isPrimary ? 'Cannot remove the primary domain' : 'Remove domain'}
                                     >
-                                        Remove Domain
+                                        {t?.Domains?.removeDomain || 'Remove Domain'}
                                     </button>
                                 </div>
                             </div>
@@ -615,11 +617,11 @@ export function DomainsClient({
                         <div className="flex flex-col">
                             {/* Dùng div + m-0 để triệt tiêu mọi margin mặc định từ global CSS (h3 thường tự có margin-bottom) */}
                             <div className="m-0 p-0 text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter']">
-                                Enter the domain name you own
+                                {t?.Domains?.enterDomainTitle || 'Enter the domain name you own'}
                             </div>
                             {/* Dùng div + mt-[2px] m-0 để triệt tiêu mọi margin từ thẻ p (p thường có margin-top) */}
                             <div className="m-0 p-0 mt-[2px] text-[14px] font-bold text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter']">
-                                Note: Make sure you have access to your registrar
+                                {t?.Domains?.enterDomainNote || 'Note: Make sure you have access to your registrar'}
                             </div>
                         </div>
                         {/* Input — Figma: y=105, note bottom=81 → gap=24px */}
@@ -642,7 +644,7 @@ export function DomainsClient({
                                 onClick={() => { setIsAddModalOpen(false); setNewDomainInput(''); }}
                                 className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors font-['Inter']"
                             >
-                                Cancel
+                                {t?.Domains?.cancel || 'Cancel'}
                             </button>
                             {/* Figma: dim gradient when empty, full gradient when input has value */}
                             <button
@@ -653,7 +655,7 @@ export function DomainsClient({
                                 className={`flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] text-white text-[16px] font-semibold leading-[1.5em] transition-all shadow-[0px_4px_6px_-4px_rgba(0,0,0,0.1),0px_10px_15px_-3px_rgba(0,0,0,0.1)] font-['Inter'] ${newDomainInput.trim() ? 'opacity-100 hover:opacity-90' : 'opacity-50'} ${isPending ? 'opacity-50' : ''}`}
                             >
                                 {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
-                                Add Domain
+                                {t?.Domains?.addDomain || 'Add Domain'}
                             </button>
                         </div>
                     </div>
@@ -669,6 +671,7 @@ export function DomainsClient({
                     isPending={isPending}
                     onClose={() => setIsSelectPrimaryOpen(false)}
                     onSave={handleSavePrimary}
+                    t={t}
                 />
             )}
 
@@ -678,10 +681,10 @@ export function DomainsClient({
                     <div className="flex flex-col w-[448px] max-w-full p-[25px] rounded-[16px] bg-[#1E293B] border border-white/[0.08] shadow-[0px_25px_50px_-12px_rgba(0,0,0,0.25)] animate-in zoom-in-95 duration-200">
                         <div className="flex flex-col">
                             <div className="m-0 p-0 text-[20px] font-semibold text-[#F8FAFC] leading-[1.4em] font-['Inter']">
-                                Remove domain
+                                {t?.Domains?.removeDomainTitle || 'Remove domain'}
                             </div>
                             <div className="m-0 p-0 mt-[8px] text-[14px] font-normal text-[rgba(248,250,252,0.6)] leading-[1.428em] font-['Inter']">
-                                Are you sure you want to remove <span className="font-semibold text-[#F8FAFC]">{removingDomain}</span>? This will revoke the SSL certificate and the domain will no longer route to your store.
+                                {(t?.Domains?.removeDomainConfirm || 'Are you sure you want to remove {domain}? This will revoke the SSL certificate and the domain will no longer route to your store.').replace('{domain}', removingDomain)}
                             </div>
                         </div>
                         <div className="mt-[24px] flex items-center gap-[12px]">
@@ -690,7 +693,7 @@ export function DomainsClient({
                                 onClick={() => setRemovingDomain(null)}
                                 className="flex-1 flex items-center justify-center h-[50px] rounded-[16px] border border-white/[0.08] bg-transparent text-[#F8FAFC] text-[16px] font-medium leading-[1.5em] hover:bg-white/5 transition-colors font-['Inter']"
                             >
-                                Cancel
+                                {t?.Domains?.cancel || 'Cancel'}
                             </button>
                             <button
                                 type="button"
@@ -699,7 +702,7 @@ export function DomainsClient({
                                 className="flex-1 flex items-center justify-center gap-2 h-[50px] rounded-[16px] border border-[#FB2C36]/30 bg-[#FB2C36]/10 text-[#FF6467] text-[16px] font-semibold leading-[1.5em] hover:bg-[#FB2C36]/20 transition-colors font-['Inter'] disabled:opacity-50"
                             >
                                 {isPending && <Loader2 className="w-5 h-5 animate-spin" />}
-                                Remove Domain
+                                {t?.Domains?.removeDomain || 'Remove Domain'}
                             </button>
                         </div>
                     </div>

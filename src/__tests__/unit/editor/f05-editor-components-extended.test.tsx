@@ -31,11 +31,12 @@ vi.mock('@/i18n', () => ({
             editor: {
                 unpublish: { title: 'Unpublish', confirm: 'Confirm', cancel: 'Cancel', description: 'Are you sure?' },
                 unpublishModal: { title: 'Unpublish Site', warningTitle: 'Warning', warningDesc: 'Site will go offline', ownerAccessTitle: 'Owner access', ownerAccessDesc: 'Only you can see', cancel: 'Cancel', confirm: 'Confirm Unpublish', processing: 'Processing...' },
+                saveStatus: { saving: 'Saving...', saved: 'Saved', savedAgo: 'Saved {timeAgo}', notSaved: 'Not saved', draftSaving: 'Draft saving in 3s...' },
             },
         },
         locale: 'en',
     }),
-    I18nProvider: ({ children }: any) => children,
+    I18nProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 // ── Mock date-fns ────────────────────────────────────────────────────────

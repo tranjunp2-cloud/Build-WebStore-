@@ -1,10 +1,32 @@
 'use client'
 
-import { FormEvent, useCallback, useId, useRef, useState } from 'react'
+import { FormEvent, useCallback, useId, useRef, useState, type ReactNode } from 'react'
 import { AnimatedSection } from '../shared/animations'
 import type { BlockProps } from '../types'
 import type { NewsletterConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+
+// ── Local helpers (Phase 05 refactor) ───────────────────────────────────────
+// Brand identity vars preserved per Option C additive strategy.
+
+const NEWSLETTER_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
+
+type NewsletterSectionProps = {
+    children: ReactNode
+    paddingClass?: string
+    style?: React.CSSProperties
+}
+
+/** Outer wrapper for all 3 variants. AnimatedSection + token container. */
+function NewsletterSection({ children, paddingClass = SECTION_PADDING.default, style }: NewsletterSectionProps) {
+    return (
+        <AnimatedSection className={paddingClass} style={style}>
+            <div className={NEWSLETTER_CONTAINER}>{children}</div>
+        </AnimatedSection>
+    )
+}
 
 type SubmitState = 'idle' | 'loading' | 'success' | 'error'
 
@@ -108,7 +130,7 @@ function EmailForm({
             <button
                 type="submit"
                 disabled={state === 'loading'}
-                className="px-6 py-3 font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 flex-shrink-0 flex items-center justify-center gap-2"
+                className={`px-6 py-3 ${TOUCH_TARGET.min} font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 flex-shrink-0 flex items-center justify-center gap-2`}
                 style={{
                     background: CSS_VARS.primary,
                     borderRadius: CSS_VARS.radiusMd,
@@ -129,73 +151,66 @@ function EmailForm({
 function InlineVariant({ block, siteId }: { block: NewsletterConfig; siteId?: string }) {
     const { headline, subheadline, buttonLabel = 'Subscribe', placeholder = 'your@email.com' } = block
     return (
-        <AnimatedSection className="py-12 md:py-16" style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
-            <div className="container mx-auto px-6">
-                <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-12 max-w-4xl mx-auto">
-                    <div className="flex-1 text-center lg:text-left">
-                        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                            {headline || 'Stay Updated'}
-                        </h2>
-                        {subheadline && <p style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
-                    </div>
-                    <div className="flex-1 w-full max-w-md">
-                        <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="row" />
-                    </div>
+        <NewsletterSection paddingClass={SECTION_PADDING.compact} style={{ color: CSS_VARS.text, background: CSS_VARS.surface }}>
+            <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-12 max-w-4xl mx-auto">
+                <div className="flex-1 text-center lg:text-left">
+                    <Heading level={2} className="mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                        {headline || 'Stay Updated'}
+                    </Heading>
+                    {subheadline && <Body style={{ color: CSS_VARS.muted }}>{subheadline}</Body>}
+                </div>
+                <div className="flex-1 w-full max-w-md">
+                    <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="row" />
                 </div>
             </div>
-        </AnimatedSection>
+        </NewsletterSection>
     )
 }
 
 function PopupVariant({ block, siteId }: { block: NewsletterConfig; siteId?: string }) {
     const { headline, subheadline, buttonLabel = 'Subscribe', placeholder = 'your@email.com' } = block
     return (
-        <AnimatedSection className="py-16 md:py-20" style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
-            <div className="container mx-auto px-6">
-                <div
-                    className="max-w-md mx-auto text-center p-8 md:p-10"
-                    style={{
-                        background: CSS_VARS.surface,
-                        borderRadius: CSS_VARS.radiusLg,
-                        boxShadow: CSS_VARS.shadowMd,
-                        border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
-                    }}
-                >
-                    <h2 className="text-2xl md:text-3xl font-bold mb-3" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                        {headline || 'Stay Updated'}
-                    </h2>
-                    {subheadline && <p className="mb-6" style={{ color: CSS_VARS.muted }}>{subheadline}</p>}
-                    <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="stack" />
-                </div>
+        <NewsletterSection style={{ color: CSS_VARS.text, background: CSS_VARS.background }}>
+            <div
+                className="max-w-md mx-auto text-center p-8 md:p-10"
+                style={{
+                    background: CSS_VARS.surface,
+                    borderRadius: CSS_VARS.radiusLg,
+                    boxShadow: CSS_VARS.shadowMd,
+                    border: '1px solid rgba(var(--brand-primary-rgb), 0.1)',
+                }}
+            >
+                <Heading level={2} className="mb-3" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                    {headline || 'Stay Updated'}
+                </Heading>
+                {subheadline && <Body className="mb-6" style={{ color: CSS_VARS.muted }}>{subheadline}</Body>}
+                <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="stack" />
             </div>
-        </AnimatedSection>
+        </NewsletterSection>
     )
 }
 
 function BannerVariant({ block, siteId }: { block: NewsletterConfig; siteId?: string }) {
     const { headline, subheadline, buttonLabel = 'Subscribe', placeholder = 'your@email.com' } = block
     return (
-        <AnimatedSection
-            className="py-16 md:py-20"
+        <NewsletterSection
             style={{
                 background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
                 color: '#ffffff',
             }}
         >
-            <div className="container mx-auto px-6">
-                <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-12 max-w-4xl mx-auto">
-                    <div className="flex-1 text-center lg:text-left">
-                        <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
-                            {headline || 'Stay Updated'}
-                        </h2>
-                        {subheadline && <p className="opacity-85">{subheadline}</p>}
-                    </div>
-                    <div className="flex-1 w-full max-w-md">
-                        <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="row" />
-                    </div>
+            <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-12 max-w-4xl mx-auto">
+                <div className="flex-1 text-center lg:text-left">
+                    <Heading level={2} className="mb-2" style={{ fontFamily: CSS_VARS.fontHeading }}>
+                        {headline || 'Stay Updated'}
+                    </Heading>
+                    {subheadline && <Body className="opacity-85">{subheadline}</Body>}
+                </div>
+                <div className="flex-1 w-full max-w-md">
+                    <EmailForm placeholder={placeholder} buttonLabel={buttonLabel} siteId={siteId} layout="row" />
                 </div>
             </div>
-        </AnimatedSection>
+        </NewsletterSection>
     )
 }
 

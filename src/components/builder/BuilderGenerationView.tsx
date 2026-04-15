@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { Check, Loader2, X } from 'lucide-react'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 import { useI18n } from '@/i18n'
+import { cn } from '@/lib/utils'
 
 interface BuilderGenerationViewProps {
     message?: string
@@ -12,6 +13,45 @@ interface BuilderGenerationViewProps {
     elapsedSeconds?: number
     onCancel?: () => void
     showTimeoutWarning?: boolean
+}
+
+/**
+ * Blend discrete SSE step progress (10→20→60→95→100) with a time-based
+ * asymptotic curve so the bar keeps advancing during the long silent
+ * OpenAI call phase. Without this the bar visibly stalls at ~20% for
+ * the 40–90s it takes gpt-4.1-mini to return.
+ *
+ * Curve: 10 + 82·(1 − e^(−t/45))
+ *   t=0s  →10%   t=15s→33%   t=30s→52%   t=45s→66%
+ *   t=60s →78%   t=90s→89%   t=120s→92%  asymptote→92%
+ *
+ * We cap time-based output at 92 so the bar never fills without a real
+ * signal. Once an event reports ≥92 (parsing/saving/done) we honour it
+ * verbatim so the final snap to 100% happens on the `done` event.
+ */
+function computeEffectiveProgress(eventProgress: number, elapsedSeconds?: number): number {
+    const rawEvent = Number.isFinite(eventProgress) ? eventProgress : 0
+    const clampedEvent = Math.max(10, Math.min(100, rawEvent))
+    if (clampedEvent >= 92) return clampedEvent
+
+    const t = typeof elapsedSeconds === 'number' && elapsedSeconds > 0 ? elapsedSeconds : 0
+    const timeBased = 10 + 82 * (1 - Math.exp(-t / 45))
+    return Math.max(clampedEvent, Math.min(92, timeBased))
+}
+
+/**
+ * Map raw server-side event progress to the active step in the 3-phase indicator.
+ *   step 0 — Analyzing business information  (progress < 20)
+ *   step 1 — Generating content & design    (20 ≤ progress < 60)
+ *   step 2 — Preparing preview               (progress ≥ 60)
+ * Steps with index < active render as "done" (green check),
+ * step === active renders as "in progress" (gradient spinner),
+ * step > active renders as "pending" (muted number).
+ */
+function getActiveStep(rawProgress: number): 0 | 1 | 2 {
+    if (rawProgress >= 60) return 2
+    if (rawProgress >= 20) return 1
+    return 0
 }
 
 function BuilderGenerationCard({
@@ -25,7 +65,8 @@ function BuilderGenerationCard({
     onCancel?: () => void
     showTimeoutWarning?: boolean
 }) {
-    const { t } = useI18n()
+    const { t, ti } = useI18n()
+    const activeStep = getActiveStep(progress)
     return (
         <div className="mx-auto flex w-full max-w-[864px] items-center justify-center px-12">
             <div className="relative w-full max-w-[448px] rounded-2xl border border-[rgba(59,130,246,0.15)] bg-[rgba(30,41,59,0.6)] p-8 shadow-[0px_8px_32px_0px_rgba(0,0,0,0.3)]">
@@ -47,26 +88,47 @@ function BuilderGenerationCard({
                     </div>
 
                     <div className="mb-6 flex flex-col gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[rgba(0,201,80,0.2)] text-[#00C950]">
-                                <Check className="size-4" strokeWidth={3} />
-                            </div>
-                            <span className="text-sm leading-5 text-[#f8fafc]">{t.onboarding.generating.stepAnalyzing}</span>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)] opacity-65">
-                                <Loader2 className="size-4 animate-spin text-white" />
-                            </div>
-                            <span className="text-sm leading-5 text-[#f8fafc]">{t.onboarding.generating.stepGenerating}</span>
-                        </div>
-
-                        <div className="flex items-center gap-3 opacity-50">
-                            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0.05)]">
-                                <span className="text-sm font-medium text-[#94a3b8]">3</span>
-                            </div>
-                            <span className="text-sm leading-5 text-[#94a3b8]">{t.onboarding.generating.stepPreparing}</span>
-                        </div>
+                        {[
+                            t.onboarding.generating.stepAnalyzing,
+                            t.onboarding.generating.stepGenerating,
+                            t.onboarding.generating.stepPreparing,
+                        ].map((label, index) => {
+                            const state: 'done' | 'active' | 'pending' =
+                                index < activeStep ? 'done' : index === activeStep ? 'active' : 'pending'
+                            return (
+                                <div
+                                    className={cn(
+                                        'flex items-center gap-3 transition-opacity duration-500',
+                                        state === 'pending' && 'opacity-50',
+                                    )}
+                                    key={label}
+                                >
+                                    {state === 'done' && (
+                                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[rgba(0,201,80,0.2)] text-[#00C950]">
+                                            <Check className="size-4" strokeWidth={3} />
+                                        </div>
+                                    )}
+                                    {state === 'active' && (
+                                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#3b82f6_0%,#2dd4bf_100%)]">
+                                            <Loader2 className="size-4 animate-spin text-white" />
+                                        </div>
+                                    )}
+                                    {state === 'pending' && (
+                                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0.05)]">
+                                            <span className="text-sm font-medium text-[#94a3b8]">{index + 1}</span>
+                                        </div>
+                                    )}
+                                    <span
+                                        className={cn(
+                                            'text-sm leading-5',
+                                            state === 'pending' ? 'text-[#94a3b8]' : 'text-[#f8fafc]',
+                                        )}
+                                    >
+                                        {label}
+                                    </span>
+                                </div>
+                            )
+                        })}
                     </div>
 
                     <div className="flex flex-col gap-2">
@@ -76,13 +138,13 @@ function BuilderGenerationCard({
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-[rgba(255,255,255,0.05)]">
                             <div
-                                className="h-full rounded-full bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] transition-all duration-300"
-                                style={{ width: `${Math.max(10, progress)}%` }}
+                                className="h-full rounded-full bg-[linear-gradient(90deg,#3b82f6_0%,#2dd4bf_100%)] transition-[width] duration-700 ease-out"
+                                style={{ width: `${computeEffectiveProgress(progress, elapsedSeconds)}%` }}
                             />
                         </div>
                         {typeof elapsedSeconds === 'number' && elapsedSeconds > 0 && (
                             <div className="mt-1 text-center text-xs text-[#64748b]">
-                                Elapsed: {elapsedSeconds}s
+                                {ti(t.onboarding.generating.elapsed, { seconds: elapsedSeconds })}
                             </div>
                         )}
                     </div>
@@ -93,7 +155,7 @@ function BuilderGenerationCard({
                             role="alert"
                         >
                             <p className="text-center text-sm text-amber-300/90">
-                                Taking longer than expected...
+                                {t.onboarding.generating.timeoutWarning}
                             </p>
                             <button
                                 className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
@@ -101,7 +163,7 @@ function BuilderGenerationCard({
                                 type="button"
                             >
                                 <X className="size-3.5" />
-                                Cancel generation
+                                {t.onboarding.generating.cancelButton}
                             </button>
                         </div>
                     )}

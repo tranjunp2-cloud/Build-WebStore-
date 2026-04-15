@@ -16,10 +16,10 @@ export const FONT_PAIRINGS: FontPairing[] = [
     name: 'Modern Clean',
     category: 'modern',
     headingFont: 'Inter',
-    bodyFont: 'Inter',
+    bodyFont: 'Lora',
     headingWeight: 700,
     bodyWeight: 400,
-    description: 'Clean and versatile, perfect for any modern website',
+    description: 'Clean sans heading with elegant serif body — versatile contrast',
   },
   {
     id: 'editorial',
@@ -126,10 +126,10 @@ export const FONT_PAIRINGS: FontPairing[] = [
     name: 'Humanist',
     category: 'minimal',
     headingFont: 'DM Sans',
-    bodyFont: 'DM Sans',
+    bodyFont: 'Karla',
     headingWeight: 700,
     bodyWeight: 400,
-    description: 'Warm minimalism with humanist touches',
+    description: 'Geometric heading + humanist body for warm minimalism',
   },
   {
     id: 'retro-modern',
@@ -211,10 +211,223 @@ export const FONT_PAIRINGS: FontPairing[] = [
     bodyWeight: 400,
     description: 'Bold geometric for strong visual impact',
   },
+  // ── Plan 2253 Phase 02 — new unique pairs for variety (R6 fix) ──────────
+  // Mirrors src/lib/ai/font-pairings.ts resolver additions so that
+  // `theme-presets.ts` preset.fontPairingId references stay referentially
+  // intact against the authoritative FONT_PAIRINGS array consumed by
+  // `src/__tests__/unit/templates/theme-presets.test.ts`.
+  {
+    id: 'magazine-cover',
+    name: 'Magazine Cover',
+    category: 'classic',
+    headingFont: 'Playfair Display',
+    bodyFont: 'Open Sans',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Editorial magazine cover — serif headline + neutral body',
+  },
+  {
+    id: 'boutique-serif',
+    name: 'Boutique Serif',
+    category: 'classic',
+    headingFont: 'Playfair Display',
+    bodyFont: 'Inter',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Boutique luxury — classic serif headlines with modern body',
+  },
+  {
+    id: 'warm-editorial',
+    name: 'Warm Editorial',
+    category: 'playful',
+    headingFont: 'Poppins',
+    bodyFont: 'Nunito',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Warm rounded headlines with friendly editorial body',
+  },
+  {
+    id: 'contemporary',
+    name: 'Contemporary',
+    category: 'modern',
+    headingFont: 'Raleway',
+    bodyFont: 'DM Sans',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Contemporary clean — Raleway headlines with geometric body',
+  },
+  {
+    id: 'classical',
+    name: 'Classical',
+    category: 'classic',
+    headingFont: 'Inter',
+    bodyFont: 'Open Sans',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Refined neutral pairing for classical, timeless brands',
+  },
+  {
+    id: 'hospitality',
+    name: 'Hospitality',
+    category: 'playful',
+    headingFont: 'Poppins',
+    bodyFont: 'Open Sans',
+    headingWeight: 700,
+    bodyWeight: 400,
+    description: 'Welcoming hospitality — rounded headlines with clean body',
+  },
 ]
 
 /** System fonts that should not be loaded from Google Fonts */
 const SYSTEM_FONTS = ['Helvetica Neue', 'Arial', 'system-ui']
+
+// ── next/font CSS Variable Mapping ──────────────────────────────────────────
+// Maps font display names (used in FONT_PAIRINGS) to the CSS variable names
+// declared by `next/font/google` imports in `src/components/AppShell.tsx`.
+//
+// Why this exists: `next/font` self-hosts woff2 files and exposes them ONLY
+// via scoped CSS variables (e.g. `--font-playfair-display`). The family name
+// 'Playfair Display' is NOT globally registered, so `font-family: 'Playfair
+// Display'` in theme CSS falls back to system font. Theme resolver must
+// output `var(--font-playfair-display)` instead.
+//
+// Keep this map in sync with AppShell.tsx next/font imports. If you add a
+// new pairing that references an unloaded font, add both (a) the next/font
+// import in AppShell and (b) the entry below.
+export const FONT_CSS_VAR_MAP: Readonly<Record<string, string>> = {
+  // Base (always loaded, Vietnamese subset)
+  'Inter': '--font-inter',
+  'Outfit': '--font-outfit',
+
+  // Pairing fonts (20 pairings cover these)
+  'Lora': '--font-lora',
+  'Playfair Display': '--font-playfair-display',
+  'Space Grotesk': '--font-space-grotesk',
+  'Nunito': '--font-nunito',
+  'Nunito Sans': '--font-nunito-sans',
+  'Oswald': '--font-oswald',
+  'Source Sans 3': '--font-source-sans-3',
+  'Cormorant Garamond': '--font-cormorant-garamond',
+  'Proza Libre': '--font-proza-libre',
+  'DM Sans': '--font-dm-sans',
+  'Sora': '--font-sora',
+  'Work Sans': '--font-work-sans',
+  'Raleway': '--font-raleway',
+  'Poppins': '--font-poppins',
+  'Open Sans': '--font-open-sans',
+  'Karla': '--font-karla',
+  'Archivo Black': '--font-archivo-black',
+  'DM Mono': '--font-dm-mono',
+  'Merriweather': '--font-merriweather',
+  'Source Serif 4': '--font-source-serif-4',
+  'Varela Round': '--font-varela-round',
+  'Manrope': '--font-manrope',
+  'Rajdhani': '--font-rajdhani',
+  'Exo 2': '--font-exo-2',
+  'Josefin Sans': '--font-josefin-sans',
+  'Quicksand': '--font-quicksand',
+  'Montserrat': '--font-montserrat',
+  'Hind': '--font-hind',
+} as const
+
+/** Default CSS vars guaranteed loaded (for fallback chains) */
+export const DEFAULT_HEADING_VAR = '--font-outfit'
+export const DEFAULT_BODY_VAR = '--font-inter'
+
+/**
+ * Convert a font display name → a `font-family` CSS value that prefers the
+ * `next/font` scoped variable, then falls back to the always-loaded default
+ * (`--font-outfit` for heading, `--font-inter` for body), then system fonts.
+ *
+ * Usage inside `generateThemeCSS()`:
+ *   --font-heading: ${fontNameToCSSVar(theme.fontHeading, 'heading')};
+ *
+ * For unknown fonts (not in FONT_CSS_VAR_MAP), the name is still quoted as
+ * a system fallback hint — if the user happens to have it installed locally
+ * or loaded externally it will apply, otherwise the default var handles it.
+ */
+export function fontNameToCSSVar(
+  fontName: string,
+  role: 'heading' | 'body',
+): string {
+  const trimmed = fontName.trim()
+  const defaultVar = role === 'heading' ? DEFAULT_HEADING_VAR : DEFAULT_BODY_VAR
+  const knownVar = FONT_CSS_VAR_MAP[trimmed]
+  const systemFallback = role === 'heading' ? "'Outfit', sans-serif" : "'Inter', sans-serif"
+
+  if (knownVar) {
+    return `var(${knownVar}), var(${defaultVar}), ${systemFallback}`
+  }
+
+  // Unknown font — quote and try system, fall back to default loaded var
+  const quoted = /\s/.test(trimmed) ? `'${trimmed}'` : trimmed
+  return `${quoted}, var(${defaultVar}), ${systemFallback}`
+}
+
+// ── Pairing Validation ──────────────────────────────────────────────────────
+// Prevents "AI slop" — same-font pairings look generic (no contrast axis).
+
+/** Blocked font combinations — same font for heading and body removes contrast */
+export const BLOCKED_PAIRINGS: ReadonlyArray<readonly [string, string]> = [
+  ['Inter', 'Inter'],
+  ['DM Sans', 'DM Sans'],
+  ['Poppins', 'Poppins'],
+  ['Outfit', 'Outfit'],
+  ['Manrope', 'Manrope'],
+  ['Work Sans', 'Work Sans'],
+] as const
+
+export function isBlockedPairing(headingFont: string, bodyFont: string): boolean {
+  const h = headingFont.trim().toLowerCase()
+  const b = bodyFont.trim().toLowerCase()
+  return BLOCKED_PAIRINGS.some(
+    ([blockedH, blockedB]) =>
+      blockedH.toLowerCase() === h && blockedB.toLowerCase() === b,
+  )
+}
+
+export type FontPairingValidation = {
+  valid: boolean
+  reason?: string
+}
+
+/**
+ * Validates a font pairing against contrast-axis rules.
+ * - Same font for heading + body → invalid (no contrast)
+ * - Explicitly blocked combos → invalid
+ */
+export function validateFontPairing(
+  headingFont: string,
+  bodyFont: string,
+): FontPairingValidation {
+  const h = headingFont.trim()
+  const b = bodyFont.trim()
+
+  if (!h || !b) {
+    return { valid: false, reason: 'missing-font' }
+  }
+
+  if (h.toLowerCase() === b.toLowerCase()) {
+    return {
+      valid: false,
+      reason: `same-font: ${h} heading + ${b} body has no contrast axis`,
+    }
+  }
+
+  if (isBlockedPairing(h, b)) {
+    return {
+      valid: false,
+      reason: `blocked-pair: ${h} + ${b} is in BLOCKED_PAIRINGS list`,
+    }
+  }
+
+  return { valid: true }
+}
+
+/** Validates a FontPairing object (convenience wrapper) */
+export function validateFontPairingObject(pairing: FontPairing): FontPairingValidation {
+  return validateFontPairing(pairing.headingFont, pairing.bodyFont)
+}
 
 export function getFontPairing(id: string): FontPairing | undefined {
   return FONT_PAIRINGS.find((p) => p.id === id)

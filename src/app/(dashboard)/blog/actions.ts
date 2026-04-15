@@ -1,12 +1,15 @@
 'use server'
 
-import { getPayload, type Where } from 'payload'
+import { getPayload, type Where, type PayloadRequest } from 'payload'
 import configPromise from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 
 // ─── Types & Helpers ──────────────────────────────────────────────────────
 type TenantEntry = { tenant: { id: string } | string; role?: string; status?: string }
 type UserWithTenants = { id: string; email: string; tenants?: TenantEntry[] }
+
+/** Payload expects its internal User type — our auth user is compatible at runtime */
+type PayloadUser = PayloadRequest['user']
 
 function getTenantId(user: UserWithTenants): string | undefined {
     const entry = user.tenants?.[0]
@@ -24,9 +27,12 @@ export async function getBlogCategoriesAction() {
     // Get the first tenant from user's tenants array
     const tenantId = getTenantId(user as UserWithTenants)
 
-    // Apply tenant filtering
-    const where: any = {}
-    if (tenantId) where.tenant = { equals: tenantId }
+    // Apply tenant filtering + exclude soft-deleted
+    const conditions: Where[] = [
+        { status: { not_equals: 'deleted' } },
+    ]
+    if (tenantId) conditions.push({ tenant: { equals: tenantId } })
+    const where: Where = { and: conditions }
 
     const result = await payload.find({
         collection: 'blog_categories',
@@ -87,8 +93,8 @@ export async function createBlogCategoryAction(data: { name: string }) {
                 slug: slug,
                 tenant: tenantId,
                 site: siteId,
-            } as any,
-            user: user as any,
+            } as Record<string, unknown>,
+            user: user as PayloadUser,
         })
         return JSON.parse(JSON.stringify(result))
     } catch (e: unknown) {
@@ -122,14 +128,40 @@ export async function updateBlogCategoryAction(id: string, data: { name: string 
         const result = await payload.update({
             collection: 'blog_categories',
             id,
-            data: { name: data.name.trim(), slug: slug } as any,
-            user: user as any,
+            data: { name: data.name.trim(), slug: slug } as Record<string, unknown>,
+            user: user as PayloadUser,
         })
         return JSON.parse(JSON.stringify(result))
     } catch (e: unknown) {
         console.error('Failed to update category:', e)
         return { error: 'Failed to update category' }
     }
+}
+
+/**
+ * Returns count of PUBLISHED posts assigned to a category.
+ * Used by delete-category UI to decide whether to show a warning.
+ */
+export async function getCategoryPublishedPostCountAction(categoryId: string): Promise<number> {
+    const user = await getCurrentUser()
+    if (!user) return 0
+
+    const payload = await getPayload({ config: configPromise })
+    const tenantId = getTenantId(user as UserWithTenants)
+
+    const conditions: Where[] = [
+        { category: { equals: categoryId } },
+        { status: { equals: 'published' } },
+    ]
+    if (tenantId) conditions.push({ tenant: { equals: tenantId } })
+
+    const result = await payload.find({
+        collection: 'blogs',
+        where: { and: conditions },
+        limit: 1,
+        depth: 0,
+    })
+    return result.totalDocs
 }
 
 export async function deleteBlogCategoryAction(id: string) {
@@ -145,14 +177,14 @@ export async function deleteBlogCategoryAction(id: string) {
         const catTenantId = typeof existing.tenant === 'object' ? existing.tenant?.id : existing.tenant
 
         if (tenantId && catTenantId && String(tenantId) !== String(catTenantId)) {
-            return { error: 'Unauthorized delete access' }
+            return { error: 'ERR_UNAUTHORIZED' }
         }
 
-        // Cascade: unset category from all posts (TC-F17-05-06)
+        // Unset category from all posts referencing this category
         const affected = await payload.find({
             collection: 'blogs',
             where: { category: { equals: id } },
-            limit: 0,
+            limit: 500,
             depth: 0,
         })
 
@@ -168,16 +200,15 @@ export async function deleteBlogCategoryAction(id: string) {
             )
         }
 
-        await payload.update({
+        // Hard delete the category
+        await payload.delete({
             collection: 'blog_categories',
             id,
-            data: { status: 'deleted' as const },
-            user: user as any,
         })
         return { success: true }
     } catch (e: unknown) {
         console.error('Failed to delete category:', e)
-        return { error: 'Failed to delete category. It might be in use.' }
+        return { error: 'ERR_DELETE_CATEGORY' }
     }
 }
 
@@ -198,6 +229,7 @@ export async function saveBlogAction(data: {
     category?: string | null
     thumbnail?: string | null
     publishedAt?: string | null
+    scheduledPublishDate?: string | null
     seo?: {
         metaTitle?: string
         metaDescription?: string
@@ -225,7 +257,7 @@ export async function saveBlogAction(data: {
         }
     }
 
-    const body: Record<string, any> = {
+    const body: Record<string, unknown> = {
         title: data.title,
         slug: data.slug,
         content: data.content,
@@ -233,6 +265,7 @@ export async function saveBlogAction(data: {
         category: data.category ? (isNaN(Number(data.category)) ? data.category : Number(data.category)) : null,
         thumbnail: data.thumbnail ? (isNaN(Number(data.thumbnail)) ? data.thumbnail : Number(data.thumbnail)) : null,
         publishedAt: data.publishedAt || null,
+        scheduledPublishDate: data.scheduledPublishDate || null,
         seo: data.seo || {},
         author: (user as UserWithTenants).id,
     }
@@ -259,16 +292,16 @@ export async function saveBlogAction(data: {
 
         const result = await payload.create({
             collection: 'blogs',
-            data: body as any,
-            user: user as any,
+            data: body as Record<string, unknown>,
+            user: user as PayloadUser,
         })
         return JSON.parse(JSON.stringify(result))
     } else {
         const result = await payload.update({
             collection: 'blogs',
             id: data.id!,
-            data: body as any,
-            user: user as any,
+            data: body as Record<string, unknown>,
+            user: user as PayloadUser,
         })
         return JSON.parse(JSON.stringify(result))
     }
@@ -288,17 +321,20 @@ export async function listBlogsAction(params: {
     const payload = await getPayload({ config: configPromise })
     const tenantId = getTenantId(user as UserWithTenants)
 
-    const where: Record<string, any> = {}
-    if (tenantId) where.tenant = { equals: tenantId }
-    if (params.status && params.status !== 'all') where.status = { equals: params.status }
-    if (params.category && params.category !== 'all') where.category = { equals: params.category }
+    const conditions: Where[] = []
+    if (tenantId) conditions.push({ tenant: { equals: tenantId } })
+    if (params.status && params.status !== 'all') conditions.push({ status: { equals: params.status } })
+    if (params.category && params.category !== 'all') conditions.push({ category: { equals: params.category } })
     const trimmedSearch = params.search?.trim()
     if (trimmedSearch) {
-        where.or = [
-            { title: { contains: trimmedSearch } },
-            { slug: { contains: trimmedSearch } },
-        ]
+        conditions.push({
+            or: [
+                { title: { contains: trimmedSearch } },
+                { slug: { contains: trimmedSearch } },
+            ],
+        })
     }
+    const where: Where = conditions.length > 0 ? { and: conditions } : {}
 
     const sortField = params.sort || '-createdAt'
     const result = await payload.find({
@@ -339,7 +375,7 @@ export async function deleteBlogAction(id: string) {
     await payload.delete({
         collection: 'blogs',
         id,
-        user: user as any,
+        user: user as PayloadUser,
     })
 
     return { success: true }
@@ -388,8 +424,8 @@ export async function updateBlogStatusAction(id: string, status: string) {
     const result = await payload.update({
         collection: 'blogs',
         id,
-        data: { status } as any,
-        user: user as any,
+        data: { status } as Record<string, unknown>,
+        user: user as PayloadUser,
     })
 
     return JSON.parse(JSON.stringify(result))

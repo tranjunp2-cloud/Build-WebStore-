@@ -211,6 +211,8 @@ describe('[TC-MIG-NP.03] Pauses polling when tab is hidden', () => {
     beforeEach(() => {
         vi.useFakeTimers()
         mockSetUnreadCount.mockClear()
+        // Stub Notification.permission = 'granted' → POLL_SLOW_MS (60s) for deterministic timing
+        vi.stubGlobal('Notification', { permission: 'granted' })
         fetchMock = vi.fn(() => makeFetchOk(buildNotificationsResponse()))
         vi.stubGlobal('fetch', fetchMock)
         Object.defineProperty(document, 'hidden', {
@@ -239,7 +241,7 @@ describe('[TC-MIG-NP.03] Pauses polling when tab is hidden', () => {
 
         const callsBeforeHide = fetchMock.mock.calls.length
 
-        // Act — hide the tab then advance 15s
+        // Act — hide the tab then advance 60s
         await act(async () => {
             Object.defineProperty(document, 'hidden', {
                 value: true,
@@ -247,7 +249,7 @@ describe('[TC-MIG-NP.03] Pauses polling when tab is hidden', () => {
                 configurable: true,
             })
             document.dispatchEvent(new Event('visibilitychange'))
-            await vi.advanceTimersByTimeAsync(15_000)
+            await vi.advanceTimersByTimeAsync(60_000)
         })
 
         // Assert — no additional scheduled polls fired while hidden
@@ -313,6 +315,9 @@ describe('[TC-MIG-NP.04] Exponential backoff on consecutive errors', () => {
     beforeEach(() => {
         vi.useFakeTimers()
         mockSetUnreadCount.mockClear()
+        // Stub Notification.permission = 'granted' so getBasePollInterval() returns
+        // POLL_SLOW_MS (60s), making backoff timings deterministic for these tests
+        vi.stubGlobal('Notification', { permission: 'granted' })
     })
 
     afterEach(() => {
@@ -320,13 +325,13 @@ describe('[TC-MIG-NP.04] Exponential backoff on consecutive errors', () => {
         vi.unstubAllGlobals()
     })
 
-    it('TC-MIG-NP.04: interval grows to 30s after a fetch error', async () => {
+    it('TC-MIG-NP.04: interval grows to 120s after a fetch error', async () => {
         /**
          * Sequence:
-         *   t=0:   initial poll fires (success) → schedules next at t=15s
-         *   t=15s: second poll fires (error)    → interval doubles to 30s
-         *   t=30s: NO fetch (30s not elapsed yet)
-         *   t=45s: third poll fires at 30s after the error
+         *   t=0:    initial poll fires (success) → schedules next at t=60s
+         *   t=60s:  second poll fires (error)    → interval doubles to 120s
+         *   t=120s: NO fetch (120s not elapsed yet from error)
+         *   t=180s: third poll fires at 120s after the error
          */
         let callCount = 0
         const fetchMock = vi.fn(() => {
@@ -338,28 +343,26 @@ describe('[TC-MIG-NP.04] Exponential backoff on consecutive errors', () => {
 
         await act(async () => {
             render(<NotificationProvider />)
-            // Flush initial poll microtasks
             await Promise.resolve()
         })
-        // callCount === 1 (initial success)
 
-        // Advance 15s → second poll fires and fails
+        // Advance 60s → second poll fires and fails
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(15_000)
+            await vi.advanceTimersByTimeAsync(60_000)
         })
         expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2)
 
         const callsAfterFirstError = fetchMock.mock.calls.length
 
-        // Advance another 15s — backoff means NO new poll yet (interval is now 30s)
+        // Advance another 60s — backoff means NO new poll yet (interval is now 120s)
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(15_000)
+            await vi.advanceTimersByTimeAsync(60_000)
         })
         expect(fetchMock.mock.calls.length).toBe(callsAfterFirstError)
 
-        // Advance remaining 15s — now 30s has passed since error → poll fires
+        // Advance remaining 60s — now 120s has passed since error → poll fires
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(15_000)
+            await vi.advanceTimersByTimeAsync(60_000)
         })
         expect(fetchMock.mock.calls.length).toBeGreaterThan(callsAfterFirstError)
     })
@@ -367,23 +370,23 @@ describe('[TC-MIG-NP.04] Exponential backoff on consecutive errors', () => {
     it('TC-MIG-NP.04: backoff is capped and polling continues (not stalled forever)', async () => {
         /**
          * Every call fails. We drive through the backoff schedule:
-         *   t=0:    initial poll → error → interval=30s
-         *   t=30s:  poll → error → interval=60s
-         *   t=90s:  poll → error → interval=60s (capped)
-         *   t=150s: poll → error → interval=60s (capped)
+         *   t=0:    initial poll → error → interval=120s
+         *   t=120s: poll → error → interval=120s (capped at 120s)
+         *   t=240s: poll → error → interval=120s (capped)
+         *   t=360s: poll → error → interval=120s (capped)
          *
-         * After 150s we expect at least 4 fetch calls total.
+         * After 360s we expect at least 4 fetch calls total.
          */
         const fetchMock = vi.fn(() => makeFetchError(503))
         vi.stubGlobal('fetch', fetchMock)
 
         await act(async () => {
             render(<NotificationProvider />)
-            await Promise.resolve() // flush initial poll (call #1, error)
+            await Promise.resolve()
         })
 
         // Drive through 3 more backoff cycles
-        for (const step of [30_000, 60_000, 60_000]) {
+        for (const step of [120_000, 120_000, 120_000]) {
             await act(async () => {
                 await vi.advanceTimersByTimeAsync(step)
             })
@@ -393,19 +396,16 @@ describe('[TC-MIG-NP.04] Exponential backoff on consecutive errors', () => {
         expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(4)
     })
 
-    it('TC-MIG-NP.04: interval resets to 15s after a successful poll following an error', async () => {
+    it('TC-MIG-NP.04: interval resets to 60s after a successful poll following an error', async () => {
         /**
          * Sequence:
-         *   initial → error → interval=30s
-         *   t=30s  → success → interval resets to 15s
-         *   t=45s  → next poll fires (confirms 15s reset, not 30s)
+         *   initial → error → interval=120s
+         *   t=120s → success → interval resets to 60s
+         *   t=180s → next poll fires (confirms 60s reset, not 120s)
          */
         let callCount = 0
         const fetchMock = vi.fn(() => {
             callCount++
-            // call 1 (initial): error
-            // call 2 (t=30s):   success — resets interval to 15s
-            // call 3 (t=45s):   success
             if (callCount === 1) return makeFetchError(500)
             return makeFetchOk(buildNotificationsResponse())
         })
@@ -413,19 +413,19 @@ describe('[TC-MIG-NP.04] Exponential backoff on consecutive errors', () => {
 
         await act(async () => {
             render(<NotificationProvider />)
-            await Promise.resolve() // call #1 (error)
+            await Promise.resolve()
         })
 
-        // t=30s: call #2 fires (backoff interval), succeeds → resets to 15s
+        // t=120s: call #2 fires (backoff interval), succeeds → resets to 60s
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(30_000)
+            await vi.advanceTimersByTimeAsync(120_000)
         })
         const callsAfterReset = fetchMock.mock.calls.length
         expect(callsAfterReset).toBeGreaterThanOrEqual(2)
 
-        // t=45s: if interval reset to 15s, call #3 should fire at t=30+15=45s
+        // t=180s: if interval reset to 60s, call #3 should fire
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(15_000)
+            await vi.advanceTimersByTimeAsync(60_000)
         })
         expect(fetchMock.mock.calls.length).toBeGreaterThan(callsAfterReset)
     })
@@ -436,6 +436,8 @@ describe('[TC-MIG-NP.05] AbortController prevents overlapping fetches', () => {
     beforeEach(() => {
         vi.useFakeTimers()
         mockSetUnreadCount.mockClear()
+        // Stub Notification.permission = 'granted' → POLL_SLOW_MS (60s) for deterministic timing
+        vi.stubGlobal('Notification', { permission: 'granted' })
     })
 
     afterEach(() => {
@@ -457,9 +459,9 @@ describe('[TC-MIG-NP.05] AbortController prevents overlapping fetches', () => {
             await Promise.resolve() // initial poll (signal #1)
         })
 
-        // Advance 15s → second poll fires (signal #2)
+        // Advance 60s → second poll fires (signal #2)
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(15_000)
+            await vi.advanceTimersByTimeAsync(60_000)
         })
 
         // Assert — at least two calls, each with their own AbortSignal
@@ -473,9 +475,9 @@ describe('[TC-MIG-NP.05] AbortController prevents overlapping fetches', () => {
     it('TC-MIG-NP.05: AbortError from aborted fetch is swallowed (no backoff)', async () => {
         /**
          * Sequence:
-         *   call #1 (initial): resolves OK → interval stays at 15s
-         *   call #2 (t=15s):   rejects with AbortError → interval MUST stay at 15s
-         *   call #3 (t=30s):   fires at the normal 15s interval (not backed-off 30s)
+         *   call #1 (initial): resolves OK → interval stays at 60s
+         *   call #2 (t=60s):   rejects with AbortError → interval MUST stay at 60s
+         *   call #3 (t=120s):  fires at the normal 60s interval (not backed-off 120s)
          */
         let callCount = 0
         const fetchMock = vi.fn(() => {
@@ -491,20 +493,20 @@ describe('[TC-MIG-NP.05] AbortController prevents overlapping fetches', () => {
 
         await act(async () => {
             render(<NotificationProvider />)
-            await Promise.resolve() // call #1 (success)
+            await Promise.resolve()
         })
 
-        // t=15s: call #2 fires (AbortError)
+        // t=60s: call #2 fires (AbortError)
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(15_000)
+            await vi.advanceTimersByTimeAsync(60_000)
         })
         expect(callCount).toBeGreaterThanOrEqual(2)
 
         const callsAfterAbort = fetchMock.mock.calls.length
 
-        // t=30s: call #3 should fire at 15s after abort (no backoff)
+        // t=120s: call #3 should fire at 60s after abort (no backoff)
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(15_000)
+            await vi.advanceTimersByTimeAsync(60_000)
         })
         expect(fetchMock.mock.calls.length).toBeGreaterThan(callsAfterAbort)
     })

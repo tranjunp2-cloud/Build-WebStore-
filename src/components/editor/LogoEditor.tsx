@@ -5,6 +5,7 @@ import { Loader2, Upload } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
+import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 
 interface LogoEditorProps {
     currentLogo?: string | null
@@ -65,16 +66,13 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             previewUrlRef.current = localPreview
             setPreviewUrl(localPreview)
 
-            // 2. Upload logo
+            // 2. Upload logo via server action (same as product form)
             const formData = new FormData()
             formData.append('file', processed)
-            formData.append('_payload', JSON.stringify({ alt: 'Site Logo' }))
+            formData.append('alt', le.altSiteLogo)
 
-            const uploadRes = await fetch('/api/media', { method: 'POST', body: formData, credentials: 'include' })
-            if (!uploadRes.ok) throw new Error('Logo upload failed')
-
-            const uploadedLogo = await uploadRes.json()
-            const logoUrl = uploadedLogo.doc.url as string
+            const uploadedLogo = await uploadMediaAction(formData)
+            const logoUrl = uploadedLogo.url as string
 
             // 3. Auto-generate favicon from the uploaded logo
             let faviconUrl: string | undefined
@@ -83,13 +81,10 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             if (faviconBlob) {
                 const faviconForm = new FormData()
                 faviconForm.append('file', new File([faviconBlob], 'favicon.png', { type: 'image/png' }))
-                faviconForm.append('_payload', JSON.stringify({ alt: 'Favicon' }))
+                faviconForm.append('alt', le.altFavicon)
 
-                const faviconRes = await fetch('/api/media', { method: 'POST', body: faviconForm, credentials: 'include' })
-                if (faviconRes.ok) {
-                    const faviconData = await faviconRes.json()
-                    faviconUrl = faviconData.doc.url as string
-                }
+                const faviconData = await uploadMediaAction(faviconForm)
+                faviconUrl = faviconData.url as string
             }
 
             onLogoChange(logoUrl, faviconUrl)

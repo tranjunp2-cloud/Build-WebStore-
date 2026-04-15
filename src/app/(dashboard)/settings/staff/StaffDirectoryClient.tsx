@@ -97,7 +97,8 @@ export function StaffDirectoryClient({
     };
 
     const handleBulkRemove = () => {
-        if (!confirm(`Are you sure you want to remove ${selectedIds.length} staff members?`)) return;
+        const confirmMsg = (t?.Staff?.bulkConfirm || 'Are you sure you want to remove {count} staff members?').replace('{count}', String(selectedIds.length));
+        if (!confirm(confirmMsg)) return;
         startTransition(async () => {
             const res = await bulkRemoveStaff(selectedIds);
             if (res.success) {
@@ -105,7 +106,7 @@ export function StaffDirectoryClient({
                 setSelectedIds([]);
                 toast.success(t?.Staff?.toast?.removedBulk || 'Selected staff removed successfully');
             } else {
-                toast.error(res.error || 'Failed to remove staff');
+                toast.error(res.error || t?.Staff?.toast?.bulkRemoveFailed || 'Failed to remove staff');
             }
         });
     };
@@ -124,7 +125,7 @@ export function StaffDirectoryClient({
                 toast.success(ti(t?.Staff?.toast?.updated || 'User marked as {status}', { status: newStatus }));
                 setOpenDropdownId(null);
             } else {
-                toast.error(res.error || 'Failed to update status');
+                toast.error(res.error || t?.Staff?.toast?.updateFailed || 'Failed to update status');
             }
         });
     };
@@ -136,7 +137,7 @@ export function StaffDirectoryClient({
                 toast.success(t?.Staff?.toast?.resent || 'Invitation email resent successfully');
                 setOpenDropdownId(null);
             } else {
-                toast.error(res.error || 'Failed to resend invite');
+                toast.error(res.error || t?.Staff?.toast?.resendFailed || 'Failed to resend invite');
             }
         });
     };
@@ -280,7 +281,7 @@ export function StaffDirectoryClient({
                                             ) : (
                                                 <div className="flex items-center gap-[8px]">
                                                     <div className="w-[8px] h-[8px] rounded-full bg-[rgba(248,250,252,0.3)]"></div>
-                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">Pending</span>
+                                                    <span className="text-[14px] font-normal text-[rgba(248,250,252,0.8)] leading-[1.428em] font-['Inter']">{t?.Staff?.table?.pending || 'Pending'}</span>
                                                 </div>
                                             )}
                                         </td>
@@ -296,7 +297,7 @@ export function StaffDirectoryClient({
                                                             type="button"
                                                             onClick={() => { setEditingStaff(user); setIsDrawerOpen(true); }}
                                                             className="bg-transparent border-none shadow-none p-0 m-0 outline-none hover:opacity-80 transition-opacity flex items-center justify-center"
-                                                            title="Edit Details"
+                                                            title={t?.Staff?.tooltip?.edit || 'Edit Details'}
                                                         >
                                                             <Edit2 className="w-[18px] h-[18px] text-[#3B82F6]" strokeWidth={2.5} />
                                                         </button>
@@ -307,7 +308,7 @@ export function StaffDirectoryClient({
                                                             type="button"
                                                             onClick={() => handleRemove(user.id)}
                                                             className="bg-transparent border-none shadow-none p-0 m-0 outline-none hover:opacity-80 transition-opacity flex items-center justify-center"
-                                                            title="Remove User"
+                                                            title={t?.Staff?.tooltip?.remove || 'Remove User'}
                                                         >
                                                             <Trash2 className="w-[18px] h-[18px] text-[#FF6467]" strokeWidth={2.5} />
                                                         </button>
@@ -324,7 +325,7 @@ export function StaffDirectoryClient({
                                     <td colSpan={4} className="px-[24px] py-[60px] text-center text-[rgba(248,250,252,0.6)]">
                                         <div className="flex flex-col items-center gap-3">
                                             <Users className="w-10 h-10 text-slate-600" />
-                                            <p>{debouncedSearch ? 'No staff members match your search.' : 'No staff members found.'}</p>
+                                            <p>{debouncedSearch ? (t?.Staff?.emptyState?.noMatch || 'No staff members match your search.') : (t?.Staff?.emptyState?.noStaff || 'No staff members found.')}</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -337,7 +338,7 @@ export function StaffDirectoryClient({
                 {totalPages > 1 && (
                     <div className="h-[56px] border-t border-white/[0.08] flex items-center justify-between px-[24px] bg-[#1E293B]">
                         <span className="text-[13px] text-slate-400">
-                            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredStaff.length)} of {filteredStaff.length} results
+                            {(t?.Staff?.pagination?.showing || 'Showing {from} to {to} of {total} results').replace('{from}', String((currentPage - 1) * itemsPerPage + 1)).replace('{to}', String(Math.min(currentPage * itemsPerPage, filteredStaff.length))).replace('{total}', String(filteredStaff.length))}
                         </span>
                         <div className="flex items-center gap-2">
                             <button
@@ -345,14 +346,14 @@ export function StaffDirectoryClient({
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 className="px-3 py-1.5 rounded-[8px] text-[13px] font-medium text-slate-300 bg-[#1E293B] border border-white/[0.08] hover:bg-[#1E293B]/80 disabled:opacity-50"
                             >
-                                Previous
+                                {t?.Staff?.pagination?.previous || 'Previous'}
                             </button>
                             <button
                                 disabled={currentPage === totalPages}
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                 className="px-3 py-1.5 rounded-[8px] text-[13px] font-medium text-slate-300 bg-[#1E293B] border border-white/[0.08] hover:bg-[#1E293B]/80 disabled:opacity-50"
                             >
-                                Next
+                                {t?.Staff?.pagination?.next || 'Next'}
                             </button>
                         </div>
                     </div>

@@ -1,57 +1,15 @@
 /**
  * Merge user content into new template blocks when switching templates.
- * Preserves user-edited content (text, arrays) while applying new template structure (variant/layout).
+ * Preserves user-edited content (text, arrays) while applying new template
+ * structure (variant/layout).
+ *
+ * PAGES_FIELDS + CONTENT_FIELDS live in `./pages-schema.ts` (single source
+ * of truth shared with apply-template sanitizer).
  */
 
-// Fields that define template structure (variant/layout) — NOT user content
-const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
+import { CONTENT_FIELDS, PAGES_FIELDS } from './pages-schema'
 
-// All allowed fields per block type (from Pages.ts Payload schema)
-export const PAGES_FIELDS: Record<string, string[]> = {
-    // Core blocks
-    hero: ['variant', 'headline', 'subheadline', 'videoUrl'],
-    navigation: ['style', 'logoText', 'links'],
-    about: ['layout', 'sectionLabel', 'headline', 'body'],
-    features: ['sectionLabel', 'headline', 'subheadline', 'layout', 'features'],
-    testimonials: ['headline', 'variant', 'testimonials'],
-    gallery: ['headline', 'layout'],
-    contact: ['headline', 'subtext', 'email', 'phone', 'address', 'showMap', 'mapEmbedUrl'],
-    footer: ['logoText', 'logo', 'tagline', 'columns', 'copyrightText', 'showSocialLinks'],
-    stats: ['headline', 'stats'],
-    pricing: ['headline', 'subheadline'],
-    faq: ['headline', 'faqs'],
-    team: ['headline'],
-    socialWidget: ['variant', 'headline', 'links'],
-    cartWidget: ['variant', 'label', 'showLabel'],
-    // AI-generated / Block Library blocks (must be here for content merge during template switch)
-    cta: ['variant', 'headline', 'subheadline', 'ctaLabel', 'ctaUrl', 'ctaStyle'],
-    newsletter: ['variant', 'headline', 'subheadline', 'buttonLabel', 'placeholder'],
-    video: ['variant', 'headline', 'subheadline', 'videoUrl', 'posterImage'],
-    'logo-cloud': ['variant', 'headline', 'logos'],
-    'products-grid': ['variant', 'headline', 'subheadline', 'limit', 'category'],
-    'products-featured': ['variant', 'headline', 'subheadline'],
-    'service-cards': ['variant', 'headline', 'subheadline', 'services'],
-    carousel: ['variant', 'headline', 'autoplay', 'interval', 'items'],
-    'step-process': ['variant', 'headline', 'subheadline', 'steps'],
-    divider: ['variant', 'height', 'color'],
-    'announcement-bar': ['variant', 'message', 'linkText', 'linkUrl', 'dismissible', 'backgroundColor'],
-    'whatsapp-button': ['variant', 'phoneNumber', 'message', 'label', 'position'],
-    'menu-food': ['variant', 'headline', 'categories'],
-    'social-proof': ['variant', 'headline', 'reviews'],
-    'portfolio-grid': ['variant', 'headline', 'subheadline', 'projects'],
-    'google-maps': ['variant', 'headline', 'embedUrl', 'address', 'height'],
-    accordion: ['variant', 'headline', 'description', 'items'],
-    'countdown-timer': ['variant', 'headline', 'targetDate', 'expiredMessage', 'showDays', 'showHours', 'showMinutes', 'showSeconds'],
-    'custom-html': ['html'],
-    'blog-list': ['variant', 'headline', 'subheadline', 'limit'],
-}
-
-// Content fields per block type = PAGES_FIELDS minus structural fields
-// These are preserved from user's existing blocks when switching templates
-export const CONTENT_FIELDS: Record<string, string[]> = {}
-for (const [bt, fields] of Object.entries(PAGES_FIELDS)) {
-    CONTENT_FIELDS[bt] = fields.filter(f => !STRUCTURAL_FIELDS.has(f))
-}
+export { PAGES_FIELDS, CONTENT_FIELDS }
 
 /**
  * Merge user content into template blocks.

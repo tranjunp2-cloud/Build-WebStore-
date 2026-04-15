@@ -47,37 +47,12 @@ type SocialWidgetLink = {
     enabled?: boolean
 }
 
-const SOCIAL_PLATFORM_META: Record<SocialWidgetLink['platform'], { label: string; mark: string; placeholder: string; accent: string }> = {
-    facebook: {
-        label: 'Facebook',
-        mark: 'f',
-        placeholder: 'facebook.com/yourbrand',
-        accent: '#2563eb',
-    },
-    whatsapp: {
-        label: 'WhatsApp',
-        mark: 'wa',
-        placeholder: '60123456789',
-        accent: '#16a34a',
-    },
-    instagram: {
-        label: 'Instagram',
-        mark: 'ig',
-        placeholder: 'instagram.com/yourbrand',
-        accent: '#db2777',
-    },
-    linkedin: {
-        label: 'LinkedIn',
-        mark: 'in',
-        placeholder: 'linkedin.com/company/yourbrand',
-        accent: '#0284c7',
-    },
-    youtube: {
-        label: 'YouTube',
-        mark: '▶',
-        placeholder: 'youtube.com/@yourbrand',
-        accent: '#dc2626',
-    },
+const SOCIAL_PLATFORM_META: Record<SocialWidgetLink['platform'], { mark: string; accent: string }> = {
+    facebook: { mark: 'f', accent: '#2563eb' },
+    whatsapp: { mark: 'wa', accent: '#16a34a' },
+    instagram: { mark: 'ig', accent: '#db2777' },
+    linkedin: { mark: 'in', accent: '#0284c7' },
+    youtube: { mark: '▶', accent: '#dc2626' },
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────
@@ -201,7 +176,7 @@ function SettingsPanelInner({
     onHeaderUpdate, onFooterUpdate, onLogoChange, onSiteSettingsChange, onPageUpdate,
     requestedTab,
 }: SettingsPanelProps) {
-    const { t } = useI18n()
+    const { t, ti } = useI18n()
     const pm = t.editor.pageManager
     const s = t.editor.settings
     // Version key: changes when block data changes (from inline editing or AI) → forces input re-mount
@@ -296,7 +271,7 @@ function SettingsPanelInner({
                 <div className="mt-1 flex items-center gap-2">
                     <input type="color" value={(theme.primaryColor as string) || '#0ea5e9'}
                         onChange={e => onThemeChange('primaryColor', e.target.value)}
-                        aria-label="Primary color picker"
+                        aria-label={t.editor.settingsValidation.primaryColorLabel}
                         className="h-7 w-7 rounded border-0 cursor-pointer bg-transparent" />
                     <input value={(theme.primaryColor as string) || '#0ea5e9'}
                         onChange={e => onThemeChange('primaryColor', e.target.value)}
@@ -383,7 +358,7 @@ function SettingsPanelInner({
                                 if (!v || /^\+?[\d\s\-().]*$/.test(v)) {
                                     void onSiteSettingsChange?.({ contactInfo: { ...siteContactInfo, phone: v } })
                                 } else {
-                                    toast.error('Please enter a valid phone number (digits, +, -, spaces)')
+                                    toast.error(t.editor.settingsValidation.invalidPhone)
                                 }
                             }}
                             variant="editor"
@@ -629,7 +604,11 @@ function SettingsPanelInner({
                                     if (data.hasExisting) {
                                         toast.dismiss(loadingToastId)
                                         const confirmed = window.confirm(
-                                            `Existing meta will be replaced:\n\nTitle: "${data.existing?.title || '(empty)'}"\n→ "${proposed.title}"\n\nDescription: "${data.existing?.description || '(empty)'}"\n→ "${proposed.description}"\n\nApply changes?`
+                                            t.editor.settingsValidation.seoConfirmReplace
+                                                .replace('{oldTitle}', data.existing?.title || '(empty)')
+                                                .replace('{newTitle}', proposed.title)
+                                                .replace('{oldDesc}', data.existing?.description || '(empty)')
+                                                .replace('{newDesc}', proposed.description)
                                         )
                                         if (!confirmed) {
                                             toast.info(s.seoCancelled)
@@ -677,19 +656,19 @@ function SettingsPanelInner({
             <div className={sectionCls}>
                 <label className={labelCls}>{s.navStyle}</label>
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                    {['standard', 'centered'].map(style => (
+                    {(['standard', 'centered'] as const).map(style => (
                         <button
                             key={style}
                             type="button"
                             onClick={() => onHeaderUpdate?.({ navStyle: style })}
                             className={cn(
-                                'rounded-xl border px-3 py-2 text-xs font-medium capitalize transition-colors',
+                                'rounded-xl border px-3 py-2 text-xs font-medium transition-colors',
                                 (headerBlock as Record<string, unknown>)?.navStyle === style || (!((headerBlock as Record<string, unknown>)?.navStyle) && style === 'standard')
                                     ? 'border-blue-500/30 bg-blue-500/10 text-blue-300'
                                     : 'border-white/10 bg-white/5 text-slate-400 hover:bg-white/10'
                             )}
                         >
-                            {style}
+                            {style === 'standard' ? s.navStyleStandard : s.navStyleCentered}
                         </button>
                     ))}
                 </div>
@@ -842,7 +821,7 @@ function SettingsPanelInner({
                                     onClick={() => onBlockFieldChange(currentBlockIndex, 'variant', v)}
                                     className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
                                         block.variant === v ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30' : 'bg-white/5 text-gray-500 border border-transparent hover:bg-white/10')}>
-                                    {v}
+                                    {v.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                                 </button>
                             ))}
                         </div>
@@ -990,7 +969,7 @@ function SettingsPanelInner({
                         {((block.ctaButtons || []) as CtaButton[]).map((btn, i) => (
                             <div key={`cta-${btn.label}-${btn.url}-${i}`} className="mt-3 rounded-lg bg-white/5 p-3 space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-gray-500">Button {i + 1}</span>
+                                    <span className="text-[10px] text-gray-500">{ti(s.buttonN, { n: i + 1 })}</span>
                                     <button onClick={() => removeArrayItem('ctaButtons', i)} aria-label={`Remove button ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
                                 <Input defaultValue={stripHtmlForDisplay(btn.label)} placeholder={s.label}
@@ -1040,7 +1019,7 @@ function SettingsPanelInner({
                         {((block.features || []) as FeatureItem[]).map((feat, i) => (
                             <div key={`feat-${feat.title}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-gray-500">{feat.icon || '✦'} Feature {i + 1}</span>
+                                    <span className="text-[10px] text-gray-500">{feat.icon || '✦'} {ti(s.featureN, { n: i + 1 })}</span>
                                     <button onClick={() => removeArrayItem('features', i)} aria-label={`Remove feature ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
                                 <Input defaultValue={feat.title || ''} placeholder={s.title}
@@ -1069,7 +1048,7 @@ function SettingsPanelInner({
                         {((block.testimonials || []) as TestimonialItem[]).map((item, i) => (
                             <div key={`test-${item.name}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-gray-500">Review {i + 1}</span>
+                                    <span className="text-[10px] text-gray-500">{ti(s.reviewN, { n: i + 1 })}</span>
                                     <button onClick={() => removeArrayItem('testimonials', i)} aria-label={`Remove testimonial ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
                                 <Input defaultValue={item.name || ''} placeholder={s.name}
@@ -1086,7 +1065,7 @@ function SettingsPanelInner({
                                     className={editorTextareaClassName} />
                             </div>
                         ))}
-                        <button onClick={() => addArrayItem('testimonials', { name: 'Customer', title: '', quote: 'Great experience!', rating: 5 })}
+                        <button onClick={() => addArrayItem('testimonials', { name: s.defaultCustomerName, title: '', quote: s.defaultReviewQuote, rating: 5 })}
                             className="mt-2 w-full rounded-lg bg-blue-500/10 py-1.5 text-xs text-blue-400 hover:bg-blue-500/20 transition-colors">{s.addTestimonial}</button>
                     </div>
                 )}
@@ -1098,7 +1077,7 @@ function SettingsPanelInner({
                         {((block.columns || []) as FooterColumn[]).map((col, i) => (
                             <div key={`col-${(col as FooterColumn).title}-${i}`} className="mt-2 rounded-lg bg-white/5 p-2.5 space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] text-gray-500">Column {i + 1}</span>
+                                    <span className="text-[10px] text-gray-500">{ti(s.columnN, { n: i + 1 })}</span>
                                     <button onClick={() => removeArrayItem('columns', i)} aria-label={`Remove column ${i + 1}`} className="text-[10px] text-red-400 hover:text-red-300">✕</button>
                                 </div>
                                 <Input defaultValue={col.title || ''} placeholder={s.columnTitle}
@@ -1177,10 +1156,10 @@ function SettingsPanelInner({
                                             </span>
                                             <div>
                                                 <p className="text-sm font-medium text-white">
-                                                    {SOCIAL_PLATFORM_META[link.platform].label}
+                                                    {(s.socialPlatforms as Record<string, { label: string }>)[link.platform]?.label || link.platform}
                                                 </p>
                                                 <p className="text-[11px] text-slate-500">
-                                                    {link.platform === 'whatsapp' ? 'Phone number or wa.me link' : 'Public profile URL'}
+                                                    {link.platform === 'whatsapp' ? s.socialHintWhatsapp : s.socialHintDefault}
                                                 </p>
                                             </div>
                                         </div>
@@ -1199,7 +1178,7 @@ function SettingsPanelInner({
                                     </div>
                                     <Input
                                         defaultValue={link.url || ''}
-                                        placeholder={SOCIAL_PLATFORM_META[link.platform].placeholder}
+                                        placeholder={(s.socialPlatforms as Record<string, { placeholder: string }>)[link.platform]?.placeholder || ''}
                                         onBlur={(e: FieldBlurEvent) => updateArrayItem('links', i, 'url', e.target.value)}
                                         variant="editor"
                                         className={editorInputClassName}

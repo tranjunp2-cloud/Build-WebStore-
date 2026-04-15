@@ -12,6 +12,13 @@ const nextConfig: NextConfig = {
   // standalone is required for Docker (DO) but breaks multipart form-data on Vercel.
   // Vercel sets VERCEL=1 at build time — skip standalone for Vercel deployments.
   ...(process.env.VERCEL ? {} : { output: 'standalone' as const }),
+  // ENABLE_HARNESS=1 includes `*.harness.tsx` files in the route table for the
+  // AI gen test harness (Phase 03). Default build excludes them — production /
+  // staging never sees the harness route. See plans/260414-0837-ai-gen-test-harness/.
+  pageExtensions:
+    process.env.ENABLE_HARNESS === '1'
+      ? ['tsx', 'ts', 'jsx', 'js', 'harness.tsx']
+      : ['tsx', 'ts', 'jsx', 'js'],
   serverExternalPackages: ['undici', 'pg', 'isomorphic-dompurify', 'web-push', 'googleapis'],
   eslint: {
     // CI runs lint separately — skip during build to save ~1 min

@@ -4,8 +4,12 @@ import { motion } from 'framer-motion'
 import type { BlockProps } from '../../types'
 import type { HeroConfig } from '../config'
 import { AnimatedSection } from '../../shared/animations'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { RichText } from '../../shared/RichText'
+import { HERO_CONTAINER } from '../shared'
+import { TOUCH_TARGET } from '@/lib/design-tokens'
+
+void _CSS_VARS
 
 export function MinimalHero({ block }: BlockProps<HeroConfig>) {
     const { headline, subheadline, ctaButtons = [] } = block
@@ -17,7 +21,7 @@ export function MinimalHero({ block }: BlockProps<HeroConfig>) {
                 background: `radial-gradient(ellipse 60% 50% at 50% 50%, rgba(var(--brand-primary-rgb), 0.05) 0%, transparent 70%)`,
             }} />
 
-            <div className="container mx-auto px-6 text-center max-w-4xl relative z-10">
+            <div className={`${HERO_CONTAINER} text-center max-w-4xl relative z-10`}>
                 <motion.h1
                     initial={{ opacity: 0, y: 30 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -51,7 +55,7 @@ export function MinimalHero({ block }: BlockProps<HeroConfig>) {
                             href={ctaButtons[0].url}
                             whileHover={{ scale: 1.04, y: -2 }}
                             whileTap={{ scale: 0.97 }}
-                            className="px-10 py-4 rounded-xl font-semibold text-sm transition-all duration-300"
+                            className={`px-10 py-4 rounded-xl font-semibold text-sm transition-all duration-300 ${TOUCH_TARGET.min} inline-flex items-center justify-center`}
                             style={{
                                 background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`,
                                 color: '#fff',

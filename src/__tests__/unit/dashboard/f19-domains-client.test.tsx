@@ -217,7 +217,7 @@ describe('F19 Domain Management (DomainsClient)', () => {
         await waitFor(() => {
             const firstIp = (process.env.NEXT_PUBLIC_SERVER_IP ?? '162.159.140.98').split(',')[0].trim();
             expect(navigator.clipboard.writeText).toHaveBeenCalledWith(firstIp);
-            expect(toast.success).toHaveBeenCalledWith('Copied IP 1! ✅');
+            expect(toast.success).toHaveBeenCalledWith('Copied IP 1!');
         });
     });
 
