@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // F23: Auto-upgrade legacy store-{id} slug to smart slug from business name
+        // F23: Sync tenant slug with builder — ensure Domain page shows same URL as the builder
         if (resolvedTenantId) {
             try {
                 const tenant = await payload.findByID({ collection: 'tenants', id: resolvedTenantId })
@@ -194,8 +194,19 @@ export async function POST(req: NextRequest) {
                 const userChosenSlug = (businessInfo as Record<string, unknown>)?.slug as string | undefined
                 const businessName = businessInfo?.businessName || ''
 
-                if (currentSlug && /^store-\d+$/.test(currentSlug) && (userChosenSlug || businessName)) {
-                    const baseSlug = userChosenSlug || slugify(businessName)
+                // Case 1: User explicitly chose a slug in the builder → always sync, regardless of current slug
+                if (userChosenSlug && userChosenSlug !== currentSlug) {
+                    // Slug was already verified available on client-side, but double-check uniqueness
+                    const newSlug = await ensureUniqueSlug(payload, userChosenSlug, user.id)
+                    await payload.update({
+                        collection: 'tenants',
+                        id: resolvedTenantId,
+                        data: { slug: newSlug } as Record<string, unknown>,
+                    })
+                }
+                // Case 2: No explicit slug chosen, but tenant has legacy store-{id} slug → auto-upgrade from business name
+                else if (!userChosenSlug && currentSlug && /^store-\d+$/.test(currentSlug) && businessName) {
+                    const baseSlug = slugify(businessName)
                     if (baseSlug && baseSlug !== currentSlug) {
                         const newSlug = await ensureUniqueSlug(payload, baseSlug, user.id)
                         await payload.update({
@@ -206,7 +217,7 @@ export async function POST(req: NextRequest) {
                     }
                 }
             } catch {
-                // Non-critical — slug upgrade failure shouldn't block site generation
+                // Non-critical — slug sync failure shouldn't block site generation
             }
         }
 
