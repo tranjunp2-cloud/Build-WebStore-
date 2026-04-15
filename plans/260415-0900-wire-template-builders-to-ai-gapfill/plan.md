@@ -1,10 +1,13 @@
 ---
 title: "Wire Template Composer Builders into AI Gap-Fill"
 description: "Short-term fix to delegate AI gen gap-fill content to template-composer hand-curated builders. Unlock template-quality content for AI path without rebuild."
-status: pending
+status: shipped
 priority: P0
-effort: 4h (1 phase, 1 PR)
+effort: 4h planned / ~1h actual (1 phase, 1 PR)
 branch: feat/F01-ai-gen-wire-template-builders
+pr: '#618'
+commit: 6bfa3c12
+shipped_at: 2026-04-15
 tags: [ai-gen, template-composer, quick-win, content-quality]
 created: 2026-04-15
 ---
@@ -33,7 +36,7 @@ Parallel short-term fix cho team chạy trước v1.0, không block rebuild plan
 
 | # | Phase | Effort | Status |
 |---|-------|--------|--------|
-| [01](./phase-01-wire-builders.md) | Export builders + delegate gap-fill + tests | 4h | pending |
+| [01](./phase-01-wire-builders.md) | Export builders + delegate gap-fill + tests | 4h planned / ~1h actual | ✅ shipped (`6bfa3c12` / PR #618) |
 
 Single-phase plan. No research/scout phases — scope fully specified by journal + comparison report.
 
@@ -65,3 +68,40 @@ Single-phase plan. No research/scout phases — scope fully specified by journal
 - `src/lib/ai/content-injection.ts` — AI gap-fill path (wire target)
 - `src/lib/ai/business-info-mapper.ts:mapBusinessInfo` — `BusinessInfoInput → Partial<BusinessSample>` adapter (reuse)
 - `src/lib/ai/content/types.ts` — BusinessSample + CategoryContent types
+
+---
+
+## Shipping log
+
+**2026-04-15** — phase 01 shipped via PR #618 (`6bfa3c12`)
+
+### Diff summary
+- 3 files changed: `template-composer.ts` (+5 exports), `content-injection.ts` (+60/-19 delegation), `content-delegation.test.ts` (+180 new, 15 tests)
+- Net: +240 / −19 lines
+
+### Test results
+- **15/15** new `content-delegation.test.ts` cases pass
+- **1518/1518** full AI unit test suite pass (baseline 1474 + 15 new + 29 other plan additions)
+- Zero regression in `content-rotation.test.ts` (8/8) + `structure-enforcer.test.ts` (11/11)
+
+### Live smoke test — bibi Dental (`userBiz.products = ['Teeth Whitening', 'Dental Implants']`)
+
+| Block | Before (generic gap-fill) | After (template-composer delegation) |
+|---|---|---|
+| `features[0].title` | ⭐ Quality Service | 🦷 Teeth Whitening Service |
+| `features[1].title` | 🚀 Fast Response | Expert Dental Implants |
+| `stats` labels | Happy Customers / Years / Rating | Years Experience / Patients Treated / Specialist Doctors / Patient Rating |
+| `team[0]` | Team Lead — Founder | **Dr. Tan Wei Ming — General Practitioner** (MBBS UM) |
+| `pricing` plans | Starter / Pro / Enterprise | Basic Check-up / Comprehensive / Executive |
+| `service-cards[0]` | ⭐ Premium Service | Teeth Whitening Service (product-derived) |
+
+### Scope realized vs planned
+- ✅ Export 5 builders
+- ✅ Delegate 5 switch cases (with try-catch fallback)
+- ✅ 15 new unit tests covering delegation + determinism + shape compat
+- ✅ Zero schema changes, no plumbing changes (scout found `ctx.userBiz` already wired via plan 2249 phase-07)
+- ✅ **Time saved**: 4h planned → ~1h actual (scout pre-verification cut plumbing work)
+
+### Next steps
+- Post-merge: re-run `measure-variety-offline` harness to quantify content diversity delta
+- Long-term: rebuild plan `260415-0845-ai-gen-template-first-rebuild/` (post-v1.0)

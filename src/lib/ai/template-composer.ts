@@ -324,7 +324,7 @@ function featuresFromProducts(
   })
 }
 
-function buildFeatures(biz: BusinessSample, category: string): Record<string, unknown> {
+export function buildFeatures(biz: BusinessSample, category: string): Record<string, unknown> {
   const featureMap: Record<string, { icon: string; title: string; description: string }[]> = {
     restaurant: [
       { icon: 'Utensils', title: 'Authentic Recipes', description: 'Traditional recipes passed down through generations, using only the freshest local ingredients.' },
@@ -482,7 +482,7 @@ function buildFooter(biz: BusinessSample, pages: string[]): Record<string, unkno
   }
 }
 
-function buildStats(category: string): Record<string, unknown> {
+export function buildStats(category: string): Record<string, unknown> {
   const statsMap: Record<string, { value: string; label: string; suffix?: string }[]> = {
     restaurant: [
       { value: '15', label: 'Years Serving', suffix: '+' },
@@ -615,7 +615,7 @@ function buildAbout(biz: BusinessSample): Record<string, unknown> {
   }
 }
 
-function buildPricing(category: string): Record<string, unknown> {
+export function buildPricing(category: string): Record<string, unknown> {
   const pricingMap: Record<string, { name: string; price: string; period: string; features: string[]; highlighted: boolean }[]> = {
     tech: [
       { name: 'Starter', price: 'RM 99', period: '/month', features: ['1 Website', '5 GB Storage', 'SSL Certificate', 'Email Support'], highlighted: false },
@@ -675,7 +675,7 @@ function buildPricing(category: string): Record<string, unknown> {
   }
 }
 
-function buildTeam(category: string): Record<string, unknown> {
+export function buildTeam(category: string): Record<string, unknown> {
   const teamMap: Record<string, { name: string; role: string; bio: string }[]> = {
     health: [
       { name: 'Dr. Tan Wei Ming', role: 'General Practitioner', bio: 'MBBS (UM), 15 years experience in family medicine.' },
@@ -959,7 +959,7 @@ function buildPortfolioGrid(): Record<string, unknown> {
   }
 }
 
-function buildServiceCards(biz: BusinessSample, category: string): Record<string, unknown> {
+export function buildServiceCards(biz: BusinessSample, category: string): Record<string, unknown> {
   const servicesMap: Record<string, { title: string; description: string; icon: string; price?: string; priceUnit?: string }[]> = {
     business: [
       { title: 'Strategy Consulting', description: 'C-suite advisory and market strategy development.', icon: 'BarChart', price: 'RM 500', priceUnit: '/hour' },
