@@ -8,7 +8,11 @@
         "learnMore": "Ketahui Lagi",
         "copyright": "© 2026 Web Store. Hak cipta terpelihara.",
         "language": "Bahasa",
-        "search": "Cari..."
+        "search": "Cari...",
+        "desktop": "Desktop",
+        "mobile": "Mudah alih",
+        "preview": "Pratonton",
+        "back": "Kembali"
     },
     "nav": {
         "platform": "Platform",
@@ -166,7 +170,40 @@
             "stepGenerating": "Menjana kandungan & reka bentuk",
             "stepPreparing": "Menyediakan pratonton",
             "progressLabel": "Membina laman web anda",
-            "processing": "Memproses..."
+            "processing": "Memproses...",
+            "elapsed": "Masa berlalu: {seconds}s",
+            "timeoutWarning": "Mengambil masa lebih lama daripada dijangka...",
+            "cancelButton": "Batalkan penjanaan",
+            "draftExpired": "Draf AI Builder sebelumnya anda telah tamat tempoh selepas 24 jam.",
+            "saveFailed": "Gagal menyimpan perubahan pratonton terkini."
+        },
+        "completion": {
+            "successMessage": "telah berjaya dicipta!",
+            "sectionsGenerated": "+{count} bahagian",
+            "sectionsGeneratedLabel": "dijana",
+            "generationTimeLabel": "masa penjanaan",
+            "description": "Anda boleh melihat Pratonton di sebelah kanan, buka Editor untuk membuat perubahan, atau Terbitkan sekarang!",
+            "previewTitle": "Pratonton Laman Web",
+            "previewSubtitle": "Laman web anda yang dijana oleh AI",
+            "viewFullPreview": "Lihat Pratonton Penuh",
+            "startingMessage": "Memulakan penciptaan laman web...",
+            "mobilePreviewTitle": "Pratonton mudah alih",
+            "mobilePreviewDescription": "Buka pratonton mendalam untuk menyemak laman web yang dijana pada mudah alih.",
+            "openPreviewButton": "Buka Pratonton",
+            "arrangeSectionsTitle": "Susun bahagian",
+            "arrangeSectionsDescription": "Gunakan mod senarai pada mudah alih untuk mengalih bahagian ke atas atau ke bawah dengan selamat.",
+            "openEditor": "Buka Editor",
+            "publishing": "Menerbitkan...",
+            "publishWebsite": "Terbitkan Laman Web",
+            "publishSuccess": "Laman web berjaya diterbitkan!",
+            "loading": "Memuatkan...",
+            "goToDashboard": "Pergi ke Papan Pemuka",
+            "congratulations": "Tahniah!",
+            "websiteLiveMessage": "Laman web anda {name} kini tersiar dan diterbitkan ke internet.",
+            "copyLink": "Salin Pautan",
+            "copied": "Disalin",
+            "linkCopied": "Pautan disalin! 🎉",
+            "copyFailed": "Gagal menyalin pautan"
         },
         "form": {
             "businessName": "Nama Perniagaan",
@@ -212,7 +249,18 @@
             "errorUnsafe": "URL ini mengandungi kandungan yang tidak dibenarkan.",
             "errorRateLimit": "Terlalu banyak permintaan. Sila tunggu sebentar.",
             "errorGeneric": "Sesuatu telah berlaku. Sila cuba lagi atau masukkan maklumat secara manual.",
-            "tryManual": "Cuba masukkan secara manual"
+            "tryManual": "Cuba masukkan secara manual",
+            "initializing": "Memulakan...",
+            "slugLabel": "Alamat laman web anda",
+            "slugPlaceholder": "nama-kedai-anda",
+            "slugMinLength": "Sekurang-kurangnya 3 aksara diperlukan",
+            "slugInvalidFormat": "Format tidak sah",
+            "slugReserved": "Sub-domain ini telah ditempah",
+            "slugTaken": "Telah digunakan",
+            "slugAvailable": "Tersedia",
+            "slugChecking": "Memeriksa ketersediaan...",
+            "slugCheckError": "Tidak dapat menyemak. Sila cuba lagi.",
+            "slugHelperText": "Anda boleh menukar ini kemudian di Tetapan > Domain"
         }
     },
     "email": {
@@ -1127,6 +1175,8 @@
                 "bulkDeleteConfirm": "Adakah anda pasti mahu memadamkan {count} kiriman?",
                 "bulkDeleteWarning": "Tindakan ini tidak dapat dibuat asal.",
                 "deletePublishedWarning": "Amaran: Kiriman ini sedang diterbitkan dan boleh dilihat oleh pelanggan anda. Memadamkannya akan segera mengalihkannya daripada etalase anda.",
+                "bulkDeleteTitle": "Padam {count} kiriman?",
+                "bulkDeletePublishedWarning": "Sesetengah kiriman yang dipilih sedang diterbitkan. Memadamnya akan segera mengalihkannya daripada etalase anda.",
                 "cancel": "Batal",
                 "deleting": "Memadamkan...",
                 "bulkPublish": "Terbitkan",
@@ -1161,6 +1211,7 @@
                 "postTitle": "Tajuk kiriman",
                 "titlePlaceholder": "cth., Strategi Pemasaran E-dagang",
                 "titleRequired": "Tajuk diperlukan",
+                "contentRequired": "Kandungan diperlukan",
                 "titleMaxLength": "Tajuk mestilah kurang daripada 255 aksara",
                 "slugInvalid": "Slug hanya boleh mengandungi huruf kecil, nombor, dan sempang",
                 "urlSlugLabel": "Slug URL (dijana secara auto, boleh disunting)",
@@ -1238,7 +1289,7 @@
                 "saveBtn": "Simpan",
                 "closeBtn": "Tutup",
                 "removeTitle": "Buang kategori",
-                "removeConfirmMsg": "Adakah anda pasti ingin membuang kategori \"{name}\"?\nKiriman menggunakan kategori ini akan diubah kepada \"Tanpa Kategori\".",
+                "removeConfirmMsg": "Adakah anda pasti ingin membuang kategori \"{name}\"?\nKategori ini akan dipadam secara kekal.",
                 "cancelBtn": "Batal",
                 "deletingBtn": "Memadam...",
                 "deleteBtn": "Padam",
@@ -1248,7 +1299,8 @@
                 "toastUpdateSuccess": "Kategori dikemas kini",
                 "toastUpdateFail": "Gagal mengemas kini kategori",
                 "toastDeleteSuccess": "Kategori \"{name}\" telah dipadam",
-                "toastDeleteFail": "Gagal memadam kategori"
+                "toastDeleteFail": "Gagal memadam kategori",
+                "deletePublishedWarning": "Kategori ini diberikan kepada {count} kiriman yang diterbitkan. Memadamnya akan mengalih keluar kategori daripada kiriman tersebut, tetapi ia akan kekal diterbitkan."
             },
             "categoryPage": {
                 "title": "Urus Kategori",
@@ -1259,8 +1311,9 @@
                 "namePlaceholder": "Nama kategori",
                 "close": "Tutup",
                 "deleteTitle": "Padam Kategori",
-                "deleteConfirm": "Adakah anda pasti ingin memadam",
-                "deleteWarning": "Kiriman yang ditetapkan kepada kategori ini akan menjadi tanpa kategori. Tindakan ini tidak boleh dibatalkan.",
+                "deleteConfirm": "Adakah anda pasti mahu memadam \"{name}\"?",
+                "deletePublishedWarning": "Kategori ini diberikan kepada {count} kiriman yang diterbitkan. Memadamnya akan mengalih keluar kategori daripada kiriman tersebut, tetapi ia akan kekal diterbitkan.",
+                "deleteWarning": "Kategori ini akan dipadam secara kekal. Tindakan ini tidak boleh dibatalkan.",
                 "cancel": "Batal",
                 "delete": "Padam",
                 "deleting": "Memadam...",
@@ -1686,6 +1739,12 @@
             "newCount": "{count} pemberitahuan baharu",
             "justNow": "Baru sahaja",
             "dismiss": "Tutup"
+        },
+        "push": {
+            "title": "Aktifkan pemberitahuan desktop?",
+            "description": "Dapatkan pemberitahuan tentang pesanan baharu dan kemas kini walaupun tab ini di latar belakang.",
+            "enable": "Aktifkan",
+            "later": "Nanti"
         }
     },
     "Staff": {

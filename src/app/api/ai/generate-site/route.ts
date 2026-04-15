@@ -546,7 +546,12 @@ export async function POST(req: NextRequest) {
 
         for (const pageDefinition of pageDefinitions) {
             // Sanitize variants in each page's layout blocks (safety net for cloned heroes)
-            const sanitizedLayout = Array.isArray(pageDefinition.layout)
+            // Plan 260415 — also run sanitizeBlocksForPayload on EVERY page's
+            // layout (not just homepage), so sub-page team/testimonials/faq
+            // blocks get defensive name/role/question/etc fallback. Without
+            // this the AI happy path could ship a team block with an empty
+            // member name on /about and crash payload.create.
+            const variantFixed = Array.isArray(pageDefinition.layout)
                 ? pageDefinition.layout.map((block: AIBlock | null) => {
                     if (!block) return block
                     if (typeof block.blockType === 'string' && blockRegistry.has(block.blockType)) {
@@ -560,6 +565,9 @@ export async function POST(req: NextRequest) {
                     return block
                 })
                 : pageDefinition.layout
+            const sanitizedLayout = Array.isArray(variantFixed)
+                ? sanitizeBlocksForPayload(variantFixed.filter((b): b is AIBlock => Boolean(b)))
+                : variantFixed
 
             const createdPage = await payload.create({
                 collection: 'pages',
@@ -1105,25 +1113,39 @@ function sanitizeBlocksForPayload(blocks: AIBlock[]): AIBlock[] {
             delete sanitized.items
         }
 
-        // ── Team: members[].socials[] requires { platform, url } ──
+        // ── Team: members[] requires { name (required) } + socials[] ──
+        // Plan 260415 — defensive name + role fallback. Payload schema marks
+        // `members.name` as `required: true`, so any member with empty/missing
+        // name crashes the whole `payload.create` with a ValidationError.
+        // Historical gens have surfaced this when GPT returned 4+ members and
+        // left the last one with only `bio` + `image`. Run this as a final
+        // pre-save sanitize so neither the AI happy path nor the fallback
+        // composer can ship a nameless team member.
         if (sanitized.blockType === 'team' && Array.isArray(sanitized.members)) {
-            sanitized.members = sanitized.members.map((memberRaw: unknown) => {
-                const member = (typeof memberRaw === 'object' && memberRaw !== null) ? memberRaw as Record<string, unknown> : {};
-                const safeMember = { ...member }
-                if (Array.isArray(safeMember.socials)) {
-                    safeMember.socials = safeMember.socials.map((socialRaw: unknown) => {
-                        if (typeof socialRaw === 'string') {
-                            return { platform: socialRaw.toLowerCase(), url: '#' }
-                        }
-                        const social = (typeof socialRaw === 'object' && socialRaw !== null) ? socialRaw as Record<string, unknown> : {};
-                        return {
-                            platform: String(social.platform || social.name || 'twitter').toLowerCase(),
-                            url: String(social.url || social.link || '#'),
-                        }
-                    })
-                }
-                return safeMember
-            })
+            sanitized.members = sanitized.members
+                .map((memberRaw: unknown, idx: number) => {
+                    const member = (typeof memberRaw === 'object' && memberRaw !== null) ? memberRaw as Record<string, unknown> : {};
+                    const safeMember = { ...member }
+                    const rawName = (member.name ?? member.fullName ?? member.displayName ?? '') as string
+                    const trimmedName = typeof rawName === 'string' ? rawName.trim() : ''
+                    safeMember.name = trimmedName || `Team Member ${idx + 1}`
+                    const rawRole = (member.role ?? member.position ?? member.title ?? '') as string
+                    const trimmedRole = typeof rawRole === 'string' ? rawRole.trim() : ''
+                    safeMember.role = trimmedRole || 'Team Member'
+                    if (Array.isArray(safeMember.socials)) {
+                        safeMember.socials = safeMember.socials.map((socialRaw: unknown) => {
+                            if (typeof socialRaw === 'string') {
+                                return { platform: socialRaw.toLowerCase(), url: '#' }
+                            }
+                            const social = (typeof socialRaw === 'object' && socialRaw !== null) ? socialRaw as Record<string, unknown> : {};
+                            return {
+                                platform: String(social.platform || social.name || 'twitter').toLowerCase(),
+                                url: String(social.url || social.link || '#'),
+                            }
+                        })
+                    }
+                    return safeMember
+                })
         }
 
         // ── About: ensure headline ──

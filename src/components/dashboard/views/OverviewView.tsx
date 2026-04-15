@@ -144,10 +144,15 @@ export async function OverviewView({ searchParams }: Props) {
             ordersRes, prevOrdersRes, pendingOrdersRes,
             viewsSeriesRes, leadsSeriesRes, engagementSeriesRes, revenueSeriesRes
         ] = await Promise.all([
-            // Raw SQL: Payload API doesn't support COUNT(DISTINCT). Tenant isolation is manual
-            // via tenant_id filter — safe because tenantId is from getCurrentTenantId() (JWT auth).
-            payload.db.drizzle.execute(sql`SELECT COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${startDate.toISOString()}`),
-            payload.db.drizzle.execute(sql`SELECT COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${prevStartDate.toISOString()} AND created_at < ${startDate.toISOString()}`),
+            // Views (Traffic) = total pageview count per PRD: "Lượt views (Traffic)"
+            payload.count({
+                collection: 'analytics',
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'pageview' } }
+            }),
+            payload.count({
+                collection: 'analytics',
+                where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: prevStartDate.toISOString(), less_than: startDate.toISOString() }, event: { equals: 'pageview' } }
+            }),
             payload.count({ 
                 collection: 'analytics', 
                 where: { tenant: { equals: tenantId }, createdAt: { greater_than_equal: startDate.toISOString() }, event: { equals: 'click' } }
@@ -180,7 +185,7 @@ export async function OverviewView({ searchParams }: Props) {
                 sort: '-createdAt', 
                 limit: 5 
             }),
-            payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, COUNT(DISTINCT session_id) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${startDate.toISOString()} GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')`),
+            payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'pageview' AND created_at >= ${startDate.toISOString()} GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')`),
             payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event = 'click' AND created_at >= ${startDate.toISOString()} GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')`),
             payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, COUNT(*) as count FROM analytics WHERE tenant_id = ${tenantId} AND event IN ('add_to_cart', 'checkout') AND created_at >= ${startDate.toISOString()} GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')`),
             payload.db.drizzle.execute(sql`SELECT TO_CHAR(created_at, 'YYYY-MM-DD') as date_str, SUM(total) as count FROM orders WHERE tenant_id = ${tenantId} AND status IN ('paid', 'completed') AND created_at >= ${startDate.toISOString()} GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')`)
@@ -191,8 +196,8 @@ export async function OverviewView({ searchParams }: Props) {
             return ((curr - prev) / prev) * 100
         }
 
-        views = Number(viewsRes.rows[0]?.count || 0)
-        prevViews = Number(prevViewsRes.rows[0]?.count || 0)
+        views = viewsRes.totalDocs
+        prevViews = prevViewsRes.totalDocs
         viewsChange = getChange(views, prevViews)
 
         leads = leadsRes.totalDocs

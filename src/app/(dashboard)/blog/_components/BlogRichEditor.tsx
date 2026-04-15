@@ -24,6 +24,7 @@ import {
     type Editor,
     Plugin,
 } from 'ckeditor5'
+import { AutoLink } from '@ckeditor/ckeditor5-link'
 import 'ckeditor5/ckeditor5.css'
 import { useState, useEffect } from 'react'
 import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
@@ -122,10 +123,13 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
 
     // Sync character count to the custom DOM element injected in toolbar
     useEffect(() => {
-        const charCountDiv = document.getElementById('ck-char-count')
-        if (charCountDiv) {
-            charCountDiv.textContent = `${charCount} ${t.dashboard.blog.editor.characters}`
+        const update = () => {
+            const el = document.getElementById('ck-char-count')
+            if (el) el.textContent = `${charCount} ${t.dashboard.blog.editor.characters}`
         }
+        update()
+        const id = setTimeout(update, 150)
+        return () => clearTimeout(id)
     }, [charCount, t.dashboard.blog.editor.characters])
 
     const handleImproveText = async (instruction: string) => {
@@ -212,6 +216,7 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                         Italic,
                         Underline,
                         Link,
+                        AutoLink,
                         Image,
                         ImageInsert,
                         ImageUpload,
@@ -481,6 +486,10 @@ export function BlogRichEditor({ content, onChange, placeholder }: BlogRichEdito
                 .blog-ckeditor-wrapper .ck.ck-editor__editable a {
                     color: #2DD4BF !important;
                     text-decoration: underline !important;
+                }
+                .blog-ckeditor-wrapper .ck.ck-editor__editable a:empty::after {
+                    content: attr(href);
+                    color: #2DD4BF;
                 }
                 .blog-ckeditor-wrapper .ck.ck-editor__editable .ck-link_selected {
                     color: #2DD4BF !important;

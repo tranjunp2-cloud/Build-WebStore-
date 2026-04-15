@@ -8,7 +8,11 @@
         "learnMore": "Learn More",
         "copyright": "© 2026 Web Store. All rights reserved.",
         "language": "Language",
-        "search": "Search..."
+        "search": "Search...",
+        "desktop": "Desktop",
+        "mobile": "Mobile",
+        "preview": "Preview",
+        "back": "Back"
     },
     "nav": {
         "platform": "Platform",
@@ -166,7 +170,40 @@
             "stepGenerating": "Generating content & design",
             "stepPreparing": "Preparing preview",
             "progressLabel": "Building your website",
-            "processing": "Processing..."
+            "processing": "Processing...",
+            "elapsed": "Elapsed: {seconds}s",
+            "timeoutWarning": "Taking longer than expected...",
+            "cancelButton": "Cancel generation",
+            "draftExpired": "Your previous AI builder draft expired after 24 hours.",
+            "saveFailed": "Failed to save the latest preview changes."
+        },
+        "completion": {
+            "successMessage": "has been created successfully!",
+            "sectionsGenerated": "+{count} sections",
+            "sectionsGeneratedLabel": "generated",
+            "generationTimeLabel": "generation time",
+            "description": "You can view the Preview on the right, open the Editor to make changes, or Publish now!",
+            "previewTitle": "Website Preview",
+            "previewSubtitle": "Your AI-generated website",
+            "viewFullPreview": "View Full Preview",
+            "startingMessage": "Starting website creation...",
+            "mobilePreviewTitle": "Mobile preview",
+            "mobilePreviewDescription": "Open the immersive preview to review the generated site on mobile.",
+            "openPreviewButton": "Open Preview",
+            "arrangeSectionsTitle": "Arrange sections",
+            "arrangeSectionsDescription": "Use list mode on mobile to move sections up or down safely.",
+            "openEditor": "Open Editor",
+            "publishing": "Publishing...",
+            "publishWebsite": "Publish Website",
+            "publishSuccess": "Website published successfully!",
+            "loading": "Loading...",
+            "goToDashboard": "Go To Dashboard",
+            "congratulations": "Congratulations!",
+            "websiteLiveMessage": "Your website {name} is now live and published to the internet.",
+            "copyLink": "Copy Link",
+            "copied": "Copied",
+            "linkCopied": "Link copied! 🎉",
+            "copyFailed": "Failed to copy link"
         },
         "form": {
             "businessName": "Business Name",
@@ -212,7 +249,18 @@
             "errorUnsafe": "This URL contains content that is not allowed.",
             "errorRateLimit": "Too many requests. Please wait a moment and try again.",
             "errorGeneric": "Something went wrong. Please try again or enter info manually.",
-            "tryManual": "Try manual entry"
+            "tryManual": "Try manual entry",
+            "initializing": "Initializing...",
+            "slugLabel": "Your website address",
+            "slugPlaceholder": "your-store-name",
+            "slugMinLength": "At least 3 characters required",
+            "slugInvalidFormat": "Invalid format",
+            "slugReserved": "This subdomain is reserved",
+            "slugTaken": "Already taken",
+            "slugAvailable": "Available",
+            "slugChecking": "Checking availability...",
+            "slugCheckError": "Unable to check. Please try again.",
+            "slugHelperText": "You can change this later in Settings > Domains"
         }
     },
     "email": {
@@ -1127,6 +1175,8 @@
                 "bulkDeleteConfirm": "Are you sure you want to delete {count} posts?",
                 "bulkDeleteWarning": "This action cannot be undone.",
                 "deletePublishedWarning": "Warning: This post is currently published and visible to your customers. Deleting it will immediately remove it from your storefront.",
+                "bulkDeleteTitle": "Delete {count} posts?",
+                "bulkDeletePublishedWarning": "Some selected posts are currently published. Deleting them will immediately remove them from your storefront.",
                 "cancel": "Cancel",
                 "deleting": "Deleting...",
                 "bulkPublish": "Publish",
@@ -1161,6 +1211,7 @@
                 "postTitle": "Post title",
                 "titlePlaceholder": "e.g., E-commerce Marketing Strategies",
                 "titleRequired": "Title is required",
+                "contentRequired": "Content is required",
                 "titleMaxLength": "Title must be less than 255 characters",
                 "slugInvalid": "Slug can only contain lowercase letters, numbers, and hyphens",
                 "urlSlugLabel": "URL Slug (auto-generated, editable)",
@@ -1238,7 +1289,7 @@
                 "saveBtn": "Save",
                 "closeBtn": "Close",
                 "removeTitle": "Remove category",
-                "removeConfirmMsg": "Are you sure you want to remove the \"{name}\" category?\nPosts using this category will be changed to \"Uncategorized\".",
+                "removeConfirmMsg": "Are you sure you want to remove the \"{name}\" category?\nThis category will be permanently deleted.",
                 "cancelBtn": "Cancel",
                 "deletingBtn": "Deleting...",
                 "deleteBtn": "Delete",
@@ -1248,7 +1299,8 @@
                 "toastUpdateSuccess": "Category updated",
                 "toastUpdateFail": "Failed to update category",
                 "toastDeleteSuccess": "Category \"{name}\" deleted",
-                "toastDeleteFail": "Failed to delete category"
+                "toastDeleteFail": "Failed to delete category",
+                "deletePublishedWarning": "This category is assigned to {count} published post(s). Deleting it will remove the category from those posts, but they will remain published."
             },
             "categoryPage": {
                 "title": "Manage Category",
@@ -1259,8 +1311,9 @@
                 "namePlaceholder": "Category name",
                 "close": "Close",
                 "deleteTitle": "Delete Category",
-                "deleteConfirm": "Are you sure you want to delete",
-                "deleteWarning": "Posts assigned to this category will become uncategorized. This cannot be undone.",
+                "deleteConfirm": "Are you sure you want to delete \"{name}\"?",
+                "deletePublishedWarning": "This category is assigned to {count} published post(s). Deleting it will remove the category from those posts, but they will remain published.",
+                "deleteWarning": "This category will be permanently removed. This cannot be undone.",
                 "cancel": "Cancel",
                 "delete": "Delete",
                 "deleting": "Deleting...",
@@ -1686,6 +1739,12 @@
             "newCount": "{count} new notifications",
             "justNow": "Just now",
             "dismiss": "Dismiss"
+        },
+        "push": {
+            "title": "Enable desktop notifications?",
+            "description": "Get notified about new orders and updates even when this tab is in the background.",
+            "enable": "Enable",
+            "later": "Later"
         }
     },
     "Staff": {
