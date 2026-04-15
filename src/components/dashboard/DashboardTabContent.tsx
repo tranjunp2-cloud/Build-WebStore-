@@ -20,10 +20,10 @@ export function DashboardTabContent({ defaultTab, children }: { defaultTab: stri
 
     const handleSetTab = useCallback((tab: TabId) => {
         setActiveTab(tab)
-        // Update URL for bookmarkability without triggering server re-render
+        // Update URL without triggering server re-render; pushState creates history entry for Back/Forward
         const params = new URLSearchParams(searchParams.toString())
         params.set('tab', tab)
-        window.history.replaceState(null, '', `/dashboard?${params.toString()}`)
+        window.history.pushState(null, '', `/dashboard?${params.toString()}`)
     }, [searchParams])
 
     // Sync activeTab when browser Back/Forward changes the URL

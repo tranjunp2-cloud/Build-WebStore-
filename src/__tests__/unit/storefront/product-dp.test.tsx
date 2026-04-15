@@ -61,7 +61,7 @@ vi.mock('@/lib/auth', () => ({
     getCurrentTenantId: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('@/components/site-renderer/OwnerContext', () => ({
-    OwnerProvider: ({ children }: any) => children,
+    OwnerProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 
 describe('Storefront Product Detail Page (US-F08-06)', () => {
