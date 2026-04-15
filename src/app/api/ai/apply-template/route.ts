@@ -13,6 +13,7 @@ import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { mergeUserContent } from '@/lib/ai/merge-user-content'
+import { resolveSiteType } from '@/lib/ai/site-type'
 import { sanitizeBlocksForPayload } from '@/lib/ai/pages-schema'
 
 /**
@@ -302,11 +303,9 @@ export const POST = withAuth(async (user, req) => {
                 tenant: tenantId,
                 status: 'draft',
                 generationStatus: 'generating',
-                siteType: (() => {
-                    const VALID_SITE_TYPES = new Set(['business', 'ecommerce', 'restaurant', 'tech', 'health', 'education', 'realestate', 'fitness', 'creative', 'beauty', 'blog'])
-                    const raw = Array.isArray(template.category) ? String(template.category[0]) : String(template.category || 'business')
-                    return VALID_SITE_TYPES.has(raw) ? raw : 'business'
-                })(),
+                siteType: resolveSiteType(
+                    Array.isArray(template.category) ? template.category[0] : template.category,
+                ),
                 theme: templateTheme,
             },
         })

@@ -3,33 +3,66 @@ import { APIError } from 'payload'
 
 // Plan 260415 fix-500 — custom handler for /api/media/file/[filename] that
 // survives missing-on-disk errors. Payload's default getFileHandler calls
-// fs.stat(staticDir/filename) and returns 500 on ENOENT; we intercept first,
-// redirect to S3 when configured, otherwise return 404 cleanly.
-const mediaFileFallbackHandler: PayloadHandler = async (_req) => {
-    const filename = (_req as unknown as { routeParams?: { filename?: string } }).routeParams?.filename
+// fs.stat(staticDir/filename) and returns 500 on ENOENT. We intercept FIRST
+// and always return a concrete Response (so there's no fall-through typing
+// ambiguity):
+//   1. Local file exists → stream it with correct Content-Type
+//   2. Missing + S3 env configured → 302 redirect to public S3 URL
+//   3. Missing + no S3 → clean 404
+// Logs showed ~90 x 500/24h from this path alone before the fix.
+
+const MIME_BY_EXT: Record<string, string> = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.pdf': 'application/pdf',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+}
+
+function mimeFromFilename(filename: string): string {
+    const dotIndex = filename.lastIndexOf('.')
+    if (dotIndex < 0) return 'application/octet-stream'
+    const ext = filename.slice(dotIndex).toLowerCase()
+    return MIME_BY_EXT[ext] ?? 'application/octet-stream'
+}
+
+const mediaFileFallbackHandler: PayloadHandler = async (req): Promise<Response> => {
+    const routeParams = (req as unknown as { routeParams?: { filename?: string } }).routeParams
+    const filename = routeParams?.filename
     if (typeof filename !== 'string' || filename.length === 0) {
         return new Response('Missing filename', { status: 400 })
     }
+
+    // 1. Try local disk first (dev + legacy files).
     try {
         const fs = await import('fs/promises')
         const path = await import('path')
-        const stat = await fs.stat(path.resolve('public/media', filename))
-        // Local file exists — signal "fall through" by returning undefined
-        // via a hacky workaround: Payload only falls through when the handler
-        // returns non-Response. Return a Response only when we want to short
-        // circuit. Here we prefer to let the default handler stream the file.
-        if (stat.isFile()) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return undefined as any
-        }
+        const localPath = path.resolve('public/media', filename)
+        const data = await fs.readFile(localPath)
+        return new Response(data, {
+            status: 200,
+            headers: {
+                'Content-Type': mimeFromFilename(filename),
+                'Content-Length': String(data.byteLength),
+                'Cache-Control': 'public, max-age=31536000, immutable',
+            },
+        })
     } catch {
-        /* fall through to S3 redirect */
+        /* fall through — not a local file */
     }
+
+    // 2. Redirect to S3 if configured.
     const bucket = process.env.S3_BUCKET
     const endpoint = process.env.NEXT_PUBLIC_S3_ENDPOINT || process.env.S3_ENDPOINT
     if (bucket && endpoint) {
         return Response.redirect(`${endpoint}/${bucket}/${filename}`, 302)
     }
+
+    // 3. Nothing found — return clean 404 (not 500).
     return new Response('File not found', { status: 404 })
 }
 
