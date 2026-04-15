@@ -36,7 +36,7 @@ vi.mock('@/i18n', () => ({
         },
         locale: 'en',
     }),
-    I18nProvider: ({ children }: any) => children,
+    I18nProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 // ── Mock date-fns ────────────────────────────────────────────────────────

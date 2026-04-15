@@ -130,7 +130,8 @@ export function PageManagerPanel({
 
             onPagesChanged?.()
         } catch (err) {
-            toast.error(err instanceof Error ? err.message : t.editor.pageManagerPanel.createError)
+            console.error('[PageManagerPanel] Create page failed:', err)
+            toast.error(t.editor.pageManagerPanel.createError)
         } finally {
             setIsSubmitting(false)
         }
