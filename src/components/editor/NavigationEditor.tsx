@@ -93,6 +93,8 @@ function NavLinkRow({
     openPanelId: string | null
     onSetOpenPanelId: (id: string | null) => void
 }) {
+    const { t } = useI18n()
+    const nv = t.editor.navigationValidation
     const [isExpanded, setIsExpanded] = useState(true)
     const [isRenaming, setIsRenaming] = useState(false)
     const isPanelOpen = openPanelId === link.id
@@ -116,7 +118,7 @@ function NavLinkRow({
     const handleLabelCommit = useCallback((rawValue: string) => {
         const value = rawValue.trim()
         if (!validateLinkLabel(value)) {
-            toast.error('Link label is required')
+            toast.error(nv.labelRequired)
             return
         }
 
@@ -127,11 +129,11 @@ function NavLinkRow({
         const value = rawValue.trim()
         if (!validateLinkUrl(link, value)) {
             if (link.type === 'page') {
-                toast.error('Please select a page')
+                toast.error(nv.selectPageError)
             } else if (!value) {
-                toast.error('Link URL is required')
+                toast.error(nv.urlRequired)
             } else {
-                toast.error('Please enter a valid URL starting with http:// or https://')
+                toast.error(nv.invalidUrl)
             }
             return
         }
@@ -176,7 +178,7 @@ function NavLinkRow({
                     >
                         {link.label}
                         {(!link.url || link.url === '#') && (
-                            <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" title="No destination set" />
+                            <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" title={nv.noDestination} />
                         )}
                     </span>
                 )}
@@ -213,7 +215,7 @@ function NavLinkRow({
                                     })
                                 }}
                                 className="h-7 w-full cursor-pointer appearance-none rounded-md border border-cyan-400/20 bg-slate-900/80 pl-6 pr-6 text-[11px] font-medium text-slate-200 transition-colors hover:border-cyan-300/40 focus:border-cyan-300 focus:outline-none"
-                                aria-label="Link type"
+                                aria-label={nv.linkType}
                             >
                                 {linkTypeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                             </select>
@@ -227,13 +229,13 @@ function NavLinkRow({
                                 onChange={(e) => {
                                     const value = e.target.value
                                     if (!validateLinkUrl(link, value)) {
-                                        toast.error('Please select a page')
+                                        toast.error(nv.selectPageError)
                                         return
                                     }
                                     onUpdate(link.id, { url: value })
                                 }}
                                 className="h-7 w-full cursor-pointer appearance-none rounded-md border border-white/10 bg-white/[0.05] pl-2.5 pr-6 text-[11px] text-slate-200 transition-colors hover:border-white/20 focus:border-cyan-300 focus:outline-none"
-                                aria-label="Page destination"
+                                aria-label={nv.pageDestination}
                             >
                                 <option value="#">{nav.selectPage}</option>
                                 {pages.map(p => <option key={p.id} value={normalizePageOptionUrl(p.slug)}>{p.title}</option>)}
@@ -243,7 +245,7 @@ function NavLinkRow({
                     ) : (
                         <input
                             defaultValue={link.url}
-                            placeholder="https://..."
+                            placeholder={nv.urlPlaceholder}
                             onBlur={(e) => handleUrlCommit(e.target.value)}
                             className="h-7 w-full min-w-0 rounded-md border border-white/10 bg-white/[0.05] px-2.5 text-[11px] text-slate-200 outline-none transition-colors placeholder:text-slate-500 hover:border-white/20 focus:border-cyan-300"
                         />

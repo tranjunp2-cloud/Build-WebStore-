@@ -203,7 +203,18 @@
             "copyLink": "Salin Pautan",
             "copied": "Disalin",
             "linkCopied": "Pautan disalin! 🎉",
-            "copyFailed": "Gagal menyalin pautan"
+            "copyFailed": "Gagal menyalin pautan",
+            "yourWebsite": "Laman web anda",
+            "previewPreparing": "Pratonton sedang disediakan.",
+            "savingDraft": "Menyimpan draf...",
+            "savedAt": "Disimpan {time}",
+            "saveFailed": "Gagal menyimpan",
+            "unsavedChanges": "Perubahan belum disimpan",
+            "pagesGenerated": "{count} halaman",
+            "generated": "dijana",
+            "generationTime": "{seconds}s",
+            "createdSuccessfully": "Laman web \"{name}\" telah berjaya dicipta!",
+            "viewPreviewHint": "Anda boleh melihat Pratonton di sebelah kanan, buka Editor untuk membuat perubahan, atau Terbitkan sekarang!"
         },
         "form": {
             "businessName": "Nama Perniagaan",
@@ -1919,7 +1930,22 @@
             "updating": "Mengemaskini...",
             "preview": "Pratonton",
             "live": "Aktif",
-            "draft": "Draf"
+            "draft": "Draf",
+            "saving": "Menyimpan...",
+            "unsaved": "Belum disimpan",
+            "saved": "Disimpan",
+            "menu": "Menu",
+            "templates": "Templat",
+            "undo": "Buat Asal",
+            "redo": "Buat Semula",
+            "undoShortcut": "Buat Asal (Cmd/Ctrl+Z)",
+            "redoShortcut": "Buat Semula (Cmd/Ctrl+Shift+Z)",
+            "openMenu": "Buka menu",
+            "desktop": "Desktop",
+            "mobile": "Mudah Alih",
+            "changesPending": "Perubahan menunggu",
+            "sitePreview": "Pratonton Laman",
+            "dragToReorder": "Seret untuk susun semula bahagian"
         },
         "publishModal": {
             "title": "Sedia untuk Terbitkan?",
@@ -1931,7 +1957,35 @@
             "seoSet": "Metadata SEO telah ditetapkan",
             "seoSetDesc": "Semua halaman mempunyai tajuk dan penerangan meta.",
             "cancel": "Batal",
-            "publishNow": "Terbitkan Sekarang"
+            "publishNow": "Terbitkan Sekarang",
+            "publishingBtn": "Menerbitkan...",
+            "seoMissingOne": "{count} halaman tiada tajuk atau penerangan meta",
+            "seoMissingMany": "{count} halaman tiada tajuk atau penerangan meta"
+        },
+        "imageToolbar": {
+            "changeImage": "Tukar Gambar",
+            "generateAI": "Jana Gambar AI"
+        },
+        "saveStatus": {
+            "saving": "Menyimpan...",
+            "saved": "Disimpan",
+            "savedAgo": "Disimpan {timeAgo}",
+            "notSaved": "Tidak disimpan",
+            "draftSaving": "Draf disimpan dalam 3s..."
+        },
+        "richText": {
+            "heading1": "Tajuk 1",
+            "heading2": "Tajuk 2",
+            "heading3": "Tajuk 3",
+            "heading4": "Tajuk 4",
+            "paragraph": "Perenggan",
+            "bold": "Tebal",
+            "italic": "Italik",
+            "underline": "Garis Bawah",
+            "alignLeft": "Jajar Kiri",
+            "alignCenter": "Jajar Tengah",
+            "alignRight": "Jajar Kanan",
+            "justify": "Jajar Penuh"
         },
         "unpublishModal": {
             "title": "Nyahterbit Laman Web",
@@ -2159,6 +2213,124 @@
             "labelVisible": "Label terlihat",
             "iconOnly": "Ikon sahaja",
             "badgeDesc": "Kiraan lencana sentiasa terlihat"
+        },
+        "statusBar": {
+            "connected": "Disambungkan",
+            "pageLabel": "Halaman:",
+            "blocksCount": "{count} blok"
+        },
+        "undoRedo": {
+            "undo": "Buat Asal",
+            "redo": "Buat Semula",
+            "undoTooltip": "Buat Asal: {label} (Ctrl+Z)",
+            "redoTooltip": "Buat Semula: {label} (Ctrl+Y)",
+            "lastChange": "perubahan terakhir",
+            "lastUndoneChange": "perubahan asal terakhir",
+            "nothingToUndo": "Tiada untuk dibuat asal",
+            "nothingToRedo": "Tiada untuk dibuat semula",
+            "groupLabel": "Buat asal dan buat semula",
+            "mobileGroupLabel": "Buat asal dan buat semula mudah alih"
+        },
+        "template": {
+            "title": "Pilih Templat",
+            "searchPlaceholder": "Cari templat...",
+            "showingCount": "Menunjukkan {filtered} daripada {total} templat",
+            "loading": "Memuatkan templat...",
+            "loadError": "Gagal memuatkan templat",
+            "noTemplates": "Tiada templat tersedia lagi.",
+            "seedHint": "Jalankan POST /api/templates/seed untuk mencipta templat.",
+            "noMatch": "Tiada templat sepadan dengan penapis ini",
+            "applyConfirmTitle": "Guna \"{name}\"?",
+            "applyConfirmDesc": "Ini akan menggunakan susun atur dan tema templat baharu. Kandungan sedia ada (teks, imej) akan dikekalkan jika boleh.",
+            "cancel": "Batal",
+            "applying": "Menggunakan...",
+            "applyButton": "Guna Templat",
+            "appliedSuccess": "Templat \"{name}\" telah digunakan!",
+            "applyFailed": "Gagal menggunakan templat",
+            "previewTitle": "Pratonton: {name}",
+            "all": "Semua",
+            "restaurant": "Restoran",
+            "ecommerce": "E-Dagang",
+            "beauty": "Kecantikan",
+            "tech": "Teknologi",
+            "health": "Kesihatan",
+            "education": "Pendidikan",
+            "realEstate": "Hartanah",
+            "fitness": "Kecergasan",
+            "creative": "Kreatif",
+            "business": "Perniagaan",
+            "cafeBakery": "Kafe & Bakeri",
+            "events": "Acara",
+            "blog": "Blog",
+            "travel": "Pelancongan"
+        },
+        "addSection": {
+            "testimonials": "Tambah testimoni",
+            "testimonialsCompact": "💬 Tambah testimoni",
+            "testimonialsPrompt": "Tambah bahagian testimoni dengan 3 ulasan pelanggan",
+            "faq": "Tambah Soalan Lazim",
+            "faqCompact": "❓ Tambah Soalan Lazim",
+            "faqPrompt": "Tambah bahagian soalan lazim dengan 3 soalan pelanggan biasa",
+            "gallery": "Tambah galeri",
+            "galleryCompact": "🖼️ Tambah galeri",
+            "galleryPrompt": "Tambah bahagian galeri dengan 6 imej pemegang tempat",
+            "features": "Tambah ciri",
+            "featuresCompact": "✨ Tambah ciri",
+            "featuresPrompt": "Tambah bahagian ciri dengan 3 sorotan perkhidmatan utama",
+            "team": "Tambah pasukan",
+            "teamCompact": "👥 Tambah pasukan",
+            "teamPrompt": "Tambah bahagian pasukan dengan 3 ahli pasukan",
+            "newsletter": "Tambah surat berita",
+            "newsletterCompact": "✉️ Tambah surat berita",
+            "newsletterPrompt": "Tambah bahagian pendaftaran surat berita",
+            "banner": "Tambah sepanduk",
+            "bannerCompact": "📣 Tambah sepanduk",
+            "bannerPrompt": "Tambah bahagian sepanduk untuk kempen promosi",
+            "cta": "Tambah CTA",
+            "ctaCompact": "🚀 Tambah CTA",
+            "ctaPrompt": "Tambah bahagian seruan tindakan dengan tawaran yang kuat"
+        },
+        "inlineEditComponent": {
+            "clickToEdit": "Klik untuk sunting",
+            "defaultPlaceholder": "Klik untuk sunting...",
+            "save": "Simpan",
+            "cancel": "Batal",
+            "aiRewrite": "Tulis Semula AI",
+            "aiPlaceholder": "cth. Jadikan lebih pendek, tambah emoji...",
+            "rewrite": "Tulis Semula"
+        },
+        "preview": {
+            "mapImageError": "Tidak dapat memetakan imej ke medan blok",
+            "imageReplaceSuccess": "Imej berjaya diganti",
+            "imageReplaceFailed": "Gagal mengganti imej",
+            "inlineEditFailed": "Suntingan sebaris gagal",
+            "aiContextLocked": "Konteks penjanaan AI dikunci ke: {blockType}"
+        },
+        "pageManagerPanel": {
+            "title": "Pengurus Halaman",
+            "description": "Cipta, pilih, sembunyikan dan padam halaman untuk laman ini.",
+            "createError": "Ralat mencipta halaman",
+            "slugConflict": "Slug halaman sudah wujud dalam laman ini",
+            "noPagesFound": "Tiada halaman dijumpai",
+            "noPagesSuggestion": "Cipta halaman baru atau cuba kata kunci carian lain."
+        },
+        "navigationValidation": {
+            "labelRequired": "Label pautan diperlukan",
+            "selectPageError": "Sila pilih halaman",
+            "urlRequired": "URL pautan diperlukan",
+            "invalidUrl": "Sila masukkan URL yang sah bermula dengan http:// atau https://",
+            "noDestination": "Tiada destinasi ditetapkan",
+            "linkType": "Jenis pautan",
+            "pageDestination": "Destinasi halaman",
+            "urlPlaceholder": "https://..."
+        },
+        "settingsValidation": {
+            "invalidPhone": "Sila masukkan nombor telefon yang sah (digit, +, -, ruang)",
+            "primaryColorLabel": "Pemilih warna utama",
+            "seoConfirmReplace": "Meta sedia ada akan diganti:\n\nTajuk: \"{oldTitle}\"\n→ \"{newTitle}\"\n\nPenerangan: \"{oldDesc}\"\n→ \"{newDesc}\"\n\nGunakan perubahan?"
+        },
+        "menuDrawer": {
+            "defaultUserName": "Pengguna"
         }
     }
 }
