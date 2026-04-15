@@ -791,6 +791,8 @@ export default function EditorPage() {
                     onUndoLastAction={handleUndo}
                     siteName={siteName || site?.name || ''}
                     theme={theme}
+                    currentPageSlug={page?.slug || 'home'}
+                    currentPageTitle={currentPageTitle}
                     externalActivity={chatActivity}
                     compact={isCompactLayout}
                 />
