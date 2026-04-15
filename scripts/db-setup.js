@@ -1642,8 +1642,22 @@ const MIGRATIONS = [
       _uuid varchar NOT NULL DEFAULT gen_random_uuid()::text,
       _path varchar NOT NULL DEFAULT 'layout', block_name varchar,
       variant varchar, headline varchar, subheadline varchar,
-      cta_label varchar, cta_url varchar, cta_style varchar
+      cta_label varchar, cta_url varchar, cta_style varchar,
+      secondary_cta_label varchar, secondary_cta_url varchar
     );`,
+  },
+  // Plan 260415 cta-bugfix — add secondary_cta fields + rename floating → card
+  {
+    name: 'pages_blocks_cta.secondary_cta_label',
+    sql: `ALTER TABLE pages_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_label varchar;`,
+  },
+  {
+    name: 'pages_blocks_cta.secondary_cta_url',
+    sql: `ALTER TABLE pages_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_url varchar;`,
+  },
+  {
+    name: 'pages_blocks_cta.rename_floating_to_card',
+    sql: `UPDATE pages_blocks_cta SET variant = 'card' WHERE variant = 'floating';`,
   },
   {
     name: 'pages_blocks_newsletter.create_table',
@@ -1967,8 +1981,22 @@ const MIGRATIONS = [
       id serial PRIMARY KEY, _order integer NOT NULL, _parent_id integer NOT NULL,
       _path text NOT NULL, _uuid varchar, block_name varchar,
       variant varchar, headline varchar, subheadline varchar,
-      cta_label varchar, cta_url varchar, cta_style varchar
+      cta_label varchar, cta_url varchar, cta_style varchar,
+      secondary_cta_label varchar, secondary_cta_url varchar
     );`,
+  },
+  // Plan 260415 cta-bugfix — version table sync
+  {
+    name: '_pages_v_blocks_cta.secondary_cta_label',
+    sql: `ALTER TABLE _pages_v_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_label varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_cta.secondary_cta_url',
+    sql: `ALTER TABLE _pages_v_blocks_cta ADD COLUMN IF NOT EXISTS secondary_cta_url varchar;`,
+  },
+  {
+    name: '_pages_v_blocks_cta.rename_floating_to_card',
+    sql: `UPDATE _pages_v_blocks_cta SET variant = 'card' WHERE variant = 'floating';`,
   },
   {
     name: '_pages_v_blocks_newsletter.create_table',
