@@ -305,8 +305,8 @@ export default function EditorPage() {
             window.setTimeout(() => setSaveSuccess(false), 2000)
             return true
         } catch (err) {
-            const message = err instanceof Error ? err.message : t.editor.toast.saveFailed
-            toast.error(t.editor.toast.saveFailed, { description: message })
+            console.error('[Editor] Save failed:', err)
+            toast.error(t.editor.toast.saveFailed)
             return false
         } finally {
             setIsSaving(false)
@@ -642,8 +642,8 @@ export default function EditorPage() {
 
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
-            const message = err instanceof Error ? err.message : t.editor.toast.publishFailed
-            toast.error(t.editor.toast.publishFailed, { description: message })
+            console.error('[Editor] Publish failed:', err)
+            toast.error(t.editor.toast.publishFailed)
         } finally {
             setIsPublishing(false)
         }
@@ -689,8 +689,8 @@ export default function EditorPage() {
 
             window.setTimeout(() => setPublishSuccess(false), 3000)
         } catch (err) {
-            const message = err instanceof Error ? err.message : t.editor.toast.publishFailed
-            toast.error(t.editor.toast.publishFailed, { description: message })
+            console.error('[Editor] Re-publish failed:', err)
+            toast.error(t.editor.toast.publishFailed)
         } finally {
             setIsPublishing(false)
         }

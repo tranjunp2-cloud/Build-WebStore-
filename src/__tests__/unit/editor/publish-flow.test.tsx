@@ -224,7 +224,7 @@ describe('Publish and Save Flows (TC-F05)', () => {
 
         await waitFor(() => {
             // Verify 409 toast fires with server error message
-            expect(toast.error).toHaveBeenCalledWith('Lưu thất bại', expect.objectContaining({ description: 'Version conflict' }))
+            expect(toast.error).toHaveBeenCalledWith('Lưu thất bại')
         })
     })
 

@@ -116,4 +116,67 @@ describe('PreviewScripts', () => {
         expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseover', expect.any(Function))
         removeEventListenerSpy.mockRestore()
     })
+
+    describe('SET_DROP_HINT message', () => {
+        it('should update CSS drop hint text when receiving SET_DROP_HINT message', () => {
+            // Arrange — inject the style element that PreviewScripts creates
+            const style = document.createElement('style')
+            style.id = 'editor-preview-styles'
+            style.innerHTML = `
+                .insert-marker::after {
+                  content: 'Drop to add block'; /*drop-hint*/
+                }
+            `
+            document.head.appendChild(style)
+
+            render(<PreviewScripts />)
+
+            // Act — dispatch SET_DROP_HINT message from same origin
+            const event = new MessageEvent('message', {
+                data: { type: 'SET_DROP_HINT', text: 'Lepaskan untuk tambah blok' },
+                origin: window.location.origin,
+            })
+            window.dispatchEvent(event)
+
+            // Assert — CSS content should be updated
+            expect(style.innerHTML).toContain("content: 'Lepaskan untuk tambah blok'")
+            expect(style.innerHTML).toContain('/*drop-hint*/')
+        })
+
+        it('should escape single quotes in drop hint text', () => {
+            // Arrange
+            const style = document.createElement('style')
+            style.id = 'editor-preview-styles'
+            style.innerHTML = `
+                .insert-marker::after {
+                  content: 'Drop to add block'; /*drop-hint*/
+                }
+            `
+            document.head.appendChild(style)
+
+            render(<PreviewScripts />)
+
+            // Act — text with single quote
+            const event = new MessageEvent('message', {
+                data: { type: 'SET_DROP_HINT', text: "Drop it's here" },
+                origin: window.location.origin,
+            })
+            window.dispatchEvent(event)
+
+            // Assert — single quote should be escaped
+            expect(style.innerHTML).toContain("content: 'Drop it\\'s here'")
+        })
+
+        it('should not crash when style element is missing', () => {
+            // Arrange — no style element injected
+            render(<PreviewScripts />)
+
+            // Act — should not throw
+            const event = new MessageEvent('message', {
+                data: { type: 'SET_DROP_HINT', text: 'Test' },
+                origin: window.location.origin,
+            })
+            expect(() => window.dispatchEvent(event)).not.toThrow()
+        })
+    })
 })
