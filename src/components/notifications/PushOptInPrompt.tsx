@@ -63,7 +63,7 @@ export function PushOptInPrompt() {
 
     registerAndSubscribe()
       .then(() => {
-        try { localStorage.setItem(PUSH_SUBSCRIBE_KEY, Date.now().toString()) } catch { /* ignore */ }
+        try { localStorage.setItem(PUSH_SUBSCRIBE_KEY, Date.now().toString()) } catch (e) { console.warn('[Push] Failed to persist subscribe timestamp', e) }
       })
       .catch((err) => console.warn('[Push] Auto re-subscribe failed', err))
   }, [])
@@ -105,7 +105,7 @@ export function PushOptInPrompt() {
       if (permission === 'granted') {
         await registerAndSubscribe()
         localStorage.setItem('push-opt-in-completed', 'true')
-        try { localStorage.setItem(PUSH_SUBSCRIBE_KEY, Date.now().toString()) } catch { /* ignore */ }
+        try { localStorage.setItem(PUSH_SUBSCRIBE_KEY, Date.now().toString()) } catch (e) { console.warn('[Push] Failed to persist subscribe timestamp', e) }
       }
     } catch (err) {
       console.error('[Push] Opt-in failed', err)
