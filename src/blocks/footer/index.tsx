@@ -263,9 +263,13 @@ export function FooterBlock({ block, theme: _theme, site }: BlockProps<FooterCon
                 {/* Main footer content */}
                 <div className="pt-14 pb-8">
                     <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-12">
+                        {/* Plan 260415 nav-bugfix — grid-cols-2 cứng trên mobile làm
+                            Brand column và LinkColumn squish vào 2 cột hẹp (~150px).
+                            Đổi sang grid-cols-1 ở base để stack đẹp, sm:grid-cols-2
+                            từ 640px, md:grid-cols-3 từ 768px, lg:grid-cols-5 từ 1024px. */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-12">
                             {/* Brand column */}
-                            <div className="col-span-2 md:col-span-1">
+                            <div className="sm:col-span-2 md:col-span-1">
                                 <BrandLogo logoText={logoText} logo={mergedBlock.logo} size="md" className="mb-3" />
                                 {tagline && (
                                     <Body size="small" className="opacity-40 leading-relaxed max-w-xs">{tagline}</Body>
