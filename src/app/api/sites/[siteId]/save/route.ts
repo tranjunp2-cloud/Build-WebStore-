@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { saveSiteSchema } from '@/lib/validations/sites'
 import { parseRequest } from '@/lib/validations/helpers'
 import { normalizeBlocksForPersistence } from '@/lib/block-normalization'
+import { withPayloadRetry, classifyTransientError } from '@/lib/payload-retry'
 
 
 /** Only persist theme fields defined in the Sites collection schema.
@@ -164,12 +165,23 @@ export async function PATCH(
             }
 
             if (page) {
-                await payload.update({
-                    collection: 'pages',
-                    id: page.id,
-                    data: { layout: normalizedBlocks },
-                    draft: isDraft ?? false,
-                })
+                // Plan 260415 fix-500: wrap in retry — Payload drafts/versions
+                // system races cause deadlocks + FK violations on _pages_v_blocks_*
+                // under concurrent autosave. Transient — retry with backoff.
+                await withPayloadRetry(
+                    () => payload.update({
+                        collection: 'pages',
+                        id: page!.id,
+                        data: { layout: normalizedBlocks },
+                        draft: isDraft ?? false,
+                    }),
+                    {
+                        onRetry: (attempt, kind, err) => {
+                            const msg = err instanceof Error ? err.message : String(err)
+                            console.warn(`[Save Retry] attempt=${attempt} kind=${kind} pageId=${page!.id} msg=${msg.slice(0, 200)}`)
+                        },
+                    },
+                )
             }
         }
 
@@ -181,12 +193,36 @@ export async function PATCH(
     } catch (error: unknown) {
         const errMsg = error instanceof Error ? error.message : String(error)
         const errName = error instanceof Error ? error.name : 'Unknown'
-        console.error('[Save Error]', errName + ':', errMsg)
+        const transientKind = classifyTransientError(error)
+
+        // Plan 260415 fix-500 — structured log + debugId. If the error is a
+        // transient deadlock/FK that survived the retry wrapper, surface as
+        // 409 Conflict so the editor client can retry on its own without
+        // showing "something went wrong".
+        const debugId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+        console.error('[Save Error]', JSON.stringify({
+            debugId,
+            errName,
+            errMsg: errMsg.slice(0, 500),
+            transient: transientKind,
+        }))
         if (error && typeof error === 'object' && 'data' in error) {
-            console.error('[Save Error] Validation data:', JSON.stringify((error as Record<string, unknown>).data, null, 2))
+            console.error('[Save Error] Validation data:', debugId, JSON.stringify((error as Record<string, unknown>).data, null, 2).slice(0, 1000))
         }
+
+        if (transientKind) {
+            return NextResponse.json(
+                {
+                    error: 'Save conflicted with a concurrent edit. Please try again.',
+                    debugId,
+                    retryable: true,
+                },
+                { status: 409 },
+            )
+        }
+
         return NextResponse.json(
-            { error: 'Save failed: ' + errMsg },
+            { error: 'Save failed. Please try again in a moment.', debugId },
             { status: 500 },
         )
     }
