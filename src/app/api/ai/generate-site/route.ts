@@ -216,8 +216,9 @@ export async function POST(req: NextRequest) {
                         })
                     }
                 }
-            } catch {
+            } catch (err) {
                 // Non-critical — slug sync failure shouldn't block site generation
+                payload.logger.error({ err, tenantId: resolvedTenantId }, 'AI generation: Tenant slug sync failed')
             }
         }
 
