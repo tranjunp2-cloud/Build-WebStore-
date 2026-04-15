@@ -3,6 +3,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
+import DOMPurify from 'isomorphic-dompurify'
 
 export const dynamic = 'force-dynamic'
 
@@ -132,11 +134,14 @@ export default async function BlogDetailPage({ params }: Props) {
 
                 {/* Featured Image */}
                 {thumbnail && (
-                    <div className="rounded-xl overflow-hidden mb-8">
-                        <img
+                    <div className="relative rounded-xl overflow-hidden mb-8 aspect-[16/9]">
+                        <Image
                             src={thumbnail}
                             alt={post.title as string}
-                            className="w-full h-auto object-cover"
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 100vw, 768px"
+                            priority
                         />
                     </div>
                 )}
@@ -149,7 +154,7 @@ export default async function BlogDetailPage({ params }: Props) {
                         prose-blockquote:border-blue-500 prose-blockquote:text-gray-400
                         prose-code:text-teal-400 prose-code:bg-white/5 prose-code:px-1 prose-code:rounded
                         prose-img:rounded-xl"
-                    dangerouslySetInnerHTML={{ __html: post.content as string }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content as string) }}
                 />
 
                 {/* Back to Blog */}

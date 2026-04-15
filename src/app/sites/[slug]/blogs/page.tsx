@@ -3,6 +3,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export const dynamic = 'force-dynamic'
 
@@ -109,11 +110,13 @@ export default async function BlogListingPage({ params }: Props) {
                                 >
                                     {/* Thumbnail */}
                                     {thumbnail ? (
-                                        <div className="aspect-[16/9] overflow-hidden">
-                                            <img
+                                        <div className="relative aspect-[16/9] overflow-hidden">
+                                            <Image
                                                 src={thumbnail}
                                                 alt={post.title as string}
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                fill
+                                                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                                                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                                             />
                                         </div>
                                     ) : (
