@@ -30,24 +30,27 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
         )
     }
 
+    /* Plan 260415 service-cards-bugfix — stable keys + opacity WCAG fix + truncate price */
     const renderGridCard = (service: ServiceItem, i: number) => (
         <div
-            key={i}
+            key={`${service.title}-${i}`}
             className={`${CARD_PADDING.lg} rounded-2xl transition-all duration-300 hover:shadow-lg group`}
             style={{ background: `linear-gradient(135deg, rgba(var(--brand-primary-rgb), 0.024), transparent)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.071)` }}
         >
             <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform duration-300"
                 style={{ background: `rgba(var(--brand-primary-rgb), 0.082)` }}
+                aria-hidden="true"
             >
                 {service.icon}
             </div>
             <Heading level={3} className="mb-3">{service.title}</Heading>
-            <Body size="small" className="opacity-50 leading-relaxed mb-4">{service.description}</Body>
+            {/* Lỗi D — opacity-50 fail WCAG contrast → opacity-70 */}
+            <Body size="small" className="opacity-70 leading-relaxed mb-4">{service.description}</Body>
             {service.price && (
-                <p className="text-2xl font-bold mb-1" style={{ color: 'var(--brand-primary)' }}>
+                <p className="text-xl sm:text-2xl font-bold mb-1 break-words" style={{ color: 'var(--brand-primary)' }}>
                     {service.price}
-                    {service.priceUnit && <span className="text-sm font-normal opacity-60">{service.priceUnit}</span>}
+                    {service.priceUnit && <span className="text-sm font-normal opacity-70 ml-1">{service.priceUnit}</span>}
                 </p>
             )}
             <ServiceCTA cta={service.cta} />
@@ -56,25 +59,26 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
 
     const renderListCard = (service: ServiceItem, i: number) => (
         <div
-            key={i}
-            className={`flex flex-col md:flex-row items-start gap-6 ${CARD_PADDING.md} rounded-2xl transition-all duration-300 hover:shadow-lg`}
+            key={`${service.title}-${i}`}
+            className={`flex flex-col sm:flex-row items-center sm:items-start gap-6 ${CARD_PADDING.md} rounded-2xl transition-all duration-300 hover:shadow-lg`}
             style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.071)` }}
         >
             <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl shrink-0"
                 style={{ background: `rgba(var(--brand-primary-rgb), 0.082)` }}
+                aria-hidden="true"
             >
                 {service.icon}
             </div>
-            <div className="flex-1">
+            <div className="flex-1 text-center sm:text-left min-w-0">
                 <Heading level={3} className="mb-2">{service.title}</Heading>
-                <Body size="small" className="opacity-50 leading-relaxed">{service.description}</Body>
+                <Body size="small" className="opacity-70 leading-relaxed">{service.description}</Body>
                 <ServiceCTA cta={service.cta} />
             </div>
             {service.price && (
-                <div className="shrink-0 text-right">
-                    <p className="text-2xl font-bold" style={{ color: 'var(--brand-primary)' }}>{service.price}</p>
-                    {service.priceUnit && <Body size="small" className="opacity-50">{service.priceUnit}</Body>}
+                <div className="shrink-0 text-center sm:text-right">
+                    <p className="text-xl sm:text-2xl font-bold break-words" style={{ color: 'var(--brand-primary)' }}>{service.price}</p>
+                    {service.priceUnit && <Body size="small" className="opacity-70">{service.priceUnit}</Body>}
                 </div>
             )}
         </div>
@@ -122,6 +126,14 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
         )
     }
 
+    /* Plan 260415 Lỗi B — empty state thay vì silent null return */
+    if (!services || services.length === 0) {
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+            console.warn('[service-cards] services array empty — block rendered nothing')
+        }
+        return null
+    }
+
     return (
         <AnimatedSection className={SECTION_PADDING.default}>
             <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
@@ -131,7 +143,7 @@ export function ServiceCardsBlock({ block, theme: _theme }: BlockProps<ServiceCa
                         <RichText text={headline} as="span" />
                     </Heading>
                     {subheadline && (
-                        <Body size="lg" className="opacity-50 leading-relaxed">
+                        <Body size="lg" className="opacity-70 leading-relaxed">
                             <RichText text={subheadline} as="span" />
                         </Body>
                     )}

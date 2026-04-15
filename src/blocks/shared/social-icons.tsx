@@ -4,7 +4,7 @@
  * Inline SVG cho platforms lucide-react không có (tiktok, threads, x) + re-export
  * lucide icons cho platforms có sẵn. Mọi platform render với size tiêu chuẩn 16px.
  *
- * Fallback: Link icon từ lucide cho platform unknown (thay vì chữ cái đầu).
+ * Fallback: Link icon từ lucide cho platform unknown (thay vì chữ cái đầu legacy).
  */
 
 import {
