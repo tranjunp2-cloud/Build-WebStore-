@@ -4,6 +4,26 @@ import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { toast } from 'sonner'
 import '@testing-library/jest-dom'
 
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: {
+            storefront: {
+                cart: {
+                    title: 'Cart',
+                    empty: 'Your cart is empty',
+                    subtotal: 'Subtotal',
+                    proceedToCheckout: 'Proceed to Checkout',
+                    checkoutUnavailable: 'Checkout feature is coming soon',
+                    qty: 'Qty:',
+                },
+            },
+        },
+        ti: (s: string) => s,
+    }),
+}))
+vi.mock('@/components/site-renderer/OwnerContext', () => ({
+    useIsOwner: () => false,
+}))
 // Note: To isolate logic properly, we mock next/navigation and others.
 vi.mock('next/navigation', () => ({
     usePathname: () => '/',
@@ -59,7 +79,7 @@ describe('Site Global Settings & Widgets (TC-F05.20 to TC-F05.28)', () => {
         fireEvent.click(screen.getByText('Proceed to Checkout'))
         
         // Assert: fallback toast triggers to prevent navigation inside Iframe Editor.
-        expect(toast.info).toHaveBeenCalledWith('Tính năng Checkout đang được phát triển')
+        expect(toast.info).toHaveBeenCalledWith('Checkout feature is coming soon')
     })
 
     it('TC-F05.28: Global Settings Binding enforces Hotline validation', () => {
