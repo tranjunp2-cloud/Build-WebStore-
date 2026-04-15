@@ -33,8 +33,9 @@ vi.mock('@/i18n', () => ({
                 },
             },
             editor: {
-                toolbar: { sitePreview: 'Site Preview', dragToReorder: 'Drag to reorder section' },
-                preview: { mapImageError: 'Could not map image to block field', imageReplaceSuccess: 'Image replaced successfully', imageReplaceFailed: 'Failed to replace image', inlineEditFailed: 'Inline edit failed', aiContextLocked: 'AI Generation context locked to: {blockType}' },
+                toolbar: { sitePreview: 'Site Preview', dragToReorder: 'Drag to reorder section', drag: 'Drag' },
+                preview: { altUploadedImage: 'Uploaded image', editWithAI: 'Edit with AI', mapImageError: 'Could not map image to block field', imageReplaceSuccess: 'Image replaced successfully', imageReplaceFailed: 'Failed to replace image', inlineEditFailed: 'Inline edit failed', aiContextLocked: 'AI Generation context locked to: {blockType}' },
+                blockLibrary: { dropToAdd: 'Drop to add block' },
                 inlineEditComponent: { clickToEdit: 'Click to edit', defaultPlaceholder: 'Click to edit...', save: 'Save', cancel: 'Cancel', aiRewrite: 'AI Rewrite', aiPlaceholder: 'e.g. Make it shorter, add emoji...', rewrite: 'Rewrite' },
                 richText: { heading1: 'Heading 1', heading2: 'Heading 2', heading3: 'Heading 3', heading4: 'Heading 4', paragraph: 'Paragraph', bold: 'Bold', italic: 'Italic', underline: 'Underline', alignLeft: 'Align Left', alignCenter: 'Align Center', alignRight: 'Align Right', justify: 'Justify' },
                 imageToolbar: { changeImage: 'Change Image', generateAI: 'Generate AI Image' },

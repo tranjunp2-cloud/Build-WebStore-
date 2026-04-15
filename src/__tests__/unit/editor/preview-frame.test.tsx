@@ -15,8 +15,9 @@ vi.mock('@/i18n', () => ({
     useI18n: () => ({
         t: {
             editor: {
-                toolbar: { sitePreview: 'Site Preview', dragToReorder: 'Drag to reorder section' },
-                preview: { mapImageError: 'Could not map image to block field', imageReplaceSuccess: 'Image replaced successfully', imageReplaceFailed: 'Failed to replace image', inlineEditFailed: 'Inline edit failed', aiContextLocked: 'AI Generation context locked to: {blockType}' },
+                toolbar: { sitePreview: 'Site Preview', dragToReorder: 'Drag to reorder section', drag: 'Drag' },
+                preview: { altUploadedImage: 'Uploaded image', editWithAI: 'Edit with AI', mapImageError: 'Could not map image to block field', imageReplaceSuccess: 'Image replaced successfully', imageReplaceFailed: 'Failed to replace image', inlineEditFailed: 'Inline edit failed', aiContextLocked: 'AI Generation context locked to: {blockType}' },
+                blockLibrary: { dropToAdd: 'Drop to add block' },
             },
         },
         locale: 'en',
