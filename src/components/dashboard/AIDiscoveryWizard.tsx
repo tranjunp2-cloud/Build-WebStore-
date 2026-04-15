@@ -126,7 +126,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
     const isLeftSwipe = distance > minSwipeDistance
     const isRightSwipe = distance < -minSwipeDistance
 
-    if (isLeftSwipe) {
+    if (isLeftSwipe && !isLastStep) {
       handleNext()
     } else if (isRightSwipe) {
       handlePrev()
@@ -168,7 +168,7 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
 
             {/* Top: Media Showcase */}
             <div
-              className={`relative w-full max-w-[260px] aspect-[4/3] sm:aspect-auto sm:w-full sm:max-w-none sm:h-[320px] rounded-[16px] bg-gradient-to-br ${stepData.gradient} flex items-center justify-center mx-auto sm:mx-0 border border-white/5 shrink-0 overflow-hidden ${imageLoaded && !imageError ? 'cursor-pointer hover:border-[#3B82F6]/50 hover:shadow-[0_0_12px_rgba(59,130,246,0.15)]' : ''} transition-all`}
+              className={`relative w-full max-w-[290px] aspect-video sm:aspect-video sm:w-full sm:max-w-none sm:h-auto rounded-[16px] bg-gradient-to-br ${stepData.gradient} flex items-center justify-center mx-auto sm:mx-0 border border-white/5 shrink-0 overflow-hidden ${imageLoaded && !imageError ? 'cursor-pointer hover:border-[#3B82F6]/50 hover:shadow-[0_0_12px_rgba(59,130,246,0.15)]' : ''} transition-all`}
               onClick={() => imageLoaded && !imageError && setLightboxSrc({ src: stepData.icon, title: stepData.title })}
             >
               {/* Shimmer skeleton — visible while image loads */}
@@ -192,8 +192,8 @@ export function AIDiscoveryWizard({ userId }: { userId?: number | string }) {
                   alt={stepData.title}
                   fill
                   unoptimized
-                  sizes="(max-width: 640px) 260px, 672px"
-                  className={`object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                  sizes="(max-width: 640px) 290px, 672px"
+                  className={`object-contain transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                   onLoad={() => setImageLoaded(true)}
                   onError={() => setImageError(true)}
                 />
