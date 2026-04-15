@@ -64,7 +64,7 @@ vi.mock('@/components/site-renderer/OwnerContext', () => ({
     OwnerProvider: ({ children }: { children: React.ReactNode }) => children,
 }))
 vi.mock('@/components/storefront/I18nText', () => ({
-    I18nText: ({ render }: { render: (t: Record<string, any>) => React.ReactNode }) => {
+    I18nText: ({ render }: { render: (t: Record<string, unknown>) => React.ReactNode }) => {
         const en = require('../../../i18n/locales/en.json')
         return render(en)
     },
