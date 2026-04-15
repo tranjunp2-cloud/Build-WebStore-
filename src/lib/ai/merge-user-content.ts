@@ -1,35 +1,15 @@
 /**
  * Merge user content into new template blocks when switching templates.
- * Preserves user-edited content (text, arrays) while applying new template structure (variant/layout).
+ * Preserves user-edited content (text, arrays) while applying new template
+ * structure (variant/layout).
+ *
+ * PAGES_FIELDS + CONTENT_FIELDS live in `./pages-schema.ts` (single source
+ * of truth shared with apply-template sanitizer).
  */
 
-// Fields that define template structure (variant/layout) — NOT user content
-const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
+import { CONTENT_FIELDS, PAGES_FIELDS } from './pages-schema'
 
-// All allowed fields per block type (from Pages.ts Payload schema)
-export const PAGES_FIELDS: Record<string, string[]> = {
-    hero: ['variant', 'headline', 'subheadline', 'videoUrl'],
-    navigation: ['style', 'logoText', 'links'],
-    about: ['layout', 'sectionLabel', 'headline', 'body'],
-    features: ['sectionLabel', 'headline', 'subheadline', 'layout', 'features'],
-    testimonials: ['headline', 'variant', 'testimonials'],
-    gallery: ['headline', 'layout'],
-    contact: ['headline', 'subtext', 'email', 'phone', 'address', 'showMap', 'mapEmbedUrl'],
-    footer: ['logoText', 'logo', 'tagline', 'columns', 'copyrightText', 'showSocialLinks'],
-    stats: ['headline', 'stats'],
-    pricing: ['headline', 'subheadline'],
-    faq: ['headline', 'faqs'],
-    team: ['headline'],
-    socialWidget: ['variant', 'headline', 'links'],
-    cartWidget: ['variant', 'label', 'showLabel'],
-}
-
-// Content fields per block type = PAGES_FIELDS minus structural fields
-// These are preserved from user's existing blocks when switching templates
-export const CONTENT_FIELDS: Record<string, string[]> = {}
-for (const [bt, fields] of Object.entries(PAGES_FIELDS)) {
-    CONTENT_FIELDS[bt] = fields.filter(f => !STRUCTURAL_FIELDS.has(f))
-}
+export { PAGES_FIELDS, CONTENT_FIELDS }
 
 /**
  * Merge user content into template blocks.
