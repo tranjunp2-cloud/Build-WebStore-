@@ -42,8 +42,15 @@ function CountUp({ value, duration = 1200 }: { value: string; duration?: number 
     const ref = useRef<HTMLSpanElement>(null)
     const isInView = useInView(ref, { once: true })
     const shouldReduce = useReducedMotion()
-    const numericValue = parseInt(value.replace(/[^0-9]/g, ''), 10)
-    const isNumeric = !isNaN(numericValue) && /\d/.test(value)
+    // Plan 260415 — treat a value as animatable ONLY when it has a single
+    // contiguous digit run (e.g. "500+", "98%", "10+"). Multi-run values
+    // like "24/7" or "4.9★" previously mis-animated because `replace(/\d+/,
+    // String(count))` only swaps the FIRST digit group, leaving the second
+    // group trailing behind ("24/7" → "247/7" mid-animation).
+    const digitMatches = value.match(/\d+/g) ?? []
+    const isSingleDigitRun = digitMatches.length === 1
+    const numericValue = isSingleDigitRun ? parseInt(digitMatches[0]!, 10) : NaN
+    const isNumeric = isSingleDigitRun && !isNaN(numericValue)
     const [count, setCount] = useState(0)
 
     useEffect(() => {
