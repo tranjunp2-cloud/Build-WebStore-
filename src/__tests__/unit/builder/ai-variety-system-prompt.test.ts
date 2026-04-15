@@ -138,8 +138,30 @@ describe('buildSystemPrompt — design quality rules', () => {
     expect(prompt).toContain('Anti-Patterns')
   })
 
-  it('should contain composition hint in user prompt for known category', () => {
+  it('should inject RHYTHM block sequence when recipe is provided', () => {
+    // Plan 2253 cleanup (PR #617) — legacy `generateCompositionHint` with
+    // "Suggested block composition" soft hint was deleted (R12 — AI ignores
+    // soft hints). Replaced by plan 2249 phase-04 hard RHYTHM constraint
+    // injected only when a CategoryRecipe is passed via options.
+    const mockRecipe = {
+      id: 'rest-story',
+      label: 'Story-first',
+      rhythm: 'story-first' as const,
+      blocks: ['hero', 'about', 'features', 'testimonials', 'cta', 'footer'],
+      required: ['hero', 'about', 'cta'],
+      middleShuffleRange: [2, 4] as [number, number],
+      description: 'Lead with the founder story — best for heritage brands.',
+    }
+    const prompt = buildUserPrompt(businessInfo, { recipe: mockRecipe })
+    expect(prompt).toContain('RHYTHM: Story-first')
+    expect(prompt).toContain('Block sequence:')
+    expect(prompt).toContain('hero → about → features')
+  })
+
+  it('should NOT contain legacy "Suggested block composition" text', () => {
+    // Regression guard for the PR #617 cleanup — ensure the deprecated
+    // composition hint text never re-appears via regression.
     const prompt = buildUserPrompt(businessInfo)
-    expect(prompt).toContain('Suggested block composition')
+    expect(prompt).not.toContain('Suggested block composition')
   })
 })
