@@ -27,6 +27,7 @@
  */
 
 import type { AITask } from './config'
+import type { Payload } from 'payload'
 
 // Per-1M-token pricing used to estimate cost. Sourced from
 // plans/260414-0914-ai-model-optimization/research/researcher-01-openai-models-2026.md
@@ -66,6 +67,14 @@ export type LogAiUsageInput = {
     /** Payload tenant id — accepts string (UUID) or number (serial) */
     tenantId?: number | string | null
     errorCode?: string | null
+    /**
+     * Plan 260415 fix-500 — optional Payload instance from the caller. When
+     * provided, skip the dynamic import + secondary `getPayload({ config })`
+     * which was both wasteful (~500ms cold-start) and polluting logs with
+     * "missing secret key" warnings that masked real errors. Callers that
+     * already have a Payload instance (nearly every AI route) should pass it.
+     */
+    payload?: Payload
 }
 
 /**
@@ -75,12 +84,17 @@ export type LogAiUsageInput = {
 export function logAiUsage(input: LogAiUsageInput): void {
     void (async () => {
         try {
-            // Dynamic import to avoid pulling Payload into cold-start bundle of
-            // every route that calls AI. Payload is heavy — only load when we
-            // actually have a log row to write.
-            const { getPayload } = await import('payload')
-            const configPromise = (await import('@/payload.config')).default
-            const payload = await getPayload({ config: configPromise })
+            let payload: Payload
+            if (input.payload) {
+                payload = input.payload
+            } else {
+                // Fallback: dynamic import if caller didn't supply one.
+                // Avoids pulling Payload into cold-start bundle of routes that
+                // don't already have it.
+                const { getPayload } = await import('payload')
+                const configPromise = (await import('@/payload.config')).default
+                payload = await getPayload({ config: configPromise })
+            }
 
             const costUsd = estimateCostUsd(input.model, input.tokensIn, input.tokensOut)
 
