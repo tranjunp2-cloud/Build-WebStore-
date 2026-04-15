@@ -9,6 +9,21 @@ import { checkRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
 import { mergeUserContent } from '@/lib/ai/merge-user-content'
 
+/** Recursively strip Payload system fields so Payload creates fresh records */
+const STRIP_KEYS = new Set(['id', '_order', '_parent_id', '_path', '_uuid', 'createdAt', 'updatedAt'])
+function stripSystemFields(obj: unknown): unknown {
+    if (Array.isArray(obj)) return obj.map(stripSystemFields)
+    if (obj && typeof obj === 'object') {
+        const result: Record<string, unknown> = {}
+        for (const [key, val] of Object.entries(obj)) {
+            if (STRIP_KEYS.has(key)) continue
+            result[key] = stripSystemFields(val)
+        }
+        return result
+    }
+    return obj
+}
+
 /**
  * POST /api/ai/apply-template
  * Creates a new site from a template's default blocks and theme.
@@ -275,80 +290,75 @@ export const POST = withAuth(async (user, req) => {
                 return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
             }
 
-            // Build pages list from templatePages or fallback to defaultBlocks
-            const templatePages = (template.templatePages as Array<{ title: string; slug: string; isHomepage?: boolean; layout: unknown }>)
-            const rawPages = templatePages?.length
-                ? templatePages
-                : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
-            const pagesToCreate = rawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
-            injectNavLinks(pagesToCreate)
-
             _siteId = Number(siteId)
 
-            // Mark as generating before destructive operations
+            // Build template variant map: blockType → variant/style/layout from template
+            const templatePages = (template.templatePages as Array<{ layout: unknown }>)
+            const templateBlockList = templatePages?.length
+                ? (templatePages.flatMap(p => (p.layout as Record<string, unknown>[]) || []))
+                : blocks
+            const sanitizedTemplateBlocks = sanitizeBlocks(templateBlockList)
+
+            // Extract variant/style per blockType from template (first match wins)
+            const templateVariantMap: Record<string, Record<string, unknown>> = {}
+            for (const tb of sanitizedTemplateBlocks) {
+                const bt = tb.blockType as string
+                if (!bt || templateVariantMap[bt]) continue
+                const structural: Record<string, unknown> = {}
+                for (const field of ['variant', 'layout', 'style']) {
+                    if (tb[field] !== undefined) structural[field] = tb[field]
+                }
+                templateVariantMap[bt] = structural
+            }
+
+            // Mark as re-skinning
             await payload.update({
                 collection: 'sites',
                 id: Number(siteId),
                 data: { generationStatus: 'generating' },
             })
 
-            // 1. Collect existing pages + their blocks (to preserve user content)
-            const existingPages = await payload.find({
-                collection: 'pages',
-                where: { site: { equals: Number(siteId) } },
-                limit: 100,
-            })
-
-            // Build lookup: homepage blocks + slug-matched blocks for content merging
-            const existingPageMap: Record<string, Record<string, unknown>[]> = {}
-            let homepageBlocks: Record<string, unknown>[] = []
-            for (const page of existingPages.docs) {
-                const pageData = page as Record<string, unknown>
-                const blocks = (pageData.layout as Record<string, unknown>[]) || []
-                const slug = pageData.slug as string
-                if (pageData.isHomepage) homepageBlocks = blocks
-                if (slug) existingPageMap[slug] = blocks
-            }
-
-            // 2. Delete old pages
-            for (const page of existingPages.docs) {
-                await payload.delete({ collection: 'pages', id: page.id })
-            }
-
-            // 3. Update site theme
+            // 1. Update site theme only
             await payload.update({
                 collection: 'sites',
                 id: Number(siteId),
                 data: { theme: templateTheme },
             })
 
-            // 4. Create new pages from template, merging user content where possible
-            for (const [idx, page] of pagesToCreate.entries()) {
-                // Find matching existing blocks: homepage→homepage, then slug match
-                const matchingBlocks = page.isHomepage
-                    ? homepageBlocks
-                    : (existingPageMap[page.slug] || [])
+            // 2. Re-skin existing pages: keep all pages, blocks, and content
+            //    Only change variant/style/layout per block from template
+            const existingPages = await payload.find({
+                collection: 'pages',
+                where: { site: { equals: Number(siteId) } },
+                limit: 100,
+            })
 
-                const mergedLayout = matchingBlocks.length > 0
-                    ? mergeUserContent(page.layout, matchingBlocks)
-                    : page.layout
+            for (const page of existingPages.docs) {
+                const pageData = page as Record<string, unknown>
+                const currentBlocks = (pageData.layout as Record<string, unknown>[]) || []
+                if (currentBlocks.length === 0) continue
 
-                await payload.create({
+                // Re-skin each block: apply template variant, keep all user content
+                const reskinned = currentBlocks.map(block => {
+                    const bt = block.blockType as string
+                    if (!bt) return block
+
+                    const templateVariant = templateVariantMap[bt]
+                    if (!templateVariant || Object.keys(templateVariant).length === 0) return block
+
+                    // Only overwrite structural fields (variant/layout/style)
+                    return { ...block, ...templateVariant }
+                })
+
+                await payload.update({
                     collection: 'pages',
-                    data: {
-                        title: page.title,
-                        slug: page.slug,
-                        site: Number(siteId),
-                        tenant: tenantId,
-                        isHomepage: page.isHomepage ?? idx === 0,
-                        _status: 'published',
-                        layout: mergedLayout,
-                    },
+                    id: page.id,
+                    data: { layout: stripSystemFields(reskinned) as Record<string, unknown>[] },
                 })
                 _createdPagesCount++
             }
 
-            // 4. Mark generation completed
+            // 3. Mark completed
             await payload.update({
                 collection: 'sites',
                 id: Number(siteId),
@@ -367,7 +377,7 @@ export const POST = withAuth(async (user, req) => {
                 siteId: Number(siteId),
                 siteName: existingSite.name,
                 templateName: template.name,
-                pagesCreated: pagesToCreate.length,
+                pagesUpdated: _createdPagesCount,
                 applied: true,
             })
         }
@@ -377,7 +387,12 @@ export const POST = withAuth(async (user, req) => {
         const newSiteRawPages = newSiteTemplatePages?.length
             ? newSiteTemplatePages
             : [{ title: 'Home', slug: 'home', isHomepage: true, layout: blocks }]
-        const pagesToCreate = newSiteRawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
+        const pagesToCreate = newSiteRawPages.map(p => ({
+            title: p.title,
+            slug: p.slug,
+            isHomepage: p.isHomepage,
+            layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []),
+        }))
         injectNavLinks(pagesToCreate)
 
         const site = await payload.create({
@@ -408,7 +423,7 @@ export const POST = withAuth(async (user, req) => {
                     tenant: tenantId,
                     isHomepage: page.isHomepage ?? idx === 0,
                     _status: 'published',
-                    layout: page.layout,
+                    layout: stripSystemFields(page.layout) as Record<string, unknown>[],
                 },
             })
             _createdPagesCount++
