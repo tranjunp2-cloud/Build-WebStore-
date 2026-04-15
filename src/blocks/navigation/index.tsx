@@ -340,6 +340,11 @@ export function NavigationBlock({ block, theme, site }: BlockProps<NavigationCon
             style={{
                 borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
                 background: 'rgba(9,9,11,0.85)',
+                // Plan 260415 nav fix: set explicit white text so DropdownLink's
+                // `opacity-60` renders as 60% white on the dark bg instead of
+                // inheriting the document's default black (which collides with
+                // the near-black bg and drops contrast below WCAG AA).
+                color: '#fff',
                 backdropFilter: 'blur(20px) saturate(1.8)',
                 WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
             }}
@@ -595,6 +600,8 @@ function CenteredNav({ mergedBlock, logoText, links, ctaButton }: {
             style={{
                 borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
                 background: 'rgba(9,9,11,0.85)',
+                // Plan 260415 nav fix: explicit white text for DropdownLink children.
+                color: '#fff',
                 backdropFilter: 'blur(20px) saturate(1.8)',
                 WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
             }}
@@ -687,6 +694,8 @@ function MegaMenuNav({ mergedBlock, logoText, links, ctaButton }: {
             style={{
                 borderBottom: `1px solid rgba(var(--brand-primary-rgb), 0.071)`,
                 background: 'rgba(9,9,11,0.85)',
+                // Plan 260415 nav fix: explicit white text for DropdownLink children.
+                color: '#fff',
                 backdropFilter: 'blur(20px) saturate(1.8)',
                 WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
             }}

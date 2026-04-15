@@ -10,19 +10,19 @@
  * Plan: plans/260414-2249-ai-gen-wix-level-optimize/phase-05-multipage-completeness.md
  */
 
-import type { BlogPost } from './types'
+import type { BlogPost, BusinessSample } from './types'
 
 export const BLOG_SEEDS_BY_CATEGORY: Record<string, BlogPost[]> = {
   restaurant: [
-    { title: '5 Tips for First-Time Diners', excerpt: 'Navigate our menu like a regular — what to order, when to come, how to ask for the chef\'s pick.', slug: 'first-time-diners', category: 'Dining Tips', readTime: '3 min' },
-    { title: 'Behind the Kitchen: A Day in the Life', excerpt: 'Sourcing, prep, service — follow our team through a full service day from 6am market run to midnight clean-down.', slug: 'behind-the-kitchen', category: 'Story', readTime: '5 min' },
-    { title: 'Our Ingredient Sources', excerpt: 'Meet the Penang fishermen, Cameron highland farmers, and spice traders who make our menu possible.', slug: 'ingredient-sources', category: 'Sourcing', readTime: '4 min' },
-    { title: 'Seasonal Menu: What\'s New This Month', excerpt: 'Fresh catches and seasonal produce driving our new dishes — limited time only.', slug: 'seasonal-menu', category: 'Menu', readTime: '2 min' },
+    { title: '5 Tips for First-Time Diners at {business}', excerpt: 'Navigate our menu like a regular — what to order, when to come, how to ask for the chef\'s pick at {business}.', slug: 'first-time-diners', category: 'Dining Tips', readTime: '3 min' },
+    { title: 'Behind the Kitchen: A Day at {business}', excerpt: 'Sourcing, prep, service — follow the {business} team through a full service day from 6am market run to midnight clean-down.', slug: 'behind-the-kitchen', category: 'Story', readTime: '5 min' },
+    { title: 'How We Source Our {product}', excerpt: 'Meet the Penang fishermen, Cameron highland farmers, and spice traders who make our {product} possible.', slug: 'ingredient-sources', category: 'Sourcing', readTime: '4 min' },
+    { title: 'Seasonal Menu: {product} Specials', excerpt: 'Fresh catches and seasonal produce driving our new {product} dishes — limited time only.', slug: 'seasonal-menu', category: 'Menu', readTime: '2 min' },
   ],
   ecommerce: [
-    { title: 'How to Style Our Signature Collection', excerpt: 'Three looks for three occasions — minimal, statement, weekend.', slug: 'styling-collection', category: 'Style', readTime: '4 min' },
-    { title: 'Our Sourcing Story', excerpt: 'Fair-trade suppliers, artisan partners, and why we never compromise on craftsmanship.', slug: 'sourcing-story', category: 'About', readTime: '5 min' },
-    { title: 'Customer Favorites This Month', excerpt: 'The 10 items flying off our virtual shelves — plus restock dates for sold-out picks.', slug: 'customer-favorites', category: 'Trending', readTime: '3 min' },
+    { title: 'How to Style {business} {product}', excerpt: 'Three looks for three occasions — minimal, statement, weekend — with our {product}.', slug: 'styling-collection', category: 'Style', readTime: '4 min' },
+    { title: 'The {business} Sourcing Story', excerpt: 'Fair-trade suppliers, artisan partners, and why {business} never compromises on craftsmanship.', slug: 'sourcing-story', category: 'About', readTime: '5 min' },
+    { title: 'Customer Favorites at {business} This Month', excerpt: 'The 10 {product} items flying off our virtual shelves — plus restock dates for sold-out picks.', slug: 'customer-favorites', category: 'Trending', readTime: '3 min' },
     { title: 'Size Guide: Getting the Perfect Fit', excerpt: 'Honest measurements, real body types, zero guesswork.', slug: 'size-guide', category: 'Guide', readTime: '6 min' },
   ],
   beauty: [
@@ -74,10 +74,10 @@ export const BLOG_SEEDS_BY_CATEGORY: Record<string, BlogPost[]> = {
     { title: 'The Consulting Toolkit We Use Daily', excerpt: 'Frameworks, templates, and software that shape our engagements.', slug: 'consulting-toolkit', category: 'Tools', readTime: '5 min' },
   ],
   fnb: [
-    { title: 'The Art of Pulling Teh Tarik', excerpt: 'Why we train every barista to pull the perfect stretch — and why it matters.', slug: 'pulling-teh-tarik', category: 'Craft', readTime: '3 min' },
-    { title: 'Our Coffee Sourcing Story', excerpt: 'Direct trade with farmers in Cameron Highlands and Sumatra — the relationships behind every cup.', slug: 'coffee-sourcing', category: 'Sourcing', readTime: '5 min' },
-    { title: 'Weekend Menu: Brunch Specials', excerpt: 'Three new dishes + classic favorites. Served Saturday and Sunday only.', slug: 'brunch-specials', category: 'Menu', readTime: '2 min' },
-    { title: 'How to Brew Great Coffee at Home', excerpt: 'Beans, grind, water, technique — our barista\'s pocket guide.', slug: 'home-brewing', category: 'Tips', readTime: '4 min' },
+    { title: 'The Art of the Pour at {business}', excerpt: 'Why {business} trains every barista to pull the perfect stretch — and why it matters.', slug: 'pulling-teh-tarik', category: 'Craft', readTime: '3 min' },
+    { title: '{business} Sourcing: Our {product} Story', excerpt: 'Direct trade with farmers in Cameron Highlands and Sumatra — the relationships behind every {product}.', slug: 'coffee-sourcing', category: 'Sourcing', readTime: '5 min' },
+    { title: 'Weekend Menu at {business}: {product} Specials', excerpt: 'Three new dishes + classic favorites at {business}. Served Saturday and Sunday only.', slug: 'brunch-specials', category: 'Menu', readTime: '2 min' },
+    { title: 'How to Brew Great {product} at Home', excerpt: 'Beans, grind, water, technique — the {business} barista\'s pocket guide.', slug: 'home-brewing', category: 'Tips', readTime: '4 min' },
   ],
   events: [
     { title: '2026 Wedding Trends We\'re Loving', excerpt: 'Minimal color palettes, forage florals, and intimate guest counts — the shift we\'re seeing.', slug: 'wedding-trends-2026', category: 'Trends', readTime: '5 min' },
@@ -100,12 +100,41 @@ export const BLOG_SEEDS_BY_CATEGORY: Record<string, BlogPost[]> = {
 }
 
 /**
+ * Substitute `{business}` / `{product}` placeholders inside a blog seed
+ * string using user-supplied business data. Missing fields fall back to
+ * a neutral word ("our") so the string never ships with visible braces.
+ */
+function substitutePlaceholders(str: string, biz: Partial<BusinessSample> | undefined): string {
+  if (!biz) return str
+  const name = biz.name?.trim() || 'our'
+  const product = biz.products?.[0]?.trim() || 'menu'
+  return str
+    .replace(/\{business\}/g, name)
+    .replace(/\{product\}/g, product)
+}
+
+/**
  * Get blog seeds for a category, with fallback for unknown categories.
  * Always returns an array (possibly empty) — never undefined.
+ *
+ * Plan 07 — optional `biz` arg substitutes `{business}` / `{product}`
+ * placeholders inside seed titles/excerpts so the Blog sub-page weaves
+ * the user's business name + top product into every post. Backward-compat:
+ * omitting `biz` returns the raw templated strings (useful for unit tests
+ * that count entries).
  */
-export function getBlogSeeds(category: string): BlogPost[] {
+export function getBlogSeeds(
+  category: string,
+  biz?: Partial<BusinessSample>,
+): BlogPost[] {
   const key = category.toLowerCase().replace(/[\s_-]+/g, '')
-  return BLOG_SEEDS_BY_CATEGORY[key] ?? BLOG_SEEDS_BY_CATEGORY['business'] ?? []
+  const seeds = BLOG_SEEDS_BY_CATEGORY[key] ?? BLOG_SEEDS_BY_CATEGORY['business'] ?? []
+  if (!biz) return seeds
+  return seeds.map((seed) => ({
+    ...seed,
+    title: substitutePlaceholders(seed.title, biz),
+    excerpt: substitutePlaceholders(seed.excerpt, biz),
+  }))
 }
 
 /** Total blog seed count — used by coverage test. */

@@ -158,6 +158,26 @@ function buildNavigation(
   }
 }
 
+/**
+ * Plan 07 — truncate on word boundary so the hero subheadline + headline
+ * never break mid-word. Mirrors the helper in seo-generator.ts / content-injection.ts.
+ */
+function truncateHeroText(str: string, maxChars: number): string {
+  if (!str) return ''
+  if (str.length <= maxChars) return str
+  const sliced = str.slice(0, maxChars - 1)
+  const lastSpace = sliced.lastIndexOf(' ')
+  if (lastSpace > maxChars * 0.6) return sliced.slice(0, lastSpace).trimEnd() + '…'
+  return sliced.trimEnd() + '…'
+}
+
+function capHeroWords(str: string, maxWords: number): string {
+  if (!str) return ''
+  const words = str.split(/\s+/).filter(Boolean)
+  if (words.length <= maxWords) return words.join(' ')
+  return words.slice(0, maxWords).join(' ')
+}
+
 function buildHero(
   biz: BusinessSample,
   category: string,
@@ -166,11 +186,40 @@ function buildHero(
 ): Record<string, unknown> {
   const variants = CATEGORY_HERO_VARIANTS[category] ?? ['centered']
   const variant = variants[variantIndex % variants.length]
+
+  // Plan 07 — headline derived from biz.name + short tail so each business
+  // produces a distinct hero. Canned `biz.heroHeadline` becomes a defensive
+  // fallback for the pathological "all user fields empty" case.
+  const name = (biz.name || '').trim()
+  const description = (biz.description || '').trim()
+  const topProduct = biz.products?.[0]?.trim() || undefined
+  const descWords = description.split(/\s+/).filter(Boolean)
+  const tail = topProduct
+    ? capitalizeFirst(topProduct)
+    : descWords.length >= 3
+      ? descWords.slice(0, 5).join(' ')
+      : (biz.tagline || '').split(/\s+/).slice(0, 5).join(' ')
+
+  let headline: string
+  if (name && (tail || description)) {
+    headline = capHeroWords(tail ? `${name} — ${tail}` : name, 10)
+  } else {
+    // Defensive — biz.heroHeadline from canned pool.
+    headline = biz.heroHeadline
+  }
+
+  // Subheadline: user description truncated on word boundary. Fall back to
+  // canned heroSubheadline only when biz.description is missing (rare since
+  // canned BusinessSample always has a description).
+  const subheadline = description
+    ? truncateHeroText(description, 140)
+    : biz.heroSubheadline
+
   return {
     blockType: 'hero',
     variant,
-    headline: biz.heroHeadline,
-    subheadline: biz.heroSubheadline,
+    headline,
+    subheadline,
     ctaButtons: [
       { label: resolveCTA(mood, category, 'primary'), url: '/contact', style: 'primary' },
       { label: resolveCTA(mood, category, 'secondary'), url: '/about', style: 'outline' },
@@ -1294,7 +1343,8 @@ function buildServicesPage(biz: BusinessSample, content: CategoryContent, catego
 function buildBlogPage(biz: BusinessSample, category: string, pages: string[]): TemplatePage {
   // Plan 260414-2249 phase-05: seed blog-list with category-appropriate
   // posts so the Blog sub-page never renders with a single empty heading.
-  const seeds = getBlogSeeds(category)
+  // Plan 07: pass biz so seed titles substitute `{business}` + `{product}`.
+  const seeds = getBlogSeeds(category, biz)
   const items = seeds.slice(0, 6).map((post) => ({
     title: post.title,
     excerpt: post.excerpt,
@@ -1330,6 +1380,102 @@ function buildBlogPage(biz: BusinessSample, category: string, pages: string[]): 
 // ── Blueprint-driven composer (NEW — replaces algorithmic composition) ──────
 
 import type { TemplatePreset, BlockSpec } from './template-definitions'
+import { pickRecipe, type CategoryRecipe } from './category-recipes'
+import {
+  NAV_VARIANT_BY_CATEGORY,
+  CONTACT_VARIANT_BY_CATEGORY,
+  FOOTER_VARIANT_BY_CATEGORY,
+} from './category-requirements'
+import { seededShufflePick, hashString } from './seeded-random'
+
+/**
+ * Plan 260415 — rotate structural block variants per category seed pool.
+ * Walks every page layout and overrides `variant` for navigation / contact
+ * / footer blocks with a seed-picked entry from the curated category pool,
+ * so same-category businesses spread across different shapes instead of
+ * locking to the composer's hardcoded default.
+ */
+function rotateStructuralVariants(
+  pages: TemplatePage[],
+  category: string,
+  seed: number,
+): void {
+  const pools: Array<{ blockType: string; pool: readonly string[] | undefined; salt: string }> = [
+    { blockType: 'navigation', pool: NAV_VARIANT_BY_CATEGORY[category], salt: 'navigation' + category },
+    { blockType: 'contact', pool: CONTACT_VARIANT_BY_CATEGORY[category], salt: 'contact' + category },
+    { blockType: 'footer', pool: FOOTER_VARIANT_BY_CATEGORY[category], salt: 'footer' + category },
+  ]
+  for (const { blockType, pool, salt } of pools) {
+    if (!pool || pool.length === 0) continue
+    const picked = seededShufflePick(pool, seed ^ hashString(salt)) ?? pool[0]
+    for (const page of pages) {
+      for (const block of page.layout as Array<Record<string, unknown>>) {
+        if (block.blockType === blockType) {
+          block.variant = picked
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Plan 07 — reorder a page's BlockSpecs to follow the recipe's block
+ * sequence (best-effort). Navigation (index 0) and footer (last) are
+ * locked in place; hero follows nav; middle blocks are reordered per
+ * `recipe.blocks` with leftover specs appended after the recipe-matched
+ * ones so nothing is lost.
+ *
+ * Returns `null` only when the page has no hero spec at all (a shape
+ * the composer can't safely rearrange). Missing required blocks from
+ * the recipe are silently skipped — the reorder is best-effort so
+ * partial recipe application still changes same-category sites.
+ */
+function reorderSpecsByRecipe(
+  specs: BlockSpec[],
+  recipe: CategoryRecipe,
+): BlockSpec[] | null {
+  const nav = specs.find((s) => s.blockType === 'navigation')
+  const hero = specs.find((s) => s.blockType === 'hero')
+  const footer = specs.find((s) => s.blockType === 'footer')
+  if (!hero) return null
+
+  // Middle pool: non-structural specs grouped by blockType.
+  const middlePool = new Map<string, BlockSpec[]>()
+  for (const s of specs) {
+    if (s === nav || s === hero || s === footer) continue
+    const arr = middlePool.get(s.blockType) ?? []
+    arr.push(s)
+    middlePool.set(s.blockType, arr)
+  }
+
+  // Walk the recipe order, consuming from the middle pool. Skip recipe
+  // block types that the preset doesn't have (sub-page blocks like
+  // `contact` / `about` commonly live off-homepage in our blueprints).
+  const consumed = new Set<BlockSpec>()
+  const middleOrdered: BlockSpec[] = []
+  for (const bt of recipe.blocks) {
+    if (bt === 'hero' || bt === 'navigation' || bt === 'footer') continue
+    const arr = middlePool.get(bt)
+    if (arr && arr.length > 0) {
+      const spec = arr.shift()!
+      middleOrdered.push(spec)
+      consumed.add(spec)
+    }
+  }
+  // Append any preset specs the recipe did not mention, preserving their
+  // original relative order — no block is ever dropped.
+  for (const s of specs) {
+    if (s === nav || s === hero || s === footer) continue
+    if (!consumed.has(s)) middleOrdered.push(s)
+  }
+
+  const out: BlockSpec[] = []
+  if (nav) out.push(nav)
+  out.push(hero)
+  out.push(...middleOrdered)
+  if (footer) out.push(footer)
+  return out
+}
 
 /**
  * Build a single block from a BlockSpec blueprint.
@@ -1622,7 +1768,7 @@ function enrichSubPages(
       const blogList = blogPage.layout[blogListIdx] as Record<string, unknown>
       const existingItems = (blogList.items as unknown[] | undefined) ?? []
       if (existingItems.length === 0) {
-        const seeds = getBlogSeeds(category).slice(0, 6).map((post) => ({
+        const seeds = getBlogSeeds(category, biz).slice(0, 6).map((post) => ({
           title: post.title,
           excerpt: post.excerpt,
           slug: post.slug,
@@ -1679,20 +1825,36 @@ export function composeFromBlueprint(
   const mood: ThemeMood =
     THEME_MOODS[preset.themePreset.moodId] ?? THEME_MOODS.serene
 
+  // Plan 07 — runtime recipe picker. Same (category, seed, biz.name) always
+  // returns the same recipe so reruns are stable, but two businesses with
+  // different names at the same base seed land on different block sequences.
+  // The reorder helper returns null when the preset blueprint is missing a
+  // required block — in that case we keep the preset sequence untouched.
+  const recipe = pickRecipe(preset.category, seed, { name: biz.name })
+
   // Template path content language — defaults to 'en' since template content
   // in src/lib/ai/content/*.ts is pre-curated. Phase 04 wires the SAME
   // content-rules validator used by the AI path, so any blocked CTA in the
   // hand-authored template content is caught + fixed uniformly.
   const templateLang: ContentLang = 'en'
 
-  const pages: TemplatePage[] = preset.pages.map((page) => ({
-    title: page.name,
-    slug: page.slug,
-    layout: page.blocks.map((spec) => {
-      const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood)
-      return applyContentValidation(block, templateLang)
-    }),
-  }))
+  const pages: TemplatePage[] = preset.pages.map((page, pageIdx) => {
+    // Only reorder the homepage — sub-pages keep their preset blueprint so
+    // About/Contact/Blog/Services stay on their canonical shapes.
+    let specs: readonly BlockSpec[] = page.blocks
+    if (pageIdx === 0) {
+      const reordered = reorderSpecsByRecipe([...page.blocks], recipe)
+      if (reordered) specs = reordered
+    }
+    return {
+      title: page.name,
+      slug: page.slug,
+      layout: specs.map((spec) => {
+        const block = buildBlockFromSpec(spec, content, biz, preset.category, pageNames, seed, mood)
+        return applyContentValidation(block, templateLang)
+      }),
+    }
+  })
 
   // Plan 260414-2249 phase-05: enrich sub-pages to 5-page completeness standard.
   // - Ensure Blog page exists with seeded posts from content/blog-seeds.ts
@@ -1700,6 +1862,11 @@ export function composeFromBlueprint(
   // - Ensure Contact page has google-maps + opening-hours FAQ when user provides address
   // Mutates `pages` in place via helper — adds missing pages, updates existing.
   enrichSubPages(pages, biz, preset.category)
+
+  // Plan 260415 — rotate navigation / contact / footer variants from the
+  // curated per-category pools so same-category businesses ship different
+  // structural shapes instead of locking to the composer's default variant.
+  rotateStructuralVariants(pages, preset.category, seed)
 
   return {
     name: preset.name,

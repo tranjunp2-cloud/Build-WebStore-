@@ -49,8 +49,18 @@ export interface ImagePool {
 export interface BuildPoolCtx {
   category: string
   mood?: ThemeMood
-  /** Top product term from Phase 01 business-info-mapper (already translated). */
+  /**
+   * Top product term from Phase 01 business-info-mapper (already translated).
+   * Retained for backward compatibility — when `products` is absent, this is
+   * the single term threaded into the Unsplash query.
+   */
   topProduct?: string
+  /**
+   * Plan 07 — full top-N translated products. When provided (max 3 kept),
+   * the query joins them so two restaurants with similar first products
+   * (e.g. "ramen" vs "noodles") still yield distinct pool queries.
+   */
+  products?: string[]
   /** Deterministic seed — same seed returns same query (query-level stability). */
   seed: number
   /** Optional sizes; defaults match typical block needs per home page. */
@@ -72,23 +82,35 @@ const DEFAULT_SQUARE_SIZE = 6
  *   3. Photography filter hint (e.g. "warm tones", "high contrast")
  *   4. Category base fallback (e.g. "restaurant interior")
  */
-function buildPoolQuery(ctx: BuildPoolCtx, relaxed: boolean = false): string {
+export function buildPoolQuery(ctx: BuildPoolCtx, relaxed: boolean = false): string {
   const terms: string[] = []
   const seen = new Set<string>()
   const push = (t: string | undefined) => {
     if (!t) return
-    const lower = t.toLowerCase()
+    const trimmed = t.trim()
+    if (!trimmed) return
+    const lower = trimmed.toLowerCase()
     if (seen.has(lower)) return
-    terms.push(t)
+    terms.push(trimmed)
     seen.add(lower)
   }
 
-  if (ctx.topProduct) push(ctx.topProduct)
+  // Plan 07 — when full products[] is supplied, join the top 3 into the
+  // query. Two restaurants whose first parsed product collides (e.g. both
+  // "noodles") still diverge because products[2]+[3] differ.
+  const productTerms = (ctx.products ?? []).slice(0, 3)
+  if (productTerms.length > 0) {
+    for (const p of productTerms) push(p)
+  } else if (ctx.topProduct) {
+    push(ctx.topProduct)
+  }
 
   if (!relaxed && ctx.mood) {
-    // Top 2 mood imagery adjectives — the cohesion drivers
+    // Top 2 mood imagery adjectives — the cohesion drivers. Cap the total
+    // term count so Unsplash still has a fighting chance of matching.
+    const capacity = productTerms.length >= 3 ? 4 : 4
     for (const adj of ctx.mood.imageryKeywords.slice(0, 2)) {
-      if (terms.length >= 4) break
+      if (terms.length >= capacity) break
       push(adj)
     }
   }

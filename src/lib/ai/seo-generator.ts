@@ -65,11 +65,29 @@ function stripHtml(s: string): string {
 
 /**
  * Mine the first text-rich field from a page's blocks. Used as the
- * basis for the per-page meta description. Priority order:
+ * basis for the per-page meta description.
+ *
+ * Priority order for sub-pages:
  *   hero.subheadline → about.body → hero.headline → first block's headline
+ *
+ * Plan 07 — for the homepage, prefer `biz.description` over
+ * `hero.subheadline` when description is non-empty and > 40 chars. The
+ * enforcer-padded or canned hero subheadline is often identical across
+ * same-category businesses; `biz.description` is always user-supplied,
+ * so it ships the most variety for meta descriptions.
  */
-function minePageText(page: PageForSeo): string {
+function minePageText(
+  page: PageForSeo,
+  biz?: BusinessSample,
+  isHomepage: boolean = false,
+): string {
   const blocks = (page.blocks ?? page.layout ?? []) as Array<Record<string, unknown>>
+
+  // Plan 07 — homepage-specific priority: user description wins when provided.
+  if (isHomepage && biz?.description && biz.description.trim().length > 40) {
+    return stripHtml(biz.description)
+  }
+
   if (blocks.length === 0) return ''
 
   // 1. Hero subheadline — usually the money description
@@ -157,7 +175,8 @@ export function generatePageSeo(
   title = truncateOnWord(title, TITLE_MAX)
 
   // ── Description ────────────────────────────────────────────
-  let description = minePageText(page)
+  const isHomepage = page.isHomepage === true || page.title.toLowerCase() === 'home'
+  let description = minePageText(page, biz, isHomepage)
   if (!description) {
     // Defensive fallback — use page-specific boilerplate, NOT site tagline
     description = page.isHomepage
