@@ -1381,6 +1381,42 @@ function buildBlogPage(biz: BusinessSample, category: string, pages: string[]): 
 
 import type { TemplatePreset, BlockSpec } from './template-definitions'
 import { pickRecipe, type CategoryRecipe } from './category-recipes'
+import {
+  NAV_VARIANT_BY_CATEGORY,
+  CONTACT_VARIANT_BY_CATEGORY,
+  FOOTER_VARIANT_BY_CATEGORY,
+} from './category-requirements'
+import { seededShufflePick, hashString } from './seeded-random'
+
+/**
+ * Plan 260415 — rotate structural block variants per category seed pool.
+ * Walks every page layout and overrides `variant` for navigation / contact
+ * / footer blocks with a seed-picked entry from the curated category pool,
+ * so same-category businesses spread across different shapes instead of
+ * locking to the composer's hardcoded default.
+ */
+function rotateStructuralVariants(
+  pages: TemplatePage[],
+  category: string,
+  seed: number,
+): void {
+  const pools: Array<{ blockType: string; pool: readonly string[] | undefined; salt: string }> = [
+    { blockType: 'navigation', pool: NAV_VARIANT_BY_CATEGORY[category], salt: 'navigation' + category },
+    { blockType: 'contact', pool: CONTACT_VARIANT_BY_CATEGORY[category], salt: 'contact' + category },
+    { blockType: 'footer', pool: FOOTER_VARIANT_BY_CATEGORY[category], salt: 'footer' + category },
+  ]
+  for (const { blockType, pool, salt } of pools) {
+    if (!pool || pool.length === 0) continue
+    const picked = seededShufflePick(pool, seed ^ hashString(salt)) ?? pool[0]
+    for (const page of pages) {
+      for (const block of page.layout as Array<Record<string, unknown>>) {
+        if (block.blockType === blockType) {
+          block.variant = picked
+        }
+      }
+    }
+  }
+}
 
 /**
  * Plan 07 — reorder a page's BlockSpecs to follow the recipe's block
@@ -1826,6 +1862,11 @@ export function composeFromBlueprint(
   // - Ensure Contact page has google-maps + opening-hours FAQ when user provides address
   // Mutates `pages` in place via helper — adds missing pages, updates existing.
   enrichSubPages(pages, biz, preset.category)
+
+  // Plan 260415 — rotate navigation / contact / footer variants from the
+  // curated per-category pools so same-category businesses ship different
+  // structural shapes instead of locking to the composer's default variant.
+  rotateStructuralVariants(pages, preset.category, seed)
 
   return {
     name: preset.name,
