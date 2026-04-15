@@ -15,6 +15,8 @@ vi.mock('@/blocks/registry', () => ({
 }))
 
 import { SettingsPanel } from '@/components/editor/SettingsPanel'
+import { I18nProvider } from '@/i18n'
+import React from 'react'
 
 const mockTheme = {
     primaryColor: '#0ea5e9',
@@ -50,7 +52,7 @@ describe('SettingsPanel', () => {
 
     it('defaults to Global Site Settings when no block is selected', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} block={null} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} /></I18nProvider>)
 
         // Assert
         expect(screen.getByText('Global Site Settings')).toBeInTheDocument()
@@ -60,7 +62,7 @@ describe('SettingsPanel', () => {
 
     it('renders block name and index in header', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
 
         // Assert
         expect(screen.getByText(/Hero/)).toBeInTheDocument()
@@ -71,7 +73,7 @@ describe('SettingsPanel', () => {
 
     it('renders variant buttons for blocks with multiple variants', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
 
         // Assert
         expect(screen.getByText('default')).toBeInTheDocument()
@@ -80,7 +82,7 @@ describe('SettingsPanel', () => {
 
     it('clicking a variant calls onBlockFieldChange', () => {
         // Arrange
-        render(<SettingsPanel {...defaultProps} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
 
         // Act
         fireEvent.click(screen.getByText('centered'))
@@ -93,7 +95,7 @@ describe('SettingsPanel', () => {
 
     it('renders headline input with default value', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
 
         // Assert
         const input = screen.getByDisplayValue('Welcome to our site')
@@ -102,7 +104,7 @@ describe('SettingsPanel', () => {
 
     it('headline onBlur calls onBlockFieldChange', () => {
         // Arrange
-        render(<SettingsPanel {...defaultProps} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
         const input = screen.getByDisplayValue('Welcome to our site')
 
         // Act
@@ -116,7 +118,7 @@ describe('SettingsPanel', () => {
 
     it('renders theme section with primary color picker', () => {
         // Arrange & Act — render without block to stay on Global tab
-        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
         // Assert
         expect(screen.getByLabelText('Primary color picker')).toBeInTheDocument()
@@ -124,7 +126,7 @@ describe('SettingsPanel', () => {
 
     it('color picker change calls onThemeChange with primaryColor', () => {
         // Arrange — render without block to stay on Global tab
-        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
         const colorPicker = screen.getByLabelText('Primary color picker')
 
         // Act
@@ -136,7 +138,7 @@ describe('SettingsPanel', () => {
 
     it('renders heading font selector with current value', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
         // Assert
         expect(screen.getByText('Heading Font')).toBeInTheDocument()
@@ -147,7 +149,7 @@ describe('SettingsPanel', () => {
 
     it('changing heading font calls onThemeChange', () => {
         // Arrange
-        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
         const selects = screen.getAllByRole('combobox')
 
         // Act
@@ -159,7 +161,7 @@ describe('SettingsPanel', () => {
 
     it('renders body font selector with current value', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
         // Assert
         expect(screen.getByText('Body Font')).toBeInTheDocument()
@@ -170,7 +172,7 @@ describe('SettingsPanel', () => {
 
     it('changing body font calls onThemeChange', () => {
         // Arrange
-        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
         const selects = screen.getAllByRole('combobox')
 
         // Act
@@ -184,16 +186,43 @@ describe('SettingsPanel', () => {
 
     it('renders dark/light color mode buttons', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
         // Assert
         expect(screen.getByText('Dark')).toBeInTheDocument()
         expect(screen.getByText('Light')).toBeInTheDocument()
     })
 
+    it('infers page link type and current page value for legacy menu links without explicit type', () => {
+        render(
+            <I18nProvider defaultLocale="en">
+                <SettingsPanel
+                    {...defaultProps}
+                    block={null}
+                    blockIndex={null}
+                    headerBlock={{
+                        blockType: 'navigation',
+                        links: [{ label: 'About', url: '/about' }],
+                    }}
+                    pages={[
+                        { id: 'home', title: 'Homepage', slug: '/', status: 'published', isVisible: true, updatedAt: '' },
+                        { id: 'about', title: 'About', slug: 'about', status: 'published', isVisible: true, updatedAt: '' },
+                    ]}
+                    requestedTab={{ tab: 'menu', key: 1 }}
+                />
+            </I18nProvider>
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: '✏️' }))
+
+        const selects = screen.getAllByRole('combobox')
+        expect(selects[0]).toHaveValue('page')
+        expect(selects[1]).toHaveValue('/about')
+    })
+
     it('clicking Light mode calls onThemeChange with colorMode', () => {
         // Arrange
-        render(<SettingsPanel {...defaultProps} block={null} blockIndex={null} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} block={null} blockIndex={null} /></I18nProvider>)
 
         // Act
         fireEvent.click(screen.getByText('Light'))
@@ -206,7 +235,7 @@ describe('SettingsPanel', () => {
 
     it('duplicate button calls onDuplicateBlock', () => {
         // Arrange
-        render(<SettingsPanel {...defaultProps} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
 
         // Act
         fireEvent.click(screen.getByText(/duplicate/i))
@@ -217,7 +246,7 @@ describe('SettingsPanel', () => {
 
     it('delete button calls onDeleteBlock', () => {
         // Arrange
-        render(<SettingsPanel {...defaultProps} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} /></I18nProvider>)
 
         // Act
         fireEvent.click(screen.getByText(/delete/i))
@@ -230,7 +259,7 @@ describe('SettingsPanel', () => {
 
     it('does not render theme section when theme is undefined', () => {
         // Arrange & Act
-        render(<SettingsPanel {...defaultProps} theme={undefined} />)
+        render(<I18nProvider defaultLocale="en"><SettingsPanel {...defaultProps} theme={undefined} /></I18nProvider>)
 
         // Assert
         expect(screen.queryByLabelText('Primary color picker')).not.toBeInTheDocument()

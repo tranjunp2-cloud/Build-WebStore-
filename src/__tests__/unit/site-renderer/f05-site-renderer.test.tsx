@@ -116,6 +116,76 @@ describe('[TC-F04-SR-01] SiteRenderer renders blocks from page.layout using bloc
         expect(screen.getByTestId('block-hero')).toBeInTheDocument()
         expect(screen.getByTestId('block-footer')).toBeInTheDocument()
     })
+
+    it('prefers site.headerBlock over navigation block in page.layout', () => {
+        const capturedBlocks: Record<string, unknown>[] = []
+        const NavBlock = ({ block }: { block: Record<string, unknown> }) => {
+            capturedBlocks.push(block)
+            return React.createElement('div', { 'data-testid': 'block-navigation' })
+        }
+
+        mockGetComponent.mockImplementation((type: string) =>
+            type === 'navigation' ? NavBlock : null
+        )
+
+        render(
+            <SiteRenderer
+                site={{
+                    ...defaultSite,
+                    headerBlock: {
+                        blockType: 'navigation',
+                        links: [
+                            {
+                                label: 'Services',
+                                url: '/services',
+                                children: [{ label: 'Consulting', url: '/services/consulting' }],
+                            },
+                        ],
+                    },
+                }}
+                page={{
+                    layout: [
+                        { blockType: 'navigation', links: [{ label: 'Old Menu', url: '/old' }] },
+                    ],
+                }}
+            />
+        )
+
+        expect(capturedBlocks[0].links).toEqual([
+            {
+                label: 'Services',
+                url: '/services',
+                children: [{ label: 'Consulting', url: '/services/consulting' }],
+            },
+        ])
+    })
+
+    it('injects site.headerBlock when page.layout does not contain navigation', () => {
+        const NavBlock = makeTestBlock('navigation')
+        const HeroBlock = makeTestBlock('hero')
+        mockGetComponent.mockImplementation((type: string) => {
+            if (type === 'navigation') return NavBlock
+            if (type === 'hero') return HeroBlock
+            return null
+        })
+
+        render(
+            <SiteRenderer
+                site={{
+                    ...defaultSite,
+                    headerBlock: {
+                        blockType: 'navigation',
+                        links: [{ label: 'Services', url: '/services' }],
+                    },
+                }}
+                page={{ layout: [{ blockType: 'hero' }] }}
+            />
+        )
+
+        expect(mockGetComponent).toHaveBeenNthCalledWith(1, 'navigation')
+        expect(mockGetComponent).toHaveBeenNthCalledWith(2, 'hero')
+        expect(screen.getByTestId('block-navigation')).toBeInTheDocument()
+    })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -544,8 +614,10 @@ describe('[TC-F04-SR-07] SiteRenderer renders GoogleFontsLoader with correct fon
         expect(loaders).toHaveLength(1)
     })
 
-    it('CSS variables reference the resolved font names from theme', () => {
-        // Arrange
+    it('CSS variables reference next/font scoped vars from theme (post-F01D fix)', () => {
+        // Arrange — Merriweather is mapped in FONT_CSS_VAR_MAP.
+        // Lato is NOT in the map (not loaded in AppShell) → helper falls back
+        // to default --font-inter, with the name as system hint. Both branches tested.
         const site = { theme: { fontHeading: 'Merriweather', fontBody: 'Lato' } }
 
         // Act
@@ -553,8 +625,10 @@ describe('[TC-F04-SR-07] SiteRenderer renders GoogleFontsLoader with correct fon
 
         // Assert
         const style = container.querySelector('style')
-        expect(style?.textContent).toContain("--font-heading: 'Merriweather'")
-        expect(style?.textContent).toContain("--font-body: 'Lato'")
+        // Merriweather has var mapping → var(--font-merriweather) first in chain
+        expect(style?.textContent).toContain('--font-heading: var(--font-merriweather)')
+        // Lato unmapped → name first (no quotes, single word) + default --font-inter fallback
+        expect(style?.textContent).toContain('--font-body: Lato, var(--font-inter)')
     })
 })
 

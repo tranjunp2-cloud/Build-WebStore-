@@ -92,6 +92,44 @@ export default async function PreviewPage({ params, searchParams }: PreviewPageP
 
         if (!page) return <div>No page found for this preview.</div>
 
+        // 4b. For non-homepage pages without nav/footer, inherit from homepage
+        const pageLayout = (page.layout as Array<{ blockType: string }>) || []
+        const hasNav = pageLayout.some((b: { blockType: string }) => b.blockType === 'navigation')
+        const hasFooter = pageLayout.some((b: { blockType: string }) => b.blockType === 'footer')
+
+        if (!page.isHomepage && (!hasNav || !hasFooter)) {
+            // Check site-level headerBlock/footerBlock first
+            const siteHeaderBlock = site.headerBlock as Record<string, unknown> | null
+            const siteFooterBlock = site.footerBlock as Record<string, unknown> | null
+
+            let navBlock = siteHeaderBlock ? { ...siteHeaderBlock, blockType: siteHeaderBlock.blockType || 'navigation' } : null
+            let footerBlock = siteFooterBlock ? { ...siteFooterBlock, blockType: siteFooterBlock.blockType || 'footer' } : null
+
+            // Fallback: extract from homepage layout if site-level blocks are not set
+            if (!navBlock || !footerBlock) {
+                const homepageResult = await payload.find({
+                    collection: 'pages',
+                    where: { site: { equals: siteId }, isHomepage: { equals: true } },
+                    draft: true,
+                    limit: 1,
+                    depth: 3,
+                })
+                const homepage = homepageResult.docs[0] as any
+                if (homepage?.layout) {
+                    const homeLayout = homepage.layout as Array<{ blockType: string; [key: string]: unknown }>
+                    if (!navBlock) navBlock = homeLayout.find(b => b.blockType === 'navigation') || null
+                    if (!footerBlock) footerBlock = homeLayout.find(b => b.blockType === 'footer') || null
+                }
+            }
+
+            const injectedLayout = [
+                ...(!hasNav && navBlock ? [navBlock] : []),
+                ...pageLayout,
+                ...(!hasFooter && footerBlock ? [footerBlock] : []),
+            ]
+            page = { ...page, layout: injectedLayout }
+        }
+
         // 5. Fetch all pages for navigation filtering parity
         const navPagesResult = await payload.find({
             collection: 'pages',

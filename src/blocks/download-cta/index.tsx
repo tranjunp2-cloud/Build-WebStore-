@@ -6,6 +6,10 @@ import type { DownloadCTAConfig } from './config'
 import { CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET, CARD_PADDING } from '@/lib/design-tokens'
+
+const DC_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 
 function DownloadIcon({ color }: { color: string }) {
     return (
@@ -15,12 +19,12 @@ function DownloadIcon({ color }: { color: string }) {
     )
 }
 
-function DownloadButton({ fileUrl, label, pc }: { fileUrl: string; label: string; pc: string }) {
+function DownloadButton({ fileUrl, label }: { fileUrl: string; label: string; pc?: string }) {
     return (
         <a
             href={fileUrl}
             download
-            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-sm text-white transition-all duration-300 hover:opacity-90"
+            className={`inline-flex items-center gap-2 px-8 py-3.5 rounded-xl font-semibold text-sm text-white transition-all duration-300 hover:opacity-90 ${TOUCH_TARGET.min}`}
             style={{ background: `linear-gradient(135deg, var(--brand-primary), rgba(var(--brand-primary-rgb), 0.800))`, boxShadow: `0 8px 30px rgba(var(--brand-primary-rgb), 0.208)` }}
         >
             <DownloadIcon color="#fff" />
@@ -29,7 +33,7 @@ function DownloadButton({ fileUrl, label, pc }: { fileUrl: string; label: string
     )
 }
 
-function EmailGate({ onSubmit, pc, label }: { onSubmit: () => void; pc: string; label: string }) {
+function EmailGate({ onSubmit, label }: { onSubmit: () => void; pc?: string; label: string }) {
     const [email, setEmail] = useState('')
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
@@ -43,12 +47,12 @@ function EmailGate({ onSubmit, pc, label }: { onSubmit: () => void; pc: string; 
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 required
-                className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-sm outline-none transition-colors"
+                className="flex-1 px-4 py-3 rounded-xl bg-white/5 text-base outline-none transition-colors"
                 style={{ border: `1px solid rgba(var(--brand-primary-rgb), 0.188)` }}
             />
             <button
                 type="submit"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm text-white transition-all duration-300 hover:opacity-90 whitespace-nowrap"
+                className={`inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm text-white transition-all duration-300 hover:opacity-90 whitespace-nowrap ${TOUCH_TARGET.min}`}
                 style={{ background: 'var(--brand-primary)' }}
             >
                 <DownloadIcon color="#fff" />
@@ -58,7 +62,8 @@ function EmailGate({ onSubmit, pc, label }: { onSubmit: () => void; pc: string; 
     )
 }
 
-export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>) {
+export function DownloadCTABlock({ block, theme: _theme }: BlockProps<DownloadCTAConfig>) {
+    void _theme
     const {
         variant = 'card',
         headline,
@@ -72,23 +77,25 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
     const [unlocked, setUnlocked] = useState(!requireEmail)
 
     const fileMeta = (fileName || fileSize) && (
-        <p className="text-sm opacity-40 mt-2">
+        <Body size="small" className="opacity-40 mt-2">
             {fileName}{fileName && fileSize && ' · '}{fileSize}
-        </p>
+        </Body>
     )
 
     const action = unlocked ? (
-        <DownloadButton fileUrl={fileUrl} label={buttonLabel} pc={CSS_VARS.primary} />
+        <DownloadButton fileUrl={fileUrl} label={buttonLabel} />
     ) : (
-        <EmailGate onSubmit={() => setUnlocked(true)} pc={CSS_VARS.primary} label={buttonLabel} />
+        <EmailGate onSubmit={() => setUnlocked(true)} label={buttonLabel} />
     )
 
     if (variant === 'minimal') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6 text-center">
-                    <RichText text={headline} as="h2" className="text-2xl md:text-3xl font-bold font-heading mb-3" />
-                    {description && <p className="opacity-50 mb-6 max-w-lg mx-auto">{description}</p>}
+            <AnimatedSection className={SECTION_PADDING.default}>
+                <div className={`${DC_CONTAINER} text-center`}>
+                    <Heading level={3} className="mb-3">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {description && <Body className="opacity-50 mb-6 max-w-lg mx-auto">{description}</Body>}
                     <div className="flex flex-col items-center gap-2">
                         {action}
                         {fileMeta}
@@ -100,8 +107,8 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
 
     if (variant === 'banner') {
         return (
-            <AnimatedSection className="py-24">
-                <div className="container mx-auto px-6">
+            <AnimatedSection className={SECTION_PADDING.default}>
+                <div className={DC_CONTAINER}>
                     <div
                         className="rounded-3xl p-10 md:p-16 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden"
                         style={{
@@ -110,8 +117,10 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
                         }}
                     >
                         <div className="flex-1">
-                            <RichText text={headline} as="h2" className="text-3xl md:text-4xl font-bold font-heading mb-3" />
-                            {description && <p className="opacity-50 max-w-lg">{description}</p>}
+                            <Heading level={2} className="mb-3">
+                                <RichText text={headline} as="span" />
+                            </Heading>
+                            {description && <Body className="opacity-50 max-w-lg">{description}</Body>}
                             {fileMeta}
                         </div>
                         <div className="shrink-0">{action}</div>
@@ -123,10 +132,10 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
 
     // card (default)
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6 flex justify-center">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${DC_CONTAINER} flex justify-center`}>
                 <div
-                    className="rounded-2xl p-8 md:p-12 text-center max-w-lg w-full"
+                    className={`rounded-2xl ${CARD_PADDING.lg} md:p-12 text-center max-w-lg w-full`}
                     style={{ background: `rgba(var(--brand-primary-rgb), 0.031)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }}
                 >
                     <div
@@ -135,8 +144,10 @@ export function DownloadCTABlock({ block, theme }: BlockProps<DownloadCTAConfig>
                     >
                         <DownloadIcon color={CSS_VARS.primary} />
                     </div>
-                    <RichText text={headline} as="h2" className="text-2xl md:text-3xl font-bold font-heading mb-3" />
-                    {description && <p className="opacity-50 mb-6 max-w-sm mx-auto">{description}</p>}
+                    <Heading level={3} className="mb-3">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {description && <Body className="opacity-50 mb-6 max-w-sm mx-auto">{description}</Body>}
                     <div className="flex flex-col items-center gap-2">
                         {action}
                         {fileMeta}

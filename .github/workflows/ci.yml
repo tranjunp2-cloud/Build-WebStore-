@@ -1,14 +1,27 @@
-# CI Pipeline — Parallel: quality-check → test || build → metrics → notify
-# PR → CI (quality check + test + build parallel) → Quality comment
-# Push → CI → Vercel auto-deploys → Vercel webhook notifies Lark
+# CI Pipeline — quality + test on PRs, CI-driven Vercel deploy on push
 #
-# Architecture (4.5 min target):
-#   quality-check (1.5m): lint + typecheck + migrations
-#   test (3.5m) ─┐
-#                 ├─ parallel (needs: quality-check)
-#   build (3m)  ─┘
-#   metrics (PR only, needs: test + build): coverage + bundle comment
-#   notify-fail (if failure): Lark notification
+# PR            → quality-check + test + metrics comment
+# Push staging  → deploy-staging                    (via VERCEL_TOKEN)
+# Push main     → deploy-production                 (via VERCEL_TOKEN)
+#
+# Quality/test DO NOT run on push — merge commits on staging/main are
+# already validated by the PR's own CI run. Branch protection blocks
+# direct push, so every commit passes through CI on its PR exactly once.
+# This removes the 5+ min duplicate-CI tax from deploy time.
+#
+# Why CI-driven deploy instead of Vercel git webhook:
+#   Vercel Pro blocks commits from non-team-members with
+#   "commit author does not have contributing access". CI deploys under the
+#   token owner's identity, so any team member's push can land.
+#   See plans/260413-1126-vercel-deploy-blocked/ for full diagnosis.
+#
+# Architecture:
+#   quality-check (1.5m, PR only): lint + typecheck + migrations
+#   test (3.5m, PR only, needs: quality-check)
+#   metrics (PR only, needs: test)
+#   deploy-staging    (push staging, no needs — CI already ran on PR)
+#   deploy-production (push main,    no needs — CI already ran on PR)
+#   notify-fail (PR only, if failure)
 name: CI
 
 on:
@@ -16,7 +29,6 @@ on:
     branches: [main, staging]
     paths-ignore:
       - 'docs/**'
-      - '.github/workflows/**'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/CONTRIBUTING.md'
       - '.github/GIT_AND_CI_RULES.md'
@@ -27,7 +39,6 @@ on:
     branches: [main, staging]
     paths-ignore:
       - 'docs/**'
-      - '.github/workflows/**'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/CONTRIBUTING.md'
       - '.github/GIT_AND_CI_RULES.md'
@@ -45,6 +56,11 @@ jobs:
   # ──────────────────────────────────────
   quality-check:
     name: "Quality: Lint + Typecheck"
+    # pull_request only — merge commits on staging/main are already
+    # validated by the PR's own CI run. GitHub branch protection blocks
+    # direct push, so every code change passes through this job at
+    # least once before it can land.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -57,6 +73,25 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Guard against stray lockfiles
+        # Repo uses npm only. A stray pnpm-lock.yaml / yarn.lock makes
+        # `vercel build` auto-detect pnpm/yarn and spawn a binary the
+        # runner does not have (ENOENT), breaking deploy. Seen twice:
+        # 83f91a75, then PR #555 (commit e4d0448c) reintroduced it and
+        # broke staging deploy run 24412315694. Fail fast here before
+        # npm install so dev gets the signal in ~1 second.
+        run: |
+          STRAY=$(ls pnpm-lock.yaml yarn.lock 2>/dev/null || true)
+          if [ -n "$STRAY" ]; then
+            echo "::error::Stray lockfile detected: $STRAY"
+            echo "::error::Repo uses npm only. Delete with: git rm $STRAY && git commit"
+            echo "::error::Background: vercel build auto-detects pnpm/yarn from lockfile"
+            echo "::error::and spawns a binary not installed on the CI runner (ENOENT)."
+            echo "::error::See plans/260413-1126-vercel-deploy-blocked/ for history."
+            exit 1
+          fi
+          echo "✓ no stray lockfiles"
 
       - name: Install dependencies
         run: npm ci
@@ -78,7 +113,9 @@ jobs:
   # ──────────────────────────────────────
   test:
     name: "Test"
+    # pull_request only — see quality-check rationale above.
     needs: quality-check
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -215,8 +252,10 @@ jobs:
   # ──────────────────────────────────────
   notify-fail:
     name: "Notify: CI Failed"
+    # pull_request only — deploy jobs have their own dedicated
+    # deploy_fail notification; this job catches quality/test failures.
     needs: [quality-check, test]
-    if: failure()
+    if: failure() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -243,6 +282,294 @@ jobs:
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ──────────────────────────────────────
-  # Deployment handled by Vercel GitHub Integration (auto-deploy on push).
-  # Deploy notifications sent via Vercel webhook → /api/webhooks/vercel → Lark
+  # Job 6: Deploy to Vercel (staging branch)
   # ──────────────────────────────────────
+  deploy-staging:
+    name: "Deploy: Vercel (staging)"
+    # No `needs` — quality-check and test only run on pull_request, and
+    # this job only runs on push, so a `needs` would make the job
+    # permanently skipped. GitHub branch protection guarantees every
+    # merge commit was already CI-validated on its source PR.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: vercel-deploy-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Get commit subject
+        id: commit
+        # First line of the commit message, trimmed to 80 chars.
+        # Bot's extractPRNumber() parses `Merge pull request #N` or `(#N)`
+        # and fetches full PR details from GitHub API — richer cards.
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 80)
+          echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
+
+      - name: Cache Next.js build output
+        # Next.js incremental build reuses .next/cache between runs.
+        # First build after lockfile change is still cold (~5 min),
+        # subsequent builds drop to ~1-2 min.
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+            node_modules/.cache
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ github.job }}-
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@50
+
+      - name: Pull Vercel env (staging custom environment)
+        # --environment=staging pulls the custom env directly, which stamps
+        # .vercel/.env.staging.local with VERCEL_TARGET_ENV=staging. This
+        # metadata must match `vercel build --target=staging` and
+        # `vercel deploy --prebuilt --target=staging` below, otherwise the
+        # CLI aborts with a "prebuilt environment mismatch" error.
+        run: vercel pull --yes --environment=staging --token="$VERCEL_TOKEN"
+
+      - name: Preflight — Postgres reachable
+        run: |
+          # Ensure the DB is reachable from the runner before build runs migrations.
+          # Reads DATABASE_URI from the env file that vercel pull just wrote.
+          set -e
+          ENV_FILE=".vercel/.env.staging.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${DATABASE_URI:-}" ]; then
+            echo "::error::DATABASE_URI not present in $ENV_FILE"
+            exit 1
+          fi
+          # TCP-level probe using node builtins — no npm install required.
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
+
+      - name: Build --target=staging
+        # --target=staging must match both the pulled env metadata
+        # (VERCEL_TARGET_ENV=staging from --environment=staging) and the
+        # deploy flag below. Without it, vercel build stamps the prebuilt
+        # output with target=preview and vercel deploy --prebuilt
+        # --target=staging fails the prebuilt environment mismatch check.
+        run: vercel build --target=staging --token="$VERCEL_TOKEN"
+
+      - name: Deploy --prebuilt --target=staging
+        id: deploy
+        run: |
+          # --target=staging routes this deploy at the custom "staging"
+          # environment so Vercel auto-aliases it to web-v2.dev.ecommercehub.my.
+          # Without --target the deploy lands in generic Preview and the
+          # staging alias stays on the previous deployment.
+          set -e
+          URL=$(vercel deploy --prebuilt --target=staging --archive=tgz --token="$VERCEL_TOKEN")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Verify alias rollover
+        run: |
+          # Authoritative API check — does web-v2.dev.ecommercehub.my now
+          # point at the deployment we just created? If not, fail the job
+          # with a clear error so we don't silently serve stale staging.
+          set -e
+          DEPLOY_URL="${{ steps.deploy.outputs.url }}"
+          EXPECTED="${DEPLOY_URL#https://}"
+          for i in 1 2 3 4 5; do
+            # -s (silent) not -sf — HTTP errors still pipe body to node,
+            # which returns empty string via try/catch. `set -e` therefore
+            # never aborts the loop on a transient API blip.
+            ACTUAL=$(curl -s \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v4/aliases/web-v2.dev.ecommercehub.my?teamId=$VERCEL_ORG_ID" \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).deployment?.url||'')}catch{console.log('')}})")
+            if [ "$ACTUAL" = "$EXPECTED" ]; then
+              echo "✓ alias rolled over: web-v2.dev.ecommercehub.my -> $ACTUAL"
+              exit 0
+            fi
+            echo "attempt $i: expected=$EXPECTED actual=$ACTUAL — retrying in 5s..."
+            sleep 5
+          done
+          echo "::error::alias web-v2.dev.ecommercehub.my did not roll over to $EXPECTED (still $ACTUAL)"
+          exit 1
+
+      - name: Notify deploy success
+        if: success()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_success'
+          environment: 'staging'
+          branch: staging
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ steps.deploy.outputs.url }}
+
+      - name: Notify deploy fail
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'staging'
+          branch: staging
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  # ──────────────────────────────────────
+  # Job 7: Deploy to Vercel (main branch → production)
+  # ──────────────────────────────────────
+  deploy-production:
+    name: "Deploy: Vercel (production)"
+    # No `needs` — see deploy-staging rationale above.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: vercel-deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Get commit subject
+        id: commit
+        # First line of the commit message, trimmed to 80 chars.
+        # Bot's extractPRNumber() parses `Merge pull request #N` or `(#N)`
+        # and fetches full PR details from GitHub API — richer cards.
+        run: |
+          SUBJECT=$(git log -1 --format='%s' | head -c 80)
+          echo "subject=$SUBJECT" >> "$GITHUB_OUTPUT"
+          echo "commit subject: $SUBJECT"
+
+      - name: Cache Next.js build output
+        # Next.js incremental build reuses .next/cache between runs.
+        # First build after lockfile change is still cold (~5 min),
+        # subsequent builds drop to ~1-2 min.
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+            node_modules/.cache
+          key: next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ github.job }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ github.job }}-
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@50
+
+      - name: Pull Vercel env (production)
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Preflight — Postgres reachable
+        run: |
+          set -e
+          ENV_FILE=".vercel/.env.production.local"
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "::error::vercel pull did not produce $ENV_FILE"
+            exit 1
+          fi
+          # shellcheck disable=SC1090
+          set -a && . "$ENV_FILE" && set +a
+          if [ -z "${DATABASE_URI:-}" ]; then
+            echo "::error::DATABASE_URI not present in $ENV_FILE"
+            exit 1
+          fi
+          # TCP-level probe using node builtins — no npm install required.
+          node -e "
+            const net = require('net');
+            const u = new URL(process.env.DATABASE_URI);
+            const s = net.createConnection({ host: u.hostname, port: Number(u.port || 5432) });
+            s.setTimeout(5000);
+            s.on('connect', () => { console.log('pg tcp ok ('+u.hostname+':'+(u.port||5432)+')'); s.end(); process.exit(0); });
+            s.on('timeout', () => { console.error('pg tcp timeout'); process.exit(1); });
+            s.on('error',   (e) => { console.error('pg tcp err:', e.message); process.exit(1); });
+          "
+
+      - name: Build (prod)
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy --prebuilt --prod
+        id: deploy
+        run: |
+          set -e
+          URL=$(vercel deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Notify deploy success
+        if: success()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_success'
+          environment: 'production'
+          branch: main
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ steps.deploy.outputs.url }}
+
+      - name: Notify deploy fail
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'deploy_fail'
+          environment: 'production'
+          branch: main
+          author: ${{ github.actor }}
+          commit-sha: ${{ github.sha }}
+          commit-msg: ${{ steps.commit.outputs.subject }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

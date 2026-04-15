@@ -135,30 +135,89 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
         let normalizedSlug = slug.startsWith('/') ? slug : `/${slug}`
         if (normalizedSlug === '//') normalizedSlug = '/'
 
+        // Block reserved slugs — these are auto-managed by the system
+        const RESERVED_SLUGS = ['/404']
+        if (RESERVED_SLUGS.includes(normalizedSlug)) {
+            return new NextResponse('This slug is reserved and cannot be used', { status: 400 })
+        }
+
         // Soft guard: page count limit. Not atomic under concurrent writes, but acceptable —
         // worst case is 101 pages instead of 100 (harmless). Hard enforcement would need a DB trigger.
         const { totalDocs: pageCount } = await payload.find({
             collection: 'pages',
-            where: { site: { equals: siteId } },
+            where: { site: { equals: siteId }, deletedAt: { exists: false } },
             limit: 0,
         })
         if (pageCount >= MAX_PAGES_PER_SITE) {
             return new NextResponse(`Maximum ${MAX_PAGES_PER_SITE} pages per site reached`, { status: 400 })
         }
 
-        // Optimistic check: slug uniqueness (DB constraint is the real guard)
+        // Optimistic check: slug uniqueness among non-deleted pages (DB constraint is the real guard)
         const { docs: existing } = await payload.find({
             collection: 'pages',
             where: {
                 and: [
                     { site: { equals: siteId } },
                     { slug: { equals: normalizedSlug } },
+                    { deletedAt: { exists: false } },
                 ],
             },
             limit: 1,
         })
         if (existing.length > 0) {
             return new NextResponse('Page slug already exists in this site', { status: 409 })
+        }
+
+        // Build default layout: nav + hero + footer (inherited from homepage)
+        type LayoutBlock = Record<string, unknown> & { blockType: string }
+        const defaultLayout: LayoutBlock[] = []
+
+        // Recursively strip Payload system fields so Payload creates fresh records
+        const STRIP_KEYS = new Set(['id', '_order', '_parent_id', '_path', '_uuid', 'createdAt', 'updatedAt'])
+        function stripSystemFields(obj: unknown): unknown {
+            if (Array.isArray(obj)) return obj.map(stripSystemFields)
+            if (obj && typeof obj === 'object') {
+                const result: Record<string, unknown> = {}
+                for (const [key, val] of Object.entries(obj)) {
+                    if (STRIP_KEYS.has(key)) continue
+                    result[key] = stripSystemFields(val)
+                }
+                return result
+            }
+            return obj
+        }
+
+        try {
+            const homepageResult = await payload.find({
+                collection: 'pages',
+                where: { site: { equals: siteId }, isHomepage: { equals: true } },
+                limit: 1,
+                depth: 2,
+            })
+            const homepage = homepageResult.docs[0] as { layout?: LayoutBlock[] } | undefined
+            if (homepage?.layout) {
+                const navBlock = homepage.layout.find(b => b.blockType === 'navigation')
+                const footerBlock = homepage.layout.find(b => b.blockType === 'footer')
+                if (navBlock) {
+                    defaultLayout.push(stripSystemFields(navBlock) as LayoutBlock)
+                }
+                defaultLayout.push({
+                    blockType: 'hero',
+                    variant: 'centered',
+                    headline: title,
+                    subheadline: '',
+                } as LayoutBlock)
+                if (footerBlock) {
+                    defaultLayout.push(stripSystemFields(footerBlock) as LayoutBlock)
+                }
+            }
+        } catch {
+            defaultLayout.push({
+                blockType: 'hero',
+                variant: 'centered',
+                headline: title,
+                subheadline: '',
+            } as LayoutBlock)
         }
 
         let newPage: Record<string, unknown>
@@ -168,9 +227,9 @@ export const POST = withAuth<RouteContext>(async (user, request, ctx) => {
                 data: {
                     title,
                     slug: normalizedSlug,
-                    site: siteId,
+                    site: Number(siteId),
                     isVisible: true,
-                    layout: [],
+                    layout: defaultLayout.length > 0 ? defaultLayout : [],
                     _status: 'draft',
                 },
             })

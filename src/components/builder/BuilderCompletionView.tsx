@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowDown, ArrowUp, Check, Clock3, ExternalLink, LayoutDashboard, Loader2, Upload } from 'lucide-react'
+import { ArrowDown, ArrowUp, Clock3, ExternalLink, LayoutDashboard, Loader2, Rocket } from 'lucide-react'
 import { BuilderPreviewMode, BuilderPreviewModeToggle, BuilderPreviewSurface } from '@/components/builder/BuilderPreviewPrimitives'
 import { BuilderStepScreen } from '@/components/builder/onboarding/BuilderStepScreen'
 
@@ -294,26 +294,33 @@ export default function BuilderCompletionView({
         </div>
     )
 
+    // Design 2026-04-14: two primary actions side-by-side (Open Editor + Publish Website)
+    // with a tertiary "Go To Dashboard" text link below. Matches the approved reference
+    // at docs/design/F01 completion screen.
     const leftFooter = (
-        <div className="flex flex-col gap-3">
-            <CompletionPrimaryButton
-                icon={isNavigating ? <Loader2 className="size-4 animate-spin" /> : <LayoutDashboard className="size-4" />}
+        <div className="flex flex-col items-center gap-4">
+            <div className="flex w-full gap-3">
+                <CompletionPrimaryButton
+                    icon={<ExternalLink className="size-4" />}
+                    label="Open Editor"
+                    onClick={onOpenEditor}
+                    disabled={isPublishing || isNavigating}
+                />
+                <CompletionSecondaryButton
+                    icon={isPublishing ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
+                    label={isPublishing ? 'Publishing...' : 'Publish Website'}
+                    onClick={onPublish}
+                    disabled={isPublishing}
+                />
+            </div>
+            <button
+                className="text-sm font-medium text-[#3b82f6] underline underline-offset-4 transition-colors hover:text-[#60a5fa] disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isPublishing || isNavigating}
-                label={isNavigating ? 'Loading...' : 'Dashboard'}
                 onClick={onDashboard}
-            />
-            <CompletionPrimaryButton
-                disabled={isPublishing}
-                icon={isPublishing ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-                label={isPublishing ? 'Publishing...' : 'Publish Website'}
-                onClick={onPublish}
-            />
-            <CompletionSecondaryButton
-                disabled={isPublishing}
-                icon={<ExternalLink className="size-4" />}
-                label="Open Editor"
-                onClick={onOpenEditor}
-            />
+                type="button"
+            >
+                {isNavigating ? 'Loading...' : 'Go To Dashboard'}
+            </button>
         </div>
     )
 

@@ -1,0 +1,144 @@
+# AI Gen Test Harness — opt-in coverage check for F01V
+#
+# Triggers when a PR is labelled `run-harness`. Generates the full template
+# matrix (210 fixtures), runs structural guards, renders fixtures via
+# Playwright, builds the HTML gallery report, and uploads everything as a
+# 14-day artifact. On failure, posts a summary via prime-bot-assistant.
+#
+# Why label-only: full matrix takes ~12 min. We don't want it on every PR —
+# only when explicitly requested by author/reviewer (`run-harness` label).
+#
+# Note: render/report steps depend on Phase 03 + 04 deliverables. Until those
+# land, harness:render and harness:report will fail; the workflow swallows
+# render failures (continue-on-error) so the structural-only run still ships
+# its artifact for review.
+name: AI Harness
+
+on:
+  pull_request:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Harness mode: full | quick'
+        default: 'full'
+        required: false
+
+concurrency:
+  group: ai-harness-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness:
+    name: "Harness: matrix + structural + render"
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'run-harness'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate matrix
+        id: gen
+        run: npm run harness:gen
+
+      - name: Run structural guards
+        id: check
+        run: npm run harness:check
+        # Structural failures must surface — do NOT continue-on-error here.
+
+      - name: Start dev server (for render)
+        id: dev
+        if: success()
+        run: |
+          ENABLE_HARNESS_ROUTE=1 npm run dev > .harness-out/dev-server.log 2>&1 &
+          echo "pid=$!" >> "$GITHUB_OUTPUT"
+        env:
+          ENABLE_HARNESS_ROUTE: '1'
+
+      - name: Wait for dev server
+        if: steps.dev.outcome == 'success'
+        run: npx wait-on http://localhost:3000 --timeout 120000
+
+      - name: Render fixtures (Phase 03 — fail-soft)
+        id: render
+        if: steps.dev.outcome == 'success'
+        continue-on-error: true
+        run: ENABLE_HARNESS_ROUTE=1 npm run harness:render
+
+      - name: Generate report (Phase 04 — fail-soft)
+        id: report
+        if: always()
+        continue-on-error: true
+        run: npm run harness:report
+
+      - name: Stop dev server
+        if: always() && steps.dev.outputs.pid
+        run: kill ${{ steps.dev.outputs.pid }} || true
+
+      - name: Upload harness artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-harness-${{ github.event.pull_request.number || github.run_id }}
+          path: |
+            .harness-out/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Prepare notification info
+        if: failure()
+        id: notify_info
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref || github.ref_name }}"
+          COMMIT_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          AUTHOR="${{ github.event.pull_request.user.login || github.actor }}"
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          COMMIT_MSG=$(git log --format='%s' -n 1 2>/dev/null | head -c 80 || echo "AI harness run")
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "author=$AUTHOR" >> "$GITHUB_OUTPUT"
+          echo "commit_msg=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
+
+      - name: Notify harness failure
+        if: failure()
+        uses: ./.github/actions/smart-notify
+        with:
+          bot-url: ${{ secrets.BOT_NOTIFY_URL }}
+          bot-secret: ${{ secrets.BOT_SECRET }}
+          event: 'ci_fail'
+          branch: ${{ steps.notify_info.outputs.branch }}
+          author: ${{ steps.notify_info.outputs.author }}
+          commit-sha: ${{ steps.notify_info.outputs.short_sha }}
+          commit-msg: ${{ steps.notify_info.outputs.commit_msg }}
+          failed-step: 'AI Harness (structural or render)'
+          ci-status: "Harness: matrix gen → structural check → render → report"
+          pr-number: ${{ github.event.pull_request.number }}
+          pr-title: ${{ github.event.pull_request.title }}
+          pr-url: ${{ github.event.pull_request.html_url }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

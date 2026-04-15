@@ -2,11 +2,16 @@
 
 import type { BlockProps } from '../types'
 import type { GalleryMasonryConfig } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING } from '@/lib/design-tokens'
 
-export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryConfig>) {
+void _CSS_VARS
+
+export function GalleryMasonryBlock({ block, theme: _theme }: BlockProps<GalleryMasonryConfig>) {
+    void _theme
     const { variant = 'masonry', headline, images = [] } = block
 
     const columnsClass = variant === 'grid-4'
@@ -19,11 +24,13 @@ export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryC
     const gridCols = variant === 'grid-4' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 {headline && (
                     <div className="text-center mb-14">
-                        <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading" />
+                        <Heading level={2}>
+                            <RichText text={headline} as="span" />
+                        </Heading>
                     </div>
                 )}
 
@@ -40,7 +47,7 @@ export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryC
                                     className="absolute inset-0 flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                                     style={{ background: `linear-gradient(to top, rgba(var(--brand-primary-rgb), 0.800), transparent)` }}
                                 >
-                                    {img.caption && <p className="text-white text-sm font-medium">{img.caption}</p>}
+                                    {img.caption && <Body size="small" className="text-white font-medium">{img.caption}</Body>}
                                 </div>
                             </div>
                         ))}
@@ -58,7 +65,7 @@ export function GalleryMasonryBlock({ block, theme }: BlockProps<GalleryMasonryC
                                     className="absolute inset-0 flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                                     style={{ background: `linear-gradient(to top, rgba(var(--brand-primary-rgb), 0.800), transparent)` }}
                                 >
-                                    {img.caption && <p className="text-white text-sm font-medium">{img.caption}</p>}
+                                    {img.caption && <Body size="small" className="text-white font-medium">{img.caption}</Body>}
                                 </div>
                             </div>
                         ))}

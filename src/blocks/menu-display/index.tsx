@@ -4,9 +4,13 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { BlockProps } from '../types'
 import type { MenuDisplayConfig, MenuDisplayItem, DietaryTag } from './config'
-import { CSS_VARS } from '@/lib/theme/resolve'
+import { CSS_VARS as _CSS_VARS } from '@/lib/theme/resolve'
 import { AnimatedSection } from '../shared/animations'
 import { RichText } from '../shared/RichText'
+import { Heading, Body } from '../shared/Typography'
+import { CONTAINER, INNER_PADDING, SECTION_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
+
+void _CSS_VARS
 
 const DIETARY_ICONS: Record<DietaryTag, { label: string; icon: string }> = {
     halal: { label: 'Halal', icon: '\u2714\uFE0F' },
@@ -90,10 +94,11 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
                         {categories.map((cat, i) => (
                             <button
                                 key={i}
+                                type="button"
                                 role="tab"
                                 aria-selected={activeTab === i}
                                 onClick={() => setActiveTab(i)}
-                                className="px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200"
+                                className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 ${TOUCH_TARGET.min}`}
                                 style={activeTab === i
                                     ? { background: 'var(--brand-primary)', color: '#fff' }
                                     : { background: `rgba(var(--brand-primary-rgb), 0.063)`, border: `1px solid rgba(var(--brand-primary-rgb), 0.125)` }
@@ -256,11 +261,17 @@ export function MenuDisplayBlock({ block }: BlockProps<MenuDisplayConfig>) {
     )
 
     return (
-        <AnimatedSection className="py-24">
-            <div className="container mx-auto px-6">
+        <AnimatedSection className={SECTION_PADDING.default}>
+            <div className={`${CONTAINER.default} mx-auto ${INNER_PADDING}`}>
                 <div className="text-center max-w-2xl mx-auto mb-12">
-                    <RichText text={headline} as="h2" className="text-4xl md:text-5xl font-bold font-heading mb-5 leading-tight" />
-                    {subheadline && <RichText text={subheadline} as="p" className="text-lg opacity-50 leading-relaxed" />}
+                    <Heading level={2} className="mb-5 leading-tight">
+                        <RichText text={headline} as="span" />
+                    </Heading>
+                    {subheadline && (
+                        <Body size="lg" className="opacity-50 leading-relaxed">
+                            <RichText text={subheadline} as="span" />
+                        </Body>
+                    )}
                 </div>
 
                 {variant === 'tabs' && renderTabs()}

@@ -7,6 +7,8 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { blockRegistry } from '@/blocks/registry'
+import { selectModel } from '@/lib/ai/config'
+import { logAiUsage } from '@/lib/ai/log-usage'
 import {
     createAddSectionBlock,
     getAddSectionLabel,
@@ -29,7 +31,7 @@ type AIEditPayload = {
 }
 
 type AIEditResult = {
-    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block'
+    action: 'update_block' | 'update_theme' | 'add_block' | 'delete_block' | 'undo' | 'reorder_block' | 'none'
     changes?: Record<string, unknown>
     blockIndex?: number
     afterIndex?: number
@@ -131,7 +133,14 @@ For undoing the previous action:
 7. If the user asks to add a section, use add_block with appropriate content
 8. Supported add-section types: testimonials, faq, gallery, features, team, newsletter, banner, cta
 9. New sections should be appended to the bottom by default unless the user explicitly asks otherwise
-10. If the user asks to undo, revert, or go back to the previous state, use the "undo" action with a polite message.`
+10. If the user asks to undo, revert, or go back to the previous state, use the "undo" action with a polite message.
+
+## SCOPE RESTRICTIONS
+- You are ONLY allowed to edit this website's content, layout, theme, and blocks.
+- If the user asks anything unrelated to website editing (general knowledge, coding help, personal questions, etc.), respond with:
+  {"action": "none", "message": "I can only help with editing your website. Please ask me to change text, colors, layout, or add/remove sections."}
+- When a specific block is selected (block #${blockIndex + 1}), PREFER "update_block" targeting that block. Only use "update_theme" if the user explicitly asks to change the overall theme/colors/fonts.
+- Do NOT use "update_theme" when the user asks to change a specific section's color — use "update_block" with the block's own color/style fields instead.`
 
     const openai = getOpenAI()
     if (!openai) {
@@ -161,15 +170,41 @@ For undoing the previous action:
         }
     }
 
-    const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: instruction },
-        ],
-        temperature: 0.7,
-        max_tokens: 2000,
-        response_format: { type: 'json_object' },
+    const callStart = Date.now()
+    let completion: Awaited<ReturnType<typeof openai.chat.completions.create>>
+    try {
+        completion = await openai.chat.completions.create({
+            model: selectModel('chat-edit'),
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: instruction },
+            ],
+            // phase-04: lower temperature 0.7 → 0.3 — edit-block needs fidelity, not variety.
+            // User request "change hero headline to X" should return X verbatim, not a creative rephrasing.
+            temperature: 0.3,
+            max_tokens: 2000,
+            response_format: { type: 'json_object' },
+        })
+    } catch (err) {
+        logAiUsage({
+            endpoint: 'chat-edit',
+            model: selectModel('chat-edit'),
+            tokensIn: 0,
+            tokensOut: 0,
+            durationMs: Date.now() - callStart,
+            success: false,
+            errorCode: err instanceof Error ? err.name : 'unknown',
+        })
+        throw err
+    }
+
+    logAiUsage({
+        endpoint: 'chat-edit',
+        model: completion.model,
+        tokensIn: completion.usage?.prompt_tokens ?? 0,
+        tokensOut: completion.usage?.completion_tokens ?? 0,
+        durationMs: Date.now() - callStart,
+        success: true,
     })
 
     const content = completion.choices[0]?.message?.content
@@ -178,6 +213,11 @@ For undoing the previous action:
     }
 
     const result = JSON.parse(content) as AIEditResult
+
+    // Handle scope rejection — AI determined the request is out of scope
+    if (result.action === 'none') {
+        return result
+    }
 
     if (result.action === 'add_block') {
         const normalizedBlock = normalizeAddSectionBlock(

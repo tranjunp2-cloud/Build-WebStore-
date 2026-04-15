@@ -2,6 +2,12 @@
 
 ## Dependencies
 node_modules/
+# Repo uses npm (package-lock.json). Stray pnpm/yarn lockfiles break
+# `vercel build` — it auto-detects pnpm from the file and spawns a pnpm
+# binary that does not exist on the GH Actions runner (ENOENT). Seen
+# twice: 83f91a75, then PR #555 (commit e4d0448c) reintroduced it.
+pnpm-lock.yaml
+yarn.lock
 
 ## Next.js
 .next/
@@ -57,6 +63,13 @@ _agent/
 .worktrees/
 .gitnexus
 
+## Vercel CLI (project link + pulled env files)
+.vercel/
+
 # Playwright auth state
 e2e/.auth/
 coverage/
+
+## Test harness output (Phase F01V test coverage)
+.harness-out/
+.env*.local

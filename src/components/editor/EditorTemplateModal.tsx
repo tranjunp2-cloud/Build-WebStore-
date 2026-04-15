@@ -321,7 +321,7 @@ export function EditorTemplateModal({ isOpen, onClose, siteId, onApplied }: Edit
                                     Apply &ldquo;{confirmTemplate.name}&rdquo;?
                                 </h3>
                                 <p className="mt-1 text-sm text-gray-400">
-                                    This will replace all your pages and theme with the new template. This action cannot be undone.
+                                    This will apply the new template layout and theme. Your existing content (text, images) will be preserved where possible.
                                 </p>
                             </div>
                         </div>

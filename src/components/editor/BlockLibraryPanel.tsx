@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, Search } from 'lucide-react'
 import { blockRegistry } from '@/blocks/registry'
 import { cn } from '@/lib/utils'
 import type { AIAction, BlockData } from '@/types/editor'
+import { useI18n } from '@/i18n'
 
 type LibraryCategoryId = 'basics' | 'store' | 'content' | 'form' | 'widgets' | 'media' | 'layout' | 'commerce'
 
@@ -15,15 +16,35 @@ type CategoryConfig = {
     blockTypes: string[]
 }
 
+/** BUG-F05-021: Blocks to hide from the library panel.
+ *  - Duplicate functionality (have variant replacements)
+ *  - Out of scope per PRD
+ *  - Missing backend / tech constraints
+ *  Kept in registry for backward compatibility with existing sites. */
+const HIDDEN_BLOCKS = new Set([
+    'gallery-masonry',   // → use gallery variant=masonry
+    'pricing-table',     // → use pricing variant=table
+    'accordion',         // → use faq variant=accordion
+    'client-logos',      // → use logo-cloud
+    'custom-html',       // out of scope: no HTML/CSS injection
+    'breadcrumb',        // out of scope: should auto-generate
+    'video-background',  // out of scope: duplicates video variant
+    'before-after',      // out of scope: too niche
+    'blog-list',         // missing: no CMS backend
+    'download-cta',      // missing: no file hosting
+    'google-maps',       // missing: requires API key config
+    'countdown-timer',   // missing: client-side only, no persist
+])
+
 const categoryConfig: CategoryConfig[] = [
     { id: 'basics', label: 'Basics', icon: '📦', blockTypes: ['hero', 'cta', 'about', 'features', 'step-process', 'service-cards'] },
-    { id: 'content', label: 'Content', icon: '📄', blockTypes: ['faq', 'accordion', 'blog-list', 'testimonials', 'social-proof', 'portfolio-grid'] },
-    { id: 'media', label: 'Media', icon: '🖼️', blockTypes: ['gallery', 'gallery-masonry', 'video', 'video-background', 'carousel', 'before-after'] },
-    { id: 'store', label: 'Business', icon: '💼', blockTypes: ['pricing', 'pricing-table', 'feature-comparison', 'menu-food', 'countdown-timer'] },
+    { id: 'content', label: 'Content', icon: '📄', blockTypes: ['faq', 'testimonials', 'social-proof', 'portfolio-grid'] },
+    { id: 'media', label: 'Media', icon: '🖼️', blockTypes: ['gallery', 'video', 'carousel'] },
+    { id: 'store', label: 'Business', icon: '💼', blockTypes: ['pricing', 'feature-comparison', 'menu-food'] },
     { id: 'commerce', label: 'Commerce', icon: '🛒', blockTypes: ['products-grid', 'products-featured', 'cartWidget'] },
-    { id: 'form', label: 'Form & Contact', icon: '📝', blockTypes: ['contact', 'newsletter', 'download-cta', 'google-maps', 'whatsapp-button'] },
-    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'client-logos', 'socialWidget', 'team'] },
-    { id: 'layout', label: 'Layout', icon: '📐', blockTypes: ['custom-html', 'divider', 'breadcrumb', 'announcement-bar'] },
+    { id: 'form', label: 'Form & Contact', icon: '📝', blockTypes: ['contact', 'newsletter', 'whatsapp-button'] },
+    { id: 'widgets', label: 'Widgets', icon: '🔧', blockTypes: ['stats', 'logo-cloud', 'socialWidget', 'team'] },
+    { id: 'layout', label: 'Layout', icon: '📐', blockTypes: ['divider', 'announcement-bar'] },
 ]
 
 const itemIconOverrides: Record<string, string> = {
@@ -78,6 +99,8 @@ export function BlockLibraryPanel({
     selectedBlock,
     onAIAction,
 }: BlockLibraryPanelProps) {
+    const { t } = useI18n()
+    const bl = t.editor.blockLibrary
     const [query, setQuery] = useState('')
     const [expandedCategory, setExpandedCategory] = useState<LibraryCategoryId>('basics')
 
@@ -86,6 +109,7 @@ export function BlockLibraryPanel({
 
         return categoryConfig.map(category => {
             const items = category.blockTypes
+                .filter(bt => !HIDDEN_BLOCKS.has(bt))
                 .map(getBlockMeta)
                 .filter(item => {
                     if (!keyword) return true
@@ -125,7 +149,7 @@ export function BlockLibraryPanel({
                         type="text"
                         value={query}
                         onChange={event => setQuery(event.target.value)}
-                        placeholder="Search blocks..."
+                        placeholder={bl.searchPlaceholder}
                         className="h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] pl-9 pr-4 text-[13px] text-white placeholder:text-slate-500 outline-none transition-all focus:border-cyan-400/40 focus:bg-[#1E293B] focus:shadow-[0_0_0_1px_rgba(34,211,238,0.1)]"
                     />
                 </div>
@@ -178,7 +202,7 @@ export function BlockLibraryPanel({
                                                     <p className="truncate text-[11px] text-slate-500">{item.description}</p>
                                                 </div>
                                                 <span className="shrink-0 text-[10px] text-slate-600 opacity-0 transition-opacity group-hover:opacity-100">
-                                                    click or drag
+                                                    {bl.dragHint}
                                                 </span>
                                             </button>
                                         ))}
@@ -192,7 +216,7 @@ export function BlockLibraryPanel({
 
             <div className="border-t border-white/[0.06] bg-[#0B1120]/60 px-4 py-3">
                 <p className="text-center text-[11px] text-slate-500">
-                    Click to add or drag blocks into preview
+                    {bl.footerHint}
                 </p>
             </div>
         </div>

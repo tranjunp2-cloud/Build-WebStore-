@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { FilterDropdown } from './_components/FilterDropdown'
@@ -33,9 +33,9 @@ type BlogPost = {
     title: string
     slug: string
     status: 'draft' | 'published'
-    author: { name?: string; email: string } | string
+    author: { name?: string; email?: string; firstName?: string; lastName?: string } | string
     category: { name: string; id: string } | string | null
-    thumbnail?: any
+    thumbnail?: { url?: string; id?: string } | string | null
     createdAt: string
     updatedAt: string
 }
@@ -81,21 +81,30 @@ export default function BlogListPage() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [search, setSearch] = useState('')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<'' | 'draft' | 'published'>('')
     const [page, setPage] = useState(1)
-    const [sortBy, setSortBy] = useState('-createdAt')
+    const [sortBy, setSortBy] = useState('-updatedAt')
     const [categoryFilter, setCategoryFilter] = useState('')
     const [categories, setCategories] = useState<BlogCategory[]>([])
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
     const [bulkActionLoading, setBulkActionLoading] = useState(false)
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
+    // Debounce search input — wait 400ms after user stops typing before fetching
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    useEffect(() => {
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+        searchTimerRef.current = setTimeout(() => setDebouncedSearch(search), 400)
+        return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+    }, [search])
+
     const fetchPosts = useCallback(async () => {
         setLoading(true)
         setError(null)
         try {
             const res = await listBlogsAction({
-                search: search || undefined,
+                search: debouncedSearch || undefined,
                 status: statusFilter || undefined,
                 category: categoryFilter || undefined,
                 page: page,
@@ -104,12 +113,12 @@ export default function BlogListPage() {
 
             setPosts(res.data || [])
             setMeta(res.meta || null)
-        } catch (err: any) {
-            setError(err.message || 'Something went wrong')
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Something went wrong')
         } finally {
             setLoading(false)
         }
-    }, [search, statusFilter, categoryFilter, sortBy, page])
+    }, [debouncedSearch, statusFilter, categoryFilter, sortBy, page])
 
     useEffect(() => {
         fetchPosts()
@@ -302,7 +311,7 @@ export default function BlogListPage() {
     }
 
     return (
-        <div className="flex flex-col w-full max-w-[1594px] mx-auto p-[24px] font-['Inter'] h-[calc(100vh-120px)] overflow-hidden">
+        <div className="flex flex-col w-full max-w-[1594px] mx-auto p-[12px] md:p-[24px] font-['Inter'] h-[calc(100vh-120px)] overflow-hidden">
             {/* Header Container */}
             <div className="flex flex-col xl:flex-row xl:justify-between xl:items-center w-full gap-4 xl:gap-0">
                 <div className="flex flex-col items-stretch gap-[4px] min-w-[242.98px] h-[56px]">
@@ -350,10 +359,10 @@ export default function BlogListPage() {
                 </div>
 
                 {/* Dropdowns */}
-                <div className="flex flex-col md:flex-row items-center gap-[12px] w-full xl:w-auto shrink-0">
+                <div className="flex flex-col xl:flex-row items-center gap-[12px] w-full xl:w-auto shrink-0">
                     {/* All Status Dropdown */}
                     <FilterDropdown
-                        className="w-full md:w-[241px] h-[50px]"
+                        className="w-full xl:w-[241px] h-[50px]"
                         value={statusFilter}
                         onChange={(val) => setStatusFilter(val as '' | 'draft' | 'published')}
                         placeholder={t.dashboard.blog.filters.allStatus}
@@ -366,7 +375,7 @@ export default function BlogListPage() {
 
                     {/* All Categories Dropdown */}
                     <FilterDropdown
-                        className="w-full md:w-[241px] h-[50px]"
+                        className="w-full xl:w-[241px] h-[50px]"
                         value={categoryFilter}
                         onChange={setCategoryFilter}
                         placeholder={t.dashboard.blog.filters.allCategories}
@@ -378,13 +387,13 @@ export default function BlogListPage() {
 
                     {/* Newest (Sort) Dropdown */}
                     <FilterDropdown
-                        className="w-full md:w-[241px] h-[50px]"
+                        className="w-full xl:w-[241px] h-[50px]"
                         value={sortBy}
                         onChange={setSortBy}
                         placeholder={t.dashboard.blog.filters.sortNewest}
                         options={[
-                            { label: t.dashboard.blog.filters.sortNewest, value: '-createdAt' },
-                            { label: t.dashboard.blog.filters.sortOldest, value: 'createdAt' },
+                            { label: t.dashboard.blog.filters.sortNewest, value: '-updatedAt' },
+                            { label: t.dashboard.blog.filters.sortOldest, value: 'updatedAt' },
                             { label: t.dashboard.blog.filters.sortNameAsc, value: 'title' },
                             { label: t.dashboard.blog.filters.sortNameDesc, value: '-title' }
                         ]}
@@ -413,9 +422,133 @@ export default function BlogListPage() {
                 </div>
             )}
 
-            <div className="flex flex-col w-full bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px] mt-[32px] overflow-hidden flex-1 min-h-0 shrink-0">
+            {/* Mobile Card Layout (visible only below xl) */}
+            <div className="flex flex-col w-full flex-1 overflow-y-auto xl:hidden gap-4 mt-[24px] min-h-0">
+                {posts.length === 0 ? (
+                    <div className="flex flex-col w-full items-center justify-center gap-[16px] py-[64px]">
+                        <FileText className="w-[64px] h-[64px] text-[rgba(248,250,252,0.2)]" strokeWidth={2} />
+                        <span className="font-['Inter'] text-[16px] font-[400] leading-[1.5em] text-[rgba(248,250,252,0.6)]">
+                            {t.dashboard.blog.noMatches}
+                        </span>
+                        {(search || statusFilter || categoryFilter) && (
+                            <button
+                                onClick={() => { setSearch(''); setStatusFilter(''); setCategoryFilter(''); }}
+                                className="flex items-center gap-[6px] px-[16px] py-[8px] rounded-[10px] border border-[rgba(248,250,252,0.15)] text-[rgba(248,250,252,0.6)] hover:text-white hover:border-[rgba(248,250,252,0.3)] transition-colors font-['Inter'] text-[14px] font-[500]"
+                            >
+                                <X className="w-[14px] h-[14px]" />
+                                <span>{t.dashboard.blog.resetFilters || 'Reset Filters'}</span>
+                            </button>
+                        )}
+                    </div>
+                ) : posts.map((post) => (
+                    <div
+                        key={`mobile-${post.id}`}
+                        className="flex flex-col bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px] p-4 gap-4"
+                    >
+                        {/* Top Content Row */}
+                        <div className="flex flex-row gap-4">
+                            {/* Image */}
+                            <div className="shrink-0 w-[96px] h-[80px] bg-[#0B1120] rounded-[12px] border border-[rgba(255,255,255,0.08)] overflow-hidden">
+                                {post.thumbnail ? (
+                                    <img
+                                        src={getThumbUrl(typeof post.thumbnail === 'object' ? post.thumbnail.url : '')}
+                                        alt="Thumbnail"
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <span className="text-[#9CA3AF] text-xs">{t.dashboard.blog.noImage}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Content details */}
+                            <div className="flex flex-col flex-1 min-w-0 gap-[10px]">
+                                {/* Title & Checkbox */}
+                                <div className="flex flex-row justify-between items-start gap-2">
+                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[20px] text-[#F8FAFC] line-clamp-2 flex-1 min-w-0">
+                                        {post.title}
+                                    </span>
+                                    <div className="shrink-0 pt-0.5">
+                                        <BlogCheckbox
+                                            checked={selectedIds.has(post.id)}
+                                            onClick={() => toggleSelect(post.id)}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Badges */}
+                                <div className="flex flex-row items-center gap-2 flex-wrap">
+                                    <div className="flex items-center bg-[rgba(59,130,246,0.1)] rounded-[12px] border border-[rgba(59,130,246,0.3)] px-[9px] py-[3px]">
+                                        <span className="font-['Inter'] font-[500] text-[12px] leading-[16px] text-[#3B82F6] truncate max-w-[80px]">
+                                            {getCategoryName(post.category)}
+                                        </span>
+                                    </div>
+                                    {post.status === 'published' ? (
+                                        <div className="flex items-center bg-[rgba(0,201,80,0.1)] rounded-[12px] border border-[rgba(0,201,80,0.3)] px-[9px] py-[3px]">
+                                            <span className="font-['Inter'] font-[500] text-[12px] leading-[16px] text-[#05DF72]">{t.dashboard.blog.filters.published}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center bg-[rgba(245,158,11,0.1)] rounded-[12px] border border-[rgba(245,158,11,0.3)] px-[9px] py-[3px]">
+                                            <span className="font-['Inter'] font-[500] text-[12px] leading-[16px] text-[#F59E0B]">{t.dashboard.blog.filters.draft}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Author & Date */}
+                                <div className="flex flex-row justify-between items-center">
+                                    <span className="font-['Inter'] font-[400] text-[12px] leading-[16px] text-[rgba(248,250,252,0.6)] truncate max-w-[100px]">
+                                        {typeof post.author === 'object' && post.author ? (post.author.firstName ? `${post.author.firstName} ${post.author.lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
+                                    </span>
+                                    <span className="font-['Inter'] font-[400] text-[12px] leading-[16px] text-[rgba(248,250,252,0.6)]">
+                                        {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(post.updatedAt))}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons Row */}
+                        <div className="flex flex-row items-center gap-2 border-t border-[rgba(255,255,255,0.05)] pt-3">
+                            <button
+                                onClick={() => router.push(`/blog/${post.id}`)}
+                                className="flex items-center justify-center gap-1.5 bg-[rgba(0,201,80,0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
+                            >
+                                <Eye className="w-4 h-4 text-[#05DF72]" />
+                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#05DF72]">{t.dashboard.blog.actions.view}</span>
+                            </button>
+                            <button
+                                onClick={() => router.push(`/blog/${post.id}`)}
+                                className="flex items-center justify-center gap-1.5 bg-[rgba(59,130,246,0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
+                            >
+                                <SquarePen className="w-4 h-4 text-[#3B82F6]" />
+                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#3B82F6]">{t.dashboard.blog.actions.edit}</span>
+                            </button>
+                            <button
+                                onClick={() => openDeleteConfirm(post)}
+                                className="flex items-center justify-center gap-1.5 bg-[rgba(251,44,54,0.1)] rounded-[12px] h-[36px] flex-1 hover:opacity-80 transition-opacity"
+                            >
+                                <Trash2 className="w-4 h-4 text-[#FF6467]" />
+                                <span className="font-['Inter'] font-[500] text-[14px] leading-[20px] text-[#FF6467]">{t.dashboard.blog.actions.delete}</span>
+                            </button>
+                        </div>
+                    </div>
+                ))}
+
+                {meta && meta.totalPages > 1 && (
+                    <div className="flex items-center justify-center py-4 shrink-0">
+                        <BlogPagination
+                            currentPage={meta.page}
+                            totalPages={meta.totalPages}
+                            onPageChange={setPage}
+                        />
+                    </div>
+                )}
+            </div>
+
+            {/* Desktop Table Layout (visible only at xl+) */}
+            <div className="hidden xl:flex flex-col w-full bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px] mt-[32px] overflow-hidden flex-1 min-h-0 shrink-0">
                 <div className="flex flex-col flex-1 w-full bg-transparent overflow-x-auto overflow-y-hidden min-h-0 custom-scrollbar">
-                    <div className="max-xl:hidden flex flex-col flex-1 min-w-[1200px] w-full min-h-0">
+                    <div className="flex flex-col flex-1 min-w-[1200px] w-full min-h-0">
                         {/* Header */}
                         <div className="flex justify-between items-center w-full h-[56px] shrink-0 bg-[rgba(11,17,32,0.5)] border-b border-[rgba(255,255,255,0.05)]">
                             <div className="flex justify-center items-center w-[66.55px] h-full shrink-0">
@@ -511,7 +644,7 @@ export default function BlogListPage() {
 
                                     <div className="w-[157.33px] h-[80.5px] pl-[24px] flex items-center shrink-0">
                                         <span className="truncate font-['Inter'] text-[14px] font-[400] leading-[1.4285714285714286em] text-[rgba(248,250,252,0.7)]">
-                                            {typeof post.author === 'object' && post.author ? ((post.author as any).firstName ? `${(post.author as any).firstName} ${(post.author as any).lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
+                                            {typeof post.author === 'object' && post.author ? (post.author.firstName ? `${post.author.firstName} ${post.author.lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
                                         </span>
                                     </div>
 
@@ -532,139 +665,6 @@ export default function BlogListPage() {
                                 </div>
                             ))}
                         </div>
-                    </div>
-
-                    {/* Mobile Card Layout (visible only up to xl, max-xl) */}
-                    <div className="flex flex-col w-full flex-1 overflow-y-auto px-[23.99px] xl:hidden gap-[15.985733032226562px]">
-                        {posts.length === 0 ? (
-                            <div className="flex flex-col w-full items-center justify-center gap-[16px] py-[64px]">
-                                <FileText className="w-[64px] h-[64px] text-[rgba(248,250,252,0.2)]" strokeWidth={2} />
-                                <span className="font-['Inter'] text-[16px] font-[400] leading-[1.5em] text-[rgba(248,250,252,0.6)]">
-                                    {t.dashboard.blog.noMatches}
-                                </span>
-                            </div>
-                        ) : posts.map((post) => (
-                            <div
-                                key={`mobile-${post.id}`}
-                                className="flex flex-col bg-[rgba(30,41,59,0.6)] border border-[rgba(255,255,255,0.08)] rounded-[16px]"
-                                style={{
-                                    padding: '17.033966064453125px 17.033973693847656px 1.0482499599456787px 17.03398895263672px',
-                                    borderWidth: '1.0482499599456787px'
-                                }}
-                            >
-                                <div className="flex flex-col w-full" style={{ gap: '15.985748291015625px' }}>
-                                    {/* Top Content Row */}
-                                    <div className="flex flex-row" style={{ gap: '16px' }}>
-                                        {/* Image */}
-                                        <div
-                                            className="shrink-0 bg-[#0B1120] rounded-[12px] flex items-center justify-center overflow-hidden"
-                                            style={{ width: '96px', height: '79.99px' }}
-                                        >
-                                            {post.thumbnail ? (
-                                                <img
-                                                    src={getThumbUrl(typeof post.thumbnail === 'object' ? post.thumbnail.url : '')}
-                                                    alt="Thumbnail"
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <span className="text-[#9CA3AF] text-xs">{t.dashboard.blog.noImage}</span>
-                                            )}
-                                        </div>
-
-                                        {/* Content details */}
-                                        <div className="flex flex-col" style={{ gap: '10px', width: '187.52px' }}>
-                                            {/* Title & Checkbox */}
-                                            <div className="flex flex-row justify-between w-full" style={{ gap: '7.99px' }}>
-                                                <div style={{ width: '162px', height: '40px' }} className="overflow-hidden">
-                                                    <span className="font-['Inter'] font-[600] text-[14px] leading-[1.4285714285714286em] text-[#F8FAFC] line-clamp-2">
-                                                        {post.title}
-                                                    </span>
-                                                </div>
-                                                <div style={{ width: '15.99px', height: '15.99px' }} className="shrink-0 pt-1">
-                                                    <BlogCheckbox
-                                                        checked={selectedIds.has(post.id)}
-                                                        onClick={() => toggleSelect(post.id)}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            {/* Badges */}
-                                            <div className="flex flex-row items-center w-full gap-[8px]">
-                                                {/* Category Badge */}
-                                                <div
-                                                    className="flex flex-row items-center justify-center bg-[rgba(59,130,246,0.1)] rounded-[12px] border border-[rgba(59,130,246,0.3)]"
-                                                    style={{ padding: '2px 8px', borderWidth: '1.0482499599456787px' }}
-                                                >
-                                                    <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[#3B82F6] truncate max-w-[80px]">
-                                                        {getCategoryName(post.category)}
-                                                    </span>
-                                                </div>
-
-                                                {/* Status Badge */}
-                                                {post.status === 'published' ? (
-                                                    <div
-                                                        className="flex flex-row items-center justify-center bg-[rgba(0,201,80,0.1)] rounded-[12px] border border-[rgba(0,201,80,0.3)]"
-                                                        style={{ padding: '2px 8px', borderWidth: '1.0482499599456787px' }}
-                                                    >
-                                                        <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[#05DF72]">{t.dashboard.blog.filters.published}</span>
-                                                    </div>
-                                                ) : (
-                                                    <div
-                                                        className="flex flex-row items-center justify-center bg-[rgba(245,158,11,0.1)] rounded-[12px] border border-[rgba(245,158,11,0.3)]"
-                                                        style={{ padding: '2px 8px', borderWidth: '1.0482499599456787px' }}
-                                                    >
-                                                        <span className="font-['Inter'] font-[500] text-[12px] leading-[1.3333333333333333em] text-[#F59E0B]">{t.dashboard.blog.filters.draft}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Author & Date */}
-                                            <div className="flex flex-row justify-between items-center w-full">
-                                                <span className="font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] text-[rgba(248,250,252,0.6)] truncate max-w-[80px]">
-                                                    {typeof post.author === 'object' && post.author ? ((post.author as any).firstName ? `${(post.author as any).firstName} ${(post.author as any).lastName || ''}`.trim() : post.author.email?.split('@')[0]) : t.dashboard.blog.unknownAuthor}
-                                                </span>
-                                                <span className="font-['Inter'] font-[400] text-[12px] leading-[1.3333333333333333em] text-[rgba(248,250,252,0.6)]">
-                                                    {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(post.updatedAt))}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Action Buttons Row */}
-                                    <div
-                                        className="flex flex-row items-center w-full border-t border-[rgba(255,255,255,0.05)] justify-between"
-                                        style={{
-                                            borderTopWidth: '1.0482499599456787px',
-                                            paddingTop: '8px',
-                                            paddingBottom: '8px',
-                                            gap: '7.99px'
-                                        }}
-                                    >
-                                        <button
-                                            onClick={() => router.push(`/blog/${post.id}`)}
-                                            className="flex flex-row justify-center items-center bg-[rgba(0,201,80,0.1)] rounded-[12px] hover:opacity-80 transition-opacity"
-                                            style={{ width: '95px', height: '36px' }}
-                                        >
-                                            <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#05DF72]">{t.dashboard.blog.actions.view}</span>
-                                        </button>
-                                        <button
-                                            onClick={() => router.push(`/blog/${post.id}`)}
-                                            className="flex flex-row justify-center items-center bg-[rgba(59,130,246,0.1)] rounded-[12px] hover:opacity-80 transition-opacity"
-                                            style={{ width: '86px', height: '36px' }}
-                                        >
-                                            <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#3B82F6]">Edit</span>
-                                        </button>
-                                        <button
-                                            onClick={() => openDeleteConfirm(post)}
-                                            className="flex flex-row justify-center items-center bg-[rgba(251,44,54,0.1)] rounded-[12px] hover:opacity-80 transition-opacity"
-                                            style={{ width: '107px', height: '36px' }}
-                                        >
-                                            <span className="font-['Inter'] font-[500] text-[14px] leading-[1.4285714285714286em] text-[#FF6467]">Delete</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
                     </div>
                 </div>
 
@@ -780,7 +780,7 @@ export default function BlogListPage() {
                                     className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {bulkActionLoading ? (
-                                        <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</>
+                                        <><Loader2 className="w-4 h-4 animate-spin" /> {t.dashboard.blog.actions.deleting || 'Deleting...'}</>
                                     ) : (
                                         <><Trash2 className="w-4 h-4" /> {t.dashboard.blog.actions.delete}</>
                                     )}

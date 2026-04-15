@@ -49,11 +49,10 @@ export function HelpCenterNav() {
       </div>
 
       {/* ───────── Mobile Dropdown ───────── */}
-      {/* Figma: width 343px, height 43px, bg #161E2E, border 1px #1F2937, radius 8px */}
-      <div className="md:hidden relative">
+      <div className={`md:hidden relative rounded-lg ${open ? 'border border-[#9CA3AF]' : ''}`}>
         <button
           onClick={() => setOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-2.5 bg-[#161E2E] border border-[#1F2937] rounded-lg text-sm font-semibold text-white"
+          className={`w-full flex items-center justify-between px-4 py-2.5 bg-[#161E2E] rounded-lg text-sm font-semibold text-white focus:outline-none ${open ? 'rounded-b-none' : 'border border-[#374151]'}`}
           aria-haspopup="listbox"
           aria-expanded={open}
         >
@@ -64,7 +63,7 @@ export function HelpCenterNav() {
         </button>
 
         {open && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-[#161E2E] border border-[#1F2937] rounded-lg shadow-lg z-50 overflow-hidden">
+          <div className="bg-[#161E2E] border-t border-t-[#374151] rounded-b-lg overflow-hidden">
             {TABS.map((tab) => {
               const isActive =
                 tab.href === '/help'

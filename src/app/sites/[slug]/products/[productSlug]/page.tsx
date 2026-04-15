@@ -1,10 +1,12 @@
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { AddToCartButton } from '@/components/storefront/AddToCartButton'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
+import { TrackingManager } from '@/components/site-renderer/TrackingManager'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -65,13 +67,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const description = (product as any).seo?.description || (product as any).shortDescription || `Buy ${product.name} from ${site.name}`
     const ogImage = (product as any).images?.[0]?.image?.url
 
+    // BUG-F05-020: Resolve canonical URL for product pages
+    const reqHeaders = await headers()
+    const tenantHostname = reqHeaders.get('x-tenant-hostname')
+    const tenantSlug = reqHeaders.get('x-tenant-slug')
+    const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
+
+    let baseUrl: string
+    if (tenantHostname) {
+        baseUrl = `https://${tenantHostname}`
+    } else if (tenantSlug) {
+        baseUrl = `https://${tenantSlug}.${PLATFORM_DOMAIN}`
+    } else if (slug !== 'custom') {
+        baseUrl = `https://${slug}.${PLATFORM_DOMAIN}`
+    } else {
+        baseUrl = ''
+    }
+    const canonical = baseUrl ? `${baseUrl}/products/${productSlug}` : undefined
+
     return {
         title,
         description,
+        alternates: canonical ? { canonical } : undefined,
         openGraph: {
             title,
             description,
             type: 'website',
+            ...(canonical ? { url: canonical } : {}),
             ...(ogImage && { images: [{ url: ogImage }] }),
         },
     }
@@ -124,6 +146,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
     return (
         <>
+            <TrackingManager siteId={String(site.id)} />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
             <div style={{ fontFamily: `${(site.theme as any)?.fontBody || 'Inter'}, sans-serif` }}>
@@ -255,6 +278,7 @@ export default async function ProductDetailPage({ params }: Props) {
                             }}
                             primaryColor={primaryColor}
                             siteSlug={slug}
+                            siteId={String(site.id)}
                         />
 
                         {/* Extended Attributes Grid (US-F08-06) */}
@@ -299,7 +323,7 @@ export default async function ProductDetailPage({ params }: Props) {
             </div>
 
             {/* Cart Drawer */}
-            <CartDrawer siteSlug={slug} />
+            <CartDrawer siteSlug={slug} siteId={String(site.id)} />
         </>
     )
 }

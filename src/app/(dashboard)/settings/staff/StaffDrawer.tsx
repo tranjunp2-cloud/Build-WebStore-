@@ -20,12 +20,14 @@ export function StaffDrawer({
     onClose,
     editData = null,
     currentUserId,
+    currentUserEmail,
     tenantId
 }: {
     isOpen: boolean;
     onClose: () => void;
     editData?: StaffMember | null;
     currentUserId?: string;
+    currentUserEmail?: string;
     tenantId?: string;
 }) {
     const { t } = useI18n();
@@ -34,6 +36,7 @@ export function StaffDrawer({
     const isRoleDisabled = editData?.role === 'owner' || isSelf;
 
     const [email, setEmail] = useState('');
+    const [emailError, setEmailError] = useState('');
     const [role, setRole] = useState<'admin' | 'custom'>('admin');
     const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
     const [isPending, startTransition] = useTransition();
@@ -46,6 +49,7 @@ export function StaffDrawer({
                 setSelectedFeatures(editData.permissions || []);
             } else {
                 setEmail('');
+                setEmailError('');
                 setRole('admin');
                 setSelectedFeatures([]);
             }
@@ -63,40 +67,63 @@ export function StaffDrawer({
     };
 
     const handleSave = () => {
-        if (!isEditMode && (!email.trim() || !email.includes('@'))) {
-            toast.error('Please enter a valid email address');
-            return;
+        if (!isEditMode) {
+            // BUG-F19.15 + F19.08: Inline email validation
+            if (!email.trim()) {
+                setEmailError(t?.Staff?.drawer?.errorEmailRequired || 'Please enter an email address');
+                return;
+            }
+            if (!email.includes('@')) {
+                setEmailError(t?.Staff?.drawer?.errorEmailInvalid || 'Invalid email address');
+                return;
+            }
+            if (email.length > 254) {
+                setEmailError(t?.Staff?.drawer?.errorEmailTooLong || 'Email must not exceed 254 characters');
+                return;
+            }
+            // BUG-F19.10: Block self-invite
+            if (currentUserEmail && email.toLowerCase() === currentUserEmail.toLowerCase()) {
+                setEmailError(t?.Staff?.drawer?.errorSelfInvite || 'You cannot invite yourself');
+                return;
+            }
         }
 
         if (role === 'custom' && selectedFeatures.length === 0) {
-            toast.error('Please select at least one custom permission');
+            toast.error(t?.Staff?.toast?.permissionRequired || 'Please select at least one custom permission');
             return;
         }
 
         startTransition(async () => {
-            if (isEditMode) {
-                if (!editData) return;
-                const displayName = [editData.firstName, editData.lastName].filter(Boolean).join(' ') || '';
-                const res = await updateStaff(editData.id, displayName, role, role === 'custom' ? selectedFeatures : undefined);
-                if (res.success) {
-                    toast.success('Staff updated successfully!');
-                    onClose();
+            try {
+                if (isEditMode) {
+                    if (!editData) return;
+                    const displayName = [editData.firstName, editData.lastName].filter(Boolean).join(' ') || '';
+                    const res = await updateStaff(editData.id, displayName, role, role === 'custom' ? selectedFeatures : undefined);
+                    if (res.success) {
+                        toast.success(t?.Staff?.toast?.staffUpdated || 'Staff updated successfully!');
+                        onClose();
+                    } else {
+                        toast.error(res.error || t?.Staff?.toast?.staffUpdateFailed || 'Failed to update staff');
+                    }
                 } else {
-                    toast.error(res.error || 'Failed to update staff');
+                    const res = await inviteStaffAction({
+                        email: email,
+                        name: email.split('@')[0],
+                        role: role,
+                        permissions: role === 'custom' ? selectedFeatures : undefined
+                    });
+                    if (res.success) {
+                        toast.success(t?.Staff?.toast?.inviteSent || 'Invitation sent successfully!');
+                        onClose();
+                    } else {
+                        // BUG-F19.09 + F19.16: Show error toast for duplicate/invalid email
+                        toast.error(res.error || t?.Staff?.toast?.inviteFailed || 'Failed to send invitation');
+                    }
                 }
-            } else {
-                const res = await inviteStaffAction({
-                    email: email,
-                    name: email.split('@')[0], 
-                    role: role,
-                    permissions: role === 'custom' ? selectedFeatures : undefined
-                });
-                if (res.success) {
-                    toast.success('Invitation sent successfully!');
-                    onClose();
-                } else {
-                    toast.error(res.error || 'Failed to send invitation');
-                }
+            } catch (err: unknown) {
+                // BUG-F19.16: Catch any uncaught errors — never expose internal error to client
+                console.error('[StaffDrawer] invite failed');
+                toast.error(t?.Staff?.drawer?.errorGeneric || 'Something went wrong. Please try again.');
             }
         });
     };
@@ -130,13 +157,19 @@ export function StaffDrawer({
                         <input
                             type="email"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
+                            onChange={(e) => { setEmail(e.target.value); setEmailError(''); }}
                             disabled={isEditMode}
+                            maxLength={254}
                             placeholder="staff@domain.com"
-                            className="w-full h-[48px] px-[16px] rounded-[12px] bg-slate-900/50 text-[16px] text-slate-50 placeholder:text-slate-50/40 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-['Inter'] disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+                            className={`w-full h-[48px] px-[16px] rounded-[12px] bg-slate-900/50 text-[16px] text-slate-50 placeholder:text-slate-50/40 focus:outline-none focus:ring-1 transition-all font-['Inter'] disabled:opacity-50 disabled:cursor-not-allowed ${emailError ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'focus:border-blue-500/50 focus:ring-blue-500/50'}`}
+                            style={{ border: emailError ? '1px solid rgb(239, 68, 68)' : '1px solid rgba(255,255,255,0.08)' }}
                         />
-                        {!isEditMode && (
+                        {emailError && (
+                            <p className="text-[12px] font-normal text-red-400 font-['Inter'] mt-[4px]">
+                                {emailError}
+                            </p>
+                        )}
+                        {!isEditMode && !emailError && (
                             <p className="text-[12px] font-normal text-slate-50/50 font-['Inter'] mt-[4px]">
                                 {t?.Staff?.drawer?.emailNeeded || 'Send an invitation to join your store.'}
                             </p>
@@ -200,7 +233,7 @@ export function StaffDrawer({
                                             const isChecked = selectedFeatures.includes(feature.id);
                                             const isFeatureDisabled = editData?.role === 'owner';
                                             return (
-                                                <div 
+                                                <div
                                                     key={feature.id}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -238,7 +271,7 @@ export function StaffDrawer({
                     </button>
                     <button
                         type="button"
-                        disabled={isPending || editData?.role === 'owner'}
+                        disabled={isPending || editData?.role === 'owner' || (role === 'custom' && selectedFeatures.length === 0)}
                         onClick={handleSave}
                         style={{ background: 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)', boxShadow: '0px 4px 6px -4px rgba(59, 130, 246, 0.3), 0px 10px 15px -3px rgba(59, 130, 246, 0.3)' }}
                         className="flex items-center justify-center px-[32px] h-[46px] rounded-[12px] text-white text-[16px] font-semibold hover:opacity-90 transition-opacity font-['Inter'] disabled:opacity-50 disabled:cursor-not-allowed"

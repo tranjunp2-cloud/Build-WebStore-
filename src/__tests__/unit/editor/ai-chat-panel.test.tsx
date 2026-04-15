@@ -1,8 +1,35 @@
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { AIChatPanel } from '@/components/editor/AIChatPanel'
 
 // ── Mocks ────────────────────────────────────────────────────────────────
+vi.mock('@/i18n', () => ({
+    useI18n: () => ({
+        t: {
+            editor: {
+                aiChat: {
+                    welcomeMessage: 'Hello! What would you like to edit?',
+                    drafting: 'AI is drafting...',
+                    thinking: 'AI is thinking...',
+                    appliedChanges: 'Applied changes to website.',
+                    editFailed: 'AI editing failed',
+                    failedToEdit: 'Failed to edit website',
+                    outOfScope: 'I can only help with editing your website.',
+                    undo: 'Undo',
+                    changeColorPrompt: 'Change color',
+                    addSectionPrompt: '+ Add section',
+                    inputPlaceholder: 'Tell AI what to change...',
+                    send: 'send',
+                    newLine: 'new line',
+                },
+            },
+        },
+        locale: 'en',
+    }),
+    I18nProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
 vi.mock('@/components/editor/AddSectionPromptChips', () => ({
     AddSectionPromptChips: ({ onPromptSelect }: any) => (
         <button data-testid="prompt-chip" onClick={() => onPromptSelect('Test Prompt')}>

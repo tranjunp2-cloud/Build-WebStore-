@@ -50,6 +50,11 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({
     notFound: vi.fn()
 }))
+vi.mock('next/headers', () => ({
+    headers: vi.fn().mockResolvedValue(new Map([
+        ['x-tenant-slug', 'demo'],
+    ])),
+}))
 
 describe('Storefront Product Detail Page (US-F08-06)', () => {
     it('renders attributes grid when attributes are present (AC-2)', async () => {

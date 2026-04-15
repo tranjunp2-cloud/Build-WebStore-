@@ -1,4 +1,9 @@
 export const dynamic = 'force-dynamic'
+// Override vercel.json's 60s default — template application merges blocks,
+// may re-run AI content generation, and persists 1 site + N pages + M blocks
+// through Payload, which comfortably exceeds 60s in practice. Same root cause
+// as generate-site 504s. Keeping parity to avoid another latency surprise.
+export const maxDuration = 300
 import { NextResponse } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
@@ -7,6 +12,7 @@ import { parseRequest } from '@/lib/validations/helpers'
 import { withAuth } from '@/lib/auth'
 import { checkRateLimit } from '@/lib/rateLimit'
 import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
+import { mergeUserContent } from '@/lib/ai/merge-user-content'
 
 /**
  * POST /api/ai/apply-template
@@ -14,6 +20,10 @@ import { slugify, ensureUniqueSlug } from '@/lib/utils/slugify'
  * Body: { templateId: string }
  */
 export const POST = withAuth(async (user, req) => {
+    let _siteId: string | number | null = null
+    let _payload: Awaited<ReturnType<typeof getPayload>> | null = null
+    let _createdPagesCount = 0
+
     try {
         // Rate Limit: 20 template applications per hour
         const rateLimit = await checkRateLimit(String(user.id), 20)
@@ -25,6 +35,7 @@ export const POST = withAuth(async (user, req) => {
         }
 
         const payload = await getPayload({ config })
+        _payload = payload
 
         const { data, errorResponse } = await parseRequest(req, applyTemplateSchema)
         if (errorResponse) return errorResponse
@@ -234,13 +245,19 @@ export const POST = withAuth(async (user, req) => {
         }
 
         const rawTheme = (template.defaultTheme as Record<string, unknown>) || {}
-        // Pick only valid theme fields — Payload groups may have extra metadata
+        // Pick only valid theme fields — Payload select fields reject unknown values
+        const VALID_HEADING_FONTS = ['Outfit', 'Inter', 'Playfair Display', 'DM Sans', 'Poppins', 'Raleway']
+        const VALID_BODY_FONTS = ['Inter', 'DM Sans', 'Lato', 'Open Sans', 'Nunito']
+        const VALID_COLOR_MODES = ['light', 'dark']
+        const rawHeading = String(rawTheme.fontHeading || '')
+        const rawBody = String(rawTheme.fontBody || '')
+        const rawColorMode = String(rawTheme.colorMode || '')
         const templateTheme = {
             primaryColor: String(rawTheme.primaryColor || '#0ea5e9'),
             secondaryColor: String(rawTheme.secondaryColor || '#d946ef'),
-            fontHeading: String(rawTheme.fontHeading || 'Outfit'),
-            fontBody: String(rawTheme.fontBody || 'Inter'),
-            colorMode: String(rawTheme.colorMode || 'dark'),
+            fontHeading: VALID_HEADING_FONTS.includes(rawHeading) ? rawHeading : 'Outfit',
+            fontBody: VALID_BODY_FONTS.includes(rawBody) ? rawBody : 'Inter',
+            colorMode: VALID_COLOR_MODES.includes(rawColorMode) ? rawColorMode : 'dark',
         }
 
         // === APPLY TO EXISTING SITE (multi-page + transaction) ===
@@ -271,26 +288,56 @@ export const POST = withAuth(async (user, req) => {
             const pagesToCreate = rawPages.map(p => ({ ...p, layout: sanitizeBlocks((p.layout as Record<string, unknown>[]) || []) }))
             injectNavLinks(pagesToCreate)
 
-            // Delete old pages → update theme → create new pages (sequential)
-            // 1. Delete all existing pages for this site
+            _siteId = Number(siteId)
+
+            // Mark as generating before destructive operations
+            await payload.update({
+                collection: 'sites',
+                id: Number(siteId),
+                data: { generationStatus: 'generating' },
+            })
+
+            // 1. Collect existing pages + their blocks (to preserve user content)
             const existingPages = await payload.find({
                 collection: 'pages',
                 where: { site: { equals: Number(siteId) } },
                 limit: 100,
             })
+
+            // Build lookup: homepage blocks + slug-matched blocks for content merging
+            const existingPageMap: Record<string, Record<string, unknown>[]> = {}
+            let homepageBlocks: Record<string, unknown>[] = []
+            for (const page of existingPages.docs) {
+                const pageData = page as Record<string, unknown>
+                const blocks = (pageData.layout as Record<string, unknown>[]) || []
+                const slug = pageData.slug as string
+                if (pageData.isHomepage) homepageBlocks = blocks
+                if (slug) existingPageMap[slug] = blocks
+            }
+
+            // 2. Delete old pages
             for (const page of existingPages.docs) {
                 await payload.delete({ collection: 'pages', id: page.id })
             }
 
-            // 2. Update site theme
+            // 3. Update site theme
             await payload.update({
                 collection: 'sites',
                 id: Number(siteId),
                 data: { theme: templateTheme },
             })
 
-            // 3. Create new pages from template
+            // 4. Create new pages from template, merging user content where possible
             for (const [idx, page] of pagesToCreate.entries()) {
+                // Find matching existing blocks: homepage→homepage, then slug match
+                const matchingBlocks = page.isHomepage
+                    ? homepageBlocks
+                    : (existingPageMap[page.slug] || [])
+
+                const mergedLayout = matchingBlocks.length > 0
+                    ? mergeUserContent(page.layout, matchingBlocks)
+                    : page.layout
+
                 await payload.create({
                     collection: 'pages',
                     data: {
@@ -300,12 +347,20 @@ export const POST = withAuth(async (user, req) => {
                         tenant: tenantId,
                         isHomepage: page.isHomepage ?? idx === 0,
                         _status: 'published',
-                        layout: page.layout,
+                        layout: mergedLayout,
                     },
                 })
+                _createdPagesCount++
             }
 
-            // 4. Increment template usage count
+            // 4. Mark generation completed
+            await payload.update({
+                collection: 'sites',
+                id: Number(siteId),
+                data: { generationStatus: 'completed' },
+            })
+
+            // 5. Increment template usage count
             await payload.update({
                 collection: 'templates',
                 id: templateId,
@@ -336,6 +391,7 @@ export const POST = withAuth(async (user, req) => {
                 name: String(template.name || 'Untitled'),
                 tenant: tenantId,
                 status: 'draft',
+                generationStatus: 'generating',
                 siteType: (() => {
                     const VALID_SITE_TYPES = new Set(['business', 'ecommerce', 'restaurant', 'tech', 'health', 'education', 'realestate', 'fitness', 'creative', 'beauty', 'blog'])
                     const raw = Array.isArray(template.category) ? String(template.category[0]) : String(template.category || 'business')
@@ -344,6 +400,7 @@ export const POST = withAuth(async (user, req) => {
                 theme: templateTheme,
             },
         })
+        _siteId = site.id as string | number
 
         // Create all template pages
         for (const [idx, page] of pagesToCreate.entries()) {
@@ -359,6 +416,7 @@ export const POST = withAuth(async (user, req) => {
                     layout: page.layout,
                 },
             })
+            _createdPagesCount++
         }
 
         // 404 Page (always created)
@@ -379,6 +437,14 @@ export const POST = withAuth(async (user, req) => {
                 },
             },
         })
+        _createdPagesCount++
+
+        // Mark generation completed
+        await payload.update({
+            collection: 'sites',
+            id: site.id as string | number,
+            data: { generationStatus: 'completed' },
+        })
 
         // Increment template usage count
         await payload.update({
@@ -396,6 +462,16 @@ export const POST = withAuth(async (user, req) => {
         })
 
     } catch (error: unknown) {
+        // Smart status: partial success (≥1 page created) = completed, 0 pages = failed
+        if (_siteId && _payload) {
+            const status = _createdPagesCount > 0 ? 'completed' : 'failed'
+            await _payload.update({
+                collection: 'sites',
+                id: _siteId,
+                data: { generationStatus: status },
+            }).catch((_e: unknown) => console.error('[Apply Template] Failed to update generation status:', _e))
+        }
+
         const errMessage = error instanceof Error ? error.message : 'Unknown error'
         console.error('[Apply Template Error]', errMessage, error)
         return NextResponse.json(

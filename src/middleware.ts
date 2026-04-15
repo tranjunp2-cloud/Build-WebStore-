@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { buildMaintenanceHtml } from '@/lib/maintenance'
 
 const ADMIN_PATHS = ['/admin', '/api']
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN || 'primeweb.app'
@@ -28,9 +29,13 @@ const protectedPaths = [
     '/settings',
     '/account',
     '/help',
+    '/blog',
 ]
 
 const authPaths = ['/login', '/register', '/verify-otp', '/forgot-password', '/reset-password']
+
+// SEO paths with dots that need tenant rewriting (not static files)
+const SEO_PATHS = ['/sitemap.xml', '/robots.txt']
 
 /**
  * Multi-tenant middleware
@@ -50,13 +55,15 @@ export async function middleware(req: NextRequest) {
     const hostname = req.headers.get('host')?.split(':')[0] || req.nextUrl.hostname
 
     // Allow Next.js internals and static files
-    if (
-        pathname.startsWith('/_next') ||
-        pathname.startsWith('/favicon') ||
-        pathname.startsWith('/public') ||
-        pathname.includes('.')
-    ) {
-        return NextResponse.next()
+    if (!SEO_PATHS.includes(pathname)) {
+        if (
+            pathname.startsWith('/_next') ||
+            pathname.startsWith('/favicon') ||
+            pathname.startsWith('/public') ||
+            pathname.includes('.')
+        ) {
+            return NextResponse.next()
+        }
     }
 
     // ── API and admin routes: pass through ─────────────────────────────
@@ -123,10 +130,24 @@ export async function middleware(req: NextRequest) {
             try {
                 const checkRes = await fetch(checkUrl, { cache: 'no-store', signal: controller.signal })
                 if (checkRes.ok) {
-                    const { redirect, newSlug } = await checkRes.json()
-                    if (redirect && newSlug && newSlug !== tenantSlug) {
-                        const redirectUrl = `https://${newSlug}.${PLATFORM_DOMAIN}${pathname}`
+                    const data = await checkRes.json()
+                    if (data.redirect && data.newSlug && data.newSlug !== tenantSlug) {
+                        const redirectUrl = `https://${data.newSlug}.${PLATFORM_DOMAIN}${pathname}`
                         return NextResponse.redirect(redirectUrl, { status: 301 })
+                    }
+                    // BUG-F05-006: Return 503 for maintenance mode (draft + was published)
+                    if (data.maintenance && !pathname.startsWith('/api')) {
+                        return new NextResponse(
+                            buildMaintenanceHtml(data.siteName || ''),
+                            {
+                                status: 503,
+                                headers: {
+                                    'Content-Type': 'text/html; charset=utf-8',
+                                    'Retry-After': '3600',
+                                    'Cache-Control': 'no-store',
+                                },
+                            },
+                        )
                     }
                 }
             } finally {

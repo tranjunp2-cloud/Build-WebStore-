@@ -92,7 +92,7 @@ describe('Mobile Up/Down Reorder [TC-F03.18, TC-F03.19]', () => {
     })
 
     function openModal() {
-        render(<DashboardCustomizeModal defaultPreferences={['views', 'leads', 'engagement', 'revenue']} />)
+        render(<DashboardCustomizeModal defaultPreferences={['views', 'leads', 'engagement']} />)
         fireEvent.click(screen.getByTestId('customize-dashboard-btn'))
     }
 
@@ -103,8 +103,8 @@ describe('Mobile Up/Down Reorder [TC-F03.18, TC-F03.19]', () => {
         expect(screen.getByTestId('move-down-views')).toBeInTheDocument()
         expect(screen.getByTestId('move-up-leads')).toBeInTheDocument()
         expect(screen.getByTestId('move-down-leads')).toBeInTheDocument()
-        expect(screen.getByTestId('move-up-revenue')).toBeInTheDocument()
-        expect(screen.getByTestId('move-down-revenue')).toBeInTheDocument()
+        expect(screen.getByTestId('move-up-engagement')).toBeInTheDocument()
+        expect(screen.getByTestId('move-down-engagement')).toBeInTheDocument()
     })
 
     it('[TC-F03.18] first item has move-up disabled', () => {
@@ -117,7 +117,7 @@ describe('Mobile Up/Down Reorder [TC-F03.18, TC-F03.19]', () => {
     it('[TC-F03.18] last item has move-down disabled', () => {
         openModal()
 
-        const downBtn = screen.getByTestId('move-down-revenue')
+        const downBtn = screen.getByTestId('move-down-engagement')
         expect(downBtn).toBeDisabled()
     })
 
@@ -163,6 +163,6 @@ describe('Mobile Up/Down Reorder [TC-F03.18, TC-F03.19]', () => {
         expect(screen.getByTestId('customize-item-views')).toBeInTheDocument()
         expect(screen.getByTestId('customize-item-leads')).toBeInTheDocument()
         expect(screen.getByTestId('customize-item-engagement')).toBeInTheDocument()
-        expect(screen.getByTestId('customize-item-revenue')).toBeInTheDocument()
+        expect(screen.queryByTestId('customize-item-revenue')).not.toBeInTheDocument()
     })
 })

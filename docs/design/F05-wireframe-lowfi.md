@@ -2,6 +2,7 @@
 
 Tài liệu này phác thảo cấu trúc giao diện (Low-Fi Wireframe) cho màn hình F05 AI Editor dựa trên các tài liệu đặc tả (PRD).
 > **Links figma:** https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30668-18322&t=Yv0FOSGAQrfAsGh3-4
+> **Links figma mobile:** https://www.figma.com/design/oFACZVA1oplxslloJWEkLp/TM_Prime-Web-V2.0?node-id=30881-4619&t=GdNslDJjKmpEoMkY-1
 ---
 
 ## 1. Màn hình Desktop (Desktop View)

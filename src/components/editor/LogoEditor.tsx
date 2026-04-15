@@ -4,6 +4,8 @@ import React, { useRef, useState, useEffect } from 'react'
 import { Loader2, Upload } from 'lucide-react'
 import { processImageFile } from '@/lib/utils/image'
 import { toast } from 'sonner'
+import { useI18n } from '@/i18n'
+import { uploadMediaAction } from '@/app/(dashboard)/actions/media'
 
 interface LogoEditorProps {
     currentLogo?: string | null
@@ -37,6 +39,8 @@ async function generateFavicon(imageUrl: string): Promise<Blob | null> {
 }
 
 export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
+    const { t } = useI18n()
+    const le = t.editor.logoEditor
     const fileInputRef = useRef<HTMLInputElement>(null)
     const previewUrlRef = useRef<string | null>(null)
     const [isUploading, setIsUploading] = useState(false)
@@ -62,16 +66,13 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             previewUrlRef.current = localPreview
             setPreviewUrl(localPreview)
 
-            // 2. Upload logo
+            // 2. Upload logo via server action (same as product form)
             const formData = new FormData()
             formData.append('file', processed)
-            formData.append('_payload', JSON.stringify({ alt: 'Site Logo' }))
+            formData.append('alt', 'Site Logo')
 
-            const uploadRes = await fetch('/api/media', { method: 'POST', body: formData, credentials: 'include' })
-            if (!uploadRes.ok) throw new Error('Logo upload failed')
-
-            const uploadedLogo = await uploadRes.json()
-            const logoUrl = uploadedLogo.doc.url as string
+            const uploadedLogo = await uploadMediaAction(formData)
+            const logoUrl = uploadedLogo.url as string
 
             // 3. Auto-generate favicon from the uploaded logo
             let faviconUrl: string | undefined
@@ -80,20 +81,17 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
             if (faviconBlob) {
                 const faviconForm = new FormData()
                 faviconForm.append('file', new File([faviconBlob], 'favicon.png', { type: 'image/png' }))
-                faviconForm.append('_payload', JSON.stringify({ alt: 'Favicon' }))
+                faviconForm.append('alt', 'Favicon')
 
-                const faviconRes = await fetch('/api/media', { method: 'POST', body: faviconForm, credentials: 'include' })
-                if (faviconRes.ok) {
-                    const faviconData = await faviconRes.json()
-                    faviconUrl = faviconData.doc.url as string
-                }
+                const faviconData = await uploadMediaAction(faviconForm)
+                faviconUrl = faviconData.url as string
             }
 
             onLogoChange(logoUrl, faviconUrl)
-            toast.success('Logo updated' + (faviconUrl ? ' & Favicon generated' : ''))
+            toast.success(le.success + (faviconUrl ? le.faviconGenerated : ''))
         } catch (error) {
             console.error('Logo upload error:', error)
-            toast.error('Failed to update logo')
+            toast.error(le.error)
         } finally {
             setIsUploading(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
@@ -133,7 +131,7 @@ export function LogoEditor({ currentLogo, onLogoChange }: LogoEditorProps) {
                 )}
 
                 <span className="text-xs font-medium leading-4 text-[#94A3B8]">
-                    {isUploading ? 'Uploading...' : 'Click to upload'}
+                    {isUploading ? le.uploading : le.clickToUpload}
                 </span>
             </button>
 

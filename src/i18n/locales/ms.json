@@ -296,7 +296,16 @@
             "morning": "pagi",
             "afternoon": "petang",
             "evening": "malam",
+            "welcomeTitle": "Selamat datang ke Papan Pemuka PrimeWeb",
+            "welcomeSubtitle": "Pantau prestasi kedai anda dan urus perniagaan dalam talian anda dari satu tempat.",
+            "pendingLabel": "Tertangguh",
+            "itemsLabel": "item",
             "customize": "Sesuaikan",
+            "tabs": {
+                "overview": "Gambaran",
+                "analytics": "Analitis",
+                "seo": "Kesihatan SEO"
+            },
             "stats": {
                 "views": "Paparan (Trafik)",
                 "leads": "Klik (Prospek)",
@@ -315,7 +324,10 @@
                 "score": "Skor:",
                 "statusGood": "Baik",
                 "statusWarning": "Perlu Pembaikan",
-                "fixAll": "✨ AI Baiki Semua Isu"
+                "fixAll": "✨ AI Baiki Semua Isu",
+                "fix": "Baiki",
+                "issue": "Isu",
+                "issues": "Isu"
             },
             "periods": {
                 "today": "Hari ini",
@@ -330,6 +342,17 @@
                 "save": "Simpan Perubahan"
             }
         },
+        "empty": {
+            "title": "Tiada data laman web",
+            "description": "Cipta laman web pertama anda untuk mula menjejak prestasi perniagaan.",
+            "cta": "+ Cipta Laman Web Baharu"
+        },
+        "generationFailed": {
+            "title": "Pembinaan laman web tidak selesai",
+            "description": "Jangan risau — anda boleh cuba bina semula dengan AI atau pilih daripada templat sedia ada.",
+            "retryAi": "Cuba semula dengan AI",
+            "chooseTemplate": "Pilih templat"
+        },
         "sites": {
             "title": "Laman Web Saya",
             "viewAll": "Lihat Semua →",
@@ -338,7 +361,13 @@
             "draft": "Draf",
             "lastEdited": "Akhir disunting: ",
             "edit": "Sunting",
-            "preview": "Pratonton"
+            "preview": "Pratonton",
+            "noSites": "Tiada laman web lagi",
+            "noSitesDesc": "Cipta laman web pertama anda untuk bermula",
+            "createWebsite": "Cipta Laman Web",
+            "incomplete": "Tidak lengkap",
+            "retryAi": "Cuba semula dengan AI",
+            "template": "Templat"
         },
         "analytics": {
             "title": "Analitis",
@@ -355,7 +384,8 @@
             "topBlogs": "Blog Teratas",
             "topReferrers": "Sumber Utama",
             "views": "Paparan",
-            "clicks": "Klik"
+            "clicks": "Klik",
+            "noData": "Tiada data tersedia untuk tempoh ini."
         },
         "seo": {
             "title": "Papan Pemuka SEO",
@@ -420,6 +450,9 @@
                 "description": "Cipta laman terlebih dahulu untuk menggunakan Papan Pemuka SEO",
                 "cta": "Pergi ke Papan Pemuka"
             },
+            "issuesList": "Isu SEO",
+            "missingTitle": "Tiada tajuk",
+            "missingDesc": "Tiada penerangan",
             "healthOverview": "Gambaran Kesihatan SEO",
             "scoreLabel": "Skor: {score}/100",
             "fixAllButton": "✨ Baiki Semua Isu",
@@ -1128,6 +1161,8 @@
                 "postTitle": "Tajuk kiriman",
                 "titlePlaceholder": "cth., Strategi Pemasaran E-dagang",
                 "titleRequired": "Tajuk diperlukan",
+                "titleMaxLength": "Tajuk mestilah kurang daripada 255 aksara",
+                "slugInvalid": "Slug hanya boleh mengandungi huruf kecil, nombor, dan sempang",
                 "urlSlugLabel": "Slug URL (dijana secara auto, boleh disunting)",
                 "thumbnailLabel": "Lakaran Pribit Utama",
                 "replace": "Ganti",
@@ -1140,7 +1175,7 @@
                 "manageCategories": "Urus Kategori",
                 "author": "Pengarang",
                 "publishDate": "Tarikh Terbit",
-                "seoTitle": "Pengoptimuman Carian (SEO)",
+                "seoTitle": "Tetapan SEO",
                 "seoDesc": "Pratonton bagaimana kiriman anda muncul dalam hasil carian.",
                 "generateSeo": "Jana melalui AI",
                 "metaTitle": "Tajuk Meta",
@@ -1171,7 +1206,26 @@
                 "invalidFileType": "Hanya fail JPEG dan PNG diterima",
                 "draftRecoveryMessage": "Draf yang belum disimpan ditemui. Pulihkan?",
                 "draftRestore": "Pulihkan",
-                "draftDismiss": "Abaikan"
+                "draftDismiss": "Abaikan",
+                "loadFailed": "Gagal memuatkan catatan",
+                "networkError": "Ralat rangkaian",
+                "draftRestored": "Draf dipulihkan",
+                "thumbnailUploadError": "Ralat muat naik imej",
+                "scheduledPublishWarning": "Penerbitan berjadual belum disokong. Disimpan sebagai draf.",
+                "postCreated": "Catatan berjaya dicipta!",
+                "postSaved": "Catatan berjaya disimpan!",
+                "saveFailed": "Gagal menyimpan catatan",
+                "enterTitleOrContent": "Masukkan tajuk atau kandungan dahulu",
+                "seoGenerated": "Metadata SEO berjaya dijana!",
+                "aiUnavailableFallback": "AI tidak tersedia — diisi daripada kandungan",
+                "aiGenerated": "Catatan berjaya dijana!",
+                "aiGenerationFailed": "Penjanaan gagal",
+                "aiImproveLabel": "Penambahbaikan AI",
+                "aiMakeProfessional": "Jadikan Profesional",
+                "aiMakeShorter": "Jadikan Lebih Pendek",
+                "aiImproveWriting": "Perbaiki Penulisan",
+                "aiRewriting": "Menulis semula...",
+                "cancel": "Batal"
             },
             "categoryModal": {
                 "title": "Urus Kategori",
@@ -1195,6 +1249,28 @@
                 "toastUpdateFail": "Gagal mengemas kini kategori",
                 "toastDeleteSuccess": "Kategori \"{name}\" telah dipadam",
                 "toastDeleteFail": "Gagal memadam kategori"
+            },
+            "categoryPage": {
+                "title": "Urus Kategori",
+                "existingTitle": "Kategori Sedia Ada",
+                "itemsCount": "{count} item",
+                "noCategories": "Belum ada kategori",
+                "addNew": "Tambah Kategori Baru",
+                "namePlaceholder": "Nama kategori",
+                "close": "Tutup",
+                "deleteTitle": "Padam Kategori",
+                "deleteConfirm": "Adakah anda pasti ingin memadam",
+                "deleteWarning": "Kiriman yang ditetapkan kepada kategori ini akan menjadi tanpa kategori. Tindakan ini tidak boleh dibatalkan.",
+                "cancel": "Batal",
+                "delete": "Padam",
+                "deleting": "Memadam...",
+                "toastCreated": "Kategori \"{name}\" dicipta",
+                "toastCreateFail": "Gagal mencipta kategori",
+                "toastUpdated": "Kategori dikemas kini",
+                "toastUpdateFail": "Gagal mengemas kini kategori",
+                "toastDeleted": "Kategori \"{name}\" telah dipadam",
+                "toastDeleteFail": "Gagal memadam kategori",
+                "toastLoadFail": "Gagal memuatkan kategori"
             },
             "pagination": {
                 "previous": "Sebelumnya",
@@ -1364,23 +1440,19 @@
         },
         "overview": {
             "title": "Pusat Bantuan",
-            "subtitle": "Ketahui cara menggunakan sistem pengurusan kedai dalam talian anda.",
+            "subtitle": "Ketahui cara menggunakan sistem pengurusan laman web anda.",
             "welcomeTitle": "👋 Selamat datang ke EchPrime!",
-            "welcomeDesc": "EchPrime CMS membantu anda menguruskan keseluruhan kedai dalam talian anda — daripada mencipta laman web, menguruskan produk, memproses pesanan hingga menganalisis hasil. Berikut adalah gambaran keseluruhan ciri utama.",
+            "welcomeDesc": "EchPrime membantu anda membina dan mengurus laman web profesional anda — daripada mencipta laman web dengan AI, menulis artikel blog dioptimumkan SEO hingga menjejak trafik dan penglibatan. Berikut adalah gambaran keseluruhan ciri utama.",
             "featuresTitle": "🚀 Ciri Utama",
             "features": {
                 "dashboardTitle": "Papan Pemuka",
-                "dashboardDesc": "Lihat gambaran masa nyata tentang hasil, pesanan, dan pelawat.",
+                "dashboardDesc": "Lihat gambaran masa nyata tentang trafik laman web, petunjuk, dan penglibatan.",
                 "aiBuilderTitle": "Pembina Laman Web AI",
-                "aiBuilderDesc": "Cipta laman web jualan profesional dalam hanya 5 minit dengan AI.",
-                "productsTitle": "Produk",
-                "productsDesc": "Uruskan produk, harga RM, inventori, Lencana Halal, dan imej produk.",
-                "ordersTitle": "Pesanan",
-                "ordersDesc": "Proses pesanan COD, Pindahan Bank, DuitNow. Cetak invois dengan satu klik.",
+                "aiBuilderDesc": "Cipta laman web profesional dalam hanya 5 minit dengan AI.",
                 "blogTitle": "Blog",
                 "blogDesc": "Tulis artikel blog mesra SEO untuk menarik lebih ramai pelanggan.",
-                "settingsTitle": "Tetapan Kedai",
-                "settingsDesc": "Konfigurasikan domain, pembayaran, dan jemput staf pentadbir."
+                "settingsTitle": "Tetapan",
+                "settingsDesc": "Konfigurasikan domain dan jemput staf pentadbir."
             },
             "needHelpTitle": "📞 Perlukan lebih bantuan?",
             "needHelpDesc": "Jika anda tidak menjumpai jawapan, hubungi pasukan sokongan kami melalui WhatsApp atau e-mel "
@@ -1392,51 +1464,100 @@
             },
             "tab": {
                 "escToClose": "ESC untuk tutup · Cubit untuk zum di mudah alih",
-                "fullResolution": "Tangkapan skrin resolusi penuh"
+                "fullResolution": "Tangkapan skrin resolusi penuh",
+                "stepByStepGuide": "Panduan Langkah demi Langkah"
             },
             "data": {
-                "products": {
-                    "label": "Produk",
-                    "steps": [
-                        {
-                            "title": "Akses Menu Produk",
-                            "desc": "Dari Bar Sisi kiri, klik pada <strong>\"📦 Produk\"</strong> untuk membuka senarai produk semasa anda.",
-                            "imgTitle": "Paparan Senarai Produk"
-                        },
-                        {
-                            "title": "Cipta Produk Baru",
-                            "desc": "Klik butang <strong>[+ Tambah Produk]</strong> di bahagian atas kanan. Isi borang:<ul class=\"text-[#9CA3AF] mb-4 mt-1 ml-5 text-[14px] leading-[24px] list-disc marker:text-[#9CA3AF]\"><li>Nama produk, harga RM, penerangan terperinci</li><li>Muat naik imej produk (WebP dicadangkan, ≤ 5MB/imej)</li><li>Aktifkan Lencana Halal jika produk mempunyai pensijilan JAKIM</li><li>Tetapkan inventori dan berat penghantaran</li></ul>",
-                            "imgTitle": "Borang Cipta Produk"
-                        },
-                        {
-                            "title": "Urus Imej Produk",
-                            "desc": "Seret dan lepas atau klik <strong>Semak Imbas Fail</strong> untuk memuat naik pelbagai imej. Seret dan lepas untuk susun semula. Imej pertama akan menjadi imej utama di Storefront.",
-                            "imgTitle": "Pengurus Galeri Imej"
-                        }
-                    ]
-                },
-                "orders": {
-                    "label": "Pesanan",
-                    "steps": [
-                        {
-                            "title": "Lihat Senarai Pesanan",
-                            "desc": "Pergi ke <strong>\"🛒 Pesanan\"</strong> untuk melihat semua pesanan. Gunakan penapis Status untuk mencari pesanan yang perlu diproses.",
-                            "imgTitle": "Senarai Pesanan"
-                        },
-                        {
-                            "title": "Proses Pesanan",
-                            "desc": "Klik pada pesanan untuk lihat butiran. Kemas kini status: <strong>Disahkan → Dihantar → Diterima</strong>. Masukkan kod penjejakan J&T/Pos Laju.",
-                            "imgTitle": "Butiran Pesanan"
-                        }
-                    ]
-                },
                 "dashboard": {
                     "label": "Papan Pemuka",
                     "steps": [
                         {
                             "title": "Gambaran Keseluruhan Papan Pemuka",
-                            "desc": "Papan pemuka memaparkan metrik utama: jumlah hasil, bilangan pesanan, pelawat, dan Tindakan Pantas.",
-                            "imgTitle": "Gambaran Keseluruhan"
+                            "desc": "Papan pemuka memaparkan metrik utama: trafik laman web, petunjuk, penglibatan, dan skor kesihatan SEO.",
+                            "imgTitle": "Gambaran Keseluruhan",
+                            "guide": [
+                                "Navigasi ke <strong>Papan Pemuka</strong> dari bar sisi — ini adalah skrin utama anda selepas log masuk.",
+                                "Tab <strong>Gambaran Keseluruhan</strong> memaparkan metrik utama: jumlah paparan laman web (Trafik), klik pautan (Petunjuk), dan penglibatan pengguna.",
+                                "Gunakan <strong>Pemilih Tempoh</strong> (Hari Ini / 7 hari / 30 hari) di kanan atas untuk menukar julat masa analitik.",
+                                "Klik <strong>Sesuaikan</strong> untuk seret-dan-lepas, tunjuk/sembunyikan kad metrik untuk memperibadikan susun atur papan pemuka anda.",
+                                "Widget <strong>Kesihatan SEO</strong> memaparkan skor SEO laman anda daripada 100 dengan amaran tindakan — klik \"AI Baiki Semua Isu\" untuk optimum automatik."
+                            ]
+                        }
+                    ]
+                },
+                "builder": {
+                    "label": "Pembina Laman Web AI",
+                    "steps": [
+                        {
+                            "title": "Masukkan Maklumat Perniagaan",
+                            "desc": "Berikan maklumat asas supaya AI dapat mencipta laman web yang sempurna untuk anda.",
+                            "imgTitle": "Borang Maklumat Perniagaan",
+                            "guide": [
+                                "Masukkan <strong>Nama Perniagaan</strong> anda (cth., \"The Cookie House\", \"Beauty Spa Hana\").",
+                                "Pilih <strong>Industri</strong> anda — pilih daripada: Restoran/Kafe/F&B, Kedai/Fesyen/E-dagang, Teknologi/IT/SaaS, Kesihatan/Pergigian/Klinik, Hartanah, Portfolio/Freelancer/Agensi, Pendidikan/Latihan, Gim/Kecergasan/Yoga, atau Lain-lain.",
+                                "Terangkan <strong>Produk / Perkhidmatan</strong> anda — AI akan menggunakannya untuk mencadangkan imej produk dan susun atur.",
+                                "Tambah <strong>Penerangan</strong> secara pilihan untuk lebih konteks tentang perniagaan anda.",
+                                "Klik <strong>\"Teruskan — AI akan cipta laman web anda →\"</strong> untuk memulakan proses penjanaan."
+                            ]
+                        },
+                        {
+                            "title": "AI Menjana Laman Web Anda",
+                            "desc": "AI menganalisis maklumat perniagaan anda dan menjana reka bentuk sempurna secara automatik.",
+                            "imgTitle": "Skrin Pemprosesan AI",
+                            "guide": [
+                                "Selepas klik Teruskan, AI mula <strong>menganalisis maklumat perniagaan anda</strong>.",
+                                "Sistem kemudian <strong>menjana kandungan & reka bentuk</strong> — termasuk susun atur, warna, dan imej sepadan dengan industri anda.",
+                                "Akhirnya, ia <strong>menyediakan pratonton</strong> supaya anda boleh menyemak hasilnya.",
+                                "Proses ini biasanya mengambil masa 30-60 saat. Anda akan melihat bar kemajuan dengan setiap langkah."
+                            ]
+                        },
+                        {
+                            "title": "Pratonton & Semakan Responsif",
+                            "desc": "Semak laman web AI anda pada kedua-dua paparan Desktop dan Mudah Alih sebelum menerbitkan.",
+                            "imgTitle": "Pratonton Laman Web - Desktop",
+                            "guide": [
+                                "Setelah dijana, anda akan melihat halaman <strong>Pratonton Laman Web</strong> dengan laman AI anda.",
+                                "Togol antara paparan <strong>Desktop</strong> dan <strong>Mudah Alih</strong> untuk menyemak susun atur responsif.",
+                                "Klik <strong>\"Lihat Pratonton Penuh\"</strong> untuk membuka laman web dalam tab baru.",
+                                "Jika berpuas hati, teruskan untuk menerbitkan laman web anda. Anda sentiasa boleh mengeditnya kemudian."
+                            ]
+                        },
+                        {
+                            "title": "Chat AI — Edit dengan Perbualan",
+                            "desc": "Gunakan Chat AI untuk membuat perubahan pada laman web anda dengan hanya menerangkan apa yang anda mahu.",
+                            "imgTitle": "Editor Chat AI",
+                            "guide": [
+                                "Buka tab <strong>AI CHAT</strong> di bar sisi kiri Editor.",
+                                "Taip apa yang anda mahu ubah — cth., <strong>\"Boleh tukar warna ke merah jambu?\"</strong> atau <strong>\"Tambah bahagian baru\"</strong>.",
+                                "AI akan memproses permintaan anda dan menunjukkan <strong>\"Menyediakan perubahan untuk pratonton...\"</strong> semasa mengemas kini.",
+                                "Gunakan <strong>cip cadangan pantas</strong> di bawah (cth., \"Tukar warna\", \"+ Tambah bahagian\") untuk tindakan biasa.",
+                                "Perubahan diterapkan secara masa nyata pada pratonton — semak dan simpan atau minta penyesuaian lanjut."
+                            ]
+                        },
+                        {
+                            "title": "Tukar Templat",
+                            "desc": "Layari dan tukar ke reka bentuk templat berbeza pada bila-bila masa.",
+                            "imgTitle": "Galeri Templat",
+                            "guide": [
+                                "Dalam Editor, klik untuk membuka <strong>Galeri Templat</strong> untuk melayari reka bentuk yang tersedia.",
+                                "Gunakan <strong>bar carian</strong> atau <strong>penapis kategori</strong> (Restoran, E-Dagang, Kecantikan, Teknologi, Kesihatan, Pendidikan, dll.) untuk mencari templat yang sesuai.",
+                                "Setiap templat menunjukkan pratonton, nama, penerangan, dan palet warna.",
+                                "Klik pada templat untuk menerapkannya — kandungan anda akan dipindahkan ke susun atur reka bentuk baru.",
+                                "Kedua-dua templat Percuma dan <strong>Pro</strong> tersedia bergantung pada pelan anda."
+                            ]
+                        },
+                        {
+                            "title": "Edit Komponen pada Setiap Halaman",
+                            "desc": "Gunakan panel Komponen untuk menambah, mengalih keluar, dan menyesuaikan bahagian pada halaman anda.",
+                            "imgTitle": "Panel Komponen",
+                            "guide": [
+                                "Buka tab <strong>KOMPO...</strong> (Komponen) di bar sisi kiri.",
+                                "Layari kategori komponen: <strong>Asas</strong> (Hero, CTA, Tentang, Ciri, Proses Langkah, Kad Perkhidmatan), <strong>Kandungan</strong>, <strong>Media</strong>, <strong>Perniagaan</strong>, <strong>Perdagangan</strong>, <strong>Borang & Hubungi</strong>, <strong>Widget</strong>, dan <strong>Susun Atur</strong>.",
+                                "Gunakan <strong>Cari blok</strong> untuk mencari jenis komponen tertentu dengan cepat.",
+                                "Seret komponen dari panel untuk menambahnya ke halaman anda pada kedudukan yang dikehendaki.",
+                                "Klik pada mana-mana komponen dalam pratonton untuk memilih dan mengedit kandungan, gaya, dan tetapannya.",
+                                "Beralih antara halaman menggunakan tab <strong>HALAMAN</strong> untuk mengedit bahagian berbeza laman web anda."
+                            ]
                         }
                     ]
                 },
@@ -1444,9 +1565,50 @@
                     "label": "Blog",
                     "steps": [
                         {
-                            "title": "Cipta Artikel Blog Baru",
-                            "desc": "Pergi ke <strong>\"📝 Blog\"</strong> → klik <strong>[+ Artikel Baru]</strong>. Tulis kandungan menggunakan Editor Teks Kaya, tambah imej, dan tetapkan meta SEO.",
-                            "imgTitle": "Editor Blog"
+                            "title": "Akses Pengurusan Blog",
+                            "desc": "Navigasi ke bahagian Blog dari bar sisi untuk melihat dan mengurus semua artikel blog anda.",
+                            "imgTitle": "Pengurusan Blog",
+                            "guide": [
+                                "Klik <strong>\"📝 Blog\"</strong> di bar sisi kiri untuk membuka halaman pengurusan blog.",
+                                "Anda akan melihat senarai semua artikel blog anda dengan status (Draf / Diterbitkan), kategori, dan tarikh terbit.",
+                                "Gunakan <strong>bar carian</strong> untuk mencari artikel tertentu, atau tapis mengikut status dan kategori.",
+                                "Klik <strong>[+ Artikel Baru]</strong> di kanan atas untuk mula mencipta artikel blog baru."
+                            ]
+                        },
+                        {
+                            "title": "Cipta & Edit Artikel Blog",
+                            "desc": "Gunakan editor teks kaya untuk menulis kandungan, tambah imej, dan konfigurasikan tetapan artikel.",
+                            "imgTitle": "Editor Blog & Pembantu AI",
+                            "guide": [
+                                "Masukkan <strong>Tajuk Artikel</strong> anda di atas — slug URL dijana automatik daripada tajuk (boleh diedit).",
+                                "Gunakan <strong>Editor Teks Kaya</strong> untuk menulis kandungan dengan pemformatan: tajuk, tebal, italik, senarai, pautan, dan imej terbenam.",
+                                "Di bar sisi kanan, konfigurasikan <strong>Tetapan Artikel</strong>: Kategori, Penulis, dan Tarikh Terbit.",
+                                "Muat naik <strong>Imej Kecil Utama</strong> (PNG/JPG sehingga 10MB) — ini muncul dalam senarai blog dan perkongsian sosial.",
+                                "Isi bahagian <strong>Pengoptimuman Carian (SEO)</strong>: Meta Tajuk (maks 60 aksara) dan Meta Penerangan (maks 160 aksara) untuk kedudukan carian yang lebih baik."
+                            ]
+                        },
+                        {
+                            "title": "Gunakan Pembantu AI",
+                            "desc": "Biarkan AI membantu anda menjana idea dan kandungan blog untuk menjimatkan masa.",
+                            "imgTitle": "Pembantu AI Blog",
+                            "guide": [
+                                "Klik butang <strong>\"Pembantu AI\"</strong> (ungu, kanan atas) untuk membuka penjana blog AI.",
+                                "Masukkan <strong>topik</strong> anda (cth., \"Strategi Pemasaran E-dagang\") dalam medan teks.",
+                                "Pilih <strong>Nada Suara</strong>: Profesional, Mesra, atau Persuasif.",
+                                "Klik <strong>\"Jana Idea Blog\"</strong> — AI akan mencipta draf tajuk, rangka kandungan, dan meta SEO untuk anda.",
+                                "Anda juga boleh klik <strong>\"Jana melalui AI\"</strong> di sebelah bahagian SEO untuk menjana automatik tajuk meta dan penerangan."
+                            ]
+                        },
+                        {
+                            "title": "Terbit atau Simpan Draf",
+                            "desc": "Simpan kerja anda sebagai draf atau terbitkan secara langsung ke laman web anda.",
+                            "imgTitle": "Pilihan Penerbitan",
+                            "guide": [
+                                "Klik <strong>\"Simpan Draf\"</strong> untuk menyimpan artikel tanpa menerbitkan — anda boleh terus mengedit kemudian.",
+                                "Klik <strong>\"Terbit\"</strong> untuk menjadikan artikel anda langsung di laman web dengan segera.",
+                                "Artikel yang diterbitkan muncul di halaman blog laman web anda dan diindeks oleh enjin carian.",
+                                "Anda boleh menyahterbit atau mengedit mana-mana artikel pada bila-bila masa dari halaman senarai blog."
+                            ]
                         }
                     ]
                 },
@@ -1456,7 +1618,15 @@
                         {
                             "title": "Konfigurasi Domain",
                             "desc": "Pergi ke <strong>\"⚙️ Tetapan → Domain\"</strong>. Tambah domain khas, konfigurasi DNS (A Record, CNAME), dan sahkan sambungan.",
-                            "imgTitle": "Tetapan Domain"
+                            "imgTitle": "Tetapan Domain",
+                            "guide": [
+                                "Pergi ke <strong>\"⚙️ Tetapan → Domain\"</strong> dari bar sisi untuk membuka Pengurusan Domain.",
+                                "Subdomain lalai anda (cth., <code>kedai-anda.web-v2.dev.ecommercehub.my</code>) ditetapkan dan disambungkan secara automatik.",
+                                "Klik <strong>\"+ Tambah Domain Khas\"</strong> untuk menyambungkan domain anda sendiri (cth., <code>syarikat-abc.com</code>).",
+                                "Konfigurasikan DNS di pendaftar domain anda: <strong>A Record</strong> → Tunjuk ke IP statik yang ditunjukkan, <strong>CNAME Record</strong> → Tunjuk ke <code>web-v2.dev.ecommercehub.my</code>.",
+                                "Klik <strong>\"Sahkan Sambungan\"</strong> untuk menyemak penyebaran DNS. Status akan bertukar dari \"Pengesahan Tertangguh\" ke \"Disambungkan\".",
+                                "Gunakan <strong>\"Pilih domain utama\"</strong> untuk menetapkan domain mana yang pelawat lihat sebagai URL utama."
+                            ]
                         }
                     ]
                 }
@@ -1467,23 +1637,34 @@
             "emptyTitle": "Tiada jawapan dijumpai",
             "emptyDesc": "Cuba kata kunci lain atau hubungi sokongan melalui WhatsApp.",
             "categories": {
-                "productsTitle": "🛍️ Pengurusan Produk",
-                "qAddProduct": "Bagaimana cara menambah produk baru?",
-                "aAddProduct": "Pergi ke menu <strong>Produk</strong> → klik <strong>[+ Tambah Produk]</strong> di bahagian atas kanan. Isi nama, harga RM, penerangan, muat naik imej produk (maksimum 10, dicadangkan format WebP). Klik <strong>Simpan</strong>.",
-                "qMultipleImages": "Bagaimana memuat naik pelbagai imej?",
-                "aMultipleImages": "Seret dan lepas imej ke kawasan muat naik, atau gunakan <strong>Semak Imbas Fail</strong>. Maksimum 10 imej, ≤ 5MB setiap satu. Format: JPG, PNG, WebP.",
-                "qHalal": "Di manakah Lencana Halal dipaparkan?",
-                "aHalal": "Lencana Halal (JAKIM) dipaparkan pada <strong>Kad Produk</strong> dan <strong>Halaman Perincian Produk</strong> di kedai. Aktifkannya dalam borang produk → bahagian <strong>Pensijilan Halal</strong>.",
-                "ordersTitle": "🛒 Pengurusan Pesanan",
-                "qCod": "Bagaimana pesanan COD diproses?",
-                "aCod": "Pesanan COD akan mempunyai status <strong>Menunggu Pembayaran</strong> sehingga penghantar mengesahkan kutipan. Anda boleh mengemas kini status secara manual dalam perincian pesanan → <strong>Tandakan sebagai Dibayar</strong>.",
-                "qInvoice": "Bagaimana mencetak slip pembungkusan / invois?",
-                "aInvoice": "Pergi ke <strong>Pesanan</strong> → pilih pesanan → klik <strong>Cetak Invois</strong> atau <strong>Cetak Slip Pembungkusan</strong>. Sistem akan menjana PDF untuk dicetak.",
-                "paymentsTitle": "💳 Pembayaran",
-                "qFpx": "Apakah kaedah pembayaran yang disokong?",
-                "aFpx": "EchPrime menyokong: <strong>FPX</strong> (perbankan dalam talian Malaysia), <strong>Kad Kredit/Debit</strong> (Visa, Mastercard), <strong>DuitNow QR</strong>, <strong>COD</strong> (Tunai Semasa Penghantaran), dan <strong>Pemindahan Bank</strong> manual.",
-                "qSst": "Adakah SST 6% dikira secara automatik?",
-                "aSst": "Ya, apabila anda mengaktifkan <strong>SST</strong> dalam <strong>Tetapan Kedai → Konfigurasi Cukai</strong>, sistem mengira 6% SST secara automatik dan memaparkannya dengan jelas kepada pembeli."
+                "dashboardTitle": "📊 Papan Pemuka",
+                "qDashboardMetrics": "Apakah metrik yang dipaparkan di Papan Pemuka?",
+                "aDashboardMetrics": "Papan Pemuka memaparkan tiga metrik utama: <strong>Trafik / Paparan</strong> (jumlah lawatan halaman), <strong>Petunjuk / Klik</strong> (klik pautan dan interaksi), dan <strong>Penglibatan</strong> (aktiviti pengguna bukan paparan halaman). Gunakan pemilih tempoh untuk melihat data untuk Hari Ini, 7 hari, atau 30 hari.",
+                "qDashboardCustomize": "Bagaimana menyesuaikan susun atur Papan Pemuka?",
+                "aDashboardCustomize": "Klik butang <strong>Sesuaikan</strong> di bahagian atas kanan Papan Pemuka. Modal akan muncul di mana anda boleh seret-dan-lepas untuk menyusun semula kad metrik, dan togol ikon mata untuk menunjukkan atau menyembunyikan metrik tertentu.",
+                "qDashboardSeo": "Apakah Widget Kesihatan SEO?",
+                "aDashboardSeo": "<strong>Widget Kesihatan SEO</strong> memaparkan skor SEO laman web anda daripada 100. Ia menunjukkan amaran seperti tajuk meta yang hilang atau imej yang tidak dioptimumkan. Klik <strong>\"AI Baiki Semua Isu\"</strong> untuk membenarkan AI mengoptimumkan SEO laman web anda secara automatik.",
+                "builderTitle": "🤖 Pembina Laman Web AI",
+                "qBuilderCreate": "Bagaimana mencipta laman web dengan AI?",
+                "aBuilderCreate": "Klik <strong>\"Bina dengan AI\"</strong> di Papan Pemuka atau pergi ke <strong>Pembina → Baru</strong>. Masukkan nama perniagaan anda, pilih industri, nyatakan produk/perkhidmatan anda, kemudian klik <strong>\"Teruskan — AI akan mencipta laman web anda\"</strong>. AI akan menjana laman web lengkap dalam kira-kira 30-60 saat.",
+                "qBuilderEdit": "Bolehkah saya mengedit laman web yang dijana AI?",
+                "aBuilderEdit": "Ya! Selepas AI menjana laman web anda, anda boleh menyesuaikannya sepenuhnya menggunakan <strong>Editor Visual</strong>. Edit teks, tukar imej, susun semula bahagian, laraskan warna dan fon — semuanya dengan antara muka seret-dan-lepas.",
+                "qBuilderMobile": "Adakah laman web yang dijana AI responsif untuk mudah alih?",
+                "aBuilderMobile": "Ya, semua laman web yang dijana AI adalah responsif sepenuhnya. Anda boleh pratonton paparan <strong>Desktop</strong> dan <strong>Mudah Alih</strong> menggunakan butang togol di halaman Pratonton Laman Web. Susun atur menyesuaikan secara automatik kepada semua saiz skrin.",
+                "blogTitle": "📝 Blog",
+                "qBlogCreate": "Bagaimana mencipta artikel blog baru?",
+                "aBlogCreate": "Pergi ke <strong>\"📝 Blog\"</strong> di bar sisi → klik <strong>[+ Artikel Baru]</strong>. Masukkan tajuk, tulis kandungan menggunakan Editor Teks Kaya, muat naik lakaran kecil utama, tetapkan kategori dan tarikh terbit, kemudian klik <strong>Terbit</strong> atau <strong>Simpan Draf</strong>.",
+                "qBlogAi": "Bagaimana Pembantu AI Blog berfungsi?",
+                "aBlogAi": "Klik butang <strong>\"Pembantu AI\"</strong> (ungu) di bahagian atas kanan editor blog. Masukkan topik anda, pilih nada suara (Profesional, Mesra, atau Memujuk), kemudian klik <strong>\"Jana Idea Blog\"</strong>. AI akan menjana tajuk, rangka kandungan, dan meta SEO untuk anda.",
+                "qBlogSeo": "Bagaimana mengoptimumkan artikel blog untuk SEO?",
+                "aBlogSeo": "Dalam editor blog, tatal ke bahagian <strong>\"Pengoptimuman Carian (SEO)\"</strong> di bar sisi kanan. Isi <strong>Tajuk Meta</strong> (maksimum 60 aksara) dan <strong>Penerangan Meta</strong> (maksimum 160 aksara). Anda juga boleh klik <strong>\"Jana melalui AI\"</strong> untuk menjana tag meta yang dioptimumkan secara automatik.",
+                "settingsTitle": "⚙️ Tetapan",
+                "qSettingsDomain": "Bagaimana menyambungkan domain tersuai?",
+                "aSettingsDomain": "Pergi ke <strong>\"⚙️ Tetapan → Domain\"</strong>. Klik <strong>\"+ Tambah Domain Tersuai\"</strong>, masukkan nama domain anda (cth., abccompany.com). Kemudian konfigurasi rekod DNS di pendaftar domain anda dan klik <strong>\"Sahkan Sambungan\"</strong>.",
+                "qSettingsDns": "Bagaimana mengkonfigurasi rekod DNS?",
+                "aSettingsDns": "Selepas menambah domain anda, sistem menunjukkan rekod DNS yang diperlukan:<ul><li><strong>A Record</strong> — Halakan domain anda ke alamat IP statik yang ditunjukkan (cth., 162.159.140.98)</li><li><strong>CNAME Record</strong> — Halakan ke <strong>web-v2.dev.ecommercehub.my</strong></li></ul>Penyebaran DNS biasanya mengambil masa 15 minit hingga 48 jam bergantung pada pendaftar anda.",
+                "qSettingsStaff": "Bagaimana menjemput staf pentadbir?",
+                "aSettingsStaff": "Pergi ke <strong>\"⚙️ Tetapan → Staf\"</strong>. Klik <strong>\"Jemput Staf\"</strong>, masukkan alamat e-mel mereka, dan pilih peranan (Penonton atau Akses Penuh). Mereka akan menerima jemputan e-mel untuk menyertai ruang kerja anda."
             }
         }
     },
@@ -1544,6 +1725,11 @@
             "lastName": "Nama Belakang",
             "email": "Alamat E-mel",
             "emailNeeded": "Kami memerlukan e-mel untuk menghantar jemputan.",
+            "errorEmailRequired": "Sila masukkan alamat e-mel",
+            "errorEmailInvalid": "Alamat e-mel tidak sah",
+            "errorEmailTooLong": "E-mel tidak boleh melebihi 254 aksara",
+            "errorSelfInvite": "Anda tidak boleh menjemput diri sendiri",
+            "errorGeneric": "Sesuatu telah berlaku. Sila cuba lagi.",
             "roles": {
                 "label": "Tahap Akses",
                 "admin": "Pengurus",
@@ -1579,9 +1765,90 @@
         "toast": {
             "removed": "Pengguna dikeluarkan",
             "removedBulk": "Staf yang dipilih telah dibuang",
+            "removeFailed": "Gagal mengeluarkan pengguna",
             "updated": "Pengguna ditandakan sebagai {status}",
-            "resent": "E-mel jemputan berjaya dihantar semula"
-        }
+            "updateFailed": "Gagal mengemas kini status",
+            "resent": "E-mel jemputan berjaya dihantar semula",
+            "resendFailed": "Gagal menghantar semula jemputan",
+            "staffUpdated": "Staf berjaya dikemas kini!",
+            "staffUpdateFailed": "Gagal mengemas kini staf",
+            "inviteSent": "Jemputan berjaya dihantar!",
+            "inviteFailed": "Gagal menghantar jemputan",
+            "bulkRemoveFailed": "Gagal mengeluarkan staf",
+            "permissionRequired": "Sila pilih sekurang-kurangnya satu kebenaran"
+        },
+        "emptyState": {
+            "noMatch": "Tiada staf sepadan dengan carian anda.",
+            "noStaff": "Tiada staf ditemui."
+        },
+        "pagination": {
+            "showing": "Menunjukkan {from} hingga {to} daripada {total} keputusan",
+            "previous": "Sebelumnya",
+            "next": "Seterusnya"
+        },
+        "tooltip": {
+            "edit": "Sunting Butiran",
+            "remove": "Keluarkan Pengguna"
+        },
+        "bulkConfirm": "Adakah anda pasti ingin mengeluarkan {count} ahli staf?"
+    },
+    "Domains": {
+        "title": "Pengurusan Domain",
+        "subtitle": "Urus domain tersuai untuk kedai web anda",
+        "addDomainHeading": "Tambah Domain ke kedai anda",
+        "addDomainDesc": "Sambungkan domain tersuai untuk menjadikan kedai anda boleh diakses",
+        "selectPrimary": "Pilih domain utama",
+        "addCustomDomain": "Tambah Domain Tersuai",
+        "currentPrimary": "Domain Utama Semasa",
+        "changeSubdomain": "Tukar subdomain",
+        "cancel": "Batal",
+        "save": "Simpan",
+        "confirmChange": "Sahkan perubahan",
+        "changeSubdomainTitle": "Tukar subdomain?",
+        "subdomainRedirectMsg": "Subdomain semasa anda {old} akan dialihkan ke {new} selama 30 hari.",
+        "subdomainWarning": "Selepas 30 hari, pautan lama akan berhenti berfungsi. Kemas kini bahan pemasaran anda.",
+        "pendingVerification": "Pengesahan Tertangguh",
+        "configureDns": "Konfigurasikan rekod DNS ini di pendaftar domain anda:",
+        "aRecord": "Rekod A (IP Statik)",
+        "pointToIps": "Halakan domain anda ke mana-mana IP ini.",
+        "cnameRecord": "Rekod CNAME",
+        "copiedIp": "IP {n} disalin!",
+        "copied": "Disalin!",
+        "verifyConnection": "Sahkan Sambungan",
+        "verifying": "Mengesahkan...",
+        "remove": "Buang",
+        "removeDomain": "Buang Domain",
+        "connectedSecured": "Disambung & Dilindungi",
+        "connected": "Disambung",
+        "enterDomainTitle": "Masukkan nama domain yang anda miliki",
+        "enterDomainNote": "Nota: Pastikan anda mempunyai akses kepada pendaftar anda",
+        "addDomain": "Tambah Domain",
+        "removeDomainTitle": "Buang domain",
+        "removeDomainConfirm": "Adakah anda pasti mahu membuang {domain}? Ini akan membatalkan sijil SSL dan domain tidak lagi menghala ke kedai anda.",
+        "noVerifiedDomains": "Belum ada domain tersuai yang disahkan. Tambah dan sahkan domain tersuai dahulu.",
+        "slugMinChars": "Sekurang-kurangnya 3 aksara",
+        "slugReserved": "Terpelihara",
+        "slugTaken": "Sudah diambil",
+        "slugCheckFailed": "Semakan gagal",
+        "subdomainUpdated": "Subdomain berjaya dikemas kini!",
+        "subdomainUpdateFailed": "Gagal mengemas kini subdomain",
+        "subdomainUpdateError": "Gagal mengemas kini subdomain. Sila cuba lagi.",
+        "domainAdded": "Domain berjaya ditambah! Sila konfigurasikan DNS.",
+        "domainAddFailed": "Gagal menambah domain",
+        "domainVerified": "Domain berjaya disahkan! Sambungan SSL dilindungi.",
+        "verificationFailed": "Pengesahan gagal.",
+        "domainRemoved": "Domain tersuai dibuang.",
+        "domainRemoveFailed": "Gagal membuang domain",
+        "platformPrimary": "Subdomain platform kini menjadi domain utama anda.",
+        "customPrimary": "\"{domain}\" kini menjadi Domain Utama anda.",
+        "primaryUpdateFailed": "Gagal mengemas kini domain utama.",
+        "errorHttpPrefix": "Tidak perlu masukkan http/https, masukkan nama domain sahaja",
+        "errorRequired": "Sila masukkan nama domain",
+        "errorSpaces": "Nama domain tidak boleh mengandungi ruang",
+        "errorTooLong": "Nama domain tidak boleh melebihi 253 aksara",
+        "errorNoTld": "Domain mesti mempunyai sambungan (cth: .com, .my)",
+        "errorInvalidChars": "Domain mengandungi aksara tidak sah",
+        "errorInvalidFormat": "Format domain tidak sah"
     },
     "editor": {
         "toolbar": {
@@ -1633,6 +1900,206 @@
         "maintenance": {
             "banner": "Laman web dalam Mod Penyelenggaraan. Pelanggan akan melihat halaman penyelenggaraan.",
             "republish": "Terbitkan Semula"
+        },
+        "pageManager": {
+            "addNewPage": "Tambah Halaman Baru",
+            "searchPlaceholder": "Cari halaman...",
+            "pageNamePlaceholder": "Nama halaman (cth: Promosi)",
+            "slugPreview": "Slug:",
+            "cancel": "Batal",
+            "create": "Cipta",
+            "home": "Utama",
+            "editing": "Menyunting",
+            "editWithAI": "Sunting dengan AI Chat",
+            "visible": "Terlihat",
+            "hidden": "Tersembunyi",
+            "delete": "Padam",
+            "pageCreated": "Halaman berjaya dicipta",
+            "pageHidden": "Halaman disembunyikan",
+            "visibilityFailed": "Gagal mengemas kini keterlihatan",
+            "deleteFailed": "Gagal memadam halaman",
+            "deleteSuccess": "Halaman dipadam. Buat asal?",
+            "undo": "Buat Asal",
+            "restored": "Halaman dipulihkan",
+            "restoreFailed": "Gagal memulihkan halaman",
+            "hidePage": "Sembunyikan halaman",
+            "showPage": "Tunjukkan halaman",
+            "deletePage": "Padam halaman",
+            "homeProtected": "Halaman utama tidak boleh dipadam",
+            "homeHideProtected": "Halaman utama tidak boleh disembunyikan",
+            "deleteConfirmTitle": "Padam halaman ini?",
+            "deleteConfirmMsg": "Adakah anda pasti mahu memadam halaman",
+            "deleteConfirmDesc": "Anda boleh buat asal dalam beberapa saat selepas pemadaman.",
+            "confirmDelete": "Padam",
+            "customPage": "Halaman 404 Tersuai",
+            "emptyTitle": "Tiada halaman lagi",
+            "emptyDesc": "Cipta halaman pertama anda untuk bermula.",
+            "slugLocked": "Slug dikunci selepas diterbitkan untuk melindungi SEO dan pautan luaran."
+        },
+        "aiChat": {
+            "welcomeMessage": "Hai! Apa yang anda ingin ubah?",
+            "drafting": "AI sedang merangka...",
+            "thinking": "AI sedang berfikir...",
+            "appliedChanges": "Perubahan telah digunakan pada laman web.",
+            "editFailed": "Pengeditan AI gagal",
+            "failedToEdit": "Gagal mengedit laman web",
+            "outOfScope": "Saya hanya boleh membantu mengedit laman web anda.",
+            "undo": "Buat Asal",
+            "changeColorPrompt": "Tukar warna",
+            "addSectionPrompt": "+ Tambah bahagian",
+            "inputPlaceholder": "Beritahu AI apa yang perlu diubah...",
+            "send": "hantar",
+            "newLine": "baris baru"
+        },
+        "menu": {
+            "dashboard": "Papan Pemuka",
+            "myWebsite": "Laman Web Saya",
+            "editor": "Editor",
+            "blog": "Blog",
+            "siteSettings": "Tetapan Laman",
+            "domains": "Domain",
+            "staff": "Kakitangan",
+            "helpCenter": "Pusat Bantuan",
+            "logout": "Log Keluar"
+        },
+        "blockLibrary": {
+            "searchPlaceholder": "Cari blok...",
+            "dragHint": "klik atau seret",
+            "footerHint": "Klik untuk tambah atau seret blok ke pratonton"
+        },
+        "inlineEdit": {
+            "title": "Suntingan AI Sebaris",
+            "currentText": "Teks Semasa",
+            "instruction": "Bagaimana anda mahu mengubah ini?",
+            "placeholder": "Contoh: Jadikan lebih ringkas dan premium.",
+            "cancel": "Batal",
+            "applying": "Menggunakan",
+            "apply": "Guna"
+        },
+        "logoEditor": {
+            "success": "Logo dikemas kini",
+            "faviconGenerated": " & Favicon dijana",
+            "error": "Gagal mengemas kini logo",
+            "uploading": "Memuat naik...",
+            "clickToUpload": "Klik untuk muat naik"
+        },
+        "navigation": {
+            "title": "Pautan Navigasi",
+            "noLinks": "Tiada pautan lagi. Tambah di bawah.",
+            "addLink": "+ Tambah Pautan",
+            "newLink": "Pautan Baru",
+            "internalPage": "Halaman Dalaman",
+            "externalUrl": "URL Luaran",
+            "email": "E-mel",
+            "phone": "Telefon",
+            "selectPage": "Pilih halaman",
+            "addSubLink": "Tambah sub-pautan",
+            "moveUp": "Alih ke atas",
+            "moveDown": "Alih ke bawah",
+            "moveLeft": "Alih ke kiri",
+            "makeSubItem": "Jadikan sub-item"
+        },
+        "settings": {
+            "brandIdentity": "Identiti Jenama",
+            "businessName": "Nama Perniagaan",
+            "businessNamePlaceholder": "Syarikat Anda",
+            "uploadLogo": "Muat Naik Logo",
+            "contactInfo": "Maklumat Hubungan",
+            "phone": "Telefon",
+            "phonePlaceholder": "+60 12-345-6789",
+            "email": "E-mel",
+            "emailPlaceholder": "hello@company.com",
+            "invalidEmail": "Sila masukkan alamat e-mel yang sah",
+            "address": "Alamat",
+            "addressPlaceholder": "12 Jalan Ampang, Kuala Lumpur",
+            "socialLinks": "Pautan Sosial",
+            "invalidSocialHtml": "Input tidak sah — HTML tidak dibenarkan",
+            "invalidSocialUrl": "Sila masukkan URL yang sah (https://...)",
+            "themeColors": "Tema & Warna",
+            "primaryColor": "Warna Utama",
+            "headingFont": "Fon Tajuk",
+            "bodyFont": "Fon Badan",
+            "colorMode": "Mod Warna",
+            "dark": "Gelap",
+            "light": "Cerah",
+            "urlSlug": "Slug URL",
+            "metaTitle": "Tajuk Meta",
+            "metaDescription": "Penerangan Meta",
+            "metaDescPlaceholder": "Beritahu enjin carian dan platform sosial tentang halaman ini.",
+            "googlePreview": "Pratonton Google",
+            "titleTruncated": "Tajuk mungkin dipotong di Carian Google.",
+            "descTruncated": "Penerangan mungkin dipotong di Carian Google.",
+            "characters": "aksara",
+            "selectPageSeo": "Pilih halaman untuk konfigurasi tetapan SEO.",
+            "generatingSeo": "Menjana pengoptimuman SEO menggunakan AI...",
+            "seoCancelled": "Perubahan SEO dibatalkan",
+            "seoGenerated": "Pengoptimuman SEO berjaya dijana!",
+            "seoFailed": "Gagal menjana SEO",
+            "seoError": "Ralat menjana SEO",
+            "generating": "Menjana...",
+            "autoSeo": "Pengoptimuman SEO Automatik",
+            "navStyle": "Gaya Navigasi",
+            "globalSettings": "Tetapan Laman Global",
+            "seoSettings": "Tetapan SEO",
+            "menuSettings": "Tetapan Menu",
+            "blockSettings": "Tetapan Blok",
+            "globalDesc": "Urus identiti perniagaan, maklumat hubungan, dan saluran sosial.",
+            "seoDesc": "Kawal metadata dan pratonton kandungan sosial.",
+            "menuDesc": "Konfigurasi struktur navigasi dan persembahan menu.",
+            "blockDesc": "Laraskan jarak, kandungan, dan persembahan untuk blok yang dipilih.",
+            "tabGlobal": "Global",
+            "tabSeo": "SEO",
+            "tabMenu": "Menu",
+            "tabBlock": "Blok",
+            "selectBlock": "Sila pilih blok terlebih dahulu",
+            "selectBlockMsg": "Pilih blok dalam pratonton untuk membuka tetapan khusus blok.",
+            "variant": "Varian",
+            "logoText": "Teks Logo",
+            "headline": "Tajuk Utama",
+            "subheadline": "Sub-tajuk",
+            "sectionLabel": "Label Bahagian",
+            "bodyText": "Teks Badan",
+            "description": "Penerangan",
+            "tagline": "Slogan",
+            "ctaButton": "Butang CTA",
+            "buttonText": "Teks butang",
+            "buttonUrl": "URL Butang",
+            "copyright": "Hak Cipta",
+            "ctaButtons": "Butang CTA",
+            "label": "Label",
+            "url": "URL",
+            "addButton": "+ Tambah Butang",
+            "features": "Ciri-ciri",
+            "title": "Tajuk",
+            "icon": "Ikon (emoji)",
+            "addFeature": "+ Tambah Ciri",
+            "testimonials": "Testimoni",
+            "name": "Nama",
+            "titleRole": "Jawatan / Peranan",
+            "quote": "Petikan",
+            "addTestimonial": "+ Tambah Testimoni",
+            "footerColumns": "Lajur Footer",
+            "columnTitle": "Tajuk Lajur",
+            "links": "pautan",
+            "actions": "Tindakan",
+            "duplicate": "Duplikat",
+            "delete": "Padam",
+            "socialWidget": "Widget Sosial",
+            "stayConnected": "Kekal berhubung",
+            "displayStyle": "Gaya Paparan",
+            "platforms": "Platform",
+            "platformsDesc": "Laman yang diterbitkan akan membuka setiap platform yang diaktifkan dalam tab baru.",
+            "hidden": "Tersembunyi",
+            "visible": "Terlihat",
+            "cartWidget": "Widget Troli",
+            "checkoutBehavior": "Kelakuan Daftar Keluar",
+            "checkoutDesc": "Dalam pratonton, daftar keluar kembali ke toast apabila daftar keluar etalase tidak tersedia.",
+            "buttonLabel": "Label Butang",
+            "cart": "Troli",
+            "showTextLabel": "Tunjukkan Label Teks",
+            "labelVisible": "Label terlihat",
+            "iconOnly": "Ikon sahaja",
+            "badgeDesc": "Kiraan lencana sentiasa terlihat"
         }
     }
 }
