@@ -310,6 +310,19 @@ describe('DashboardEmptyState', () => {
         expect(screen.getByText('No website data available')).toBeInTheDocument()
         expect(screen.getByText(/Create your first website/)).toBeInTheDocument()
     })
+
+    it('[TC-F03.01] mobile: description text wraps (no whitespace-nowrap)', () => {
+        render(<DashboardEmptyState />)
+        const description = screen.getByText(/Create your first website/)
+        expect(description.className).not.toContain('whitespace-nowrap')
+    })
+
+    it('[TC-F03.01] mobile: container has horizontal padding', () => {
+        const { container } = render(<DashboardEmptyState />)
+        // Outer container is the first child div with px-6
+        const outerDiv = container.firstElementChild as HTMLElement
+        expect(outerDiv.className).toContain('px-6')
+    })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
