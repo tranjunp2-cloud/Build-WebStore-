@@ -127,7 +127,7 @@ describe('PageManagerPanel', () => {
 
         // Assert
         await waitFor(() => {
-            expect(toast.error).toHaveBeenCalledWith('Error creating page')
+            expect(toast.error).toHaveBeenCalledWith('Page slug already exists in this site')
         })
         expect(useEditorStore.getState().pages).toHaveLength(2) // No new page added
     })

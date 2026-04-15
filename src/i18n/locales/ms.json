@@ -2305,6 +2305,7 @@
             "title": "Pengurus Halaman",
             "description": "Cipta, pilih, sembunyikan dan padam halaman untuk laman ini.",
             "createError": "Ralat mencipta halaman",
+            "slugConflict": "Slug halaman sudah wujud dalam laman ini",
             "noPagesFound": "Tiada halaman dijumpai",
             "noPagesSuggestion": "Cipta halaman baru atau cuba kata kunci carian lain."
         },

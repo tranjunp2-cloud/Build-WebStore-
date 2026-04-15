@@ -2305,6 +2305,7 @@
             "title": "Page Manager",
             "description": "Create, select, hide, and soft-delete pages for this site.",
             "createError": "Error creating page",
+            "slugConflict": "Page slug already exists in this site",
             "noPagesFound": "No pages found",
             "noPagesSuggestion": "Create a new page or try a different search keyword."
         },

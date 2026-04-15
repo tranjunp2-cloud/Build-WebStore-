@@ -111,8 +111,11 @@ export function PageManagerPanel({
             })
 
             if (!res.ok) {
-                const errorText = await res.text()
-                throw new Error(errorText || 'Failed to create page')
+                if (res.status === 409) {
+                    toast.error(t.editor.pageManagerPanel.slugConflict)
+                    return
+                }
+                throw new Error(`HTTP ${res.status}`)
             }
 
             const data = await res.json()
