@@ -2,6 +2,14 @@
 
 import { useEffect } from 'react'
 
+/** Replace drop-hint CSS content text. Exported for testing. */
+export function replaceDropHintCSS(css: string, text: string): string {
+    return css.replace(
+        /content:\s*'[^']*';\s*\/\*drop-hint\*\//,
+        `content: '${text.replace(/'/g, "\\'")}'; /*drop-hint*/`
+    )
+}
+
 export function PreviewScripts() {
     useEffect(() => {
         let parentOrigin = '*'
@@ -565,10 +573,7 @@ export function PreviewScripts() {
             if (e.data?.type === 'SET_DROP_HINT' && e.data.text) {
                 const styleEl = document.getElementById('editor-preview-styles')
                 if (styleEl) {
-                    styleEl.innerHTML = styleEl.innerHTML.replace(
-                        /content:\s*'[^']*';\s*\/\*drop-hint\*\//,
-                        `content: '${e.data.text.replace(/'/g, "\\'")}'; /*drop-hint*/`
-                    )
+                    styleEl.innerHTML = replaceDropHintCSS(styleEl.innerHTML, e.data.text)
                 }
             }
             if (e.data?.type === 'THEME_UPDATE' && e.data.css) {

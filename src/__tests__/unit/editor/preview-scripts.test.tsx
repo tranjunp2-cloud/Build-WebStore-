@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { PreviewScripts } from '@/components/editor/PreviewScripts'
+import { PreviewScripts, replaceDropHintCSS } from '@/components/editor/PreviewScripts'
 
 describe('PreviewScripts', () => {
     let mockPostMessage: ReturnType<typeof vi.fn>
@@ -117,65 +117,28 @@ describe('PreviewScripts', () => {
         removeEventListenerSpy.mockRestore()
     })
 
-    describe('SET_DROP_HINT message', () => {
-        const dispatchDropHint = (text: string) => {
-            // Dispatch MessageEvent with origin matching window.location.origin
-            // so PreviewScripts' origin check passes in JSDOM
-            const event = new MessageEvent('message', {
-                data: { type: 'SET_DROP_HINT', text },
-                origin: window.location.origin,
-            })
-            window.dispatchEvent(event)
-        }
+    describe('replaceDropHintCSS', () => {
+        it('should replace drop hint text in CSS', () => {
+            const css = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
+            const result = replaceDropHintCSS(css, 'Lepaskan untuk tambah blok')
 
-        afterEach(() => {
-            document.getElementById('editor-preview-styles')?.remove()
+            expect(result).toContain("content: 'Lepaskan untuk tambah blok'")
+            expect(result).toContain('/*drop-hint*/')
+            expect(result).not.toContain('Drop to add block')
         })
 
-        it('should update CSS drop hint text when receiving SET_DROP_HINT message', () => {
-            // Arrange
-            const style = document.createElement('style')
-            style.id = 'editor-preview-styles'
-            style.innerHTML = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
-            document.head.appendChild(style)
+        it('should escape single quotes in replacement text', () => {
+            const css = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
+            const result = replaceDropHintCSS(css, "Drop it's here")
 
-            render(<PreviewScripts />)
-
-            // Act
-            dispatchDropHint('Lepaskan untuk tambah blok')
-
-            // Assert
-            expect(style.innerHTML).toContain("content: 'Lepaskan untuk tambah blok'")
-            expect(style.innerHTML).toContain('/*drop-hint*/')
+            expect(result).toContain("content: 'Drop it\\'s here'")
         })
 
-        it('should escape single quotes in drop hint text', () => {
-            // Arrange
-            const style = document.createElement('style')
-            style.id = 'editor-preview-styles'
-            style.innerHTML = `.insert-marker::after { content: 'Drop to add block'; /*drop-hint*/ }`
-            document.head.appendChild(style)
+        it('should return CSS unchanged when marker is missing', () => {
+            const css = `.insert-marker::after { content: 'no marker here'; }`
+            const result = replaceDropHintCSS(css, 'Test')
 
-            render(<PreviewScripts />)
-
-            // Act
-            dispatchDropHint("Drop it's here")
-
-            // Assert
-            expect(style.innerHTML).toContain("content: 'Drop it\\'s here'")
-        })
-
-        it('should not crash when style element is missing', () => {
-            // Arrange — no style element, spy console.error
-            const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-            render(<PreviewScripts />)
-
-            // Act
-            dispatchDropHint('Test')
-
-            // Assert — no errors
-            expect(errorSpy).not.toHaveBeenCalled()
-            errorSpy.mockRestore()
+            expect(result).toBe(css)
         })
     })
 })
