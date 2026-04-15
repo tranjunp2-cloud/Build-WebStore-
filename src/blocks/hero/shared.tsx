@@ -6,6 +6,7 @@ import type { HeroConfig } from './config'
 import { RichText } from '../shared/RichText'
 import { CONTAINER, INNER_PADDING, TOUCH_TARGET } from '@/lib/design-tokens'
 import { trackEvent } from '@/lib/analytics/track-event'
+import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 
 // Token shortcut: hero containers consume CONTAINER.default + INNER_PADDING.
 export const HERO_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
@@ -15,6 +16,7 @@ export const HERO_CONTAINER = `${CONTAINER.default} mx-auto ${INNER_PADDING}`
 // TOUCH_TARGET.min added explicitly as a guarantee in case future restyles
 // shrink the padding. siteId prop threads through for click tracking.
 export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: HeroConfig['ctaButtons']; variant?: 'default' | 'glass'; siteId?: string }) {
+    const isOwner = useIsOwner()
     if (!buttons || buttons.length === 0) return null
 
     return (
@@ -24,7 +26,7 @@ export function CTAButtons({ buttons, variant = 'default', siteId }: { buttons: 
                     key={i}
                     href={btn?.url}
                     onClick={() => {
-                        if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' } })
+                        if (siteId) trackEvent({ siteId, event: 'click', metadata: { label: btn.label, url: btn?.url, variant: 'hero' }, isOwner })
                     }}
                     whileHover={{ scale: 1.03, y: -2 }}
                     whileTap={{ scale: 0.98 }}

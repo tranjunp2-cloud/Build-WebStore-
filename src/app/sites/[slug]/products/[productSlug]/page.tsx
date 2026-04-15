@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
@@ -7,6 +8,9 @@ import Link from 'next/link'
 import { AddToCartButton } from '@/components/storefront/AddToCartButton'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { TrackingManager } from '@/components/site-renderer/TrackingManager'
+import { OwnerProvider } from '@/components/site-renderer/OwnerContext'
+import { getCurrentUser } from '@/lib/auth'
+import type { TenantMembership } from '@/lib/normalize-tenants'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -15,7 +19,7 @@ type Props = {
     params: Promise<{ slug: string; productSlug: string }>
 }
 
-async function getProductData(slug: string, productSlug: string) {
+const getProductData = cache(async function getProductData(slug: string, productSlug: string) {
     const payload = await getPayload({ config })
 
     const tenantsResult = await payload.find({
@@ -55,7 +59,7 @@ async function getProductData(slug: string, productSlug: string) {
     if (!product) return null
 
     return { tenant, site, product }
-}
+})
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug, productSlug } = await params
@@ -111,12 +115,40 @@ export default async function ProductDetailPage({ params }: Props) {
 
     if (!data) notFound()
 
-    const { site, product } = data
-    const p = product as any
-    const primaryColor = (site.theme as any)?.primaryColor || '#0ea5e9'
+    const { tenant, site, product } = data
+
+    interface ProductView {
+        id: string | number
+        slug: string
+        name: string
+        price: number
+        compareAtPrice?: number
+        currency?: string
+        inventory: number
+        sku?: string
+        shortDescription?: string
+        category?: { id: string; name: string; breadcrumbs?: string }
+        attributes?: Array<{ key: string; value: string }>
+        images?: Array<{ image?: { url: string }; alt?: string }>
+        seo?: { title?: string; description?: string }
+    }
+    interface SiteTheme {
+        primaryColor?: string
+        fontBody?: string
+        fontHeading?: string
+    }
+
+    const p = product as ProductView
+    const primaryColor = (site.theme as SiteTheme | undefined)?.primaryColor || '#0ea5e9'
+
+    // Check ownership to skip analytics tracking for tenant member visits
+    const user = await getCurrentUser()
+    const isOwner = !!user && (user.tenants?.map((t: TenantMembership) =>
+        typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+    ) ?? []).includes(String(tenant.id))
     const images = p.images || []
     const hasDiscount = p.compareAtPrice && p.compareAtPrice > p.price
-    const discountPercent = hasDiscount ? Math.round((1 - p.price / p.compareAtPrice) * 100) : 0
+    const discountPercent = hasDiscount ? Math.round((1 - p.price / p.compareAtPrice!) * 100) : 0
 
     // JSON-LD Product schema
     const attributes = p.attributes || []
@@ -145,11 +177,11 @@ export default async function ProductDetailPage({ params }: Props) {
     }
 
     return (
-        <>
-            <TrackingManager siteId={String(site.id)} />
+        <OwnerProvider value={isOwner}>
+            <TrackingManager siteId={String(site.id)} isOwner={isOwner} />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-            <div style={{ fontFamily: `${(site.theme as any)?.fontBody || 'Inter'}, sans-serif` }}>
+            <div style={{ fontFamily: `${(site.theme as SiteTheme | undefined)?.fontBody || 'Inter'}, sans-serif` }}>
                 {/* Nav */}
                 <nav style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -157,7 +189,7 @@ export default async function ProductDetailPage({ params }: Props) {
                 }}>
                     <Link href={`/sites/${slug}`} style={{
                         fontSize: '20px', fontWeight: 700, textDecoration: 'none', color: '#111',
-                        fontFamily: `${(site.theme as any)?.fontHeading || 'Outfit'}, sans-serif`,
+                        fontFamily: `${(site.theme as SiteTheme | undefined)?.fontHeading || 'Outfit'}, sans-serif`,
                     }}>
                         {site.name}
                     </Link>
@@ -231,7 +263,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
                         <h1 style={{
                             fontSize: '32px', fontWeight: 700, margin: '0 0 16px', color: '#111',
-                            fontFamily: `${(site.theme as any)?.fontHeading || 'Outfit'}, sans-serif`,
+                            fontFamily: `${(site.theme as SiteTheme | undefined)?.fontHeading || 'Outfit'}, sans-serif`,
                         }}>
                             {p.name}
                         </h1>
@@ -244,7 +276,7 @@ export default async function ProductDetailPage({ params }: Props) {
                             {hasDiscount && (
                                 <>
                                     <span style={{ fontSize: '18px', color: '#999', textDecoration: 'line-through' }}>
-                                        {formatPrice(p.compareAtPrice, p.currency || 'MYR')}
+                                        {formatPrice(p.compareAtPrice!, p.currency || 'MYR')}
                                     </span>
                                     <span style={{
                                         background: '#fef2f2', color: '#ef4444', fontSize: '13px',
@@ -324,6 +356,6 @@ export default async function ProductDetailPage({ params }: Props) {
 
             {/* Cart Drawer */}
             <CartDrawer siteSlug={slug} siteId={String(site.id)} />
-        </>
+        </OwnerProvider>
     )
 }
