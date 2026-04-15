@@ -28,6 +28,7 @@ import {
     buildPricing as composerBuildPricing,
     buildTeam as composerBuildTeam,
     buildServiceCards as composerBuildServiceCards,
+    buildHero as composerBuildHero,
 } from './template-composer'
 
 export interface InjectionContext {
@@ -236,7 +237,31 @@ export function buildBlockFromLibrary(
             }
 
         case 'hero': {
-            // Plan 07 — prefer user-threaded hero when any user field is present.
+            // Plan 260415 Phase 03 — delegate to composer buildHero when the
+            // merged biz sample has a name + description/tagline/products. It
+            // derives `name — top product` headlines + truncated descriptions
+            // instead of canned "Welcome to ${name}" strings. Falls back to
+            // the legacy user-thread path on any error.
+            const canDelegate = !!(mergedBiz.name && (mergedBiz.description || mergedBiz.tagline || (mergedBiz.products && mergedBiz.products.length > 0)))
+            if (canDelegate) {
+                try {
+                    const composed = composerBuildHero(mergedBiz, category, bizSeed, ctx.mood) as Block
+                    // Ensure CTA buttons align with mood (composer emits generic labels).
+                    const primaryLabel = resolveLibraryCTA(ctx.mood, category, 'primary')
+                    const secondaryLabel = resolveLibraryCTA(ctx.mood, category, 'secondary')
+                    return {
+                        ...composed,
+                        ctaButtons: [
+                            { label: primaryLabel, url: '/contact', style: 'primary' },
+                            { label: secondaryLabel, url: '/about', style: 'secondary' },
+                        ],
+                    }
+                } catch (err) {
+                    console.warn('[content-injection] composerBuildHero failed, falling back:', err)
+                }
+            }
+
+            // Legacy fallback — Plan 07 user-thread path kept as defensive branch.
             const userHero = threadHeroBiz(userBiz, ctx.mood, category)
             const headline = userHero?.headline
                 ?? substituteBusinessName(biz?.heroHeadline ?? `Welcome to ${name}`, name)

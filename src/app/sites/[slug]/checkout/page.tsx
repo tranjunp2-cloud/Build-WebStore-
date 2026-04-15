@@ -40,6 +40,7 @@ const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
 export default function CheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
     const [slug, setSlug] = useState('')
     const [siteId, setSiteId] = useState('')
+    const [isOwner, setIsOwner] = useState(false)
     const { items, subtotal, clearCart } = useCartStore()
 
     const [form, setForm] = useState<CheckoutForm>(initialForm)
@@ -74,6 +75,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                 if (!siteRes.ok) return
                 const siteData = await siteRes.json()
                 if (siteData.docs?.[0]) setSiteId(String(siteData.docs[0].id))
+
+                // Step 3: Check if current user is tenant member (skip tracking for owners)
+                const meRes = await fetch('/api/users/me')
+                if (meRes.ok) {
+                    const meData = await meRes.json()
+                    const userTenantIds = (meData.user?.tenants ?? []).map((t: { tenant: string | { id: string } }) =>
+                        typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+                    )
+                    setIsOwner(userTenantIds.includes(String(tenant.id)))
+                }
             } catch { }
         }
         fetchSite()
@@ -193,6 +204,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
                     trackEvent({
                         siteId,
                         event: 'purchase',
+                        isOwner,
                         metadata: {
                             orderNumber: data.data.orderNumber,
                             total: data.data.total,
