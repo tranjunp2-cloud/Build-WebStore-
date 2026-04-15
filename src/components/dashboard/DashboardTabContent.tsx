@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 export type TabId = 'overview' | 'analytics' | 'seo'
 
@@ -16,20 +16,37 @@ export function useTabContext() {
 
 export function DashboardTabContent({ defaultTab, children }: { defaultTab: string; children: ReactNode }) {
     const [activeTab, setActiveTab] = useState<TabId>((defaultTab || 'overview') as TabId)
-    const router = useRouter()
     const searchParams = useSearchParams()
 
     const handleSetTab = useCallback((tab: TabId) => {
-        setActiveTab(tab) // Instant UI update for active indicator
-        // Trigger server re-render so only the new tab's queries execute
+        setActiveTab(tab)
+        // Update URL for bookmarkability without triggering server re-render
         const params = new URLSearchParams(searchParams.toString())
         params.set('tab', tab)
-        router.push(`/dashboard?${params.toString()}`)
-    }, [router, searchParams])
+        window.history.replaceState(null, '', `/dashboard?${params.toString()}`)
+    }, [searchParams])
+
+    // Sync activeTab when browser Back/Forward changes the URL
+    useEffect(() => {
+        const handlePopState = () => {
+            const tab = new URLSearchParams(window.location.search).get('tab')
+            if (tab && (tab === 'overview' || tab === 'analytics' || tab === 'seo')) {
+                setActiveTab(tab)
+            }
+        }
+        window.addEventListener('popstate', handlePopState)
+        return () => window.removeEventListener('popstate', handlePopState)
+    }, [])
 
     return (
         <TabContext.Provider value={{ activeTab, setActiveTab: handleSetTab }}>
             {children}
         </TabContext.Provider>
     )
+}
+
+/** Renders children but hides via CSS when tab is inactive */
+export function TabPanel({ tabId, children }: { tabId: TabId; children: ReactNode }) {
+    const { activeTab } = useTabContext()
+    return <div className={activeTab !== tabId ? 'hidden' : undefined}>{children}</div>
 }

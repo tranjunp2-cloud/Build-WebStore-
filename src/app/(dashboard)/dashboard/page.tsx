@@ -8,7 +8,7 @@ import { SEOView } from '@/components/dashboard/views/SEOView'
 import { DashboardTabs } from '@/components/dashboard/DashboardTabs'
 import { PeriodSelector } from '@/components/dashboard/PeriodSelector'
 import { DashboardCustomizeModal } from '@/components/dashboard/DashboardCustomizeModal'
-import { DashboardTabContent } from '@/components/dashboard/DashboardTabContent'
+import { DashboardTabContent, TabPanel } from '@/components/dashboard/DashboardTabContent'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentTenantId } from '@/lib/auth'
@@ -80,21 +80,28 @@ export default async function DashboardRoot({ searchParams }: Props) {
                     </div>
                 )}
 
-                {/* Only render the active tab — avoids 3x query cost */}
-                {tab === 'overview' && (
+                {/* Render all tabs — TabPanel hides inactive via CSS for instant switching.
+                   Note: PeriodSelector still uses router.push() which re-renders all tabs.
+                   This is an accepted tradeoff — period changes are rare (1-2x/session)
+                   while tab switches are frequent and must be instant. */}
+                <TabPanel tabId="overview">
                     <Suspense fallback={<OverviewSkeleton />}>
                         <OverviewView searchParams={searchParams} />
                     </Suspense>
-                )}
-                {tab === 'analytics' && (
-                    <Suspense fallback={<AnalyticsSkeleton />}>
-                        <AnalyticsView searchParams={searchParams} />
-                    </Suspense>
-                )}
-                {tab === 'seo' && (
-                    <Suspense fallback={<SEOSkeleton />}>
-                        <SEOView />
-                    </Suspense>
+                </TabPanel>
+                {hasUsableSites && (
+                    <>
+                        <TabPanel tabId="analytics">
+                            <Suspense fallback={<AnalyticsSkeleton />}>
+                                <AnalyticsView searchParams={searchParams} />
+                            </Suspense>
+                        </TabPanel>
+                        <TabPanel tabId="seo">
+                            <Suspense fallback={<SEOSkeleton />}>
+                                <SEOView />
+                            </Suspense>
+                        </TabPanel>
+                    </>
                 )}
             </DashboardTabContent>
         </div>

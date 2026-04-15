@@ -4,6 +4,7 @@ import { useCartStore, type CartItem } from '@/store/cartStore'
 import { X, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react'
 import { toast } from 'sonner'
 import { trackEvent } from '@/lib/analytics/track-event'
+import { useIsOwner } from '@/components/site-renderer/OwnerContext'
 
 function formatPrice(price: number, currency: string) {
     if (currency === 'MYR') return `RM ${price.toFixed(2)}`
@@ -13,6 +14,7 @@ function formatPrice(price: number, currency: string) {
 
 export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: string }) {
     const { items, isOpen, closeCart, removeItem, updateQuantity, subtotal, itemCount } = useCartStore()
+    const isOwner = useIsOwner()
     const hasCheckoutRoute = Boolean(siteSlug)
 
     if (!isOpen) return null
@@ -137,6 +139,7 @@ export function CartDrawer({ siteSlug, siteId }: { siteSlug: string; siteId?: st
                                         siteId,
                                         event: 'checkout',
                                         metadata: { itemCount: items.length, subtotal: subtotal() },
+                                        isOwner,
                                     })
                                 }}
                                 style={{

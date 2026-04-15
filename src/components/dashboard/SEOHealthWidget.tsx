@@ -78,7 +78,7 @@ export function SEOHealthWidget({ score, issueCounts, siteId, missingSeoItems }:
                     title={t.dashboard.overview.seo.fixAll || 'Fix All Issues'}
                 >
                     <Sparkles className="h-3.5 w-3.5 text-white" />
-                    {t.dashboard.overview.seo.fix}
+                    {t.dashboard.overview.seo.fixAll || 'AI Fix All Issues'}
                 </button>
             </div>
 

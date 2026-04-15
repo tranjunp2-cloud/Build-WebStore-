@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
@@ -7,6 +8,9 @@ import Link from 'next/link'
 import { AddToCartButton } from '@/components/storefront/AddToCartButton'
 import { CartDrawer } from '@/components/storefront/CartDrawer'
 import { TrackingManager } from '@/components/site-renderer/TrackingManager'
+import { OwnerProvider } from '@/components/site-renderer/OwnerContext'
+import { getCurrentUser } from '@/lib/auth'
+import type { TenantMembership } from '@/lib/normalize-tenants'
 
 // Force dynamic — uses getPayload() for product data at runtime
 export const dynamic = 'force-dynamic'
@@ -15,7 +19,7 @@ type Props = {
     params: Promise<{ slug: string; productSlug: string }>
 }
 
-async function getProductData(slug: string, productSlug: string) {
+const getProductData = cache(async function getProductData(slug: string, productSlug: string) {
     const payload = await getPayload({ config })
 
     const tenantsResult = await payload.find({
@@ -55,7 +59,7 @@ async function getProductData(slug: string, productSlug: string) {
     if (!product) return null
 
     return { tenant, site, product }
-}
+})
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug, productSlug } = await params
@@ -111,9 +115,15 @@ export default async function ProductDetailPage({ params }: Props) {
 
     if (!data) notFound()
 
-    const { site, product } = data
+    const { tenant, site, product } = data
     const p = product as any
     const primaryColor = (site.theme as any)?.primaryColor || '#0ea5e9'
+
+    // Check ownership to skip analytics tracking for tenant member visits
+    const user = await getCurrentUser()
+    const isOwner = !!user && (user.tenants?.map((t: TenantMembership) =>
+        typeof t.tenant === 'object' ? String(t.tenant.id) : String(t.tenant)
+    ) ?? []).includes(String(tenant.id))
     const images = p.images || []
     const hasDiscount = p.compareAtPrice && p.compareAtPrice > p.price
     const discountPercent = hasDiscount ? Math.round((1 - p.price / p.compareAtPrice) * 100) : 0
@@ -145,8 +155,8 @@ export default async function ProductDetailPage({ params }: Props) {
     }
 
     return (
-        <>
-            <TrackingManager siteId={String(site.id)} />
+        <OwnerProvider value={isOwner}>
+            <TrackingManager siteId={String(site.id)} isOwner={isOwner} />
             <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
             <div style={{ fontFamily: `${(site.theme as any)?.fontBody || 'Inter'}, sans-serif` }}>
@@ -324,6 +334,6 @@ export default async function ProductDetailPage({ params }: Props) {
 
             {/* Cart Drawer */}
             <CartDrawer siteSlug={slug} siteId={String(site.id)} />
-        </>
+        </OwnerProvider>
     )
 }
