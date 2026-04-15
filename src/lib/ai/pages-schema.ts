@@ -113,6 +113,8 @@ export const PAGES_FIELDS: Record<string, string[]> = {
     'countdown-timer': ['variant', 'headline', 'targetDate', 'expiredMessage', 'showDays', 'showHours', 'showMinutes', 'showSeconds'],
     'custom-html': ['html'],
     'blog-list': ['variant', 'headline', 'subheadline', 'limit'],
+    breadcrumb: ['variant', 'items'],
+    'client-logos': ['variant', 'headline', 'logos'],
 }
 
 const STRUCTURAL_FIELDS = new Set(['variant', 'layout', 'style'])
