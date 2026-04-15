@@ -28,7 +28,7 @@ export function SplitVideoHero({ block, site }: BlockProps<HeroConfig>) {
     }
 
     return (
-        <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
+        <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
             <GradientBlob color={primaryColor} className="top-[-10%] right-[-5%]" size={600} opacity={0.12} />
             <GradientBlob color={primaryColor} className="bottom-[-15%] left-[-8%]" size={500} opacity={0.08} />
             <DotGrid color={primaryColor} />

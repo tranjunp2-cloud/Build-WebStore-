@@ -29,7 +29,7 @@ export function GradientHero({ block, site }: BlockProps<HeroConfig>) {
     `
 
     return (
-        <AnimatedSection className="relative min-h-[92vh] flex items-center overflow-hidden">
+        <AnimatedSection className="relative min-h-[75vh] md:min-h-[92vh] flex items-center overflow-hidden">
             <style dangerouslySetInnerHTML={{ __html: gradientKeyframes }} />
             <div
                 className="absolute inset-0"

@@ -164,7 +164,7 @@ function DotIndicator({ count, activeIndex, onSelect, label = (i) => `View item 
         <div className={className}>
             {Array.from({ length: count }).map((_, i) => (
                 <button
-                    key={i}
+                    key={`dot-${i}`}
                     type="button"
                     onClick={() => onSelect(i)}
                     className={`${TOUCH_TARGET.min} min-w-[44px] flex items-center justify-center rounded-full transition-all duration-200`}
@@ -214,6 +214,14 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
     const variant = block.variant || 'cards'
     const category = (site?.siteType as string) || 'business'
 
+    /* Plan 260415 Lỗi G — empty state dev console.warn + early return */
+    if (!testimonials.length) {
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+            console.warn('[testimonials] testimonials array empty — block rendered nothing')
+        }
+        return null
+    }
+
     // ── masonry variant ───────────────────────────────────────────────────
     if (variant === 'masonry') {
         return (
@@ -222,7 +230,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                 <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
                     {testimonials.map((t, i) => (
                         <motion.div
-                            key={i}
+                            key={`${t.name || 'testimonial'}-${i}`}
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
@@ -276,7 +284,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                     {testimonials.map((t, i) => {
                         const videoUrl = (t as TestimonialItem & { videoUrl?: string }).videoUrl
                         return (
-                            <StaggerItem key={i}>
+                            <StaggerItem key={`${t.name || 'testimonial'}-${i}`}>
                                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 items-center ${i % 2 === 1 ? 'md:direction-rtl' : ''}`}>
                                     {/* Video / avatar side */}
                                     <div
@@ -337,7 +345,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
                 <div className="max-w-3xl mx-auto flex flex-col gap-10">
                     {testimonials.map((t, i) => (
                         <motion.div
-                            key={i}
+                            key={`${t.name || 'testimonial'}-${i}`}
                             initial={{ opacity: 0, y: 16 }}
                             whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
@@ -365,7 +373,7 @@ export function TestimonialsBlock({ block, theme, site }: BlockProps<Testimonial
             <TestimonialsHeader headline={headline} showSubtitle />
             <StaggerGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {testimonials.map((t, i) => (
-                    <StaggerItem key={i}>
+                    <StaggerItem key={`${t.name || 'testimonial'}-${i}`}>
                         <HoverCard
                             className={`${CARD_PADDING.lg} rounded-2xl h-full relative group transition-shadow duration-300 hover:shadow-xl`}
                             style={{
@@ -514,9 +522,11 @@ function TestimonialsMinimalQuote({
     category: string
 }) {
     const [currentIndex, setCurrentIndex] = useState(0)
+    /* Plan 260415 Lỗi E — pause on hover/focus */
+    const [isPaused, setIsPaused] = useState(false)
 
     useEffect(() => {
-        if (testimonials.length <= 1) return
+        if (testimonials.length <= 1 || isPaused) return
         // Respect prefers-reduced-motion
         const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
         if (mq.matches) return
@@ -525,7 +535,7 @@ function TestimonialsMinimalQuote({
             setCurrentIndex(prev => (prev + 1) % testimonials.length)
         }, 6000)
         return () => clearInterval(timer)
-    }, [testimonials.length])
+    }, [testimonials.length, isPaused])
 
     if (testimonials.length === 0) return null
     const t = testimonials[currentIndex]
@@ -533,7 +543,16 @@ function TestimonialsMinimalQuote({
     return (
         <TestimonialsSection>
             <TestimonialsHeader headline={headline} />
-            <div className="max-w-3xl mx-auto text-center relative">
+            <div
+                className="max-w-3xl mx-auto text-center relative"
+                onMouseEnter={() => setIsPaused(true)}
+                onMouseLeave={() => setIsPaused(false)}
+                onFocus={() => setIsPaused(true)}
+                onBlur={() => setIsPaused(false)}
+                role="region"
+                aria-roledescription="carousel"
+                aria-label="Customer testimonial"
+            >
                 {/* Large decorative quote mark */}
                 <div
                     className="text-[12rem] font-serif leading-none select-none absolute -top-16 left-1/2 -translate-x-1/2 pointer-events-none"
@@ -551,10 +570,13 @@ function TestimonialsMinimalQuote({
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.5 }}
                         className="relative z-10"
+                        aria-live="polite"
+                        aria-atomic="true"
                     >
-                        <p className="text-2xl md:text-3xl italic opacity-70 leading-relaxed mb-8">
+                        {/* Plan 260415 Lỗi I — blockquote semantic */}
+                        <blockquote className="text-2xl md:text-3xl italic opacity-70 leading-relaxed mb-8">
                             &ldquo;{t.quote}&rdquo;
-                        </p>
+                        </blockquote>
                         <div className="flex items-center justify-center gap-3">
                             <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={48} />
                             <AuthorMeta
@@ -596,6 +618,8 @@ function TestimonialsCarousel({
     category: string
 }) {
     const [currentIndex, setCurrentIndex] = useState(0)
+    /* Plan 260415 Lỗi E — pause on hover: state paused, clear timer khi hover */
+    const [isPaused, setIsPaused] = useState(false)
 
     const goTo = useCallback((idx: number) => {
         if (idx < 0) setCurrentIndex(testimonials.length - 1)
@@ -604,7 +628,7 @@ function TestimonialsCarousel({
     }, [testimonials.length])
 
     useEffect(() => {
-        if (testimonials.length <= 1) return
+        if (testimonials.length <= 1 || isPaused) return
         const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
         if (mq.matches) return
 
@@ -612,7 +636,7 @@ function TestimonialsCarousel({
             setCurrentIndex(prev => (prev + 1) % testimonials.length)
         }, 5000)
         return () => clearInterval(timer)
-    }, [testimonials.length])
+    }, [testimonials.length, isPaused])
 
     if (testimonials.length === 0) return null
     const t = testimonials[currentIndex]
@@ -620,7 +644,17 @@ function TestimonialsCarousel({
     return (
         <TestimonialsSection>
             <TestimonialsHeader headline={headline} showSubtitle />
-            <div className="relative max-w-2xl mx-auto">
+            {/* Plan 260415 Lỗi D + E — aria-live="polite" announce slide changes + pause on hover/focus */}
+            <div
+                className="relative max-w-2xl mx-auto"
+                onMouseEnter={() => setIsPaused(true)}
+                onMouseLeave={() => setIsPaused(false)}
+                onFocus={() => setIsPaused(true)}
+                onBlur={() => setIsPaused(false)}
+                role="region"
+                aria-roledescription="carousel"
+                aria-label="Customer testimonials"
+            >
                 {testimonials.length > 1 && (
                     <>
                         <CarouselArrow direction="prev" onClick={() => goTo(currentIndex - 1)} />
@@ -641,6 +675,8 @@ function TestimonialsCarousel({
                             background: 'linear-gradient(160deg, rgba(var(--brand-primary-rgb), 0.031), transparent 60%)',
                             border: '1px solid rgba(var(--brand-primary-rgb), 0.063)',
                         }}
+                        aria-live="polite"
+                        aria-atomic="true"
                     >
                         <div className="flex justify-center mb-6">
                             <AvatarRing color={CSS_VARS.primary} src={t.avatar?.url || getTeamAvatar(category, currentIndex)} name={t.name} size={72} />
@@ -694,7 +730,7 @@ function TestimonialsAvatarRow({
             <div className="flex justify-center gap-4 mb-10 flex-wrap">
                 {testimonials.map((t, i) => (
                     <button
-                        key={i}
+                        key={`${t.name || 'testimonial'}-${i}`}
                         type="button"
                         onClick={() => setSelectedIndex(i)}
                         className={`rounded-full transition-all duration-200 focus:outline-none ${TOUCH_TARGET.min}`}
